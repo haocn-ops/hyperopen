@@ -372,7 +372,9 @@
   [{:keys [outcome-options outcome-option-id outcome-option-ui]} outcome-handlers]
   (when (and outcome-handlers
              (> (count outcome-options) 1))
-    [:div {:class ["min-w-[11rem]" "max-w-[18rem]" "flex-none"]
+    [:div {:class ["relative" "min-w-[11rem]" "max-w-[18rem]" "flex-none"]
+           :style (when (:open? outcome-option-ui)
+                    {:z-index 260})
            :data-role "market-strip-outcome-option-selector"}
      (order-form-controls/outcome-option-row outcome-options
                                              outcome-option-id
@@ -399,16 +401,18 @@
   [:div {:class ["relative" "hidden"
                  "grid-cols-[max-content_minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,0.9fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)]"
                  "items-center" "gap-2" "px-0" "py-2" "lg:grid" "md:gap-3"]}
-   [:div {:class ["relative" "group/outcome-name" "flex" "justify-start"
+   [:div {:class ["flex" "justify-start"
                   "app-shell-gutter-left" "min-w-fit" "items-center" "gap-2"]
-          :data-role "outcome-market-name-hover-region"}
-    (icon-button/asset-button icon-market
-                              dropdown-visible?
-                              missing-icons
-                              loaded-icons
-                              {:outcome-hover-glow? true})
-    (outcome-option-market-strip-selector row-vm outcome-handlers)
-    (outcome-tooltip/outcome-tooltip-panel (:outcome-tooltip row-vm))]
+          :data-role "outcome-market-selector-group"}
+    [:div {:class ["relative" "group/outcome-name" "flex" "items-center"]
+           :data-role "outcome-market-name-hover-region"}
+     (icon-button/asset-button icon-market
+                               dropdown-visible?
+                               missing-icons
+                               loaded-icons
+                               {:outcome-hover-glow? true})
+     (outcome-tooltip/outcome-tooltip-panel (:outcome-tooltip row-vm))]
+    (outcome-option-market-strip-selector row-vm outcome-handlers)]
    [:div {:class ["flex" "justify-center"]}
     (data-column "Countdown" (or countdown-text "—") {:numeric? true})]
    [:div {:class ["flex" "justify-center"]}

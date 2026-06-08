@@ -207,15 +207,20 @@
                        (world-cup-row-vm {:open? false :query ""})
                        {:outcome-handlers (outcome-option-handlers-fixture)})
             selector (support/find-node-by-role view-node "market-strip-outcome-option-selector")
+            hover-region (support/find-node-by-role view-node "outcome-market-name-hover-region")
             trigger (support/find-node-by-role view-node "outcome-option-select-trigger")
             menu (support/find-node-by-role view-node "outcome-option-select-menu")
-            strings (set (support/collect-strings view-node))]
+            strings (set (support/collect-strings view-node))
+            hover-region-strings (set (support/collect-strings hover-region))]
         (is (some? selector))
+        (is (some? hover-region))
         (is (some? trigger))
         (is (= [[:actions/toggle-outcome-option-dropdown]]
                (get-in trigger [1 :on :click])))
         (is (contains? strings "2026 World Cup Champion"))
         (is (contains? strings "France"))
+        (is (not (contains? hover-region-strings "France")))
+        (is (not (support/contains-class? selector "group/outcome-name")))
         (is (not (contains? strings "Spain")))
         (is (nil? menu))
         (is (support/contains-class? selector "max-w-[18rem]"))))))
@@ -239,6 +244,10 @@
         (is (= [[:actions/set-outcome-option-query [:event.target/value]]]
                (get-in search-input [1 :on :input])))
         (is (support/contains-class? menu "w-[min(42rem,calc(100vw-2rem))]"))
+        (is (support/contains-class? menu "bg-[#0B151A]"))
+        (is (support/contains-class? menu "z-[280]"))
+        (is (= {:z-index 260}
+               (get-in selector [1 :style])))
         (is (contains? strings "Live Outcomes"))
         (is (contains? strings "% Chance"))
         (is (contains? strings "Price"))

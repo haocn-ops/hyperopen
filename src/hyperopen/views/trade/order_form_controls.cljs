@@ -611,13 +611,14 @@
         menu [:div {:class (into ["absolute"
                                    "left-0"
                                    "top-[calc(100%+0.375rem)]"
-                                   "z-30"
+                                   "z-[280]"
+                                   "isolate"
                                    "rounded-lg"
                                    "border"
                                    "border-base-300"
-                                   "bg-base-100"
+                                   "bg-[#0B151A]"
                                    "p-2"
-                                   "shadow-xl"]
+                                   "shadow-[0_18px_54px_rgba(0,0,0,0.62)]"]
                                   (or menu-width-classes ["right-0"]))
                     :data-role "outcome-option-select-menu"
                     :on {:keydown (:on-option-dropdown-keydown outcome-handlers)}}

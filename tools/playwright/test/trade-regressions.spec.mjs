@@ -1554,18 +1554,23 @@ test("market strip uses searchable dropdown for multi-option outcome markets @sm
   await expect(selector.locator('[data-role="outcome-option-select-menu"]')).toHaveCount(0);
   await expect(rows).toHaveCount(0);
 
+  await trigger.hover();
+  await expect(marketStrip.locator('[data-role="outcome-market-tooltip"]')).toHaveCSS("opacity", "0");
+
   await trigger.click();
   const menu = selector.locator('[data-role="outcome-option-select-menu"]');
   await expect(menu).toBeVisible();
+  await expect(menu).toHaveCSS("background-color", "rgb(11, 21, 26)");
   await expect(menu).toContainText("Live Outcomes");
   await expect(menu).toContainText("% Chance");
   await expect(menu).toContainText("Price");
   await expect(menu).toContainText("Volume");
   await expect(menu).toContainText("Open Int");
-  await expect(rows).toHaveCount(3);
-  await expect(rows.nth(0)).toContainText("France");
-  await expect(rows.nth(1)).toContainText("Spain");
-  await expect(rows.nth(2)).toContainText("Argentina");
+  await expect(rows).toHaveCount(48);
+  await expect(rows.nth(0)).toContainText("Algeria");
+  await expect(rows.nth(1)).toContainText("Argentina");
+  await expect(rows.filter({ hasText: "France" })).toHaveCount(1);
+  await expect(rows.filter({ hasText: "Spain" })).toHaveCount(1);
 
   await menu.getByRole("searchbox", { name: "Search outcome options" }).fill("sp");
   await expect(rows).toHaveCount(1);

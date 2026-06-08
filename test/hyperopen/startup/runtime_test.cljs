@@ -1206,7 +1206,7 @@
            (fn []
              (is (= [{:priority :high}] @critical-context-fetches))
              (is (= [{:phase :bootstrap}] @bootstrap-selector-fetches))
-             (is (= [{:phase :full}] @deferred-selector-fetches))
+             (is (= [] @deferred-selector-fetches))
              (is (some #(= [:mark "app:critical-data:ready"] %) @mark-calls))
              (is (some #(= [:mark "app:full-bootstrap:ready"] %) @mark-calls))
              (let [skipped-fetches (atom []) skipped-marks (atom [])]
@@ -1235,7 +1235,7 @@
                                                    (swap! forced-marks conj mark))})
                             (.then
                              (fn []
-                               (is (= [{:phase :full}] @forced-fetches))
+                               (is (= [] @forced-fetches))
                                (is (= ["app:full-bootstrap:ready"] @forced-marks))))))
                       (startup-runtime/schedule-deferred-bootstrap!
                        {:startup-runtime startup-runtime-atom

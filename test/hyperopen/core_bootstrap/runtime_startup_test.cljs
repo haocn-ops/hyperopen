@@ -24,7 +24,7 @@
 
 (def with-test-navigator browser-mocks/with-test-navigator)
 
-(deftest initialize-remote-data-streams-phased-bootstrap-test
+(deftest initialize-remote-data-streams-keeps-full-selector-expansion-demand-driven-test
   (let [phases (atom [])
         critical-fetches (atom 0)
         deferred-callback (atom nil)]
@@ -61,7 +61,7 @@
       (is (= [:bootstrap] @phases))
       (is (fn? @deferred-callback))
       (@deferred-callback)
-      (is (= [:bootstrap :full] @phases)))))
+      (is (= [:bootstrap] @phases)))))
 
 (deftest ensure-runtime-bootstrapped-runs-bootstrap-once-test
   (let [calls (atom 0)]

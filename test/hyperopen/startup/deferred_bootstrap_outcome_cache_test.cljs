@@ -2,7 +2,7 @@
   (:require [cljs.test :refer-macros [async deftest is]]
             [hyperopen.startup.runtime :as startup-runtime]))
 
-(deftest deferred-bootstrap-refreshes-cache-hydrated-selector-when-outcomes-are-missing-test
+(deftest deferred-bootstrap-keeps-selector-expansion-demand-driven-when-cache-is-partial-test
   (async done
     (let [fetches (atom [])]
       (-> (startup-runtime/run-deferred-bootstrap!
@@ -17,7 +17,7 @@
             :mark-performance! (fn [_mark])})
           (.then
            (fn []
-             (is (= [{:phase :full}] @fetches))
+             (is (= [] @fetches))
              (let [skipped-fetches (atom [])]
                (-> (startup-runtime/run-deferred-bootstrap!
                     {:store (atom {:asset-selector {:cache-hydrated? true
@@ -41,7 +41,7 @@
              (is false (str err))
              (done)))))))
 
-(deftest deferred-bootstrap-refreshes-cache-hydrated-selector-on-portfolio-optimize-route-test
+(deftest deferred-bootstrap-keeps-selector-expansion-demand-driven-on-portfolio-optimize-startup-test
   (async done
     (let [fetches (atom [])]
       (-> (startup-runtime/run-deferred-bootstrap!
@@ -60,7 +60,7 @@
             :mark-performance! (fn [_mark])})
           (.then
            (fn []
-             (is (= [{:phase :full}] @fetches))
+             (is (= [] @fetches))
              (done)))
           (.catch
            (fn [err]

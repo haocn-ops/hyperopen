@@ -5,7 +5,6 @@
             [hyperopen.account.context :as account-context]
             [hyperopen.api.info-client :as info-client]
             [hyperopen.platform :as platform]
-            [hyperopen.portfolio.routes :as portfolio-routes]
             [hyperopen.startup.route-refresh :as route-refresh]
             [hyperopen.wallet.address-watcher :as address-watcher]))
 (defn default-startup-runtime-state
@@ -482,37 +481,14 @@
        (fn []
          (mark-performance! "app:critical-data:ready")))))
 
-(defn- parse-optional-number
-  [value]
-  (cond
-    (number? value) value
-    (string? (some-> value str str/trim))
-    (let [parsed (js/parseFloat value)]
-      (when-not (js/isNaN parsed)
-        parsed))
-    :else nil))
-
-(defn- incomplete-active-perp-market?
-  [store]
-  (let [state @store
-        active-market (:active-market state)]
-    (and (= :perp (:market-type active-market))
-         (nil? (parse-optional-number (:maxLeverage active-market))))))
-
-(defn- skip-deferred-bootstrap?
-  [store]
-  (and (true? (get-in @store [:asset-selector :cache-hydrated?]))
-       (not (portfolio-routes/portfolio-optimize-route? (get-in @store [:router :path])))
-       (some #(= :outcome (:market-type %)) (get-in @store [:asset-selector :markets]))
-       (not (incomplete-active-perp-market? store))))
-
 (defn run-deferred-bootstrap!
-  [{:keys [store fetch-asset-selector-markets! mark-performance!]}]
-  (let [bootstrap-promise (if (skip-deferred-bootstrap? store)
-                            ;; Restored selector markets are enough for immediate trade rendering.
-                            ;; Keep the full fan-out on demand when the selector is opened.
-                            (js/Promise.resolve nil)
-                            (fetch-asset-selector-markets! store {:phase :full}))]
+  [{:keys [mark-performance!]}]
+  (let [bootstrap-promise
+        ;; Startup no longer owns full selector-market expansion. Keep the
+        ;; deferred completion mark, but let explicit demand paths request the
+        ;; full catalog when the user opens the selector or enters a route that
+        ;; needs it.
+        (js/Promise.resolve nil)]
     (-> bootstrap-promise
         (.finally
          (fn []
@@ -564,9 +540,10 @@
   ;; Keep startup route refreshes scoped to the actual current route only.
   (refresh-current-route! store dispatch! nil)
   (install-address-handlers!)
-  ;; Keep startup scoped to the active trade route. Full selector-market expansion
-  ;; off the critical path, but restore the prefetch as deferred idle work so the
-  ;; selector is usually warm by the time the user opens it.
+  ;; Keep startup scoped to the active route. Startup only hydrates the
+  ;; bootstrap selector data; full selector-market expansion belongs to
+  ;; explicit demand paths such as opening the selector or entering a route
+  ;; that already requests the full catalog.
   (start-critical-bootstrap!)
   (when (fn? schedule-deferred-bootstrap!)
     (schedule-deferred-bootstrap!)))

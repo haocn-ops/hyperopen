@@ -2,6 +2,8 @@
   (:require [clojure.string :as str]
             [cljs.test :refer-macros [deftest is testing]]
             [hyperopen.asset-selector.active-market-cache :as cache]
+            [hyperopen.asset-selector.markets :as markets]
+            [hyperopen.asset-selector.outcome-fixtures :as outcome-fixtures]
             [hyperopen.platform :as platform]))
 
 (def normalize-deps
@@ -72,7 +74,7 @@
                            {:side-index "1" :side-name "No" :coin "#1" :asset-id "100000001"}]}
           normalize-deps)))
 
-  (is (= {:coin "BTC"
+	  (is (= {:coin "BTC"
           :key "perp:BTC"
           :symbol "BTC-USDC"
           :base "BTC"
@@ -99,7 +101,24 @@
             :perp-dex-index "1"
             :asset-id "110003"
             :maxLeverage "25"}
-           normalize-deps))))
+	           normalize-deps))))
+
+(deftest normalize-active-market-display-preserves-grouped-outcome-question-fields-test
+  (let [outcome-markets (markets/build-outcome-markets outcome-fixtures/live-outcome-meta
+                                                        outcome-fixtures/live-outcome-ctxs)
+        range-market (first (filter #(= "question:30" (:key %)) outcome-markets))
+        normalized (cache/normalize-active-market-display range-market normalize-deps)]
+    (is (= "question:30" (:key normalized)))
+    (is (= :question (:outcome-kind normalized)))
+    (is (= :crypto (:outcome-category normalized)))
+    (is (= 30 (:question-id normalized)))
+    (is (= ["Below 61044" "61044 to 63535" "Above 63535"]
+           (mapv :label (:question-options normalized))))
+    (is (= ["#1610" "#1611" "#1620" "#1621" "#1630" "#1631"]
+           (:outcome-subscription-coins normalized)))
+    (is (= "#1620" (get-in normalized [:question-options 1 :yes-coin])))
+    (is (= "#1621" (get-in normalized [:question-options 1 :no-coin])))
+    (is (= "#1620" (get-in normalized [:outcome-side-aliases "#1620" :coin])))))
 
 (deftest persist-active-market-display-persists-normalized-json-and-guards-errors-test
   (testing "valid normalized payload is persisted"

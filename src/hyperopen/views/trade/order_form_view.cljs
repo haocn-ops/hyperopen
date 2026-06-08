@@ -64,6 +64,8 @@
                 outcome?
                 outcome-sides
                 outcome-side-index
+                outcome-options
+                outcome-option-id
                 read-only?
                 display
                 ui-leverage
@@ -163,16 +165,20 @@
         (action-side-tabs side side-handlers)
         (controls/side-row side side-handlers))
       (when outcome?
-        (controls/outcome-side-row outcome-sides
-                                   outcome-side-index
-                                   outcome-handlers
-                                   {:action-prefix (if (= side :sell)
-                                                     "Sell "
-                                                     "Buy ")
-                                    :side->intent (fn [outcome-side]
-                                                    (if (= 1 (:side-index outcome-side))
-                                                      :sell
-                                                      :buy))}))
+        [:div {:class ["space-y-1.5"]}
+         (controls/outcome-option-row outcome-options
+                                      outcome-option-id
+                                      outcome-handlers)
+         (controls/outcome-side-row outcome-sides
+                                    outcome-side-index
+                                    outcome-handlers
+                                    {:action-prefix (if (= side :sell)
+                                                      "Sell "
+                                                      "Buy ")
+                                     :side->intent (fn [outcome-side]
+                                                     (if (= 1 (:side-index outcome-side))
+                                                       :sell
+                                                       :buy))})])
       (controls/balances-row display)
 
       (when show-limit-like-controls?

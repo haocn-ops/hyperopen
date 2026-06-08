@@ -484,6 +484,30 @@
                                 (= side-index selected-side-index)
                                 ((:on-select-outcome-side outcome-handlers) side-index)))])))
 
+(defn- outcome-option-id
+  [option]
+  (let [value (:outcome-id option)
+        parsed (cond
+                 (number? value) value
+                 (string? value) (js/parseInt value 10)
+                 :else js/NaN)]
+    (when (and (number? parsed)
+               (not (js/isNaN parsed)))
+      (int parsed))))
+
+(defn outcome-option-row
+  [outcome-options selected-option-id outcome-handlers]
+  (when (> (count outcome-options) 1)
+    [:div {:class ["flex" "min-h-[33px]" "items-center" "gap-1.5" "rounded-lg" "bg-base-200" "p-0.5" "sm:gap-2"]}
+     (for [option outcome-options
+           :let [option-id (outcome-option-id option)
+                 label (or (:label option) (str "Outcome " option-id))]]
+       ^{:key (str "outcome-option-" option-id)}
+       (primitives/side-button label
+                               :option
+                               (= option-id selected-option-id)
+                               ((:on-select-outcome-option outcome-handlers) option-id)))]))
+
 (defn balances-row [display]
   [:div {:class ["space-y-1.5"]}
    [:div {:class ["flex" "items-center" "justify-between"]}

@@ -186,6 +186,24 @@
     (is (contains? strings "$180,824"))
     (is (contains? strings "$254,722"))))
 
+(deftest grouped-outcome-asset-list-item-renders-option-summary-test
+  (let [asset {:key "question:30"
+               :symbol "BTC price range on Jun 6 at 2:00 AM?"
+               :title "BTC price range on Jun 6 at 2:00 AM?"
+               :coin "#1610"
+               :market-type :outcome
+               :outcome-kind :question
+               :outcome-summary "Below 61044 61%  *  61044 to 63535 30%  *  Above 63535 1%"
+               :mark 0.612275
+               :volume24h 35139.23554
+               :openInterest 30433}
+        row (rows/asset-list-item asset false false #{} #{} #{})
+        mobile-row (rows/mobile-asset-list-item asset false false #{})
+        strings (set (concat (support/collect-strings row)
+                             (support/collect-strings mobile-row)))]
+    (is (contains? strings "BTC price range on Jun 6 at 2:00 AM?"))
+    (is (contains? strings "Below 61044 61%  *  61044 to 63535 30%  *  Above 63535 1%"))))
+
 (deftest outcome-asset-list-item-uses-wide-desktop-outcome-grid-test
   (let [asset {:key "outcome:0"
                :symbol "BTC above 78213 on May 3 at 2:00 AM?"

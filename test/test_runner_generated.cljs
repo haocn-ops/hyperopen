@@ -96,6 +96,7 @@
             [hyperopen.asset-selector.market-live-projection-test]
             [hyperopen.asset-selector.markets-cache-test]
             [hyperopen.asset-selector.markets-test]
+            [hyperopen.asset-selector.outcome-actions-test]
             [hyperopen.asset-selector.settings-test]
             [hyperopen.chart.settings-test]
             [hyperopen.config-test]
@@ -798,6 +799,7 @@
              'hyperopen.asset-selector.market-live-projection-test
              'hyperopen.asset-selector.markets-cache-test
              'hyperopen.asset-selector.markets-test
+             'hyperopen.asset-selector.outcome-actions-test
              'hyperopen.asset-selector.settings-test
              'hyperopen.chart.settings-test
              'hyperopen.config-test

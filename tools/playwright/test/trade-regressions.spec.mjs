@@ -424,6 +424,370 @@ async function seedOutcomeAssetSelectorMarketsCache(page) {
   });
 }
 
+async function seedGroupedOutcomeAssetSelectorState(page, { activeTab = null } = {}) {
+  await page.evaluate((nextActiveTab) => {
+    const c = globalThis.cljs?.core;
+    const store = globalThis.hyperopen?.system?.store;
+
+    if (!c || !store) {
+      throw new Error("Hyperopen store or cljs core unavailable");
+    }
+
+    const kw = (name) => c.keyword(name);
+    const path = (...segments) => c.PersistentVector.fromArray(segments.map(kw), true);
+    const vector = (items) => c.PersistentVector.fromArray(items, true);
+    const map = (pairs) => c.PersistentArrayMap.fromArray(pairs.flatMap(([key, value]) => [kw(key), value]), true);
+    const stringMap = (pairs) => c.PersistentArrayMap.fromArray(pairs.flatMap(([key, value]) => [key, value]), true);
+    const side = ({ sideIndex, sideName, coin, assetId, outcomeId, optionLabel, mark }) =>
+      map([
+        ["side-index", sideIndex],
+        ["side-name", sideName],
+        ["side-label", sideName],
+        ["coin", coin],
+        ["asset-id", assetId],
+        ["outcome-id", outcomeId],
+        ["outcome-option-label", optionLabel],
+        ["mark", mark]
+      ]);
+    const option = ({ label, outcomeId, yes, no, mark, volume24h, openInterest }) =>
+      map([
+        ["label", label],
+        ["outcome-id", outcomeId],
+        ["yes-coin", c.get(yes, kw("coin"))],
+        ["yes-asset-id", c.get(yes, kw("asset-id"))],
+        ["no-coin", c.get(no, kw("coin"))],
+        ["no-asset-id", c.get(no, kw("asset-id"))],
+        ["mark", mark],
+        ["volume24h", volume24h],
+        ["openInterest", openInterest],
+        ["sides", vector([yes, no])]
+      ]);
+
+    const belowYes = side({
+      sideIndex: 0,
+      sideName: "Yes",
+      coin: "#1610",
+      assetId: 100001610,
+      outcomeId: 161,
+      optionLabel: "Below 61044",
+      mark: 0.612275
+    });
+    const belowNo = side({
+      sideIndex: 1,
+      sideName: "No",
+      coin: "#1611",
+      assetId: 100001611,
+      outcomeId: 161,
+      optionLabel: "Below 61044",
+      mark: 0.387725
+    });
+    const middleYes = side({
+      sideIndex: 0,
+      sideName: "Yes",
+      coin: "#1620",
+      assetId: 100001620,
+      outcomeId: 162,
+      optionLabel: "61044 to 63535",
+      mark: 0.3003
+    });
+    const middleNo = side({
+      sideIndex: 1,
+      sideName: "No",
+      coin: "#1621",
+      assetId: 100001621,
+      outcomeId: 162,
+      optionLabel: "61044 to 63535",
+      mark: 0.6997
+    });
+    const aboveYes = side({
+      sideIndex: 0,
+      sideName: "Yes",
+      coin: "#1630",
+      assetId: 100001630,
+      outcomeId: 163,
+      optionLabel: "Above 63535",
+      mark: 0.01181
+    });
+    const aboveNo = side({
+      sideIndex: 1,
+      sideName: "No",
+      coin: "#1631",
+      assetId: 100001631,
+      outcomeId: 163,
+      optionLabel: "Above 63535",
+      mark: 0.98819
+    });
+    const cpiBelowYes = side({
+      sideIndex: 0,
+      sideName: "Yes",
+      coin: "#1010",
+      assetId: 100001010,
+      outcomeId: 101,
+      optionLabel: "Below 4.3%",
+      mark: 0.61
+    });
+    const cpiBelowNo = side({
+      sideIndex: 1,
+      sideName: "No",
+      coin: "#1011",
+      assetId: 100001011,
+      outcomeId: 101,
+      optionLabel: "Below 4.3%",
+      mark: 0.39
+    });
+    const spursYes = side({
+      sideIndex: 0,
+      sideName: "San Antonio",
+      coin: "#1420",
+      assetId: 100001420,
+      outcomeId: 142,
+      optionLabel: "San Antonio",
+      mark: 0.67
+    });
+    const spursNo = side({
+      sideIndex: 1,
+      sideName: "New York",
+      coin: "#1421",
+      assetId: 100001421,
+      outcomeId: 142,
+      optionLabel: "New York",
+      mark: 0.33
+    });
+    const franceYes = side({
+      sideIndex: 0,
+      sideName: "Yes",
+      coin: "#1890",
+      assetId: 100001890,
+      outcomeId: 189,
+      optionLabel: "France",
+      mark: 0.17
+    });
+    const franceNo = side({
+      sideIndex: 1,
+      sideName: "No",
+      coin: "#1891",
+      assetId: 100001891,
+      outcomeId: 189,
+      optionLabel: "France",
+      mark: 0.83
+    });
+    const spainYes = side({
+      sideIndex: 0,
+      sideName: "Yes",
+      coin: "#2120",
+      assetId: 100002120,
+      outcomeId: 212,
+      optionLabel: "Spain",
+      mark: 0.17
+    });
+    const spainNo = side({
+      sideIndex: 1,
+      sideName: "No",
+      coin: "#2121",
+      assetId: 100002121,
+      outcomeId: 212,
+      optionLabel: "Spain",
+      mark: 0.83
+    });
+    const argentinaYes = side({
+      sideIndex: 0,
+      sideName: "Yes",
+      coin: "#1730",
+      assetId: 100001730,
+      outcomeId: 173,
+      optionLabel: "Argentina",
+      mark: 0.14
+    });
+    const argentinaNo = side({
+      sideIndex: 1,
+      sideName: "No",
+      coin: "#1731",
+      assetId: 100001731,
+      outcomeId: 173,
+      optionLabel: "Argentina",
+      mark: 0.86
+    });
+
+    const questionOptions = vector([
+      option({
+        label: "Below 61044",
+        outcomeId: 161,
+        yes: belowYes,
+        no: belowNo,
+        mark: 0.612275,
+        volume24h: 20_000,
+        openInterest: 30_000
+      }),
+      option({
+        label: "61044 to 63535",
+        outcomeId: 162,
+        yes: middleYes,
+        no: middleNo,
+        mark: 0.3003,
+        volume24h: 14_000,
+        openInterest: 20_000
+      }),
+      option({
+        label: "Above 63535",
+        outcomeId: 163,
+        yes: aboveYes,
+        no: aboveNo,
+        mark: 0.01181,
+        volume24h: 352,
+        openInterest: 3_075
+      })
+    ]);
+    const worldCupOptions = vector([
+      option({
+        label: "France",
+        outcomeId: 189,
+        yes: franceYes,
+        no: franceNo,
+        mark: 0.17,
+        volume24h: 3_000,
+        openInterest: 33_000
+      }),
+      option({
+        label: "Spain",
+        outcomeId: 212,
+        yes: spainYes,
+        no: spainNo,
+        mark: 0.17,
+        volume24h: 2_500,
+        openInterest: 32_000
+      }),
+      option({
+        label: "Argentina",
+        outcomeId: 173,
+        yes: argentinaYes,
+        no: argentinaNo,
+        mark: 0.14,
+        volume24h: 1_995,
+        openInterest: 33_616
+      })
+    ]);
+    const rangeAliases = stringMap([
+      ["#1610", map([["coin", "#1610"], ["outcome-id", 161], ["side-index", 0], ["option-label", "Below 61044"], ["sibling-coins", vector(["#1610", "#1611"])]])],
+      ["#1611", map([["coin", "#1611"], ["outcome-id", 161], ["side-index", 1], ["option-label", "Below 61044"], ["sibling-coins", vector(["#1610", "#1611"])]])],
+      ["#1620", map([["coin", "#1620"], ["outcome-id", 162], ["side-index", 0], ["option-label", "61044 to 63535"], ["sibling-coins", vector(["#1620", "#1621"])]])],
+      ["#1621", map([["coin", "#1621"], ["outcome-id", 162], ["side-index", 1], ["option-label", "61044 to 63535"], ["sibling-coins", vector(["#1620", "#1621"])]])],
+      ["outcome:162", map([["coin", "outcome:162"], ["outcome-id", 162], ["side-index", 0], ["option-label", "61044 to 63535"], ["sibling-coins", vector(["#1620", "#1621"])]])]
+    ]);
+
+    const rangeMarket = map([
+      ["key", "question:30"],
+      ["coin", "#1610"],
+      ["symbol", "BTC price range on Jun 6 at 2:00 AM?"],
+      ["title", "BTC price range on Jun 6 at 2:00 AM?"],
+      ["base", "BTC"],
+      ["quote", "USDC"],
+      ["market-type", kw("outcome")],
+      ["category", kw("outcome")],
+      ["outcome-kind", kw("question")],
+      ["outcome-category", kw("crypto")],
+      ["question-id", 30],
+      ["fallback-outcome-id", 160],
+      ["named-outcome-ids", vector([161, 162, 163])],
+      ["period", "1d"],
+      ["question-options", questionOptions],
+      ["outcome-sides", vector([belowYes, belowNo])],
+      ["outcome-side-aliases", rangeAliases],
+      ["outcome-subscription-coins", vector(["#1610", "#1611", "#1620", "#1621", "#1630", "#1631"])],
+      ["outcome-summary", "Below 61044 61%  *  61044 to 63535 30%  *  Above 63535 1%"],
+      ["mark", 0.612275],
+      ["volume24h", 34_352],
+      ["openInterest", 53_075]
+    ]);
+    const cpiMarket = map([
+      ["key", "question:19"],
+      ["coin", "#1010"],
+      ["symbol", "May CPI year-over-year"],
+      ["title", "May CPI year-over-year"],
+      ["base", "CPI"],
+      ["quote", "USDC"],
+      ["market-type", kw("outcome")],
+      ["category", kw("outcome")],
+      ["outcome-kind", kw("question")],
+      ["outcome-category", kw("economics")],
+      ["question-id", 19],
+      ["question-options", vector([
+        option({ label: "Below 4.3%", outcomeId: 101, yes: cpiBelowYes, no: cpiBelowNo, mark: 0.61, volume24h: 4_361, openInterest: 34_654 })
+      ])],
+      ["outcome-sides", vector([cpiBelowYes, cpiBelowNo])],
+      ["outcome-subscription-coins", vector(["#1010", "#1011"])],
+      ["outcome-summary", "Below 4.3% 61%"],
+      ["mark", 0.61],
+      ["volume24h", 4_361],
+      ["openInterest", 34_654]
+    ]);
+    const worldCupMarket = map([
+      ["key", "question:32"],
+      ["coin", "#1890"],
+      ["symbol", "2026 World Cup Champion"],
+      ["title", "2026 World Cup Champion"],
+      ["base", "World Cup"],
+      ["quote", "USDC"],
+      ["market-type", kw("outcome")],
+      ["category", kw("outcome")],
+      ["outcome-kind", kw("question")],
+      ["outcome-category", kw("sports")],
+      ["outcome-subcategory", kw("football")],
+      ["question-id", 32],
+      ["fallback-outcome-id", 171],
+      ["named-outcome-ids", vector([189, 212, 173])],
+      ["question-options", worldCupOptions],
+      ["outcome-sides", vector([franceYes, franceNo])],
+      ["outcome-subscription-coins", vector(["#1890", "#1891", "#2120", "#2121", "#1730", "#1731"])],
+      ["outcome-summary", "France 17%  *  Spain 17%  *  Argentina 14%"],
+      ["mark", 0.17],
+      ["volume24h", 40_000],
+      ["openInterest", 325_917]
+    ]);
+    const sportsMarket = map([
+      ["key", "outcome:142"],
+      ["coin", "#1420"],
+      ["symbol", "2026 NBA Finals champion"],
+      ["title", "2026 NBA Finals champion"],
+      ["base", "NBA"],
+      ["quote", "USDC"],
+      ["market-type", kw("outcome")],
+      ["category", kw("outcome")],
+      ["outcome-kind", kw("binary")],
+      ["outcome-category", kw("sports")],
+      ["outcome-subcategory", kw("basketball")],
+      ["outcome-id", 142],
+      ["outcome-sides", vector([spursYes, spursNo])],
+      ["outcome-subscription-coins", vector(["#1420", "#1421"])],
+      ["outcome-summary", "San Antonio 67%  *  New York 33%"],
+      ["mark", 0.67],
+      ["volume24h", 29_092],
+      ["openInterest", 50_529]
+    ]);
+    const markets = vector([rangeMarket, worldCupMarket, sportsMarket, cpiMarket]);
+    let nextState = c.deref(store);
+    nextState = c.assoc_in(nextState, path("asset-selector", "markets"), markets);
+    nextState = c.assoc_in(
+      nextState,
+      path("asset-selector", "market-by-key"),
+      stringMap([["question:30", rangeMarket], ["question:32", worldCupMarket], ["outcome:142", sportsMarket], ["question:19", cpiMarket]])
+    );
+    nextState = c.assoc_in(
+      nextState,
+      path("asset-selector", "market-index-by-key"),
+      stringMap([["question:30", 0], ["question:32", 1], ["outcome:142", 2], ["question:19", 3]])
+    );
+    if (nextActiveTab) {
+      nextState = c.assoc_in(nextState, path("asset-selector", "active-tab"), kw(nextActiveTab));
+    }
+    nextState = c.assoc_in(nextState, path("asset-selector", "phase"), kw("full"));
+    nextState = c.assoc_in(nextState, path("asset-selector", "loading?"), false);
+    nextState = c.assoc_in(nextState, path("asset-selector", "sort-by"), kw("volume"));
+    nextState = c.assoc_in(nextState, path("asset-selector", "sort-direction"), kw("desc"));
+    nextState = c.assoc_in(nextState, path("asset-selector", "live-market-subscriptions-paused?"), true);
+    c.reset_BANG_(store, nextState);
+  }, activeTab);
+}
+
 async function seedOutcomeActiveAsset(page) {
   await page.evaluate(() => {
     const c = globalThis.cljs?.core;
@@ -1079,6 +1443,51 @@ test("asset selector outcome rows use full-width question copy without duplicate
     scrollWidth: node.scrollWidth
   }));
   expect(textGeometry.scrollWidth).toBeLessThanOrEqual(textGeometry.clientWidth + 1);
+});
+
+test("asset selector outcome subtabs render grouped question markets @smoke @regression", async ({ page }) => {
+  await visitRoute(page, "/trade");
+  await dispatch(page, [":actions/toggle-asset-dropdown", ":asset-selector"]);
+  await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
+  await seedGroupedOutcomeAssetSelectorState(page, { activeTab: "outcome" });
+  await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
+
+  const rows = page.locator('[data-role="asset-selector-row"]');
+  await expect(page.getByRole("button", { name: "Crypto (1d)", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Economics", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Sports", exact: true })).toBeVisible();
+  const cryptoRangeRow = rows.filter({ hasText: "BTC price range on Jun 6 at 2:00 AM?" }).first();
+  await expect(cryptoRangeRow).toBeVisible();
+  await expect(cryptoRangeRow).toContainText("61044 to 63535");
+
+  await page.getByRole("button", { name: "Economics", exact: true }).click();
+  await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
+  await seedGroupedOutcomeAssetSelectorState(page);
+  await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
+  await expect(rows.first()).toContainText("May CPI year-over-year");
+  await expect(rows.first()).toContainText("Below 4.3%");
+
+  await page.getByRole("button", { name: "Sports", exact: true }).click();
+  await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
+  await seedGroupedOutcomeAssetSelectorState(page);
+  await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
+  const worldCupRow = rows.filter({ hasText: "2026 World Cup Champion" }).first();
+  const nbaChampionRow = rows.filter({ hasText: "2026 NBA Finals champion" }).first();
+  await expect(worldCupRow).toBeVisible();
+  await expect(worldCupRow).toContainText("France 17%");
+  await expect(worldCupRow).toContainText("Spain 17%");
+  await expect(worldCupRow).toContainText("Argentina 14%");
+  await expect(nbaChampionRow).toBeVisible();
+  await expect(nbaChampionRow).toContainText("San Antonio 67%");
+  await expect(nbaChampionRow).toContainText("New York 33%");
+  await expect(rows.first()).not.toContainText("May CPI year-over-year");
+
+  await page.getByRole("button", { name: "Crypto (1d)", exact: true }).click();
+  await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
+  await seedGroupedOutcomeAssetSelectorState(page);
+  await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
+  await expect(rows.first()).toContainText("BTC price range on Jun 6 at 2:00 AM?");
+  await expect(rows.first()).not.toContainText("NBA Finals Game 2");
 });
 
 test("outcome market tooltip stays within active selector width and glows on hover @regression", async ({ page }) => {

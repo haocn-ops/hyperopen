@@ -30,7 +30,9 @@
                             (dispatch-command (cmd/set-order-side side)))}
 
    :outcome {:on-select-outcome-side (fn [side-index]
-                                       (dispatch-command (cmd/set-order-outcome-side side-index)))}
+                                       (dispatch-command (cmd/set-order-outcome-side side-index)))
+             :on-select-outcome-option (fn [outcome-id]
+                                         (dispatch-command (cmd/set-order-outcome-option outcome-id)))}
 
    :price {:on-set-to-mid (dispatch-command (cmd/set-order-price-to-mid))
            :on-focus (dispatch-command (cmd/focus-order-price-input))

@@ -100,6 +100,9 @@
 (defn set-order-outcome-side [side-index]
   (update-order-field [:outcome-side] side-index))
 
+(defn set-order-outcome-option [outcome-id]
+  (update-order-field [:outcome-option-id] outcome-id))
+
 (defn set-limit-price-input []
   (update-order-field [:price] event-target-value))
 

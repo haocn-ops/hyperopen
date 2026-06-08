@@ -204,3 +204,57 @@
     (is (= 100000001 (get-in sell-no-request [:action :orders 0 :a])))
     (is (false? (get-in sell-no-request [:action :orders 0 :b])))
     (is (nil? (:pre-actions default-request)))))
+
+(deftest build-order-request-resolves-selected-question-option-asset-id-test
+  (let [form (-> (trading/default-order-form)
+                 (assoc :type :limit
+                        :side :sell
+                        :size "1"
+                        :price "0.58"
+                        :outcome-option-id 162
+                        :outcome-side 1))
+        state {:active-asset "#1621"
+               :active-market {:coin "#1621"
+                               :symbol "BTC price range on Jun 6 at 2:00 AM?"
+                               :title "BTC price range on Jun 6 at 2:00 AM?"
+                               :quote "USDC"
+                               :market-type :outcome
+                               :outcome-kind :question
+                               :mark 0.69
+                               :szDecimals 0
+                               :question-options [{:outcome-id 161
+                                                   :label "Below 61044"
+                                                   :sides [{:side-index 0
+                                                            :side-label "Yes"
+                                                            :coin "#1610"
+                                                            :asset-id 100001610}
+                                                           {:side-index 1
+                                                            :side-label "No"
+                                                            :coin "#1611"
+                                                            :asset-id 100001611}]}
+                                                  {:outcome-id 162
+                                                   :label "61044 to 63535"
+                                                   :sides [{:side-index 0
+                                                            :side-label "Yes"
+                                                            :coin "#1620"
+                                                            :asset-id 100001620}
+                                                           {:side-index 1
+                                                            :side-label "No"
+                                                            :coin "#1621"
+                                                            :asset-id 100001621}]}]
+                               :outcome-sides [{:side-index 0
+                                                :side-label "Yes"
+                                                :coin "#1610"
+                                                :asset-id 100001610}
+                                               {:side-index 1
+                                                :side-label "No"
+                                                :coin "#1611"
+                                                :asset-id 100001611}]}
+               :orderbooks {"#1621" {:bids [{:px "0.57"}]
+                                      :asks [{:px "0.59"}]}}
+               :webdata2 {:clearinghouseState {:marginSummary {:accountValue "1000"
+                                                               :totalMarginUsed "250"}}}
+               :asset-contexts {}}
+        request (trading/build-order-request state form)]
+    (is (= 100001621 (get-in request [:action :orders 0 :a])))
+    (is (= false (get-in request [:action :orders 0 :b])))))

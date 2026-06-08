@@ -57,11 +57,7 @@
 (defn- active-market-side-coins
   [market canonical-coin]
   (let [side-coins (when (= :outcome (:market-type market))
-                     (->> (:outcome-sides market)
-                          (keep :coin)
-                          (filter string?)
-                          distinct
-                          vec))]
+                     (markets/outcome-subscription-coins market))]
     (vec (or (seq side-coins)
              [canonical-coin]))))
 
@@ -277,15 +273,16 @@
                      (market-token (:coin market-or-coin))
                      (market-token market-or-coin))
         market (resolve-market-input market-by-key market-or-coin)
-        coin (or (:coin market) input-coin)
+        coin (or input-coin (:coin market))
         resolved-market (or market
                             (when (string? coin)
                               (markets/resolve-or-infer-market-by-coin market-by-key coin)))
-        canonical-coin (or (:coin resolved-market) coin)
+        selected-market (markets/market-with-selected-outcome-coin resolved-market coin)
+        canonical-coin (or (:coin selected-market) (:coin resolved-market) coin)
         current-asset (get-in state [:active-asset])
         current-market (:active-market state)
         current-side-coins (active-market-side-coins current-market current-asset)
-        selected-side-coins (active-market-side-coins resolved-market canonical-coin)
+        selected-side-coins (active-market-side-coins selected-market canonical-coin)
         switched-asset? (and (seq canonical-coin)
                              (not= canonical-coin current-asset))
         reset-order-form (when (and switched-asset?
@@ -311,7 +308,7 @@
                                           [[:asset-selector :highlighted-market-key] nil]
                                           [[:orderbook-ui :price-aggregation-dropdown-visible?] false]
                                           [[:orderbook-ui :size-unit-dropdown-visible?] false]
-                                          [[:active-market] resolved-market]]
+                                          [[:active-market] selected-market]]
                                    reset-order-form
                                    (conj [[:order-form] reset-order-form])
                                    reset-order-form-ui

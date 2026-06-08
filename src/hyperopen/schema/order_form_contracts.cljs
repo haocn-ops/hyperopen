@@ -16,6 +16,8 @@
     :outcome?
     :outcome-sides
     :outcome-side-index
+    :outcome-options
+    :outcome-option-id
     :read-only?
     :display
     :ui-leverage
@@ -94,6 +96,8 @@
 (s/def :order-form-vm/outcome? boolean?)
 (s/def :order-form-vm/outcome-sides vector?)
 (s/def :order-form-vm/outcome-side-index int?)
+(s/def :order-form-vm/outcome-options vector?)
+(s/def :order-form-vm/outcome-option-id int?)
 (s/def :order-form-vm/read-only? boolean?)
 (s/def :order-form-vm/ui-leverage number?)
 (s/def :order-form-vm/next-leverage number?)
@@ -217,6 +221,8 @@
                     :order-form-vm/outcome?
                     :order-form-vm/outcome-sides
                     :order-form-vm/outcome-side-index
+                    :order-form-vm/outcome-options
+                    :order-form-vm/outcome-option-id
                     :order-form-vm/read-only?
                     :order-form-vm/display
                     :order-form-vm/ui-leverage

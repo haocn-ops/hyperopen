@@ -39,7 +39,8 @@
 (defn- market-primary-sort-rank [sort-key asset]
   (case sort-key
     :name (market-title-token asset)
-    :price (safe-sort-number (:mark asset))
+    :price (max (safe-sort-number (:mark asset))
+                (safe-sort-number (:highest-option-mark asset)))
     :volume (safe-sort-number (:volume24h asset))
     :change (safe-sort-number (:change24hPct asset))
     :openInterest (safe-sort-number (:openInterest asset))
@@ -71,18 +72,27 @@
         title (str/lower-case (or (:title asset) ""))
         coin (str/lower-case (or (:coin asset) ""))
         base (str/lower-case (or (:base asset) ""))
-        underlying (str/lower-case (or (:underlying asset) ""))]
+        underlying (str/lower-case (or (:underlying asset) ""))
+        outcome-summary (str/lower-case (or (:outcome-summary asset) ""))
+        option-labels (->> (:question-options asset)
+                           (keep :label)
+                           (str/join " ")
+                           str/lower-case)]
     (if strict?
       (or (str/starts-with? symbol query)
           (str/starts-with? title query)
           (str/starts-with? coin query)
           (str/starts-with? base query)
-          (str/starts-with? underlying query))
+          (str/starts-with? underlying query)
+          (str/starts-with? outcome-summary query)
+          (str/starts-with? option-labels query))
       (or (str/includes? symbol query)
           (str/includes? title query)
           (str/includes? coin query)
           (str/includes? base query)
-          (str/includes? underlying query)))))
+          (str/includes? underlying query)
+          (str/includes? outcome-summary query)
+          (str/includes? option-labels query)))))
 
 (defn- hip3-tab-eligible?
   [asset strict?]
@@ -110,6 +120,10 @@
                       (= "15m" (:period asset)))
     :outcome-1d (and (= :outcome (:market-type asset))
                      (= "1d" (:period asset)))
+    :outcome-economics (and (= :outcome (:market-type asset))
+                            (= :economics (:outcome-category asset)))
+    :outcome-sports (and (= :outcome (:market-type asset))
+                         (= :sports (:outcome-category asset)))
     :crypto (and (= :perp (:market-type asset)) (= :crypto (:category asset)))
     :tradfi (and (= :perp (:market-type asset)) (= :tradfi (:category asset)))
     :hip3 (and (= :perp (:market-type asset))

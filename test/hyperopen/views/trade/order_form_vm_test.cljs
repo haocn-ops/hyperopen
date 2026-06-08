@@ -150,6 +150,55 @@
     (is (= "No" (:base-symbol view-model)))
     (is (= ["Yes" "No"] (mapv :side-label (:outcome-sides view-model))))))
 
+(deftest order-form-vm-exposes-question-option-selector-model-test
+  (let [state (assoc (base-state {:type :limit
+                                  :outcome-option-id 162
+                                  :outcome-side 1}
+                                 {})
+                     :active-asset "#1621"
+                     :active-market {:coin "#1621"
+                                     :quote "USDH"
+                                     :market-type :outcome
+                                     :outcome-kind :question
+                                     :question-id 30
+                                     :szDecimals 0
+                                     :question-options [{:outcome-id 161
+                                                         :label "Below 61044"
+                                                         :sides [{:side-index 0
+                                                                  :side-label "Yes"
+                                                                  :coin "#1610"
+                                                                  :asset-id 100001610}
+                                                                 {:side-index 1
+                                                                  :side-label "No"
+                                                                  :coin "#1611"
+                                                                  :asset-id 100001611}]}
+                                                        {:outcome-id 162
+                                                         :label "61044 to 63535"
+                                                         :sides [{:side-index 0
+                                                                  :side-label "Yes"
+                                                                  :coin "#1620"
+                                                                  :asset-id 100001620}
+                                                                 {:side-index 1
+                                                                  :side-label "No"
+                                                                  :coin "#1621"
+                                                                  :asset-id 100001621}]}]
+                                     :outcome-sides [{:side-index 0
+                                                      :side-label "Yes"
+                                                      :coin "#1610"
+                                                      :asset-id 100001610}
+                                                     {:side-index 1
+                                                      :side-label "No"
+                                                      :coin "#1611"
+                                                      :asset-id 100001611}]})
+        view-model (vm/order-form-vm state)]
+    (is (true? (:outcome? view-model)))
+    (is (= 162 (:outcome-option-id view-model)))
+    (is (= ["Below 61044" "61044 to 63535"]
+           (mapv :label (:outcome-options view-model))))
+    (is (= ["#1620" "#1621"] (mapv :coin (:outcome-sides view-model))))
+    (is (= 1 (:outcome-side-index view-model)))
+    (is (= "61044 to 63535" (:base-symbol view-model)))))
+
 (deftest order-type-plugin-config-contract-test
   (let [config order-type-registry/order-type-config
         pro-types (set (order-type-registry/pro-order-types))

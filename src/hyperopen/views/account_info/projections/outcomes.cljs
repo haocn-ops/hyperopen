@@ -84,6 +84,7 @@
               :market-symbol (:symbol market)
               :market-coin (:coin market)
               :market-mark (:mark market)
+              :outcome-option-label (:outcome-option-label side)
               :quote (or (:quote market) "USDH")
               :token-name (token-name-from-encoding encoding)}))))
 
@@ -124,6 +125,17 @@
                {:seen #{} :markets []})
        :markets))
 
+(defn- question-option-sides
+  [market]
+  (->> (:question-options market)
+       (mapcat (fn [option]
+                 (map #(cond-> %
+                         (and (:label option)
+                              (nil? (:outcome-option-label %)))
+                         (assoc :outcome-option-label (:label option)))
+                      (:sides option))))
+       vec))
+
 (defn- outcome-side-lookup
   [market-by-key options]
   (reduce (fn [lookup market]
@@ -136,7 +148,8 @@
                             (assoc-side-lookup lookup** side-entry)
                             lookup**))
                         lookup*
-                        (or (:outcome-sides market) [])))
+                        (concat (or (:outcome-sides market) [])
+                                (question-option-sides market))))
               lookup))
           {}
           (outcome-market-candidates market-by-key options)))
@@ -261,6 +274,7 @@
      :side-name (or (:side-name side-entry)
                     (:sideName side-entry)
                     (fallback-side-name side-coin))
+     :outcome-option-label (:outcome-option-label side-entry)
      :side-index (:side-index side-entry)
      :type-label "Outcome"
      :size size

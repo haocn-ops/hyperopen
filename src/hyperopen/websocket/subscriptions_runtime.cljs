@@ -1,5 +1,6 @@
 (ns hyperopen.websocket.subscriptions-runtime
-  (:require [hyperopen.websocket.migration-flags :as migration-flags]))
+  (:require [hyperopen.asset-selector.markets :as markets]
+            [hyperopen.websocket.migration-flags :as migration-flags]))
 
 (def ^:private active-candle-owner
   :active-chart)
@@ -7,11 +8,7 @@
 (defn active-market-subscription-coins
   [market canonical-coin]
   (let [side-coins (when (= :outcome (:market-type market))
-                     (->> (:outcome-sides market)
-                          (keep :coin)
-                          (filter string?)
-                          distinct
-                          vec))]
+                     (markets/outcome-subscription-coins market))]
     (vec (or (seq side-coins)
              (when (string? canonical-coin)
                [canonical-coin])))))
@@ -30,14 +27,16 @@
   (log-fn "Subscribing to active asset context for:" coin)
   (let [market-by-key (get-in @store [:asset-selector :market-by-key] {})
         market (resolve-market-by-coin-fn market-by-key coin)
-        canonical-coin (or (:coin market) coin)
+        selected-market (markets/market-with-selected-outcome-coin market coin)
+        canonical-coin (or (:coin selected-market) (:coin market) coin)
         resolved-market (or market
                            (resolve-market-by-coin-fn
                             market-by-key
                             canonical-coin))
-        subscription-coins (active-market-subscription-coins resolved-market canonical-coin)]
+        resolved-market* (markets/market-with-selected-outcome-coin resolved-market canonical-coin)
+        subscription-coins (active-market-subscription-coins resolved-market* canonical-coin)]
     (persist-active-asset! canonical-coin)
-    (persist-active-market-display! resolved-market)
+    (persist-active-market-display! resolved-market*)
     (swap! store
            (fn [state]
              (let [market (or resolved-market
@@ -48,7 +47,9 @@
                    (assoc-in [:active-assets :loading] true)
                    (assoc-in [:active-asset] canonical-coin)
                    (assoc-in [:selected-asset] canonical-coin)
-                   (assoc :active-market (or market (:active-market state)))))))
+                   (assoc :active-market (or (markets/market-with-selected-outcome-coin market canonical-coin)
+                                             market
+                                             (:active-market state)))))))
     (doseq [ctx-coin subscription-coins]
       (subscribe-active-asset-ctx! ctx-coin))
     (let [selected-timeframe (get-in @store [:chart-options :selected-timeframe] :1d)]

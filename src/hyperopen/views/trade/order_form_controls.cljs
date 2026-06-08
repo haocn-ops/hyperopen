@@ -1,5 +1,7 @@
 (ns hyperopen.views.trade.order-form-controls
-  (:require [hyperopen.state.trading :as trading]
+  (:require [clojure.string :as str]
+            [hyperopen.state.trading :as trading]
+            [hyperopen.utils.formatting :as fmt]
             [hyperopen.views.trade.order-form-component-primitives :as primitives]))
 
 (defn- price-context-accessory [{:keys [label mid-available?]} on-set-to-mid]
@@ -495,18 +497,189 @@
                (not (js/isNaN parsed)))
       (int parsed))))
 
+(defn- selected-outcome-option
+  [outcome-options selected-option-id]
+  (or (some (fn [option]
+              (when (= selected-option-id
+                       (outcome-option-id option))
+                option))
+            outcome-options)
+      (first outcome-options)))
+
+(defn- safe-option-number
+  [value]
+  (let [parsed (cond
+                 (number? value) value
+                 (string? value) (js/parseFloat value)
+                 :else js/NaN)]
+    (when (and (number? parsed)
+               (not (js/isNaN parsed)))
+      parsed)))
+
+(defn- option-chance-text
+  [option]
+  (if-let [mark (safe-option-number (:mark option))]
+    (fmt/format-percentage (* mark 100) 0)
+    "--"))
+
+(defn- option-price-text
+  [option]
+  (if-let [mark (safe-option-number (:mark option))]
+    (.toFixed mark 5)
+    "--"))
+
+(defn- option-currency-text
+  [value]
+  (if-let [number-value (safe-option-number value)]
+    (fmt/format-large-currency number-value)
+    "--"))
+
+(defn- outcome-option-row-button
+  [option selected-option-id outcome-handlers]
+  (let [option-id (outcome-option-id option)
+        label (or (:label option) (str "Outcome " option-id))]
+    [:button {:type "button"
+              :role "option"
+              :aria-selected (= option-id selected-option-id)
+              :data-role "outcome-option-select-row"
+              :class (into ["grid"
+                            "w-full"
+                            "grid-cols-[minmax(0,1.35fr)_4.5rem_5rem_5.5rem_5.75rem]"
+                            "items-center"
+                            "gap-3"
+                            "rounded"
+                            "px-2"
+                            "py-1"
+                            "text-left"
+                            "text-xs"
+                            "transition-colors"
+                            "focus:outline-none"
+                            "focus:ring-0"
+                            "focus:ring-offset-0"]
+                           (if (= option-id selected-option-id)
+                             ["bg-[#23383b]" "text-[#F6FEFD]"]
+                             ["text-[#F6FEFD]" "hover:bg-base-200"]))
+              :on {:click ((:on-select-outcome-option outcome-handlers) option-id)}}
+     [:span {:class ["truncate" "font-semibold"]} label]
+     [:span {:class ["num" "text-[#D2DAD7]"]} (option-chance-text option)]
+     [:span {:class ["num" "text-[#D2DAD7]"]} (option-price-text option)]
+     [:span {:class ["num" "text-[#D2DAD7]"]} (option-currency-text (:volume24h option))]
+     [:span {:class ["num" "text-[#D2DAD7]"]} (option-currency-text (:openInterest option))]]))
+
+(defn- option-matches-query?
+  [query option]
+  (let [query* (some-> query str str/trim str/lower-case)]
+    (or (not (seq query*))
+        (str/includes? (str/lower-case (str (or (:label option) "")))
+                       query*))))
+
+(defn- outcome-option-dropdown
+  [outcome-options selected-option-id outcome-handlers {:keys [open? query]}]
+  (let [selected-option (selected-outcome-option outcome-options selected-option-id)
+        selected-id (outcome-option-id selected-option)
+        selected-label (or (:label selected-option) (str "Outcome " selected-id))
+        filtered-options (filterv #(option-matches-query? query %) outcome-options)
+        trigger [:button {:type "button"
+                          :aria-haspopup "listbox"
+                          :aria-expanded (boolean open?)
+                          :aria-label "Outcome option"
+                          :data-role "outcome-option-select-trigger"
+                          :class ["flex"
+                                  "h-[33px]"
+                                  "w-full"
+                                  "items-center"
+                                  "justify-between"
+                                  "gap-2"
+                                  "rounded-lg"
+                                  "border"
+                                  "border-base-300"
+                                  "bg-base-200"
+                                  "px-3"
+                                  "text-sm"
+                                  "font-medium"
+                                  "text-[#F6FEFD]"
+                                  "transition-colors"
+                                  "hover:border-[#6f7a88]"
+                                  "focus:outline-none"
+                                  "focus:ring-1"
+                                  "focus:ring-[#8a96a6]/40"
+                                  "focus:ring-offset-0"]
+                          :on {:click (:on-toggle-option-dropdown outcome-handlers)
+                               :keydown (:on-option-dropdown-keydown outcome-handlers)}}
+                 [:span {:class ["truncate"]} selected-label]
+                 [:span {:class ["text-[#949E9C]"]} "⌄"]]
+        menu [:div {:class ["absolute"
+                            "left-0"
+                            "right-0"
+                            "top-[calc(100%+0.375rem)]"
+                            "z-30"
+                            "rounded-lg"
+                            "border"
+                            "border-base-300"
+                            "bg-base-100"
+                            "p-2"
+                            "shadow-xl"]
+                    :data-role "outcome-option-select-menu"
+                    :on {:keydown (:on-option-dropdown-keydown outcome-handlers)}}
+              [:input {:type "search"
+                       :value (or query "")
+                       :placeholder "Search"
+                       :aria-label "Search outcome options"
+                       :class (into ["h-8"
+                                     "w-full"
+                                     "rounded-md"
+                                     "border"
+                                     "border-base-300"
+                                     "bg-base-200"
+                                     "px-2"
+                                     "text-sm"
+                                     "text-[#F6FEFD]"
+                                     "placeholder:text-[#949E9C]"]
+                                    primitives/neutral-input-focus-classes)
+                       :on {:input (:on-change-option-query outcome-handlers)}}]
+              [:div {:class ["mt-2"
+                             "grid"
+                             "grid-cols-[minmax(0,1.35fr)_4.5rem_5rem_5.5rem_5.75rem]"
+                             "gap-3"
+                             "px-2"
+                             "text-xs"
+                             "font-medium"
+                             "text-[#949E9C]"]}
+               [:span "Live Outcomes"]
+               [:span "% Chance"]
+               [:span "Price"]
+               [:span "Volume"]
+               [:span "Open Int"]]
+              [:div {:class ["mt-1" "max-h-64" "overflow-y-auto"]
+                     :role "listbox"
+                     :aria-label "Outcome options"}
+               (if (seq filtered-options)
+                 (for [option filtered-options
+                       :let [option-id (outcome-option-id option)]]
+                   ^{:key (str "outcome-option-menu-" option-id)}
+                   (outcome-option-row-button option selected-option-id outcome-handlers))
+                 [:div {:class ["px-2" "py-3" "text-sm" "text-[#949E9C]"]}
+                  "No matching outcomes"])]]
+        wrapper [:div {:class ["relative"]} trigger]]
+    (cond-> wrapper
+      open? (conj menu))))
+
 (defn outcome-option-row
-  [outcome-options selected-option-id outcome-handlers]
+  ([outcome-options selected-option-id outcome-handlers]
+   (outcome-option-row outcome-options selected-option-id outcome-handlers nil))
+  ([outcome-options selected-option-id outcome-handlers option-ui]
   (when (> (count outcome-options) 1)
-    [:div {:class ["flex" "min-h-[33px]" "items-center" "gap-1.5" "rounded-lg" "bg-base-200" "p-0.5" "sm:gap-2"]}
-     (for [option outcome-options
-           :let [option-id (outcome-option-id option)
-                 label (or (:label option) (str "Outcome " option-id))]]
-       ^{:key (str "outcome-option-" option-id)}
-       (primitives/side-button label
-                               :option
-                               (= option-id selected-option-id)
-                               ((:on-select-outcome-option outcome-handlers) option-id)))]))
+    (if (> (count outcome-options) 2)
+      (outcome-option-dropdown outcome-options selected-option-id outcome-handlers option-ui)
+      [:div {:class ["flex" "min-h-[33px]" "items-center" "gap-1.5" "rounded-lg" "bg-base-200" "p-0.5" "sm:gap-2"]}
+       (for [option outcome-options
+             :let [option-id (outcome-option-id option)
+                   label (or (:label option) (str "Outcome " option-id))]]
+         ^{:key (str "outcome-option-" option-id)}
+         (primitives/side-button label
+                                 :option
+                                 (= option-id selected-option-id)
+                                 ((:on-select-outcome-option outcome-handlers) option-id)))]))))
 
 (defn balances-row [display]
   [:div {:class ["space-y-1.5"]}

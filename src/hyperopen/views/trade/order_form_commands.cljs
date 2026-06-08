@@ -73,6 +73,18 @@
 (defn handle-tif-dropdown-keydown [key]
   (command :order-form/handle-tif-dropdown-keydown key))
 
+(defn toggle-outcome-option-dropdown []
+  (command :order-form/toggle-outcome-option-dropdown))
+
+(defn close-outcome-option-dropdown []
+  (command :order-form/close-outcome-option-dropdown))
+
+(defn set-outcome-option-query []
+  (command :order-form/set-outcome-option-query event-target-value))
+
+(defn handle-outcome-option-dropdown-keydown [key]
+  (command :order-form/handle-outcome-option-dropdown-keydown key))
+
 (defn select-pro-order-type [order-type]
   (command :order-form/select-pro-order-type order-type))
 

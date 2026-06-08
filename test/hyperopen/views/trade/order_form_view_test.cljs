@@ -4,6 +4,7 @@
                                                                   collect-strings
                                                                   button-node-by-label
                                                                   find-first-node
+                                                                  find-all-nodes
                                                                   first-index]]
             [hyperopen.views.trade.order-form-view :as view]))
 
@@ -85,6 +86,145 @@
         buy-no-classes (set (get-in (button-node-by-label view-node "Buy No") [1 :class]))]
     (is (contains? buy-no-classes "bg-ho-sell-hi"))
     (is (contains? buy-no-classes "text-ho-text"))))
+
+(defn- grouped-world-cup-state
+  [ui-overrides]
+  (assoc (base-state {:type :limit
+                      :outcome-option-id 189
+                      :outcome-side 0}
+                     ui-overrides)
+         :active-asset "#1890"
+         :active-market {:coin "#1890"
+                         :quote "USDH"
+                         :market-type :outcome
+                         :outcome-kind :question
+                         :question-id 32
+                         :szDecimals 0
+                         :question-options [{:outcome-id 172
+                                             :label "Algeria"
+                                             :mark 0.01
+                                             :volume24h 12
+                                             :openInterest 41
+                                             :sides [{:side-index 0 :side-label "Yes" :coin "#1720"}
+                                                     {:side-index 1 :side-label "No" :coin "#1721"}]}
+                                            {:outcome-id 173
+                                             :label "Argentina"
+                                             :mark 0.14
+                                             :volume24h 2461
+                                             :openInterest 35592
+                                             :sides [{:side-index 0 :side-label "Yes" :coin "#1730"}
+                                                     {:side-index 1 :side-label "No" :coin "#1731"}]}
+                                            {:outcome-id 189
+                                             :label "France"
+                                             :mark 0.18
+                                             :volume24h 5776
+                                             :openInterest 41448
+                                             :sides [{:side-index 0 :side-label "Yes" :coin "#1890"}
+                                                     {:side-index 1 :side-label "No" :coin "#1891"}]}
+                                            {:outcome-id 212
+                                             :label "Spain"
+                                             :mark 0.17
+                                             :volume24h 1791
+                                             :openInterest 27056
+                                             :sides [{:side-index 0 :side-label "Yes" :coin "#2120"}
+                                                     {:side-index 1 :side-label "No" :coin "#2121"}]}]
+                         :outcome-sides [{:side-index 0
+                                          :side-label "Yes"
+                                          :coin "#1890"}
+                                         {:side-index 1
+                                          :side-label "No"
+                                          :coin "#1891"}]}))
+
+(deftest order-form-renders-multi-outcome-options-as-closed-dropdown-test
+  (let [view-node (view/order-form-view (grouped-world-cup-state {}))
+        trigger (find-first-node view-node
+                                 (fn [node]
+                                   (= "outcome-option-select-trigger"
+                                      (get-in node [1 :data-role]))))
+        menu (find-first-node view-node
+                              (fn [node]
+                                (= "outcome-option-select-menu"
+                                   (get-in node [1 :data-role]))))
+        option-buttons (find-all-nodes view-node
+                                       (fn [node]
+                                         (= "outcome-option-select-row"
+                                            (get-in node [1 :data-role]))))
+        strings (set (collect-strings view-node))]
+    (is (some? trigger))
+    (is (= [[:actions/toggle-outcome-option-dropdown]]
+           (get-in trigger [1 :on :click])))
+    (is (contains? strings "France"))
+    (is (not (contains? strings "Argentina")))
+    (is (not (contains? strings "Spain")))
+    (is (nil? menu))
+    (is (= [] option-buttons))))
+
+(deftest order-form-open-multi-outcome-dropdown-renders-searchable-live-option-table-test
+  (let [view-node (view/order-form-view
+                   (grouped-world-cup-state {:outcome-option-dropdown-open? true
+                                             :outcome-option-query "sp"}))
+        menu (find-first-node view-node
+                              (fn [node]
+                                (= "outcome-option-select-menu"
+                                   (get-in node [1 :data-role]))))
+        search-input (find-first-node view-node
+                                      (fn [node]
+                                        (= :input (first node))))
+        option-buttons (find-all-nodes view-node
+                                       (fn [node]
+                                         (= "outcome-option-select-row"
+                                            (get-in node [1 :data-role]))))
+        spain-button (first option-buttons)
+        strings (set (collect-strings view-node))]
+    (is (some? menu))
+    (is (= "sp" (get-in search-input [1 :value])))
+    (is (= [[:actions/set-outcome-option-query [:event.target/value]]]
+           (get-in search-input [1 :on :input])))
+    (is (contains? strings "Live Outcomes"))
+    (is (contains? strings "% Chance"))
+    (is (contains? strings "Price"))
+    (is (contains? strings "Volume"))
+    (is (contains? strings "Open Int"))
+    (is (= ["Spain"] (mapv #(first (collect-strings %)) option-buttons)))
+    (is (= [[:actions/close-outcome-option-dropdown]
+            [:actions/update-order-form [:outcome-option-id] 212]]
+           (get-in spain-button [1 :on :click])))))
+
+(deftest order-form-keeps-binary-outcome-options-as-two-button-selector-test
+  (let [state (assoc (base-state {:type :limit
+                                  :outcome-option-id 142
+                                  :outcome-side 0})
+                     :active-asset "#1420"
+                     :active-market {:coin "#1420"
+                                     :quote "USDH"
+                                     :market-type :outcome
+                                     :outcome-kind :question
+                                     :question-id 31
+                                     :szDecimals 0
+                                     :question-options [{:outcome-id 141
+                                                         :label "San Antonio"
+                                                         :sides [{:side-index 0 :side-label "Yes" :coin "#1410"}
+                                                                 {:side-index 1 :side-label "No" :coin "#1411"}]}
+                                                        {:outcome-id 142
+                                                         :label "New York"
+                                                         :sides [{:side-index 0 :side-label "Yes" :coin "#1420"}
+                                                                 {:side-index 1 :side-label "No" :coin "#1421"}]}]
+                                     :outcome-sides [{:side-index 0
+                                                      :side-label "Yes"
+                                                      :coin "#1420"}
+                                                     {:side-index 1
+                                                      :side-label "No"
+                                                      :coin "#1421"}]})
+        view-node (view/order-form-view state)
+        trigger (find-first-node view-node
+                                 (fn [node]
+                                   (= "outcome-option-select-trigger"
+                                      (get-in node [1 :data-role]))))
+        san-antonio-button (button-node-by-label view-node "San Antonio")
+        new-york-button (button-node-by-label view-node "New York")]
+    (is (nil? trigger))
+    (is (some? san-antonio-button))
+    (is (some? new-york-button))))
 
 (deftest leverage-row-renders-isolated-margin-label-when-selected-test
   (let [view-node (view/order-form-view (base-state {:margin-mode :isolated}))

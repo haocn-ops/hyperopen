@@ -11,6 +11,8 @@
    :size-unit-dropdown-open? false
    :tpsl-unit-dropdown-open? false
    :tif-dropdown-open? false
+   :outcome-option-dropdown-open? false
+   :outcome-option-query ""
    :price-input-focused? false
    :tpsl-panel-open? false
    :entry-mode :limit
@@ -37,6 +39,8 @@
                                      :size-unit-dropdown-open? false
                                      :tpsl-unit-dropdown-open? false
                                      :tif-dropdown-open? false
+                                     :outcome-option-dropdown-open? false
+                                     :outcome-option-query ""
                                      :price-input-focused? "yes"
                                      :tpsl-panel-open? false
                                      :entry-mode :limit

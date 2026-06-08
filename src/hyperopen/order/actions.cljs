@@ -162,6 +162,36 @@
                              (boolean (:tif-dropdown-open? ui-state))]]]])
     []))
 
+(defn toggle-outcome-option-dropdown [state]
+  (let [ui-state (:order-form-ui (transitions/toggle-outcome-option-dropdown state))]
+    [[:effects/save-many [[[:order-form-ui :outcome-option-dropdown-open?]
+                           (boolean (:outcome-option-dropdown-open? ui-state))]
+                          [[:order-form-ui :outcome-option-query]
+                           (:outcome-option-query ui-state)]]]]))
+
+(defn close-outcome-option-dropdown [state]
+  (let [ui-state (:order-form-ui (transitions/close-outcome-option-dropdown state))]
+    [[:effects/save-many [[[:order-form-ui :outcome-option-dropdown-open?]
+                           (boolean (:outcome-option-dropdown-open? ui-state))]
+                          [[:order-form-ui :outcome-option-query]
+                           (:outcome-option-query ui-state)]]]]))
+
+(defn set-outcome-option-query [state query]
+  (let [ui-state (:order-form-ui (transitions/set-outcome-option-query state query))]
+    [[:effects/save-many [[[:order-form-ui :outcome-option-dropdown-open?]
+                           (boolean (:outcome-option-dropdown-open? ui-state))]
+                          [[:order-form-ui :outcome-option-query]
+                           (:outcome-option-query ui-state)]]]]))
+
+(defn handle-outcome-option-dropdown-keydown [state key]
+  (if-let [transition (transitions/handle-outcome-option-dropdown-keydown state key)]
+    (let [ui-state (:order-form-ui transition)]
+      [[:effects/save-many [[[:order-form-ui :outcome-option-dropdown-open?]
+                             (boolean (:outcome-option-dropdown-open? ui-state))]
+                            [[:order-form-ui :outcome-option-query]
+                             (:outcome-option-query ui-state)]]]])
+    []))
+
 (defn set-order-ui-leverage [state leverage]
   (transition-save-many state (transitions/set-order-ui-leverage state leverage)))
 

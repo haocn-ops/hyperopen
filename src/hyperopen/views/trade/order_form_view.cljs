@@ -91,6 +91,11 @@
                                               (get-in state [:order-form-ui :size-unit-dropdown-open?])))
         tif-dropdown-open? (boolean (or (:tif-dropdown-open? ui)
                                         (get-in state [:order-form-ui :tif-dropdown-open?])))
+        outcome-option-dropdown-open? (boolean (or (:outcome-option-dropdown-open? ui)
+                                                   (get-in state [:order-form-ui :outcome-option-dropdown-open?])))
+        outcome-option-query (or (:outcome-option-query ui)
+                                 (get-in state [:order-form-ui :outcome-option-query])
+                                 "")
         max-leverage (or (:max-leverage ui)
                          (trading/market-max-leverage state))
         cross-margin-allowed? (if (contains? ui :cross-margin-allowed?)
@@ -168,7 +173,9 @@
         [:div {:class ["space-y-1.5"]}
          (controls/outcome-option-row outcome-options
                                       outcome-option-id
-                                      outcome-handlers)
+                                      outcome-handlers
+                                      {:open? outcome-option-dropdown-open?
+                                       :query outcome-option-query})
          (controls/outcome-side-row outcome-sides
                                     outcome-side-index
                                     outcome-handlers

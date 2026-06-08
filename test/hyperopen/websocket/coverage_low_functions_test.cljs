@@ -104,6 +104,8 @@
                                      :size-unit-dropdown-open? false
                                      :tpsl-unit-dropdown-open? false
                                      :tif-dropdown-open? false
+                                     :outcome-option-dropdown-open? false
+                                     :outcome-option-query ""
                                      :price-input-focused? false
                                      :tpsl-panel-open? false
                                      :entry-mode :limit
@@ -312,6 +314,8 @@
                   :size-unit-dropdown-open? true
                   :tpsl-unit-dropdown-open? false
                   :tif-dropdown-open? true
+                  :outcome-option-dropdown-open? true
+                  :outcome-option-query "fr"
                   :price-input-focused? false
                   :tpsl-panel-open? true
                   :submitting? true

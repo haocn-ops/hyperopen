@@ -788,6 +788,52 @@ async function seedGroupedOutcomeAssetSelectorState(page, { activeTab = null } =
   }, activeTab);
 }
 
+async function seedWorldCupOutcomeOrderForm(page) {
+  await seedGroupedOutcomeAssetSelectorState(page, { activeTab: "sports" });
+  await page.evaluate(() => {
+    const c = globalThis.cljs?.core;
+    const store = globalThis.hyperopen?.system?.store;
+
+    if (!c || !store) {
+      throw new Error("Hyperopen store or cljs core unavailable");
+    }
+
+    const kw = (name) => c.keyword(name);
+    const path = (...segments) => c.PersistentVector.fromArray(segments, true);
+    const worldCupMarket = c.get_in(
+      c.deref(store),
+      path(kw("asset-selector"), kw("market-by-key"), "question:32")
+    );
+
+    if (!worldCupMarket) {
+      throw new Error("World Cup grouped outcome market missing from seeded state");
+    }
+
+    let nextState = c.deref(store);
+    nextState = c.assoc_in(nextState, path(kw("active-asset")), "#1890");
+    nextState = c.assoc_in(nextState, path(kw("selected-asset")), "#1890");
+    nextState = c.assoc_in(nextState, path(kw("active-market")), worldCupMarket);
+    nextState = c.assoc_in(nextState, path(kw("order-form"), kw("outcome-option-id")), 189);
+    nextState = c.assoc_in(nextState, path(kw("order-form"), kw("outcome-side")), 0);
+    nextState = c.assoc_in(
+      nextState,
+      path(kw("order-form-ui"), kw("outcome-option-dropdown-open?")),
+      false
+    );
+    nextState = c.assoc_in(
+      nextState,
+      path(kw("order-form-ui"), kw("outcome-option-query")),
+      ""
+    );
+    c.reset_BANG_(store, nextState);
+
+    const renderApp = globalThis.hyperopen?.app?.bootstrap?.render_app_BANG_;
+    if (typeof renderApp === "function") {
+      renderApp(c.deref(store));
+    }
+  });
+}
+
 async function seedOutcomeActiveAsset(page) {
   await page.evaluate(() => {
     const c = globalThis.cljs?.core;
@@ -1488,6 +1534,38 @@ test("asset selector outcome subtabs render grouped question markets @smoke @reg
   await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
   await expect(rows.first()).toContainText("BTC price range on Jun 6 at 2:00 AM?");
   await expect(rows.first()).not.toContainText("NBA Finals Game 2");
+});
+
+test("order form uses searchable dropdown for multi-option outcome markets @smoke @regression", async ({ page }) => {
+  await visitRoute(page, "/trade");
+  await seedWorldCupOutcomeOrderForm(page);
+  await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
+
+  const orderForm = page.locator('[data-parity-id="order-form"]');
+  const trigger = orderForm.locator('[data-role="outcome-option-select-trigger"]');
+  const rows = orderForm.locator('[data-role="outcome-option-select-row"]');
+
+  await expect(trigger).toBeVisible();
+  await expect(trigger).toContainText("France");
+  await expect(orderForm.locator('[data-role="outcome-option-select-menu"]')).toHaveCount(0);
+  await expect(rows).toHaveCount(0);
+
+  await trigger.click();
+  const menu = orderForm.locator('[data-role="outcome-option-select-menu"]');
+  await expect(menu).toBeVisible();
+  await expect(menu).toContainText("Live Outcomes");
+  await expect(menu).toContainText("% Chance");
+  await expect(menu).toContainText("Price");
+  await expect(menu).toContainText("Volume");
+  await expect(menu).toContainText("Open Int");
+  await expect(rows).toHaveCount(3);
+  await expect(rows.nth(0)).toContainText("France");
+  await expect(rows.nth(1)).toContainText("Spain");
+  await expect(rows.nth(2)).toContainText("Argentina");
+
+  await menu.getByRole("searchbox", { name: "Search outcome options" }).fill("sp");
+  await expect(rows).toHaveCount(1);
+  await expect(rows.first()).toContainText("Spain");
 });
 
 test("outcome market tooltip stays within active selector width and glows on hover @regression", async ({ page }) => {

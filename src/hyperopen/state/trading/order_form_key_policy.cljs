@@ -16,6 +16,8 @@
    :size-unit-dropdown-open?
    :tpsl-unit-dropdown-open?
    :tif-dropdown-open?
+   :outcome-option-dropdown-open?
+   :outcome-option-query
    :price-input-focused?
    :tpsl-panel-open?])
 

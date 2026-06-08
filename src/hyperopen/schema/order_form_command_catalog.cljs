@@ -58,6 +58,18 @@
    {:command-id :order-form/handle-tif-dropdown-keydown
     :action-id :actions/handle-tif-dropdown-keydown
     :handler-key :handle-tif-dropdown-keydown}
+   {:command-id :order-form/toggle-outcome-option-dropdown
+    :action-id :actions/toggle-outcome-option-dropdown
+    :handler-key :toggle-outcome-option-dropdown}
+   {:command-id :order-form/close-outcome-option-dropdown
+    :action-id :actions/close-outcome-option-dropdown
+    :handler-key :close-outcome-option-dropdown}
+   {:command-id :order-form/set-outcome-option-query
+    :action-id :actions/set-outcome-option-query
+    :handler-key :set-outcome-option-query}
+   {:command-id :order-form/handle-outcome-option-dropdown-keydown
+    :action-id :actions/handle-outcome-option-dropdown-keydown
+    :handler-key :handle-outcome-option-dropdown-keydown}
    {:command-id :order-form/select-pro-order-type
     :action-id :actions/select-pro-order-type
     :handler-key :select-pro-order-type}

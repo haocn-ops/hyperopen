@@ -25,6 +25,10 @@
    :toggle-tif-dropdown order-actions/toggle-tif-dropdown
    :close-tif-dropdown order-actions/close-tif-dropdown
    :handle-tif-dropdown-keydown order-actions/handle-tif-dropdown-keydown
+   :toggle-outcome-option-dropdown order-actions/toggle-outcome-option-dropdown
+   :close-outcome-option-dropdown order-actions/close-outcome-option-dropdown
+   :set-outcome-option-query order-actions/set-outcome-option-query
+   :handle-outcome-option-dropdown-keydown order-actions/handle-outcome-option-dropdown-keydown
    :set-order-ui-leverage order-actions/set-order-ui-leverage
    :set-order-margin-mode order-actions/set-order-margin-mode
    :set-order-size-percent order-actions/set-order-size-percent

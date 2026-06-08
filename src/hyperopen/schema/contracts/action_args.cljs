@@ -421,6 +421,10 @@
    :actions/toggle-tif-dropdown ::common/no-args
    :actions/close-tif-dropdown ::common/no-args
    :actions/handle-tif-dropdown-keydown ::common/key-args
+   :actions/toggle-outcome-option-dropdown ::common/no-args
+   :actions/close-outcome-option-dropdown ::common/no-args
+   :actions/set-outcome-option-query ::common/single-input-args
+   :actions/handle-outcome-option-dropdown-keydown ::common/key-args
    :actions/set-order-ui-leverage-draft ::common/single-input-args
    :actions/confirm-order-ui-leverage ::common/no-args
    :actions/set-order-ui-leverage ::common/single-input-args

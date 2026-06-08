@@ -25,6 +25,10 @@
    (commands/toggle-tif-dropdown)
    (commands/close-tif-dropdown)
    (commands/handle-tif-dropdown-keydown commands/event-key)
+   (commands/toggle-outcome-option-dropdown)
+   (commands/close-outcome-option-dropdown)
+   (commands/set-outcome-option-query)
+   (commands/handle-outcome-option-dropdown-keydown commands/event-key)
    (commands/select-pro-order-type :scale)
    (commands/set-order-ui-leverage-draft 18)
    (commands/confirm-order-ui-leverage)
@@ -86,6 +90,12 @@
   (is (= {:command-id :order-form/toggle-tpsl-unit-dropdown
           :args []}
          (commands/toggle-tpsl-unit-dropdown)))
+  (is (= {:command-id :order-form/toggle-outcome-option-dropdown
+          :args []}
+         (commands/toggle-outcome-option-dropdown)))
+  (is (= {:command-id :order-form/set-outcome-option-query
+          :args [commands/event-target-value]}
+         (commands/set-outcome-option-query)))
   (is (= {:command-id :order-form/update-order-form
           :args [[:twap :hours] commands/event-target-value]}
          (commands/set-twap-hours-input)))

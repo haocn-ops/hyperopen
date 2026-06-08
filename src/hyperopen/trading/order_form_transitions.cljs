@@ -427,6 +427,36 @@
   (when (= key "Escape")
     (close-tif-dropdown state)))
 
+(defn toggle-outcome-option-dropdown [state]
+  (let [ui-state (trading/order-form-ui-state state)
+        open? (boolean (:outcome-option-dropdown-open? ui-state))
+        next-open? (not open?)]
+    (enforce-field-ownership
+     state
+     {:order-form-ui (assoc ui-state
+                            :outcome-option-dropdown-open? next-open?
+                            :outcome-option-query (if next-open?
+                                                    ""
+                                                    (:outcome-option-query ui-state)))})))
+
+(defn close-outcome-option-dropdown [state]
+  (enforce-field-ownership
+   state
+   {:order-form-ui (assoc (trading/order-form-ui-state state)
+                          :outcome-option-dropdown-open? false
+                          :outcome-option-query "")}))
+
+(defn set-outcome-option-query [state query]
+  (enforce-field-ownership
+   state
+   {:order-form-ui (assoc (trading/order-form-ui-state state)
+                          :outcome-option-dropdown-open? true
+                          :outcome-option-query (str (or query "")))}))
+
+(defn handle-outcome-option-dropdown-keydown [state key]
+  (when (= key "Escape")
+    (close-outcome-option-dropdown state)))
+
 (defn set-order-ui-leverage [state leverage]
   (let [form (trading/order-form-draft state)
         ui-state (trading/order-form-ui-state state)
@@ -652,6 +682,13 @@
       (trading/effective-order-form-ui
        form
        (assoc ui-state :tpsl-unit-dropdown-open? false))
+
+      (= path [:outcome-option-id])
+      (trading/effective-order-form-ui
+       form
+       (assoc ui-state
+              :outcome-option-dropdown-open? false
+              :outcome-option-query ""))
 
       (and (= path [:reduce-only])
            (true? value))

@@ -32,7 +32,14 @@
    :outcome {:on-select-outcome-side (fn [side-index]
                                        (dispatch-command (cmd/set-order-outcome-side side-index)))
              :on-select-outcome-option (fn [outcome-id]
-                                         (dispatch-command (cmd/set-order-outcome-option outcome-id)))}
+                                         (into []
+                                               (concat
+                                                (dispatch-command (cmd/close-outcome-option-dropdown))
+                                                (dispatch-command (cmd/set-order-outcome-option outcome-id)))))
+             :on-toggle-option-dropdown (dispatch-command (cmd/toggle-outcome-option-dropdown))
+             :on-close-option-dropdown (dispatch-command (cmd/close-outcome-option-dropdown))
+             :on-option-dropdown-keydown (dispatch-command (cmd/handle-outcome-option-dropdown-keydown cmd/event-key))
+             :on-change-option-query (dispatch-command (cmd/set-outcome-option-query))}
 
    :price {:on-set-to-mid (dispatch-command (cmd/set-order-price-to-mid))
            :on-focus (dispatch-command (cmd/focus-order-price-input))

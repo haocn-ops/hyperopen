@@ -574,7 +574,7 @@
                        query*))))
 
 (defn- outcome-option-dropdown
-  [outcome-options selected-option-id outcome-handlers {:keys [open? query]}]
+  [outcome-options selected-option-id outcome-handlers {:keys [open? query menu-width-classes]}]
   (let [selected-option (selected-outcome-option outcome-options selected-option-id)
         selected-id (outcome-option-id selected-option)
         selected-label (or (:label selected-option) (str "Outcome " selected-id))
@@ -608,17 +608,17 @@
                                :keydown (:on-option-dropdown-keydown outcome-handlers)}}
                  [:span {:class ["truncate"]} selected-label]
                  [:span {:class ["text-[#949E9C]"]} "⌄"]]
-        menu [:div {:class ["absolute"
-                            "left-0"
-                            "right-0"
-                            "top-[calc(100%+0.375rem)]"
-                            "z-30"
-                            "rounded-lg"
-                            "border"
-                            "border-base-300"
-                            "bg-base-100"
-                            "p-2"
-                            "shadow-xl"]
+        menu [:div {:class (into ["absolute"
+                                   "left-0"
+                                   "top-[calc(100%+0.375rem)]"
+                                   "z-30"
+                                   "rounded-lg"
+                                   "border"
+                                   "border-base-300"
+                                   "bg-base-100"
+                                   "p-2"
+                                   "shadow-xl"]
+                                  (or menu-width-classes ["right-0"]))
                     :data-role "outcome-option-select-menu"
                     :on {:keydown (:on-option-dropdown-keydown outcome-handlers)}}
               [:input {:type "search"

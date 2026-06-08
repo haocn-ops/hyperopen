@@ -1,7 +1,8 @@
 (ns hyperopen.views.active-asset-view
   (:require [hyperopen.views.active-asset.row :as active-asset-row]
             [hyperopen.views.active-asset.vm :as active-asset-vm]
-            [hyperopen.views.asset-selector-view :as asset-selector]))
+            [hyperopen.views.asset-selector-view :as asset-selector]
+            [hyperopen.views.trade.order-form-handlers :as order-form-handlers]))
 
 ;; Public trade-page entrypoint for the active asset strip.
 ;; Rendering consumes the normalized panel VM from `hyperopen.views.active-asset.vm`;
@@ -44,7 +45,9 @@
            :data-parity-id "market-strip"}
      [:div
       (if active-asset
-        (active-asset-row/active-asset-row-from-vm row-vm)
+        (active-asset-row/active-asset-row-from-vm
+         row-vm
+         {:outcome-handlers (:outcome (order-form-handlers/build-handlers))})
         (active-asset-row/select-asset-row dropdown-state))]
      (when asset-selector-props*
        (asset-selector/asset-selector-wrapper asset-selector-props*))]))

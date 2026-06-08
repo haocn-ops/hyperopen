@@ -1536,22 +1536,26 @@ test("asset selector outcome subtabs render grouped question markets @smoke @reg
   await expect(rows.first()).not.toContainText("NBA Finals Game 2");
 });
 
-test("order form uses searchable dropdown for multi-option outcome markets @smoke @regression", async ({ page }) => {
+test("market strip uses searchable dropdown for multi-option outcome markets @smoke @regression", async ({ page }) => {
   await visitRoute(page, "/trade");
   await seedWorldCupOutcomeOrderForm(page);
   await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
 
   const orderForm = page.locator('[data-parity-id="order-form"]');
-  const trigger = orderForm.locator('[data-role="outcome-option-select-trigger"]');
-  const rows = orderForm.locator('[data-role="outcome-option-select-row"]');
+  const marketStrip = page.locator('[data-parity-id="market-strip"]');
+  const selector = marketStrip.locator('[data-role="market-strip-outcome-option-selector"]');
+  const trigger = selector.locator('[data-role="outcome-option-select-trigger"]');
+  const rows = selector.locator('[data-role="outcome-option-select-row"]');
 
+  await expect(orderForm.locator('[data-role="outcome-option-select-trigger"]')).toHaveCount(0);
+  await expect(selector).toBeVisible();
   await expect(trigger).toBeVisible();
   await expect(trigger).toContainText("France");
-  await expect(orderForm.locator('[data-role="outcome-option-select-menu"]')).toHaveCount(0);
+  await expect(selector.locator('[data-role="outcome-option-select-menu"]')).toHaveCount(0);
   await expect(rows).toHaveCount(0);
 
   await trigger.click();
-  const menu = orderForm.locator('[data-role="outcome-option-select-menu"]');
+  const menu = selector.locator('[data-role="outcome-option-select-menu"]');
   await expect(menu).toBeVisible();
   await expect(menu).toContainText("Live Outcomes");
   await expect(menu).toContainText("% Chance");

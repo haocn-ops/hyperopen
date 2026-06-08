@@ -135,7 +135,7 @@
                                           :side-label "No"
                                           :coin "#1891"}]}))
 
-(deftest order-form-renders-multi-outcome-options-as-closed-dropdown-test
+(deftest order-form-omits-multi-outcome-option-selector-from-body-test
   (let [view-node (view/order-form-view (grouped-world-cup-state {}))
         trigger (find-first-node view-node
                                  (fn [node]
@@ -150,16 +150,14 @@
                                          (= "outcome-option-select-row"
                                             (get-in node [1 :data-role]))))
         strings (set (collect-strings view-node))]
-    (is (some? trigger))
-    (is (= [[:actions/toggle-outcome-option-dropdown]]
-           (get-in trigger [1 :on :click])))
-    (is (contains? strings "France"))
-    (is (not (contains? strings "Argentina")))
-    (is (not (contains? strings "Spain")))
+    (is (nil? trigger))
+    (is (contains? strings "Buy Yes"))
+    (is (contains? strings "Buy No"))
+    (is (not (contains? strings "Live Outcomes")))
     (is (nil? menu))
     (is (= [] option-buttons))))
 
-(deftest order-form-open-multi-outcome-dropdown-renders-searchable-live-option-table-test
+(deftest order-form-open-multi-outcome-dropdown-state-does-not-render-body-menu-test
   (let [view-node (view/order-form-view
                    (grouped-world-cup-state {:outcome-option-dropdown-open? true
                                              :outcome-option-query "sp"}))
@@ -169,26 +167,18 @@
                                    (get-in node [1 :data-role]))))
         search-input (find-first-node view-node
                                       (fn [node]
-                                        (= :input (first node))))
+                                        (= "Search outcome options"
+                                           (get-in node [1 :aria-label]))))
         option-buttons (find-all-nodes view-node
                                        (fn [node]
                                          (= "outcome-option-select-row"
                                             (get-in node [1 :data-role]))))
-        spain-button (first option-buttons)
         strings (set (collect-strings view-node))]
-    (is (some? menu))
-    (is (= "sp" (get-in search-input [1 :value])))
-    (is (= [[:actions/set-outcome-option-query [:event.target/value]]]
-           (get-in search-input [1 :on :input])))
-    (is (contains? strings "Live Outcomes"))
-    (is (contains? strings "% Chance"))
-    (is (contains? strings "Price"))
-    (is (contains? strings "Volume"))
-    (is (contains? strings "Open Int"))
-    (is (= ["Spain"] (mapv #(first (collect-strings %)) option-buttons)))
-    (is (= [[:actions/close-outcome-option-dropdown]
-            [:actions/update-order-form [:outcome-option-id] 212]]
-           (get-in spain-button [1 :on :click])))))
+    (is (nil? menu))
+    (is (nil? search-input))
+    (is (not (contains? strings "Live Outcomes")))
+    (is (not (contains? strings "Spain")))
+    (is (= [] option-buttons))))
 
 (deftest order-form-keeps-binary-outcome-options-as-two-button-selector-test
   (let [state (assoc (base-state {:type :limit
@@ -220,11 +210,11 @@
                                  (fn [node]
                                    (= "outcome-option-select-trigger"
                                       (get-in node [1 :data-role]))))
-        san-antonio-button (button-node-by-label view-node "San Antonio")
-        new-york-button (button-node-by-label view-node "New York")]
+        strings (set (collect-strings view-node))]
     (is (nil? trigger))
-    (is (some? san-antonio-button))
-    (is (some? new-york-button))))
+    (is (contains? strings "Buy Yes"))
+    (is (contains? strings "Buy No"))
+    (is (not (contains? strings "Live Outcomes")))))
 
 (deftest leverage-row-renders-isolated-margin-label-when-selected-test
   (let [view-node (view/order-form-view (base-state {:margin-mode :isolated}))

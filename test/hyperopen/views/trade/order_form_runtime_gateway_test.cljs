@@ -44,6 +44,7 @@
     (is (contains? supported-ids :order-form/set-order-margin-mode))
     (is (contains? supported-ids :order-form/set-order-ui-leverage-draft))
     (is (contains? supported-ids :order-form/set-order-size-input-mode))
+    (is (contains? supported-ids :order-form/select-outcome-option))
     (is (contains? supported-ids :order-form/update-order-form))
     (is (contains? supported-ids :order-form/submit-order))))
 

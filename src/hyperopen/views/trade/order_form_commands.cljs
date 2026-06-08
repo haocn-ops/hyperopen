@@ -113,7 +113,7 @@
   (update-order-field [:outcome-side] side-index))
 
 (defn set-order-outcome-option [outcome-id]
-  (update-order-field [:outcome-option-id] outcome-id))
+  (command :order-form/select-outcome-option outcome-id))
 
 (defn set-limit-price-input []
   (update-order-field [:price] event-target-value))

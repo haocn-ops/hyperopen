@@ -126,7 +126,6 @@
 (s/def ::submit-unlocked-cancel-request-args
   (s/or :request-only (s/tuple ::api-submit-request)
         :request-and-path-values (s/tuple ::api-submit-request ::common/path-values)))
-
 (s/def ::set-ui-theme-args (s/tuple ::common/non-empty-string))
 
 (s/def ::action-id (s/and keyword?
@@ -425,6 +424,7 @@
    :actions/close-outcome-option-dropdown ::common/no-args
    :actions/set-outcome-option-query ::common/single-input-args
    :actions/handle-outcome-option-dropdown-keydown ::common/key-args
+   :actions/select-outcome-option ::common/single-input-args
    :actions/set-order-ui-leverage-draft ::common/single-input-args
    :actions/confirm-order-ui-leverage ::common/no-args
    :actions/set-order-ui-leverage ::common/single-input-args

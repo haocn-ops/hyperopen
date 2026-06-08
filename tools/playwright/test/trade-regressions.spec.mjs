@@ -553,60 +553,98 @@ async function seedGroupedOutcomeAssetSelectorState(page, { activeTab = null } =
       optionLabel: "New York",
       mark: 0.33
     });
-    const franceYes = side({
-      sideIndex: 0,
-      sideName: "Yes",
-      coin: "#1890",
-      assetId: 100001890,
-      outcomeId: 189,
-      optionLabel: "France",
-      mark: 0.17
-    });
-    const franceNo = side({
-      sideIndex: 1,
-      sideName: "No",
-      coin: "#1891",
-      assetId: 100001891,
-      outcomeId: 189,
-      optionLabel: "France",
-      mark: 0.83
-    });
-    const spainYes = side({
-      sideIndex: 0,
-      sideName: "Yes",
-      coin: "#2120",
-      assetId: 100002120,
-      outcomeId: 212,
-      optionLabel: "Spain",
-      mark: 0.17
-    });
-    const spainNo = side({
-      sideIndex: 1,
-      sideName: "No",
-      coin: "#2121",
-      assetId: 100002121,
-      outcomeId: 212,
-      optionLabel: "Spain",
-      mark: 0.83
-    });
-    const argentinaYes = side({
-      sideIndex: 0,
-      sideName: "Yes",
-      coin: "#1730",
-      assetId: 100001730,
-      outcomeId: 173,
-      optionLabel: "Argentina",
-      mark: 0.14
-    });
-    const argentinaNo = side({
-      sideIndex: 1,
-      sideName: "No",
-      coin: "#1731",
-      assetId: 100001731,
-      outcomeId: 173,
-      optionLabel: "Argentina",
-      mark: 0.86
-    });
+    const worldCupSpecs = [
+      { label: "Algeria", outcomeId: 301, coinBase: 301, mark: 0.00244, volume24h: 0, openInterest: 27_779 },
+      { label: "Argentina", outcomeId: 173, coinBase: 173, mark: 0.09005, volume24h: 2_395, openInterest: 50_807 },
+      { label: "Australia", outcomeId: 302, coinBase: 302, mark: 0.00478, volume24h: 0, openInterest: 27_596 },
+      { label: "Austria", outcomeId: 303, coinBase: 303, mark: 0.00287, volume24h: 0, openInterest: 27_792 },
+      { label: "Belgium", outcomeId: 304, coinBase: 304, mark: 0.02001, volume24h: 42, openInterest: 28_913 },
+      { label: "Bosnia and Herzegovina", outcomeId: 305, coinBase: 305, mark: 0.00369, volume24h: 2, openInterest: 27_787 },
+      { label: "Brazil", outcomeId: 306, coinBase: 306, mark: 0.085, volume24h: 444, openInterest: 48_379 },
+      { label: "Canada", outcomeId: 307, coinBase: 307, mark: 0.0018, volume24h: 0, openInterest: 27_596 },
+      { label: "Cape Verde", outcomeId: 308, coinBase: 308, mark: 0.00259, volume24h: 0, openInterest: 27_792 },
+      { label: "Colombia", outcomeId: 309, coinBase: 309, mark: 0.01444, volume24h: 26, openInterest: 27_811 },
+      { label: "Congo DR", outcomeId: 310, coinBase: 310, mark: 0.00219, volume24h: 0, openInterest: 27_596 },
+      { label: "Croatia", outcomeId: 311, coinBase: 311, mark: 0.008, volume24h: 85, openInterest: 28_004 },
+      { label: "Curacao", outcomeId: 312, coinBase: 312, mark: 0.0015, volume24h: 0, openInterest: 27_500 },
+      { label: "Czechia", outcomeId: 313, coinBase: 313, mark: 0.004, volume24h: 4, openInterest: 27_640 },
+      { label: "Ecuador", outcomeId: 314, coinBase: 314, mark: 0.006, volume24h: 7, openInterest: 27_690 },
+      { label: "Egypt", outcomeId: 315, coinBase: 315, mark: 0.004, volume24h: 12, openInterest: 27_630 },
+      { label: "England", outcomeId: 316, coinBase: 316, mark: 0.1109, volume24h: 615, openInterest: 15_168 },
+      { label: "France", outcomeId: 189, coinBase: 189, mark: 0.17514, volume24h: 5_776, openInterest: 41_448 },
+      { label: "Germany", outcomeId: 317, coinBase: 317, mark: 0.05319, volume24h: 179, openInterest: 14_524 },
+      { label: "Ghana", outcomeId: 318, coinBase: 318, mark: 0.003, volume24h: 0, openInterest: 27_588 },
+      { label: "Greece", outcomeId: 319, coinBase: 319, mark: 0.002, volume24h: 0, openInterest: 27_550 },
+      { label: "Iran", outcomeId: 320, coinBase: 320, mark: 0.003, volume24h: 0, openInterest: 27_560 },
+      { label: "Italy", outcomeId: 321, coinBase: 321, mark: 0.018, volume24h: 39, openInterest: 28_210 },
+      { label: "Japan", outcomeId: 322, coinBase: 322, mark: 0.02137, volume24h: 50, openInterest: 12_230 },
+      { label: "Mexico", outcomeId: 323, coinBase: 323, mark: 0.015, volume24h: 33, openInterest: 28_100 },
+      { label: "Morocco", outcomeId: 324, coinBase: 324, mark: 0.026, volume24h: 58, openInterest: 28_840 },
+      { label: "Netherlands", outcomeId: 325, coinBase: 325, mark: 0.04064, volume24h: 415, openInterest: 12_713 },
+      { label: "Nigeria", outcomeId: 326, coinBase: 326, mark: 0.007, volume24h: 8, openInterest: 27_820 },
+      { label: "Norway", outcomeId: 327, coinBase: 327, mark: 0.0321, volume24h: 121, openInterest: 12_478 },
+      { label: "Paraguay", outcomeId: 328, coinBase: 328, mark: 0.006, volume24h: 5, openInterest: 27_780 },
+      { label: "Poland", outcomeId: 329, coinBase: 329, mark: 0.008, volume24h: 8, openInterest: 27_880 },
+      { label: "Portugal", outcomeId: 330, coinBase: 330, mark: 0.10559, volume24h: 3_092, openInterest: 22_417 },
+      { label: "Qatar", outcomeId: 331, coinBase: 331, mark: 0.001, volume24h: 0, openInterest: 27_500 },
+      { label: "Saudi Arabia", outcomeId: 332, coinBase: 332, mark: 0.004, volume24h: 3, openInterest: 27_640 },
+      { label: "Scotland", outcomeId: 333, coinBase: 333, mark: 0.006, volume24h: 5, openInterest: 27_790 },
+      { label: "Senegal", outcomeId: 334, coinBase: 334, mark: 0.006, volume24h: 7, openInterest: 27_800 },
+      { label: "Serbia", outcomeId: 335, coinBase: 335, mark: 0.005, volume24h: 3, openInterest: 27_720 },
+      { label: "South Korea", outcomeId: 336, coinBase: 336, mark: 0.008, volume24h: 8, openInterest: 27_880 },
+      { label: "Spain", outcomeId: 212, coinBase: 212, mark: 0.17098, volume24h: 1_791, openInterest: 27_056 },
+      { label: "Sweden", outcomeId: 337, coinBase: 337, mark: 0.005, volume24h: 5, openInterest: 27_720 },
+      { label: "Switzerland", outcomeId: 338, coinBase: 338, mark: 0.01, volume24h: 12, openInterest: 27_950 },
+      { label: "Tunisia", outcomeId: 339, coinBase: 339, mark: 0.003, volume24h: 0, openInterest: 27_560 },
+      { label: "Turkey", outcomeId: 340, coinBase: 340, mark: 0.009, volume24h: 10, openInterest: 27_910 },
+      { label: "Ukraine", outcomeId: 341, coinBase: 341, mark: 0.006, volume24h: 5, openInterest: 27_780 },
+      { label: "Uruguay", outcomeId: 342, coinBase: 342, mark: 0.02, volume24h: 39, openInterest: 28_300 },
+      { label: "USA", outcomeId: 343, coinBase: 343, mark: 0.015, volume24h: 20, openInterest: 28_050 },
+      { label: "Wales", outcomeId: 344, coinBase: 344, mark: 0.004, volume24h: 2, openInterest: 27_640 },
+      { label: "Ivory Coast", outcomeId: 345, coinBase: 345, mark: 0.005, volume24h: 5, openInterest: 27_700 }
+    ];
+    const makeWorldCupOption = (spec) => {
+      const yesCoin = `#${spec.coinBase}0`;
+      const noCoin = `#${spec.coinBase}1`;
+      const yes = side({
+        sideIndex: 0,
+        sideName: "Yes",
+        coin: yesCoin,
+        assetId: 100_000_000 + spec.coinBase * 10,
+        outcomeId: spec.outcomeId,
+        optionLabel: spec.label,
+        mark: spec.mark
+      });
+      const no = side({
+        sideIndex: 1,
+        sideName: "No",
+        coin: noCoin,
+        assetId: 100_000_001 + spec.coinBase * 10,
+        outcomeId: spec.outcomeId,
+        optionLabel: spec.label,
+        mark: Math.max(0, 1 - spec.mark)
+      });
+      return {
+        ...spec,
+        yes,
+        no,
+        option: option({
+          label: spec.label,
+          outcomeId: spec.outcomeId,
+          yes,
+          no,
+          mark: spec.mark,
+          volume24h: spec.volume24h,
+          openInterest: spec.openInterest
+        })
+      };
+    };
+    const worldCupRows = worldCupSpecs.map(makeWorldCupOption);
+    const worldCupOptions = vector(worldCupRows.map((row) => row.option));
+    const worldCupSubscriptionCoins = vector(
+      worldCupRows.flatMap((row) => [c.get(row.yes, kw("coin")), c.get(row.no, kw("coin"))])
+    );
+    const franceWorldCup = worldCupRows.find((row) => row.label === "France");
 
     const questionOptions = vector([
       option({
@@ -635,35 +673,6 @@ async function seedGroupedOutcomeAssetSelectorState(page, { activeTab = null } =
         mark: 0.01181,
         volume24h: 352,
         openInterest: 3_075
-      })
-    ]);
-    const worldCupOptions = vector([
-      option({
-        label: "France",
-        outcomeId: 189,
-        yes: franceYes,
-        no: franceNo,
-        mark: 0.17,
-        volume24h: 3_000,
-        openInterest: 33_000
-      }),
-      option({
-        label: "Spain",
-        outcomeId: 212,
-        yes: spainYes,
-        no: spainNo,
-        mark: 0.17,
-        volume24h: 2_500,
-        openInterest: 32_000
-      }),
-      option({
-        label: "Argentina",
-        outcomeId: 173,
-        yes: argentinaYes,
-        no: argentinaNo,
-        mark: 0.14,
-        volume24h: 1_995,
-        openInterest: 33_616
       })
     ]);
     const rangeAliases = stringMap([
@@ -736,10 +745,10 @@ async function seedGroupedOutcomeAssetSelectorState(page, { activeTab = null } =
       ["fallback-outcome-id", 171],
       ["named-outcome-ids", vector([189, 212, 173])],
       ["question-options", worldCupOptions],
-      ["outcome-sides", vector([franceYes, franceNo])],
-      ["outcome-subscription-coins", vector(["#1890", "#1891", "#2120", "#2121", "#1730", "#1731"])],
+      ["outcome-sides", vector([franceWorldCup.yes, franceWorldCup.no])],
+      ["outcome-subscription-coins", worldCupSubscriptionCoins],
       ["outcome-summary", "France 17%  *  Spain 17%  *  Argentina 14%"],
-      ["mark", 0.17],
+      ["mark", 0.17514],
       ["volume24h", 40_000],
       ["openInterest", 325_917]
     ]);
@@ -1555,7 +1564,14 @@ test("market strip uses searchable dropdown for multi-option outcome markets @sm
   await expect(rows).toHaveCount(0);
 
   await trigger.hover();
-  await expect(marketStrip.locator('[data-role="outcome-market-tooltip"]')).toHaveCSS("opacity", "0");
+  await expect.poll(async () => {
+    const tooltip = marketStrip.locator('[data-role="outcome-market-tooltip"]');
+    if (await tooltip.count() === 0) {
+      return "hidden";
+    }
+    const opacity = await tooltip.first().evaluate((node) => getComputedStyle(node).opacity);
+    return opacity === "0" ? "hidden" : "visible";
+  }, { timeout: 5_000 }).toBe("hidden");
 
   await trigger.click();
   const menu = selector.locator('[data-role="outcome-option-select-menu"]');
@@ -1575,6 +1591,37 @@ test("market strip uses searchable dropdown for multi-option outcome markets @sm
   await menu.getByRole("searchbox", { name: "Search outcome options" }).fill("sp");
   await expect(rows).toHaveCount(1);
   await expect(rows.first()).toContainText("Spain");
+  await rows.first().click();
+  await waitForIdle(page, { quietMs: 200, timeoutMs: 6_000, pollMs: 50 });
+
+  await expect(trigger).toContainText("Spain");
+  await expect(menu).toHaveCount(0);
+  await expect.poll(async () => {
+    return page.evaluate(() => {
+      const c = globalThis.cljs?.core;
+      const store = globalThis.hyperopen?.system?.store;
+      if (!c || !store) {
+        throw new Error("Hyperopen store unavailable");
+      }
+      const kw = (name) => c.keyword(name);
+      const path = (...segments) => c.PersistentVector.fromArray(segments.map(kw), true);
+      const state = c.deref(store);
+      const activeMarket = c.get(state, kw("active-market"));
+      return {
+        route: c.get_in(state, path("router", "path")),
+        activeAsset: c.get(state, kw("active-asset")),
+        selectedAsset: c.get(state, kw("selected-asset")),
+        activeMarketCoin: activeMarket ? c.get(activeMarket, kw("coin")) : null,
+        outcomeOptionId: c.get_in(state, path("order-form", "outcome-option-id"))
+      };
+    });
+  }, { timeout: 6_000 }).toEqual({
+    route: "/trade/%232120",
+    activeAsset: "#2120",
+    selectedAsset: "#2120",
+    activeMarketCoin: "#2120",
+    outcomeOptionId: 212
+  });
 });
 
 test("outcome market tooltip stays within active selector width and glows on hover @regression", async ({ page }) => {

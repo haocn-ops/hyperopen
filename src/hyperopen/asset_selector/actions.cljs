@@ -343,6 +343,66 @@
     (select-asset state market)
     []))
 
+(defn- outcome-option-id
+  [option]
+  (parse-int-value (:outcome-id option)))
+
+(defn- selected-question-option
+  [market outcome-id]
+  (let [outcome-id* (parse-int-value outcome-id)]
+    (some (fn [option]
+            (when (= outcome-id* (outcome-option-id option))
+              option))
+          (:question-options market))))
+
+(defn- selected-outcome-side-index
+  [state market]
+  (or (parse-int-value (get-in state [:order-form :outcome-side]))
+      (parse-int-value (get-in state [:order-form :outcome-side-index]))
+      (parse-int-value (get-in state [:active-market :outcome-side-index]))
+      (parse-int-value (:side-index (first (:outcome-sides market))))
+      0))
+
+(defn- selected-option-side-coin
+  [option side-index]
+  (or (:coin (some (fn [side]
+                     (when (= side-index (parse-int-value (:side-index side)))
+                       side))
+                   (:sides option)))
+      (case side-index
+        0 (:yes-coin option)
+        1 (:no-coin option)
+        nil)
+      (:yes-coin option)
+      (:coin (first (:sides option)))))
+
+(defn- current-outcome-market
+  [state]
+  (let [active-market (:active-market state)]
+    (or (when (= :outcome (:market-type active-market))
+          active-market)
+        (when-let [active-asset (:active-asset state)]
+          (let [market-by-key (get-in state [:asset-selector :market-by-key] {})]
+            (markets/resolve-or-infer-market-by-coin market-by-key active-asset))))))
+
+(defn select-outcome-option
+  [state outcome-id]
+  (if-let [market (current-outcome-market state)]
+    (if-let [option (selected-question-option market outcome-id)]
+      (let [side-index (selected-outcome-side-index state market)
+            selected-coin (selected-option-side-coin option side-index)
+            outcome-id* (outcome-option-id option)
+            state* (cond-> (-> state
+                                (assoc-in [:order-form-ui :outcome-option-dropdown-open?] false)
+                                (assoc-in [:order-form-ui :outcome-option-query] ""))
+                     (map? (:order-form state))
+                     (assoc-in [:order-form :outcome-option-id] outcome-id*))]
+        (if (seq selected-coin)
+          (select-asset state* selected-coin)
+          []))
+      [])
+    []))
+
 (defn update-asset-search
   [_state value]
   (append-selector-subscription-sync

@@ -70,6 +70,9 @@
    {:command-id :order-form/handle-outcome-option-dropdown-keydown
     :action-id :actions/handle-outcome-option-dropdown-keydown
     :handler-key :handle-outcome-option-dropdown-keydown}
+   {:command-id :order-form/select-outcome-option
+    :action-id :actions/select-outcome-option
+    :handler-key :select-outcome-option}
    {:command-id :order-form/select-pro-order-type
     :action-id :actions/select-pro-order-type
     :handler-key :select-pro-order-type}

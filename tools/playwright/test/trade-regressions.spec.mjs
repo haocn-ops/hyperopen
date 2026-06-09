@@ -1718,8 +1718,9 @@ test("outcome market tooltip uses adaptive readable width and glows on hover @re
   expect(triggerGlow.borderColor).toContain("45, 212, 191");
   expect(triggerGlow.boxShadow).toContain("45, 212, 191");
 
-  const settlementLabel = tooltip.getByText("BTC mark price is above 78,213");
-  await expect(settlementLabel).toHaveCSS("white-space", "nowrap");
+  const settlementLabel = tooltip.locator('[data-role="outcome-tooltip-settlement-label"]');
+  await expect(settlementLabel).toHaveCSS("white-space", "normal");
+  await expect(settlementLabel).toContainText("BTC mark price is above 78,213");
   await expect(tooltip.getByText("on May 03, 2026 02:00 AM UTC")).toBeVisible();
   await expect(tooltip.getByText("Payouts are in USDH.")).toBeVisible();
   await expect(tooltip.getByText("Learn more")).toHaveCount(0);
@@ -1756,36 +1757,56 @@ test("outcome market tooltip scrolls long outcome details without becoming narro
   const trigger = hoverRegion.locator("button").first();
   const tooltip = page.locator('[data-role="outcome-market-tooltip"]');
   const summary = tooltip.locator('[data-role="outcome-tooltip-summary-scroll"]');
+  const scrollContainer = tooltip.locator('[data-role="outcome-tooltip-scroll-container"]');
 
   await hoverRegion.hover();
-  await expect(tooltip).toHaveCSS("opacity", "1");
+  await expect.poll(async () => {
+    return tooltip.evaluate((node) => Number(getComputedStyle(node).opacity));
+  }, { timeout: 5_000 }).toBeGreaterThan(0.9);
   await expect(summary).toContainText("Each associated outcome corresponds");
+  await expect(tooltip.getByText("Settlement Condition")).toHaveCount(0);
 
   const geometry = await page.evaluate(() => {
     const trigger = document.querySelector('[data-role="outcome-market-name-hover-region"] button');
     const panel = document.querySelector('[data-role="outcome-market-tooltip"]');
     const summary = document.querySelector('[data-role="outcome-tooltip-summary-scroll"]');
-    if (!trigger || !panel || !summary) {
+    const scrollContainer = document.querySelector('[data-role="outcome-tooltip-scroll-container"]');
+    const footer = document.querySelector('[data-role="outcome-tooltip-shield-icon"]')?.parentElement;
+    if (!trigger || !panel || !summary || !scrollContainer || !footer) {
       throw new Error("Long outcome tooltip geometry unavailable");
     }
     const triggerRect = trigger.getBoundingClientRect();
     const panelRect = panel.getBoundingClientRect();
     const summaryStyle = getComputedStyle(summary);
+    const scrollStyle = getComputedStyle(scrollContainer);
+    scrollContainer.scrollTop = scrollContainer.scrollHeight;
+    const footerRect = footer.getBoundingClientRect();
     return {
       triggerWidth: triggerRect.width,
       panelWidth: panelRect.width,
       panelRight: panelRect.right,
+      panelBottom: panelRect.bottom,
       viewportWidth: window.innerWidth,
+      viewportHeight: window.innerHeight,
       summaryClientHeight: summary.clientHeight,
       summaryScrollHeight: summary.scrollHeight,
-      summaryOverflowY: summaryStyle.overflowY
+      summaryOverflowY: summaryStyle.overflowY,
+      scrollClientHeight: scrollContainer.clientHeight,
+      scrollScrollHeight: scrollContainer.scrollHeight,
+      scrollOverflowY: scrollStyle.overflowY,
+      footerBottom: footerRect.bottom
     };
   });
 
   expect(geometry.panelWidth).toBeGreaterThan(geometry.triggerWidth + 240);
   expect(geometry.panelRight).toBeLessThanOrEqual(geometry.viewportWidth - 16 + 1);
-  expect(geometry.summaryOverflowY).toBe("auto");
-  expect(geometry.summaryScrollHeight).toBeGreaterThan(geometry.summaryClientHeight);
+  expect(geometry.panelBottom).toBeLessThanOrEqual(geometry.viewportHeight);
+  expect(geometry.summaryOverflowY).toBe("visible");
+  expect(geometry.summaryScrollHeight).toBeLessThanOrEqual(geometry.summaryClientHeight + 1);
+  expect(geometry.scrollOverflowY).toBe("auto");
+  expect(geometry.scrollScrollHeight).toBeGreaterThan(geometry.scrollClientHeight);
+  expect(geometry.footerBottom).toBeLessThanOrEqual(geometry.panelBottom);
+  await expect(scrollContainer).toContainText("Payouts are in USDH.");
 });
 
 test("disconnected stop spectate clears stale account surfaces @regression", async ({ page }) => {

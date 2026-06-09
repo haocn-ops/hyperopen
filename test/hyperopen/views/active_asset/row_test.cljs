@@ -117,7 +117,9 @@
                                                                                 :now-ms 1777751495000})
             strings (set (support/collect-strings view-node))
             tooltip (support/find-node-by-role view-node "outcome-market-tooltip")
-            summary-scroll (support/find-node-by-role view-node "outcome-tooltip-summary-scroll")]
+            scroll-container (support/find-node-by-role view-node "outcome-tooltip-scroll-container")
+            summary-scroll (support/find-node-by-role view-node "outcome-tooltip-summary-scroll")
+            settlement-label (support/find-node-by-role view-node "outcome-tooltip-settlement-label")]
         (is (contains? strings "Countdown"))
         (is (contains? strings "10h 8m 25s"))
         (is (contains? strings "% Chance"))
@@ -148,11 +150,14 @@
         (is (= {:width "min(44rem, calc(100vw - 2rem))"
                 :max-width "calc(100vw - 2rem)"}
                (get-in tooltip [1 :style])))
-        (is (= {:max-height "min(30rem, calc(100vh - 16rem))"}
-               (get-in summary-scroll [1 :style])))
-        (is (support/contains-class? summary-scroll "overflow-y-auto"))
+        (is (= {:max-height "min(40rem, calc(100vh - 5rem))"}
+               (get-in scroll-container [1 :style])))
+        (is (support/contains-class? scroll-container "overflow-y-auto"))
+        (is (not (support/contains-class? summary-scroll "overflow-y-auto")))
         (is (support/contains-class? view-node "shadow-[0_0_24px_rgba(45,212,191,0.10),0_18px_70px_rgba(0,0,0,0.55)]"))
-        (is (support/contains-class? view-node "whitespace-nowrap"))
+        (is (support/contains-class? settlement-label "whitespace-normal"))
+        (is (support/contains-class? settlement-label "break-words"))
+        (is (not (support/contains-class? settlement-label "whitespace-nowrap")))
         (is (support/contains-class? view-node "items-center"))
         (is (support/contains-class? view-node "group-hover/outcome-name:border-[#2dd4bf]/35"))
         (is (not (support/contains-class? tooltip "right-0")))

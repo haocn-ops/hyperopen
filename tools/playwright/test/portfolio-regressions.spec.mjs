@@ -398,6 +398,21 @@ async function seedPortfolioWalletAddress(page, address) {
   await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
 }
 
+async function seedPortfolioWebdata2(page, webdata2) {
+  await page.evaluate((payload) => {
+    const c = globalThis.cljs.core;
+    const kw = (name) => c.keyword(name);
+    const opts = c.PersistentArrayMap.fromArray([kw("keywordize-keys"), true], true);
+    const store = globalThis.hyperopen.system.store;
+    const nextState = c.assoc_in(
+      c.deref(store),
+      c.PersistentVector.fromArray([kw("webdata2")], true),
+      c.js__GT_clj(payload, opts)
+    );
+    c.reset_BANG_(store, nextState);
+  }, webdata2);
+}
+
 async function seedPortfolioLedgerRows(page, rows) {
   await page.evaluate((payload) => {
     const c = globalThis.cljs.core;
@@ -1425,6 +1440,62 @@ test("portfolio optimizer setup turnover cap switch disables and restores cap @r
   await expect(turnoverToggle).toHaveAttribute("aria-checked", "true");
   await expect(turnoverInput).toBeEnabled();
   await expect(turnoverInput).toHaveValue(/1(?:\.0)?/);
+});
+
+test("portfolio optimizer From holdings seeds current exposure constraints @regression", async ({ page }) => {
+  await visitRoute(page, "/portfolio/optimize/new");
+  await seedPortfolioWalletAddress(page, "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+  await waitForIdle(page, { quietMs: 800, timeoutMs: 8_000, pollMs: 50 });
+  await seedPortfolioWebdata2(page, {
+    clearinghouseState: {
+      marginSummary: { accountValue: "1000" },
+      assetPositions: [
+        {
+          position: {
+            coin: "BTC",
+            szi: "1",
+            positionValue: "1500",
+            leverage: { type: "cross", value: "5" }
+          }
+        },
+        {
+          position: {
+            coin: "ETH",
+            szi: "-1",
+            markPx: "500",
+            leverage: { type: "cross", value: "5" }
+          }
+        }
+      ]
+    }
+  });
+
+  await expect(page.locator("[data-role='portfolio-optimizer-setup-route-surface']"))
+    .toBeVisible();
+  await page.locator("[data-role='portfolio-optimizer-universe-use-current']").click();
+  await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
+
+  await expect(page.locator("[data-role='portfolio-optimizer-universe-selected-row-perp:BTC']"))
+    .toBeVisible();
+  await expect(page.locator("[data-role='portfolio-optimizer-universe-selected-row-perp:ETH']"))
+    .toBeVisible();
+
+  const constraintsPanel = page.locator("[data-role='portfolio-optimizer-constraints-panel']");
+  await constraintsPanel.locator("summary").click();
+  await expect.poll(async () => constraintsPanel.evaluate((element) => element.open)).toBe(true);
+  await expect(page.locator("[data-role='portfolio-optimizer-constraint-gross-max-input']"))
+    .toHaveValue("2");
+  await expect(page.locator("[data-role='portfolio-optimizer-constraint-net-min-input']"))
+    .toHaveValue("0.95");
+  await expect(page.locator("[data-role='portfolio-optimizer-constraint-net-max-input']"))
+    .toHaveValue("1.05");
+  await expect(page.locator("[data-role='portfolio-optimizer-constraint-max-asset-weight-input']"))
+    .toHaveValue("1.5");
+  await expect(page.locator("[data-role='portfolio-optimizer-constraint-max-turnover-toggle']"))
+    .toHaveAttribute("aria-checked", "false");
+  await expect(page.locator("[data-role='portfolio-optimizer-constraint-max-turnover-input']"))
+    .toBeDisabled();
+  await expect(constraintsPanel).toContainText("no cap");
 });
 
 test("portfolio optimizer setup exposes separate model layers @regression", async ({ page }) => {

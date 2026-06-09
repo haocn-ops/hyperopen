@@ -14,10 +14,60 @@
 
 (def ^:private positive-number? coercion/positive-number?)
 
+(def ^:private finite-number? coercion/finite-number?)
+
+(def ^:private exposure-band-width
+  0.05)
+
+(def ^:private constraint-rounding-scale
+  100)
+
+(def ^:private rounding-epsilon
+  0.000000001)
+
 (defn- zeroish?
   [value]
   (or (nil? value)
       (zero? value)))
+
+(defn- ceil-to-constraint-precision
+  [value]
+  (/ (js/Math.ceil (- (* value constraint-rounding-scale)
+                      rounding-epsilon))
+     constraint-rounding-scale))
+
+(defn- floor-to-constraint-precision
+  [value]
+  (/ (js/Math.floor (+ (* value constraint-rounding-scale)
+                       rounding-epsilon))
+     constraint-rounding-scale))
+
+(defn- current-weight-for-cap
+  [nav-usdc exposure]
+  (or (let [weight (parse-number (:weight exposure))]
+        (when (finite-number? weight)
+          (abs-number weight)))
+      (let [notional (or (parse-number (:abs-notional-usdc exposure))
+                         (some-> (:signed-notional-usdc exposure)
+                                 parse-number
+                                 abs-number))]
+        (when (and (positive-number? nav-usdc)
+                   (finite-number? notional))
+          (/ notional nav-usdc)))))
+
+(defn- max-current-asset-weight
+  [nav-usdc exposures]
+  (reduce max
+          0
+          (keep (partial current-weight-for-cap nav-usdc)
+                exposures)))
+
+(defn- existing-max-asset-weight
+  [constraints]
+  (let [value (parse-number (:max-asset-weight constraints))]
+    (when (and (finite-number? value)
+               (not (neg? value)))
+      value)))
 
 (defn- market-mark-price
   [market]
@@ -327,3 +377,38 @@
                           exposures)
      :warnings (vec (concat perp-warnings spot-warnings))
      :signature (snapshot-signature state address)}))
+
+(defn current-derived-constraints
+  [snapshot existing-constraints]
+  (let [constraints (or existing-constraints {})
+        nav-usdc (parse-number (get-in snapshot [:capital :nav-usdc]))
+        gross-usdc (parse-number (get-in snapshot [:capital :gross-exposure-usdc]))
+        net-usdc (parse-number (get-in snapshot [:capital :net-exposure-usdc]))
+        exposures (seq (:exposures snapshot))]
+    (when (and (positive-number? nav-usdc)
+               (finite-number? gross-usdc)
+               (finite-number? net-usdc)
+               exposures)
+      (let [gross-ratio (/ gross-usdc nav-usdc)
+            net-ratio (/ net-usdc nav-usdc)
+            net-min (floor-to-constraint-precision
+                     (- net-ratio exposure-band-width))
+            net-max (ceil-to-constraint-precision
+                     (+ net-ratio exposure-band-width))
+            gross-max (ceil-to-constraint-precision
+                       (max gross-ratio
+                            (abs-number net-min)
+                            (abs-number net-max)))
+            current-max-asset-weight (ceil-to-constraint-precision
+                                      (max-current-asset-weight nav-usdc
+                                                                exposures))
+            max-asset-weight (max (or (existing-max-asset-weight constraints)
+                                      0)
+                                  current-max-asset-weight)]
+        (assoc constraints
+               :long-only? false
+               :gross-max gross-max
+               :net-min net-min
+               :net-max net-max
+               :max-asset-weight max-asset-weight
+               :max-turnover nil)))))

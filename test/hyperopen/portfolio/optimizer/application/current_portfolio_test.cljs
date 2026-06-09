@@ -121,3 +121,74 @@
              :instrument-id "spot:MISSING"
              :coin "MISSING"}]
            (:warnings snapshot)))))
+
+(deftest current-derived-constraints-center-gross-and-net-on-current-book-test
+  (let [snapshot {:capital {:nav-usdc 10000
+                            :gross-exposure-usdc 16000
+                            :net-exposure-usdc 10000}
+                  :exposures [{:instrument-id "perp:BTC"
+                               :weight 1.3
+                               :signed-notional-usdc 13000
+                               :abs-notional-usdc 13000
+                               :side :long}
+                              {:instrument-id "perp:ETH"
+                               :weight -0.3
+                               :signed-notional-usdc -3000
+                               :abs-notional-usdc 3000
+                               :side :short}]}
+        existing {:long-only? true
+                  :gross-max 2.0
+                  :net-min 1.0
+                  :net-max 1.0
+                  :max-asset-weight 0.5
+                  :dust-usdc 0.0
+                  :max-turnover 1.0
+                  :rebalance-tolerance 0.03}
+        constraints (current-portfolio/current-derived-constraints
+                     snapshot
+                     existing)]
+    (is (= false (:long-only? constraints)))
+    (is (= 1.6 (:gross-max constraints)))
+    (is (= 0.95 (:net-min constraints)))
+    (is (= 1.05 (:net-max constraints)))
+    (is (= 1.3 (:max-asset-weight constraints)))
+    (is (nil? (:max-turnover constraints)))
+    (is (= 0.03 (:rebalance-tolerance constraints)))))
+
+(deftest current-derived-constraints-keep-partial-exposure-near-current-test
+  (let [snapshot {:capital {:nav-usdc 100005
+                            :gross-exposure-usdc 32005
+                            :net-exposure-usdc 20005}
+                  :exposures [{:instrument-id "perp:BTC"
+                               :weight (/ 25000 100005)
+                               :signed-notional-usdc 25000
+                               :abs-notional-usdc 25000}
+                              {:instrument-id "perp:ETH"
+                               :weight (/ -6000 100005)
+                               :signed-notional-usdc -6000
+                               :abs-notional-usdc 6000}
+                              {:instrument-id "spot:PURR"
+                               :weight (/ 5 100005)
+                               :signed-notional-usdc 5
+                               :abs-notional-usdc 5}]}
+        constraints (current-portfolio/current-derived-constraints
+                     snapshot
+                     {:gross-max 2.0
+                      :net-min 1.0
+                      :net-max 1.0
+                      :max-asset-weight 0.5
+                      :max-turnover 1.0})]
+    (is (= 0.33 (:gross-max constraints)))
+    (is (= 0.15 (:net-min constraints)))
+    (is (= 0.26 (:net-max constraints)))
+    (is (= 0.5 (:max-asset-weight constraints)))
+    (is (= false (:long-only? constraints)))
+    (is (nil? (:max-turnover constraints)))))
+
+(deftest current-derived-constraints-return-nil-without-positive-capital-test
+  (is (nil? (current-portfolio/current-derived-constraints
+             {:capital {:nav-usdc 0
+                        :gross-exposure-usdc 0
+                        :net-exposure-usdc 0}
+              :exposures []}
+             {:gross-max 2.0}))))

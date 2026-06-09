@@ -359,7 +359,10 @@
   (let [snapshot (current-portfolio/current-portfolio-snapshot state)
         universe (usable-universe-from-current-exposures
                   state
-                  (:exposures snapshot))]
+                  (:exposures snapshot))
+        current-derived-constraints
+        (when-let [constraints (get-in state contracts/draft-constraints-path)]
+          (current-portfolio/current-derived-constraints snapshot constraints))]
     (if (seq universe)
       (let [prefetch-state (history-prefetch/cleanup-to-instrument-ids
                             (history-prefetch/prefetch-state state)
@@ -375,6 +378,10 @@
                                   (:changed? prefetch-plan))
             path-values (cond-> (into [[contracts/draft-universe-path universe]]
                                       (black-litterman-universe-path-values state universe))
+                          current-derived-constraints
+                          (conj [contracts/draft-constraints-path
+                                 current-derived-constraints])
+
                           prefetch-changed?
                           (conj [contracts/history-prefetch-path
                                  (:state prefetch-plan)]))]

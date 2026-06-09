@@ -1,6 +1,7 @@
 (ns hyperopen.runtime.collaborators.order
   (:require [hyperopen.funding.actions :as funding-actions]
-            [hyperopen.order.actions :as order-actions]))
+            [hyperopen.order.actions :as order-actions]
+            [hyperopen.order.outcome-option-sort :as outcome-option-sort]))
 
 (defn action-deps []
   {:select-order-entry-mode order-actions/select-order-entry-mode
@@ -28,6 +29,7 @@
    :toggle-outcome-option-dropdown order-actions/toggle-outcome-option-dropdown
    :close-outcome-option-dropdown order-actions/close-outcome-option-dropdown
    :set-outcome-option-query order-actions/set-outcome-option-query
+   :set-outcome-option-sort outcome-option-sort/set-outcome-option-sort
    :handle-outcome-option-dropdown-keydown order-actions/handle-outcome-option-dropdown-keydown
    :set-order-ui-leverage order-actions/set-order-ui-leverage
    :set-order-margin-mode order-actions/set-order-margin-mode

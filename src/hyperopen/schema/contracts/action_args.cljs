@@ -130,7 +130,6 @@
 
 (s/def ::action-id (s/and keyword?
                           #(= "actions" (namespace %))))
-
 (def action-args-spec-by-id
   {:actions/init-websockets ::common/no-args
    :actions/subscribe-to-asset ::common/coin-args
@@ -423,6 +422,7 @@
    :actions/toggle-outcome-option-dropdown ::common/no-args
    :actions/close-outcome-option-dropdown ::common/no-args
    :actions/set-outcome-option-query ::common/single-input-args
+   :actions/set-outcome-option-sort ::common/keyword-or-string-args
    :actions/handle-outcome-option-dropdown-keydown ::common/key-args
    :actions/select-outcome-option ::common/single-input-args
    :actions/set-order-ui-leverage-draft ::common/single-input-args

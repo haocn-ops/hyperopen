@@ -370,8 +370,7 @@
 
 (defn- outcome-option-market-strip-selector
   [{:keys [outcome-options outcome-option-id outcome-option-ui]} outcome-handlers]
-  (when (and outcome-handlers
-             (> (count outcome-options) 1))
+  (when (and outcome-handlers (> (count outcome-options) 1))
     [:div {:class ["relative" "min-w-[11rem]" "max-w-[18rem]" "flex-none"]
            :style (when (:open? outcome-option-ui)
                     {:z-index 260})
@@ -380,8 +379,9 @@
                                              outcome-option-id
                                              outcome-handlers
                                              (assoc outcome-option-ui
-                                                    :menu-width-classes
-                                                    ["w-[min(42rem,calc(100vw-2rem))]"]))]))
+                                                    :menu-width-classes ["w-[min(42rem,calc(100vw-2rem))]"]
+                                                    :menu-style
+                                                    {:width "min(42rem, calc(100vw - 2rem))" :max-width "calc(100vw - 2rem)"}))]))
 
 (defn- desktop-outcome-active-asset-row
   [{:keys [icon-market

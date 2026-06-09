@@ -28,6 +28,7 @@
    (commands/toggle-outcome-option-dropdown)
    (commands/close-outcome-option-dropdown)
    (commands/set-outcome-option-query)
+   (commands/set-outcome-option-sort :chance)
    (commands/handle-outcome-option-dropdown-keydown commands/event-key)
    (commands/select-pro-order-type :scale)
    (commands/set-order-ui-leverage-draft 18)
@@ -97,6 +98,9 @@
   (is (= {:command-id :order-form/set-outcome-option-query
           :args [commands/event-target-value]}
          (commands/set-outcome-option-query)))
+  (is (= {:command-id :order-form/set-outcome-option-sort
+          :args [:chance]}
+         (commands/set-outcome-option-sort :chance)))
   (is (= {:command-id :order-form/update-order-form
           :args [[:twap :hours] commands/event-target-value]}
          (commands/set-twap-hours-input)))
@@ -134,7 +138,10 @@
           (commands/toggle-reduce-only))))
   (is (= [[:actions/select-outcome-option 162]]
          (intent-adapter/command->actions
-          (commands/set-order-outcome-option 162)))))
+          (commands/set-order-outcome-option 162))))
+  (is (= [[:actions/set-outcome-option-sort :chance]]
+         (intent-adapter/command->actions
+          (commands/set-outcome-option-sort :chance)))))
 
 (deftest command-catalog-covers-all-command-builders-test
   (let [supported-ids (command-catalog/supported-command-ids)]

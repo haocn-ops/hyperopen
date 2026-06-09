@@ -39,7 +39,9 @@
              :on-toggle-option-dropdown (dispatch-command (cmd/toggle-outcome-option-dropdown))
              :on-close-option-dropdown (dispatch-command (cmd/close-outcome-option-dropdown))
              :on-option-dropdown-keydown (dispatch-command (cmd/handle-outcome-option-dropdown-keydown cmd/event-key))
-             :on-change-option-query (dispatch-command (cmd/set-outcome-option-query))}
+             :on-change-option-query (dispatch-command (cmd/set-outcome-option-query))
+             :on-sort-option-column (fn [column]
+                                      (dispatch-command (cmd/set-outcome-option-sort column)))}
 
    :price {:on-set-to-mid (dispatch-command (cmd/set-order-price-to-mid))
            :on-focus (dispatch-command (cmd/focus-order-price-input))

@@ -300,7 +300,9 @@
              :funding-ui (if tooltip-open?
                             (open-tooltip-funding-ui-state state active-asset active-market)
                             (funding-tooltip-ui-state state))
-             :trade-ui {:mobile-asset-details-open? (true? (get-in state [:trade-ui :mobile-asset-details-open?]))}}
+             :trade-ui {:mobile-asset-details-open? (true? (get-in state [:trade-ui :mobile-asset-details-open?]))
+                        :outcome-option-sort-by (get-in state [:trade-ui :outcome-option-sort-by])
+                        :outcome-option-sort-direction (get-in state [:trade-ui :outcome-option-sort-direction])}}
       tooltip-open?
       (assoc :account (:account state)
              :perp-dex-clearinghouse (:perp-dex-clearinghouse state)
@@ -432,7 +434,11 @@
                                                 [:order-form-ui :outcome-option-dropdown-open?]))
                          :query (or (get-in full-state
                                             [:order-form-ui :outcome-option-query])
-                                    "")}
+                                    "")
+                         :sort-by (get-in full-state
+                                          [:trade-ui :outcome-option-sort-by])
+                         :sort-direction (get-in full-state
+                                                 [:trade-ui :outcome-option-sort-direction])}
      :outcome-tooltip (outcome-tooltip-model market)
      :outcome-chance-label outcome-chance-label
      :missing-icons (get-in full-state [:asset-selector :missing-icons] #{})

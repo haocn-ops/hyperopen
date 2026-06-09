@@ -1,8 +1,8 @@
 (ns hyperopen.views.trade.order-form-controls
-  (:require [clojure.string :as str]
-            [hyperopen.state.trading :as trading]
+  (:require [hyperopen.state.trading :as trading]
             [hyperopen.utils.formatting :as fmt]
-            [hyperopen.views.trade.order-form-component-primitives :as primitives]))
+            [hyperopen.views.trade.order-form-component-primitives :as primitives]
+            [hyperopen.views.trade.outcome-option-sort :as outcome-option-sort]))
 
 (defn- price-context-accessory [{:keys [label mid-available?]} on-set-to-mid]
   [:button {:type "button"
@@ -534,6 +534,8 @@
     (fmt/format-large-currency number-value)
     "--"))
 
+(def ^:private outcome-option-grid-template "minmax(0, 1.35fr) 4.5rem 5rem 5.5rem 5.75rem")
+
 (defn- outcome-option-row-button
   [option selected-option-id outcome-handlers]
   (let [option-id (outcome-option-id option)
@@ -544,7 +546,6 @@
               :data-role "outcome-option-select-row"
               :class (into ["grid"
                             "w-full"
-                            "grid-cols-[minmax(0,1.35fr)_4.5rem_5rem_5.5rem_5.75rem]"
                             "items-center"
                             "gap-3"
                             "rounded"
@@ -559,6 +560,7 @@
                            (if (= option-id selected-option-id)
                              ["bg-[#23383b]" "text-[#F6FEFD]"]
                              ["text-[#F6FEFD]" "hover:bg-base-200"]))
+              :style {:grid-template-columns outcome-option-grid-template}
               :on {:click ((:on-select-outcome-option outcome-handlers) option-id)}}
      [:span {:class ["truncate" "font-semibold"]} label]
      [:span {:class ["num" "text-[#D2DAD7]"]} (option-chance-text option)]
@@ -566,19 +568,17 @@
      [:span {:class ["num" "text-[#D2DAD7]"]} (option-currency-text (:volume24h option))]
      [:span {:class ["num" "text-[#D2DAD7]"]} (option-currency-text (:openInterest option))]]))
 
-(defn- option-matches-query?
-  [query option]
-  (let [query* (some-> query str str/trim str/lower-case)]
-    (or (not (seq query*))
-        (str/includes? (str/lower-case (str (or (:label option) "")))
-                       query*))))
-
 (defn- outcome-option-dropdown
-  [outcome-options selected-option-id outcome-handlers {:keys [open? query menu-width-classes]}]
+  [outcome-options selected-option-id outcome-handlers {:keys [open?
+                                                               query menu-width-classes menu-style
+                                                               sort-by
+                                                               sort-direction]}]
   (let [selected-option (selected-outcome-option outcome-options selected-option-id)
         selected-id (outcome-option-id selected-option)
         selected-label (or (:label selected-option) (str "Outcome " selected-id))
-        filtered-options (filterv #(option-matches-query? query %) outcome-options)
+        sorted-options (outcome-option-sort/filtered-sorted-options outcome-options query sort-by sort-direction)
+        active-sort-column (outcome-option-sort/normalize-column sort-by)
+        active-sort-direction (outcome-option-sort/normalize-direction sort-direction)
         trigger [:button {:type "button"
                           :aria-haspopup "listbox"
                           :aria-expanded (boolean open?)
@@ -621,7 +621,7 @@
                                    "shadow-[0_18px_54px_rgba(0,0,0,0.62)]"]
                                   (or menu-width-classes ["right-0"]))
                     :data-role "outcome-option-select-menu"
-                    :on {:keydown (:on-option-dropdown-keydown outcome-handlers)}}
+                    :style (merge {:background-color "#0B151A"} menu-style) :on {:keydown (:on-option-dropdown-keydown outcome-handlers)}}
               [:input {:type "search"
                        :value (or query "")
                        :placeholder "Search"
@@ -640,22 +640,22 @@
                        :on {:input (:on-change-option-query outcome-handlers)}}]
               [:div {:class ["mt-2"
                              "grid"
-                             "grid-cols-[minmax(0,1.35fr)_4.5rem_5rem_5.5rem_5.75rem]"
                              "gap-3"
                              "px-2"
                              "text-xs"
                              "font-medium"
-                             "text-[#949E9C]"]}
-               [:span "Live Outcomes"]
-               [:span "% Chance"]
-               [:span "Price"]
-               [:span "Volume"]
-               [:span "Open Int"]]
+                             "text-[#949E9C]"]
+                     :style {:grid-template-columns outcome-option-grid-template} :data-role "outcome-option-select-header-row"}
+               (outcome-option-sort/header "Live Outcomes" :label active-sort-column active-sort-direction outcome-handlers)
+               (outcome-option-sort/header "% Chance" :chance active-sort-column active-sort-direction outcome-handlers)
+               (outcome-option-sort/header "Price" :price active-sort-column active-sort-direction outcome-handlers)
+               (outcome-option-sort/header "Volume" :volume active-sort-column active-sort-direction outcome-handlers)
+               (outcome-option-sort/header "Open Int" :open-interest active-sort-column active-sort-direction outcome-handlers)]
               [:div {:class ["mt-1" "max-h-64" "overflow-y-auto"]
                      :role "listbox"
                      :aria-label "Outcome options"}
-               (if (seq filtered-options)
-                 (for [option filtered-options
+               (if (seq sorted-options)
+                 (for [option sorted-options
                        :let [option-id (outcome-option-id option)]]
                    ^{:key (str "outcome-option-menu-" option-id)}
                    (outcome-option-row-button option selected-option-id outcome-handlers))

@@ -234,6 +234,9 @@
                        {:outcome-handlers (outcome-option-handlers-fixture)})
             selector (support/find-node-by-role view-node "market-strip-outcome-option-selector")
             menu (support/find-node-by-role view-node "outcome-option-select-menu")
+            header-row (support/find-node-by-role view-node "outcome-option-select-header-row")
+            first-option-row (support/find-node-by-role view-node "outcome-option-select-row")
+            option-grid-template "minmax(0, 1.35fr) 4.5rem 5rem 5.5rem 5.75rem"
             search-input (support/find-node
                           #(and (vector? %)
                                 (= :input (first %)))
@@ -246,8 +249,14 @@
         (is (support/contains-class? menu "w-[min(42rem,calc(100vw-2rem))]"))
         (is (support/contains-class? menu "bg-[#0B151A]"))
         (is (support/contains-class? menu "z-[280]"))
+        (is (= {:background-color "#0B151A"
+                :width "min(42rem, calc(100vw - 2rem))"
+                :max-width "calc(100vw - 2rem)"}
+               (get-in menu [1 :style])))
         (is (= {:z-index 260}
                (get-in selector [1 :style])))
+        (is (= option-grid-template (get-in header-row [1 :style :grid-template-columns])))
+        (is (= option-grid-template (get-in first-option-row [1 :style :grid-template-columns])))
         (is (contains? strings "Live Outcomes"))
         (is (contains? strings "% Chance"))
         (is (contains? strings "Price"))

@@ -5,6 +5,7 @@
             [hyperopen.chart.settings :as chart-settings]
             [hyperopen.header.actions :as header-actions]
             [hyperopen.order.actions :as order-actions]
+            [hyperopen.order.outcome-option-sort :as outcome-option-sort]
             [hyperopen.orderbook.actions :as orderbook-actions]
             [hyperopen.orderbook.settings :as orderbook-settings]
             [hyperopen.portfolio.actions :as portfolio-actions]
@@ -431,6 +432,9 @@
 
 (def set-order-size-input-mode
   order-actions/set-order-size-input-mode)
+
+(def set-outcome-option-sort
+  outcome-option-sort/set-outcome-option-sort)
 
 (def focus-order-price-input
   order-actions/focus-order-price-input)

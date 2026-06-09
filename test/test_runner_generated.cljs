@@ -179,6 +179,7 @@
             [hyperopen.order.cancel-guard-test]
             [hyperopen.order.exchange-errors-test]
             [hyperopen.order.feedback-runtime-test]
+            [hyperopen.order.outcome-option-sort-test]
             [hyperopen.orderbook.actions-test]
             [hyperopen.orderbook.price-aggregation-test]
             [hyperopen.orderbook.settings-test]
@@ -456,6 +457,7 @@
             [hyperopen.views.active-asset.funding-tooltip-model-test]
             [hyperopen.views.active-asset.funding-tooltip-popover-test]
             [hyperopen.views.active-asset.icon-button-test]
+            [hyperopen.views.active-asset.outcome-option-sort-test]
             [hyperopen.views.active-asset.row-helpers-test]
             [hyperopen.views.active-asset.row-test]
             [hyperopen.views.active-asset.vm-test]
@@ -882,6 +884,7 @@
              'hyperopen.order.cancel-guard-test
              'hyperopen.order.exchange-errors-test
              'hyperopen.order.feedback-runtime-test
+             'hyperopen.order.outcome-option-sort-test
              'hyperopen.orderbook.actions-test
              'hyperopen.orderbook.price-aggregation-test
              'hyperopen.orderbook.settings-test
@@ -1159,6 +1162,7 @@
              'hyperopen.views.active-asset.funding-tooltip-model-test
              'hyperopen.views.active-asset.funding-tooltip-popover-test
              'hyperopen.views.active-asset.icon-button-test
+             'hyperopen.views.active-asset.outcome-option-sort-test
              'hyperopen.views.active-asset.row-helpers-test
              'hyperopen.views.active-asset.row-test
              'hyperopen.views.active-asset.vm-test

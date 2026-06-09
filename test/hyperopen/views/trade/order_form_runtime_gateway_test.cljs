@@ -41,6 +41,7 @@
     (is (contains? supported-ids :order-form/toggle-tif-dropdown))
     (is (contains? supported-ids :order-form/toggle-outcome-option-dropdown))
     (is (contains? supported-ids :order-form/set-outcome-option-query))
+    (is (contains? supported-ids :order-form/set-outcome-option-sort))
     (is (contains? supported-ids :order-form/set-order-margin-mode))
     (is (contains? supported-ids :order-form/set-order-ui-leverage-draft))
     (is (contains? supported-ids :order-form/set-order-size-input-mode))

@@ -67,6 +67,9 @@
    {:command-id :order-form/set-outcome-option-query
     :action-id :actions/set-outcome-option-query
     :handler-key :set-outcome-option-query}
+   {:command-id :order-form/set-outcome-option-sort
+    :action-id :actions/set-outcome-option-sort
+    :handler-key :set-outcome-option-sort}
    {:command-id :order-form/handle-outcome-option-dropdown-keydown
     :action-id :actions/handle-outcome-option-dropdown-keydown
     :handler-key :handle-outcome-option-dropdown-keydown}

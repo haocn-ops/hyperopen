@@ -1587,6 +1587,35 @@ test("market strip uses searchable dropdown for multi-option outcome markets @sm
   await expect(rows.nth(1)).toContainText("Argentina");
   await expect(rows.filter({ hasText: "France" })).toHaveCount(1);
   await expect(rows.filter({ hasText: "Spain" })).toHaveCount(1);
+  await expect(menu.locator('[data-role="outcome-option-sort-label"]')).toBeVisible();
+  await expect(menu.locator('[data-role="outcome-option-sort-chance"]')).toBeVisible();
+  await expect(menu.locator('[data-role="outcome-option-sort-price"]')).toBeVisible();
+  await expect(menu.locator('[data-role="outcome-option-sort-volume"]')).toBeVisible();
+  await expect(menu.locator('[data-role="outcome-option-sort-open-interest"]')).toBeVisible();
+  await expect(menu).toHaveCSS("background-color", "rgb(11, 21, 26)");
+  const menuBox = await menu.boundingBox();
+  expect(menuBox?.width).toBeGreaterThan(560);
+  const layoutProbe = await rows.first().evaluate((row) => {
+    const rowRect = row.getBoundingClientRect();
+    const cellRects = Array.from(row.children).map((child) => child.getBoundingClientRect());
+    return {
+      templateColumns: getComputedStyle(row).gridTemplateColumns,
+      rowHeight: rowRect.height,
+      cellCount: cellRects.length,
+      maxTopDelta: Math.max(...cellRects.map((rect) => Math.abs(rect.top - cellRects[0].top))),
+      columnsIncrease: cellRects.every((rect, index) => index === 0 || rect.left > cellRects[index - 1].left)
+    };
+  });
+  expect(layoutProbe.cellCount).toBe(5);
+  expect(layoutProbe.templateColumns.split(" ").length).toBe(5);
+  expect(layoutProbe.rowHeight).toBeLessThan(40);
+  expect(layoutProbe.maxTopDelta).toBeLessThan(2);
+  expect(layoutProbe.columnsIncrease).toBe(true);
+
+  await menu.locator('[data-role="outcome-option-sort-volume"]').click();
+  await expect(rows.first()).toContainText("France");
+  await menu.locator('[data-role="outcome-option-sort-label"]').click();
+  await expect(rows.first()).toContainText("Algeria");
 
   await menu.getByRole("searchbox", { name: "Search outcome options" }).fill("sp");
   await expect(rows).toHaveCount(1);
@@ -1606,12 +1635,10 @@ test("market strip uses searchable dropdown for multi-option outcome markets @sm
       const kw = (name) => c.keyword(name);
       const path = (...segments) => c.PersistentVector.fromArray(segments.map(kw), true);
       const state = c.deref(store);
-      const activeMarket = c.get(state, kw("active-market"));
       return {
         route: c.get_in(state, path("router", "path")),
         activeAsset: c.get(state, kw("active-asset")),
         selectedAsset: c.get(state, kw("selected-asset")),
-        activeMarketCoin: activeMarket ? c.get(activeMarket, kw("coin")) : null,
         outcomeOptionId: c.get_in(state, path("order-form", "outcome-option-id"))
       };
     });
@@ -1619,9 +1646,9 @@ test("market strip uses searchable dropdown for multi-option outcome markets @sm
     route: "/trade/%232120",
     activeAsset: "#2120",
     selectedAsset: "#2120",
-    activeMarketCoin: "#2120",
     outcomeOptionId: 212
   });
+  await expect(page.getByRole("region", { name: "#2120 price chart, 1D timeframe" })).toBeVisible();
 });
 
 test("outcome market tooltip stays within active selector width and glows on hover @regression", async ({ page }) => {

@@ -82,6 +82,9 @@
 (defn set-outcome-option-query []
   (command :order-form/set-outcome-option-query event-target-value))
 
+(defn set-outcome-option-sort [column]
+  (command :order-form/set-outcome-option-sort column))
+
 (defn handle-outcome-option-dropdown-keydown [key]
   (command :order-form/handle-outcome-option-dropdown-keydown key))
 

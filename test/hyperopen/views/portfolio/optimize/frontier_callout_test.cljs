@@ -136,6 +136,17 @@
     (is (= "https://app.hyperliquid.xyz/coins/xyz:AAPL.svg"
            (node-attr aapl-symbol :href)))))
 
+(deftest point-rows-render-exposure-as-multipliers-test
+  (let [rows (frontier-callout/point-rows
+              {:expected-return 0.146
+               :volatility 0.12
+               :sharpe 0.84}
+              {:exposure {:gross 1.84
+                          :net 0.92}})
+        value-by-label (into {} (map (juxt :label :value) rows))]
+    (is (= "1.84x" (get value-by-label "Gross Exposure")))
+    (is (= "0.92x" (get value-by-label "Net Exposure")))))
+
 (deftest blended-portfolio-callout-compacts-long-allocation-label-test
   (let [callout (frontier-callout/callout
                  {:bounds {:width 560 :height 340}

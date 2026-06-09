@@ -41,6 +41,8 @@
     (is (some? (node-by-role view-node "portfolio-optimizer-rebalance-preview")))
     (is (contains? strings "Allocation"))
     (is (contains? strings "How much to trust this"))
+    (is (contains? strings "0.37x"))
+    (is (contains? strings "0.33x"))
     (is (contains? strings "low-invested-exposure"))
     (is (contains? strings "partially-blocked"))))
 

@@ -127,11 +127,11 @@
 
      (some? (:gross exposure))
      (conj {:label "Gross Exposure"
-            :value (opt-format/format-pct (:gross exposure))})
+            :value (opt-format/format-multiple (:gross exposure))})
 
      (some? (:net exposure))
      (conj {:label "Net Exposure"
-            :value (opt-format/format-pct (:net exposure))}))))
+            :value (opt-format/format-multiple (:net exposure))}))))
 
 (defn aria-label
   [label rows]

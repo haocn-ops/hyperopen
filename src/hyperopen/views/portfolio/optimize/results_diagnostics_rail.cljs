@@ -116,8 +116,8 @@
      "Diagnostics"
      "Engine diagnostics are rendered from the run result, not recomputed in the view."
      [:div {:class ["grid" "grid-cols-2" "gap-2" "lg:grid-cols-4"]}
-      (summary/summary-card "Gross" (opt-format/format-pct (:gross-exposure diagnostics)))
-      (summary/summary-card "Net" (opt-format/format-pct (:net-exposure diagnostics)))
+      (summary/summary-card "Gross" (opt-format/format-multiple (:gross-exposure diagnostics)))
+      (summary/summary-card "Net" (opt-format/format-multiple (:net-exposure diagnostics)))
       (summary/summary-card "Effective N" (opt-format/format-decimal (:effective-n diagnostics)))
       (summary/summary-card "Turnover" (opt-format/format-pct (:turnover diagnostics)))]
      [:div {:class ["grid" "grid-cols-1" "gap-2" "lg:grid-cols-3"]}
@@ -301,7 +301,7 @@
        [:summary {:class ["cursor-pointer" "px-4" "py-3" "font-mono" "text-[0.62rem]" "uppercase" "tracking-[0.08em]" "text-trading-muted/70"]}
         "More Diagnostics"]
        [:div {:class ["space-y-2" "px-4" "pb-4"]}
-        (summary/summary-card "Gross" (opt-format/format-pct (:gross-exposure diagnostics)))
-        (summary/summary-card "Net" (opt-format/format-pct (:net-exposure diagnostics)))
+        (summary/summary-card "Gross" (opt-format/format-multiple (:gross-exposure diagnostics)))
+        (summary/summary-card "Net" (opt-format/format-multiple (:net-exposure diagnostics)))
         (summary/summary-card "Turnover" (opt-format/format-pct (:turnover diagnostics)))
         (summary/summary-card "Condition #" (opt-format/format-decimal (:condition-number conditioning)))]]]]))

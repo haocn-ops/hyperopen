@@ -35,6 +35,19 @@
        (str (when (pos? pct) "+") label suffix))
      "N/A")))
 
+(defn format-multiple
+  ([value]
+   (format-multiple value nil))
+  ([value {:keys [minimum-fraction-digits maximum-fraction-digits]
+           :or {minimum-fraction-digits 2
+                maximum-fraction-digits 2}}]
+   (if (finite-number? value)
+     (str (locale-number value
+                         {:minimumFractionDigits minimum-fraction-digits
+                          :maximumFractionDigits maximum-fraction-digits})
+          "x")
+     "N/A")))
+
 (defn format-decimal
   ([value]
    (format-decimal value nil))

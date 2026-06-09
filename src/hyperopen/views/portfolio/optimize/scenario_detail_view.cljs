@@ -255,7 +255,7 @@
                (str "rebalance " (opt-format/keyword-label (:status preview))))
      (kpi-card "portfolio-optimizer-scenario-kpi-rebalance"
                "Gross / Net"
-               (str (opt-format/format-pct gross) " / " (opt-format/format-pct net))
+               (str (opt-format/format-multiple gross) " / " (opt-format/format-multiple net))
                "constraint utilization")]))
 
 (defn- stale-banner

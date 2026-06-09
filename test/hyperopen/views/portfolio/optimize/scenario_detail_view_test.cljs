@@ -201,7 +201,7 @@
                                             :return-decomposition-by-instrument
                                             {"perp:BTC" {:return-component 0.1 :funding-component 0.02}
                                              "perp:ETH" {:return-component 0.08 :funding-component 0.01}}
-                                            :diagnostics {:turnover 0.2}
+                                            :diagnostics {:turnover 0.2 :gross-exposure 1.5 :net-exposure 0.5}
                                             :rebalance-preview {:status :ready
                                                                 :capital-usd 100000
                                                                 :summary {:ready-count 2 :blocked-count 0}
@@ -238,10 +238,8 @@
             (node-by-role view-node "portfolio-optimizer-scenario-rerun"))))
     (is (not (contains? strings "Recompute")))
     (is (contains? strings "Capital Rotation"))
-    (is (contains? strings "14.00%"))
-    (is (contains? strings "32.00%"))
-    (is (contains? strings "0.571"))
-    (is (contains? strings "20.00%"))
+    (doseq [value ["14.00%" "32.00%" "0.571" "20.00%" "1.50x / 0.50x"]]
+      (is (contains? strings value)))
     (is (contains? strings "data as of "))
     (is (contains? strings "gross ≤ 1.5 · cap 40.00%"))
     (is (contains? strings "Draft inputs differ from the last successful run. Refreshing automatically while previous output stays visible."))

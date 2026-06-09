@@ -59,6 +59,34 @@
          (transfer-policy/parse-usdc-micros "9007199254.740991")))
   (is (nil? (transfer-policy/parse-usdc-micros "9007199254.740992"))))
 
+(deftest normalize-vault-transfer-mode-falls-back-to-default-for-invalid-input-test
+  (is (= :withdraw
+         (transfer-policy/normalize-vault-transfer-mode " WITHDRAW ")))
+  (is (= transfer-policy/default-vault-transfer-mode
+         (transfer-policy/normalize-vault-transfer-mode "unsupported")))
+  (is (= transfer-policy/default-vault-transfer-mode
+         (transfer-policy/normalize-vault-transfer-mode :sideways)))
+  (is (= transfer-policy/default-vault-transfer-mode
+         (transfer-policy/normalize-vault-transfer-mode 7))))
+
+(deftest vault-transfer-deposit-allowed-blocks-liquidator-vaults-even-for-the-leader-test
+  (let [leader-state (base-state "en-US" false)
+        liquidator-state (assoc-in leader-state
+                                   [:vaults :details-by-address vault-address :name]
+                                   " Liquidator ")
+        merged-liquidator-state {:wallet {:address leader-address}
+                                 :vaults {:details-by-address {vault-address {:name "   "
+                                                                              :allow-deposits? false}}
+                                          :merged-index-rows [{:vault-address vault-address
+                                                               :name " LIQUIDATOR "
+                                                               :leader leader-address}]}}]
+    (is (true?
+         (transfer-policy/vault-transfer-deposit-allowed? leader-state vault-address)))
+    (is (false?
+         (transfer-policy/vault-transfer-deposit-allowed? liquidator-state vault-address)))
+    (is (false?
+         (transfer-policy/vault-transfer-deposit-allowed? merged-liquidator-state vault-address)))))
+
 (deftest vault-transfer-preview-uses-route-fallback-and-localized-amount-test
   (let [state (base-state "fr-FR" true)
         result (transfer-policy/vault-transfer-preview
@@ -97,6 +125,34 @@
     (is (false? (:ok? result)))
     (is (= "Invalid vault address."
            (:display-message result)))))
+
+(deftest vault-transfer-preview-defaults-non-map-modal-and-ignores-non-function-route-fallback-test
+  (let [result (transfer-policy/vault-transfer-preview
+                {:route-vault-address-fn :not-a-function}
+                (base-state "en-US" true)
+                :not-a-map)]
+    (is (= {:ok? false
+            :display-message "Invalid vault address."}
+           result))))
+
+(deftest vault-transfer-preview-prefers-explicit-modal-vault-address-over-route-fallback-test
+  (let [result (transfer-policy/vault-transfer-preview
+                {:route-vault-address-fn (fn [_] "not-a-vault")}
+                (base-state "en-US" true)
+                {:open? true
+                 :mode :deposit
+                 :vault-address " 0X1234567890ABCDEF1234567890ABCDEF12345678 "
+                 :amount-input "1"
+                 :withdraw-all? false})]
+    (is (true? (:ok? result)))
+    (is (= vault-address
+           (:vault-address result)))
+    (is (= {:vault-address vault-address
+            :action {:type "vaultTransfer"
+                     :vaultAddress vault-address
+                     :isDeposit true
+                     :usd 1000000}}
+           (:request result)))))
 
 (deftest vault-transfer-preview-rejects-when-deposit-gating-disables-vault-test
   (let [state {:wallet {:address "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}

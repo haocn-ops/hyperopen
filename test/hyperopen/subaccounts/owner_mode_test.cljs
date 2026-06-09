@@ -341,17 +341,17 @@
                                    owner-mode-promise)
             :local-storage-get (fn [_] nil)})
           (.then (fn [_result]
-                   (swap! store assoc-in
-                          [:account-context :spectate-mode]
-                          {:active? true
-                           :address spectate-address})
-                   (@resolve-owner-mode! :unified)
-                   (js/setTimeout
-                    (fn []
-                      (is (not= {:owner owner-address :mode :unified}
-                                (get-in @store [:account-context :subaccounts :owner-mode])))
-                      (done))
-                    0)))
+                   (is (not= {:owner owner-address :mode :unified}
+                             (get-in @store [:account-context :subaccounts :owner-mode])))
+                   (done)))
           (.catch (fn [err]
                     (is false (str "Unexpected viewed-owner-change load error: " err))
-                    (done)))))))
+                    (done))))
+      (js/setTimeout
+       (fn []
+         (swap! store assoc-in
+                [:account-context :spectate-mode]
+                {:active? true
+                 :address spectate-address})
+         (@resolve-owner-mode! :unified))
+       0))))

@@ -4,17 +4,15 @@
             [test-runner-generated :as generated-runner]))
 
 (defn run-all-tests
-  "Run all test namespaces and return the results"
-  []
-  (generated-runner/run-generated-tests))
+  "Run all generated test namespaces with the provided cljs.test env."
+  ([]
+   (run-all-tests
+    (runner-support/process-exit-reporting-env "\n=== Test Results ===")))
+  ([env]
+   (generated-runner/run-generated-tests env)))
 
 (defn -main
   "Entry point for test runner"
   []
   (println "\n=== Running Hyperopen Tests ===")
-  (let [results (run-all-tests)]
-    (println "\n=== Test Results ===")
-    (runner-support/apply-process-exit! results)))
-
-;; Run tests when this namespace loads in test environment
-(-main)
+  (run-all-tests))

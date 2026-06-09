@@ -1,5 +1,6 @@
 (ns hyperopen.views.portfolio.optimize.workspace-view-test
   (:require [cljs.test :refer-macros [deftest is]]
+            [clojure.string :as str]
             [hyperopen.portfolio.optimizer.actions.common :as action-common]
             [hyperopen.portfolio.optimizer.application.setup-readiness :as setup-readiness]
             [hyperopen.portfolio.optimizer.fixtures :as fixtures]
@@ -338,6 +339,53 @@
            (get-in (node-by-role view-node
                                  "portfolio-optimizer-constraint-max-asset-weight-input")
                    [1 :aria-invalid])))))
+
+(deftest portfolio-optimizer-workspace-explains-net-min-capacity-presolve-test
+  (let [view-node (portfolio-view/portfolio-view
+                   {:router {:path "/portfolio/optimize/new"}
+                    :portfolio {:optimizer
+                                {:draft {:universe [{:instrument-id "perp:BTC"
+                                                     :market-type :perp
+                                                     :coin "BTC"}
+                                                    {:instrument-id "perp:ETH"
+                                                     :market-type :perp
+                                                     :coin "ETH"}]
+                                         :objective {:kind :minimum-variance}
+                                         :constraints {:long-only? false
+                                                       :max-asset-weight 1.0
+                                                       :gross-max 100
+                                                       :net-min 5
+                                                       :net-max 50}}
+                                 :run-state {:status :infeasible
+                                             :completed-at-ms 3000
+                                             :result {:status :infeasible
+                                                      :reason :constraint-presolve
+                                                      :details
+                                                      {:violations
+                                                       [{:code :sum-upper-below-net-min
+                                                         :sum-upper 2
+                                                         :net-min 5}]}}}}}})
+        strings (collect-strings view-node)
+        contains-text? (fn [text]
+                         (some #(str/includes? % text) strings))
+        max-asset-input (node-by-role view-node
+                                      "portfolio-optimizer-constraint-max-asset-weight-input")
+        net-min-input (node-by-role view-node
+                                    "portfolio-optimizer-constraint-net-min-input")
+        net-max-input (node-by-role view-node
+                                    "portfolio-optimizer-constraint-net-max-input")]
+    (is (some? (node-by-role view-node "portfolio-optimizer-infeasible-banner")))
+    (is (contains-text?
+         "Maximum possible net exposure is 2, below the minimum of 5."))
+    (is (contains-text?
+         "Lower Net Exposure Min, add eligible long assets, or raise Max Asset Weight."))
+    (is (contains-text? "sum-upper-below-net-min"))
+    (is (= "true" (get-in max-asset-input [1 :data-infeasible])))
+    (is (= "true" (get-in max-asset-input [1 :aria-invalid])))
+    (is (= "true" (get-in net-min-input [1 :data-infeasible])))
+    (is (= "true" (get-in net-min-input [1 :aria-invalid])))
+    (is (nil? (get-in net-max-input [1 :data-infeasible])))
+    (is (nil? (get-in net-max-input [1 :aria-invalid])))))
 
 (deftest portfolio-optimizer-workspace-renders-solver-rejection-diagnostics-test
   (let [view-node (portfolio-view/portfolio-view

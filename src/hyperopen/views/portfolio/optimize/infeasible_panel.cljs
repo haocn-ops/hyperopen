@@ -4,6 +4,7 @@
 
 (def ^:private violation-control-keys
   {:sum-upper-below-target #{:max-asset-weight}
+   :sum-upper-below-net-min #{:net-min :max-asset-weight}
    :sum-lower-above-target #{:held-locks}
    :target-return-above-feasible-maximum #{:target-return}
    :solver-result-gross-exposure-violation #{:gross-max}
@@ -40,10 +41,26 @@
       (:reason result) [(:reason result)]
       :else [])))
 
+(defn- structured-violation-messages
+  [violation]
+  (case (:code violation)
+    :sum-upper-below-net-min
+    (when (and (opt-format/finite-number? (:sum-upper violation))
+               (opt-format/finite-number? (:net-min violation)))
+      [(str "Maximum possible net exposure is "
+            (opt-format/format-decimal (:sum-upper violation))
+            ", below the minimum of "
+            (opt-format/format-decimal (:net-min violation))
+            ".")
+       "Lower Net Exposure Min, add eligible long assets, or raise Max Asset Weight."])
+    nil))
+
 (defn- violation-messages
   [result]
   (->> (get-in result [:details :violations])
-       (keep :message)
+       (mapcat (fn [violation]
+                 (cons (:message violation)
+                       (structured-violation-messages violation))))
        (remove str/blank?)
        distinct
        vec))

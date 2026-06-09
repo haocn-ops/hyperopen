@@ -518,6 +518,91 @@ test("portfolio optimizer setup explains rejected solver output @smoke @regressi
     .toHaveAttribute("data-infeasible", "true");
 });
 
+for (const viewport of [
+  { label: "mobile", width: 375, height: 900 },
+  { label: "tablet", width: 768, height: 900 },
+  { label: "desktop", width: 1280, height: 900 },
+  { label: "wide", width: 1440, height: 900 }
+]) {
+  test(`portfolio optimizer setup explains infeasible net-min capacity presolve at ${viewport.label} @smoke @regression`, async ({ page }) => {
+    test.setTimeout(90_000);
+
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await visitRoute(page, "/portfolio/optimize/new", {
+      routeModuleTimeoutMs: 30_000,
+      idleOptions: { quietMs: 400, timeoutMs: 8_000, pollMs: 50 }
+    });
+
+    await seedOptimizerState(page, [
+      seedPatch(optimizerPath("draft"), {
+        id: "draft-current",
+        universe: [
+          {
+            "instrument-id": "perp:BTC",
+            "market-type": optimizerKeyword("perp"),
+            coin: "BTC",
+            symbol: "BTC-USDC",
+            name: "Bitcoin"
+          },
+          {
+            "instrument-id": "perp:ETH",
+            "market-type": optimizerKeyword("perp"),
+            coin: "ETH",
+            symbol: "ETH-USDC",
+            name: "Ethereum"
+          }
+        ],
+        objective: { kind: optimizerKeyword("minimum-variance") },
+        constraints: {
+          "long-only?": false,
+          "max-asset-weight": 1,
+          "gross-max": 100,
+          "net-min": 5,
+          "net-max": 50
+        }
+      }),
+      seedPatch(optimizerPath("run-state"), {
+        status: optimizerKeyword("infeasible"),
+        "completed-at-ms": 1777046100000,
+        result: {
+          status: optimizerKeyword("infeasible"),
+          reason: optimizerKeyword("constraint-presolve"),
+          details: {
+            violations: [
+              {
+                code: optimizerKeyword("sum-upper-below-net-min"),
+                "sum-upper": 2,
+                "net-min": 5
+              }
+            ]
+          }
+        }
+      })
+    ]);
+
+    const banner = page.locator("[data-role='portfolio-optimizer-infeasible-banner']");
+    await expect(banner).toBeVisible();
+    await expect(banner)
+      .toContainText("Maximum possible net exposure is 2, below the minimum of 5.");
+    await expect(banner)
+      .toContainText("Lower Net Exposure Min, add eligible long assets, or raise Max Asset Weight.");
+    await expect(banner.locator("span", { hasText: "sum-upper-below-net-min" }))
+      .toHaveCount(1);
+    await expect(page.locator("[data-role='portfolio-optimizer-constraint-max-asset-weight-input']"))
+      .toHaveAttribute("data-infeasible", "true");
+    await expect(page.locator("[data-role='portfolio-optimizer-constraint-max-asset-weight-input']"))
+      .toHaveAttribute("aria-invalid", "true");
+    await expect(page.locator("[data-role='portfolio-optimizer-constraint-net-min-input']"))
+      .toHaveAttribute("data-infeasible", "true");
+    await expect(page.locator("[data-role='portfolio-optimizer-constraint-net-min-input']"))
+      .toHaveAttribute("aria-invalid", "true");
+    await expect(page.locator("[data-role='portfolio-optimizer-constraint-net-max-input']"))
+      .not.toHaveAttribute("data-infeasible", "true");
+    await expect(page.locator("[data-role='portfolio-optimizer-constraint-net-max-input']"))
+      .not.toHaveAttribute("aria-invalid", "true");
+  });
+}
+
 test("portfolio optimizer draft results render namespaced market icons on frontier and exposure rows @smoke @regression", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
   await visitRoute(page, "/portfolio/optimize/new", {

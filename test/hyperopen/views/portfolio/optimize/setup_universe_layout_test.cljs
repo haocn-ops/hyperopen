@@ -211,6 +211,29 @@
     (is (= true (get-in spot-short [1 :disabled])))
     (is (nil? (click-actions spot-short)))))
 
+(deftest setup-selected-universe-remove-label-uses-visible-identity-test
+  (let [spot-instrument {:instrument-id "spot:PURR"
+                         :market-type :spot
+                         :coin "PURR"
+                         :symbol "PURR/USDC"
+                         :shortable? false
+                         :position-side :long}
+        view-node (portfolio-view/portfolio-view
+                   {:router {:path "/portfolio/optimize/new"}
+                    :portfolio {:optimizer
+                                {:draft {:universe [spot-instrument]
+                                         :objective {:kind :minimum-variance}
+                                         :return-model {:kind :historical-mean}
+                                         :risk-model {:kind :diagonal-shrink}
+                                         :constraints {:long-only? false}}}}})
+        remove-button (node-by-role view-node
+                                    "portfolio-optimizer-universe-remove-spot:PURR")]
+    (is (= "Remove PURR/USDC spot"
+           (get-in remove-button [1 :aria-label])))
+    (is (= [[:actions/remove-portfolio-optimizer-universe-instrument
+             "spot:PURR"]]
+           (click-actions remove-button)))))
+
 (deftest setup-selected-vault-row-shows-shared-gap-when-loaded-history-is-misaligned-test
   (let [vault-a "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         vault-b "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"

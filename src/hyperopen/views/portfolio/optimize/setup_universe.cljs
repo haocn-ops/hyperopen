@@ -81,6 +81,13 @@
    (side-button instrument-id position-side short-selectable? :long)
    (side-button instrument-id position-side short-selectable? :short)])
 
+(defn- remove-aria-label
+  [primary-label market-type instrument-id]
+  (str "Remove "
+       (or primary-label instrument-id "instrument")
+       (when-let [market-type-label (some-> market-type name)]
+         (str " " market-type-label))))
+
 (defn- selected-row
   [{:keys [instrument-id
            market-type
@@ -107,7 +114,7 @@
      [:span {:class ["text-right"]}
       [:button {:type "button"
                 :class ["font-mono" "text-[0.6875rem]" "text-trading-muted" "hover:text-warning"]
-                :aria-label (str "Remove " instrument-id)
+                :aria-label (remove-aria-label primary-label market-type instrument-id)
                 :data-role (str "portfolio-optimizer-universe-remove-" instrument-id)
                 :on {:click [[:actions/remove-portfolio-optimizer-universe-instrument
                                instrument-id]]}}

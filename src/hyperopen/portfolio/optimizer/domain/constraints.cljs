@@ -124,6 +124,13 @@
       :else
       false)))
 
+(defn- position-side
+  [instrument]
+  (when (contains? instrument :position-side)
+    (case (coercion/normalize-keyword-like (:position-side instrument))
+      :short :short
+      :long)))
+
 (defn- native-cadence-for
   [history instrument-id]
   (or (get-in history [:cadence-by-instrument instrument-id])
@@ -209,7 +216,8 @@
   (let [id (instrument-id instrument)
         max-long-weight (max-long-weight-for constraints id)
         max-short-weight (max-short-weight-for constraints id)
-        shortable? (instrument-shortable? constraints instrument)]
+        shortable? (instrument-shortable? constraints instrument)
+        side (position-side instrument)]
     (if (locked? constraints id)
       (let [weight (current-weight current-weights id)]
         {:lower weight
@@ -222,8 +230,20 @@
       (if (:long-only? constraints)
         {:lower 0
          :upper max-long-weight}
-        {:lower (if shortable? (- max-short-weight) 0)
-         :upper max-long-weight}))))
+        (case side
+          :long
+          {:lower 0
+           :upper max-long-weight}
+
+          :short
+          (if shortable?
+            {:lower (- max-short-weight)
+             :upper 0}
+            {:lower 0
+             :upper max-long-weight})
+
+          {:lower (if shortable? (- max-short-weight) 0)
+           :upper max-long-weight})))))
 
 (defn- target-net
   [constraints]

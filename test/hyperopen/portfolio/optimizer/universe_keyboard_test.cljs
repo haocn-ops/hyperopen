@@ -29,6 +29,7 @@
                         :market-type :perp
                         :coin "ETH"
                         :shortable? true
+                        :position-side :long
                         :symbol "ETH-USDC"}
         state {:portfolio-ui {:optimizer {:universe-search-active-index 1}}
                :portfolio {:optimizer {:draft {:universe []}}}

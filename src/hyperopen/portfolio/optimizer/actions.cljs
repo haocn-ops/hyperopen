@@ -86,6 +86,12 @@
 (def toggle-portfolio-optimizer-universe-instrument-exclusion-and-run
   universe/toggle-portfolio-optimizer-universe-instrument-exclusion-and-run)
 
+(def set-portfolio-optimizer-universe-instrument-side
+  universe/set-portfolio-optimizer-universe-instrument-side)
+
+(def set-portfolio-optimizer-universe-instrument-side-and-run
+  universe/set-portfolio-optimizer-universe-instrument-side-and-run)
+
 (def remove-portfolio-optimizer-universe-instrument
   universe/remove-portfolio-optimizer-universe-instrument)
 

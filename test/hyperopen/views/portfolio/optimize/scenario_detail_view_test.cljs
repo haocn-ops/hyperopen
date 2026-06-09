@@ -248,6 +248,82 @@
     (is (contains? strings "Stale Output"))
     (is (contains? strings "These allocation weights come from the last successful run. The app is refreshing them automatically; save and execute unlock when the refreshed run completes."))))
 
+(deftest portfolio-optimizer-allocation-table-renders-position-side-controls-test
+  (let [view-node (portfolio-view/portfolio-view
+                   {:router {:path "/portfolio/optimize/scn_sides"}
+                    :portfolio {:optimizer
+                                {:active-scenario {:loaded-id "scn_sides"
+                                                   :name "Side Check"
+                                                   :status :computed}
+                                 :draft {:id "scn_sides"
+                                         :name "Side Check"
+                                         :universe [{:instrument-id "perp:BTC"
+                                                     :market-type :perp
+                                                     :coin "BTC"
+                                                     :shortable? true
+                                                     :position-side :long}
+                                                    {:instrument-id "perp:ARB"
+                                                     :market-type :perp
+                                                     :coin "ARB"
+                                                     :shortable? true
+                                                     :position-side :short}]
+                                         :objective {:kind :minimum-variance}
+                                         :return-model {:kind :historical-mean}
+                                         :risk-model {:kind :sample-covariance}
+                                         :constraints {:long-only? false
+                                                       :max-asset-weight 0.5
+                                                       :gross-max 1.0}
+                                         :metadata {:dirty? false}}
+                                 :last-successful-run
+                                 (fixtures/sample-last-successful-run
+                                  {:computed-at-ms 1714137600000
+                                   :request-signature {:seed 1}
+                                   :result {:as-of-ms 1714137600000
+                                            :instrument-ids ["perp:BTC" "perp:ARB"]
+                                            :current-weights [0.1 0.0]
+                                            :target-weights [0.3 -0.1]
+                                            :target-weights-by-instrument {"perp:BTC" 0.3
+                                                                           "perp:ARB" -0.1}
+                                            :current-weights-by-instrument {"perp:BTC" 0.1
+                                                                            "perp:ARB" 0.0}
+                                            :labels-by-instrument {"perp:BTC" "BTC"
+                                                                   "perp:ARB" "ARB"}
+                                            :expected-return 0.08
+                                            :volatility 0.22
+                                            :performance {:in-sample-sharpe 0.36}
+                                            :history-summary {:return-observations 12
+                                                              :stale? false}
+                                            :return-model :historical-mean
+                                            :risk-model :sample-covariance
+                                            :diagnostics {:turnover 0.3
+                                                          :gross-exposure 0.4
+                                                          :net-exposure 0.2}
+                                            :rebalance-preview {:status :ready
+                                                                :capital-usd 100000
+                                                                :summary {:ready-count 2
+                                                                          :blocked-count 0}
+                                                                :rows []}}})}}})
+        btc-long (node-by-role view-node
+                               "portfolio-optimizer-target-exposure-side-long-perp-BTC")
+        arb-short (node-by-role view-node
+                                "portfolio-optimizer-target-exposure-side-short-perp-ARB")]
+    (is (some? btc-long))
+    (is (some? arb-short))
+    (is (= "true" (node-attr btc-long :data-selected)))
+    (is (= "true" (node-attr arb-short :data-selected)))
+    (is (= [[:actions/set-portfolio-optimizer-universe-instrument-side-and-run
+             "perp:BTC"
+             :short]]
+           (click-actions
+            (node-by-role view-node
+                          "portfolio-optimizer-target-exposure-side-short-perp-BTC"))))
+    (is (= [[:actions/set-portfolio-optimizer-universe-instrument-side-and-run
+             "perp:ARB"
+             :long]]
+           (click-actions
+            (node-by-role view-node
+                          "portfolio-optimizer-target-exposure-side-long-perp-ARB"))))))
+
 (deftest portfolio-optimizer-scenario-sharpe-kpi-renders-current-to-target-raw-sharpe-test
   (let [view-node (portfolio-view/portfolio-view
                    {:router {:path "/portfolio/optimize/scn_sharpe"}

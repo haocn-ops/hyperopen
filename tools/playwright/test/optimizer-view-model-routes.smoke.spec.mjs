@@ -25,7 +25,8 @@ async function seedRetainedDraftScenario(page) {
       kw("market-type"), kw("perp"),
       kw("coin"), "BTC",
       kw("symbol"), "BTC-USDC",
-      kw("name"), "Bitcoin"
+      kw("name"), "Bitcoin",
+      kw("position-side"), kw("long")
     ]);
     const draft = map([
       kw("id"), "draft-current",
@@ -96,16 +97,40 @@ async function seedRetainedDraftScenario(page) {
         kw("rows"), vector([])
       ])
     ]);
-    const requestSignature = map([kw("seed"), "retained-draft-smoke"]);
+    const store = globalThis.hyperopen.system.store;
+    let state = c.deref(store);
+    state = c.assoc_in(state, path("portfolio", "optimizer", "draft"), draft);
+    state = c.assoc_in(
+      state,
+      path("portfolio", "optimizer", "history-data"),
+      map([
+        kw("candle-history-by-coin"), map([
+          "BTC", vector([
+            map([kw("time-ms"), 1000, kw("close"), "100"]),
+            map([kw("time-ms"), 2000, kw("close"), "102"]),
+            map([kw("time-ms"), 3000, kw("close"), "105"]),
+            map([kw("time-ms"), 4000, kw("close"), "109"])
+          ])
+        ]),
+        kw("funding-history-by-coin"), map([
+          "BTC", vector([map([kw("time-ms"), 1000, kw("funding-rate-raw"), 0])])
+        ])
+      ])
+    );
+    state = c.assoc_in(
+      state,
+      path("portfolio", "optimizer", "runtime"),
+      map([kw("as-of-ms"), 5000, kw("stale-after-ms"), 60000])
+    );
+    const readiness = hyperopen.portfolio.optimizer.application.setup_readiness.build_readiness(state);
+    const request = c.get(readiness, kw("request"));
+    const requestSignature =
+      hyperopen.portfolio.optimizer.contracts.signatures.build_request_signature(request);
     const lastSuccessfulRun = map([
       kw("request-signature"), requestSignature,
       kw("computed-at-ms"), 1777046100000,
       kw("result"), result
     ]);
-
-    const store = globalThis.hyperopen.system.store;
-    let state = c.deref(store);
-    state = c.assoc_in(state, path("portfolio", "optimizer", "draft"), draft);
     state = c.assoc_in(
       state,
       path("portfolio", "optimizer", "active-scenario"),
@@ -151,14 +176,16 @@ async function seedTwoAssetDraftScenario(page) {
       kw("market-type"), kw("perp"),
       kw("coin"), "BTC",
       kw("symbol"), "BTC-USDC",
-      kw("name"), "Bitcoin"
+      kw("name"), "Bitcoin",
+      kw("position-side"), kw("long")
     ]);
     const ethInstrument = map([
       kw("instrument-id"), "hl:perp:ETH",
       kw("market-type"), kw("perp"),
       kw("coin"), "ETH",
       kw("symbol"), "ETH-USDC",
-      kw("name"), "Ethereum"
+      kw("name"), "Ethereum",
+      kw("position-side"), kw("long")
     ]);
     const draft = map([
       kw("id"), "draft-current",
@@ -230,13 +257,6 @@ async function seedTwoAssetDraftScenario(page) {
         kw("rows"), vector([])
       ])
     ]);
-    const requestSignature = map([kw("seed"), "two-asset-draft-smoke"]);
-    const lastSuccessfulRun = map([
-      kw("request-signature"), requestSignature,
-      kw("computed-at-ms"), 1777046100000,
-      kw("result"), result
-    ]);
-
     const store = globalThis.hyperopen.system.store;
     let state = c.deref(store);
     state = c.assoc_in(state, path("portfolio", "optimizer", "draft"), draft);
@@ -276,6 +296,15 @@ async function seedTwoAssetDraftScenario(page) {
       path("portfolio", "optimizer", "runtime"),
       map([kw("as-of-ms"), 5000, kw("stale-after-ms"), 60000])
     );
+    const readiness = hyperopen.portfolio.optimizer.application.setup_readiness.build_readiness(state);
+    const request = c.get(readiness, kw("request"));
+    const requestSignature =
+      hyperopen.portfolio.optimizer.contracts.signatures.build_request_signature(request);
+    const lastSuccessfulRun = map([
+      kw("request-signature"), requestSignature,
+      kw("computed-at-ms"), 1777046100000,
+      kw("result"), result
+    ]);
     state = c.assoc_in(state, path("portfolio", "optimizer", "last-successful-run"), lastSuccessfulRun);
     state = c.assoc_in(
       state,

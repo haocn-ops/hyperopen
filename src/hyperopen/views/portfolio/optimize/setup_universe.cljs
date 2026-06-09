@@ -40,15 +40,58 @@
    (when (= :vault market-type)
      (tag "vault" :info))])
 
+(defn- side-button
+  [instrument-id selected-side short-selectable? side]
+  (let [selected? (= selected-side side)
+        enabled? (or (= :long side)
+                     short-selectable?)]
+    [:button {:type "button"
+              :class (cond-> ["h-6" "w-6" "border" "border-base-300"
+                              "font-mono" "text-[0.6rem]" "font-semibold"
+                              "uppercase" "leading-none" "transition-colors"]
+                       selected? (conj "bg-success/70" "text-base-100")
+                       (and (not selected?) enabled?)
+                       (conj "text-trading-muted" "hover:border-warning/60"
+                             "hover:text-warning")
+                       (not enabled?)
+                       (conj "cursor-not-allowed" "text-trading-muted/30"
+                             "opacity-50"))
+              :aria-label (str "Set " instrument-id " "
+                               (name side))
+              :aria-pressed (if selected? "true" "false")
+              :data-role (str "portfolio-optimizer-universe-side-"
+                              (name side)
+                              "-"
+                              instrument-id)
+              :data-selected (when selected? "true")
+              :disabled (when-not enabled? true)
+              :on (when enabled?
+                    {:click [[:actions/set-portfolio-optimizer-universe-instrument-side
+                              instrument-id
+                              side]]})}
+     (case side
+       :short "S"
+       "L")]))
+
+(defn- side-control
+  [instrument-id position-side short-selectable?]
+  [:span {:class ["inline-flex" "items-center" "justify-end"]
+          :data-role (str "portfolio-optimizer-universe-side-control-"
+                          instrument-id)}
+   (side-button instrument-id position-side short-selectable? :long)
+   (side-button instrument-id position-side short-selectable? :short)])
+
 (defn- selected-row
   [{:keys [instrument-id
            market-type
            primary-label
            secondary-label
            history-label
-           history-tone]}]
+           history-tone
+           position-side
+           short-selectable?]}]
     [:div {:class ["optimizer-universe-row"
-                   "grid" "grid-cols-[18px_minmax(0,1fr)_42px_72px_20px]"
+                   "grid" "grid-cols-[18px_minmax(0,1fr)_42px_72px_52px_20px]"
                    "items-center" "gap-2" "border-b" "border-base-300"
                    "px-2" "py-1.5" "last:border-b-0" "hover:bg-base-200/30"]
            :data-role (str "portfolio-optimizer-universe-selected-row-" instrument-id)}
@@ -60,6 +103,7 @@
        secondary-label]]
      [:span {:class ["min-w-0"]} (market-type-tags market-type)]
      [:span {:class ["min-w-0"]} (tag history-label history-tone)]
+     (side-control instrument-id position-side short-selectable?)
      [:span {:class ["text-right"]}
       [:button {:type "button"
                 :class ["font-mono" "text-[0.6875rem]" "text-trading-muted" "hover:text-warning"]
@@ -96,7 +140,7 @@
 
 (defn- selected-table-header
   []
-  [:div {:class ["grid" "grid-cols-[18px_minmax(0,1fr)_42px_72px_20px]"
+  [:div {:class ["grid" "grid-cols-[18px_minmax(0,1fr)_42px_72px_52px_20px]"
                  "items-center" "gap-2" "border-b" "border-base-300"
                  "bg-base-200/40" "px-2" "py-1.5" "font-mono"
                  "text-[0.55rem]" "font-semibold" "uppercase"
@@ -106,6 +150,7 @@
    [:span "Asset"]
    [:span "Type"]
    [:span "History"]
+   [:span {:class ["text-right"]} "Side"]
    [:span {:class ["sr-only"]} "Remove"]])
 
 (defn- candidate-table-header

@@ -148,6 +148,7 @@
                    :market-type :perp
                    :coin "BTC"
                    :shortable? true
+                   :position-side :long
                    :symbol "BTC-USDC"
                    :name "Bitcoin"}
                   history-metadata)
@@ -156,6 +157,7 @@
                    :market-type :perp
                    :coin "BTC"
                    :shortable? true
+                   :position-side :long
                    :symbol "BTC-USDC"}
                   history-metadata)
            (action-common/exposure->universe-instrument exposure)))))

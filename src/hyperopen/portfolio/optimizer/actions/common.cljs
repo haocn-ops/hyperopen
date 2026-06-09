@@ -17,6 +17,27 @@
 
 (def non-blank-text coercion/non-blank-text)
 
+(defn normalize-position-side
+  [side]
+  (let [side* (normalize-keyword-like side)]
+    (if (contains? #{:long :short} side*)
+      side*
+      :long)))
+
+(defn selectable-position-side
+  [shortable? side]
+  (let [side* (normalize-position-side side)]
+    (if (and (= :short side*)
+             (not shortable?))
+      :long
+      side*)))
+
+(defn- default-position-side
+  [source shortable?]
+  (selectable-position-side shortable?
+                            (or (:position-side source)
+                                (:side source))))
+
 (def ^:private optimizer-history-keys
   [:optimizer-history/instrument-id
    :optimizer-history/display-symbol
@@ -33,7 +54,8 @@
   [exposure]
   (let [instrument-id (non-blank-text (:instrument-id exposure))
         coin (non-blank-text (:coin exposure))
-        market-type (:market-type exposure)]
+        market-type (:market-type exposure)
+        shortable? (= :perp market-type)]
     (when (and instrument-id
                coin
                (keyword? market-type))
@@ -41,7 +63,8 @@
         (cond-> {:instrument-id instrument-id
                  :market-type market-type
                  :coin coin
-                 :shortable? (= :perp market-type)}
+                 :shortable? shortable?
+                 :position-side (default-position-side exposure shortable?)}
           (non-blank-text (:dex exposure))
           (assoc :dex (non-blank-text (:dex exposure)))
           (non-blank-text (:symbol exposure)) (assoc :symbol (non-blank-text (:symbol exposure)))
@@ -55,7 +78,8 @@
   (let [instrument-id (non-blank-text (:key market))
         coin (non-blank-text (:coin market))
         market-type (normalize-keyword-like (:market-type market))
-        vault-address (ids/normalize-vault-address (:vault-address market))]
+        vault-address (ids/normalize-vault-address (:vault-address market))
+        shortable? (= :perp market-type)]
     (when (and instrument-id
                coin
                (contains? supported-universe-market-types market-type)
@@ -65,7 +89,8 @@
         (cond-> {:instrument-id instrument-id
                  :market-type market-type
                  :coin coin
-                 :shortable? (= :perp market-type)}
+                 :shortable? shortable?
+                 :position-side (default-position-side market shortable?)}
           (= :vault market-type)
           (assoc :vault-address vault-address)
           (non-blank-text (:dex market))

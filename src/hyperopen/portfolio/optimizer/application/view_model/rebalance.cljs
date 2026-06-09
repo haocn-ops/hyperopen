@@ -13,6 +13,12 @@
     (and (finite-number? value) (pos? value)) "long"
     :else "flat"))
 
+(defn- position-side
+  [value]
+  (case (coercion/normalize-keyword-like value)
+    :short :short
+    :long))
+
 (defn- instrument-group-key
   [labels-by-instrument instrument-id]
   (let [value (or (get labels-by-instrument instrument-id)
@@ -99,6 +105,30 @@
               (reverse candidates))
         (first candidates))))
 
+(defn- short-selectable?
+  [instrument instrument-id]
+  (cond
+    (contains? instrument :shortable?)
+    (true? (:shortable? instrument))
+
+    (= :perp (ids/normalize-market-type
+              (or (:market-type instrument)
+                  (:instrument-type instrument))))
+    true
+
+    (str/starts-with? (str instrument-id) "perp:")
+    true
+
+    :else false))
+
+(defn- row-position-side
+  [draft-instrument target-weight]
+  (or (when draft-instrument
+        (position-side (:position-side draft-instrument)))
+      (if (neg? (or target-weight 0))
+        :short
+        :long)))
+
 (defn- row-model
   [idx labels-by-instrument binding-instrument-ids excluded-ids draft-by-id capital-usd
    [instrument-id current-weight target-weight]]
@@ -112,7 +142,8 @@
         current-notional (* (or capital-usd 0) current-weight*)
         target-notional (* (or capital-usd 0) target-weight*)
         delta (- target-weight* current-weight*)
-        binding? (contains? binding-instrument-ids instrument-id)]
+        binding? (contains? binding-instrument-ids instrument-id)
+        draft-instrument (get draft-by-id instrument-id)]
     {:idx idx
      :asset (instrument-group-key labels-by-instrument instrument-id)
      :instrument-id instrument-id
@@ -127,6 +158,8 @@
      :status-label (when excluded? "sell to 0")
      :current-sign (signed-label current-weight*)
      :target-sign (signed-label target-weight*)
+     :position-side (row-position-side draft-instrument target-weight*)
+     :short-selectable? (short-selectable? draft-instrument instrument-id)
      :leg-label (leg-label labels-by-instrument
                            instrument-id
                            current-weight*
@@ -164,6 +197,10 @@
      {:asset asset
       :instrument-id (when-not expandable?
                        (:instrument-id (first rows*)))
+      :position-side (if (some #(= :short (:position-side %)) rows*)
+                       :short
+                       :long)
+      :short-selectable? (boolean (some :short-selectable? rows*))
       :current-weight current-weight
       :target-weight target-weight
       :delta delta

@@ -88,6 +88,10 @@
     actions/add-portfolio-optimizer-universe-instrument-and-run
     :toggle-portfolio-optimizer-universe-instrument-exclusion-and-run
     actions/toggle-portfolio-optimizer-universe-instrument-exclusion-and-run
+    :set-portfolio-optimizer-universe-instrument-side
+    actions/set-portfolio-optimizer-universe-instrument-side
+    :set-portfolio-optimizer-universe-instrument-side-and-run
+    actions/set-portfolio-optimizer-universe-instrument-side-and-run
     :remove-portfolio-optimizer-universe-instrument
     actions/remove-portfolio-optimizer-universe-instrument
     :set-portfolio-optimizer-universe-from-current

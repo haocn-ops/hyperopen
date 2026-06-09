@@ -44,11 +44,13 @@
   (let [btc-instrument {:instrument-id "perp:BTC"
                         :market-type :perp
                         :coin "BTC"
-                        :shortable? true}
+                        :shortable? true
+                        :position-side :long}
         purr-instrument {:instrument-id "spot:PURR"
                          :market-type :spot
                          :coin "PURR"
                          :shortable? false
+                         :position-side :long
                          :symbol "PURR/USDC"
                          :base "PURR"
                          :quote "USDC"}
@@ -93,6 +95,7 @@
                         :market-type :perp
                         :coin "ETH"
                         :shortable? true
+                        :position-side :long
                         :dex "hl"
                         :symbol "ETH-USDC"
                         :base "ETH"
@@ -101,6 +104,7 @@
                          :market-type :spot
                          :coin "PURR/USDC"
                          :shortable? false
+                         :position-side :long
                          :symbol "PURR/USDC"
                          :base "PURR"
                          :quote "USDC"}
@@ -178,6 +182,7 @@
                         :market-type :perp
                         :coin "ETH"
                         :shortable? true
+                        :position-side :long
                         :symbol "ETH-USDC"
                         :base "ETH"
                         :quote "USDC"}
@@ -216,7 +221,8 @@
         eth-instrument {:instrument-id "perp:ETH"
                         :market-type :perp
                         :coin "ETH"
-                        :shortable? true}
+                        :shortable? true
+                        :position-side :long}
         state {:portfolio {:optimizer {:draft {:universe [btc-instrument]
                                                :return-model {:kind :black-litterman
                                                               :views []}
@@ -298,11 +304,70 @@
             state
             "perp:ETH")))))
 
+(deftest set-draft-universe-instrument-side-updates-row-and-marks-dirty-test
+  (let [btc-instrument {:instrument-id "perp:BTC"
+                        :market-type :perp
+                        :coin "BTC"
+                        :shortable? true
+                        :position-side :long}
+        eth-instrument {:instrument-id "perp:ETH"
+                        :market-type :perp
+                        :coin "ETH"
+                        :shortable? true
+                        :position-side :long}
+        state {:portfolio {:optimizer {:draft {:universe [btc-instrument
+                                                           eth-instrument]}}}}]
+    (is (= [[:effects/save-many
+             [[[:portfolio :optimizer :draft :universe]
+               [(assoc btc-instrument :position-side :short)
+                eth-instrument]]
+              [[:portfolio :optimizer :draft :metadata :dirty?]
+               true]]]]
+           (actions/set-portfolio-optimizer-universe-instrument-side
+            state
+            "perp:BTC"
+            :short)))))
+
+(deftest set-draft-universe-instrument-side-keeps-non-shortable-row-long-test
+  (let [spot-instrument {:instrument-id "spot:PURR"
+                         :market-type :spot
+                         :coin "PURR"
+                         :shortable? false
+                         :position-side :long}
+        state {:portfolio {:optimizer {:draft {:universe [spot-instrument]}}}}]
+    (is (= []
+           (actions/set-portfolio-optimizer-universe-instrument-side
+            state
+            "spot:PURR"
+            :short)))))
+
+(deftest set-draft-universe-instrument-side-and-run-reruns-after-side-change-test
+  (let [btc-instrument {:instrument-id "perp:BTC"
+                        :market-type :perp
+                        :coin "BTC"
+                        :shortable? true
+                        :position-side :long}
+        state {:portfolio {:optimizer {:draft {:universe [btc-instrument]
+                                               :return-model {:kind :historical-mean}
+                                               :risk-model {:kind :sample-covariance}
+                                               :constraints {:long-only? false}}}}}]
+    (is (= [[:effects/save-many
+             [[[:portfolio :optimizer :draft :universe]
+               [(assoc btc-instrument :position-side :short)]]
+              [[:portfolio :optimizer :draft :metadata :dirty?]
+               true]]]
+            [:effects/run-portfolio-optimizer-pipeline]]
+           (actions/set-portfolio-optimizer-universe-instrument-side-and-run
+            state
+            "perp:BTC"
+            :short)))))
+
 (deftest add-draft-universe-instrument-preserves-history-discovery-backend-id-test
   (let [eth-instrument {:instrument-id "perp:ETH"
                         :market-type :perp
                         :coin "ETH"
                         :shortable? true
+                        :position-side :long
                         :optimizer-history/instrument-id "hl:perp:ETH"
                         :optimizer-history/display-symbol "ETH"
                         :optimizer-history/instrument-kind :hl-perp
@@ -346,6 +411,7 @@
                           :coin (str "vault:" vault-address)
                           :vault-address vault-address
                           :shortable? false
+                          :position-side :long
                           :name "Alpha Yield"
                           :symbol "Alpha Yield"
                           :tvl 500}
@@ -381,7 +447,8 @@
   (let [eth-instrument {:instrument-id "perp:ETH"
                         :market-type :perp
                         :coin "ETH"
-                        :shortable? true}
+                        :shortable? true
+                        :position-side :long}
         state {:portfolio {:optimizer
                            {:draft {:universe []}
                             :history-data {:candle-history-by-coin

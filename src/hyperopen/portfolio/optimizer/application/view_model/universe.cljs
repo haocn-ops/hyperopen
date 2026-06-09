@@ -156,6 +156,25 @@
           (if (>= volume 50000000) "deep" "medium")
           "medium"))))
 
+(defn- position-side
+  [instrument]
+  (case (coercion/normalize-keyword-like (:position-side instrument))
+    :short :short
+    :long))
+
+(defn- short-selectable?
+  [instrument]
+  (cond
+    (contains? instrument :shortable?)
+    (true? (:shortable? instrument))
+
+    (= :perp (ids/normalize-market-type
+              (or (:market-type instrument)
+                  (:instrument-type instrument))))
+    true
+
+    :else false))
+
 (declare selected-history-label)
 
 (defn selected-row-model
@@ -181,7 +200,9 @@
      :secondary-label secondary-label
      :history-label history-label
      :history-tone (if (= "sufficient" history-label) :long :warn)
-     :liquidity-label (liquidity-label instrument)}))
+     :liquidity-label (liquidity-label instrument)
+     :position-side (position-side instrument)
+     :short-selectable? (short-selectable? instrument)}))
 
 (defn candidate-row-model
   [market idx active-index]

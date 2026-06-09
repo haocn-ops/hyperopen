@@ -204,6 +204,24 @@
     (is (= [-0.25 0 0 0 -0.1] (:lower-bounds encoded)))
     (is (= [0.6 0.6 0.2 0.6 0.6] (:upper-bounds encoded)))))
 
+(deftest encode-position-side-bounds-restrict-long-and-short-legs-test
+  (let [encoded (constraints/encode-constraints
+                 {:universe [{:instrument-id "perp:BTC"
+                              :instrument-type :perp
+                              :position-side :long}
+                             {:instrument-id "perp:ARB"
+                              :instrument-type :perp
+                              :position-side :short}
+                             {:instrument-id "spot:PURR"
+                              :instrument-type :spot
+                              :position-side :short}]
+                  :constraints {:long-only? false
+                                :max-long-weight 0.6
+                                :max-short-weight 0.25}})]
+    (is (= [0 -0.25 0] (:lower-bounds encoded)))
+    (is (= [0.6 0 0.6] (:upper-bounds encoded)))
+    (is (= :ok (:status encoded)))))
+
 (deftest encode-short-cap-precedence-and-backwards-compatible-max-weight-test
   (let [encoded (constraints/encode-constraints
                  {:universe [{:instrument-id "perp:A"

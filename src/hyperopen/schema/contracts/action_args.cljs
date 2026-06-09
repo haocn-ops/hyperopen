@@ -104,6 +104,8 @@
   (s/tuple ::common/non-empty-string))
 (s/def ::portfolio-optimizer-instrument-id-args
   (s/tuple ::common/non-empty-string))
+(s/def ::portfolio-optimizer-instrument-side-args
+  (s/tuple ::common/non-empty-string ::common/keyword-or-string))
 (s/def ::portfolio-optimizer-universe-search-keydown-args
   (s/tuple ::common/non-empty-string
            (s/coll-of ::common/non-empty-string :kind vector?)))
@@ -287,9 +289,13 @@
    :actions/add-portfolio-optimizer-universe-instrument ::portfolio-optimizer-instrument-id-args
    :actions/add-portfolio-optimizer-universe-instrument-and-run
    ::portfolio-optimizer-instrument-id-args
-   :actions/toggle-portfolio-optimizer-universe-instrument-exclusion-and-run
-   ::portfolio-optimizer-instrument-id-args
-   :actions/remove-portfolio-optimizer-universe-instrument ::portfolio-optimizer-instrument-id-args
+	   :actions/toggle-portfolio-optimizer-universe-instrument-exclusion-and-run
+	   ::portfolio-optimizer-instrument-id-args
+	   :actions/set-portfolio-optimizer-universe-instrument-side
+	   ::portfolio-optimizer-instrument-side-args
+	   :actions/set-portfolio-optimizer-universe-instrument-side-and-run
+	   ::portfolio-optimizer-instrument-side-args
+	   :actions/remove-portfolio-optimizer-universe-instrument ::portfolio-optimizer-instrument-id-args
    :actions/set-portfolio-optimizer-universe-from-current ::common/no-args
    :actions/load-portfolio-optimizer-history-from-draft ::common/no-args
    :actions/save-portfolio-optimizer-scenario-from-current ::common/no-args

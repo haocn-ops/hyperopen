@@ -88,9 +88,57 @@
                                 (data-role-token asset))}]
          [:span {:class ["block" "h-3" "w-3" "rounded-full" "border" "border-base-300" "bg-base-200"]}]))]))
 
+(defn- side-button
+  [scope role-id instrument-id selected-side short-selectable? side]
+  (let [selected? (= selected-side side)
+        enabled? (and instrument-id
+                      (or (= :long side)
+                          short-selectable?))
+        token (data-role-token role-id)
+        label-id (or instrument-id role-id "allocation group")]
+    [:button {:type "button"
+              :class (cond-> ["h-6" "w-6" "border" "border-base-300"
+                              "font-mono" "text-[0.6rem]" "font-semibold"
+                              "uppercase" "leading-none" "transition-colors"]
+                       selected? (conj "bg-success/70" "text-base-100")
+                       (and (not selected?) enabled?)
+                       (conj "text-trading-muted" "hover:border-warning/60"
+                             "hover:text-warning")
+                       (not enabled?)
+                       (conj "cursor-not-allowed" "text-trading-muted/30"
+                             "opacity-50"))
+              :aria-label (str "Set " label-id " "
+                               (name side))
+              :aria-pressed (if selected? "true" "false")
+              :data-role (str scope
+                              "-side-"
+                              (name side)
+                              "-"
+                              token)
+              :data-selected (when selected? "true")
+              :disabled (when-not enabled? true)
+              :on (when enabled?
+                    {:click [[:actions/set-portfolio-optimizer-universe-instrument-side-and-run
+                              instrument-id
+                              side]]})}
+     (case side
+       :short "S"
+       "L")]))
+
+(defn- side-control
+  [scope {:keys [asset instrument-id position-side short-selectable?]}]
+  (let [role-id (or instrument-id asset "allocation-group")]
+    [:span {:class ["inline-flex" "items-center" "justify-end"]
+            :data-role (str scope
+                            "-side-control-"
+                            (data-role-token role-id))}
+     (side-button scope role-id instrument-id position-side short-selectable? :long)
+     (side-button scope role-id instrument-id position-side short-selectable? :short)]))
+
 (defn- exposure-row
   [{:keys [idx binding? hidden? current-sign target-sign leg-label current-weight
-           target-weight delta delta-notional excluded? status-label instrument-id asset]}]
+           target-weight delta delta-notional excluded? status-label instrument-id asset]
+     :as row}]
   [:tr {:class (cond-> ["optimizer-target-exposure-row" "optimizer-exposure-row"]
                 binding? (conj "bg-warning/10")
                 excluded? (conj "optimizer-target-exposure-row--excluded")
@@ -108,6 +156,8 @@
     (when excluded?
       [:span {:class ["optimizer-target-exposure-status" "ml-2"]}
        status-label])]
+   [:td {:class ["px-2" "text-right"]}
+    (side-control "portfolio-optimizer-target-exposure-row" row)]
    [:td {:class (cond-> ["font-mono" "text-right" "tabular-nums"]
                   excluded? (conj "line-through" "decoration-trading-muted/70"))}
     (opt-format/format-pct current-weight {:minimum-fraction-digits 1 :maximum-fraction-digits 1})]
@@ -169,6 +219,8 @@
     (when excluded?
       [:span {:class ["optimizer-target-exposure-status" "ml-2"]}
        status-label])]
+   [:td {:class ["px-2" "text-right"]}
+    (side-control "portfolio-optimizer-target-exposure" group)]
    [:td {:class (cond-> ["font-mono" "text-right" "font-semibold" "tabular-nums"]
                   excluded? (conj "line-through" "decoration-trading-muted/70"))}
     (opt-format/format-pct current-weight {:minimum-fraction-digits 1 :maximum-fraction-digits 1})]
@@ -353,6 +405,7 @@
         [:tr
          [:th {:class ["sticky" "top-0" "w-5" "border-b" "border-base-300" "bg-base-100" "px-2" "py-1.5" "text-left" "font-mono" "text-[0.58rem]" "font-normal" "uppercase" "tracking-[0.06em]" "text-trading-muted/70"]} ""]
          [:th {:class ["sticky" "top-0" "border-b" "border-base-300" "bg-base-100" "px-3" "py-2" "text-left" "font-mono" "text-[0.58rem]" "font-normal" "uppercase" "tracking-[0.06em]" "text-trading-muted/70"]} "Asset"]
+         [:th {:class ["sticky" "top-0" "border-b" "border-base-300" "bg-base-100" "px-2" "py-2" "text-right" "font-mono" "text-[0.58rem]" "font-normal" "uppercase" "tracking-[0.06em]" "text-trading-muted/70"]} "Side"]
          [:th {:class ["sticky" "top-0" "border-b" "border-base-300" "bg-base-100" "px-3" "py-2" "text-right" "font-mono" "text-[0.58rem]" "font-normal" "uppercase" "tracking-[0.06em]" "text-trading-muted/70"]} "Current"]
          [:th {:class ["sticky" "top-0" "border-b" "border-base-300" "bg-base-100" "px-3" "py-2" "text-right" "font-mono" "text-[0.58rem]" "font-normal" "uppercase" "tracking-[0.06em]" "text-trading-muted/70"]} "Target"]
          [:th {:class ["sticky" "top-0" "border-b" "border-base-300" "bg-base-100" "px-3" "py-2" "text-right" "font-mono" "text-[0.58rem]" "font-normal" "uppercase" "tracking-[0.06em]" "text-trading-muted/70"]} "Δ %"]

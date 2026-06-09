@@ -132,12 +132,16 @@
     :set-portfolio-optimizer-results-tab]
    [:actions/add-portfolio-optimizer-universe-instrument
     :add-portfolio-optimizer-universe-instrument]
-   [:actions/add-portfolio-optimizer-universe-instrument-and-run
-    :add-portfolio-optimizer-universe-instrument-and-run]
-   [:actions/toggle-portfolio-optimizer-universe-instrument-exclusion-and-run
-    :toggle-portfolio-optimizer-universe-instrument-exclusion-and-run]
-   [:actions/remove-portfolio-optimizer-universe-instrument
-    :remove-portfolio-optimizer-universe-instrument]
+	   [:actions/add-portfolio-optimizer-universe-instrument-and-run
+	    :add-portfolio-optimizer-universe-instrument-and-run]
+	   [:actions/toggle-portfolio-optimizer-universe-instrument-exclusion-and-run
+	    :toggle-portfolio-optimizer-universe-instrument-exclusion-and-run]
+	   [:actions/set-portfolio-optimizer-universe-instrument-side
+	    :set-portfolio-optimizer-universe-instrument-side]
+	   [:actions/set-portfolio-optimizer-universe-instrument-side-and-run
+	    :set-portfolio-optimizer-universe-instrument-side-and-run]
+	   [:actions/remove-portfolio-optimizer-universe-instrument
+	    :remove-portfolio-optimizer-universe-instrument]
    [:actions/set-portfolio-optimizer-universe-from-current :set-portfolio-optimizer-universe-from-current]
    [:actions/load-portfolio-optimizer-history-from-draft :load-portfolio-optimizer-history-from-draft]
    [:actions/save-portfolio-optimizer-scenario-from-current :save-portfolio-optimizer-scenario-from-current]

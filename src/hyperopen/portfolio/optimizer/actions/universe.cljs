@@ -205,6 +205,66 @@
   [state effects]
   (reduce state-after-save-effect state effects))
 
+(defn- instrument-shortable?
+  [instrument]
+  (cond
+    (contains? instrument :shortable?)
+    (true? (:shortable? instrument))
+
+    (= :perp (ids/normalize-market-type
+              (or (:market-type instrument)
+                  (:instrument-type instrument))))
+    true
+
+    :else false))
+
+(defn- position-side-for-instrument
+  [instrument side]
+  (common/selectable-position-side (instrument-shortable? instrument)
+                                   side))
+
+(defn- side-updated-universe
+  [universe instrument-id side]
+  (reduce (fn [{:keys [changed?] :as acc} instrument]
+            (if (common/instrument-matches-id? instrument instrument-id)
+              (let [side* (position-side-for-instrument instrument side)
+                    current-side (common/normalize-position-side
+                                  (:position-side instrument))]
+                (-> acc
+                    (update :universe conj (assoc instrument
+                                                  :position-side side*))
+                    (assoc :changed? (or changed?
+                                         (not= current-side side*)))))
+              (update acc :universe conj instrument)))
+          {:changed? false
+           :universe []}
+          universe))
+
+(defn set-portfolio-optimizer-universe-instrument-side
+  [state instrument-id side]
+  (let [instrument-id* (common/non-blank-text instrument-id)
+        universe (common/draft-universe state)]
+    (if instrument-id*
+      (let [{:keys [changed? universe]} (side-updated-universe universe
+                                                               instrument-id*
+                                                               side)]
+        (if changed?
+          (common/save-draft-path-values
+           [[contracts/draft-universe-path universe]])
+          []))
+      [])))
+
+(defn set-portfolio-optimizer-universe-instrument-side-and-run
+  [state instrument-id side]
+  (let [effects (set-portfolio-optimizer-universe-instrument-side state
+                                                                  instrument-id
+                                                                  side)]
+    (if (seq effects)
+      (into effects
+            (run-actions/run-portfolio-optimizer-from-draft
+             (projected-state-after-save-effects state effects)))
+      [])))
+
 (defn add-portfolio-optimizer-universe-instrument-and-run
   [state market-key]
   (let [effects (add-portfolio-optimizer-universe-instrument state market-key)]

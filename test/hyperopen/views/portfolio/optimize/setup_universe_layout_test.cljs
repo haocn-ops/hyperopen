@@ -177,6 +177,40 @@
     (is (contains? insufficient-strings "insufficient"))
     (is (contains? sufficient-strings "sufficient"))))
 
+(deftest setup-selected-universe-row-renders-position-side-controls-test
+  (let [spot-instrument {:instrument-id "spot:PURR"
+                         :market-type :spot
+                         :coin "PURR"
+                         :symbol "PURR/USDC"
+                         :shortable? false
+                         :position-side :long}
+        view-node (portfolio-view/portfolio-view
+                   {:router {:path "/portfolio/optimize/new"}
+                    :portfolio {:optimizer
+                                {:draft {:universe [(assoc btc-instrument
+                                                           :shortable? true
+                                                           :position-side :long)
+                                                    spot-instrument]
+                                         :objective {:kind :minimum-variance}
+                                         :return-model {:kind :historical-mean}
+                                         :risk-model {:kind :diagonal-shrink}
+                                         :constraints {:long-only? false}}}}})
+        btc-long (node-by-role view-node
+                               "portfolio-optimizer-universe-side-long-perp:BTC")
+        btc-short (node-by-role view-node
+                                "portfolio-optimizer-universe-side-short-perp:BTC")
+        spot-short (node-by-role view-node
+                                 "portfolio-optimizer-universe-side-short-spot:PURR")]
+    (is (some? btc-long))
+    (is (some? btc-short))
+    (is (= "true" (get-in btc-long [1 :data-selected])))
+    (is (= [[:actions/set-portfolio-optimizer-universe-instrument-side
+             "perp:BTC"
+             :short]]
+           (click-actions btc-short)))
+    (is (= true (get-in spot-short [1 :disabled])))
+    (is (nil? (click-actions spot-short)))))
+
 (deftest setup-selected-vault-row-shows-shared-gap-when-loaded-history-is-misaligned-test
   (let [vault-a "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         vault-b "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"

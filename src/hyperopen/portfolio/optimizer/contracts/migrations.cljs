@@ -1,15 +1,58 @@
-(ns hyperopen.portfolio.optimizer.contracts.migrations)
+(ns hyperopen.portfolio.optimizer.contracts.migrations
+  (:require [hyperopen.portfolio.optimizer.coercion :as coercion]))
 
 (def draft-schema-version 1)
 (def scenario-record-schema-version 1)
 (def tracking-record-schema-version 1)
+
+(defn- keyword-like
+  [value]
+  (coercion/normalize-keyword-like value))
+
+(defn- normalize-position-side
+  [value]
+  (case (keyword-like value)
+    :short :short
+    :long))
+
+(defn- shortable-instrument?
+  [instrument]
+  (cond
+    (contains? instrument :shortable?)
+    (true? (:shortable? instrument))
+
+    (= :perp (keyword-like (or (:market-type instrument)
+                               (:instrument-type instrument))))
+    true
+
+    :else false))
+
+(defn- migrate-universe-instrument
+  [instrument]
+  (if (map? instrument)
+    (let [shortable? (shortable-instrument? instrument)
+          side (normalize-position-side (:position-side instrument))]
+      (assoc instrument
+             :position-side (if (and (= :short side)
+                                     shortable?)
+                              :short
+                              :long)))
+    instrument))
+
+(defn- migrate-draft-universe
+  [draft]
+  (if (vector? (:universe draft))
+    (update draft :universe #(mapv migrate-universe-instrument %))
+    draft))
 
 (defn migrate-draft
   [draft]
   (let [draft* (or draft {})
         version (or (:schema-version draft*) draft-schema-version)]
     (case version
-      1 (assoc draft* :schema-version draft-schema-version)
+      1 (-> draft*
+            migrate-draft-universe
+            (assoc :schema-version draft-schema-version))
       (throw (ex-info "Unsupported optimizer draft schema version."
                       {:contract :optimizer/draft
                        :schema-version version})))))

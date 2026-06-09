@@ -115,7 +115,9 @@
                     :outcome-details "If BTC settles above 78213, YES pays $1."}
             view-node (row/active-asset-row {} market {:visible-dropdown nil} {:asset-selector {:missing-icons #{}}
                                                                                 :now-ms 1777751495000})
-            strings (set (support/collect-strings view-node))]
+            strings (set (support/collect-strings view-node))
+            tooltip (support/find-node-by-role view-node "outcome-market-tooltip")
+            summary-scroll (support/find-node-by-role view-node "outcome-tooltip-summary-scroll")]
         (is (contains? strings "Countdown"))
         (is (contains? strings "10h 8m 25s"))
         (is (contains? strings "% Chance"))
@@ -124,7 +126,8 @@
         (is (contains? strings "$537,233"))
         (is (contains? strings "Two sided-open interest: the sum of Yes and No shares on this contract"))
         (is (not (contains? strings "Details")))
-        (is (some? (support/find-node-by-role view-node "outcome-market-tooltip")))
+        (is (some? tooltip))
+        (is (some? summary-scroll))
         (is (contains? strings "Outcome Details"))
         (is (contains? strings "This market resolves to YES or NO based on the following settlement condition at the specified time."))
         (is (contains? strings "Settlement Condition"))
@@ -141,14 +144,18 @@
         (is (not (contains? strings "Learn more")))
         (is (support/contains-class? view-node "group/outcome-name"))
         (is (support/contains-class? view-node "group/outcome-open-interest"))
-        (is (support/contains-class? view-node "left-3"))
-        (is (support/contains-class? view-node "right-0"))
-        (is (support/contains-class? view-node "md:left-4"))
-        (is (support/contains-class? view-node "xl:left-6"))
+        (is (support/contains-class? tooltip "left-0"))
+        (is (= {:width "min(44rem, calc(100vw - 2rem))"
+                :max-width "calc(100vw - 2rem)"}
+               (get-in tooltip [1 :style])))
+        (is (= {:max-height "min(30rem, calc(100vh - 16rem))"}
+               (get-in summary-scroll [1 :style])))
+        (is (support/contains-class? summary-scroll "overflow-y-auto"))
         (is (support/contains-class? view-node "shadow-[0_0_24px_rgba(45,212,191,0.10),0_18px_70px_rgba(0,0,0,0.55)]"))
         (is (support/contains-class? view-node "whitespace-nowrap"))
         (is (support/contains-class? view-node "items-center"))
         (is (support/contains-class? view-node "group-hover/outcome-name:border-[#2dd4bf]/35"))
+        (is (not (support/contains-class? tooltip "right-0")))
         (is (not (support/contains-class? view-node "w-[min(50rem,calc(100vw-3rem))]")))
         (is (support/contains-class? view-node "group-hover/outcome-name:opacity-100"))
         (is (support/contains-class? view-node "group-hover/outcome-open-interest:opacity-100"))

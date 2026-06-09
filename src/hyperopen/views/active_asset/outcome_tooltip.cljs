@@ -53,10 +53,7 @@
                    "top-full"
                    "z-[240]"
                    "mt-3"
-                   "left-3"
-                   "right-0"
-                   "md:left-4"
-                   "xl:left-6"
+                   "left-0"
                    "rounded-lg"
                    "border"
                    "border-[#0f766e]/65"
@@ -72,6 +69,8 @@
                    "group-hover/outcome-name:pointer-events-auto"
                    "group-focus-within/outcome-name:opacity-100"
                    "group-focus-within/outcome-name:pointer-events-auto"]
+           :style {:width "min(44rem, calc(100vw - 2rem))"
+                   :max-width "calc(100vw - 2rem)"}
            :role "tooltip"
            :data-role "outcome-market-tooltip"}
      [:div {:class ["absolute"
@@ -92,7 +91,16 @@
        [:div {:class ["min-w-0" "space-y-2"]}
         [:div {:class ["text-lg" "font-semibold" "leading-6" "text-slate-100"]}
          (or title "Outcome Details")]
-        [:div {:class ["max-w-[40rem]" "text-sm" "leading-6" "text-slate-400"]}
+        [:div {:class ["overflow-y-auto"
+                       "pr-2"
+                       "text-sm"
+                       "leading-6"
+                       "text-slate-400"
+                       "scrollbar-thin"
+                       "scrollbar-thumb-slate-600/80"
+                       "scrollbar-track-transparent"]
+               :style {:max-height "min(30rem, calc(100vh - 16rem))"}
+               :data-role "outcome-tooltip-summary-scroll"}
          (or summary
              "This market resolves to YES or NO based on the following settlement condition at the specified time.")]]]
       [:div {:class ["border-t" "border-slate-700/45"]}

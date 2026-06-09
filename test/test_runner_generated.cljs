@@ -458,6 +458,7 @@
             [hyperopen.views.active-asset.funding-tooltip-popover-test]
             [hyperopen.views.active-asset.icon-button-test]
             [hyperopen.views.active-asset.outcome-option-sort-test]
+            [hyperopen.views.active-asset.outcome-tooltip-test]
             [hyperopen.views.active-asset.row-helpers-test]
             [hyperopen.views.active-asset.row-test]
             [hyperopen.views.active-asset.vm-test]
@@ -1163,6 +1164,7 @@
              'hyperopen.views.active-asset.funding-tooltip-popover-test
              'hyperopen.views.active-asset.icon-button-test
              'hyperopen.views.active-asset.outcome-option-sort-test
+             'hyperopen.views.active-asset.outcome-tooltip-test
              'hyperopen.views.active-asset.row-helpers-test
              'hyperopen.views.active-asset.row-test
              'hyperopen.views.active-asset.vm-test

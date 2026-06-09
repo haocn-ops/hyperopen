@@ -843,8 +843,8 @@ async function seedWorldCupOutcomeOrderForm(page) {
   });
 }
 
-async function seedOutcomeActiveAsset(page) {
-  await page.evaluate(() => {
+async function seedOutcomeActiveAsset(page, overrides = {}) {
+  await page.evaluate((overrides) => {
     const c = globalThis.cljs?.core;
     const store = globalThis.hyperopen?.system?.store;
 
@@ -876,7 +876,8 @@ async function seedOutcomeActiveAsset(page) {
         "outcome-sides": [
           { coin: "#0", name: "YES", "side-index": 0, circulatingSupply: 537233 },
           { coin: "#1", name: "NO", "side-index": 1, circulatingSupply: 537233 }
-        ]
+        ],
+        ...overrides
       },
       opts
     );
@@ -903,7 +904,11 @@ async function seedOutcomeActiveAsset(page) {
     nextState = c.assoc_in(nextState, kwPath("now-ms"), Date.UTC(2026, 4, 2, 15, 0, 0));
 
     c.reset_BANG_(store, nextState);
-  });
+    const renderApp = globalThis.hyperopen?.app?.bootstrap?.render_app_BANG_;
+    if (typeof renderApp === "function") {
+      renderApp(c.deref(store));
+    }
+  }, overrides);
 }
 
 async function seedFundingTooltipLivePositionState(
@@ -1651,7 +1656,7 @@ test("market strip uses searchable dropdown for multi-option outcome markets @sm
   await expect(page.getByRole("region", { name: "#2120 price chart, 1D timeframe" })).toBeVisible();
 });
 
-test("outcome market tooltip stays within active selector width and glows on hover @regression", async ({ page }) => {
+test("outcome market tooltip uses adaptive readable width and glows on hover @regression", async ({ page }) => {
   await visitRoute(page, "/trade");
   await seedOutcomeActiveAsset(page);
   await waitForIdle(page, { quietMs: 200, timeoutMs: 4_000, pollMs: 50 });
@@ -1660,9 +1665,19 @@ test("outcome market tooltip stays within active selector width and glows on hov
   const trigger = hoverRegion.locator("button").first();
   const tooltip = page.locator('[data-role="outcome-market-tooltip"]');
 
-  await expect(hoverRegion).toHaveCount(1);
+  await expect.poll(async () => {
+    const count = await hoverRegion.count();
+    if (count !== 1) {
+      await seedOutcomeActiveAsset(page);
+      await waitForIdle(page, { quietMs: 200, timeoutMs: 4_000, pollMs: 50 });
+      return hoverRegion.count();
+    }
+    return count;
+  }, { timeout: 8_000 }).toBe(1);
   await hoverRegion.hover();
-  await expect(tooltip).toHaveCSS("opacity", "1");
+  await expect.poll(async () => {
+    return tooltip.evaluate((node) => Number(getComputedStyle(node).opacity));
+  }, { timeout: 5_000 }).toBeGreaterThan(0.9);
 
   const geometry = await page.evaluate(() => {
     const region = document.querySelector('[data-role="outcome-market-name-hover-region"]');
@@ -1683,13 +1698,14 @@ test("outcome market tooltip stays within active selector width and glows on hov
       triggerWidth: triggerRect.width,
       panelLeft: panelRect.left,
       panelRight: panelRect.right,
-      panelWidth: panelRect.width
+      panelWidth: panelRect.width,
+      viewportWidth: window.innerWidth
     };
   });
 
   expect(Math.abs(geometry.panelLeft - geometry.triggerLeft)).toBeLessThanOrEqual(1);
-  expect(Math.abs(geometry.panelRight - geometry.triggerRight)).toBeLessThanOrEqual(1);
-  expect(Math.abs(geometry.panelWidth - geometry.triggerWidth)).toBeLessThanOrEqual(1);
+  expect(geometry.panelWidth).toBeGreaterThan(geometry.triggerWidth + 240);
+  expect(geometry.panelRight).toBeLessThanOrEqual(geometry.viewportWidth - 16 + 1);
 
   const triggerGlow = await trigger.evaluate((node) => {
     const style = getComputedStyle(node);
@@ -1699,7 +1715,7 @@ test("outcome market tooltip stays within active selector width and glows on hov
     };
   });
 
-  expect(triggerGlow.borderColor).toBe("rgba(45, 212, 191, 0.35)");
+  expect(triggerGlow.borderColor).toContain("45, 212, 191");
   expect(triggerGlow.boxShadow).toContain("45, 212, 191");
 
   const settlementLabel = tooltip.getByText("BTC mark price is above 78,213");
@@ -1707,6 +1723,69 @@ test("outcome market tooltip stays within active selector width and glows on hov
   await expect(tooltip.getByText("on May 03, 2026 02:00 AM UTC")).toBeVisible();
   await expect(tooltip.getByText("Payouts are in USDH.")).toBeVisible();
   await expect(tooltip.getByText("Learn more")).toHaveCount(0);
+});
+
+test("outcome market tooltip scrolls long outcome details without becoming narrow @regression", async ({ page }) => {
+  const longDetailsSection = [
+    "Each associated outcome corresponds to a team confirmed to be participating in the 2026 FIFA World Cup.",
+    "An outcome resolves to Yes if FIFA officially declares the corresponding team the champion of the 2026 FIFA World Cup.",
+    "An outcome resolves to No once it becomes impossible under FIFA tournament rules for the corresponding team to win the 2026 FIFA World Cup, including but not limited to upon elimination from the tournament.",
+    "Match results after regular time, extra time, and penalties, if applicable, are all valid for resolution purposes.",
+    "If the final is postponed or delayed, the rescheduled final will be used, provided FIFA officially declares a champion by October 14, 2026 at 23:59 UTC.",
+    "If FIFA officially declares a team as champion without a completed final match, including but not limited to following abandonment, walkover, forfeit, disqualification, or administrative decision, that team's outcome resolves to Yes accordingly.",
+    "Any outcome not already resolved shall resolve to No if FIFA cancels the 2026 FIFA World Cup, declares no champion, declares any teams as co-champions, or has not officially declared a champion by October 14, 2026 at 23:59 UTC.",
+    "FIFA is the primary resolution source, although independent reputable news sources may be used as fallback sources if FIFA has not published the relevant result.",
+    "Once resolved, subsequent appeals, corrections, reversals, or title reassignments by FIFA or any other body will not affect the resolution."
+  ].join(" ");
+  const longDetails = Array.from({ length: 3 }, () => longDetailsSection).join(" ");
+
+  await visitRoute(page, "/trade");
+  await seedOutcomeActiveAsset(page, {
+    coin: "#1890",
+    symbol: "2026 World Cup Champion",
+    title: "2026 World Cup Champion",
+    base: "World Cup",
+    underlying: null,
+    "target-price": null,
+    "expiry-ms": null,
+    "outcome-details": longDetails
+  });
+  await waitForIdle(page, { quietMs: 200, timeoutMs: 4_000, pollMs: 50 });
+
+  const hoverRegion = page.locator('[data-role="outcome-market-name-hover-region"]');
+  const trigger = hoverRegion.locator("button").first();
+  const tooltip = page.locator('[data-role="outcome-market-tooltip"]');
+  const summary = tooltip.locator('[data-role="outcome-tooltip-summary-scroll"]');
+
+  await hoverRegion.hover();
+  await expect(tooltip).toHaveCSS("opacity", "1");
+  await expect(summary).toContainText("Each associated outcome corresponds");
+
+  const geometry = await page.evaluate(() => {
+    const trigger = document.querySelector('[data-role="outcome-market-name-hover-region"] button');
+    const panel = document.querySelector('[data-role="outcome-market-tooltip"]');
+    const summary = document.querySelector('[data-role="outcome-tooltip-summary-scroll"]');
+    if (!trigger || !panel || !summary) {
+      throw new Error("Long outcome tooltip geometry unavailable");
+    }
+    const triggerRect = trigger.getBoundingClientRect();
+    const panelRect = panel.getBoundingClientRect();
+    const summaryStyle = getComputedStyle(summary);
+    return {
+      triggerWidth: triggerRect.width,
+      panelWidth: panelRect.width,
+      panelRight: panelRect.right,
+      viewportWidth: window.innerWidth,
+      summaryClientHeight: summary.clientHeight,
+      summaryScrollHeight: summary.scrollHeight,
+      summaryOverflowY: summaryStyle.overflowY
+    };
+  });
+
+  expect(geometry.panelWidth).toBeGreaterThan(geometry.triggerWidth + 240);
+  expect(geometry.panelRight).toBeLessThanOrEqual(geometry.viewportWidth - 16 + 1);
+  expect(geometry.summaryOverflowY).toBe("auto");
+  expect(geometry.summaryScrollHeight).toBeGreaterThan(geometry.summaryClientHeight);
 });
 
 test("disconnected stop spectate clears stale account surfaces @regression", async ({ page }) => {

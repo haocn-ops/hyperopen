@@ -309,6 +309,8 @@
     (is (some? arb-short))
     (is (= "true" (node-attr btc-long :data-selected)))
     (is (= "true" (node-attr arb-short :data-selected)))
+    (is (contains? (set (node-attr btc-long :class)) "bg-success/70"))
+    (is (contains? (set (node-attr arb-short :class)) "bg-error/70"))
     (is (= [[:actions/set-portfolio-optimizer-universe-instrument-side-and-run
              "perp:BTC"
              :short]]

@@ -190,6 +190,9 @@
                                 {:draft {:universe [(assoc btc-instrument
                                                            :shortable? true
                                                            :position-side :long)
+                                                    (assoc eth-instrument
+                                                           :shortable? true
+                                                           :position-side :short)
                                                     spot-instrument]
                                          :objective {:kind :minimum-variance}
                                          :return-model {:kind :historical-mean}
@@ -199,11 +202,19 @@
                                "portfolio-optimizer-universe-side-long-perp:BTC")
         btc-short (node-by-role view-node
                                 "portfolio-optimizer-universe-side-short-perp:BTC")
+        eth-short (node-by-role view-node
+                                "portfolio-optimizer-universe-side-short-perp:ETH")
         spot-short (node-by-role view-node
                                  "portfolio-optimizer-universe-side-short-spot:PURR")]
     (is (some? btc-long))
     (is (some? btc-short))
+    (is (some? eth-short))
     (is (= "true" (get-in btc-long [1 :data-selected])))
+    (is (= "true" (get-in eth-short [1 :data-selected])))
+    (is (contains? (class-token-set btc-long) "bg-success/70"))
+    (is (not (contains? (class-token-set btc-long) "bg-error/70")))
+    (is (contains? (class-token-set eth-short) "bg-error/70"))
+    (is (not (contains? (class-token-set eth-short) "bg-success/70")))
     (is (= [[:actions/set-portfolio-optimizer-universe-instrument-side
              "perp:BTC"
              :short]]

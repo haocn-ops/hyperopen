@@ -49,7 +49,10 @@
               :class (cond-> ["h-6" "w-6" "border" "border-base-300"
                               "font-mono" "text-[0.6rem]" "font-semibold"
                               "uppercase" "leading-none" "transition-colors"]
-                       selected? (conj "bg-success/70" "text-base-100")
+                       (and selected? (= :long side))
+                       (conj "bg-success/70" "text-base-100")
+                       (and selected? (= :short side))
+                       (conj "bg-error/70" "text-base-100")
                        (and (not selected?) enabled?)
                        (conj "text-trading-muted" "hover:border-warning/60"
                              "hover:text-warning")

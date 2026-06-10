@@ -115,9 +115,9 @@
 (deftest header-vm-brand-voice-test
   (let [degen (vm/header-vm {:ui {:theme "hyperdegen"}})
         plain (vm/header-vm {})]
-    (is (= {:wordmark "HyperDegen" :mark "HD"}
+    (is (= {:wordmark "HyperDegen" :mark "HD" :tagline "formerly responsible"}
            (:brand degen)))
-    (is (= {:wordmark "HyperOpen" :mark "HO"}
+    (is (= {:wordmark "HyperOpen" :mark "HO" :tagline nil}
            (:brand plain)))))
 
 (deftest header-vm-degen-voice-relabels-nav-test

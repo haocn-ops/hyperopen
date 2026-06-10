@@ -387,6 +387,7 @@
             [hyperopen.trading.order-form-transitions-update-test]
             [hyperopen.ui.fonts-test]
             [hyperopen.ui.preferences-test]
+            [hyperopen.ui.sfx-test]
             [hyperopen.ui.table.sort-kernel-test]
             [hyperopen.ui.theme-test]
             [hyperopen.ui.voice-test]
@@ -474,6 +475,7 @@
             [hyperopen.views.chart.d3.runtime-test]
             [hyperopen.views.chart.tooltip-core-test]
             [hyperopen.views.degen.illustrations-test]
+            [hyperopen.views.degen.order-form-test]
             [hyperopen.views.degen.widgets-test]
             [hyperopen.views.footer-build-id-test]
             [hyperopen.views.footer-view-test]
@@ -558,6 +560,7 @@
             [hyperopen.views.trade.order-form-commands-test]
             [hyperopen.views.trade.order-form-component-primitives-test]
             [hyperopen.views.trade.order-form-component-sections-test]
+            [hyperopen.views.trade.order-form-controls-side-row-test]
             [hyperopen.views.trade.order-form-runtime-gateway-test]
             [hyperopen.views.trade.order-form-summary-display-test]
             [hyperopen.views.trade.order-form-view-test]
@@ -1092,6 +1095,7 @@
              'hyperopen.trading.order-form-transitions-update-test
              'hyperopen.ui.fonts-test
              'hyperopen.ui.preferences-test
+             'hyperopen.ui.sfx-test
              'hyperopen.ui.table.sort-kernel-test
              'hyperopen.ui.theme-test
              'hyperopen.ui.voice-test
@@ -1179,6 +1183,7 @@
              'hyperopen.views.chart.d3.runtime-test
              'hyperopen.views.chart.tooltip-core-test
              'hyperopen.views.degen.illustrations-test
+             'hyperopen.views.degen.order-form-test
              'hyperopen.views.degen.widgets-test
              'hyperopen.views.footer-build-id-test
              'hyperopen.views.footer-view-test
@@ -1263,6 +1268,7 @@
              'hyperopen.views.trade.order-form-commands-test
              'hyperopen.views.trade.order-form-component-primitives-test
              'hyperopen.views.trade.order-form-component-sections-test
+             'hyperopen.views.trade.order-form-controls-side-row-test
              'hyperopen.views.trade.order-form-runtime-gateway-test
              'hyperopen.views.trade.order-form-summary-display-test
              'hyperopen.views.trade.order-form-view-test

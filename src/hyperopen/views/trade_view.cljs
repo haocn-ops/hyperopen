@@ -368,6 +368,9 @@
     {:active-asset-panel-state active-asset-panel-state
      :trade-chart-panel-state trade-chart-panel-state
      :desktop-secondary-panels-ready? desktop-secondary-panels-ready?*
+     ;; The degen experience drops the desktop equity summary so the
+     ;; bottom widget cards get the vertical room (other themes keep it).
+     :hide-account-equity? (voice/degen? state)
      :account-info-panel-state account-info-panel-state
      :account-equity-panel-state account-equity-panel-state
      :equity-metrics equity-metrics

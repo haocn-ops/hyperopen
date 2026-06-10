@@ -1,5 +1,6 @@
 (ns hyperopen.views.trade.order-form-controls
   (:require [hyperopen.state.trading :as trading]
+            [hyperopen.views.degen.order-form :as degen-order-form]
             [hyperopen.views.trade.order-form-component-primitives :as primitives]))
 
 (defn- price-context-accessory [{:keys [label mid-available?]} on-set-to-mid]
@@ -411,6 +412,7 @@
                   :aria-label "Close leverage menu"
                   :on {:click (:on-close-leverage-popover leverage-handlers)}}
          "x"]]]
+      (degen-order-form/leverage-popover-message state draft*)
       [:button {:type "button"
                 :class ["h-10"
                         "w-full"
@@ -448,12 +450,20 @@
 (defn side-row
   ([side side-handlers]
    (side-row side side-handlers nil))
-  ([side side-handlers {:keys [buy-label sell-label]
+  ([side side-handlers {:keys [buy-label sell-label massive?
+                               buy-sublabel sell-sublabel]
                         :or {buy-label "Buy / Long"
-                             sell-label "Sell / Short"}}]
-   [:div {:class ["flex" "h-[33px]" "items-center" "gap-1.5" "rounded-lg" "bg-base-200" "p-0.5" "sm:gap-2"]}
-    (primitives/side-button buy-label :buy (= side :buy) ((:on-select-side side-handlers) :buy))
-    (primitives/side-button sell-label :sell (= side :sell) ((:on-select-side side-handlers) :sell))]))
+                             sell-label "Sell / Short"}
+                        :as opts}]
+   (if massive?
+     (degen-order-form/massive-side-row side
+                                        side-handlers
+                                        (assoc opts
+                                               :buy-label buy-label
+                                               :sell-label sell-label))
+     [:div {:class ["flex" "h-[33px]" "items-center" "gap-1.5" "rounded-lg" "bg-base-200" "p-0.5" "sm:gap-2"]}
+      (primitives/side-button buy-label :buy (= side :buy) ((:on-select-side side-handlers) :buy))
+      (primitives/side-button sell-label :sell (= side :sell) ((:on-select-side side-handlers) :sell))])))
 
 (defn- outcome-side-index
   [side]

@@ -6,6 +6,8 @@
             [hyperopen.platform :as platform]
             [hyperopen.runtime.state :as runtime-state]
             [hyperopen.trading-settings :as trading-settings]
+            [hyperopen.ui.sfx :as sfx]
+            [hyperopen.ui.voice :as voice]
             [hyperopen.utils.formatting :as fmt]))
 
 (def ^:private fill-size-format-options
@@ -454,6 +456,8 @@
 
 (defn show-user-fill-toast!
   [store rows]
+  (when (trading-settings/sound-on-fill? @store)
+    (sfx/fill! (voice/degen? @store)))
   (when (trading-settings/fill-alerts-enabled? @store)
     (let [market-by-key (get-in @store [:asset-selector :market-by-key] {})]
       (doseq [payload (fill-toast-payloads rows market-by-key)]

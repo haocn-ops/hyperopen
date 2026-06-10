@@ -372,7 +372,8 @@
 (defn- brand-vm
   [state]
   {:wordmark (voice/label state :brand/wordmark)
-   :mark (voice/label state :brand/mark)})
+   :mark (voice/label state :brand/mark)
+   :tagline (when (voice/degen? state) "formerly responsible")})
 
 (defn header-vm
   [state]

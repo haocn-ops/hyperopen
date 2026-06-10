@@ -1,7 +1,7 @@
 (ns hyperopen.views.trade.order-form-view
   (:require [hyperopen.state.trading :as trading]
             [hyperopen.ui.voice :as voice]
-            [hyperopen.views.degen.widgets :as degen-widgets]
+            [hyperopen.views.degen.order-form :as degen-order-form]
             [hyperopen.views.trade.order-form-component-primitives :as primitives]
             [hyperopen.views.trade.order-form-component-sections :as sections]
             [hyperopen.views.trade.order-form-controls :as controls]
@@ -153,7 +153,7 @@
                                max-leverage
                                leverage-handlers))
       (when-not outcome?
-        (degen-widgets/leverage-warning-banner state ui-leverage))
+        (degen-order-form/leverage-warning-banner state ui-leverage))
 
       (sections/entry-mode-tabs {:entry-mode entry-mode
                                  :type type
@@ -165,10 +165,14 @@
 
       (if outcome?
         (action-side-tabs side side-handlers)
-        (controls/side-row side
-                           side-handlers
-                           {:buy-label (voice/label state :order-form/buy)
-                            :sell-label (voice/label state :order-form/sell)}))
+        (let [degen? (voice/degen? state)]
+          (controls/side-row side
+                             side-handlers
+                             {:buy-label (voice/label state :order-form/buy)
+                              :sell-label (voice/label state :order-form/sell)
+                              :massive? degen?
+                              :buy-sublabel (when degen? "(number go up pls)")
+                              :sell-sublabel (when degen? "(get me out)")})))
       (when outcome?
         (controls/outcome-side-row outcome-sides
                                    outcome-side-index

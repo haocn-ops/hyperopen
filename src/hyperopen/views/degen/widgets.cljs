@@ -18,14 +18,30 @@
    "A stop loss is just admitting defeat in advance."
    "Never sell. That way you never realize a loss. Genius."])
 
+(def quotes
+  [{:q "Risk it for the biscuit." :a "Degen Sun Tzu"}
+   {:q "Fortune favors the degen." :a "Ancient CT Proverb"}
+   {:q "It's only a loss if you check the app." :a "Anonymous Whale"}
+   {:q "Buy high, sell never." :a "The Tao of HODL"}])
+
+(defn- day-rotation
+  [coll now-ms offset]
+  (nth coll (mod (+ (js/Math.floor (/ now-ms 86400000)) offset)
+                 (count coll))))
+
 (defn daily-tip
   "Deterministic tip-of-the-day; `now-ms` injectable for tests. `offset`
    (the RESET LIFE counter) re-rolls to the next tip."
   ([] (daily-tip (.now js/Date) 0))
   ([now-ms] (daily-tip now-ms 0))
   ([now-ms offset]
-   (nth tips (mod (+ (js/Math.floor (/ now-ms 86400000)) offset)
-                  (count tips)))))
+   (day-rotation tips now-ms offset)))
+
+(defn daily-quote
+  "Deterministic quote-of-the-day; rotates with RESET LIFE like the tip."
+  ([] (daily-quote (.now js/Date) 0))
+  ([now-ms offset]
+   (day-rotation quotes now-ms offset)))
 
 (defn liq-risk
   "Margin-ratio (0..1) into a parody risk readout."
@@ -286,32 +302,6 @@
     (when (seq gainers)
       (apply max-key :degen/pct gainers))))
 
-(defn leverage-warning-banner
-  "Escalating parody warning under the leverage row; real leverage in."
-  [state leverage]
-  (when (voice/degen? state)
-    (let [lev (js/parseFloat leverage)]
-      (when-not (js/isNaN lev)
-        (when-some [warning (cond
-                              (>= lev 100)
-                              {:text "MAXIMUM DEGEN. Tell your family you love them. 💀"
-                               :classes ["border-ho-sell" "text-ho-sell"]}
-
-                              (>= lev 50)
-                              {:text "A 0.1% wick ends you. Good luck. 💀"
-                               :classes ["border-ho-sell" "text-ho-sell"]}
-
-                              (>= lev 20)
-                              {:text "WARNING: HIGH LEVERAGE = BIG FUN (or big sadness)"
-                               :classes ["border-ho-warn" "text-ho-warn"]}
-
-                              :else nil)]
-          [:div {:class (into ["rounded-md" "border" "border-dashed" "px-2.5"
-                               "py-1.5" "text-xs" "font-bold"]
-                              (:classes warning))
-                 :data-role "degen-leverage-warning"}
-           (:text warning)])))))
-
 (defn- widget-card
   [{:keys [data-role border-class title]} & body]
   [:div {:class (conj ["flex" "flex-col" "gap-1.5" "rounded-lg" "border"
@@ -332,7 +322,7 @@
           shill (top-gainer state)
           lives (get-in state [:degen :life-resets] 0)]
       [:div {:class ["hidden" "lg:grid" "grid-cols-2" "xl:grid-cols-5" "gap-2"
-                     "px-2" "pb-2"]
+                     "px-2" "py-2" "relative" "z-10" "bg-ho-bg"]
              :data-role "degen-widgets-row"}
        (widget-card {:data-role "degen-widget-shill"
                      :border-class "border-ho-warn"
@@ -375,8 +365,13 @@
                     [:div {:class ["flex" "items-start" "gap-2"]}
                      [:span {:class ["shrink-0"]}
                       (illustrations/doge "w-10")]
-                     [:p {:class ["text-xs" "text-ho-text-secondary" "leading-relaxed"]}
-                      "Such leverage. Much risk. Very degen. Wow."]])
+                     (let [{:keys [q a]} (daily-quote (.now js/Date) lives)]
+                       [:div {:class ["flex" "flex-col" "gap-1"]}
+                        [:p {:class ["text-xs" "text-ho-text-secondary" "leading-relaxed"]}
+                         "Such leverage. Much risk. Very degen. Wow."]
+                        [:p {:class ["text-xs" "text-ho-text-dim" "italic" "leading-snug"]
+                             :style marker-style}
+                         (str "“" q "” — " a)]])])
        (widget-card {:data-role "degen-widget-feeling"
                      :title "Feeling Gauge"}
                     [:div {:class ["flex" "items-center" "gap-2.5"]}

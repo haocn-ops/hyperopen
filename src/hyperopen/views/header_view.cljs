@@ -52,10 +52,15 @@
           [:span {:class (into ["text-lg" "leading-none"]
                                brand-mark-classes)}
            (:mark brand)]]
-         [:div {:class ["hidden" "md:flex" "items-center" "space-x-2" "sm:space-x-3"]}
+         [:div {:class ["hidden" "md:flex" "flex-col" "justify-center"]}
           [:span {:class (into ["text-xl" "leading-none" "sm:text-3xl"]
                                brand-wordmark-classes)}
-           (:wordmark brand)]]]
+           (:wordmark brand)]
+          (when (seq (:tagline brand))
+            [:span {:class ["text-xs" "leading-tight" "text-ho-text-dim"
+                            "italic" "whitespace-nowrap"]
+                    :data-role "header-brand-tagline"}
+             (:tagline brand)])]]
         (navigation/render-desktop-nav desktop-nav-items more-nav)
         [:div {:class ["ml-auto" "flex" "items-center" "gap-1.5" "sm:gap-2.5" "lg:gap-4"]
                :data-parity-id "header-wallet-control"}

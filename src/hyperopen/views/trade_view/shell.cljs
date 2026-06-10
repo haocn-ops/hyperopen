@@ -104,22 +104,24 @@
    {:keys [account-equity-panel-state
            desktop-secondary-panels-ready?
            equity-metrics
+           hide-account-equity?
            order-form-panel-state]}
    {:keys [render-account-equity-panel-state render-order-form-panel]}]
   [:div {:class (:order-entry-panel-classes layout)
          :data-parity-id funding-modal-positioning/trade-order-entry-panel-parity-id}
    (when (:order-entry-panel-visible? layout)
      (render-order-form-panel order-form-panel-state))
-   [:div {:class ["hidden" "border-t" "border-base-300" "lg:block"]
-          :data-parity-id "trade-desktop-account-equity-panel"}
-    (when (and desktop-layout?
-               (:order-entry-panel-visible? layout))
-      (if desktop-secondary-panels-ready?
-        (or (render-account-equity-panel-state account-equity-panel-state equity-metrics {})
-            (desktop-secondary-panel-placeholder "Account Equity"
-                                                 "trade-desktop-account-equity-placeholder"))
-        (desktop-secondary-panel-placeholder "Account Equity"
-                                             "trade-desktop-account-equity-placeholder")))]])
+   (when-not hide-account-equity?
+     [:div {:class ["hidden" "border-t" "border-base-300" "lg:block"]
+            :data-parity-id "trade-desktop-account-equity-panel"}
+      (when (and desktop-layout?
+                 (:order-entry-panel-visible? layout))
+        (if desktop-secondary-panels-ready?
+          (or (render-account-equity-panel-state account-equity-panel-state equity-metrics {})
+              (desktop-secondary-panel-placeholder "Account Equity"
+                                                   "trade-desktop-account-equity-placeholder"))
+          (desktop-secondary-panel-placeholder "Account Equity"
+                                               "trade-desktop-account-equity-placeholder")))])])
 
 (defn render-account-panel-shell
   [state

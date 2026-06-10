@@ -97,18 +97,18 @@
     (is (str/includes? rendered ":actions/select-asset-by-market-key"))
     (is (str/includes? rendered "not financial advice"))))
 
-(deftest leverage-warning-banner-test
-  (is (nil? (widgets/leverage-warning-banner {} 100)))
-  (is (nil? (widgets/leverage-warning-banner degen-state nil)))
-  (is (nil? (widgets/leverage-warning-banner degen-state 5)))
-  (let [warn (pr-str (widgets/leverage-warning-banner degen-state 20))
-        spicy (pr-str (widgets/leverage-warning-banner degen-state 50))
-        max* (pr-str (widgets/leverage-warning-banner degen-state 100))]
-    (is (str/includes? warn "BIG FUN"))
-    (is (str/includes? warn "border-ho-warn"))
-    (is (str/includes? spicy "0.1% wick"))
-    (is (str/includes? max* "MAXIMUM DEGEN"))
-    (is (str/includes? max* "border-ho-sell"))))
+(deftest daily-quote-rotation-test
+  (is (= (nth widgets/quotes 0) (widgets/daily-quote 0 0)))
+  (is (= (nth widgets/quotes 1) (widgets/daily-quote 0 1)))
+  (is (= (nth widgets/quotes 0)
+         (widgets/daily-quote 0 (count widgets/quotes)))))
+
+(deftest motivation-card-includes-quote-test
+  (let [rendered (pr-str (widgets/widgets-row degen-state))
+        quoted? (fn [{:keys [q a]}]
+                  (str/includes? rendered (str "“" q "” — " a)))]
+    (is (some quoted? widgets/quotes)
+        "the motivation card carries whichever quote today rotates to")))
 
 (deftest daily-tip-deterministic-test
   (is (= (nth widgets/tips 0) (widgets/daily-tip 0)))

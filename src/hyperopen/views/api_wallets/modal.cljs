@@ -119,12 +119,12 @@
   (when (seq (:error modal))
     [:div {:class ["rounded-lg"
                    "border"
-                   "border-[#7b3340]"
-                   "bg-[#3a1b22]/55"
+                   "border-ho-border-sell"
+                   "bg-ho-sell-soft/55"
                    "px-3"
                    "py-2"
                    "text-sm"
-                   "text-[#f2b8c5]"]
+                   "text-ho-sell-tint"]
             :data-role "api-wallets-modal-error"}
      (:error modal)]))
 
@@ -142,10 +142,10 @@
            "text-[#6c8e93]"
            "cursor-not-allowed"]
           ["border-[#2f625a]"
-           "bg-[#0d3a35]"
+           "bg-ho-accent-soft"
            "text-[#daf3ef]"
            "hover:border-[#3f7f75]"
-           "hover:bg-[#115046]"])))
+           "hover:bg-ho-accent-soft-hi"])))
 
 (defn- modal-confirm-label
   [modal]

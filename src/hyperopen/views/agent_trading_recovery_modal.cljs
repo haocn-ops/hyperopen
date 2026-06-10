@@ -125,10 +125,10 @@
                                    "text-[#6c8e93]"
                                    "cursor-not-allowed"]
                                   ["border-[#2f625a]"
-                                   "bg-[#0d3a35]"
+                                   "bg-ho-accent-soft"
                                    "text-[#daf3ef]"
                                    "hover:border-[#3f7f75]"
-                                   "hover:bg-[#115046]"]))
+                                   "hover:bg-ho-accent-soft-hi"]))
                    :on {:click [[:actions/enable-agent-trading]]}
                    :data-role "agent-trading-recovery-modal-confirm"}
           (if approving? "Awaiting signature..." "Enable Trading")]]]])))

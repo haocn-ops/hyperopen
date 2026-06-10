@@ -11,9 +11,9 @@
 (defn- action-side-tab
   [label side active? on-click]
   (let [active-classes (if (= side :sell)
-                         ["border-[#ED7088]" "text-[#ED7088]"]
+                         ["border-ho-sell-hi" "text-ho-sell-hi"]
                          ["border-primary" "text-primary"])
-        dot-class (if (= side :sell) "bg-[#ED7088]" "bg-primary")]
+        dot-class (if (= side :sell) "bg-ho-sell-hi" "bg-primary")]
     [:button {:type "button"
               :role "tab"
               :aria-selected (boolean active?)

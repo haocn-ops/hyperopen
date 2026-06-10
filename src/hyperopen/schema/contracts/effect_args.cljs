@@ -228,6 +228,8 @@
 (s/def ::portfolio-optimizer-execution-plan-args
   (s/tuple map?))
 
+(s/def ::apply-ui-theme-args (s/tuple ::common/non-empty-string))
+
 (s/def ::effect-id (s/and keyword?
                           #(= "effects" (namespace %))))
 
@@ -237,6 +239,7 @@
    :effects/restore-dialog-focus ::common/no-args
    :effects/local-storage-set ::common/storage-args
    :effects/local-storage-set-json ::common/storage-args
+   :effects/apply-ui-theme ::apply-ui-theme-args
    :effects/persist-leaderboard-preferences ::common/no-args
    :effects/queue-asset-icon-status ::common/queue-asset-icon-status-args
    :effects/sync-asset-selector-active-ctx-subscriptions ::common/no-args

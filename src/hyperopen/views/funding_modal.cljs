@@ -75,14 +75,14 @@
               :class ["rounded-lg"
                       "border"
                       "border-[#2f625a]"
-                      "bg-[#0d3a35]"
+                      "bg-ho-accent-soft"
                       "px-3.5"
                       "py-2"
                       "text-sm"
                       "font-medium"
                       "text-[#daf3ef]"
                       "hover:border-[#3f7f75]"
-                      "hover:bg-[#115046]"]
+                      "hover:bg-ho-accent-soft-hi"]
               :on {:click [[:actions/close-funding-modal]]}}
      "Close"]]])
 
@@ -91,12 +91,12 @@
   [:div {:class ["space-y-3"] :data-role "funding-unknown-content"}
    [:div {:class ["rounded-lg"
                   "border"
-                  "border-[#7b3340]"
-                  "bg-[#3a1b22]/55"
+                  "border-ho-border-sell"
+                  "bg-ho-sell-soft/55"
                   "px-3"
                   "py-3"
                   "space-y-1.5"]}
-    [:p {:class ["text-sm" "text-[#f2b8c5]"]}
+    [:p {:class ["text-sm" "text-ho-sell-tint"]}
      "This funding modal state is not supported yet."]
     [:p {:class ["text-xs" "text-[#d7b8c0]"]}
      (str "Unhandled content kind: " (pr-str kind))]]
@@ -105,14 +105,14 @@
               :class ["rounded-lg"
                       "border"
                       "border-[#2f625a]"
-                      "bg-[#0d3a35]"
+                      "bg-ho-accent-soft"
                       "px-3.5"
                       "py-2"
                       "text-sm"
                       "font-medium"
                       "text-[#daf3ef]"
                       "hover:border-[#3f7f75]"
-                      "hover:bg-[#115046]"]
+                      "hover:bg-ho-accent-soft-hi"]
               :on {:click [[:actions/close-funding-modal]]}}
      "Close"]]])
 
@@ -151,8 +151,8 @@
                         "overflow-y-auto"
                         "rounded-t-[22px]"
                         "border"
-                        "border-[#17313d]"
-                        "bg-[#06131a]"
+                        "border-ho-border-accent-muted"
+                        "bg-ho-bg-deep"
                         "px-4"
                         "pt-4"
                         "text-sm"
@@ -189,7 +189,7 @@
                              "z-[81]"
                              "space-y-3"
                              "border"
-                             "border-[#1f3b3c]"
+                             "border-ho-border-accent"
                              "bg-[#081b24]"
                              "shadow-2xl"
                              "pointer-events-auto"]
@@ -239,7 +239,7 @@
                                       "transition-colors"
                                       "focus:outline-none"
                                       "focus:ring-1"
-                                      "focus:ring-[#66e3c5]/40"
+                                      "focus:ring-ho-accent-hi/40"
                                       "focus:ring-offset-0"
                                       "focus:shadow-none"]
                                      (if mobile-sheet?
@@ -248,7 +248,7 @@
                                         "justify-center"
                                         "rounded-lg"
                                         "border"
-                                        "border-[#17313d]"
+                                        "border-ho-border-accent-muted"
                                         "bg-[#0b181d]"
                                         "text-gray-300"
                                         "hover:bg-[#102229]"
@@ -263,12 +263,12 @@
              (when (:visible? feedback)
                [:div {:class ["rounded-md"
                               "border"
-                              "border-[#7b3340]"
-                              "bg-[#3a1b22]/55"
+                              "border-ho-border-sell"
+                              "bg-ho-sell-soft/55"
                               "px-3"
                               "py-2"
                               "text-sm"
-                              "text-[#f2b8c5]"]
+                              "text-ho-sell-tint"]
                         :data-role "funding-status"}
                 (:message feedback)])]]
         (if mobile-sheet?

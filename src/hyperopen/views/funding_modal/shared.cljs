@@ -8,14 +8,14 @@
     ["rounded-lg"
      "border"
      "border-[#2f625a]"
-     "bg-[#0d3a35]"
+     "bg-ho-accent-soft"
      "px-3.5"
      "py-2"
      "text-sm"
      "font-medium"
      "text-[#daf3ef]"
      "hover:border-[#3f7f75]"
-     "hover:bg-[#115046]"]
+     "hover:bg-ho-accent-soft-hi"]
     ["rounded-lg"
      "border"
      "border-[#2c4b50]"
@@ -137,7 +137,7 @@
 (defn- outcome-tone-class
   [tone]
   (if (= tone :failure)
-    "text-[#f2b8c5]"
+    "text-ho-sell-tint"
     "text-[#7af2d7]"))
 
 (defn- lifecycle-outcome-row
@@ -187,12 +187,12 @@
           [(when (seq (:error panel))
              (notice-block ["rounded-md"
                             "border"
-                            "border-[#7b3340]"
-                            "bg-[#3a1b22]/55"
+                            "border-ho-border-sell"
+                            "bg-ho-sell-soft/55"
                             "px-2.5"
                             "py-1.5"
                             "text-xs"
-                            "text-[#f2b8c5]"]
+                            "text-ho-sell-tint"]
                            (:error panel)))
            (when (seq (:recovery-hint panel))
              (notice-block ["rounded-md"

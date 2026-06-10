@@ -5,29 +5,29 @@
   ["outline-none"
    "transition-[border-color,box-shadow]"
    "duration-150"
-   "hover:border-[#6f7a88]"
+   "hover:border-ho-text-dim"
    "hover:ring-1"
-   "hover:ring-[#6f7a88]/30"
+   "hover:ring-ho-text-dim/30"
    "hover:ring-offset-0"
    "focus:outline-none"
    "focus:ring-1"
-   "focus:ring-[#8a96a6]/40"
+   "focus:ring-ho-text-muted/40"
    "focus:ring-offset-0"
    "focus:shadow-none"
-   "focus:border-[#8a96a6]"])
+   "focus:border-ho-text-muted"])
 
 (def compact-container-focus-classes
   ["transition-[border-color,box-shadow]"
    "duration-150"
-   "hover:border-[#6f7a88]"
+   "hover:border-ho-text-dim"
    "hover:ring-1"
-   "hover:ring-[#6f7a88]/30"
+   "hover:ring-ho-text-dim/30"
    "hover:ring-offset-0"
    "focus-within:ring-1"
-   "focus-within:ring-[#8a96a6]/40"
+   "focus-within:ring-ho-text-muted/40"
    "focus-within:ring-offset-0"
    "focus-within:spectate-none"
-   "focus-within:border-[#8a96a6]"])
+   "focus-within:border-ho-text-muted"])
 
 (defn- dom-event-attr [event-id]
   (keyword (str "on-" (name event-id))))
@@ -315,8 +315,8 @@
 
 (defn side-button [label side active? on-click]
   (let [active-classes (case side
-                         :buy ["bg-[#50D2C1]" "text-[#0F1A1F]"]
-                         :sell ["bg-[#ED7088]" "text-[#F6FEFD]"]
+                         :buy ["bg-ho-accent" "text-ho-bg"]
+                         :sell ["bg-ho-sell-hi" "text-ho-text"]
                          ["bg-primary" "text-primary-content"])]
     [:button (bind-event
               {:type "button"
@@ -331,7 +331,7 @@
                              "transition-colors"]
                             (if active?
                               active-classes
-                              ["bg-[#273035]" "text-[#F6FEFD]"]))}
+                              ["bg-ho-surface-raised" "text-ho-text"]))}
               :click
               on-click)
      label]))

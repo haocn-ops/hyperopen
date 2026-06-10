@@ -1,8 +1,12 @@
 (ns hyperopen.views.trading-chart.utils.data-processing
-  (:require [hyperopen.platform :as platform]))
+  (:require [hyperopen.platform :as platform]
+            [hyperopen.views.trading-chart.utils.theme-colors :as theme-colors]))
 
-(def ^:private hyperliquid-volume-up-color "rgba(34, 171, 148, 0.5)")
-(def ^:private hyperliquid-volume-down-color "rgba(247, 82, 95, 0.5)")
+(defn- volume-up-color []
+  (theme-colors/token "--ho-chart-up"))
+
+(defn- volume-down-color []
+  (theme-colors/token "--ho-chart-down"))
 
 (defn process-candle-data [raw-data]
   "Transform raw API candle data to Lightweight.Charts format"
@@ -27,12 +31,14 @@
 
 (defn process-volume-data [candle-data]
   "Extract volume data from candle data for volume chart"
-  (->> candle-data
-       (map #(hash-map :time (:time %)
-                       :value (:volume %)
-                       :color (if (>= (:close %) (:open %))
-                                hyperliquid-volume-up-color
-                                hyperliquid-volume-down-color)))))
+  (let [up-color (volume-up-color)
+        down-color (volume-down-color)]
+    (->> candle-data
+         (map #(hash-map :time (:time %)
+                         :value (:volume %)
+                         :color (if (>= (:close %) (:open %))
+                                  up-color
+                                  down-color))))))
 
 (defn generate-mock-candles []
   "Generate mock candle data for development"

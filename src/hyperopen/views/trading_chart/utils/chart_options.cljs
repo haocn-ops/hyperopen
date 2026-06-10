@@ -1,5 +1,6 @@
 (ns hyperopen.views.trading-chart.utils.chart-options
-  (:require [hyperopen.ui.fonts :as fonts]))
+  (:require [hyperopen.ui.fonts :as fonts]
+            [hyperopen.views.trading-chart.utils.theme-colors :as theme-colors]))
 
 (def default-right-offset-bars 4)
 
@@ -9,19 +10,23 @@
 (def supported-chart-visual-profiles
   #{:legacy :subtle-v1})
 
-(def ^:private chart-visual-profile-tokens
-  {:legacy {:text-color "#e5e7eb"
-            :background-color "rgb(15, 26, 31)"
-            :grid-line-color "#374151"
-            :scale-border-color "#374151"
-            :pane-separator-color "#374151"
-            :pane-separator-hover-color "#4b5563"}
-   :subtle-v1 {:text-color "#e5e7eb"
-               :background-color "rgb(15, 26, 31)"
-               :grid-line-color "rgba(139, 148, 158, 0.16)"
-               :scale-border-color "rgba(139, 148, 158, 0.24)"
-               :pane-separator-color "rgba(139, 148, 158, 0.22)"
-               :pane-separator-hover-color "rgba(139, 148, 158, 0.30)"}})
+(defn- chart-visual-profile-tokens
+  "Profile palettes resolved from the active theme's --ho-chart-* tokens.
+   :legacy uses hard grid lines, :subtle-v1 the soft alpha grid."
+  [profile]
+  (case profile
+    :legacy {:text-color (theme-colors/token "--ho-chart-text")
+             :background-color (theme-colors/token "--ho-chart-bg")
+             :grid-line-color (theme-colors/token "--ho-chart-grid")
+             :scale-border-color (theme-colors/token "--ho-chart-grid")
+             :pane-separator-color (theme-colors/token "--ho-chart-grid")
+             :pane-separator-hover-color (theme-colors/token "--ho-chart-grid-strong")}
+    {:text-color (theme-colors/token "--ho-chart-text")
+     :background-color (theme-colors/token "--ho-chart-bg")
+     :grid-line-color (theme-colors/token "--ho-chart-grid-soft")
+     :scale-border-color (theme-colors/token "--ho-chart-border-soft")
+     :pane-separator-color (theme-colors/token "--ho-chart-separator")
+     :pane-separator-hover-color (theme-colors/token "--ho-chart-separator-hover")}))
 
 (defn normalize-chart-visual-profile [profile]
   (let [candidate (cond
@@ -57,7 +62,7 @@
                 scale-border-color
                 pane-separator-color
                 pane-separator-hover-color]}
-        (get chart-visual-profile-tokens (effective-chart-visual-profile profile))]
+        (chart-visual-profile-tokens (effective-chart-visual-profile profile))]
     {:layout {:textColor text-color
               :fontFamily (resolve-chart-font-family)
               :background {:type "solid"

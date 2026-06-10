@@ -197,7 +197,7 @@
                                    (funding-value-node display-funding display-funding-text)
                                    {:value-classes ["font-medium" "whitespace-nowrap"]})])
        (when-not read-only?
-         [:div {:class ["border-t" "border-[#17313d]" "pt-2.5"]}
+         [:div {:class ["border-t" "border-ho-border-accent-muted" "pt-2.5"]}
           [:div {:class ["relative" "flex" "flex-wrap" "items-center" "gap-x-5" "gap-y-2"]}
            (mobile-position-action-button
             "Close"

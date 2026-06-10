@@ -244,6 +244,12 @@ async function writeReleaseFixture(
     "self.addEventListener('fetch', () => {});",
     missing
   );
+  await writeFixtureFile(
+    sourceRoot,
+    "theme-preload.js",
+    "(function () {})();",
+    missing
+  );
   await writeFixtureFile(sourceRoot, "favicon.svg", "<svg></svg>\n", missing);
   await writeFixtureFile(sourceRoot, "favicon-16x16.png", "png16", missing);
   await writeFixtureFile(sourceRoot, "favicon-32x32.png", "png32", missing);
@@ -740,6 +746,7 @@ test("generateReleaseArtifacts assembles deterministic route-specific release pa
     "favicon.svg",
     "og/hyperopen-share.png",
     "sw.js",
+    "theme-preload.js",
   ]);
   assert.deepEqual(siteMetadata.rootAssetPaths, [
     "/apple-touch-icon.png",
@@ -749,6 +756,7 @@ test("generateReleaseArtifacts assembles deterministic route-specific release pa
     "/favicon.svg",
     "/og/hyperopen-share.png",
     "/sw.js",
+    "/theme-preload.js",
   ]);
 
   for (const relativePath of result.copiedRootAssetPaths) {

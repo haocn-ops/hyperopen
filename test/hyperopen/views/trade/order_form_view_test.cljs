@@ -57,8 +57,8 @@
     (is (not (contains? strings "Cross")))
     (is (not (contains? strings "20x")))
     (is (not (contains? strings "Classic")))
-    (is (contains? buy-yes-classes "bg-[#50D2C1]"))
-    (is (contains? buy-no-classes "bg-[#273035]"))
+    (is (contains? buy-yes-classes "bg-ho-accent"))
+    (is (contains? buy-no-classes "bg-ho-surface-raised"))
     (is (= [[:actions/update-order-form [:side] :buy]]
            (get-in buy-tab [1 :on :click])))
     (is (= [[:actions/update-order-form [:side] :sell]]
@@ -83,8 +83,8 @@
                                                       :asset-id 100000001}]})
         view-node (view/order-form-view state)
         buy-no-classes (set (get-in (button-node-by-label view-node "Buy No") [1 :class]))]
-    (is (contains? buy-no-classes "bg-[#ED7088]"))
-    (is (contains? buy-no-classes "text-[#F6FEFD]"))))
+    (is (contains? buy-no-classes "bg-ho-sell-hi"))
+    (is (contains? buy-no-classes "text-ho-text"))))
 
 (deftest leverage-row-renders-isolated-margin-label-when-selected-test
   (let [view-node (view/order-form-view (base-state {:margin-mode :isolated}))

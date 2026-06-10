@@ -2,6 +2,7 @@
   (:require [hyperopen.account.spectate-mode-actions :as spectate-mode-actions]
             [hyperopen.runtime.action-adapters :as action-adapters]
             [hyperopen.trading-settings :as trading-settings]
+            [hyperopen.ui.theme :as ui-theme]
             [hyperopen.wallet.agent-session :as agent-session]))
 
 (defn open-mobile-header-menu
@@ -134,6 +135,15 @@
 (defn set-confirm-market-orders-enabled
   [state enabled?]
   (persist-trading-settings state {:confirm-market-orders? (boolean enabled?)}))
+
+(defn set-ui-theme
+  [state theme-id]
+  (let [normalized (ui-theme/normalize-theme-id theme-id)]
+    (if (= normalized (ui-theme/active-theme-id state))
+      []
+      [[:effects/save [:ui :theme] normalized]
+       [:effects/local-storage-set ui-theme/local-storage-key normalized]
+       [:effects/apply-ui-theme normalized]])))
 
 (defn navigate-mobile-header-menu
   [state path]

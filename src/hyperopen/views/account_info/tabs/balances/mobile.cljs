@@ -128,7 +128,7 @@
                                                      contract-node
                                                      {:full-width? true}))])
                        (when-not read-only?
-                         [:div {:class ["border-t" "border-[#17313d]" "pt-2.5"]}
+                         [:div {:class ["border-t" "border-ho-border-accent-muted" "pt-2.5"]}
                           [:div {:class ["flex" "flex-wrap" "items-center" "gap-x-5" "gap-y-2"]}
                            (mobile-balance-footer-action "Send" send-enabled?* send-action)
                            (mobile-balance-footer-action transfer-label transfer-enabled?* transfer-action)]])]})))

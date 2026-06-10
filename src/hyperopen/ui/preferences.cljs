@@ -1,6 +1,7 @@
 (ns hyperopen.ui.preferences
   (:require [clojure.string :as str]
-            [hyperopen.platform :as platform]))
+            [hyperopen.platform :as platform]
+            [hyperopen.ui.theme :as theme]))
 
 (def ^:private ui-font-local-storage-key
   "hyperopen-ui-font")
@@ -28,3 +29,21 @@
                      nil))
           normalized (normalize-ui-font stored)]
       (set! (.-uiFont (.-dataset html-el)) normalized))))
+
+(defn restore-ui-theme-preference!
+  "Restores the persisted UI theme onto <html data-theme> and mirrors it into
+   app state at [:ui :theme] so the settings picker reflects the active theme.
+   The pre-paint script in index.html applies the same key before first
+   render; this restore is the state-owning pass."
+  ([]
+   (restore-ui-theme-preference! nil))
+  ([store]
+   (when (exists? js/document)
+     (let [stored (try
+                    (platform/local-storage-get theme/local-storage-key)
+                    (catch :default _
+                      nil))
+           normalized (theme/apply-theme-attribute! stored)]
+       (when store
+         (swap! store assoc-in [:ui :theme] normalized))
+       normalized))))

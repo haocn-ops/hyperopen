@@ -388,6 +388,7 @@
             [hyperopen.ui.fonts-test]
             [hyperopen.ui.preferences-test]
             [hyperopen.ui.table.sort-kernel-test]
+            [hyperopen.ui.theme-test]
             [hyperopen.utils.data-normalization-test]
             [hyperopen.utils.formatting-test]
             [hyperopen.utils.hl-signing-test]
@@ -1089,6 +1090,7 @@
              'hyperopen.ui.fonts-test
              'hyperopen.ui.preferences-test
              'hyperopen.ui.table.sort-kernel-test
+             'hyperopen.ui.theme-test
              'hyperopen.utils.data-normalization-test
              'hyperopen.utils.formatting-test
              'hyperopen.utils.hl-signing-test

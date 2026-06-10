@@ -395,7 +395,7 @@
                                                   (get-in % [1 :on :click])))
         classes (set (get-in positions-tab-button [1 :class]))]
     (is (contains? classes "border-[#303030]"))
-    (is (contains? classes "text-[#f6fefd]"))
+    (is (contains? classes "text-ho-text"))
     (is (not (contains? classes "bg-base-100/50")))))
 
 (deftest vault-detail-view-applies-semantic-row-accent-styles-test

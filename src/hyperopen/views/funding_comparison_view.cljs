@@ -183,7 +183,7 @@
                           "focus:ring-0"
                           "focus:ring-offset-0"]
                          (if selected?
-                           ["border-[#2f7f73]" "bg-[#123a36]" "text-[#97fce4]"]
+                           ["border-[#2f7f73]" "bg-[#123a36]" "text-ho-accent-bright"]
                            ["border-base-300" "text-trading-text-secondary" "hover:bg-base-200"]))
             :on {:click [[:actions/set-funding-comparison-timeframe value]]}}
    label])
@@ -291,7 +291,7 @@
            "No rows match the current filters.")])]
 
      (when (seq error)
-       [:div {:class ["rounded-xl" "border" "border-[#7a2836]" "bg-[#2b1118]" "px-3" "py-2" "text-sm" "text-[#ff9db2"]
+       [:div {:class ["rounded-xl" "border" "border-[#7a2836]" "bg-ho-sell-soft-deep" "px-3" "py-2" "text-sm" "text-[#ff9db2"]
               :data-role "funding-comparison-error"}
         error])]))
 

@@ -22,7 +22,7 @@
         market-classes (set (get-in market-button [1 :class]))
         limit-classes (set (get-in limit-button [1 :class]))
         pro-classes (set (get-in pro-button [1 :class]))]
-    (is (contains? market-classes "text-[#F6FEFD]"))
+    (is (contains? market-classes "text-ho-text"))
     (is (contains? limit-classes "text-[#949E9C]"))
     (is (contains? pro-classes "text-[#949E9C]"))
     (is (= "0%"
@@ -110,11 +110,11 @@
     (is (contains? buy-tab-classes "w-full"))
     (is (contains? buy-tab-classes "justify-center"))
     (is (contains? buy-tab-classes "border-primary"))
-    (is (contains? active-sell-tab-classes "border-[#ED7088]"))
-    (is (contains? active-sell-tab-classes "text-[#ED7088]"))
-    (is (contains? active-sell-dot-classes "bg-[#ED7088]"))
-    (is (not (contains? buy-tab-classes "bg-[#50D2C1]")))
-    (is (not (contains? sell-tab-classes "bg-[#273035]")))
+    (is (contains? active-sell-tab-classes "border-ho-sell-hi"))
+    (is (contains? active-sell-tab-classes "text-ho-sell-hi"))
+    (is (contains? active-sell-dot-classes "bg-ho-sell-hi"))
+    (is (not (contains? buy-tab-classes "bg-ho-accent")))
+    (is (not (contains? sell-tab-classes "bg-ho-surface-raised")))
     (is (= [[:actions/update-order-form [:side] :sell]]
            sell-click))
     (is (contains? buy-strings "Buy Yes"))

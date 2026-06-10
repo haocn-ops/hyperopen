@@ -168,15 +168,15 @@
   }
 
   .trade-toggle-checkbox {
-    color: #00d4aa;
+    color: rgb(var(--ho-buy));
     border-color: rgb(48 54 61);
     background-color: transparent;
     transition: background-color 0.15s ease, border-color 0.15s ease;
   }
 
   .trade-toggle-checkbox:checked {
-    border-color: #00d4aa;
-    background-color: #00d4aa;
+    border-color: rgb(var(--ho-buy));
+    background-color: rgb(var(--ho-buy));
   }
 
   .trade-toggle-checkbox:checked:hover {

@@ -1,0 +1,56 @@
+/* GENERATED FILE - do not edit by hand.
+ * Source: src/styles/themes/palette.js
+ * Regenerate: node tools/styles/generate_theme_css.mjs
+ */
+:root[data-theme="institutional"] {
+  /* Color tokens: RGB channel triplets (Tailwind alpha). */
+  --ho-bg: 11 14 17;
+  --ho-bg-deep: 7 9 12;
+  --ho-surface: 17 21 26;
+  --ho-surface-raised: 24 30 36;
+  --ho-border: 38 45 53;
+  --ho-text: 230 237 243;
+  --ho-text-hi: 255 255 255;
+  --ho-text-secondary: 139 152 165;
+  --ho-text-muted: 118 131 144;
+  --ho-text-dim: 84 93 104;
+  --ho-accent: 63 185 80;
+  --ho-accent-hi: 86 211 100;
+  --ho-accent-bright: 175 245 180;
+  --ho-accent-soft: 15 36 24;
+  --ho-accent-soft-hi: 20 48 32;
+  --ho-border-accent: 31 51 40;
+  --ho-border-accent-muted: 24 42 32;
+  --ho-buy: 63 185 80;
+  --ho-sell: 248 81 73;
+  --ho-sell-hi: 255 123 114;
+  --ho-sell-tint: 255 193 200;
+  --ho-sell-soft: 45 20 24;
+  --ho-sell-soft-deep: 31 12 16;
+  --ho-border-sell: 92 36 41;
+  --ho-warn: 210 153 34;
+  --ho-info: 88 166 255;
+  /* Chart tokens: complete CSS colors, read from cljs. */
+  --ho-chart-bg: rgb(11, 14, 17);
+  --ho-chart-text: #c9d1d9;
+  --ho-chart-grid: #21262d;
+  --ho-chart-grid-strong: #30363d;
+  --ho-chart-grid-soft: rgba(139, 148, 158, 0.12);
+  --ho-chart-border-soft: rgba(139, 148, 158, 0.20);
+  --ho-chart-separator: rgba(139, 148, 158, 0.18);
+  --ho-chart-separator-hover: rgba(139, 148, 158, 0.28);
+  --ho-chart-up: rgba(63, 185, 80, 0.5);
+  --ho-chart-down: rgba(248, 81, 73, 0.5);
+  --ho-chart-long: #3fb950;
+  --ho-chart-short: #f85149;
+  /* Radius tokens: mapped onto the Tailwind rounded scale. */
+  --ho-radius-sm: 0px;
+  --ho-radius: 0px;
+  --ho-radius-md: 0px;
+  --ho-radius-lg: 0px;
+  --ho-radius-xl: 0px;
+  --ho-radius-2xl: 0px;
+  --ho-radius-3xl: 0px;
+  /* Theme typography overrides. */
+  --font-ui: var(--font-mono);
+}

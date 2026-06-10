@@ -267,12 +267,12 @@
   [:div {:class ["space-y-3"]}
    [:div {:class ["rounded-lg"
                   "border"
-                  "border-[#7b3340]"
-                  "bg-[#3a1b22]/55"
+                  "border-ho-border-sell"
+                  "bg-ho-sell-soft/55"
                   "px-3"
                   "py-3"
                   "text-sm"
-                  "text-[#f2b8c5]"]}
+                  "text-ho-sell-tint"]}
     "Select an asset before continuing with the deposit flow."]
    (shared/action-row {:back-action :actions/return-to-funding-deposit-asset-select
                        :submit-action :actions/submit-funding-deposit

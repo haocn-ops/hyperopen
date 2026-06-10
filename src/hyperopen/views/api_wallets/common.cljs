@@ -36,7 +36,7 @@
 (defn inline-error
   [message]
   (when (seq message)
-    [:p {:class ["text-xs" "text-[#f2b8c5]"]}
+    [:p {:class ["text-xs" "text-ho-sell-tint"]}
      message]))
 (defn format-valid-until
   [value]

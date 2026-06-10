@@ -111,6 +111,9 @@
 (def restore-ui-font-preference!
   ui-preferences/restore-ui-font-preference!)
 
+(def restore-ui-theme-preference!
+  ui-preferences/restore-ui-theme-preference!)
+
 (def open-mobile-header-menu
   header-actions/open-mobile-header-menu)
 

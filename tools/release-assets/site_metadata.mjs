@@ -12,7 +12,7 @@ export const RELEASE_ROUTE_METADATA_SCRIPT_PATH = path.posix.join(
   "js",
   "release-route-metadata.js"
 );
-export const REQUIRED_ROOT_PUBLIC_PATHS = ["/sw.js"];
+export const REQUIRED_ROOT_PUBLIC_PATHS = ["/sw.js", "/theme-preload.js"];
 export const DEFAULT_TWITTER_CARD = "summary";
 
 export const PUBLIC_ROUTE_METADATA = [

@@ -20,8 +20,8 @@
                           "font-normal"
                           "transition-colors"]
                          (if (= value selected-tab)
-                           ["border-[#303030]" "text-[#f6fefd]"]
-                           ["border-[#303030]" "text-[#949e9c]" "hover:text-[#f6fefd]"]))
+                           ["border-[#303030]" "text-ho-text"]
+                           ["border-[#303030]" "text-[#949e9c]" "hover:text-ho-text"]))
             :on {:click [[:actions/set-vault-detail-activity-tab value]]}}
    (if-let [count-label (format-activity-count count)]
      (str label " (" count-label ")")
@@ -86,7 +86,7 @@
                                "text-[#949e9c]"
                                "transition-colors"]
                               (if filter-enabled?
-                                ["cursor-pointer" "hover:text-[#f6fefd]"]
+                                ["cursor-pointer" "hover:text-ho-text"]
                                 ["cursor-not-allowed" "opacity-50"]))
                  :on {:click [[:actions/toggle-vault-detail-activity-filter-open]]}}
         "Filter"
@@ -119,13 +119,13 @@
                                     "text-[#c7d5da]"
                                     "transition-colors"
                                     "hover:bg-[#0e2630]"
-                                    "hover:text-[#f6fefd]"]
+                                    "hover:text-ho-text"]
                                    (when (= value selected-filter*)
-                                     ["bg-[#0e2630]" "text-[#f6fefd]"]))
+                                     ["bg-[#0e2630]" "text-ho-text"]))
                       :on {:click [[:actions/set-vault-detail-activity-direction-filter value]]}}
              [:span label]
              (when (= value selected-filter*)
-               [:span {:class ["text-xs" "text-[#66e3c5]"]}
+               [:span {:class ["text-xs" "text-ho-accent-hi"]}
                 "●"])])])]]
      (case selected-activity-tab
        :performance-metrics (metrics/performance-metrics-card performance-metrics)

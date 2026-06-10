@@ -44,7 +44,7 @@
                           "transition-colors"]
                          (concat focus-visible-ring-classes
                                  (if selected?
-                                   ["border-[#2f7f73]" "bg-[#123a36]/85" "text-[#97fce4]"]
+                                   ["border-[#2f7f73]" "bg-[#123a36]/85" "text-ho-accent-bright"]
                                    ["border-base-300/80"
                                     "text-trading-text-secondary"
                                     "hover:bg-base-200"

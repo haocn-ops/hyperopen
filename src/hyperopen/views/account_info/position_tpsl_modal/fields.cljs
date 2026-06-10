@@ -61,16 +61,16 @@
   ["outline-none"
    "transition-[border-color,box-shadow]"
    "duration-150"
-   "hover:border-[#6f7a88]"
+   "hover:border-ho-text-dim"
    "hover:ring-1"
-   "hover:ring-[#6f7a88]/30"
+   "hover:ring-ho-text-dim/30"
    "hover:ring-offset-0"
    "focus:outline-none"
    "focus:ring-1"
-   "focus:ring-[#8a96a6]/40"
+   "focus:ring-ho-text-muted/40"
    "focus:ring-offset-0"
    "focus:shadow-none"
-   "focus:border-[#8a96a6]"])
+   "focus:border-ho-text-muted"])
 
 (def ^:private pnl-mode-options
   [:usd :roe-percent :position-percent])
@@ -210,7 +210,7 @@
                       "hover:text-gray-100"
                       "focus:outline-none"
                       "focus:ring-1"
-                      "focus:ring-[#8a96a6]/40"
+                      "focus:ring-ho-text-muted/40"
                       "focus:ring-offset-0"
                       "focus:shadow-none"]
               :on {:click [[:actions/set-position-tpsl-modal-field [:size-percent-input] "100"]]}}

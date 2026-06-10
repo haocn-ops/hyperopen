@@ -7,7 +7,8 @@
    [:effects/set-agent-storage-mode :set-agent-storage-mode]
    [:effects/set-agent-local-protection-mode :set-agent-local-protection-mode]
    [:effects/unlock-agent-trading :unlock-agent-trading]
-   [:effects/copy-wallet-address :copy-wallet-address]])
+   [:effects/copy-wallet-address :copy-wallet-address]
+   [:effects/apply-ui-theme :apply-ui-theme]])
 
 (def effect-order-policy-required-action-ids
   #{:actions/navigate-mobile-header-menu
@@ -28,6 +29,7 @@
    [:actions/set-confirm-open-orders-enabled :set-confirm-open-orders-enabled]
    [:actions/set-confirm-close-position-enabled :set-confirm-close-position-enabled]
    [:actions/set-confirm-market-orders-enabled :set-confirm-market-orders-enabled]
+   [:actions/set-ui-theme :set-ui-theme]
    [:actions/navigate-mobile-header-menu :navigate-mobile-header-menu]
    [:actions/request-agent-storage-mode-change :request-agent-storage-mode-change]
    [:actions/cancel-agent-storage-mode-change :cancel-agent-storage-mode-change]

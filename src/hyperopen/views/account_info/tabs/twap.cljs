@@ -161,7 +161,7 @@
                     "font-medium"
                     "text-trading-red"
                     "transition-colors"
-                    "hover:text-[#f2b8c5]"
+                    "hover:text-ho-sell-tint"
                     "whitespace-nowrap"]
             :on {:click [[:actions/cancel-twap row]]}}
    "Terminate"])

@@ -64,7 +64,7 @@
         (is (= [[:actions/toggle-account-info-mobile-card :positions expanded-row-id]]
                (get-in expanded-button [1 :on :click])))
         (is (contains? expanded-card-classes "bg-[#08161f]"))
-        (is (contains? expanded-card-classes "border-[#17313d]"))
+        (is (contains? expanded-card-classes "border-ho-border-accent-muted"))
         (is (not (contains? expanded-card-classes "bg-base-200/70")))
         (is (contains? expanded-button-classes "px-3.5"))
         (is (contains? expanded-button-classes "hover:bg-[#0c1b24]"))

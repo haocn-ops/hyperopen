@@ -1,12 +1,15 @@
-(ns hyperopen.views.trading-chart.utils.chart-interop.transforms)
+(ns hyperopen.views.trading-chart.utils.chart-interop.transforms
+  (:require [hyperopen.views.trading-chart.utils.theme-colors :as theme-colors]))
 
-(def hyperliquid-volume-up-color
-  "Hyperliquid volume up-bar color from TradingView Volume study defaults."
-  "rgba(34, 171, 148, 0.5)")
+(defn hyperliquid-volume-up-color
+  "Volume up-bar color from the active theme (--ho-chart-up)."
+  []
+  (theme-colors/token "--ho-chart-up"))
 
-(def hyperliquid-volume-down-color
-  "Hyperliquid volume down-bar color from TradingView Volume study defaults."
-  "rgba(247, 82, 95, 0.5)")
+(defn hyperliquid-volume-down-color
+  "Volume down-bar color from the active theme (--ho-chart-down)."
+  []
+  (theme-colors/token "--ho-chart-down"))
 
 (defn normalize-main-chart-type
   "Normalize aliases to canonical chart-type keywords."
@@ -136,21 +139,23 @@
 (defn transform-data-for-volume
   "Transform OHLC data to volume data with directional colors."
   [data]
-  (map (fn [candle]
-         {:value (:volume candle)
-          :time (:time candle)
-          :color (if (>= (:close candle) (:open candle))
-                   hyperliquid-volume-up-color
-                   hyperliquid-volume-down-color)})
-       data))
+  (let [up-color (hyperliquid-volume-up-color)
+        down-color (hyperliquid-volume-down-color)]
+    (map (fn [candle]
+           {:value (:volume candle)
+            :time (:time candle)
+            :color (if (>= (:close candle) (:open candle))
+                     up-color
+                     down-color)})
+         data)))
 
 (defn- volume-point
   [candle _previous-point]
   {:value (:volume candle)
    :time (:time candle)
    :color (if (>= (:close candle) (:open candle))
-            hyperliquid-volume-up-color
-            hyperliquid-volume-down-color)})
+            (hyperliquid-volume-up-color)
+            (hyperliquid-volume-down-color))})
 
 (def ^:private main-series-tail-point-builders
   {:area close-point

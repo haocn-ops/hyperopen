@@ -4,19 +4,19 @@
 (def focus-ring-classes
   ["focus:outline-none"
    "focus:ring-2"
-   "focus:ring-[#66e3c5]/45"
+   "focus:ring-ho-accent-hi/45"
    "focus:ring-offset-1"
    "focus:ring-offset-base-100"
    "focus-visible:outline-none"
    "focus-visible:ring-2"
-   "focus-visible:ring-[#66e3c5]/45"
+   "focus-visible:ring-ho-accent-hi/45"
    "focus-visible:ring-offset-1"
    "focus-visible:ring-offset-base-100"])
 
 (def focus-visible-only-ring-classes
   ["focus-visible:outline-none"
    "focus-visible:ring-2"
-   "focus-visible:ring-[#66e3c5]/45"
+   "focus-visible:ring-ho-accent-hi/45"
    "focus-visible:ring-offset-1"
    "focus-visible:ring-offset-base-100"])
 

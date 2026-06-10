@@ -4,8 +4,8 @@
 
 (defn- history-table
   [rows columns empty-text row-render]
-  [:div {:class ["overflow-x-auto" "rounded-[10px]" "border" "border-[#1b2429]"]}
-   [:table {:class ["min-w-full" "bg-[#0f1a1f]"]}
+  [:div {:class ["overflow-x-auto" "rounded-[10px]" "border" "border-ho-surface"]}
+   [:table {:class ["min-w-full" "bg-ho-bg"]}
     [:thead
      [:tr {:class ["text-xs" "text-[#949e9c]"]}
       (for [column columns]

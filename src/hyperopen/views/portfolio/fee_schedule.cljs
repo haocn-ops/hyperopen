@@ -169,7 +169,7 @@
                            "rounded-md"
                            "border"
                            "border-base-300"
-                           "bg-[#0f1a1f]"
+                           "bg-ho-bg"
                            "shadow-2xl"]
                           (if dropdown-open?
                             ["opacity-100" "scale-y-100" "translate-y-0"]
@@ -325,7 +325,7 @@
                     "rounded-lg"
                     "border"
                     "border-base-300"
-                    "bg-[#0f1a1f]"
+                    "bg-ho-bg"
                     "shadow-[0_28px_90px_rgba(0,0,0,0.62)]"]
             :style (assoc popover-style :background-color "#0f1a1f")
             :role "dialog"

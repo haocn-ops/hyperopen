@@ -24,7 +24,7 @@
            :aria-live "polite"}
      [:div {:class ["flex" "flex-col" "gap-3" "xl:flex-row" "xl:items-center" "xl:justify-between"]}
       [:div {:class ["flex" "items-start" "gap-3"]}
-       [:span {:class ["mt-0.5" "loading" "loading-spinner" "loading-sm" "text-[#66e3c5]"]
+       [:span {:class ["mt-0.5" "loading" "loading-spinner" "loading-sm" "text-ho-accent-hi"]
                :aria-hidden true}]
        [:div {:class ["space-y-1"]}
         [:div {:class ["text-sm" "font-medium" "text-trading-text"]}
@@ -109,7 +109,7 @@
                             "border"
                             "border-[#1b393a]"
                             "bg-[#071820]"]}
-          [:div {:class ["flex" "items-center" "border-b" "border-[#1f3b3c]"]}
+          [:div {:class ["flex" "items-center" "border-b" "border-ho-border-accent"]}
            (for [tab tabs]
              ^{:key (str "vault-detail-tab-" (name (:value tab)))}
              (panels/detail-tab-button tab selected-tab))]

@@ -12,7 +12,7 @@
                                            :vault-performance)]
     (is (= [[:actions/set-vault-detail-tab :about]]
            (get-in active [1 :on :click])))
-    (is (contains? (hiccup/node-class-set active) "border-[#66e3c5]"))
+    (is (contains? (hiccup/node-class-set active) "border-ho-accent-hi"))
     (is (contains? (hiccup/node-class-set inactive) "border-transparent"))))
 
 (deftest render-tab-panel-renders-about-relationship-and-component-vaults-test

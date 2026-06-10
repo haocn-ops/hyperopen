@@ -43,7 +43,7 @@
     --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
       "Liberation Mono", "Courier New", monospace;
     --font-toast-mono: "JetBrains Mono", var(--font-mono);
-    --staking-action-popover-bg: rgb(15, 26, 31);
+    --staking-action-popover-bg: rgb(var(--ho-bg, 15 26 31));
     --o-bg: #051a1c;
     --o-bg-grad-from: #072527;
     --o-bg-grad-to: #031012;

@@ -96,7 +96,7 @@
                             "transition-colors"
                             "focus:outline-none"
                             "focus:ring-1"
-                            "focus:ring-[#8a96a6]/40"
+                            "focus:ring-ho-text-muted/40"
                             "focus:ring-offset-0"
                             "focus:shadow-none"]
                            (if selected?
@@ -126,7 +126,7 @@
                             "transition-colors"
                             "focus:outline-none"
                             "focus:ring-1"
-                            "focus:ring-[#8a96a6]/40"
+                            "focus:ring-ho-text-muted/40"
                             "focus:ring-offset-0"
                             "focus:shadow-none"]
                            (if active?
@@ -161,7 +161,7 @@
                                 "justify-center"
                                 "rounded-lg"
                                 "border"
-                                "border-[#17313d]"
+                                "border-ho-border-accent-muted"
                                 (if mobile-sheet? "bg-[#0b181d]" "bg-transparent")
                                 "text-gray-300"
                                 "transition-colors"
@@ -169,7 +169,7 @@
                         "hover:text-gray-100"
                         "focus:outline-none"
                         "focus:ring-1"
-                        "focus:ring-[#66e3c5]/40"
+                        "focus:ring-ho-accent-hi/40"
                         "focus:ring-offset-0"
                         "focus:shadow-none"]
                         :aria-label "Close position sheet"
@@ -194,10 +194,10 @@
                                  "text-gray-100"
                                  "focus:outline-none"
                                  "focus:ring-1"
-                                 "focus:ring-[#8a96a6]/40"
+                                 "focus:ring-ho-text-muted/40"
                                  "focus:ring-offset-0"
                                  "focus:shadow-none"
-                                 "focus:border-[#8a96a6]"]
+                                 "focus:border-ho-text-muted"]
                          :type "text"
                          :placeholder "Limit Price"
                          :value (or (:limit-price popover*) "")
@@ -221,7 +221,7 @@
                                          "transition-colors"
                                          "focus:outline-none"
                                          "focus:ring-1"
-                                         "focus:ring-[#8a96a6]/40"
+                                         "focus:ring-ho-text-muted/40"
                                          "focus:ring-offset-0"
                                          "focus:shadow-none"]
                                         (if mid-available?
@@ -267,10 +267,10 @@
                                 "pr-6"
                                 "focus:outline-none"
                                 "focus:ring-1"
-                                "focus:ring-[#8a96a6]/40"
+                                "focus:ring-ho-text-muted/40"
                                 "focus:ring-offset-0"
                                 "focus:shadow-none"
-                                "focus:border-[#8a96a6]"]
+                                "focus:border-ho-text-muted"]
                         :type "text"
                         :inputmode "decimal"
                         :value (or (:size-percent-input popover*) "")
@@ -304,7 +304,7 @@
                                 "hover:bg-[#c7ccd4]"
                                 "focus:outline-none"
                                 "focus:ring-1"
-                                "focus:ring-[#8a96a6]/40"
+                                "focus:ring-ho-text-muted/40"
                                 "focus:ring-offset-0"
                                 "focus:shadow-none"]
                         :on {:click [[:actions/submit-position-reduce-close]]}}
@@ -319,7 +319,7 @@
                (mode-toggle-button :limit close-type)]]
 
              (when (seq (:error popover*))
-               [:div {:class ["text-xs" "text-[#ED7088]"]}
+               [:div {:class ["text-xs" "text-ho-sell-hi"]}
                 (:error popover*)])]]
         (if mobile-sheet?
           [:div {:class ["fixed" "inset-0" "z-[250]"]
@@ -340,8 +340,8 @@
                                 "overflow-y-auto"
                                 "rounded-t-[22px]"
                                 "border"
-                                "border-[#17313d]"
-                                "bg-[#06131a]"
+                                "border-ho-border-accent-muted"
+                                "bg-ho-bg-deep"
                                 "px-4"
                                 "pt-4"
                                 "text-sm"

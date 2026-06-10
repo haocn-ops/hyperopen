@@ -167,7 +167,7 @@
     (is (contains? expanded-button-classes "px-3.5"))
     (is (contains? expanded-button-classes "hover:bg-[#0c1b24]"))
     (is (contains? (hiccup/node-class-set expanded-card) "bg-[#08161f]"))
-    (is (contains? (hiccup/node-class-set expanded-card) "border-[#17313d]"))
+    (is (contains? (hiccup/node-class-set expanded-card) "border-ho-border-accent-muted"))
     (is (not (contains? (hiccup/node-class-set expanded-card) "bg-[#0f1920]")))
     (is (some? summary-grid))
     (is (some? namespace-chip))

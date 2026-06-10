@@ -12,7 +12,7 @@
 (s/def :hyperopen.views.header.settings/disabled? boolean?)
 (s/def :hyperopen.views.header.settings/icon-kind keyword?)
 (s/def :hyperopen.views.header.settings/on-change some?)
-(s/def :hyperopen.views.header.settings/row
+(s/def :hyperopen.views.header.settings/toggle-row
   (s/keys :req-un [:hyperopen.views.header.settings/id
                    :hyperopen.views.header.settings/title
                    :hyperopen.views.header.settings/hint
@@ -21,6 +21,31 @@
                    :hyperopen.views.header.settings/icon-kind
                    :hyperopen.views.header.settings/on-change]
           :opt-un [:hyperopen.views.header.settings/disabled?]))
+(s/def :hyperopen.views.header.settings/kind #{:choice})
+(s/def :hyperopen.views.header.settings/value string?)
+(s/def :hyperopen.views.header.settings/label string?)
+(s/def :hyperopen.views.header.settings/active? boolean?)
+(s/def :hyperopen.views.header.settings/action some?)
+(s/def :hyperopen.views.header.settings/option
+  (s/keys :req-un [:hyperopen.views.header.settings/value
+                   :hyperopen.views.header.settings/label
+                   :hyperopen.views.header.settings/active?
+                   :hyperopen.views.header.settings/action]))
+(s/def :hyperopen.views.header.settings/options
+  (s/coll-of :hyperopen.views.header.settings/option
+             :kind vector?
+             :min-count 2))
+(s/def :hyperopen.views.header.settings/choice-row
+  (s/keys :req-un [:hyperopen.views.header.settings/id
+                   :hyperopen.views.header.settings/kind
+                   :hyperopen.views.header.settings/title
+                   :hyperopen.views.header.settings/hint
+                   :hyperopen.views.header.settings/data-role
+                   :hyperopen.views.header.settings/icon-kind
+                   :hyperopen.views.header.settings/options]))
+(s/def :hyperopen.views.header.settings/row
+  (s/or :toggle :hyperopen.views.header.settings/toggle-row
+        :choice :hyperopen.views.header.settings/choice-row))
 (s/def :hyperopen.views.header.settings/rows
   (s/coll-of :hyperopen.views.header.settings/row :kind vector?))
 (s/def :hyperopen.views.header.settings/section
@@ -71,7 +96,31 @@
          :data-role (str data-role "-icon")}
    (icons/trading-settings-row-icon icon-kind checked?)])
 
-(defn- setting-row
+(defn- choice-option
+  [row-data-role {:keys [action active? label value]}]
+  [:button {:type "button"
+            :class ["ts-choice-option" (when active? "is-active")]
+            :data-role (str row-data-role "-option-" value)
+            :replicant/key (str row-data-role ":" value)
+            :aria-pressed (boolean active?)
+            :on {:click action}}
+   label])
+
+(defn- choice-row
+  [{:keys [data-role hint options title] :as row}]
+  [:div {:class ["ts-row" "ts-row-choice"]
+         :data-role data-role}
+   (row-icon row)
+   [:div {:class ["ts-row-text"]}
+    [:div {:class ["ts-row-label"]} title]
+    [:div {:class ["ts-row-hint"]} hint]]
+   (into
+    [:div {:class ["ts-choice"]
+           :role "group"
+           :aria-label title}]
+    (map (partial choice-option data-role) options))])
+
+(defn- toggle-row
   [{:keys [checked? confirmation data-role disabled? hint on-change title] :as row}]
   [:div {:class ["ts-row" (when disabled? "is-disabled")]
          :data-role data-role}
@@ -85,6 +134,12 @@
                    :disabled? (boolean disabled?)
                    :on-change on-change})
    (confirmation-strip confirmation)])
+
+(defn- setting-row
+  [{:keys [kind] :as row}]
+  (if (= :choice kind)
+    (choice-row row)
+    (toggle-row row)))
 
 (defn- settings-section
   [{:keys [data-role hint rows title]}]

@@ -1118,6 +1118,56 @@
     white-space: nowrap;
   }
 
+  .ts-row-choice {
+    grid-template-columns: 28px minmax(0, 1fr);
+  }
+
+  .ts-choice {
+    grid-column: 1 / -1;
+    display: flex;
+    gap: 4px;
+    padding: 3px;
+    border: 1px solid rgb(var(--ho-border-accent-muted));
+    border-radius: var(--ho-radius-lg, 0.5rem);
+    background: rgb(var(--ho-bg-deep) / 0.6);
+  }
+
+  .ts-choice-option {
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 6px 8px;
+    border: 1px solid transparent;
+    border-radius: var(--ho-radius-md, 0.375rem);
+    color: rgb(var(--ho-text-muted));
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 1.2;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition:
+      color 120ms ease,
+      background-color 120ms ease,
+      border-color 120ms ease;
+  }
+
+  .ts-choice-option:hover {
+    color: rgb(var(--ho-text));
+    background: rgb(var(--ho-surface-raised) / 0.6);
+  }
+
+  .ts-choice-option:focus-visible {
+    outline: 2px solid rgb(var(--ho-accent) / 0.6);
+    outline-offset: 1px;
+  }
+
+  .ts-choice-option.is-active {
+    color: rgb(var(--ho-accent-bright));
+    background: rgb(var(--ho-accent-soft));
+    border-color: rgb(var(--ho-border-accent));
+  }
+
   .ts-confirmation {
     grid-column: 1 / -1;
     display: flex;

@@ -15,12 +15,12 @@
         sell-when-inactive-classes (set (get-in (button-node-by-label buy-active-view "Sell / Short") [1 :class]))
         sell-when-active-classes (set (get-in (button-node-by-label sell-active-view "Sell / Short") [1 :class]))
         buy-when-inactive-classes (set (get-in (button-node-by-label sell-active-view "Buy / Long") [1 :class]))]
-    (is (contains? buy-when-active-classes "bg-[#50D2C1]"))
-    (is (contains? buy-when-active-classes "text-[#0F1A1F]"))
-    (is (contains? sell-when-active-classes "bg-[#ED7088]"))
-    (is (contains? sell-when-active-classes "text-[#F6FEFD]"))
-    (is (contains? buy-when-inactive-classes "bg-[#273035]"))
-    (is (contains? sell-when-inactive-classes "bg-[#273035]"))))
+    (is (contains? buy-when-active-classes "bg-ho-accent"))
+    (is (contains? buy-when-active-classes "text-ho-bg"))
+    (is (contains? sell-when-active-classes "bg-ho-sell-hi"))
+    (is (contains? sell-when-active-classes "text-ho-text"))
+    (is (contains? buy-when-inactive-classes "bg-ho-surface-raised"))
+    (is (contains? sell-when-inactive-classes "bg-ho-surface-raised"))))
 
 (deftest market-slippage-value-uses-green-text-class-test
   (let [view-node (view/order-form-view (base-state {:type :market :side :buy :size "2.5"}))
@@ -114,15 +114,15 @@
                                         (and (= :input (first node))
                                              (= "text" (:type attrs))))))
         required-focus-classes #{"focus:outline-none"
-                                 "hover:border-[#6f7a88]"
+                                 "hover:border-ho-text-dim"
                                  "hover:ring-1"
-                                 "hover:ring-[#6f7a88]/30"
+                                 "hover:ring-ho-text-dim/30"
                                  "hover:ring-offset-0"
                                  "focus:ring-1"
-                                 "focus:ring-[#8a96a6]/40"
+                                 "focus:ring-ho-text-muted/40"
                                  "focus:ring-offset-0"
                                  "focus:shadow-none"
-                                 "focus:border-[#8a96a6]"}
+                                 "focus:border-ho-text-muted"}
         text-input-class-sets (map (comp set :class second) text-inputs)]
     (is (not-empty text-inputs))
     (is (every? (fn [class-set]

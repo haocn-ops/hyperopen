@@ -247,7 +247,7 @@
             [:actions/update-order-form [:tif] :ioc]]
            (get-in ioc-option [1 :on :click])))
     (is (true? (get-in selected-option [1 :aria-selected])))
-    (is (contains? (set (get-in selected-option [1 :class])) "text-[#F6FEFD]"))
+    (is (contains? (set (get-in selected-option [1 :class])) "text-ho-text"))
     (is (contains? (set (get-in chevron [1 :class])) "rotate-180"))
     (is (= "open" (get-in menu [1 :data-ui-state])))
     (is (false? (get-in menu [1 :aria-hidden])))))

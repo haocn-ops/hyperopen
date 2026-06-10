@@ -305,7 +305,7 @@
               :role "status"
               :aria-live "polite"}
         [:div {:class ["flex" "max-w-[250px]" "flex-col" "items-center" "gap-2.5" "px-4" "text-center"]}
-         [:span {:class ["loading" "loading-spinner" "loading-lg" "text-[#66e3c5]"]
+         [:span {:class ["loading" "loading-spinner" "loading-lg" "text-ho-accent-hi"]
                  :aria-hidden true}]
          [:span {:class ["text-sm" "font-medium" "text-trading-text"]}
           "Loading benchmark history"]
@@ -334,7 +334,7 @@
                      "justify-items-start"
                      "gap-3"
                      "border-b"
-                     "border-[#1f3b3c]"
+                     "border-ho-border-accent"
                      "bg-[#0a232d]"
                      "px-4"
                      "py-2.5"]
@@ -367,7 +367,7 @@
          ^{:key (str "vault-detail-performance-metrics-group-" (name id))}
          [:div {:class (into ["min-w-full" "w-max" "space-y-1.5"]
                              (when (pos? idx)
-                               ["border-t" "border-[#1f3b3c]" "pt-2.5"]))}
+                               ["border-t" "border-ho-border-accent" "pt-2.5"]))}
           (for [{:keys [key] :as row} rows]
             ^{:key (str "vault-detail-performance-metric-row-" (name key))}
             (performance-metric-row row benchmark-columns* grid-style))])]]]))

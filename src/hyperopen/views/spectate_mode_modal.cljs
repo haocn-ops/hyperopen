@@ -301,7 +301,7 @@
                    "focus-visible:outline-none"
                    "focus:border-base-300"
                    "focus:ring-1"
-                   "focus:ring-[#8a96a6]/35"
+                   "focus:ring-ho-text-muted/35"
                    "focus:ring-offset-0"
                    "focus:shadow-none"]
            :on {:input on-input}
@@ -382,13 +382,13 @@
   (when (seq search-error)
     [:div {:class ["rounded-md"
                    "border"
-                   "border-[#7b3340]"
-                   "bg-[#3a1b22]/55"
+                   "border-ho-border-sell"
+                   "bg-ho-sell-soft/55"
                    "px-2.5"
                    "py-2"
                    "text-m"
                    "leading-[19px]"
-                   "text-[#f2b8c5]"]
+                   "text-ho-sell-tint"]
            :data-role "spectate-mode-search-error"}
      search-error]))
 
@@ -490,7 +490,7 @@
                  "overflow-hidden"
                  "rounded-xl"
                  "border"
-                 "border-[#1f3b3c]"
+                 "border-ho-border-accent"
                  "bg-base-100"
                  "shadow-2xl"]
          :style (resolved-panel-style anchor)

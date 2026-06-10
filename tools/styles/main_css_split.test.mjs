@@ -15,6 +15,9 @@ const repoRoot = path.resolve(
 const mainCssPath = path.join(repoRoot, "src", "styles", "main.css");
 const expectedImports = [
   "./base.css",
+  "./themes/dark.css",
+  "./themes/institutional.css",
+  "./themes/hyperdumb.css",
   "./surfaces/trading.css",
   "./surfaces/optimizer.css",
   "./surfaces/app-shell.css",

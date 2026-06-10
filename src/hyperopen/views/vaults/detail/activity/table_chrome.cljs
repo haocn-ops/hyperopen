@@ -15,9 +15,9 @@
                             "font-medium"
                             "text-[#949e9c]"
                             "transition-colors"
-                            "hover:text-[#f6fefd]"]
+                            "hover:text-ho-text"]
                            (when active?
-                             ["text-[#f6fefd]"]))
+                             ["text-ho-text"]))
               :on {:click [[:actions/sort-vault-detail-activity tab id]]}}
      [:span label]
      (when icon
@@ -47,20 +47,20 @@
 (defn position-pnl-class [pnl]
   (cond
     (and (number? pnl) (pos? pnl)) "text-[#1fa67d]"
-    (and (number? pnl) (neg? pnl)) "text-[#ed7088]"
+    (and (number? pnl) (neg? pnl)) "text-ho-sell-hi"
     :else "text-trading-text"))
 
 (defn side-tone-class
   [side-key]
   (case side-key
     :long "text-[#1fa67d]"
-    :short "text-[#ed7088]"
+    :short "text-ho-sell-hi"
     "text-trading-text"))
 
 (defn side-coin-tone-class
   [side-key]
   (case side-key
-    :long "text-[#97fce4]"
+    :long "text-ho-accent-bright"
     :short "text-[#eaafb8]"
     "text-trading-text"))
 
@@ -81,7 +81,7 @@
   [status-key]
   (case status-key
     :positive "text-[#1fa67d]"
-    :negative "text-[#ed7088]"
+    :negative "text-ho-sell-hi"
     :neutral "text-[#9aa7ad]"
     "text-trading-text"))
 
@@ -89,14 +89,14 @@
   [type-key]
   (case type-key
     :deposit "text-[#1fa67d]"
-    :withdraw "text-[#ed7088]"
+    :withdraw "text-ho-sell-hi"
     "text-trading-text"))
 
 (def activity-row-class
   ["border-b"
    "border-[#1b3237]"
    "text-sm"
-   "text-[#f6fefd]"
+   "text-ho-text"
    "transition-colors"
    "hover:bg-[#0d2028]/40"])
 

@@ -12,7 +12,7 @@
                           "font-medium"
                           "transition-colors"]
                          (if (= value selected-tab)
-                           ["border-[#66e3c5]" "text-trading-text"]
+                           ["border-ho-accent-hi" "text-trading-text"]
                            ["border-transparent" "text-[#8ea0a7]" "hover:text-trading-text"]))
             :on {:click [[:actions/set-vault-detail-tab value]]}}
    label])
@@ -45,7 +45,7 @@
        [:div {:class ["text-[#8da0a6]"]}
         "Parent strategy: "
         [:button {:type "button"
-                  :class ["num" "text-[#66e3c5]" "hover:underline"]
+                  :class ["num" "text-ho-accent-hi" "hover:underline"]
                   :on {:click [[:actions/navigate (str "/vaults/" parent-address)]]}}
          parent-address]])
      (render-address-list component-addresses)]))
@@ -91,7 +91,7 @@
       [:div {:class ["mt-1.5" "text-xs" "text-[#8fa3aa]"]}
        "Parent strategy: "
        [:button {:type "button"
-                 :class ["num" "text-[#66e3c5]" "hover:underline"]
+                 :class ["num" "text-ho-accent-hi" "hover:underline"]
                  :on {:click [[:actions/navigate (str "/vaults/" parent-address)]]}}
         (wallet/short-addr parent-address)]])
 

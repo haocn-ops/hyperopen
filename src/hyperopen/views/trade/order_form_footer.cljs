@@ -16,7 +16,7 @@
                            "transition-colors"
                            "focus:outline-none"
                            "focus:ring-1"
-                           "focus:ring-[#8a96a6]/40"
+                           "focus:ring-ho-text-muted/40"
                            "focus:ring-offset-0"]
                           (if submit-disabled?
                             ["bg-[rgb(23,69,63)]"

@@ -395,7 +395,7 @@
                    :data-role "vaults-route-connect"}
           (if wallet-connecting? "Connecting…" "Connect")])
 
-       [:div {:class ["w-full" "max-w-[320px]" "rounded-xl" "bg-[#0f1a1f]" "px-3" "py-3" "md:max-w-[360px]" "md:rounded-2xl"]}
+       [:div {:class ["w-full" "max-w-[320px]" "rounded-xl" "bg-ho-bg" "px-3" "py-3" "md:max-w-[360px]" "md:rounded-2xl"]}
         [:div {:class ["text-sm" "font-normal" "text-trading-text-secondary"]}
          "Total Value Locked"]
         (if preview-visible?

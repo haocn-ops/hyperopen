@@ -50,7 +50,7 @@
                                 "justify-center"
                                 "rounded-lg"
                                 "border"
-                                "border-[#17313d]"
+                                "border-ho-border-accent-muted"
                                 (if mobile-sheet? "bg-[#0b181d]" "bg-transparent")
                                 "text-gray-300"
                                 "transition-colors"
@@ -58,7 +58,7 @@
                                 "hover:text-gray-100"
                                 "focus:outline-none"
                                 "focus:ring-1"
-                                "focus:ring-[#66e3c5]/40"
+                                "focus:ring-ho-accent-hi/40"
                                 "focus:ring-offset-0"
                                 "focus:shadow-none"]
                         :aria-label "Close TP/SL sheet"
@@ -137,7 +137,7 @@
                                           [[:actions/set-position-tpsl-limit-price [:event.target/checked]]]))
 
              (when (seq (:error modal*))
-               [:div {:class ["text-xs" "text-[#ED7088]"]} (:error modal*)])
+               [:div {:class ["text-xs" "text-ho-sell-hi"]} (:error modal*)])
 
              [:div {:class ["grid" "grid-cols-2" "gap-3" "pt-1"]}
               [:button {:type "button"
@@ -184,8 +184,8 @@
                                 "overflow-y-auto"
                                 "rounded-t-[22px]"
                                 "border"
-                                "border-[#17313d]"
-                                "bg-[#06131a]"
+                                "border-ho-border-accent-muted"
+                                "bg-ho-bg-deep"
                                 "px-4"
                                 "pt-4"
                                 "text-sm"

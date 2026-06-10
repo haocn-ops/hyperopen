@@ -182,6 +182,17 @@
                :stroke-width "1.1"
                :stroke-linecap "round"}]]
 
+      :appearance
+      [:svg {:viewBox "0 0 14 14"
+             :fill "none"
+             :stroke "currentColor"
+             :class icon-classes}
+       [:path {:d "M7 1.8a5.2 5.2 0 1 0 0 10.4c0.9 0 1.3-0.6 1.3-1.2 0-0.5-0.3-0.8-0.6-1.1-0.3-0.3-0.6-0.6-0.6-1.1 0-0.7 0.6-1.2 1.3-1.2H10a2.2 2.2 0 0 0 2.2-2.2C12.2 3.3 9.9 1.8 7 1.8Z"
+               :stroke-width "1.1"
+               :stroke-linejoin "round"}]
+       [:circle {:cx "4.4" :cy "5.2" :r "0.8" :fill "currentColor" :stroke "none"}]
+       [:circle {:cx "7.6" :cy "4.2" :r "0.8" :fill "currentColor" :stroke "none"}]]
+
       nil)))
 
 (defn info-icon

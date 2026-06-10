@@ -193,8 +193,8 @@
     (is (= #{[[:actions/set-order-size-input-mode :quote]]
              [[:actions/set-order-size-input-mode :base]]}
            click-payloads))
-    (is (contains? quote-option-classes "bg-[#273035]"))
-    (is (contains? quote-option-classes "text-[#50D2C1]"))))
+    (is (contains? quote-option-classes "bg-ho-surface-raised"))
+    (is (contains? quote-option-classes "text-ho-accent"))))
 
 (deftest size-row-size-unit-dropdown-toggle-and-overlay-actions-test
   (let [closed-view (view/order-form-view (base-state {:type :limit}
@@ -282,8 +282,8 @@
     (is (= #{[[:actions/set-order-margin-mode :cross]]
              [[:actions/set-order-margin-mode :isolated]]}
            click-payloads))
-    (is (contains? isolated-option-classes "bg-[#273035]"))
-    (is (contains? isolated-option-classes "text-[#50D2C1]"))
+    (is (contains? isolated-option-classes "bg-ho-surface-raised"))
+    (is (contains? isolated-option-classes "text-ho-accent"))
     (is (= "closed" (get-in closed-listbox [1 :data-ui-state])))
     (is (= true (get-in closed-listbox [1 :aria-hidden])))
     (is (= "open" (get-in open-listbox [1 :data-ui-state])))

@@ -2,6 +2,7 @@
   (:require [hyperopen.account.context :as account-context]
             [hyperopen.account.spectate-mode-links :as spectate-mode-links]
             [hyperopen.trading-settings :as trading-settings]
+            [hyperopen.ui.theme :as ui-theme]
             [hyperopen.views.header.account-selector :as account-selector]
             [hyperopen.views.header.nav :as nav]
             [hyperopen.wallet.agent-session :as agent-session]
@@ -215,6 +216,23 @@
    :data-role (str "trading-settings-" (name id) "-section")
    :rows rows})
 
+(defn- theme-choice-row
+  [state]
+  (let [active-id (ui-theme/active-theme-id state)]
+    {:id :ui-theme
+     :kind :choice
+     :data-role "trading-settings-ui-theme-row"
+     :title "Theme"
+     :hint "Color palette on this device."
+     :icon-kind :appearance
+     :aria-label "Theme"
+     :options (mapv (fn [{:keys [id label]}]
+                      {:value id
+                       :label label
+                       :active? (= id active-id)
+                       :action [[:actions/set-ui-theme id]]})
+                    ui-theme/themes)}))
+
 (defn- settings-vm
   [state]
   (let [confirmation (settings-confirmation-copy
@@ -335,7 +353,12 @@
                                 :marker
                                 [[:actions/set-fill-markers-enabled
                                   (not (trading-settings/show-fill-markers? state))]]
-                                :tooltip "Show buy and sell markers for the active asset on the chart.")])]}))
+                                :tooltip "Show buy and sell markers for the active asset on the chart.")])
+                (settings-section
+                 :appearance
+                 "Appearance"
+                 "Look and feel"
+                 [(theme-choice-row state)])]}))
 
 (defn header-vm
   [state]

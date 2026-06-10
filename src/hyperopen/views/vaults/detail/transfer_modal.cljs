@@ -56,7 +56,7 @@
                       "max-w-md"
                       "rounded-2xl"
                       "border"
-                      "border-[#1f3b3c]"
+                      "border-ho-border-accent"
                       "bg-[#081b24]"
                       "p-4"
                       "shadow-2xl"
@@ -130,12 +130,12 @@
         (when (seq status-message)
           [:div {:class ["rounded-md"
                          "border"
-                         "border-[#7b3340]"
-                         "bg-[#3a1b22]/55"
+                         "border-ho-border-sell"
+                         "bg-ho-sell-soft/55"
                          "px-3"
                          "py-2"
                          "text-sm"
-                         "text-[#f2b8c5]"]
+                         "text-ho-sell-tint"]
                  :data-role "vault-transfer-status"}
            status-message])
         [:div {:class ["flex" "justify-end" "gap-2" "pt-1"]}
@@ -165,10 +165,10 @@
                                    "text-[#6c8e93]"
                                    "cursor-not-allowed"]
                                   ["border-[#2f625a]"
-                                   "bg-[#0d3a35]"
+                                   "bg-ho-accent-soft"
                                    "text-[#daf3ef]"
                                    "hover:border-[#3f7f75]"
-                                   "hover:bg-[#115046]"]))
+                                   "hover:bg-ho-accent-soft-hi"]))
                    :data-role "vault-transfer-submit"
                    :on {:click [[:actions/submit-vault-transfer]]}}
           confirm-label]]]])))

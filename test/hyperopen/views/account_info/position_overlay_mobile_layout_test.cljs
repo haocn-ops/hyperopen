@@ -30,7 +30,7 @@
     (is (some? backdrop-node))
     (is (some? close-button))
     (is (contains? surface-classes "rounded-t-[22px]"))
-    (is (contains? surface-classes "bg-[#06131a]"))
+    (is (contains? surface-classes "bg-ho-bg-deep"))
     (is (= true (get-in surface-node [1 :aria-modal])))
     (is (= "translateY(0)" (get-in surface-node [1 :style :transform])))
     (is (= "max(env(safe-area-inset-bottom), 1rem)"
@@ -54,7 +54,7 @@
     (is (some? backdrop-node))
     (is (some? close-button))
     (is (contains? surface-classes "rounded-t-[22px]"))
-    (is (contains? surface-classes "bg-[#06131a]"))
+    (is (contains? surface-classes "bg-ho-bg-deep"))
     (is (= true (get-in surface-node [1 :aria-modal])))
     (is (= "translateY(0)" (get-in surface-node [1 :style :transform])))
     (is (= "max(env(safe-area-inset-bottom), 1rem)"

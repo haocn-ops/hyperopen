@@ -232,7 +232,7 @@
                           "transition-colors"]
                          (cond
                            active?
-                           ["border-[#2dceb3]" "bg-[#0f3a35]" "text-[#97fce4]"]
+                           ["border-[#2dceb3]" "bg-[#0f3a35]" "text-ho-accent-bright"]
 
                            disabled?
                            ["cursor-not-allowed" "border-base-300" "bg-base-200/30" "text-trading-text-secondary"]

@@ -118,7 +118,7 @@
   (let [series-options #js {:priceFormat #js {:type "volume"}
                             :priceScaleId ""
                             :scaleMargins #js {:top 0.7 :bottom 0}
-                            :color transforms/hyperliquid-volume-up-color}]
+                            :color (transforms/hyperliquid-volume-up-color)}]
     (.addSeries ^js chart HistogramSeries series-options)))
 
 (defn- ohlc-prices

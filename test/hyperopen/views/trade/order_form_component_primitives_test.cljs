@@ -200,8 +200,8 @@
                                  second
                                  :class
                                  set)]
-    (is (contains? buy-active-classes "bg-[#50D2C1]"))
-    (is (contains? sell-active-classes "bg-[#ED7088]"))
+    (is (contains? buy-active-classes "bg-ho-accent"))
+    (is (contains? sell-active-classes "bg-ho-sell-hi"))
     (is (contains? other-active-classes "bg-primary"))))
 
 (deftest metric-row-default-and-custom-value-classes-test

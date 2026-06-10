@@ -41,6 +41,7 @@
                :save-many effect-adapters/save-many
                :local-storage-set effect-adapters/local-storage-set
                :local-storage-set-json effect-adapters/local-storage-set-json
+               :apply-ui-theme effect-adapters/apply-ui-theme
                :persist-leaderboard-preferences effect-adapters/persist-leaderboard-preferences-effect}
      :asset-selector {:queue-asset-icon-status (effect-adapters/make-queue-asset-icon-status runtime)
                       :sync-asset-selector-active-ctx-subscriptions effect-adapters/sync-asset-selector-active-ctx-subscriptions}

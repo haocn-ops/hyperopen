@@ -249,7 +249,7 @@
       (let [classes (hiccup/node-class-set input-node)]
         (is (contains? classes "focus:ring-offset-0"))
         (is (contains? classes "focus:shadow-none"))
-        (is (contains? classes "focus:border-[#8a96a6]"))))))
+        (is (contains? classes "focus:border-ho-text-muted"))))))
 
 (deftest position-tpsl-modal-renders-mobile-bottom-sheet-layout-test
   (let [modal (position-tpsl/from-position-row
@@ -268,7 +268,7 @@
     (is (some? layer-node))
     (is (some? backdrop-node))
     (is (contains? surface-classes "rounded-t-[22px]"))
-    (is (contains? surface-classes "bg-[#06131a]"))
+    (is (contains? surface-classes "bg-ho-bg-deep"))
     (is (= true (get-in surface-node [1 :aria-modal])))
     (is (= "translateY(0)" (get-in surface-node [1 :style :transform])))
     (is (= "max(env(safe-area-inset-bottom), 1rem)"

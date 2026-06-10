@@ -4,7 +4,7 @@
   ["overflow-hidden"
    "rounded-lg"
    "border"
-   "border-[#17313d]"
+   "border-ho-border-accent-muted"
    "bg-[#08161f]"])
 
 (def ^:private mobile-account-card-button-classes
@@ -20,7 +20,7 @@
 
 (def ^:private mobile-account-card-expanded-container-classes
   ["border-t"
-   "border-[#17313d]"
+   "border-ho-border-accent-muted"
    "px-3.5"
    "py-3"])
 

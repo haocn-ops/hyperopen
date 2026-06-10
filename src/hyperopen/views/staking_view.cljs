@@ -20,13 +20,13 @@
                           "focus:ring-offset-0"
                           "whitespace-nowrap"]
                          (if primary?
-                           ["border-[#50d2c1]"
-                            "bg-[#50d2c1]"
+                           ["border-ho-accent"
+                            "bg-ho-accent"
                             "text-[#041914]"
                             "hover:bg-[#6de3d5]"]
                            ["border-[#2f7f73]"
                             "bg-[#041a1f]"
-                            "text-[#97fce4]"
+                            "text-ho-accent-bright"
                             "hover:bg-[#0b262c]"]))
             :data-role data-role
             :on {:click [action]}}
@@ -37,7 +37,7 @@
             :class ["h-9"
                     "min-w-[90px]"
                     "rounded-lg"
-                    "bg-[#50d2c1]"
+                    "bg-ho-accent"
                     "px-4"
                     "text-xs"
                     "font-normal"
@@ -79,9 +79,9 @@
                  "rounded-[10px]"]}
    [:div {:class ["flex" "flex-wrap" "items-start" "justify-between" "gap-3"]}
     [:div {:class ["space-y-2" "max-w-[980px]"]}
-     [:h1 {:class ["text-[24px]" "md:text-[34px]" "font-normal" "leading-[1.08]" "text-[#ffffff]"]}
+     [:h1 {:class ["text-[24px]" "md:text-[34px]" "font-normal" "leading-[1.08]" "text-ho-text-hi"]}
       "Staking"]
-     [:p {:class ["text-base" "leading-5" "text-[#f6fefd]" "max-w-[1200px]"]}
+     [:p {:class ["text-base" "leading-5" "text-ho-text" "max-w-[1200px]"]}
       "The Hyperliquid L1 is a proof-of-stake blockchain where stakers delegate the native token HYPE to validators to earn staking rewards. Stakers only receive rewards when the validator successfully participates in consensus, so stakers should only delegate to reputable and trusted validators."]]
     (staking-toolbar connected?)]])
 
@@ -91,7 +91,7 @@
    [:div {:class ["grid" "gap-2"]}
     (shared/summary-card "Total Staked" (shared/format-summary-hype (:total-staked summary)) "staking-summary-total")
     (shared/summary-card "Your Stake" (shared/format-summary-hype (:your-stake summary)) "staking-summary-user")]
-   [:div {:class ["rounded-[10px]" "border" "border-[#1b2429]" "bg-[#0f1a1f]" "p-4" "space-y-2"]
+   [:div {:class ["rounded-[10px]" "border" "border-ho-surface" "bg-ho-bg" "p-4" "space-y-2"]
           :data-role "staking-balance-panel"}
     [:div {:class ["text-sm" "leading-[15px]" "font-normal" "text-[#878c8f]"]}
      "Staking Balance"]
@@ -116,7 +116,7 @@
                           "focus:ring-0"
                           "focus:ring-offset-0"]
                          (if active?
-                           ["border-[#303030]" "text-[#f6fefd]"]
+                           ["border-[#303030]" "text-ho-text"]
                            ["border-[#303030]" "text-[#949e9c]" "hover:text-[#c5d0ce]"]))
             :on {:click [action]}}
    label])
@@ -175,7 +175,7 @@
 
 (defn- tabbed-content
   [view-state]
-  [:div {:class ["rounded-[10px]" "border" "border-[#1b2429]" "bg-[#0f1a1f]" "overflow-hidden"]}
+  [:div {:class ["rounded-[10px]" "border" "border-ho-surface" "bg-ho-bg" "overflow-hidden"]}
    (tab-bar view-state)
    (active-tab-panel view-state)])
 
@@ -185,7 +185,7 @@
     [:div {:class ["rounded-xl"
                    "border"
                    "border-[#7a2836]"
-                   "bg-[#2b1118]"
+                   "bg-ho-sell-soft-deep"
                    "px-3"
                    "py-2"
                    "text-sm"

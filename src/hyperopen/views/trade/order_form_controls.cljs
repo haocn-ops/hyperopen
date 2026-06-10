@@ -47,8 +47,8 @@
                           "font-semibold"
                           "transition-colors"]
                          (if selected?
-                           ["bg-[#273035]" "text-[#50D2C1]"]
-                           ["text-[#D2DAD7]" "hover:bg-[#273035]" "hover:text-[#F6FEFD]"]))
+                           ["bg-ho-surface-raised" "text-ho-accent"]
+                           ["text-[#D2DAD7]" "hover:bg-ho-surface-raised" "hover:text-ho-text"]))
             :role "option"
             :aria-selected (boolean selected?)
             :on {:click (on-select-mode mode)}}
@@ -68,8 +68,8 @@
                           "font-semibold"
                           "transition-colors"]
                          (if selected?
-                           ["bg-[#273035]" "text-[#50D2C1]"]
-                           ["text-[#D2DAD7]" "hover:bg-[#273035]" "hover:text-[#F6FEFD]"]))
+                           ["bg-ho-surface-raised" "text-ho-accent"]
+                           ["text-[#D2DAD7]" "hover:bg-ho-surface-raised" "hover:text-ho-text"]))
             :role "option"
             :aria-selected (boolean selected?)
             :on {:click (on-select-mode mode)}}
@@ -160,8 +160,8 @@
                     "min-w-[116px]"
                     "rounded-lg"
                     "border"
-                    "border-[#273035]"
-                    "bg-[#1B2429]"
+                    "border-ho-surface-raised"
+                    "bg-ho-surface"
                     "p-1"
                     "spectate-[0_10px_24px_rgba(0,0,0,0.35)]"]
             :style {:z-index 1202
@@ -244,8 +244,8 @@
                     "min-w-[88px]"
                     "rounded-lg"
                     "border"
-                    "border-[#273035]"
-                    "bg-[#1B2429]"
+                    "border-ho-surface-raised"
+                    "bg-ho-surface"
                     "p-1"
                     "spectate-[0_10px_24px_rgba(0,0,0,0.35)]"]
             :style {:z-index 1202}

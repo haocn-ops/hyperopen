@@ -70,17 +70,17 @@
    (position-coin-cell row)
    [:td {:class (into chrome/activity-cell-num-class ["whitespace-nowrap" (chrome/side-tone-class side-key)])}
     (vf/format-size size)]
-   [:td {:class (into chrome/activity-cell-num-class ["whitespace-nowrap" "text-[#f6fefd]"])}
+   [:td {:class (into chrome/activity-cell-num-class ["whitespace-nowrap" "text-ho-text"])}
     (position-value-text position-value)]
-   [:td {:class (into chrome/activity-cell-num-class ["whitespace-nowrap" "text-[#f6fefd]"])}
+   [:td {:class (into chrome/activity-cell-num-class ["whitespace-nowrap" "text-ho-text"])}
     (vf/format-price entry-price)]
-   [:td {:class (into chrome/activity-cell-num-class ["whitespace-nowrap" "text-[#f6fefd]"])}
+   [:td {:class (into chrome/activity-cell-num-class ["whitespace-nowrap" "text-ho-text"])}
     (vf/format-price mark-price)]
    [:td {:class (into chrome/activity-cell-num-class ["whitespace-nowrap" (chrome/position-pnl-class pnl)])}
     (position-pnl-text pnl roe)]
-   [:td {:class (into chrome/activity-cell-num-class ["whitespace-nowrap" "text-[#f6fefd]"])}
+   [:td {:class (into chrome/activity-cell-num-class ["whitespace-nowrap" "text-ho-text"])}
     (position-liq-price-text liq-price)]
-   [:td {:class (into chrome/activity-cell-num-class ["whitespace-nowrap" "text-[#f6fefd]"])}
+   [:td {:class (into chrome/activity-cell-num-class ["whitespace-nowrap" "text-ho-text"])}
     (position-margin-text margin)]
    [:td {:class (into chrome/activity-cell-num-class ["whitespace-nowrap" (chrome/position-pnl-class funding)])}
     (vf/format-currency funding)]])
@@ -94,14 +94,14 @@
        (for [{:keys [coin total available usdc-value]} rows]
          ^{:key (str "balance-" coin "-" total)}
          [:tr {:class chrome/activity-row-class}
-          [:td {:class (into chrome/activity-cell-class ["whitespace-nowrap" "text-[#f6fefd]"])}
+          [:td {:class (into chrome/activity-cell-class ["whitespace-nowrap" "text-ho-text"])}
            (or coin "—")]
-          [:td {:class (into chrome/activity-cell-num-class ["whitespace-nowrap" "text-[#f6fefd]"])}
+          [:td {:class (into chrome/activity-cell-num-class ["whitespace-nowrap" "text-ho-text"])}
            (vf/format-balance-quantity total)]
           [:td {:class (into chrome/activity-cell-num-class ["whitespace-nowrap"])}
-           [:span {:class (into ["text-[#f6fefd]"] (chrome/interactive-value-class))}
+           [:span {:class (into ["text-ho-text"] (chrome/interactive-value-class))}
             (vf/format-balance-quantity available)]]
-          [:td {:class (into chrome/activity-cell-num-class ["whitespace-nowrap" "text-[#f6fefd]"])}
+          [:td {:class (into chrome/activity-cell-num-class ["whitespace-nowrap" "text-ho-text"])}
            (vf/format-currency usdc-value)]])
        (chrome/empty-table-row (count columns) "No balances available."))]]])
 
@@ -132,8 +132,8 @@
             (or coin "—")]]
           [:td {:class (into chrome/activity-cell-class ["whitespace-nowrap" (chrome/side-tone-class side-key)])} (or side "—")]
           [:td {:class (into chrome/activity-cell-num-class ["whitespace-nowrap" (chrome/side-tone-class side-key)])} (vf/format-size size)]
-          [:td {:class (into chrome/activity-cell-num-class ["whitespace-nowrap" "text-[#f6fefd]"])} (vf/format-price price)]
-          [:td {:class (into chrome/activity-cell-num-class ["whitespace-nowrap" "text-[#f6fefd]"])} (vf/format-price trigger-price)]])
+          [:td {:class (into chrome/activity-cell-num-class ["whitespace-nowrap" "text-ho-text"])} (vf/format-price price)]
+          [:td {:class (into chrome/activity-cell-num-class ["whitespace-nowrap" "text-ho-text"])} (vf/format-price trigger-price)]])
        (chrome/empty-table-row (count columns) "No open orders."))]]])
 
 (defn twap-table [rows sort-state columns]
@@ -145,14 +145,14 @@
        (for [{:keys [coin size executed-size average-price running-label reduce-only? creation-time-ms]} rows]
          ^{:key (str "twap-" coin "-" creation-time-ms "-" size)}
          [:tr {:class chrome/activity-row-class}
-          [:td {:class (into chrome/activity-cell-class ["whitespace-nowrap" "text-[#f6fefd]"])} (or coin "—")]
-          [:td {:class (into chrome/activity-cell-num-class ["whitespace-nowrap" "text-[#f6fefd]"])} (vf/format-size size)]
-          [:td {:class (into chrome/activity-cell-num-class ["whitespace-nowrap" "text-[#f6fefd]"])} (vf/format-size executed-size)]
-          [:td {:class (into chrome/activity-cell-num-class ["whitespace-nowrap" "text-[#f6fefd]"])} (vf/format-price average-price)]
-          [:td {:class (into chrome/activity-cell-class ["whitespace-nowrap" "text-[#f6fefd]"])} (or running-label "—")]
-          [:td {:class (into chrome/activity-cell-class ["whitespace-nowrap" (if (true? reduce-only?) "text-[#ed7088]" "text-[#1fa67d]")])}
+          [:td {:class (into chrome/activity-cell-class ["whitespace-nowrap" "text-ho-text"])} (or coin "—")]
+          [:td {:class (into chrome/activity-cell-num-class ["whitespace-nowrap" "text-ho-text"])} (vf/format-size size)]
+          [:td {:class (into chrome/activity-cell-num-class ["whitespace-nowrap" "text-ho-text"])} (vf/format-size executed-size)]
+          [:td {:class (into chrome/activity-cell-num-class ["whitespace-nowrap" "text-ho-text"])} (vf/format-price average-price)]
+          [:td {:class (into chrome/activity-cell-class ["whitespace-nowrap" "text-ho-text"])} (or running-label "—")]
+          [:td {:class (into chrome/activity-cell-class ["whitespace-nowrap" (if (true? reduce-only?) "text-ho-sell-hi" "text-[#1fa67d]")])}
            (if (true? reduce-only?) "Yes" "No")]
-          [:td {:class (into chrome/activity-cell-num-class ["whitespace-nowrap" "text-[#f6fefd]"])} (vf/format-time creation-time-ms)]
+          [:td {:class (into chrome/activity-cell-num-class ["whitespace-nowrap" "text-ho-text"])} (vf/format-time creation-time-ms)]
           [:td {:class (into chrome/activity-cell-class ["whitespace-nowrap" "text-[#8f9ea5]"])} "—"]])
        (chrome/empty-table-row (count columns) "No TWAPs yet."))]]])
 
@@ -179,10 +179,10 @@
             (or coin "—")]]
           [:td {:class (into chrome/activity-cell-class ["whitespace-nowrap" (chrome/side-tone-class side-key)])}
            (or side "—")]
-          [:td {:class (into chrome/activity-cell-num-class ["whitespace-nowrap" "text-[#f6fefd]"])} (vf/format-price price)]
-          [:td {:class (into chrome/activity-cell-num-class ["whitespace-nowrap" "text-[#f6fefd]"])} (vf/format-size size)]
-          [:td {:class (into chrome/activity-cell-num-class ["whitespace-nowrap" "text-[#f6fefd]"])} (vf/format-currency trade-value)]
-          [:td {:class (into chrome/activity-cell-num-class ["whitespace-nowrap" "text-[#f6fefd]"])} (vf/format-currency fee)]
+          [:td {:class (into chrome/activity-cell-num-class ["whitespace-nowrap" "text-ho-text"])} (vf/format-price price)]
+          [:td {:class (into chrome/activity-cell-num-class ["whitespace-nowrap" "text-ho-text"])} (vf/format-size size)]
+          [:td {:class (into chrome/activity-cell-num-class ["whitespace-nowrap" "text-ho-text"])} (vf/format-currency trade-value)]
+          [:td {:class (into chrome/activity-cell-num-class ["whitespace-nowrap" "text-ho-text"])} (vf/format-currency fee)]
           [:td {:class (into chrome/activity-cell-num-class ["whitespace-nowrap" (chrome/position-pnl-class closed-pnl)])}
            (vf/format-currency closed-pnl)]])
 
@@ -210,7 +210,7 @@
                 :style (chrome/side-coin-cell-style side-key)}
            [:span {:class [(chrome/side-coin-tone-class side-key)]}
             (or coin "—")]]
-          [:td {:class (into chrome/activity-cell-num-class ["whitespace-nowrap" "text-[#f6fefd]"])} (vf/format-funding-rate funding-rate)]
+          [:td {:class (into chrome/activity-cell-num-class ["whitespace-nowrap" "text-ho-text"])} (vf/format-funding-rate funding-rate)]
           [:td {:class (into chrome/activity-cell-num-class ["whitespace-nowrap" (chrome/side-tone-class side-key)])} (vf/format-size position-size)]
           [:td {:class (into chrome/activity-cell-num-class ["whitespace-nowrap" (chrome/position-pnl-class payment)])}
            (vf/format-currency payment)]])
@@ -240,9 +240,9 @@
            [:span {:class [(chrome/side-coin-tone-class side-key)]}
             (or coin "—")]]
           [:td {:class (into chrome/activity-cell-class ["whitespace-nowrap" (chrome/side-tone-class side-key)])} (or side "—")]
-          [:td {:class (into chrome/activity-cell-class ["whitespace-nowrap" "text-[#f6fefd]"])} (or type "—")]
-          [:td {:class (into chrome/activity-cell-num-class ["whitespace-nowrap" "text-[#f6fefd]"])} (vf/format-size size)]
-          [:td {:class (into chrome/activity-cell-num-class ["whitespace-nowrap" "text-[#f6fefd]"])} (vf/format-price price)]
+          [:td {:class (into chrome/activity-cell-class ["whitespace-nowrap" "text-ho-text"])} (or type "—")]
+          [:td {:class (into chrome/activity-cell-num-class ["whitespace-nowrap" "text-ho-text"])} (vf/format-size size)]
+          [:td {:class (into chrome/activity-cell-num-class ["whitespace-nowrap" "text-ho-text"])} (vf/format-price price)]
           [:td {:class (into chrome/activity-cell-class ["whitespace-nowrap" (chrome/status-tone-class status-key)])}
            (or status "—")]])
 
@@ -270,7 +270,7 @@
            (or type-label "—")]
           [:td {:class (into chrome/activity-cell-num-class ["whitespace-nowrap" (chrome/position-pnl-class signed-amount)])}
            (vf/format-currency (or signed-amount amount))]
-          [:td {:class (into chrome/activity-cell-num-class ["whitespace-nowrap" "text-[#97fce4]"])
+          [:td {:class (into chrome/activity-cell-num-class ["whitespace-nowrap" "text-ho-accent-bright"])
                 :title hash}
            [:span {:class (chrome/interactive-value-class)}
             (vf/short-hash hash)]]])
@@ -287,13 +287,13 @@
        (for [{:keys [address vault-amount unrealized-pnl all-time-pnl days-following]} rows]
          ^{:key (str "depositor-" address)}
          [:tr {:class chrome/activity-row-class}
-          [:td {:class (into chrome/activity-cell-num-class ["whitespace-nowrap" "text-[#f6fefd]"])} (or (wallet/short-addr address) "—")]
-          [:td {:class (into chrome/activity-cell-num-class ["whitespace-nowrap" "text-[#f6fefd]"])} (vf/format-currency vault-amount)]
+          [:td {:class (into chrome/activity-cell-num-class ["whitespace-nowrap" "text-ho-text"])} (or (wallet/short-addr address) "—")]
+          [:td {:class (into chrome/activity-cell-num-class ["whitespace-nowrap" "text-ho-text"])} (vf/format-currency vault-amount)]
           [:td {:class (into chrome/activity-cell-num-class ["whitespace-nowrap" (chrome/position-pnl-class unrealized-pnl)])}
            (vf/format-currency unrealized-pnl)]
           [:td {:class (into chrome/activity-cell-num-class ["whitespace-nowrap" (chrome/position-pnl-class all-time-pnl)])}
            (vf/format-currency all-time-pnl)]
-          [:td {:class (into chrome/activity-cell-num-class ["whitespace-nowrap" "text-[#f6fefd]"])}
+          [:td {:class (into chrome/activity-cell-num-class ["whitespace-nowrap" "text-ho-text"])}
            (if (number? days-following)
              (str days-following)
              "—")]])

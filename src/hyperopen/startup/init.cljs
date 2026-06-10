@@ -15,6 +15,7 @@
 (defn restore-critical-ui-state!
   [{:keys [store
            restore-ui-font-preference!
+           restore-ui-theme-preference!
            restore-ui-locale-preference!
            restore-chart-options!
            restore-orderbook-ui!
@@ -30,6 +31,9 @@
            restore-asset-selector-markets-cache!]}]
   ;; Restore root typography preference (system default, optional Inter override).
   (restore-ui-font-preference!)
+  ;; Restore the UI theme (data-theme attribute + [:ui :theme] state).
+  (when (fn? restore-ui-theme-preference!)
+    (restore-ui-theme-preference! store))
   ;; Restore UI locale preference for number/date formatting ownership.
   (restore-ui-locale-preference! store)
   ;; Restore chart options from localStorage.

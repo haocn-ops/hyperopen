@@ -74,7 +74,7 @@
                           "focus:ring-offset-0"
                           "appearance-none"]
                          (if active?
-                           ["bg-[#123a36]" "text-[#97fce4]"]
+                           ["bg-[#123a36]" "text-ho-accent-bright"]
                            ["text-white" "hover:bg-base-200"]))
             :href (or href route)
             :data-role more-data-role
@@ -174,7 +174,7 @@
                      "hover:bg-base-200"
                      "focus:outline-none"
                      "focus:ring-2"
-                     "focus:ring-[#66e3c5]/50"
+                     "focus:ring-ho-accent-hi/50"
                      "focus:ring-offset-0"]
              :on {:click [[:actions/open-mobile-header-menu]]}
              :aria-label "Open mobile menu"
@@ -247,7 +247,7 @@
                           "hover:bg-[#102229]"
                           "focus:outline-none"
                           "focus:ring-2"
-                          "focus:ring-[#66e3c5]/40"
+                          "focus:ring-ho-accent-hi/40"
                           "focus:ring-offset-0"]
                   :on {:click [[:actions/close-mobile-header-menu]]}
                   :aria-label "Close mobile menu"

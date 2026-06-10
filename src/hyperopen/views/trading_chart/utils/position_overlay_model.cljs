@@ -1,10 +1,14 @@
 (ns hyperopen.views.trading-chart.utils.position-overlay-model
   (:require [clojure.string :as str]
             [hyperopen.utils.interval :as interval]
-            [hyperopen.views.account-info.projections :as projections]))
+            [hyperopen.views.account-info.projections :as projections]
+            [hyperopen.views.trading-chart.utils.theme-colors :as theme-colors]))
 
-(def ^:private long-marker-color "#26a69a")
-(def ^:private short-marker-color "#ef5350")
+(defn- long-marker-color []
+  (theme-colors/token "--ho-chart-long"))
+
+(defn- short-marker-color []
+  (theme-colors/token "--ho-chart-short"))
 
 (defn- finite-number?
   [value]
@@ -177,7 +181,7 @@
 
 (defn- marker-color
   [side]
-  (if (= side :long) long-marker-color short-marker-color))
+  (if (= side :long) (long-marker-color) (short-marker-color)))
 
 (defn- marker-label
   [side]

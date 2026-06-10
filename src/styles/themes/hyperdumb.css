@@ -1,0 +1,54 @@
+/* GENERATED FILE - do not edit by hand.
+ * Source: src/styles/themes/palette.js
+ * Regenerate: node tools/styles/generate_theme_css.mjs
+ */
+:root[data-theme="hyperdumb"] {
+  /* Color tokens: RGB channel triplets (Tailwind alpha). */
+  --ho-bg: 10 13 10;
+  --ho-bg-deep: 5 7 5;
+  --ho-surface: 19 26 19;
+  --ho-surface-raised: 28 38 28;
+  --ho-border: 42 58 42;
+  --ho-text: 242 255 242;
+  --ho-text-hi: 255 255 255;
+  --ho-text-secondary: 156 179 156;
+  --ho-text-muted: 126 149 126;
+  --ho-text-dim: 92 112 92;
+  --ho-accent: 0 255 136;
+  --ho-accent-hi: 77 255 170;
+  --ho-accent-bright: 179 255 217;
+  --ho-accent-soft: 0 59 34;
+  --ho-accent-soft-hi: 0 85 47;
+  --ho-border-accent: 20 83 45;
+  --ho-border-accent-muted: 14 61 34;
+  --ho-buy: 0 255 136;
+  --ho-sell: 255 82 82;
+  --ho-sell-hi: 255 122 122;
+  --ho-sell-tint: 255 196 196;
+  --ho-sell-soft: 61 20 20;
+  --ho-sell-soft-deep: 42 13 13;
+  --ho-border-sell: 138 51 51;
+  --ho-warn: 255 214 10;
+  --ho-info: 56 189 248;
+  /* Chart tokens: complete CSS colors, read from cljs. */
+  --ho-chart-bg: rgb(10, 13, 10);
+  --ho-chart-text: #e8ffe8;
+  --ho-chart-grid: #1e2a1e;
+  --ho-chart-grid-strong: #2a3a2a;
+  --ho-chart-grid-soft: rgba(154, 176, 154, 0.16);
+  --ho-chart-border-soft: rgba(154, 176, 154, 0.24);
+  --ho-chart-separator: rgba(154, 176, 154, 0.22);
+  --ho-chart-separator-hover: rgba(154, 176, 154, 0.30);
+  --ho-chart-up: rgba(0, 255, 136, 0.5);
+  --ho-chart-down: rgba(255, 82, 82, 0.5);
+  --ho-chart-long: #00d474;
+  --ho-chart-short: #ff5252;
+  /* Radius tokens: mapped onto the Tailwind rounded scale. */
+  --ho-radius-sm: 0.25rem;
+  --ho-radius: 0.5rem;
+  --ho-radius-md: 0.625rem;
+  --ho-radius-lg: 0.875rem;
+  --ho-radius-xl: 1.125rem;
+  --ho-radius-2xl: 1.5rem;
+  --ho-radius-3xl: 2rem;
+}

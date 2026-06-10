@@ -1,5 +1,24 @@
 /** @type {import('tailwindcss').Config} */
-const HYPERLIQUID_BG = "#0f1a1f";
+const palette = require("./src/styles/themes/palette.js");
+
+// Semantic ho-* utilities (bg-ho-surface, text-ho-text-muted, ...) resolve
+// through the --ho-* tokens defined per theme in src/styles/themes/*.css.
+const hoColors = Object.fromEntries(
+  palette.COLOR_TOKEN_KEYS.map((key) => [
+    `ho-${key}`,
+    `rgb(var(--ho-${key}) / <alpha-value>)`,
+  ]),
+);
+
+// daisyui theme per palette entry so base-100/200/300, primary, and component
+// classes follow data-theme. The default ("dark") keys keep their historical
+// values via palette.js.
+const daisyThemes = palette.themeOrder.map((id) => ({
+  [id]: {
+    ...require("daisyui/src/theming/themes")["dark"],
+    ...palette.themes[id].daisy,
+  },
+}));
 
 module.exports = {
   content: ["./src/**/*.{cljs,clj}", "./resources/public/**/*.html"],
@@ -11,14 +30,25 @@ module.exports = {
         m: ["13px", { lineHeight: "17px" }],
       },
       colors: {
-        // Custom colors for trading interface
-        "trading-bg": HYPERLIQUID_BG,
-        "trading-surface": HYPERLIQUID_BG,
-        "trading-border": "#30363d",
-        "trading-green": "#00d4aa",
-        "trading-red": "#ff6b6b",
-        "trading-text": "#ffffff",
-        "trading-text-secondary": "#8b949e",
+        ...hoColors,
+        // Legacy trading-* names stay valid as aliases of the tokens.
+        "trading-bg": "rgb(var(--ho-bg) / <alpha-value>)",
+        "trading-surface": "rgb(var(--ho-bg) / <alpha-value>)",
+        "trading-border": "rgb(var(--ho-border) / <alpha-value>)",
+        "trading-green": "rgb(var(--ho-buy) / <alpha-value>)",
+        "trading-red": "rgb(var(--ho-sell) / <alpha-value>)",
+        "trading-text": "rgb(var(--ho-text-hi) / <alpha-value>)",
+        "trading-text-secondary":
+          "rgb(var(--ho-text-secondary) / <alpha-value>)",
+      },
+      borderRadius: {
+        sm: "var(--ho-radius-sm, 0.125rem)",
+        DEFAULT: "var(--ho-radius, 0.25rem)",
+        md: "var(--ho-radius-md, 0.375rem)",
+        lg: "var(--ho-radius-lg, 0.5rem)",
+        xl: "var(--ho-radius-xl, 0.75rem)",
+        "2xl": "var(--ho-radius-2xl, 1rem)",
+        "3xl": "var(--ho-radius-3xl, 1.5rem)",
       },
       fontFamily: {
         sans: [
@@ -37,24 +67,7 @@ module.exports = {
     require("@tailwindcss/typography"),
   ],
   daisyui: {
-    themes: [
-      {
-        dark: {
-          ...require("daisyui/src/theming/themes")["dark"],
-          primary: "#00d4aa",
-          secondary: "#8b949e",
-          accent: "#ff6b6b",
-          neutral: HYPERLIQUID_BG,
-          "base-100": HYPERLIQUID_BG,
-          "base-200": HYPERLIQUID_BG,
-          "base-300": "#30363d",
-          info: "#3abff8",
-          success: "#00d4aa",
-          warning: "#fbbd23",
-          error: "#ff6b6b",
-        },
-      },
-    ],
+    themes: daisyThemes,
     darkTheme: "dark",
     base: true,
     styled: true,

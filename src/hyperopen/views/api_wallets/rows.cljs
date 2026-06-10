@@ -164,7 +164,7 @@
         (seq error)
         [:tr
          [:td {:col-span 4
-               :class ["px-3" "py-8" "text-center" "text-sm" "text-[#f2b8c5]"]}
+               :class ["px-3" "py-8" "text-center" "text-sm" "text-ho-sell-tint"]}
           error]]
 
         :else
@@ -184,7 +184,7 @@
        "Loading API wallets..."]
 
       (seq error)
-      [:div {:class ["rounded-xl" "border" "border-[#7b3340]" "bg-[#3a1b22]/55" "px-3" "py-6" "text-center" "text-sm" "text-[#f2b8c5]"]}
+      [:div {:class ["rounded-xl" "border" "border-ho-border-sell" "bg-ho-sell-soft/55" "px-3" "py-6" "text-center" "text-sm" "text-ho-sell-tint"]}
        error]
 
       :else

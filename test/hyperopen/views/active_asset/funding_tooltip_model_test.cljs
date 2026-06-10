@@ -351,7 +351,7 @@
                   (fn [] "00:10:00")]
       (let [view-node (row/active-asset-row ctx-data market {:visible-dropdown nil} full-state)]
         (is (support/contains-class? view-node "z-[140]"))
-        (is (support/contains-class? view-node "bg-[#06131a]"))
+        (is (support/contains-class? view-node "bg-ho-bg-deep"))
         (is (support/contains-class? view-node "isolate"))
         (is (support/contains-class? view-node "bg-[#0b1820]"))
         (is (not (support/contains-class? view-node "backdrop-blur-sm")))))))

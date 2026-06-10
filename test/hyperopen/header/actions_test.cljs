@@ -264,3 +264,19 @@
                 :confirm-market-orders? true
                 :sound-on-fill? true}]]
              (sound-action base-state true))))))
+
+(deftest set-ui-theme-saves-persists-and-applies-test
+  (is (= [[:effects/save [:ui :theme] "institutional"]
+          [:effects/local-storage-set "hyperopen-ui-theme" "institutional"]
+          [:effects/apply-ui-theme "institutional"]]
+         (actions/set-ui-theme {} "institutional"))))
+
+(deftest set-ui-theme-normalizes-unknown-to-default-test
+  (is (= [[:effects/save [:ui :theme] "dark"]
+          [:effects/local-storage-set "hyperopen-ui-theme" "dark"]
+          [:effects/apply-ui-theme "dark"]]
+         (actions/set-ui-theme {:ui {:theme "hyperdumb"}} "not-a-theme"))))
+
+(deftest set-ui-theme-is-noop-when-theme-unchanged-test
+  (is (= [] (actions/set-ui-theme {:ui {:theme "hyperdumb"}} "hyperdumb")))
+  (is (= [] (actions/set-ui-theme {} "dark"))))

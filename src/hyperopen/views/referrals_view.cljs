@@ -16,13 +16,13 @@
                           "disabled:cursor-not-allowed"
                           "disabled:opacity-50"]
                          (if primary?
-                           ["border-[#50d2c1]"
-                            "bg-[#50d2c1]"
+                           ["border-ho-accent"
+                            "bg-ho-accent"
                             "text-[#041914]"
                             "hover:bg-[#6de3d5]"]
                            ["border-[#2f7f73]"
                             "bg-[#061b1f]"
-                            "text-[#97fce4]"
+                            "text-ho-accent-bright"
                             "hover:bg-[#0b262c]"]))
             :disabled disabled?
             :data-role role
@@ -33,13 +33,13 @@
   [label value role]
   [:div {:class ["rounded-lg"
                  "border"
-                 "border-[#1b2429]"
-                 "bg-[#0f1a1f]"
+                 "border-ho-surface"
+                 "bg-ho-bg"
                  "p-4"]
          :data-role role}
    [:div {:class ["text-xs" "uppercase" "tracking-[0.08em]" "text-[#878c8f]"]}
     label]
-   [:div {:class ["mt-2" "text-2xl" "text-[#f6fefd]" "num"]}
+   [:div {:class ["mt-2" "text-2xl" "text-ho-text" "num"]}
     value]])
 
 (defn- status-banner
@@ -52,7 +52,7 @@
            owner-label]}]
   (cond
     error
-    [:div {:class ["rounded-lg" "border" "border-[#7a2836]" "bg-[#2b1118]" "px-3" "py-2" "text-sm" "text-[#ff9db2]"]
+    [:div {:class ["rounded-lg" "border" "border-[#7a2836]" "bg-ho-sell-soft-deep" "px-3" "py-2" "text-sm" "text-[#ff9db2]"]
            :data-role "referrals-error"}
      [:div error]
      (when owner
@@ -61,7 +61,7 @@
                 :action [:actions/load-referrals-route "/referrals"]}))]
 
     last-error
-    [:div {:class ["rounded-lg" "border" "border-[#7a2836]" "bg-[#2b1118]" "px-3" "py-2" "text-sm" "text-[#ff9db2]"]
+    [:div {:class ["rounded-lg" "border" "border-[#7a2836]" "bg-ho-sell-soft-deep" "px-3" "py-2" "text-sm" "text-[#ff9db2]"]
            :data-role "referrals-form-error"}
      last-error]
 
@@ -72,7 +72,7 @@
      (when owner
        [:span
         " Showing referral state for "
-        [:span {:class ["num" "text-[#f6fefd]"]} owner-label]])]
+        [:span {:class ["num" "text-ho-text"]} owner-label]])]
 
     loading?
     [:div {:class ["rounded-lg" "border" "border-[#224247]" "bg-[#0b2025]" "px-3" "py-2" "text-sm" "text-[#b7d3d0]"]
@@ -83,7 +83,7 @@
     [:div {:class ["rounded-lg" "border" "border-[#1b3d40]" "bg-[#071d22]" "px-3" "py-2" "text-sm" "text-[#b7d3d0]"]
            :data-role "referrals-owner"}
      "Showing master account referral state for "
-     [:span {:class ["num" "text-[#f6fefd]"]} owner-label]]
+     [:span {:class ["num" "text-ho-text"]} owner-label]]
 
     :else
     [:div {:class ["rounded-lg" "border" "border-[#224247]" "bg-[#0b2025]" "px-3" "py-2" "text-sm" "text-[#b7d3d0]"]
@@ -111,14 +111,14 @@
            :data-role "referrals-hero"}
      [:div {:class ["flex" "flex-wrap" "items-start" "justify-between" "gap-3"]}
       [:div {:class ["space-y-2" "max-w-[900px]"]}
-       [:h1 {:class ["text-[24px]" "md:text-[34px]" "font-normal" "leading-[1.08]" "text-[#ffffff]"]}
+       [:h1 {:class ["text-[24px]" "md:text-[34px]" "font-normal" "leading-[1.08]" "text-ho-text-hi"]}
         "Referrals"]
        [:p {:class ["text-sm" "leading-5" "font-semibold" "text-[#d3f5ef]" "max-w-[880px]"]}
         "Refer users to earn rewards. "
         [:a {:href "https://hyperliquid.gitbook.io/hyperliquid-docs/referrals"
              :target "_blank"
              :rel "noreferrer"
-             :class ["text-[#97fce4]" "hover:text-[#d2fff7]"]
+             :class ["text-ho-accent-bright" "hover:text-[#d2fff7]"]
              :data-role "referrals-learn-more"}
          "Learn more"]]]
       [:div {:class ["flex" "flex-wrap" "items-center" "justify-end" "gap-2"]}
@@ -151,7 +151,7 @@
       (when (= :ready stage)
         [:div {:class ["flex" "min-w-0" "flex-wrap" "items-center" "gap-2" "text-[#b7d3d0]"]}
          [:span "Code"]
-         [:span {:class ["num" "text-[#f6fefd]"]
+         [:span {:class ["num" "text-ho-text"]
                  :data-role "referrals-own-code"}
           (or referral-code "Unavailable")]
          [:span {:class ["hidden" "break-all"]
@@ -168,7 +168,7 @@
                           "leading-[34px]"
                           "transition-colors"]
                          (if active?
-                           ["border-[#50d2c1]" "text-[#f6fefd]"]
+                           ["border-ho-accent" "text-ho-text"]
                            ["border-[#303030]" "text-[#949e9c]" "hover:text-[#c5d0ce]"]))
             :data-role (str "referrals-tab-" (name tab))
             :on {:click [[:actions/set-referrals-active-tab tab]]}}
@@ -244,7 +244,7 @@
                             "font-normal"
                             "text-[#878c8f]"
                             "transition-colors"
-                            "hover:text-[#f6fefd]"
+                            "hover:text-ho-text"
                             "focus:outline-none"
                             "focus:ring-0"
                             "focus:ring-offset-0"]
@@ -312,7 +312,7 @@
 
 (defn- table-panel
   [{:keys [active-tab referral-rows legacy-rows referrals-sort]}]
-  [:div {:class ["rounded-lg" "border" "border-[#1b2429]" "bg-[#0f1a1f]" "overflow-hidden"]
+  [:div {:class ["rounded-lg" "border" "border-ho-surface" "bg-ho-bg" "overflow-hidden"]
          :data-role "referrals-table-panel"}
    [:div {:class ["px-3" "pt-2"]}
     (tab-button (= :referrals active-tab) "Referrals" :referrals)

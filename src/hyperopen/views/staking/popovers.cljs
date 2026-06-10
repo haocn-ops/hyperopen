@@ -94,7 +94,7 @@
                     "items-center"
                     "justify-center"
                     "rounded-lg"
-                    "text-[#f6fefd]"
+                    "text-ho-text"
                     "transition-colors"
                     "hover:bg-[#16313b]"
                     "focus:outline-none"
@@ -115,12 +115,12 @@
                           "w-full"
                           "rounded-[10px]"
                           "border"
-                          "border-[#1b2429]"
+                          "border-ho-surface"
                           "bg-[#08161f]"
                           "px-3"
                           "pr-16"
                           "text-sm"
-                          "text-[#f6fefd]"]
+                          "text-ho-text"]
                          shared/neutral-input-focus-classes)
             :on {:input [on-change]}}]
    [:button {:type "button"
@@ -131,7 +131,7 @@
                      "text-xs"
                      "font-medium"
                      "leading-none"
-                     "text-[#50d2c1]"
+                     "text-ho-accent"
                      "focus:outline-none"
                      "focus:ring-0"
                      "focus:ring-offset-0"]
@@ -210,11 +210,11 @@
                           "text-sm"
                           "leading-none"]
                          (if (empty? selected-validator)
-                           ["bg-[#122c37]" "text-[#f6fefd]"]
+                           ["bg-[#122c37]" "text-ho-text"]
                            ["text-[#c8d5d7]" "hover:bg-[#112733]"]))
             :on {:click [[:actions/select-staking-validator ""]]}}
    (when (empty? selected-validator)
-     [:span {:class ["text-[#97fce4]"]} "✓"])
+     [:span {:class ["text-ho-accent-bright"]} "✓"])
    [:span "Select a Validator"]])
 (defn- validator-option-row
   [{:keys [validator name stake]} selected-validator]
@@ -234,7 +234,7 @@
                             "text-sm"
                             "leading-none"]
                            (if selected?
-                             ["bg-[#122c37]" "text-[#f6fefd]"]
+                             ["bg-[#122c37]" "text-ho-text"]
                              ["text-[#c8d5d7]" "hover:bg-[#112733]"]))
               :on {:click [[:actions/select-staking-validator validator]]}}
      [:span {:class ["truncate"]}
@@ -256,7 +256,7 @@
                  "rounded-[10px]"
                  "border"
                  "border-[#1d3540]"
-                 "bg-[#0f1a1f]"
+                 "bg-ho-bg"
                  "p-1"
                  "shadow-[0_16px_34px_rgba(0,0,0,0.45)]"]}
    (empty-validator-option selected-validator)
@@ -289,7 +289,7 @@
                              "w-full"
                              "rounded-[10px]"
                              "border"
-                             "border-[#1b2429]"
+                             "border-ho-surface"
                              "bg-[#08161f]"
                              "px-3"
                              "pr-9"
@@ -336,7 +336,7 @@
                :data-role "staking-transfer-direction-toggle"
                :on {:click [[:actions/set-staking-transfer-direction next-direction]]}}
       [:span from-label]
-      [:span {:class ["text-[16px]" "text-[#50d2c1]"]}
+      [:span {:class ["text-[16px]" "text-ho-accent"]}
        "->"]
       [:span to-label]]]))
 (defn- transfer-popover-content
@@ -466,7 +466,7 @@
               :data-role "staking-action-popover"
               :on {:keydown [[:actions/handle-staking-action-popover-keydown [:event/key]]]}}
         (popover-close-button)
-        [:h2 {:class ["text-[42px]" "font-normal" "leading-none" "text-[#f6fefd]" "text-center"]}
+        [:h2 {:class ["text-[42px]" "font-normal" "leading-none" "text-ho-text" "text-center"]}
          title]
         (case kind
           :transfer

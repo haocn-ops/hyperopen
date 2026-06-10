@@ -1,7 +1,7 @@
 /* ============================================================
    Monte Carlo tab (shared by the portfolio and vault detail surfaces)
    Design tokens lifted from the designer prototype; palette matches the
-   app theme (trading-green #00d4aa, trading-red #ff6b6b). All selectors are
+   app theme (--ho-buy, --ho-sell). All selectors are
    scoped under .monte-carlo so they cannot leak into other surfaces; the
    portfolio and vault roots each add their own surface class for any
    surface-specific overrides.
@@ -15,7 +15,7 @@
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: #00d4aa;
+  color: rgb(var(--ho-buy));
   background: rgba(0, 212, 170, 0.12);
   border: 1px solid rgba(0, 212, 170, 0.3);
   border-radius: 999px;
@@ -32,9 +32,9 @@
   --mc-text: #e9f1f2;
   --mc-text-2: #8b9ba2;
   --mc-text-3: #5d6f76;
-  --mc-accent: #00d4aa;
+  --mc-accent: rgb(var(--ho-buy));
   --mc-gold: #d4b558;
-  --mc-red: #ff6b6b;
+  --mc-red: rgb(var(--ho-sell));
   --mc-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
 
   display: flex;

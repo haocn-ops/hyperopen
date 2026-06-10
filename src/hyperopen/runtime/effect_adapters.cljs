@@ -24,6 +24,7 @@
             [hyperopen.trade-modules :as trade-modules]
             [hyperopen.trading-crypto-modules :as trading-crypto-modules]
             [hyperopen.trading-indicators-modules :as trading-indicators-modules]
+            [hyperopen.ui.theme :as ui-theme]
             [hyperopen.runtime.api-effects :as api-effects]
             [hyperopen.runtime.state :as runtime-state]
             [hyperopen.api.trading :as trading-api]
@@ -44,6 +45,10 @@
 (def local-storage-set common/local-storage-set)
 
 (def local-storage-set-json common/local-storage-set-json)
+
+(defn apply-ui-theme
+  [_ _ theme-id]
+  (ui-theme/apply-theme-attribute! theme-id))
 
 (def schedule-animation-frame! common/schedule-animation-frame!)
 

@@ -13,13 +13,13 @@
                           "disabled:cursor-not-allowed"
                           "disabled:opacity-50"]
                          (if primary?
-                           ["border-[#50d2c1]"
-                            "bg-[#50d2c1]"
+                           ["border-ho-accent"
+                            "bg-ho-accent"
                             "text-[#041914]"
                             "hover:bg-[#6de3d5]"]
                            ["border-[#2f7f73]"
                             "bg-[#061b1f]"
-                            "text-[#97fce4]"
+                            "text-ho-accent-bright"
                             "hover:bg-[#0b262c]"]))
             :disabled disabled?
             :data-role role
@@ -45,10 +45,10 @@
                     "bg-[#071317]"
                     "px-3"
                     "text-sm"
-                    "text-[#f6fefd]"
+                    "text-ho-text"
                     "outline-none"
                     "placeholder:text-[#596568]"
-                    "focus:border-[#50d2c1]"]
+                    "focus:border-ho-accent"]
             :data-role id
             :on {:input [[:actions/set-referrals-form-field field [:event.target/value]]]}}]])
 
@@ -72,7 +72,7 @@
                   "border-[#1b3d40]"
                   "bg-[#071317]"
                   "p-4"
-                  "text-[#f6fefd]"
+                  "text-ho-text"
                   "shadow-2xl"]
           :data-role "referrals-modal"}
     [:div {:class ["mb-4" "flex" "items-start" "justify-between" "gap-3"]}
@@ -85,10 +85,10 @@
                        "rounded-lg"
                        "border"
                        "border-[#263338]"
-                       "bg-[#0f1a1f]"
+                       "bg-ho-bg"
                        "text-sm"
                        "text-[#b7d3d0]"
-                       "hover:text-[#ffffff]"]
+                       "hover:text-ho-text-hi"]
                :aria-label "Close referrals modal"
                :data-role "referrals-modal-close"
                :on {:click [[:actions/close-referrals-modal]]}}
@@ -98,7 +98,7 @@
 (defn- modal-error
   [last-error]
   (when last-error
-    [:div {:class ["rounded-lg" "border" "border-[#7a2836]" "bg-[#2b1118]" "px-3" "py-2" "text-sm" "text-[#ff9db2]"]
+    [:div {:class ["rounded-lg" "border" "border-[#7a2836]" "bg-ho-sell-soft-deep" "px-3" "py-2" "text-sm" "text-[#ff9db2]"]
            :data-role "referrals-modal-error"}
      last-error]))
 
@@ -124,10 +124,10 @@
          "Confirm the normalized code below before signing. This updates referral settings for your master account only."
          "Enter the referral code exactly as you want it submitted for this master account.")]
       (when (seq code)
-        [:div {:class ["rounded-lg" "border" "border-[#1b2429]" "bg-[#0f1a1f]" "p-3"]}
+        [:div {:class ["rounded-lg" "border" "border-ho-surface" "bg-ho-bg" "p-3"]}
          [:div {:class ["text-xs" "uppercase" "tracking-[0.08em]" "text-[#878c8f]"]}
           "Normalized Code"]
-         [:div {:class ["mt-1" "text-xl" "num" "text-[#ffffff]"]
+         [:div {:class ["mt-1" "text-xl" "num" "text-ho-text-hi"]
                 :data-role "referrals-modal-normalized-code"}
           code]])
       (modal-code-field {:id "referrals-modal-code-input"
@@ -186,13 +186,13 @@
    [:div {:class ["space-y-4"]}
     [:p {:class ["text-sm" "leading-5" "text-[#b7d3d0]"]}
      "Share this Hyperopen join link with traders you refer."]
-    [:div {:class ["rounded-lg" "border" "border-[#1b2429]" "bg-[#0f1a1f]" "p-3"]}
+    [:div {:class ["rounded-lg" "border" "border-ho-surface" "bg-ho-bg" "p-3"]}
      [:div {:class ["text-xs" "uppercase" "tracking-[0.08em]" "text-[#878c8f]"]}
       "Referral Code"]
-     [:div {:class ["mt-1" "text-xl" "num" "text-[#ffffff]"]
+     [:div {:class ["mt-1" "text-xl" "num" "text-ho-text-hi"]
             :data-role "referrals-modal-own-code"}
       (or referral-code "Unavailable")]]
-    [:div {:class ["rounded-lg" "border" "border-[#1b2429]" "bg-[#0f1a1f]" "p-3"]}
+    [:div {:class ["rounded-lg" "border" "border-ho-surface" "bg-ho-bg" "p-3"]}
      [:div {:class ["text-xs" "uppercase" "tracking-[0.08em]" "text-[#878c8f]"]}
       "Join Link"]
      [:div {:class ["mt-1" "break-all" "text-sm" "text-[#d3f5ef]"]
@@ -215,10 +215,10 @@
      [:div {:class ["space-y-4"]}
       [:p {:class ["text-sm" "leading-5" "text-[#b7d3d0]"]}
        "Claimable rewards are transferred to your spot balance after the exchange accepts the signed action."]
-      [:div {:class ["rounded-lg" "border" "border-[#1b2429]" "bg-[#0f1a1f]" "p-3"]}
+      [:div {:class ["rounded-lg" "border" "border-ho-surface" "bg-ho-bg" "p-3"]}
        [:div {:class ["text-xs" "uppercase" "tracking-[0.08em]" "text-[#878c8f]"]}
         "Claimable Rewards"]
-       [:div {:class ["mt-1" "text-2xl" "num" "text-[#ffffff]"]
+       [:div {:class ["mt-1" "text-2xl" "num" "text-ho-text-hi"]
               :data-role "referrals-modal-claim-total"}
         (:claimable-label rewards)]]
       (when (seq (:rows rewards))
@@ -228,7 +228,7 @@
            [:div {:class ["flex" "items-center" "justify-between" "gap-3" "text-sm"]
                   :data-role "referrals-modal-claim-row"}
             [:span {:class ["text-[#b7d3d0]"]} token]
-            [:span {:class ["num" "text-[#f6fefd]"]}
+            [:span {:class ["num" "text-ho-text"]}
              "Claimable " unclaimed " | Claimed " claimed]])])
       (modal-error last-error)
       (disabled-reason mutation-blocked-message)

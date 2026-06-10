@@ -101,7 +101,7 @@
                             "text-xs"
                             "transition-colors"]
                            (if (= option-token selected-token)
-                             ["bg-[#123a36]" "text-[#97fce4]"]
+                             ["bg-[#123a36]" "text-ho-accent-bright"]
                              ["text-[#9fb4bb]" "hover:bg-[#0d252f]" "hover:text-trading-text"]))
               :data-role (str data-role-prefix "-option-" option-token)
               :on {:click [[:actions/set-vaults-snapshot-range value]]}}
@@ -141,7 +141,7 @@
                        "gap-1.5"
                        "rounded-md"
                        "border"
-                       "border-[#1f3b3c]"
+                       "border-ho-border-accent"
                        "bg-[#071e25]"
                        "px-2.5"
                        "text-xs"
@@ -179,7 +179,7 @@
                     "min-w-[140px]"
                     "rounded-xl"
                     "border"
-                    "border-[#1f3b3c]"
+                    "border-ho-border-accent"
                     "bg-[#071e25]"
                     "p-2"
                     "shadow-2xl"]
@@ -273,7 +273,7 @@
   (let [candidates* (vec (or candidates []))]
     [:div {:class ["relative" "w-[320px]"]
            :data-role "vault-detail-returns-benchmark-selector"}
-     [:div {:class ["rounded-md" "border" "border-[#1f3b3c]" "bg-[#071e25]" "px-2"]}
+     [:div {:class ["rounded-md" "border" "border-ho-border-accent" "bg-[#071e25]" "px-2"]}
       [:input {:id "vault-detail-returns-benchmark-search"
                :class ["h-9"
                        "w-full"
@@ -305,7 +305,7 @@
                       "overflow-y-auto"
                       "rounded-md"
                       "border"
-                      "border-[#1f3b3c]"
+                      "border-ho-border-accent"
                       "bg-[#081f29]"
                       "p-1"
                       "spectate-lg"
@@ -322,7 +322,7 @@
     (when (seq chips)
       [:div {:class ["rounded-md"
                      "border"
-                     "border-[#1f3b3c]"
+                     "border-ho-border-accent"
                      "bg-[#081f29]"
                      "p-1.5"
                      "spectate-md"]
@@ -416,7 +416,7 @@
                        "border-[#1b393a]"
                        "bg-[#071820]"
                        "p-3"]}
-     [:div {:class ["flex" "flex-wrap" "items-center" "justify-between" "gap-2" "border-b" "border-[#1f3b3c]" "pb-2"]}
+     [:div {:class ["flex" "flex-wrap" "items-center" "justify-between" "gap-2" "border-b" "border-ho-border-accent" "pb-2"]}
       [:div {:class ["flex" "items-center" "gap-2"]}
        (for [{:keys [value label]} (:series-tabs chart)]
          ^{:key (str "chart-series-" (name value))}
@@ -452,14 +452,14 @@
                        "top-0"
                        "bottom-0"
                        "border-l"
-                       "border-[#1f3b3c]"]}]
+                       "border-ho-border-accent"]}]
         (for [{:keys [y-ratio]} y-ticks]
           ^{:key (str "vault-chart-axis-tick-" y-ratio)}
           [:div {:class ["absolute"
                          "right-0"
                          "w-1.5"
                          "border-t"
-                         "border-[#1f3b3c]"]
+                         "border-ho-border-accent"]
                  :style {:top (str (* 100 y-ratio) "%")}}])]
        [:div {:class ["absolute" "right-2" "top-0" "bottom-0" "cursor-crosshair"]
               :style {:left (str plot-left "px")}

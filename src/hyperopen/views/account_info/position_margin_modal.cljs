@@ -124,16 +124,16 @@
   ["outline-none"
    "transition-[border-color,box-shadow]"
    "duration-150"
-   "hover:border-[#6f7a88]"
+   "hover:border-ho-text-dim"
    "hover:ring-1"
-   "hover:ring-[#6f7a88]/30"
+   "hover:ring-ho-text-dim/30"
    "hover:ring-offset-0"
    "focus:outline-none"
    "focus:ring-1"
-   "focus:ring-[#8a96a6]/40"
+   "focus:ring-ho-text-muted/40"
    "focus:ring-offset-0"
    "focus:shadow-none"
-   "focus:border-[#8a96a6]"])
+   "focus:border-ho-text-muted"])
 
 (defn- select-input-value!
   [event]
@@ -182,7 +182,7 @@
                       "hover:text-gray-100"
                       "focus:outline-none"
                       "focus:ring-1"
-                      "focus:ring-[#8a96a6]/40"
+                      "focus:ring-ho-text-muted/40"
                       "focus:ring-offset-0"
                       "focus:shadow-none"]
               :on {:click [[:actions/set-position-margin-amount-to-max]]}}
@@ -301,7 +301,7 @@
                             "transition-colors"
                             "focus:outline-none"
                             "focus:ring-1"
-                            "focus:ring-[#8a96a6]/40"
+                            "focus:ring-ho-text-muted/40"
                             "focus:ring-offset-0"
                             "focus:shadow-none"]
                            (if disabled?
@@ -325,7 +325,7 @@
                     "justify-center"
                     "rounded-lg"
                     "border"
-                    "border-[#17313d]"
+                    "border-ho-border-accent-muted"
                     "bg-[#0b181d]"
                     "text-gray-300"
                     "transition-colors"
@@ -333,7 +333,7 @@
                     "hover:text-gray-100"
                     "focus:outline-none"
                     "focus:ring-1"
-                    "focus:ring-[#66e3c5]/40"
+                    "focus:ring-ho-accent-hi/40"
                     "focus:ring-offset-0"
                     "focus:shadow-none"]
             :aria-label "Close margin sheet"
@@ -387,7 +387,7 @@
                                       "transition-colors"
                                       "focus:outline-none"
                                       "focus:ring-1"
-                                      "focus:ring-[#8a96a6]/40"
+                                      "focus:ring-ho-text-muted/40"
                                       "focus:ring-offset-0"
                                       "focus:shadow-none"]
                                      (if submit-enabled?
@@ -410,7 +410,7 @@
                (mode-toggle-button :remove mode remove-disabled?)]]
 
              (when (seq (:error modal*))
-               [:div {:class ["text-xs" "text-[#ED7088]"]}
+               [:div {:class ["text-xs" "text-ho-sell-hi"]}
                 (:error modal*)])]]
         (if mobile-sheet?
           [:div {:class ["fixed" "inset-0" "z-[250]"]
@@ -431,8 +431,8 @@
                                 "overflow-y-auto"
                                 "rounded-t-[22px]"
                                 "border"
-                                "border-[#17313d]"
-                                "bg-[#06131a]"
+                                "border-ho-border-accent-muted"
+                                "bg-ho-bg-deep"
                                 "px-4"
                                 "pt-4"
                                 "text-sm"

@@ -18,13 +18,13 @@
                            "transition-colors"
                            "focus:outline-none"
                            "focus:ring-2"
-                           "focus:ring-[#66e3c5]/50"
+                           "focus:ring-ho-accent-hi/50"
                            "focus:ring-offset-0"]
                           (if active?
                             ["border-[#2c5d5a]"
-                             "bg-[#0d3a35]"
+                             "bg-ho-accent-soft"
                              "text-[#daf3ef]"
-                             "hover:bg-[#115046]"]
+                             "hover:bg-ho-accent-soft-hi"]
                             ["border-base-300"
                              "bg-base-100"
                              "text-white"

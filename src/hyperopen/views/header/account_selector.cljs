@@ -126,7 +126,7 @@
                            "focus:outline-none"
                            "focus-visible:bg-white/[0.05]"]
                           (if selected?
-                            ["text-[#97fce4]"]
+                            ["text-ho-accent-bright"]
                             ["text-white"]))
              :on {:click action}}
     [:span {:class ["min-w-0" "truncate" "font-medium"]} label]
@@ -152,7 +152,7 @@
                      "text-[#56dcca]"
                      "transition-colors"
                      "hover:bg-[#123a36]"
-                     "hover:text-[#97fce4]"
+                     "hover:text-ho-accent-bright"
                      "focus:outline-none"
                      "focus-visible:ring-1"
                      "focus-visible:ring-[#56dcca]"]

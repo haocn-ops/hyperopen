@@ -127,6 +127,8 @@
   (s/or :request-only (s/tuple ::api-submit-request)
         :request-and-path-values (s/tuple ::api-submit-request ::common/path-values)))
 
+(s/def ::set-ui-theme-args (s/tuple ::common/non-empty-string))
+
 (s/def ::action-id (s/and keyword?
                           #(= "actions" (namespace %))))
 
@@ -153,6 +155,7 @@
    :actions/set-confirm-open-orders-enabled ::common/boolean-args
    :actions/set-confirm-close-position-enabled ::common/boolean-args
    :actions/set-confirm-market-orders-enabled ::common/boolean-args
+   :actions/set-ui-theme ::set-ui-theme-args
    :actions/navigate-mobile-header-menu ::common/path-args
    :actions/open-spectate-mode-mobile-header-menu ::spectate-mode-open-args
    :actions/open-spectate-mode-modal ::spectate-mode-open-args

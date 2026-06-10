@@ -32,22 +32,22 @@
   ["outline-none"
    "transition-[border-color,box-shadow]"
    "duration-150"
-   "hover:border-[#6f7a88]"
+   "hover:border-ho-text-dim"
    "hover:ring-1"
-   "hover:ring-[#6f7a88]/30"
+   "hover:ring-ho-text-dim/30"
    "hover:ring-offset-0"
    "focus:outline-none"
    "focus:ring-1"
-   "focus:ring-[#8a96a6]/40"
+   "focus:ring-ho-text-muted/40"
    "focus:ring-offset-0"
    "focus:shadow-none"
-   "focus:border-[#8a96a6]"])
+   "focus:border-ho-text-muted"])
 
 (defn status-pill
   [status]
   (case status
     :active
-    [:span {:class ["text-xs" "font-normal" "leading-6" "text-[#97fce4]"]}
+    [:span {:class ["text-xs" "font-normal" "leading-6" "text-ho-accent-bright"]}
      "Active"]
 
     :jailed
@@ -90,15 +90,15 @@
   [label value data-role]
   [:div {:class ["rounded-[10px]"
                  "border"
-                 "border-[#1b2429]"
-                 "bg-[#0f1a1f]"
+                 "border-ho-surface"
+                 "bg-ho-bg"
                  "px-4"
                  "py-3"
                  "space-y-2"]
          :data-role data-role}
    [:div {:class ["text-sm" "leading-[15px]" "font-normal" "text-[#878c8f]"]}
     label]
-   [:div {:class ["text-[30px]" "sm:text-[34px]" "leading-none" "font-normal" "text-[#f6fefd]" "num"]}
+   [:div {:class ["text-[30px]" "sm:text-[34px]" "leading-none" "font-normal" "text-ho-text" "num"]}
     value]])
 
 (defn key-value-row
@@ -106,5 +106,5 @@
   [:div {:class ["flex" "items-start" "justify-between" "gap-3" "text-xs"]}
    [:span {:class ["text-[#9aa3a4]" "leading-[15px]"]}
     label]
-   [:span {:class ["num" "text-[#f6fefd]" "font-normal" "leading-[15px]"]}
+   [:span {:class ["num" "text-ho-text" "font-normal" "leading-[15px]"]}
     value]])

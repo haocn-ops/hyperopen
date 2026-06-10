@@ -454,7 +454,7 @@
         (is (contains? (set (get-in modal-node [1 :class])) "absolute"))
         (is (contains? (set (get-in modal-node [1 :class])) "bottom-0"))
         (is (contains? (set (get-in modal-node [1 :class])) "rounded-t-[22px]"))
-        (is (contains? (set (get-in modal-node [1 :class])) "bg-[#06131a]"))
+        (is (contains? (set (get-in modal-node [1 :class])) "bg-ho-bg-deep"))
         (is (= "true" (get-in modal-node [1 :data-funding-mobile-sheet-surface])))
         (is (= "funding-modal-title" (get-in modal-node [1 :aria-labelledby])))
         (is (fn? (get-in modal-node [1 :replicant/on-render])))

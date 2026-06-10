@@ -20,14 +20,14 @@
                              "focus:ring-0"
                              "focus:ring-offset-0"]
                             (if active?
-                              ["text-[#f6fefd]"]
+                              ["text-ho-text"]
                               ["text-[#949e9c]" "hover:text-[#c5d0ce]"]))
                :data-role (str "staking-sort-header-" (name column))
                :on {:click [[:actions/set-staking-validator-sort column]]}}
       [:span label]
       [:span {:class ["num"
                       (if active?
-                        "text-[#97fce4]"
+                        "text-ho-accent-bright"
                         "text-[#5f6d70]")]}
        indicator]]]))
 
@@ -56,7 +56,7 @@
                        "py-2"
                        "text-xs"
                        "leading-tight"
-                       "text-[#f6fefd]"
+                       "text-ho-text"
                        "whitespace-normal"
                        "opacity-0"
                        "transition-opacity"
@@ -79,7 +79,7 @@
   (let [selected? (and (seq validator)
                        (= validator selected-validator))]
     [:tr {:class (into ["border-b"
-                        "border-[#1b2429]"
+                        "border-ho-surface"
                         "text-xs"
                         "cursor-pointer"
                         "transition-colors"
@@ -88,18 +88,18 @@
                          ["bg-[#1a2c31]"]))
           :on {:click [[:actions/select-staking-validator validator]]}
           :data-role "staking-validator-row"}
-     [:td {:class ["px-3" "py-1.5" "font-normal" "text-[#f6fefd]"]}
+     [:td {:class ["px-3" "py-1.5" "font-normal" "text-ho-text"]}
       name]
      (validator-description-cell {:description description})
-     [:td {:class ["px-3" "py-1.5" "num" "text-[#f6fefd]"]} (shared/format-table-hype stake)]
-     [:td {:class ["px-3" "py-1.5" "num" "text-[#f6fefd]"]}
+     [:td {:class ["px-3" "py-1.5" "num" "text-ho-text"]} (shared/format-table-hype stake)]
+     [:td {:class ["px-3" "py-1.5" "num" "text-ho-text"]}
       (if (pos? (or your-stake 0))
         (shared/format-table-hype your-stake)
         "-")]
-     [:td {:class ["px-3" "py-1.5" "num" "text-[#f6fefd]"]} (shared/format-percent uptime-fraction)]
-     [:td {:class ["px-3" "py-1.5" "num" "text-[#f6fefd]"]} (shared/format-percent predicted-apr)]
+     [:td {:class ["px-3" "py-1.5" "num" "text-ho-text"]} (shared/format-percent uptime-fraction)]
+     [:td {:class ["px-3" "py-1.5" "num" "text-ho-text"]} (shared/format-percent predicted-apr)]
      [:td {:class ["px-3" "py-1.5"]} (shared/status-pill status)]
-     [:td {:class ["px-3" "py-1.5" "num" "text-[#f6fefd]"]} (shared/format-percent commission)]]))
+     [:td {:class ["px-3" "py-1.5" "num" "text-ho-text"]} (shared/format-percent commission)]]))
 
 (defn- validator-pagination
   [{:keys [validator-page
@@ -124,8 +124,8 @@
                      "py-2"
                      "text-sm"
                      "border-t"
-                     "border-[#1b2429]"
-                     "bg-[#0f1a1f]"]
+                     "border-ho-surface"
+                     "bg-ho-bg"]
              :data-role "staking-validator-pagination"}
        [:button {:type "button"
                  :class ["text-[#5ecfc1]"
@@ -137,8 +137,8 @@
                  :data-role "staking-validator-toggle-view-all"
                  :on {:click [[:actions/set-staking-validator-show-all toggle-target]]}}
         toggle-label]
-       [:div {:class ["flex" "items-center" "gap-2" "text-[#f6fefd]"]}
-        [:span {:class ["num" "text-sm" "text-[#f6fefd]"]}
+       [:div {:class ["flex" "items-center" "gap-2" "text-ho-text"]}
+        [:span {:class ["num" "text-sm" "text-ho-text"]}
          (str validator-page-range-start "-" validator-page-range-end " of " validators-total-count)]
         [:button {:type "button"
                   :class (into ["h-7"
@@ -154,8 +154,8 @@
                                 "focus:ring-0"
                                 "focus:ring-offset-0"]
                                (if can-prev?
-                                 ["border-[#2a3b42]" "text-[#f6fefd]" "hover:bg-[#14252e]"]
-                                 ["border-[#1b2429]" "text-[#4f5a5d]" "cursor-not-allowed"]))
+                                 ["border-[#2a3b42]" "text-ho-text" "hover:bg-[#14252e]"]
+                                 ["border-ho-surface" "text-[#4f5a5d]" "cursor-not-allowed"]))
                   :disabled (not can-prev?)
                   :data-role "staking-validator-page-prev"
                   :on {:click [[:actions/set-staking-validator-page prev-page]]}}
@@ -174,8 +174,8 @@
                                 "focus:ring-0"
                                 "focus:ring-offset-0"]
                                (if can-next?
-                                 ["border-[#2a3b42]" "text-[#f6fefd]" "hover:bg-[#14252e]"]
-                                 ["border-[#1b2429]" "text-[#4f5a5d]" "cursor-not-allowed"]))
+                                 ["border-[#2a3b42]" "text-ho-text" "hover:bg-[#14252e]"]
+                                 ["border-ho-surface" "text-[#4f5a5d]" "cursor-not-allowed"]))
                   :disabled (not can-next?)
                   :data-role "staking-validator-page-next"
                   :on {:click [[:actions/set-staking-validator-page next-page]]}}
@@ -206,14 +206,14 @@
                              "gap-1.5"
                              "rounded-lg"
                              "border"
-                             "border-[#1b2429]"
-                             "bg-[#0f1a1f]"
+                             "border-ho-surface"
+                             "bg-ho-bg"
                              "px-2.5"
                              "text-xs"
                              "font-normal"
-                             "text-[#f6fefd]"
+                             "text-ho-text"
                              "transition-colors"
-                             "hover:border-[#6f7a88]"]
+                             "hover:border-ho-text-dim"]
                             shared/neutral-input-focus-classes)
                :aria-expanded (boolean open?)
                :data-role "staking-timeframe-menu-trigger"
@@ -241,8 +241,8 @@
                           "overflow-hidden"
                           "rounded-[10px]"
                           "border"
-                          "border-[#1b2429]"
-                          "bg-[#0f1a1f]"
+                          "border-ho-surface"
+                          "bg-ho-bg"
                           "shadow-[0_14px_28px_rgba(0,0,0,0.45)]"
                           "transition-[opacity,transform]"
                           "duration-100"]
@@ -262,7 +262,7 @@
                                 "font-normal"
                                 "transition-colors"]
                                (if (= value selected-timeframe)
-                                 ["bg-[#122c37]" "text-[#f6fefd]"]
+                                 ["bg-[#122c37]" "text-ho-text"]
                                  ["text-[#c8d5d7]" "hover:bg-[#112733]"]))
                   :data-role (str "staking-timeframe-option-" (name value))
                   :on {:click [[:actions/set-staking-validator-timeframe value]]}}
@@ -284,10 +284,10 @@
          :data-role "staking-validator-panel"}
    [:div {:class ["min-h-0" "flex-1" "overflow-x-auto" "overflow-y-auto"]
           :data-role "staking-validator-table-scroll-region"}
-    [:table {:class ["min-w-full" "bg-[#0f1a1f]"]
+    [:table {:class ["min-w-full" "bg-ho-bg"]
              :data-role "staking-validator-table"}
      [:thead
-      [:tr {:class ["border-b" "border-[#1b2429]" "text-xs" "text-[#949e9c]"]}
+      [:tr {:class ["border-b" "border-ho-surface" "text-xs" "text-[#949e9c]"]}
        (sortable-validator-header "Name" :name validator-sort)
        (sortable-validator-header "Description" :description validator-sort)
        (sortable-validator-header "Stake" :stake validator-sort)

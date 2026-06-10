@@ -230,7 +230,7 @@
                                       "text-left"
                                       "focus:outline-none"
                                       "focus:ring-1"
-                                      "focus:ring-[#8a96a6]/40"
+                                      "focus:ring-ho-text-muted/40"
                                       "focus:ring-offset-0"
                                       "focus:shadow-none"]
                                      (concat table/header-base-text-classes

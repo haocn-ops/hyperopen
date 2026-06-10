@@ -5,12 +5,12 @@
 
   .asset-selector-search-input {
     height: 33px;
-    border: 1px solid #273035;
+    border: 1px solid rgb(var(--ho-surface-raised));
     border-radius: 8px;
     padding: 5px 12px 5px 10px;
     background: transparent;
-    color: #f6fefd;
-    caret-color: #f6fefd;
+    color: rgb(var(--ho-text));
+    caret-color: rgb(var(--ho-text));
     transition: background-color 0.2s ease-in-out, color 0.2s ease-in-out,
       border-color 0.2s ease-in-out;
   }
@@ -24,7 +24,7 @@
 
   .asset-selector-search-input:focus-visible {
     outline: none;
-    border-color: #66e3c5;
+    border-color: rgb(var(--ho-accent-hi));
     background: transparent;
     box-shadow: 0 0 0 1px rgb(102 227 197 / 0.38),
       0 0 0 4px rgb(102 227 197 / 0.12);

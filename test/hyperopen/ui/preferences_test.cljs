@@ -38,6 +38,58 @@
           (set! (.-document js/globalThis) orig-document)
           (js-delete js/globalThis "document"))))))
 
+(deftest restore-ui-theme-preference-uses-stored-valid-value-test
+  (let [orig-document (.-document js/globalThis)
+        had-document? (has-own? js/globalThis "document")
+        html-el (js-obj "dataset" (js-obj))
+        store (atom {})]
+    (try
+      (set! (.-document js/globalThis) (js-obj "documentElement" html-el))
+      (with-redefs [hyperopen.platform/local-storage-get (fn [_] " HyperDumb ")]
+        (is (= "hyperdumb" (preferences/restore-ui-theme-preference! store)))
+        (is (= "hyperdumb" (.. js/document -documentElement -dataset -theme)))
+        (is (= "hyperdumb" (get-in @store [:ui :theme]))))
+      (finally
+        (if had-document?
+          (set! (.-document js/globalThis) orig-document)
+          (js-delete js/globalThis "document"))))))
+
+(deftest restore-ui-theme-preference-falls-back-to-default-test
+  (let [orig-document (.-document js/globalThis)
+        had-document? (has-own? js/globalThis "document")
+        html-el (js-obj "dataset" (js-obj))
+        store (atom {})]
+    (try
+      (set! (.-document js/globalThis) (js-obj "documentElement" html-el))
+      (with-redefs [hyperopen.platform/local-storage-get (fn [_] "not-a-theme")]
+        (preferences/restore-ui-theme-preference! store)
+        (is (= "dark" (.. js/document -documentElement -dataset -theme)))
+        (is (= "dark" (get-in @store [:ui :theme]))))
+      (with-redefs [hyperopen.platform/local-storage-get (fn [_]
+                                                           (throw (js/Error. "boom")))]
+        (preferences/restore-ui-theme-preference! store)
+        (is (= "dark" (.. js/document -documentElement -dataset -theme))))
+      (finally
+        (if had-document?
+          (set! (.-document js/globalThis) orig-document)
+          (js-delete js/globalThis "document"))))))
+
+(deftest restore-ui-theme-preference-no-document-noop-test
+  (let [orig-document (.-document js/globalThis)
+        had-document? (has-own? js/globalThis "document")
+        calls (atom 0)]
+    (try
+      (js-delete js/globalThis "document")
+      (with-redefs [hyperopen.platform/local-storage-get (fn [_]
+                                                           (swap! calls inc)
+                                                           "hyperdumb")]
+        (preferences/restore-ui-theme-preference! (atom {}))
+        (is (= 0 @calls)))
+      (finally
+        (if had-document?
+          (set! (.-document js/globalThis) orig-document)
+          (js-delete js/globalThis "document"))))))
+
 (deftest restore-ui-font-preference-no-document-noop-test
   (let [orig-document (.-document js/globalThis)
         had-document? (has-own? js/globalThis "document")

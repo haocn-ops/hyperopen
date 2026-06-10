@@ -31,7 +31,7 @@
 (defn- entry-mode-tab-button-classes [active?]
   (into entry-mode-tab-button-base-classes
         (if active?
-          ["text-[#F6FEFD]"]
+          ["text-ho-text"]
           ["text-[#949E9C]" "hover:text-white"])))
 
 (defn entry-mode-tabs
@@ -58,7 +58,7 @@
                    "absolute"
                    "bottom-0"
                    "h-px"
-                   "bg-[#50D2C1]"]
+                   "bg-ho-accent"]
            :style {:left (get entry-mode-indicator-left entry-mode "0%")
                    :width "33.333333%"
                    :transition "left 0.3s ease"}}]
@@ -137,8 +137,8 @@
                           "leading-6"
                           "transition-colors"]
                          (if (= selected-unit unit)
-                           ["text-[#F6FEFD]"]
-                           ["text-[#949E9C]" "hover:text-[#F6FEFD]"]))
+                           ["text-ho-text"]
+                           ["text-[#949E9C]" "hover:text-ho-text"]))
             :role "option"
             :aria-selected (boolean (= selected-unit unit))
             :title (tpsl-policy/unit-menu-label unit)
@@ -162,7 +162,7 @@
     (if-not interactive?
       [:span {:class ["text-xs"
                       "font-normal"
-                      "text-[#F6FEFD]"]
+                      "text-ho-text"]
               :title (tpsl-policy/unit-menu-label selected-unit)}
        selected-label]
       [:div {:class ["relative" "flex" "items-center"]
@@ -189,7 +189,7 @@
                          "font-normal"
                          "leading-4"
                          "whitespace-nowrap"
-                         "text-[#F6FEFD]"
+                         "text-ho-text"
                          "outline-none"
                          "focus:outline-none"
                          "focus:ring-0"
@@ -228,8 +228,8 @@
                         "min-w-[136px]"
                         "rounded-lg"
                         "border"
-                        "border-[#273035]"
-                        "bg-[#1B2429]"
+                        "border-ho-surface-raised"
+                        "bg-ho-surface"
                         "px-2"
                         "py-1"
                         "spectate-[0_8px_16px_rgba(0,0,0,0.25)]"]
@@ -320,8 +320,8 @@
                           "leading-6"
                           "transition-colors"]
                          (if (= selected-tif tif)
-                           ["text-[#F6FEFD]"]
-                           ["text-[#949E9C]" "hover:text-[#F6FEFD]"]))
+                           ["text-ho-text"]
+                           ["text-[#949E9C]" "hover:text-ho-text"]))
             :role "option"
             :aria-selected (boolean (= selected-tif tif))
             :on {:click (on-select-tif tif)}}
@@ -362,7 +362,7 @@
                        "transition-colors"
                        "duration-200"
                        "ease-in-out"
-                       "hover:text-[#F6FEFD]"
+                       "hover:text-ho-text"
                        "outline-none"
                        "focus:outline-none"
                        "focus:ring-0"
@@ -399,8 +399,8 @@
                     "min-w-[46px]"
                     "rounded-lg"
                     "border"
-                    "border-[#273035]"
-                    "bg-[#1B2429]"
+                    "border-ho-surface-raised"
+                    "bg-ho-surface"
                     "px-2"
                     "py-1"
                     "spectate-[0_8px_16px_rgba(0,0,0,0.25)]"]

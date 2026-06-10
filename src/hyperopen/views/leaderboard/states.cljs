@@ -90,7 +90,7 @@
    [:div {:class ["rounded-lg"
                   "border"
                   "border-[#7a2836]/70"
-                  "bg-[#2b1118]/80"
+                  "bg-ho-sell-soft-deep/80"
                   "px-4"
                   "py-4"]}
     [:p {:class ["text-sm" "text-[#ffb0c0]"]}

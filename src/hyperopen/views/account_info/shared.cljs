@@ -203,7 +203,7 @@
    "border"
    "bg-[#242924]"
    "text-emerald-300"
-   "border-[#273035]"])
+   "border-ho-surface-raised"])
 
 (def position-short-chip-classes
   ["px-3"
@@ -215,7 +215,7 @@
    "border"
    "bg-[#242924]"
    "text-red-300"
-   "border-[#273035]"])
+   "border-ho-surface-raised"])
 
 (defn position-chip-classes-for-side [side]
   (case side

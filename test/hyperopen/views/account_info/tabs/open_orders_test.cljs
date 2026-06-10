@@ -90,7 +90,7 @@
     (is (contains? cancel-button-classes "text-trading-red"))
     (is (contains? cancel-button-classes "min-h-6"))
     (is (contains? cancel-button-classes "w-full"))
-    (is (contains? cancel-button-classes "hover:text-[#f2b8c5]"))
+    (is (contains? cancel-button-classes "hover:text-ho-sell-tint"))
     (is (= [[:actions/confirm-cancel-visible-open-orders [sol-short-newer
                                                            sol-short-older]
              :event.currentTarget/bounds]]

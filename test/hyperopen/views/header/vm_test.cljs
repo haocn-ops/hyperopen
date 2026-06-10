@@ -69,7 +69,7 @@
         market-orders-row (row-by-id sections :confirmations :confirm-market-orders)
         sound-row (row-by-id sections :alerts :sound-on-fill)
         fill-markers-row (row-by-id sections :display :fill-markers)]
-    (is (= [:session :confirmations :alerts :display]
+    (is (= [:session :confirmations :alerts :display :appearance]
            (mapv :id sections)))
     (is (= "trading-settings-storage-mode-row" (:data-role session-row)))
     (is (= "These settings live on this device only."
@@ -95,6 +95,30 @@
     (is (= [[:actions/set-sound-on-fill-enabled true]]
            (:on-change sound-row)))
     (is (= "Fill markers" (:title fill-markers-row)))))
+
+(deftest header-vm-projects-theme-choice-row-test
+  (let [result (vm/header-vm {:ui {:theme "institutional"}
+                              :header-ui {:settings-open? true}})
+        sections (get-in result [:settings :sections])
+        theme-row (row-by-id sections :appearance :ui-theme)]
+    (is (= :choice (:kind theme-row)))
+    (is (= "trading-settings-ui-theme-row" (:data-role theme-row)))
+    (is (= ["dark" "institutional" "hyperdumb"]
+           (mapv :value (:options theme-row))))
+    (is (= ["HyperOpen" "Institutional" "HyperDumb"]
+           (mapv :label (:options theme-row))))
+    (is (= [false true false]
+           (mapv :active? (:options theme-row))))
+    (is (= [[:actions/set-ui-theme "hyperdumb"]]
+           (-> theme-row :options (nth 2) :action)))))
+
+(deftest header-vm-theme-choice-defaults-to-dark-test
+  (let [result (vm/header-vm {:header-ui {:settings-open? true}})
+        theme-row (row-by-id (get-in result [:settings :sections])
+                             :appearance
+                             :ui-theme)]
+    (is (= [true false false]
+           (mapv :active? (:options theme-row))))))
 
 (deftest header-vm-projects-passkey-session-toggle-when-remembered-session-is-enabled-test
   (let [result (vm/header-vm {:wallet {:agent {:storage-mode :local

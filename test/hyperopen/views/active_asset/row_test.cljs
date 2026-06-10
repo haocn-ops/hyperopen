@@ -259,10 +259,9 @@
         (is (= [[:actions/set-outcome-option-query [:event.target/value]]]
                (get-in search-input [1 :on :input])))
         (is (support/contains-class? menu "w-[min(42rem,calc(100vw-2rem))]"))
-        (is (support/contains-class? menu "bg-[#0B151A]"))
+        (is (support/contains-class? menu "bg-ho-bg-deep"))
         (is (support/contains-class? menu "z-[280]"))
-        (is (= {:background-color "#0B151A"
-                :width "min(42rem, calc(100vw - 2rem))"
+        (is (= {:width "min(42rem, calc(100vw - 2rem))"
                 :max-width "calc(100vw - 2rem)"}
                (get-in menu [1 :style])))
         (is (= {:z-index 260}

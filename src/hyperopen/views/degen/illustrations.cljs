@@ -1,75 +1,127 @@
 (ns hyperopen.views.degen.illustrations
-  "Original line-art mascots for the degen experience, drawn as inline SVG.
+  "Original full-color mascots for the degen experience, drawn as inline
+   SVG. No third-party artwork or binary assets — the cast is drawn from
+   scratch in code.
 
-   Single-color stroke art on purpose: every character inherits
-   `currentColor` from a `text-ho-*` token class on its wrapper, so the
-   cast restyles with the theme and the color-literal ratchet stays
-   clean. No binary assets, no third-party artwork.")
+   Illustration colors are intentionally hardcoded: per docs/THEMING.md,
+   illustrations are not a theme concern, so this namespace carries a
+   dev/theme_color_baseline.edn entry instead of semantic tokens. The
+   feeling-gauge dial is UI (not a character) and stays token-colored."
+  )
 
-(def ^:private stroke-attrs
-  {:stroke "currentColor"
-   :stroke-width "4"
-   :stroke-linecap "round"
-   :stroke-linejoin "round"
-   :fill "none"})
+;; character palette (illustration-only, see ns docstring)
+(def ^:private ink "#1c2127")
+(def ^:private frog-green "#4fa353")
+(def ^:private frog-dark "#2c5a31")
+(def ^:private eye-white "#f6f3e8")
+(def ^:private lip-red "#c0563f")
+(def ^:private lip-dark "#8e3527")
+(def ^:private shirt-blue "#2e5d8f")
+(def ^:private shiba-tan "#e0aa5e")
+(def ^:private shiba-dark "#8a5a25")
+(def ^:private shiba-cream "#f7e7c3")
+(def ^:private whale-blue "#5ba7e6")
+(def ^:private whale-belly "#d9ecfb")
+(def ^:private whale-dark "#2c4a66")
+(def ^:private shade-black "#14171c")
 
 (defn pepe
-  "Wide-mouthed frog face. Wrap in a text-ho-buy (or similar) element."
+  "Smug full-color frog, head and shirt collar."
   [size-class]
-  [:svg {:viewBox "0 0 100 90"
+  [:svg {:viewBox "0 0 120 104"
          :class [size-class]
          :role "img"
          :aria-label "smug frog mascot"
          :fill "none"}
+   ;; shirt collar behind the chin
+   [:path {:d "M12 97 C 34 83, 86 83, 108 97 L 108 104 L 12 104 Z"
+           :fill shirt-blue}]
+   ;; head
+   [:ellipse {:cx "60" :cy "60" :rx "50" :ry "37"
+              :fill frog-green :stroke frog-dark :stroke-width "3"}]
    ;; eye domes
-   [:path (merge stroke-attrs {:d "M14 34 C 14 18, 42 18, 42 32"})]
-   [:path (merge stroke-attrs {:d "M46 32 C 46 16, 76 16, 76 32"})]
-   ;; pupils, heavy lids
-   [:circle {:cx "30" :cy "29" :r "3.5" :fill "currentColor"}]
-   [:circle {:cx "62" :cy "28" :r "3.5" :fill "currentColor"}]
-   [:path (merge stroke-attrs {:d "M18 26 L 40 24"})]
-   [:path (merge stroke-attrs {:d "M50 24 L 72 22"})]
-   ;; head outline
-   [:path (merge stroke-attrs
-                 {:d "M14 34 C 4 44, 6 64, 18 72 C 34 82, 66 82, 82 72 C 94 64, 94 44, 76 32"})]
-   ;; wide lips
-   [:path (merge stroke-attrs {:d "M16 58 C 40 70, 64 70, 86 56"})]
-   [:path (merge stroke-attrs {:d "M20 64 C 42 74, 62 74, 82 62"})]
+   [:ellipse {:cx "38" :cy "30" :rx "17" :ry "14"
+              :fill frog-green :stroke frog-dark :stroke-width "3"}]
+   [:ellipse {:cx "82" :cy "28" :rx "17" :ry "14"
+              :fill frog-green :stroke frog-dark :stroke-width "3"}]
+   ;; eye whites under heavy lids
+   [:ellipse {:cx "38" :cy "35" :rx "13" :ry "8.5" :fill eye-white}]
+   [:ellipse {:cx "82" :cy "33" :rx "13" :ry "8.5" :fill eye-white}]
+   ;; lid edges
+   [:path {:d "M23 31 Q 38 37 53 31"
+           :stroke frog-dark :stroke-width "2.5" :stroke-linecap "round"}]
+   [:path {:d "M67 29 Q 82 35 97 29"
+           :stroke frog-dark :stroke-width "2.5" :stroke-linecap "round"}]
+   ;; pupils
+   [:circle {:cx "41" :cy "37" :r "3.4" :fill ink}]
+   [:circle {:cx "85" :cy "35" :r "3.4" :fill ink}]
    ;; nostrils
-   [:circle {:cx "44" :cy "44" :r "1.8" :fill "currentColor"}]
-   [:circle {:cx "54" :cy "44" :r "1.8" :fill "currentColor"}]])
+   [:ellipse {:cx "53" :cy "57" :rx "1.8" :ry "1.2" :fill frog-dark}]
+   [:ellipse {:cx "63" :cy "56.5" :rx "1.8" :ry "1.2" :fill frog-dark}]
+   ;; wide smug lips
+   [:path {:d "M14 68 C 40 80, 84 80, 106 62 C 107.5 66, 106.5 69.5, 104 72 C 82 87, 38 87, 15.5 74 Z"
+           :fill lip-red :stroke lip-dark :stroke-width "2.5"
+           :stroke-linejoin "round"}]
+   [:path {:d "M17 72.5 C 43 84.5, 81 84.5, 103 67"
+           :stroke lip-dark :stroke-width "2" :stroke-linecap "round"}]])
 
 (defn doge
-  "Shiba face; `:shades?` adds dealer sunglasses (Shill of the Day)."
+  "Full-color shiba face; `:shades?` swaps the eyes for dealer shades
+   (Shill of the Day)."
   ([size-class] (doge size-class {}))
   ([size-class {:keys [shades?]}]
-   [:svg {:viewBox "0 0 100 96"
+   [:svg {:viewBox "0 0 120 110"
           :class [size-class]
           :role "img"
           :aria-label "shiba mascot"
           :fill "none"}
     ;; ears
-    [:path (merge stroke-attrs {:d "M22 30 L 16 6 L 40 18"})]
-    [:path (merge stroke-attrs {:d "M78 30 L 84 6 L 60 18"})]
+    [:path {:d "M30 36 L 22 8 L 54 24 Z"
+            :fill shiba-tan :stroke shiba-dark :stroke-width "3"
+            :stroke-linejoin "round"}]
+    [:path {:d "M90 36 L 98 8 L 66 24 Z"
+            :fill shiba-tan :stroke shiba-dark :stroke-width "3"
+            :stroke-linejoin "round"}]
+    [:path {:d "M34 28 L 30 16 L 46 24 Z" :fill shiba-cream}]
+    [:path {:d "M86 28 L 90 16 L 74 24 Z" :fill shiba-cream}]
     ;; head
-    [:path (merge stroke-attrs
-                  {:d "M22 30 C 8 44, 10 70, 28 82 C 42 90, 58 90, 72 82 C 90 70, 92 44, 78 30 C 64 18, 36 18, 22 30"})]
+    [:ellipse {:cx "60" :cy "66" :rx "46" :ry "38"
+               :fill shiba-tan :stroke shiba-dark :stroke-width "3"}]
+    ;; muzzle and cheeks
+    [:ellipse {:cx "60" :cy "80" :rx "28" :ry "19" :fill shiba-cream}]
+    [:ellipse {:cx "25" :cy "66" :rx "9" :ry "7" :fill shiba-cream}]
+    [:ellipse {:cx "95" :cy "66" :rx "9" :ry "7" :fill shiba-cream}]
     (if shades?
-      ;; one-bar dealer shades
-      [:path (merge stroke-attrs
-                    {:d "M16 42 L 84 40 M26 42 L 28 52 C 28 56, 42 56, 42 50 L 42 42 M58 41 L 58 50 C 58 56, 72 55, 72 51 L 71 41"})]
+      ;; dealer shades
       [:g
-       [:circle {:cx "36" :cy "46" :r "3.5" :fill "currentColor"}]
-       [:circle {:cx "64" :cy "46" :r "3.5" :fill "currentColor"}]
-       [:path (merge stroke-attrs {:d "M28 38 L 42 40 M58 40 L 72 38"})]])
-    ;; snout + cheeks
-    [:circle {:cx "50" :cy "62" :r "3" :fill "currentColor"}]
-    [:path (merge stroke-attrs {:d "M50 66 C 46 72, 42 72, 40 70 M50 66 C 54 72, 58 72, 60 70"})]
-    [:circle {:cx "26" :cy "62" :r "1.6" :fill "currentColor"}]
-    [:circle {:cx "74" :cy "62" :r "1.6" :fill "currentColor"}]]))
+       [:rect {:x "26" :y "46" :width "31" :height "13" :rx "4" :fill shade-black}]
+       [:rect {:x "63" :y "46" :width "31" :height "13" :rx "4" :fill shade-black}]
+       [:path {:d "M57 51 L 63 51 M26 52 L 18 48 M94 52 L 102 48"
+               :stroke shade-black :stroke-width "3" :stroke-linecap "round"}]
+       [:path {:d "M31 50 L 38 50" :stroke "#5b6470" :stroke-width "2"
+               :stroke-linecap "round"}]]
+      ;; concerned doge eyes and brows
+      [:g
+       [:path {:d "M34 46 Q 40 42 46 45"
+               :stroke ink :stroke-width "3" :stroke-linecap "round"}]
+       [:path {:d "M74 45 Q 80 42 86 46"
+               :stroke ink :stroke-width "3" :stroke-linecap "round"}]
+       [:circle {:cx "40" :cy "54" :r "4.5" :fill ink}]
+       [:circle {:cx "80" :cy "54" :r "4.5" :fill ink}]
+       [:circle {:cx "41.5" :cy "52.5" :r "1.4" :fill eye-white}]
+       [:circle {:cx "81.5" :cy "52.5" :r "1.4" :fill eye-white}]])
+    ;; nose and mouth
+    [:path {:d "M55 71 Q 60 69 65 71 Q 64 77 60 78 Q 56 77 55 71 Z" :fill ink}]
+    [:path {:d "M60 79 Q 58 85 52 85 M60 79 Q 62 85 68 85"
+            :stroke ink :stroke-width "2.5" :stroke-linecap "round"}]
+    ;; whisker dots
+    [:circle {:cx "44" :cy "86" :r "1.1" :fill shiba-dark}]
+    [:circle {:cx "48" :cy "91" :r "1.1" :fill shiba-dark}]
+    [:circle {:cx "72" :cy "91" :r "1.1" :fill shiba-dark}]
+    [:circle {:cx "76" :cy "86" :r "1.1" :fill shiba-dark}]]))
 
 (defn whale
-  "Round whale with a spout and shades (Whale Watch)."
+  "Full-color whale with a spout and shades (Whale Watch)."
   [size-class]
   [:svg {:viewBox "0 0 120 90"
          :class [size-class]
@@ -77,19 +129,27 @@
          :aria-label "whale mascot"
          :fill "none"}
    ;; spout
-   [:path (merge stroke-attrs {:d "M44 18 C 40 10, 32 8, 26 10 M44 18 C 44 8, 52 4, 58 6"})]
-   ;; body
-   [:path (merge stroke-attrs
-                 {:d "M16 50 C 14 30, 36 22, 56 26 C 84 30, 96 44, 98 56 C 99 66, 92 74, 80 76 C 56 80, 24 76, 16 62 Z"})]
+   [:path {:d "M44 18 C 40 10, 32 8, 26 10 M44 18 C 44 8, 52 4, 58 6"
+           :stroke whale-blue :stroke-width "4" :stroke-linecap "round"}]
    ;; tail
-   [:path (merge stroke-attrs {:d "M98 56 C 106 50, 112 48, 116 50 C 113 56, 113 62, 116 68 C 108 68, 102 64, 98 60"})]
-   ;; belly lines
-   [:path (merge stroke-attrs {:d "M22 62 C 36 70, 56 72, 74 70" :stroke-width "3"})]
+   [:path {:d "M98 56 C 106 50, 112 48, 116 50 C 113 56, 113 62, 116 68 C 108 68, 102 64, 98 60 Z"
+           :fill whale-blue :stroke whale-dark :stroke-width "3"
+           :stroke-linejoin "round"}]
+   ;; body
+   [:path {:d "M16 50 C 14 30, 36 22, 56 26 C 84 30, 96 44, 98 56 C 99 66, 92 74, 80 76 C 56 80, 24 76, 16 62 Z"
+           :fill whale-blue :stroke whale-dark :stroke-width "3"
+           :stroke-linejoin "round"}]
+   ;; belly
+   [:path {:d "M20 62 C 36 72, 62 74, 80 70 C 72 77, 40 78, 22 68 Z"
+           :fill whale-belly}]
    ;; shades
-   [:path (merge stroke-attrs
-                 {:d "M28 40 L 62 38 M32 40 L 33 47 C 33 51, 44 51, 44 46 L 44 39 M50 39 L 50 46 C 50 51, 60 50, 60 46 L 59 38"})]
+   [:rect {:x "28" :y "38" :width "15" :height "10" :rx "3" :fill shade-black}]
+   [:rect {:x "47" :y "37" :width "15" :height "10" :rx "3" :fill shade-black}]
+   [:path {:d "M43 42 L 47 42 M62 41 L 70 39"
+           :stroke shade-black :stroke-width "2.5" :stroke-linecap "round"}]
    ;; smile
-   [:path (merge stroke-attrs {:d "M30 54 C 36 58, 44 58, 50 55" :stroke-width "3"})]])
+   [:path {:d "M30 56 C 36 60, 44 60, 50 57"
+           :stroke whale-dark :stroke-width "2.5" :stroke-linecap "round"}]])
 
 (defn gauge-angle
   "Needle angle in degrees for unrealized PNL; +/-75 full scale at +/-$500,
@@ -103,7 +163,8 @@
 
 (defn feeling-gauge-dial
   "Semicircular sell->warn->buy gauge; needle position derives from real
-   PNL via gauge-angle. Token classes color the arc segments."
+   PNL via gauge-angle. Token classes color the arc segments (this is UI
+   chrome, not a character, so it stays themeable)."
   [unrealized-pnl]
   (let [angle (gauge-angle unrealized-pnl)]
     [:svg {:viewBox "0 0 100 58"

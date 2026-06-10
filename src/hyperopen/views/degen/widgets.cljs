@@ -130,7 +130,7 @@
                    :value (equity-format/display-currency
                            (:account-value-display metrics))
                    :hint "(number, allegedly)"
-                   :icon [:span {:class ["text-ho-buy" "shrink-0"]}
+                   :icon [:span {:class ["shrink-0"]}
                           (illustrations/pepe "w-9")]})
        (stat-card {:data-role "degen-stat-pnl"
                    :label "Unrealized P&L (pray)"
@@ -339,7 +339,7 @@
                      :title "Shill of the Day 🗣️"}
                     (if shill
                       [:div {:class ["flex" "items-start" "gap-2"]}
-                       [:span {:class ["text-ho-warn" "shrink-0" "pt-0.5"]}
+                       [:span {:class ["shrink-0" "pt-0.5"]}
                         (illustrations/doge "w-10" {:shades? true})]
                        [:div {:class ["flex" "flex-col" "gap-1"]}
                         [:button {:type "button"
@@ -363,7 +363,7 @@
                      :border-class "border-ho-info"
                      :title "Whale Watch 🐋"}
                     [:div {:class ["flex" "items-start" "gap-2"]}
-                     [:span {:class ["text-ho-info" "shrink-0"]}
+                     [:span {:class ["shrink-0"]}
                       (illustrations/whale "w-12")]
                      [:div {:class ["flex" "flex-col" "gap-1"]}
                       [:p {:class ["text-xs" "text-ho-text-secondary" "leading-relaxed"]}
@@ -373,7 +373,7 @@
        (widget-card {:data-role "degen-widget-motivation"
                      :title "Daily Motivation 🐕"}
                     [:div {:class ["flex" "items-start" "gap-2"]}
-                     [:span {:class ["text-ho-warn" "shrink-0"]}
+                     [:span {:class ["shrink-0"]}
                       (illustrations/doge "w-10")]
                      [:p {:class ["text-xs" "text-ho-text-secondary" "leading-relaxed"]}
                       "Such leverage. Much risk. Very degen. Wow."]])

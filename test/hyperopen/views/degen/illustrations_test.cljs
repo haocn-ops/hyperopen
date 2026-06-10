@@ -11,10 +11,16 @@
     (is (vector? node) label)
     (is (= :svg (first node)) label)
     (let [rendered (pr-str node)]
-      (is (str/includes? rendered "currentColor")
-          (str label " must inherit currentColor"))
-      (is (not (re-find #"#[0-9a-fA-F]{3,8}" rendered))
-          (str label " must not hardcode colors")))))
+      (is (re-find #"#[0-9a-fA-F]{6}" rendered)
+          (str label " is full-color illustration art"))
+      (is (not (str/includes? rendered "text-ho-"))
+          (str label " must not depend on theme tokens")))))
+
+(deftest gauge-dial-stays-token-colored-test
+  (let [rendered (pr-str (illustrations/feeling-gauge-dial 0))]
+    (is (not (re-find #"#[0-9a-fA-F]{3,8}" rendered))
+        "the dial is UI chrome and must stay themeable")
+    (is (str/includes? rendered "currentColor"))))
 
 (deftest doge-shades-variant-test
   (let [plain (pr-str (illustrations/doge "w-10"))

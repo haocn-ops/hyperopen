@@ -32,6 +32,7 @@
  "src/hyperopen/views/autocorrelation_plot.cljs" 10
  "src/hyperopen/views/chart/d3/runtime.cljs" 3
  "src/hyperopen/views/chart/tooltip_core.cljs" 5
+ "src/hyperopen/views/degen/illustrations.cljs" 15
  "src/hyperopen/views/footer/mobile_nav.cljs" 3
  "src/hyperopen/views/funding_comparison_view.cljs" 8
  "src/hyperopen/views/funding_modal.cljs" 16

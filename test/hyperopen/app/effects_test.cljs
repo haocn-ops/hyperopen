@@ -1,7 +1,7 @@
 (ns hyperopen.app.effects-test
   (:require [cljs.test :refer-macros [deftest is]]
             [hyperopen.app.effects :as app-effects]
-            [hyperopen.portfolio.optimizer.runtime-catalog :as optimizer-runtime-catalog]
+            [hyperopen.route-modules :as route-modules]
             [hyperopen.runtime.effect-adapters :as effect-adapters]))
 
 (deftest runtime-effect-deps-builds-runtime-bound-handlers-via-factories-test
@@ -13,6 +13,7 @@
         copy-link-handler (fn [& _] nil)
         optimizer-run-handler (fn [& _] nil)
         optimizer-pipeline-handler (fn [& _] nil)
+        vault-transfer-handler (fn [& _] nil)
         submit-handler (fn [& _] nil)
         cancel-handler (fn [& _] nil)
         margin-handler (fn [& _] nil)]
@@ -36,12 +37,20 @@
                   (fn [runtime*]
                     (is (identical? runtime runtime*))
                     copy-link-handler)
-                  optimizer-runtime-catalog/effect-deps
-                  (fn [runtime*]
+                  route-modules/lazy-route-effect-leaf-deps
+                  (fn [runtime* module-id group-key _handler-keys]
                     (is (identical? runtime runtime*))
-                    {:portfolio-optimizer
-                     {:run-portfolio-optimizer optimizer-run-handler
-                      :run-portfolio-optimizer-pipeline optimizer-pipeline-handler}})
+                    (case [module-id group-key]
+                      [:portfolio :portfolio-optimizer]
+                      {:portfolio-optimizer
+                       {:run-portfolio-optimizer optimizer-run-handler
+                        :run-portfolio-optimizer-pipeline optimizer-pipeline-handler}}
+
+                      [:vaults :api]
+                      {:api
+                       {:api-submit-vault-transfer vault-transfer-handler}}
+
+                      {}))
                   effect-adapters/make-api-submit-order
                   (fn [runtime*]
                     (is (identical? runtime runtime*))
@@ -82,5 +91,5 @@
                         (get-in deps [:orders :api-cancel-order])))
         (is (identical? margin-handler
                         (get-in deps [:orders :api-submit-position-margin])))
-        (is (identical? effect-adapters/api-submit-vault-transfer-effect
+        (is (identical? vault-transfer-handler
                         (get-in deps [:api :api-submit-vault-transfer])))))))

@@ -5,8 +5,7 @@
             [hyperopen.funding-comparison.effects :as funding-comparison-effects]
             [hyperopen.leaderboard.effects :as leaderboard-effects]
             [hyperopen.runtime.collaborators :as collaborators]
-            [hyperopen.staking.effects :as staking-effects]
-            [hyperopen.vaults.effects :as vault-effects]))
+            [hyperopen.staking.effects :as staking-effects]))
 
 (deftest runtime-effect-deps-merges-defaults-with-overrides-test
   (let [save-fn (fn [& _] :save)
@@ -24,16 +23,11 @@
                     (get-in deps [:api :api-fetch-leaderboard])))
     (is (identical? funding-comparison-effects/api-fetch-predicted-fundings!
                     (get-in deps [:api :api-fetch-predicted-fundings])))
-    (is (identical? vault-effects/api-fetch-vault-index!
-                    (get-in deps [:api :api-fetch-vault-index])))
-    (is (identical? vault-effects/api-fetch-vault-index-with-cache!
-                    (get-in deps [:api :api-fetch-vault-index-with-cache])))
-    (is (identical? vault-effects/api-fetch-vault-webdata2!
-                    (get-in deps [:api :api-fetch-vault-webdata2])))
-    (is (identical? vault-effects/api-fetch-vault-ledger-updates!
-                    (get-in deps [:api :api-fetch-vault-ledger-updates])))
-    (is (identical? vault-effects/api-submit-vault-transfer!
-                    (get-in deps [:api :api-submit-vault-transfer])))
+    (is (nil? (get-in deps [:api :api-fetch-vault-index])))
+    (is (nil? (get-in deps [:api :api-fetch-vault-index-with-cache])))
+    (is (nil? (get-in deps [:api :api-fetch-vault-webdata2])))
+    (is (nil? (get-in deps [:api :api-fetch-vault-ledger-updates])))
+    (is (nil? (get-in deps [:api :api-submit-vault-transfer])))
     (is (identical? staking-effects/api-fetch-staking-validator-summaries!
                     (get-in deps [:api :api-fetch-staking-validator-summaries])))
     (is (identical? staking-effects/api-submit-staking-deposit!

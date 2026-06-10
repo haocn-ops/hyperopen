@@ -2,8 +2,6 @@
   (:require [cljs.test :refer-macros [deftest is]]
             [clojure.set :as set]
             [clojure.string :as str]
-            [hyperopen.app.actions :as app-actions]
-            [hyperopen.app.effects :as app-effects]
             [hyperopen.portfolio.optimizer.runtime-catalog :as optimizer-runtime-catalog]
             [hyperopen.schema.runtime-registration.portfolio :as portfolio-registration]))
 
@@ -13,27 +11,23 @@
   [path]
   (.readFileSync fs path "utf8"))
 
-(deftest app-runtime-merges-optimizer-owned-catalog-test
+(deftest app-runtime-loads-optimizer-owned-catalog-through-portfolio-route-module-test
   (let [actions-source (source "src/hyperopen/app/actions.cljs")
-        effects-source (source "src/hyperopen/app/effects.cljs")]
-    (is (str/includes? actions-source
-                       "hyperopen.portfolio.optimizer.runtime-catalog")
-        "app action deps should require the optimizer-owned runtime catalog")
-    (is (str/includes? actions-source
-                       "(optimizer-runtime-catalog/action-deps)")
-        "app action deps should merge the optimizer action catalog once")
+        effects-source (source "src/hyperopen/app/effects.cljs")
+        route-runtime-source (source "src/hyperopen/portfolio/route_runtime_module.cljs")
+        shadow-source (source "shadow-cljs.edn")]
     (is (not (str/includes? actions-source
-                            ":run-portfolio-optimizer action-adapters/run-portfolio-optimizer-action"))
-        "app action deps should not enumerate optimizer handlers inline")
-    (is (str/includes? effects-source
-                       "hyperopen.portfolio.optimizer.runtime-catalog")
-        "app effect deps should require the optimizer-owned runtime catalog")
-    (is (str/includes? effects-source
-                       "(optimizer-runtime-catalog/effect-deps runtime)")
-        "app effect deps should merge the optimizer effect catalog once")
+                            "hyperopen.portfolio.optimizer.runtime-catalog"))
+        "app action deps should stop requiring the optimizer runtime catalog directly")
     (is (not (str/includes? effects-source
-                            ":run-portfolio-optimizer\n"))
-        "app effect deps should not enumerate optimizer handlers inline")))
+                            "hyperopen.portfolio.optimizer.runtime-catalog"))
+        "app effect deps should stop requiring the optimizer runtime catalog directly")
+    (is (str/includes? route-runtime-source
+                       "hyperopen.portfolio.optimizer.runtime-catalog")
+        "the portfolio route runtime module should own the optimizer runtime catalog import")
+    (is (str/includes? shadow-source
+                       "hyperopen.portfolio.route-runtime-module")
+        "shadow-cljs should include the portfolio route runtime module in the portfolio route chunk")))
 
 (defn- optimizer-handler-key?
   [handler-key]
@@ -62,23 +56,3 @@
              (pr-str (set/difference effect-registration-keys effect-catalog-keys))
              " extra="
              (pr-str (set/difference effect-catalog-keys effect-registration-keys))))))
-
-(deftest app-runtime-consumes-optimizer-catalog-values-test
-  (let [runtime {:runtime-id :optimizer-catalog-test}
-        action-handler (fn [& _] :sentinel-action)
-        effect-handler (fn [& _] :sentinel-effect)]
-    (with-redefs [optimizer-runtime-catalog/action-deps
-                  (fn []
-                    {:portfolio-optimizer
-                     {:sentinel-action action-handler}})
-                  optimizer-runtime-catalog/effect-deps
-                  (fn [runtime*]
-                    (is (identical? runtime runtime*))
-                    {:portfolio-optimizer
-                     {:sentinel-effect effect-handler}})]
-      (is (identical? action-handler
-                      (get-in (app-actions/runtime-action-deps)
-                              [:portfolio-optimizer :sentinel-action])))
-      (is (identical? effect-handler
-                      (get-in (app-effects/runtime-effect-deps runtime)
-                              [:portfolio-optimizer :sentinel-effect]))))))

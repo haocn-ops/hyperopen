@@ -28,7 +28,8 @@
                                         :depends-on #{:main}}
                   :account_surfaces {:entries [hyperopen.views.account-surfaces-module]
                                      :depends-on #{:main}}
-                  :portfolio_route {:entries [hyperopen.views.portfolio-view]
+                  :portfolio_route {:entries [hyperopen.views.portfolio-view
+                                             hyperopen.portfolio.route-runtime-module]
                                     :depends-on #{:account_surfaces}}
                   :leaderboard_route {:entries [hyperopen.views.leaderboard-view]
                                       :depends-on #{:main}}
@@ -44,7 +45,8 @@
                                       :depends-on #{:main}}
                   :vaults_route {:entries [hyperopen.views.vaults.list-view
                                            hyperopen.views.vaults.detail-view
-                                           hyperopen.views.vaults.startup-preview]
+                                           hyperopen.views.vaults.startup-preview
+                                           hyperopen.vaults.route-runtime-module]
                                  :depends-on #{:main}}}
         :devtools {:preloads [hyperopen.telemetry.console-preload]
                    :http-root "resources/public"
@@ -128,7 +130,8 @@
                                             :depends-on #{:main}}
                       :account_surfaces {:entries [hyperopen.views.account-surfaces-module]
                                          :depends-on #{:main}}
-                      :portfolio_route {:entries [hyperopen.views.portfolio-view]
+                      :portfolio_route {:entries [hyperopen.views.portfolio-view
+                                                 hyperopen.portfolio.route-runtime-module]
                                         :depends-on #{:account_surfaces}}
                       :leaderboard_route {:entries [hyperopen.views.leaderboard-view]
                                           :depends-on #{:main}}
@@ -144,6 +147,7 @@
                                           :depends-on #{:main}}
                       :vaults_route {:entries [hyperopen.views.vaults.list-view
                                                hyperopen.views.vaults.detail-view
-                                               hyperopen.views.vaults.startup-preview]
+                                               hyperopen.views.vaults.startup-preview
+                                               hyperopen.vaults.route-runtime-module]
                                      :depends-on #{:main}}}
             :compiler-options {:optimizations :advanced}}}} 

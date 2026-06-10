@@ -11,10 +11,8 @@
             [hyperopen.runtime.collaborators.order :as order-collaborators]
             [hyperopen.runtime.collaborators.spectate-mode :as spectate-mode-collaborators]
             [hyperopen.runtime.collaborators.staking :as staking-collaborators]
-            [hyperopen.runtime.collaborators.vaults :as vault-collaborators]
             [hyperopen.runtime.collaborators.wallet :as wallet-collaborators]
-            [hyperopen.staking.effects :as staking-effects]
-            [hyperopen.vaults.effects :as vault-effects]))
+            [hyperopen.staking.effects :as staking-effects]))
 
 (defn- merge-nested
   [left right]
@@ -34,18 +32,6 @@
           :export-funding-history-csv account-history-effects/export-funding-history-csv-effect
           :api-fetch-leaderboard leaderboard-effects/api-fetch-leaderboard!
           :api-fetch-predicted-fundings funding-comparison-effects/api-fetch-predicted-fundings!
-          :api-fetch-vault-index vault-effects/api-fetch-vault-index!
-          :api-fetch-vault-index-with-cache vault-effects/api-fetch-vault-index-with-cache!
-          :api-fetch-vault-summaries vault-effects/api-fetch-vault-summaries!
-          :api-fetch-user-vault-equities vault-effects/api-fetch-user-vault-equities!
-          :api-fetch-vault-details vault-effects/api-fetch-vault-details!
-          :api-fetch-vault-benchmark-details vault-effects/api-fetch-vault-benchmark-details!
-          :api-fetch-vault-webdata2 vault-effects/api-fetch-vault-webdata2!
-          :api-fetch-vault-fills vault-effects/api-fetch-vault-fills!
-          :api-fetch-vault-funding-history vault-effects/api-fetch-vault-funding-history!
-          :api-fetch-vault-order-history vault-effects/api-fetch-vault-order-history!
-          :api-fetch-vault-ledger-updates vault-effects/api-fetch-vault-ledger-updates!
-          :api-submit-vault-transfer vault-effects/api-submit-vault-transfer!
           :api-fetch-staking-validator-summaries staking-effects/api-fetch-staking-validator-summaries!
           :api-fetch-staking-delegator-summary staking-effects/api-fetch-staking-delegator-summary!
           :api-fetch-staking-delegations staking-effects/api-fetch-staking-delegations!
@@ -74,7 +60,6 @@
     :account-history (account-history-collaborators/action-deps)
     :spectate-mode (spectate-mode-collaborators/action-deps)
     :leaderboard (leaderboard-collaborators/action-deps)
-    :vaults (vault-collaborators/action-deps)
     :funding-comparison (funding-comparison-collaborators/action-deps)
     :staking (staking-collaborators/action-deps)
     :orders (order-collaborators/action-deps)}

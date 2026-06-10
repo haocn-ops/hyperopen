@@ -284,6 +284,7 @@
             [hyperopen.portfolio.optimizer.universe-keyboard-test]
             [hyperopen.portfolio.optimizer.worker-test]
             [hyperopen.portfolio.query-state-test]
+            [hyperopen.portfolio.route-runtime-module-test]
             [hyperopen.portfolio.routes-test]
             [hyperopen.portfolio.worker-test]
             [hyperopen.referrals.actions-test]
@@ -416,6 +417,7 @@
             [hyperopen.vaults.infrastructure.persistence-test]
             [hyperopen.vaults.infrastructure.preview-cache-test]
             [hyperopen.vaults.infrastructure.routes-test]
+            [hyperopen.vaults.route-runtime-module-test]
             [hyperopen.views.account-equity-view-test]
             [hyperopen.views.account-equity-view-token-price-test]
             [hyperopen.views.account-info-view-test]
@@ -983,6 +985,7 @@
              'hyperopen.portfolio.optimizer.universe-keyboard-test
              'hyperopen.portfolio.optimizer.worker-test
              'hyperopen.portfolio.query-state-test
+             'hyperopen.portfolio.route-runtime-module-test
              'hyperopen.portfolio.routes-test
              'hyperopen.portfolio.worker-test
              'hyperopen.referrals.actions-test
@@ -1115,6 +1118,7 @@
              'hyperopen.vaults.infrastructure.persistence-test
              'hyperopen.vaults.infrastructure.preview-cache-test
              'hyperopen.vaults.infrastructure.routes-test
+             'hyperopen.vaults.route-runtime-module-test
              'hyperopen.views.account-equity-view-test
              'hyperopen.views.account-equity-view-token-price-test
              'hyperopen.views.account-info-view-test

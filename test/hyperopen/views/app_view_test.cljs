@@ -145,11 +145,10 @@
     (is (not (contains? app-main-classes "pb-[calc(3rem+env(safe-area-inset-bottom))]")))))
 
 (deftest app-view-renders-portfolio-route-with-portfolio-root-test
-  (let [view-node (app-view/app-view (assoc (base-state)
-                                            :router {:path "/portfolio"}
-                                            :wallet {}))
-        portfolio-root (hiccup/find-by-parity-id view-node "portfolio-root")
-        trade-root (hiccup/find-by-parity-id view-node "trade-root")]
+  (let [view-node (with-redefs [route-modules/route-ready? (constantly true)
+                                route-modules/render-route-view #(when (= "/portfolio" %2) [:div {:data-parity-id "portfolio-root"}])]
+                    (app-view/app-view (assoc (base-state) :router {:path "/portfolio"} :wallet {})))
+        portfolio-root (hiccup/find-by-parity-id view-node "portfolio-root") trade-root (hiccup/find-by-parity-id view-node "trade-root")]
     (is (some? portfolio-root))
     (is (nil? trade-root))))
 

@@ -33,12 +33,23 @@
    :vaults [["hyperopen" "views" "vaults" "list_view" "route_view"]
             ["hyperopen" "views" "vaults" "detail_view" "route_view"]]})
 
+(def ^:private exported-runtime-paths-by-module
+  {:portfolio {:action-deps ["hyperopen" "portfolio" "route_runtime_module" "action_deps"]
+               :effect-deps ["hyperopen" "portfolio" "route_runtime_module" "effect_deps"]}
+   :vaults {:action-deps ["hyperopen" "vaults" "route_runtime_module" "action_deps"]
+            :effect-deps ["hyperopen" "vaults" "route_runtime_module" "effect_deps"]}})
+
 (def ^:private vaults-startup-preview-restore-path
   ["hyperopen" "views" "vaults" "startup_preview" "restore_startup_preview_BANG_"])
 
 (defonce ^:private resolved-route-views (atom {}))
+(defonce ^:private resolved-route-runtime-exports (atom {}))
 
 (declare resolve-module-view)
+
+(declare resolve-module-runtime-exports)
+
+(declare cached-or-exported-route-runtime-exports)
 
 (defn default-state
   []
@@ -66,6 +77,10 @@
   [module-id]
   (get @resolved-route-views module-id))
 
+(defn- route-runtime-required?
+  [module-id]
+  (contains? exported-runtime-paths-by-module module-id))
+
 (defn- resolved-view-ready?
   [module-id resolved-view]
   (case module-id
@@ -91,10 +106,21 @@
           (swap! resolved-route-views assoc module-id resolved-view)
           resolved-view)))))
 
+(defn- route-runtime-ready?
+  [module-id]
+  (if (route-runtime-required? module-id)
+    (some? (cached-or-exported-route-runtime-exports module-id))
+    true))
+
+(defn- route-module-ready?
+  [module-id]
+  (and (some? (cached-or-exported-view module-id))
+       (route-runtime-ready? module-id)))
+
 (defn route-ready?
   [state path]
   (if-let [module-id (route-module-id path)]
-    (some? (cached-or-exported-view module-id))
+    (route-module-ready? module-id)
     true))
 
 (defn route-loading?
@@ -116,6 +142,19 @@
             root
             path-segments)))
 
+(defn- module-name
+  [module-id]
+  (get module-name-by-id module-id))
+
+(defn- load-shadow-module!
+  [module-id]
+  (if-let [shadow-module-name (module-name module-id)]
+    (if (loader/loaded? shadow-module-name)
+      (js/Promise.resolve shadow-module-name)
+      (loader/load shadow-module-name))
+    (js/Promise.reject
+     (js/Error. (str "Unknown route module: " module-id)))))
+
 (defn- resolve-module-view
   [module-id]
   (let [paths (get exported-view-paths-by-module module-id)
@@ -124,6 +163,69 @@
       :vaults {:list (nth views 0 nil)
                :detail (nth views 1 nil)}
       (nth views 0 nil))))
+
+(defn- route-runtime-exports-ready?
+  [runtime-exports]
+  (and (fn? (:action-deps runtime-exports))
+       (fn? (:effect-deps runtime-exports))))
+
+(defn- resolve-module-runtime-exports
+  [module-id]
+  (when-let [{:keys [action-deps effect-deps]}
+             (get exported-runtime-paths-by-module module-id)]
+    {:action-deps (resolve-exported-view action-deps)
+     :effect-deps (resolve-exported-view effect-deps)}))
+
+(defn- resolve-loaded-route-runtime-exports!
+  [module-id]
+  (when (route-runtime-required? module-id)
+    (let [runtime-exports (resolve-module-runtime-exports module-id)]
+      (when-not (route-runtime-exports-ready? runtime-exports)
+        (throw
+         (js/Error.
+          (str "Loaded route module without exported runtime: " module-id))))
+      (swap! resolved-route-runtime-exports assoc module-id runtime-exports)
+      runtime-exports)))
+
+(defn- cached-or-exported-route-runtime-exports
+  [module-id]
+  (let [cached-exports (get @resolved-route-runtime-exports module-id)]
+    (cond
+      (route-runtime-exports-ready? cached-exports)
+      cached-exports
+
+      (some? cached-exports)
+      (do
+        (swap! resolved-route-runtime-exports dissoc module-id)
+        nil)
+
+      :else
+      (when-let [runtime-exports (resolve-module-runtime-exports module-id)]
+        (when (route-runtime-exports-ready? runtime-exports)
+          (swap! resolved-route-runtime-exports assoc module-id runtime-exports)
+          runtime-exports)))))
+
+(defn resolved-route-runtime-action-deps
+  [module-id]
+  (when-let [action-deps-fn
+             (:action-deps (cached-or-exported-route-runtime-exports module-id))]
+    (action-deps-fn)))
+
+(defn resolved-route-runtime-effect-deps
+  [runtime module-id]
+  (when-let [effect-deps-fn
+             (:effect-deps (cached-or-exported-route-runtime-exports module-id))]
+    (effect-deps-fn runtime)))
+
+(defn- route-runtime-handler-error
+  [kind module-id handler-path]
+  (js/Error.
+   (str "Route runtime "
+        (name kind)
+        " handler unavailable: "
+        module-id
+        " "
+        (pr-str handler-path))))
 
 (defn- maybe-restore-vaults-list-preview!
   [store path]
@@ -175,38 +277,93 @@
 
 (defn load-route-module!
   [store path]
-  (if-let [module-id (route-module-id path)]
-    (if-let [existing-view (cached-or-exported-view module-id)]
-      (do
-        (when (= module-id :vaults)
-          (maybe-restore-vaults-list-preview! store path))
-        (swap! store mark-route-module-loaded module-id)
-        (js/Promise.resolve existing-view))
-      (let [module-name (get module-name-by-id module-id)
-            resolve-loaded-view!
+    (if-let [module-id (route-module-id path)]
+      (if (route-module-ready? module-id)
+        (do
+          (when (= module-id :vaults)
+            (maybe-restore-vaults-list-preview! store path))
+          (swap! store mark-route-module-loaded module-id)
+          (js/Promise.resolve (cached-or-exported-view module-id)))
+      (let [resolve-loaded-view!
             (fn []
               (let [resolved-view (resolve-module-view module-id)]
                 (when-not (resolved-view-ready? module-id resolved-view)
                   (throw (js/Error.
                           (str "Loaded route module without exported view: " module-id))))
                 (swap! resolved-route-views assoc module-id resolved-view)
+                (resolve-loaded-route-runtime-exports! module-id)
                 (when (= module-id :vaults)
                   (maybe-restore-vaults-list-preview! store path))
                 (swap! store mark-route-module-loaded module-id)
                 resolved-view))]
         (swap! store mark-route-module-loading path)
         (try
-          (if (loader/loaded? module-name)
-            (js/Promise.resolve (resolve-loaded-view!))
-            (-> (loader/load module-name)
-                (.then (fn [_]
-                         (resolve-loaded-view!)))
-                (.catch (fn [err]
-                          (swap! store mark-route-module-failed module-id err)
-                          (js/Promise.reject err)))))
+          (-> (load-shadow-module! module-id)
+              (.then (fn [_]
+                       (resolve-loaded-view!)))
+              (.catch (fn [err]
+                        (swap! store mark-route-module-failed module-id err)
+                        (js/Promise.reject err))))
           (catch :default err
             (swap! store mark-route-module-failed module-id err)
             (js/Promise.reject err)))))
     (do
       (swap! store mark-route-module-loaded nil)
       (js/Promise.resolve nil))))
+
+(defn dispatch-route-actions-after-load!
+  [store dispatch! path actions]
+  (when (and (fn? dispatch!)
+             (seq actions))
+    (if-let [module-id (route-module-id path)]
+      (if (route-module-ready? module-id)
+        (dispatch! store nil actions)
+        (-> (load-route-module! store path)
+            (.then (fn [_]
+                     (dispatch! store nil actions)))))
+      (dispatch! store nil actions))))
+
+(defn- lazy-route-action-handler
+  [module-id handler-path]
+  (fn [& args]
+    (if-let [handler (get-in (resolved-route-runtime-action-deps module-id)
+                             handler-path)]
+      (apply handler args)
+      (throw (route-runtime-handler-error :action module-id handler-path)))))
+
+(defn lazy-route-action-leaf-deps
+  [module-id group-key handler-keys]
+  {group-key
+   (into {}
+         (map (fn [handler-key]
+                [handler-key
+                 (lazy-route-action-handler module-id [group-key handler-key])]))
+         handler-keys)})
+
+(defn- lazy-route-effect-handler
+  [runtime module-id handler-path]
+  (fn [ctx store & args]
+    (if-let [handler (get-in (resolved-route-runtime-effect-deps runtime module-id)
+                             handler-path)]
+      (apply handler ctx store args)
+      (-> (load-shadow-module! module-id)
+          (.then (fn [_]
+                   (if-let [loaded-handler
+                            (get-in (resolved-route-runtime-effect-deps runtime module-id)
+                                    handler-path)]
+                     (apply loaded-handler ctx store args)
+                     (throw (route-runtime-handler-error
+                             :effect
+                             module-id
+                             handler-path)))))))))
+
+(defn lazy-route-effect-leaf-deps
+  [runtime module-id group-key handler-keys]
+  {group-key
+   (into {}
+         (map (fn [handler-key]
+                [handler-key
+                 (lazy-route-effect-handler runtime
+                                            module-id
+                                            [group-key handler-key])]))
+         handler-keys)})

@@ -862,8 +862,7 @@
                                                           :mode :withdraw
                                                           :vault-address "0x1234567890abcdef1234567890abcdef12345678"}}})
           submit-calls (atom [])
-          toast-calls (atom [])
-          dispatch-calls (atom [])]
+          toast-calls (atom [])]
       (-> (effects/api-submit-vault-transfer!
            {:store store
             :request request
@@ -872,8 +871,7 @@
                                       (js/Promise.resolve {:status "ok"}))
             :show-toast! (fn [_store kind message]
                            (swap! toast-calls conj [kind message]))
-            :dispatch! (fn [store* ctx actions]
-                         (swap! dispatch-calls conj [store* ctx actions]))
+            :dispatch! (fn [& _] :dispatch)
             :default-vault-transfer-modal-state (fn []
                                                   {:open? false
                                                    :submitting? false
@@ -900,9 +898,6 @@
                           (get-in @store [:vaults-ui :vault-transfer-modal])))
                    (is (= [[:success "Withdraw submitted."]]
                           @toast-calls))
-                   (is (= [[store nil [[:actions/load-vault-detail "0x1234567890abcdef1234567890abcdef12345678"]]]
-                           [store nil [[:actions/load-vaults]]]]
-                          @dispatch-calls))
                    (done)))
           (.catch (fn [err]
                     (js/console.error err)

@@ -3,6 +3,7 @@
             [hyperopen.account.context :as account-context]
             [hyperopen.platform :as platform]
             [hyperopen.api.promise-effects :as promise-effects]
+            [hyperopen.route-modules :as route-modules]
             [hyperopen.api.trading :as trading-api]
             [hyperopen.vaults.application.transfer-state :as vault-transfer-state]
             [hyperopen.vaults.domain.identity :as vault-identity]
@@ -647,10 +648,11 @@
                        (swap! store assoc-in [:vaults-ui :vault-transfer-modal]
                               (default-vault-transfer-modal-state))
                        (show-toast! store :success (str mode-label " submitted."))
-                       (when (and (fn? dispatch!)
-                                  (string? vault-address))
-                         (dispatch! store nil [[:actions/load-vault-detail vault-address]])
-                         (dispatch! store nil [[:actions/load-vaults]]))
+                       (when (and (fn? dispatch!) (string? vault-address))
+                         (route-modules/dispatch-route-actions-after-load! store dispatch! (str "/vaults/" vault-address)
+                                                                          [[:actions/load-vault-detail vault-address]])
+                         (route-modules/dispatch-route-actions-after-load! store dispatch! "/vaults"
+                                                                          [[:actions/load-vaults]]))
                        resp)
                      (let [error-text (str/trim (str (exchange-response-error resp)))
                            message (str mode-label " failed: "

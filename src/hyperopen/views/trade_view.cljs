@@ -3,6 +3,7 @@
             [hyperopen.trade-modules :as trade-modules]
             [hyperopen.views.active-asset.vm :as active-asset-vm]
             [hyperopen.views.active-asset-view :as active-asset-view]
+            [hyperopen.ui.voice :as voice]
             [hyperopen.views.asset-selector-view :as asset-selector-view]
             [hyperopen.views.degen.widgets :as degen-widgets]
             [hyperopen.views.l2-orderbook-view :as l2-orderbook-view]
@@ -403,6 +404,10 @@
             :data-role "trade-scroll-shell"}
       (degen-widgets/stats-strip state)
       (shell/render-mobile-active-asset-strip state layout-context renderers)
-      (shell/render-mobile-surface-tabs mobile-surface layout-context)
+      (shell/render-mobile-surface-tabs mobile-surface
+                                        layout-context
+                                        {:chart (voice/label state :mobile-surface/chart)
+                                         :orderbook (voice/label state :mobile-surface/orderbook)
+                                         :trades (voice/label state :mobile-surface/trades)})
       (shell/render-trade-grid state layout-context panel-context renderers)
       (degen-widgets/widgets-row state)]]))

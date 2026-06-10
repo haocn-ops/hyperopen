@@ -145,6 +145,13 @@
        [:effects/local-storage-set ui-theme/local-storage-key normalized]
        [:effects/apply-ui-theme normalized]])))
 
+(defn reset-degen-life
+  "Joke control on the degen Feeling Gauge widget. Bumps a session-local
+   counter; the gauge reports lives used and the degen tip re-rolls."
+  [state]
+  [[:effects/save [:degen :life-resets]
+    (inc (get-in state [:degen :life-resets] 0))]])
+
 (defn navigate-mobile-header-menu
   [state path]
   (into [[:effects/save [:header-ui :mobile-menu-open?] false]]

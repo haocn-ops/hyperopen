@@ -18,10 +18,13 @@
    "Never sell. That way you never realize a loss. Genius."])
 
 (defn daily-tip
-  "Deterministic tip-of-the-day; `now-ms` injectable for tests."
-  ([] (daily-tip (.now js/Date)))
-  ([now-ms]
-   (nth tips (mod (js/Math.floor (/ now-ms 86400000)) (count tips)))))
+  "Deterministic tip-of-the-day; `now-ms` injectable for tests. `offset`
+   (the RESET LIFE counter) re-rolls to the next tip."
+  ([] (daily-tip (.now js/Date) 0))
+  ([now-ms] (daily-tip now-ms 0))
+  ([now-ms offset]
+   (nth tips (mod (+ (js/Math.floor (/ now-ms 86400000)) offset)
+                  (count tips)))))
 
 (defn liq-risk
   "Margin-ratio (0..1) into a parody risk readout."
@@ -116,7 +119,7 @@
           pnl (:pnl-info metrics)
           risk (liq-risk ratio)
           vibes (market-vibes (change-24h-pct state))]
-      [:div {:class ["hidden" "lg:flex" "items-stretch" "gap-2" "px-2" "pt-2"
+      [:div {:class ["flex" "items-stretch" "gap-2" "px-2" "pt-2"
                      "overflow-x-auto" "scrollbar-hide"]
              :data-role "degen-stats-strip"}
        (stat-card {:data-role "degen-stat-total-value"
@@ -321,7 +324,8 @@
   (when (voice/degen? state)
     (let [metrics (equity-metrics/account-equity-metrics state)
           mood (feeling (:unrealized-pnl metrics))
-          shill (top-gainer state)]
+          shill (top-gainer state)
+          lives (get-in state [:degen :life-resets] 0)]
       [:div {:class ["hidden" "lg:grid" "grid-cols-2" "xl:grid-cols-5" "gap-2"
                      "px-2" "pb-2"]
              :data-role "degen-widgets-row"}
@@ -346,7 +350,7 @@
                      :border-class "border-ho-info"
                      :title "Degen Tip 💡"}
                     [:p {:class ["text-xs" "text-ho-text-secondary" "leading-relaxed"]}
-                     (daily-tip)])
+                     (daily-tip (.now js/Date) lives)])
        (widget-card {:data-role "degen-widget-whale"
                      :border-class "border-ho-info"
                      :title "Whale Watch 🐋"}
@@ -366,4 +370,16 @@
                      [:span {:class (conj ["text-xs" "tracking-[0.2em]"] (:class mood))}
                       (:meter mood)]]
                     [:p {:class ["text-xs" "text-ho-text-dim"]}
-                     "How's it going? (derived from real P&L)"])])))
+                     "How's it going? (derived from real P&L)"]
+                    [:div {:class ["flex" "items-center" "justify-between" "gap-2" "pt-0.5"]}
+                     [:button {:type "button"
+                               :class ["rounded-md" "border" "border-ho-sell"
+                                       "px-2" "py-1" "text-xs" "font-bold"
+                                       "text-ho-sell" "hover:bg-ho-sell-soft"
+                                       "transition-colors"]
+                               :data-role "degen-reset-life"
+                               :on {:click [[:actions/reset-degen-life]]}}
+                      "RESET LIFE"]
+                     (when (pos? lives)
+                       [:span {:class ["text-xs" "text-ho-text-dim"]}
+                        (str "Lives used: " lives)])])])))

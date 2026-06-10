@@ -30,6 +30,7 @@
    [:actions/set-confirm-close-position-enabled :set-confirm-close-position-enabled]
    [:actions/set-confirm-market-orders-enabled :set-confirm-market-orders-enabled]
    [:actions/set-ui-theme :set-ui-theme]
+   [:actions/reset-degen-life :reset-degen-life]
    [:actions/navigate-mobile-header-menu :navigate-mobile-header-menu]
    [:actions/request-agent-storage-mode-change :request-agent-storage-mode-change]
    [:actions/cancel-agent-storage-mode-change :cancel-agent-storage-mode-change]

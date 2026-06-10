@@ -31,6 +31,12 @@
    :orderbook/book {:default "Order Book" :degen "Order Book (looks important)"}
    :orderbook/trades {:default "Trades" :degen "Trades (other people's mistakes)"}
 
+   ;; Mobile surface tabs share a third of a small screen; degen variants
+   ;; stay short on purpose.
+   :mobile-surface/chart {:default "Chart" :degen "Chart (hopium)"}
+   :mobile-surface/orderbook {:default "Order Book" :degen "Book (lol)"}
+   :mobile-surface/trades {:default "Trades" :degen "Trades (pain)"}
+
    :order-form/buy {:default "Buy / Long" :degen "Buy / Moon 🚀"}
    :order-form/sell {:default "Sell / Short" :degen "Sell / Panic 😱"}
    :order-form/submit {:default "Place Order" :degen "Send It 🚀"}

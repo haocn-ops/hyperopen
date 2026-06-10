@@ -55,13 +55,17 @@
      (render-active-asset-panel state))])
 
 (defn render-mobile-surface-tabs
-  [mobile-surface {:keys [layout]}]
-  [:div {:class (:mobile-surface-tabs-classes layout)
-         :data-parity-id "trade-mobile-surface-tabs"}
-   [:div {:class ["flex" "items-center" "gap-0"]}
-    (for [[surface-id _label :as surface] trade-mobile-surfaces]
-      ^{:key (str "trade-mobile-surface-" (name surface-id))}
-      (mobile-surface-button mobile-surface surface))]])
+  ([mobile-surface layout-context]
+   (render-mobile-surface-tabs mobile-surface layout-context {}))
+  ([mobile-surface {:keys [layout]} surface-labels]
+   [:div {:class (:mobile-surface-tabs-classes layout)
+          :data-parity-id "trade-mobile-surface-tabs"}
+    [:div {:class ["flex" "items-center" "gap-0"]}
+     (for [[surface-id default-label] trade-mobile-surfaces]
+       ^{:key (str "trade-mobile-surface-" (name surface-id))}
+       (mobile-surface-button mobile-surface
+                              [surface-id (or (get surface-labels surface-id)
+                                              default-label)]))]]))
 
 (defn render-trade-chart-panel
   [desktop-layout?

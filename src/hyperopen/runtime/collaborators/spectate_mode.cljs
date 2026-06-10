@@ -24,6 +24,7 @@
    :set-confirm-close-position-enabled header-actions/set-confirm-close-position-enabled
    :set-confirm-market-orders-enabled header-actions/set-confirm-market-orders-enabled
    :set-ui-theme header-actions/set-ui-theme
+   :reset-degen-life header-actions/reset-degen-life
    :navigate-mobile-header-menu header-actions/navigate-mobile-header-menu
    :open-spectate-mode-mobile-header-menu header-actions/open-spectate-mode-mobile-header-menu
    :open-spectate-mode-modal spectate-mode-actions/open-spectate-mode-modal

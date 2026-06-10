@@ -156,6 +156,7 @@
    :actions/set-confirm-close-position-enabled ::common/boolean-args
    :actions/set-confirm-market-orders-enabled ::common/boolean-args
    :actions/set-ui-theme ::set-ui-theme-args
+   :actions/reset-degen-life ::common/no-args
    :actions/navigate-mobile-header-menu ::common/path-args
    :actions/open-spectate-mode-mobile-header-menu ::spectate-mode-open-args
    :actions/open-spectate-mode-modal ::spectate-mode-open-args

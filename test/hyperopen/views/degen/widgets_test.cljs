@@ -110,3 +110,17 @@
          (widgets/daily-tip (+ 86400000 12345))))
   (is (= (nth widgets/tips 0)
          (widgets/daily-tip (* 86400000 (count widgets/tips))))))
+
+(deftest daily-tip-rerolls-with-life-resets-test
+  (is (= (nth widgets/tips 1) (widgets/daily-tip 0 1)))
+  (is (= (nth widgets/tips 2) (widgets/daily-tip 86400000 1)))
+  (is (= (nth widgets/tips 0) (widgets/daily-tip 0 (count widgets/tips)))))
+
+(deftest feeling-gauge-reset-life-test
+  (let [rendered (pr-str (widgets/widgets-row degen-state))]
+    (is (str/includes? rendered "RESET LIFE"))
+    (is (str/includes? rendered ":actions/reset-degen-life"))
+    (is (not (str/includes? rendered "Lives used:"))))
+  (let [rendered (pr-str (widgets/widgets-row
+                          (assoc degen-state :degen {:life-resets 2})))]
+    (is (str/includes? rendered "Lives used: 2"))))

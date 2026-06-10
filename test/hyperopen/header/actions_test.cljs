@@ -280,3 +280,9 @@
 (deftest set-ui-theme-is-noop-when-theme-unchanged-test
   (is (= [] (actions/set-ui-theme {:ui {:theme "hyperdegen"}} "hyperdegen")))
   (is (= [] (actions/set-ui-theme {} "dark"))))
+
+(deftest reset-degen-life-increments-counter-test
+  (is (= [[:effects/save [:degen :life-resets] 1]]
+         (actions/reset-degen-life {})))
+  (is (= [[:effects/save [:degen :life-resets] 3]]
+         (actions/reset-degen-life {:degen {:life-resets 2}}))))

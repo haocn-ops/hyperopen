@@ -21,7 +21,14 @@
   (is (= "Order Book (looks important)"
          (voice/label {:ui {:theme "hyperdegen"}} :orderbook/book)))
   (is (= "Trades (other people's mistakes)"
-         (voice/label {:ui {:theme "hyperdegen"}} :orderbook/trades))))
+         (voice/label {:ui {:theme "hyperdegen"}} :orderbook/trades)))
+  (is (= "Order Book" (voice/label {} :mobile-surface/orderbook)))
+  (is (= "Book (lol)"
+         (voice/label {:ui {:theme "hyperdegen"}} :mobile-surface/orderbook)))
+  (is (= "Chart (hopium)"
+         (voice/label {:ui {:theme "hyperdegen"}} :mobile-surface/chart)))
+  (is (= "Trades (pain)"
+         (voice/label {:ui {:theme "hyperdegen"}} :mobile-surface/trades))))
 
 (deftest degen-predicate-test
   (is (false? (voice/degen? {})))

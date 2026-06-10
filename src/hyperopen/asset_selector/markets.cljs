@@ -1003,7 +1003,7 @@
           (some? (:prevDayRaw selected-side)) (assoc :prevDayRaw (:prevDayRaw selected-side))
           (and question-selection? (some? (:outcome-id selected-side)))
           (assoc :outcome-id (:outcome-id selected-side))
-          (and question-selection? (some? (:side-index selected-side)))
+          (some? (:side-index selected-side))
           (assoc :outcome-side-index (:side-index selected-side))
           (and question-selection? (:side-label selected-side))
           (assoc :outcome-side-label (:side-label selected-side)))))))

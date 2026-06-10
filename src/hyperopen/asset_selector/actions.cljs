@@ -283,6 +283,7 @@
         current-market (:active-market state)
         current-side-coins (active-market-side-coins current-market current-asset)
         selected-side-coins (active-market-side-coins selected-market canonical-coin)
+        selected-outcome-side-index (:outcome-side-index selected-market)
         switched-asset? (and (seq canonical-coin)
                              (not= canonical-coin current-asset))
         reset-order-form (when (and switched-asset?
@@ -308,13 +309,18 @@
                                           [[:asset-selector :highlighted-market-key] nil]
                                           [[:orderbook-ui :price-aggregation-dropdown-visible?] false]
                                           [[:orderbook-ui :size-unit-dropdown-visible?] false]
+                                          [[:active-asset] canonical-coin]
+                                          [[:selected-asset] canonical-coin]
                                           [[:active-market] selected-market]]
                                    reset-order-form
                                    (conj [[:order-form] reset-order-form])
                                    reset-order-form-ui
                                    (conj [[:order-form-ui] reset-order-form-ui])
                                    reset-order-form-runtime
-                                   (conj [[:order-form-runtime] reset-order-form-runtime]))
+                                   (conj [[:order-form-runtime] reset-order-form-runtime])
+                                   (and (= :outcome (:market-type selected-market))
+                                        (some? selected-outcome-side-index))
+                                   (conj [[:order-form :outcome-side] selected-outcome-side-index]))
         immediate-ui-effects [[:effects/save-many immediate-ui-path-values]
                               sync-asset-selector-active-ctx-subscriptions-effect]
         unsubscribe-effects (if current-asset

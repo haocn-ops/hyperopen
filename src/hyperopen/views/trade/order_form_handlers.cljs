@@ -6,6 +6,16 @@
   [command]
   (intent-adapter/command->actions command))
 
+(defn- outcome-side-index
+  [side]
+  (cond
+    (map? side) (:side-index side)
+    :else side))
+
+(defn- select-outcome-side-actions
+  [side]
+  (dispatch-command (cmd/set-order-outcome-side (outcome-side-index side))))
+
 (defn build-handlers []
   {:entry-mode {:on-close-dropdown (dispatch-command (cmd/close-pro-order-type-dropdown))
                 :on-select-entry-market (dispatch-command (cmd/select-entry-market))
@@ -29,8 +39,7 @@
    :side {:on-select-side (fn [side]
                             (dispatch-command (cmd/set-order-side side)))}
 
-   :outcome {:on-select-outcome-side (fn [side-index]
-                                       (dispatch-command (cmd/set-order-outcome-side side-index)))
+   :outcome {:on-select-outcome-side select-outcome-side-actions
              :on-select-outcome-option (fn [outcome-id]
                                          (into []
                                                (concat

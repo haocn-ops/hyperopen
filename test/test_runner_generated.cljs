@@ -183,6 +183,7 @@
             [hyperopen.orderbook.actions-test]
             [hyperopen.orderbook.price-aggregation-test]
             [hyperopen.orderbook.settings-test]
+            [hyperopen.outcome-side-market-switch-test]
             [hyperopen.platform-test]
             [hyperopen.platform.indexed-db-test]
             [hyperopen.platform.webauthn-test]
@@ -889,6 +890,7 @@
              'hyperopen.orderbook.actions-test
              'hyperopen.orderbook.price-aggregation-test
              'hyperopen.orderbook.settings-test
+             'hyperopen.outcome-side-market-switch-test
              'hyperopen.platform-test
              'hyperopen.platform.indexed-db-test
              'hyperopen.platform.webauthn-test

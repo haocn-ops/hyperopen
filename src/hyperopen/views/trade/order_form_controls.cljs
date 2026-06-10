@@ -484,7 +484,7 @@
         (primitives/side-button (str action-prefix side-label)
                                 intent
                                 (= side-index selected-side-index)
-                                ((:on-select-outcome-side outcome-handlers) side-index)))])))
+                                ((:on-select-outcome-side outcome-handlers) side)))])))
 
 (defn- outcome-option-id
   [option]

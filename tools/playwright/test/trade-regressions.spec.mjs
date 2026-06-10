@@ -766,6 +766,11 @@ async function seedGroupedOutcomeAssetSelectorState(page, { activeTab = null } =
       ["outcome-subcategory", kw("basketball")],
       ["outcome-id", 142],
       ["outcome-sides", vector([spursYes, spursNo])],
+      ["outcome-side-aliases", stringMap([
+        ["#1420", map([["outcome-id", 142], ["side-index", 0], ["sibling-coins", vector(["#1420", "#1421"])]])],
+        ["#1421", map([["outcome-id", 142], ["side-index", 1], ["sibling-coins", vector(["#1420", "#1421"])]])],
+        ["outcome:142", map([["outcome-id", 142], ["side-index", 0], ["sibling-coins", vector(["#1420", "#1421"])]])]
+      ])],
       ["outcome-subscription-coins", vector(["#1420", "#1421"])],
       ["outcome-summary", "San Antonio 67%  *  New York 33%"],
       ["mark", 0.67],
@@ -834,6 +839,70 @@ async function seedWorldCupOutcomeOrderForm(page) {
       path(kw("order-form-ui"), kw("outcome-option-query")),
       ""
     );
+    c.reset_BANG_(store, nextState);
+
+    const renderApp = globalThis.hyperopen?.app?.bootstrap?.render_app_BANG_;
+    if (typeof renderApp === "function") {
+      renderApp(c.deref(store));
+    }
+  });
+}
+
+async function seedSportsOutcomeOrderForm(page) {
+  await seedGroupedOutcomeAssetSelectorState(page, { activeTab: "sports" });
+  await page.evaluate(() => {
+    const c = globalThis.cljs?.core;
+    const store = globalThis.hyperopen?.system?.store;
+
+    if (!c || !store) {
+      throw new Error("Hyperopen store or cljs core unavailable");
+    }
+
+    const kw = (name) => c.keyword(name);
+    const path = (...segments) => c.PersistentVector.fromArray(segments, true);
+    const opts = c.PersistentArrayMap.fromArray([kw("keywordize-keys"), true], true);
+    const sportsMarket = c.get_in(
+      c.deref(store),
+      path(kw("asset-selector"), kw("market-by-key"), "outcome:142")
+    );
+
+    if (!sportsMarket) {
+      throw new Error("NBA Finals grouped outcome market missing from seeded state");
+    }
+
+    const orderbook = (bidPx, askPx) => c.js__GT_clj(
+      {
+        bids: [{ px: bidPx, sz: "20000.0" }, { px: "0.34000", sz: "152000.0" }],
+        asks: [{ px: askPx, sz: "28.0" }, { px: "0.49729", sz: "28.0" }]
+      },
+      opts
+    );
+    const context = (coin, mark, openInterest) => c.js__GT_clj(
+      {
+        coin,
+        mark,
+        markRaw: String(mark),
+        change24h: 0.0054,
+        change24hPct: 3.25,
+        dayNtlVlm: 5831,
+        openInterest
+      },
+      opts
+    );
+
+    let nextState = c.deref(store);
+    nextState = c.assoc_in(nextState, path(kw("active-asset")), "#1420");
+    nextState = c.assoc_in(nextState, path(kw("selected-asset")), "#1420");
+    nextState = c.assoc_in(nextState, path(kw("active-market")), sportsMarket);
+    nextState = c.assoc_in(nextState, path(kw("order-form"), kw("type")), kw("limit"));
+    nextState = c.assoc_in(nextState, path(kw("order-form"), kw("side")), kw("buy"));
+    nextState = c.assoc_in(nextState, path(kw("order-form"), kw("outcome-option-id")), 142);
+    nextState = c.assoc_in(nextState, path(kw("order-form"), kw("outcome-side")), 0);
+    nextState = c.assoc_in(nextState, path(kw("orderbooks"), "#1420"), orderbook("0.37240", "0.49864"));
+    nextState = c.assoc_in(nextState, path(kw("orderbooks"), "#1421"), orderbook("0.61760", "0.62851"));
+    nextState = c.assoc_in(nextState, path(kw("active-assets"), kw("contexts"), "#1420"), context("#1420", 0.3724, 780386));
+    nextState = c.assoc_in(nextState, path(kw("active-assets"), kw("contexts"), "#1421"), context("#1421", 0.6176, 780386));
+    nextState = c.assoc_in(nextState, path(kw("orderbook-ui"), kw("active-tab")), kw("orderbook"));
     c.reset_BANG_(store, nextState);
 
     const renderApp = globalThis.hyperopen?.app?.bootstrap?.render_app_BANG_;
@@ -1654,6 +1723,46 @@ test("market strip uses searchable dropdown for multi-option outcome markets @sm
     outcomeOptionId: 212
   });
   await expect(page.getByRole("region", { name: "#2120 price chart, 1D timeframe" })).toBeVisible();
+});
+
+test("two-sided outcome side selector switches chart and order book market @regression", async ({ page }) => {
+  await visitRoute(page, "/trade");
+  await seedSportsOutcomeOrderForm(page);
+  await waitForIdle(page, { quietMs: 200, timeoutMs: 6_000, pollMs: 50 });
+
+  const orderForm = page.locator('[data-parity-id="order-form"]');
+  await expect(orderForm.getByRole("button", { name: "Buy San Antonio", exact: true })).toBeVisible();
+  await expect(orderForm.getByRole("button", { name: "Buy New York", exact: true })).toBeVisible();
+  await expect(page.getByRole("region", { name: "#1420 price chart, 1D timeframe" })).toBeVisible();
+  await expect(page.locator('[data-parity-id="orderbook-panel"]')).toContainText("0.3724");
+
+  await orderForm.getByRole("button", { name: "Buy New York", exact: true }).click();
+  await waitForIdle(page, { quietMs: 250, timeoutMs: 6_000, pollMs: 50 });
+
+  await expect(page.getByRole("region", { name: "#1421 price chart, 1D timeframe" })).toBeVisible();
+  await expect(page.locator('[data-parity-id="orderbook-panel"]')).toContainText("0.621");
+  await expect(page.locator('[data-parity-id="orderbook-panel"]')).not.toContainText("0.3724");
+  await expect.poll(async () => {
+    return page.evaluate(() => {
+      const c = globalThis.cljs?.core;
+      const store = globalThis.hyperopen?.system?.store;
+      if (!c || !store) {
+        throw new Error("Hyperopen store unavailable");
+      }
+      const kw = (name) => c.keyword(name);
+      const path = (...segments) => c.PersistentVector.fromArray(segments.map(kw), true);
+      const state = c.deref(store);
+      return {
+        activeAsset: c.get(state, kw("active-asset")),
+        selectedAsset: c.get(state, kw("selected-asset")),
+        outcomeSide: c.get_in(state, path("order-form", "outcome-side"))
+      };
+    });
+  }, { timeout: 6_000 }).toEqual({
+    activeAsset: "#1421",
+    selectedAsset: "#1421",
+    outcomeSide: 1
+  });
 });
 
 test("outcome market tooltip uses adaptive readable width and glows on hover @regression", async ({ page }) => {

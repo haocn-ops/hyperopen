@@ -43,6 +43,10 @@
     --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
       "Liberation Mono", "Courier New", monospace;
     --font-toast-mono: "JetBrains Mono", var(--font-mono);
+    /* Handwritten marker type; consumed only by degen decor (chart doodles,
+       speech-bubble copy). */
+    --font-marker: "Caveat", "Bradley Hand", "Segoe Print", "Comic Sans MS",
+      "Chalkboard SE", cursive;
     --staking-action-popover-bg: rgb(var(--ho-bg, 15 26 31));
     --o-bg: #051a1c;
     --o-bg-grad-from: #072527;

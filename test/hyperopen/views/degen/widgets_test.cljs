@@ -54,6 +54,55 @@
   (is (= "NUMB 😶" (:status (widgets/feeling 0))))
   (is (= "NUMB 😶" (:status (widgets/feeling nil)))))
 
+(deftest chart-doodles-gated-and-render-test
+  (is (nil? (widgets/chart-doodles {})))
+  (is (nil? (widgets/chart-doodles {:ui {:theme "dark"}})))
+  (let [rendered (pr-str (widgets/chart-doodles degen-state))]
+    (is (str/includes? rendered "degen-chart-doodles"))
+    (is (str/includes? rendered "pointer-events-none"))
+    (is (str/includes? rendered "seems good"))
+    (is (str/includes? rendered "uh oh"))
+    (is (str/includes? rendered "MAGIC LINE ✨"))
+    (is (str/includes? rendered "trust me bro"))))
+
+(deftest top-gainer-test
+  (is (nil? (widgets/top-gainer {})))
+  (is (nil? (widgets/top-gainer
+             {:asset-selector {:market-by-key {"a" {:key "a"}}}})))
+  (let [state {:asset-selector
+               {:market-by-key
+                {"BTC" {:key "BTC" :coin "BTC" :change24hPct 2.5}
+                 "GIGA" {:key "GIGA" :coin "GIGA" :change24hPct 9001.0}
+                 "NPC" {:key "NPC" :coin "NPC" :change24hPct -9.99}
+                 "BROKEN" {:key "BROKEN" :coin "BROKEN"}}}}
+        winner (widgets/top-gainer state)]
+    (is (= "GIGA" (:key winner)))
+    (is (= 9001.0 (:degen/pct winner)))))
+
+(deftest shill-card-uses-select-asset-action-test
+  (let [state (assoc degen-state
+                     :asset-selector {:market-by-key
+                                      {"GIGA" {:key "GIGA" :coin "GIGA"
+                                               :change24hPct 9001.0}}})
+        rendered (pr-str (widgets/widgets-row state))]
+    (is (str/includes? rendered "Shill of the Day"))
+    (is (str/includes? rendered "GIGA +9001.00%"))
+    (is (str/includes? rendered ":actions/select-asset-by-market-key"))
+    (is (str/includes? rendered "not financial advice"))))
+
+(deftest leverage-warning-banner-test
+  (is (nil? (widgets/leverage-warning-banner {} 100)))
+  (is (nil? (widgets/leverage-warning-banner degen-state nil)))
+  (is (nil? (widgets/leverage-warning-banner degen-state 5)))
+  (let [warn (pr-str (widgets/leverage-warning-banner degen-state 20))
+        spicy (pr-str (widgets/leverage-warning-banner degen-state 50))
+        max* (pr-str (widgets/leverage-warning-banner degen-state 100))]
+    (is (str/includes? warn "BIG FUN"))
+    (is (str/includes? warn "border-ho-warn"))
+    (is (str/includes? spicy "0.1% wick"))
+    (is (str/includes? max* "MAXIMUM DEGEN"))
+    (is (str/includes? max* "border-ho-sell"))))
+
 (deftest daily-tip-deterministic-test
   (is (= (nth widgets/tips 0) (widgets/daily-tip 0)))
   (is (= (nth widgets/tips 1) (widgets/daily-tip 86400000)))

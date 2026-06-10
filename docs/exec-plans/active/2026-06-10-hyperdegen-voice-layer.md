@@ -26,9 +26,10 @@ A pure copy catalog, `hyperopen.ui.voice`, keyed off the active theme: `hyperdeg
 - [x] (2026-06-10) Header nav wiring (desktop/mobile/more) + vm tests for both voices.
 - [x] (2026-06-10) Account-info tab override merge (trade + portfolio call sites) + memo slice.
 - [x] (2026-06-10) Order form buy/sell/submit wiring + memo slice.
-- [ ] Follow-up — orderbook panel tabs ("Order Book"/"Trades"): `l2-orderbook.tabs/orderbook-tabs-row` takes no state; thread voice through its caller chain when touched next.
+- [x] (2026-06-10) Orderbook panel tabs voiced — `orderbook-tabs-row` grew a labels arity, `l2-orderbook-view` passes voice labels, `orderbook-view-state` carries the `{:ui {:theme …}}` slice.
 - [x] (2026-06-10) Phase C decor — `hyperopen.views.degen.widgets` (gated on `voice/degen?`, tokens only, desktop lg+): trade-route stats strip (Total Value/Unrealized P&L from `account-equity-metrics`, liq-risk tier from margin ratio, market vibes from active-asset 24h%, NFA + CONGRATS gold dashed cards) and bottom widget row (Degen Tip day-rotated, Whale Watch, Daily Motivation, Feeling Gauge from real unrealized PNL); brand wordmark/mark voiced (`HyperDegen`/`HD`) through the header vm; emoji on buy/sell/submit labels. Gotcha: new Tailwind classes in new namespaces need `npm run css:build` (JIT) — a stale CSS bundle silently drops them.
-- [ ] Follow-up — chart doodle overlay + Caveat/marker font, mock's left-rail cards (Shill of the Day needs a data-driven, non-promotional design), RESET LIFE interaction (needs an action; avoid dead controls).
+- [x] (2026-06-10) Phase D decor — chart doodle overlay (`degen-widgets/chart-doodles`: pointer-events-none SVG annotations in `--font-marker` handwriting, threaded through trade-view `renderers` into the chart wrapper; `--font-marker` cursive stack in base.css), Shill of the Day card (real top 24h gainer via `top-gainer`, click dispatches the existing `:actions/select-asset-by-market-key`, explicit not-financial-advice copy, no buy CTA), tiered `leverage-warning-banner` under the order-form leverage row (20x/50x/100x, real ui-leverage).
+- [ ] Follow-up — RESET LIFE interaction (needs a new action; avoid dead controls); mobile decor (everything is lg+ only); shell.cljs mobile surface tabs ("Order Book"/"Trades") still unvoiced (no state at that call site).
 
 ## Decisions
 

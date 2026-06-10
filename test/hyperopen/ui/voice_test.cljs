@@ -16,7 +16,12 @@
   (is (= "Trade" (voice/label {} :nav/trade)))
   (is (= "Trade" (voice/label {:ui {:theme "institutional"}} :nav/trade)))
   (is (= "Trade (Gamble)" (voice/label {:ui {:theme "hyperdegen"}} :nav/trade)))
-  (is (= "Buy / Moon 🚀" (voice/label {:ui {:theme "hyperdegen"}} :order-form/buy))))
+  (is (= "Buy / Moon 🚀" (voice/label {:ui {:theme "hyperdegen"}} :order-form/buy)))
+  (is (= "Order Book" (voice/label {} :orderbook/book)))
+  (is (= "Order Book (looks important)"
+         (voice/label {:ui {:theme "hyperdegen"}} :orderbook/book)))
+  (is (= "Trades (other people's mistakes)"
+         (voice/label {:ui {:theme "hyperdegen"}} :orderbook/trades))))
 
 (deftest degen-predicate-test
   (is (false? (voice/degen? {})))

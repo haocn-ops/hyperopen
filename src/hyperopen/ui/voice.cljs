@@ -28,6 +28,9 @@
    :nav/api {:default "API" :degen "API (Nerds)"}
    :nav/subaccounts {:default "Sub-Accounts" :degen "Sub-Accounts (Alts)"}
 
+   :orderbook/book {:default "Order Book" :degen "Order Book (looks important)"}
+   :orderbook/trades {:default "Trades" :degen "Trades (other people's mistakes)"}
+
    :order-form/buy {:default "Buy / Long" :degen "Buy / Moon 🚀"}
    :order-form/sell {:default "Sell / Short" :degen "Sell / Panic 😱"}
    :order-form/submit {:default "Place Order" :degen "Send It 🚀"}

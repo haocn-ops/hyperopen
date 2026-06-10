@@ -67,15 +67,16 @@
   [desktop-layout?
    {:keys [layout]}
    {:keys [active-asset-panel-state trade-chart-panel-state]}
-   {:keys [render-active-asset-panel-state trade-chart-panel-content-state]}]
+   {:keys [render-active-asset-panel-state trade-chart-panel-content-state chart-doodles]}]
   [:div {:class (:chart-panel-classes layout)
          :data-parity-id "trade-chart-panel"}
    [:div {:class (:desktop-active-asset-shell-classes layout)}
     (when desktop-layout?
       (render-active-asset-panel-state active-asset-panel-state))]
    (when (:chart-panel-visible? layout)
-     [:div {:class ["overflow-hidden" "flex-1" "min-h-0" "min-w-0"]}
-      (trade-chart-panel-content-state trade-chart-panel-state)])])
+     [:div {:class ["relative" "overflow-hidden" "flex-1" "min-h-0" "min-w-0"]}
+      (trade-chart-panel-content-state trade-chart-panel-state)
+      chart-doodles])])
 
 (defn render-orderbook-panel-shell
   [desktop-layout?

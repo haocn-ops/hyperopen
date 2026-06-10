@@ -1,5 +1,6 @@
 (ns hyperopen.views.l2-orderbook-view
   (:require [hyperopen.trading-settings :as trading-settings]
+            [hyperopen.ui.voice :as voice]
             [hyperopen.views.l2-orderbook.depth :as depth]
             [hyperopen.views.l2-orderbook.dropdowns :as dropdowns]
             [hyperopen.views.l2-orderbook.model :as model]
@@ -79,7 +80,9 @@
     [:div {:class ["w-full" "h-full" "min-h-0" "overflow-hidden" "flex" "flex-col"]
            :data-parity-id "orderbook-panel"}
      (when show-tabs?
-       (tabs/orderbook-tabs-row active-tab))
+       (tabs/orderbook-tabs-row active-tab
+                                {:orderbook-label (voice/label state :orderbook/book)
+                                 :trades-label (voice/label state :orderbook/trades)}))
      [:div {:class ["flex-1" "h-full" "min-h-0" "overflow-hidden" "bg-base-100"]}
       (if (= active-tab :trades)
         (tabs/tab-content-viewport

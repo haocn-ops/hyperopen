@@ -269,15 +269,16 @@
 
 (defn- orderbook-view-state
   [state active-asset orderbook-data show-surface-freshness-cues? websocket-health]
-  {:coin (or active-asset "No Asset Selected")
-   :market (:active-market state)
-   :orderbook orderbook-data
-   :orderbook-ui (:orderbook-ui state)
-   :trading-settings (:trading-settings state)
-   :show-surface-freshness-cues? show-surface-freshness-cues?
-   :websocket-health (when show-surface-freshness-cues?
-                       websocket-health)
-   :loading (and active-asset (nil? orderbook-data))})
+  (merge {:coin (or active-asset "No Asset Selected")
+          :market (:active-market state)
+          :orderbook orderbook-data
+          :orderbook-ui (:orderbook-ui state)
+          :trading-settings (:trading-settings state)
+          :show-surface-freshness-cues? show-surface-freshness-cues?
+          :websocket-health (when show-surface-freshness-cues?
+                              websocket-health)
+          :loading (and active-asset (nil? orderbook-data))}
+         (ui-voice-state state)))
 
 (defn- mobile-account-surface [state equity-metrics]
   (let [account-equity-panel (render-account-equity-panel state
@@ -385,7 +386,8 @@
                    :render-active-asset-panel-state render-active-asset-panel-state
                    :render-orderbook-panel render-orderbook-panel
                    :render-order-form-panel render-order-form-panel
-                   :trade-chart-panel-content-state trade-chart-panel-content-state}]
+                   :trade-chart-panel-content-state trade-chart-panel-content-state
+                   :chart-doodles (degen-widgets/chart-doodles state)}]
     [:div {:class ["flex-1" "flex" "flex-col" "min-h-0" "overflow-hidden"]
            :data-parity-id "trade-root"}
      [:div {:class ["w-full"

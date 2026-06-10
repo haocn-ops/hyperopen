@@ -1,6 +1,7 @@
 (ns hyperopen.views.trade.order-form-view
   (:require [hyperopen.state.trading :as trading]
             [hyperopen.ui.voice :as voice]
+            [hyperopen.views.degen.widgets :as degen-widgets]
             [hyperopen.views.trade.order-form-component-primitives :as primitives]
             [hyperopen.views.trade.order-form-component-sections :as sections]
             [hyperopen.views.trade.order-form-controls :as controls]
@@ -151,6 +152,8 @@
                                leverage-draft
                                max-leverage
                                leverage-handlers))
+      (when-not outcome?
+        (degen-widgets/leverage-warning-banner state ui-leverage))
 
       (sections/entry-mode-tabs {:entry-mode entry-mode
                                  :type type

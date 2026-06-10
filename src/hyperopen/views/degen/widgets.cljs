@@ -155,6 +155,155 @@
          "NOT FINANCIAL ADVICE! 🤡"]]
        (congrats-card state)])))
 
+(def ^:private marker-style
+  {:font-family "var(--font-marker)"})
+
+(defn- doodle-label
+  [classes text]
+  [:span {:class (into ["text-base" "font-bold" "leading-none" "whitespace-nowrap"]
+                       classes)
+          :style marker-style}
+   text])
+
+(defn chart-doodles
+  "Decorative hand-drawn annotations over the price chart. Absolutely
+   positioned, pointer-events-none, never intercepts chart interaction."
+  [state]
+  (when (voice/degen? state)
+    [:div {:class ["pointer-events-none" "absolute" "inset-0" "z-[5]"
+                   "hidden" "lg:block" "opacity-80"]
+           :data-role "degen-chart-doodles"}
+     ;; rising arrow + "seems good"
+     [:div {:class ["absolute" "left-[8%]" "top-[40%]" "w-[26%]" "text-ho-buy"]}
+      [:svg {:viewBox "0 0 120 60"
+             :class ["w-full"]
+             :fill "none"}
+       [:path {:d "M6 52 C 36 50, 64 38, 102 12"
+               :stroke "currentColor"
+               :stroke-width "3"
+               :stroke-linecap "round"
+               :vector-effect "non-scaling-stroke"}]
+       [:path {:d "M88 10 L 104 11 L 96 24"
+               :stroke "currentColor"
+               :stroke-width "3"
+               :stroke-linecap "round"
+               :stroke-linejoin "round"
+               :vector-effect "non-scaling-stroke"}]]
+      (doodle-label ["text-ho-buy"] "seems good")]
+     ;; circle around a local top
+     [:div {:class ["absolute" "left-[52%]" "top-[10%]" "w-[9%]" "text-ho-buy"]}
+      [:svg {:viewBox "0 0 100 60"
+             :class ["w-full"]
+             :fill "none"}
+       [:ellipse {:cx "50" :cy "30" :rx "44" :ry "24"
+                  :stroke "currentColor"
+                  :stroke-width "3"
+                  :vector-effect "non-scaling-stroke"}]]]
+     ;; "uh oh" + arrow into the dump
+     [:div {:class ["absolute" "right-[6%]" "top-[8%]" "w-[12%]" "text-ho-sell"
+                    "flex" "flex-col" "items-end" "gap-1"]}
+      (doodle-label ["text-ho-sell" "text-lg"] "uh oh")
+      [:svg {:viewBox "0 0 80 70"
+             :class ["w-2/3"]
+             :fill "none"}
+       [:path {:d "M70 8 C 50 18, 36 34, 26 56"
+               :stroke "currentColor"
+               :stroke-width "3"
+               :stroke-linecap "round"
+               :vector-effect "non-scaling-stroke"}]
+       [:path {:d "M20 42 L 25 58 L 40 52"
+               :stroke "currentColor"
+               :stroke-width "3"
+               :stroke-linecap "round"
+               :stroke-linejoin "round"
+               :vector-effect "non-scaling-stroke"}]]]
+     ;; gold dashed MAGIC LINE
+     [:div {:class ["absolute" "left-[10%]" "top-[64%]" "w-[58%]" "text-ho-warn"]}
+      [:div {:class ["flex" "items-baseline" "gap-2"]}
+       (doodle-label ["text-ho-warn"] "MAGIC LINE ✨")]
+      [:svg {:viewBox "0 0 400 8"
+             :preserveAspectRatio "none"
+             :class ["w-full" "h-2"]
+             :fill "none"}
+       [:path {:d "M2 4 L 398 4"
+               :stroke "currentColor"
+               :stroke-width "3"
+               :stroke-dasharray "14 10"
+               :stroke-linecap "round"
+               :vector-effect "non-scaling-stroke"}]]]
+     ;; cat + "trust me bro"
+     [:div {:class ["absolute" "right-[8%]" "bottom-[24%]" "w-[8%]" "text-ho-info"
+                    "flex" "flex-col" "items-center" "gap-1"]}
+      [:svg {:viewBox "0 0 100 90"
+             :class ["w-3/4"]
+             :fill "none"}
+       [:path {:d "M22 30 L 14 8 L 38 18"
+               :stroke "currentColor"
+               :stroke-width "3"
+               :stroke-linejoin "round"
+               :vector-effect "non-scaling-stroke"}]
+       [:path {:d "M78 30 L 86 8 L 62 18"
+               :stroke "currentColor"
+               :stroke-width "3"
+               :stroke-linejoin "round"
+               :vector-effect "non-scaling-stroke"}]
+       [:circle {:cx "50" :cy "50" :r "34"
+                 :stroke "currentColor"
+                 :stroke-width "3"
+                 :vector-effect "non-scaling-stroke"}]
+       [:circle {:cx "38" :cy "44" :r "3" :fill "currentColor"}]
+       [:circle {:cx "62" :cy "44" :r "3" :fill "currentColor"}]
+       [:path {:d "M44 60 Q 50 66, 56 60"
+               :stroke "currentColor"
+               :stroke-width "3"
+               :stroke-linecap "round"
+               :vector-effect "non-scaling-stroke"}]
+       [:path {:d "M10 50 L 30 52 M10 62 L 30 58 M90 50 L 70 52 M90 62 L 70 58"
+               :stroke "currentColor"
+               :stroke-width "2"
+               :stroke-linecap "round"
+               :vector-effect "non-scaling-stroke"}]]
+      (doodle-label ["text-ho-info"] "trust me bro")]]))
+
+(defn top-gainer
+  "Best 24h performer from real market data; nil when no markets carry a
+   numeric change."
+  [state]
+  (let [markets (vals (get-in state [:asset-selector :market-by-key] {}))
+        gainers (keep (fn [market]
+                        (let [pct (js/parseFloat (:change24hPct market))]
+                          (when-not (js/isNaN pct)
+                            (assoc market :degen/pct pct))))
+                      markets)]
+    (when (seq gainers)
+      (apply max-key :degen/pct gainers))))
+
+(defn leverage-warning-banner
+  "Escalating parody warning under the leverage row; real leverage in."
+  [state leverage]
+  (when (voice/degen? state)
+    (let [lev (js/parseFloat leverage)]
+      (when-not (js/isNaN lev)
+        (when-some [warning (cond
+                              (>= lev 100)
+                              {:text "MAXIMUM DEGEN. Tell your family you love them. 💀"
+                               :classes ["border-ho-sell" "text-ho-sell"]}
+
+                              (>= lev 50)
+                              {:text "A 0.1% wick ends you. Good luck. 💀"
+                               :classes ["border-ho-sell" "text-ho-sell"]}
+
+                              (>= lev 20)
+                              {:text "WARNING: HIGH LEVERAGE = BIG FUN (or big sadness)"
+                               :classes ["border-ho-warn" "text-ho-warn"]}
+
+                              :else nil)]
+          [:div {:class (into ["rounded-md" "border" "border-dashed" "px-2.5"
+                               "py-1.5" "text-xs" "font-bold"]
+                              (:classes warning))
+                 :data-role "degen-leverage-warning"}
+           (:text warning)])))))
+
 (defn- widget-card
   [{:keys [data-role border-class title]} & body]
   [:div {:class (conj ["flex" "flex-col" "gap-1.5" "rounded-lg" "border"
@@ -171,10 +320,28 @@
   [state]
   (when (voice/degen? state)
     (let [metrics (equity-metrics/account-equity-metrics state)
-          mood (feeling (:unrealized-pnl metrics))]
-      [:div {:class ["hidden" "lg:grid" "grid-cols-2" "xl:grid-cols-4" "gap-2"
+          mood (feeling (:unrealized-pnl metrics))
+          shill (top-gainer state)]
+      [:div {:class ["hidden" "lg:grid" "grid-cols-2" "xl:grid-cols-5" "gap-2"
                      "px-2" "pb-2"]
              :data-role "degen-widgets-row"}
+       (widget-card {:data-role "degen-widget-shill"
+                     :border-class "border-ho-warn"
+                     :title "Shill of the Day 🗣️"}
+                    (if shill
+                      [:div {:class ["flex" "flex-col" "gap-1"]}
+                       [:button {:type "button"
+                                 :class ["self-start" "text-sm" "font-bold"
+                                         "text-ho-warn" "hover:text-ho-accent-hi"
+                                         "transition-colors"]
+                                 :data-role "degen-shill-select"
+                                 :on {:click [[:actions/select-asset-by-market-key (:key shill)]]}}
+                        (str (or (:coin shill) (:key shill))
+                             " +" (.toFixed (:degen/pct shill) 2) "%")]
+                       [:p {:class ["text-xs" "text-ho-text-secondary" "leading-relaxed"]}
+                        "Definitely not a trap. (not financial advice, obviously)"]]
+                      [:p {:class ["text-xs" "text-ho-text-secondary"]}
+                       "Nothing pumping. Suspicious."]))
        (widget-card {:data-role "degen-widget-tip"
                      :border-class "border-ho-info"
                      :title "Degen Tip 💡"}

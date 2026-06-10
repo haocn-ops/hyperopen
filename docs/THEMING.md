@@ -85,5 +85,6 @@ Radius tokens: `--ho-radius-sm`, `--ho-radius`, `--ho-radius-md`, `--ho-radius-l
 ## Scope boundaries
 
 - Themes change tokens (color, type, radius). Layout, density, copy, and illustrations are not theme concerns.
+- Copy is *voiced*, not themed: `hyperopen.ui.voice` maps label keys to per-voice strings, and the active voice derives from the active theme (`hyperdegen` → `:degen`, everything else → the canonical `:default`). Tokens never carry copy; the voice catalog never carries colors. The catalog's `:default` strings are sync-tested against the surfaces that own them (header nav, account-info tab registry).
 - The portfolio optimizer keeps its scoped `--o-*` visual system.
 - The chart picks up theme tokens when its options are (re)applied — on creation, asset/timeframe change, or reload. Live re-theme of a mounted chart is a tracked follow-up.

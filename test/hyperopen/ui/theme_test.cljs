@@ -30,8 +30,8 @@
         html-el (js-obj "dataset" (js-obj))]
     (try
       (set! (.-document js/globalThis) (js-obj "documentElement" html-el))
-      (is (= "hyperdumb" (theme/apply-theme-attribute! "hyperdumb")))
-      (is (= "hyperdumb" (.. js/document -documentElement -dataset -theme)))
+      (is (= "hyperdegen" (theme/apply-theme-attribute! "hyperdegen")))
+      (is (= "hyperdegen" (.. js/document -documentElement -dataset -theme)))
       (is (= theme/default-theme-id (theme/apply-theme-attribute! "bogus")))
       (is (= theme/default-theme-id
              (.. js/document -documentElement -dataset -theme)))

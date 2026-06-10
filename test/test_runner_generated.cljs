@@ -389,6 +389,7 @@
             [hyperopen.ui.preferences-test]
             [hyperopen.ui.table.sort-kernel-test]
             [hyperopen.ui.theme-test]
+            [hyperopen.ui.voice-test]
             [hyperopen.utils.data-normalization-test]
             [hyperopen.utils.formatting-test]
             [hyperopen.utils.hl-signing-test]
@@ -472,6 +473,7 @@
             [hyperopen.views.chart.d3.model-test]
             [hyperopen.views.chart.d3.runtime-test]
             [hyperopen.views.chart.tooltip-core-test]
+            [hyperopen.views.degen.widgets-test]
             [hyperopen.views.footer-build-id-test]
             [hyperopen.views.footer-view-test]
             [hyperopen.views.funding-comparison-view-test]
@@ -1091,6 +1093,7 @@
              'hyperopen.ui.preferences-test
              'hyperopen.ui.table.sort-kernel-test
              'hyperopen.ui.theme-test
+             'hyperopen.ui.voice-test
              'hyperopen.utils.data-normalization-test
              'hyperopen.utils.formatting-test
              'hyperopen.utils.hl-signing-test
@@ -1174,6 +1177,7 @@
              'hyperopen.views.chart.d3.model-test
              'hyperopen.views.chart.d3.runtime-test
              'hyperopen.views.chart.tooltip-core-test
+             'hyperopen.views.degen.widgets-test
              'hyperopen.views.footer-build-id-test
              'hyperopen.views.footer-view-test
              'hyperopen.views.funding-comparison-view-test

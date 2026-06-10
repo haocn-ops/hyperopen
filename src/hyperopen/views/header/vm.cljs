@@ -3,6 +3,7 @@
             [hyperopen.account.spectate-mode-links :as spectate-mode-links]
             [hyperopen.trading-settings :as trading-settings]
             [hyperopen.ui.theme :as ui-theme]
+            [hyperopen.ui.voice :as voice]
             [hyperopen.views.header.account-selector :as account-selector]
             [hyperopen.views.header.nav :as nav]
             [hyperopen.wallet.agent-session :as agent-session]
@@ -20,6 +21,10 @@
 (defn- nav-href
   [state route]
   (spectate-mode-links/internal-route-href state route))
+
+(defn- with-voice-label
+  [state item]
+  (assoc item :label (voice/nav-label state (:id item) (:label item))))
 
 (defn- with-desktop-action
   [state item]
@@ -39,19 +44,23 @@
 
 (defn- desktop-nav-vm
   [state route]
-  (mapv (partial with-desktop-action state)
+  (mapv (comp (partial with-desktop-action state)
+              (partial with-voice-label state))
         (nav/items-for-placement route :desktop)))
 
 (defn- mobile-nav-vm
-  [route]
-  {:primary-items (mapv with-mobile-action
-                        (nav/items-for-placement route :mobile-primary))
-   :secondary-items (mapv with-mobile-action
-                          (nav/items-for-placement route :mobile-secondary))})
+  [state route]
+  (let [present (comp with-mobile-action
+                      (partial with-voice-label state))]
+    {:primary-items (mapv present
+                          (nav/items-for-placement route :mobile-primary))
+     :secondary-items (mapv present
+                            (nav/items-for-placement route :mobile-secondary))}))
 
 (defn- more-nav-vm
   [state route]
-  (let [items (mapv (partial with-more-action state)
+  (let [items (mapv (comp (partial with-more-action state)
+                          (partial with-voice-label state))
                     (nav/items-for-placement route :more))]
     {:menu-key (str "header-more-menu:" route)
      :active? (boolean (some :active? items))
@@ -360,14 +369,20 @@
                  "Look and feel"
                  [(theme-choice-row state)])]}))
 
+(defn- brand-vm
+  [state]
+  {:wordmark (voice/label state :brand/wordmark)
+   :mark (voice/label state :brand/mark)})
+
 (defn header-vm
   [state]
   (let [route (get-in state [:router :path] "/trade")
         spectate-active? (account-context/spectate-mode-active? state)]
     {:route route
+     :brand (brand-vm state)
      :mobile-menu-open? (true? (get-in state [:header-ui :mobile-menu-open?]))
      :desktop-nav-items (desktop-nav-vm state route)
-     :mobile-nav (mobile-nav-vm route)
+     :mobile-nav (mobile-nav-vm state route)
      :more-nav (more-nav-vm state route)
      :spectate (spectate-vm spectate-active?)
      :account-selector (account-selector/vm state)

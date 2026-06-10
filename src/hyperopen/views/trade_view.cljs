@@ -4,6 +4,7 @@
             [hyperopen.views.active-asset.vm :as active-asset-vm]
             [hyperopen.views.active-asset-view :as active-asset-view]
             [hyperopen.views.asset-selector-view :as asset-selector-view]
+            [hyperopen.views.degen.widgets :as degen-widgets]
             [hyperopen.views.l2-orderbook-view :as l2-orderbook-view]
             [hyperopen.views.trade.order-form-view :as order-form-view]
             [hyperopen.views.trade-view.layout-state :as layout-state]
@@ -85,6 +86,13 @@
   [state]
   {:asset-selector {:market-by-key (get-in state [:asset-selector :market-by-key] {})}})
 
+(defn- ui-voice-state
+  "The slice hyperopen.ui.voice reads; memoized panels that voice their
+   copy must include it in their selected state or labels go stale when
+   the theme switches."
+  [state]
+  {:ui {:theme (get-in state [:ui :theme])}})
+
 (defn- trade-chart-view-state
   [state]
   (cond-> (merge (select-view-state state trade-chart-view-base-state-keys)
@@ -96,7 +104,8 @@
 (defn- account-info-view-state
   [state]
   (cond-> (merge (select-view-state state account-info-view-base-state-keys)
-                 (asset-selector-market-lookup-state state))
+                 (asset-selector-market-lookup-state state)
+                 (ui-voice-state state))
     (surface-freshness-cues-enabled? state)
     (assoc :websocket (:websocket state)
            :websocket-ui (:websocket-ui state))))
@@ -108,7 +117,8 @@
 
 (defn- order-form-view-state
   [state]
-  (select-view-state state order-form-view-state-keys))
+  (merge (select-view-state state order-form-view-state-keys)
+         (ui-voice-state state)))
 
 (defn- account-surface-export
   [export-id]
@@ -389,6 +399,8 @@
                     "scrollbar-hide"
                     "overflow-y-auto"]
             :data-role "trade-scroll-shell"}
+      (degen-widgets/stats-strip state)
       (shell/render-mobile-active-asset-strip state layout-context renderers)
       (shell/render-mobile-surface-tabs mobile-surface layout-context)
-      (shell/render-trade-grid state layout-context panel-context renderers)]]))
+      (shell/render-trade-grid state layout-context panel-context renderers)
+      (degen-widgets/widgets-row state)]]))

@@ -9,7 +9,7 @@
 (def themes
   [{:id "dark" :label "HyperOpen"}
    {:id "institutional" :label "Institutional"}
-   {:id "hyperdumb" :label "HyperDumb"}])
+   {:id "hyperdegen" :label "HyperDegen"}])
 
 (def default-theme-id "dark")
 

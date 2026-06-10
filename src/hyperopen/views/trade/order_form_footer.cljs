@@ -4,7 +4,8 @@
 (def ^:private liquidation-price-tooltip
   "Position risk is low, so there is no liquidation price for the time being. Note that increasing the position or reducing the margin will increase the risk.")
 
-(defn submit-row [{:keys [submitting? submit-disabled? submit-tooltip on-submit]}]
+(defn submit-row [{:keys [submitting? submit-disabled? submit-tooltip
+                          submit-label submitting-label on-submit]}]
   [:div {:class ["relative" "group"]
          :tabindex (when (seq submit-tooltip) 0)}
    [:button {:type "button"
@@ -28,7 +29,9 @@
              :data-parity-id "trade-submit-order-button"
              :disabled submit-disabled?
              :on {:click on-submit}}
-    (if submitting? "Submitting..." "Place Order")]
+    (if submitting?
+      (or submitting-label "Submitting...")
+      (or submit-label "Place Order"))]
    (when (seq submit-tooltip)
      [:div {:class ["order-submit-tooltip"
                     "pointer-events-none"

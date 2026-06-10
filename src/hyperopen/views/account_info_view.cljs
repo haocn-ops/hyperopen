@@ -1,5 +1,6 @@
 (ns hyperopen.views.account-info-view
-  (:require [hyperopen.views.account-info.shared :as shared]
+  (:require [hyperopen.ui.voice :as voice]
+            [hyperopen.views.account-info.shared :as shared]
             [hyperopen.views.account-info.tab-actions :as tab-actions]
             [hyperopen.views.account-info.tab-registry :as tab-registry]
             [hyperopen.views.account-info.table :as account-table]
@@ -284,6 +285,10 @@
                 tab-order []}}]
    (let [view-model (account-info-vm/account-info-vm state)
          extra-tabs* (tab-registry/normalized-extra-tabs extra-tabs)
+         ;; Voice copy loses to caller overrides (e.g. portfolio's
+         ;; :funding-history -> "Interest" context rename).
+         tab-label-overrides* (merge (voice/account-tab-overrides state)
+                                     tab-label-overrides)
          {:keys [selected-tab
                  tab-counts
                  hide-small?
@@ -296,7 +301,7 @@
                  freshness-cues
                  error
                  loading?]} view-model
-         available-tabs* (tab-registry/available-tabs-for extra-tabs* tab-order tab-label-overrides)
+         available-tabs* (tab-registry/available-tabs-for extra-tabs* tab-order tab-label-overrides*)
          fallback-selected-tab (if (some #(= % default-selected-tab) available-tabs*)
                                  default-selected-tab
                                  (or (first available-tabs*)
@@ -340,7 +345,7 @@
                                   balances-coin-search
                                   {:extra-tabs extra-tabs
                                    :tab-click-actions-by-tab tab-click-actions-by-tab
-                                   :tab-label-overrides tab-label-overrides
+                                   :tab-label-overrides tab-label-overrides*
                                    :tab-order tab-order})
       [:div {:class ["flex-1" "min-h-0" "min-w-0" "overflow-hidden"]}
        (cond

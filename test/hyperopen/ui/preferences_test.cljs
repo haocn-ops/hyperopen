@@ -45,10 +45,10 @@
         store (atom {})]
     (try
       (set! (.-document js/globalThis) (js-obj "documentElement" html-el))
-      (with-redefs [hyperopen.platform/local-storage-get (fn [_] " HyperDumb ")]
-        (is (= "hyperdumb" (preferences/restore-ui-theme-preference! store)))
-        (is (= "hyperdumb" (.. js/document -documentElement -dataset -theme)))
-        (is (= "hyperdumb" (get-in @store [:ui :theme]))))
+      (with-redefs [hyperopen.platform/local-storage-get (fn [_] " HyperDegen ")]
+        (is (= "hyperdegen" (preferences/restore-ui-theme-preference! store)))
+        (is (= "hyperdegen" (.. js/document -documentElement -dataset -theme)))
+        (is (= "hyperdegen" (get-in @store [:ui :theme]))))
       (finally
         (if had-document?
           (set! (.-document js/globalThis) orig-document)
@@ -82,7 +82,7 @@
       (js-delete js/globalThis "document")
       (with-redefs [hyperopen.platform/local-storage-get (fn [_]
                                                            (swap! calls inc)
-                                                           "hyperdumb")]
+                                                           "hyperdegen")]
         (preferences/restore-ui-theme-preference! (atom {}))
         (is (= 0 @calls)))
       (finally

@@ -17,7 +17,7 @@ const expectedImports = [
   "./base.css",
   "./themes/dark.css",
   "./themes/institutional.css",
-  "./themes/hyperdumb.css",
+  "./themes/hyperdegen.css",
   "./surfaces/trading.css",
   "./surfaces/optimizer.css",
   "./surfaces/app-shell.css",

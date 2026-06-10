@@ -275,8 +275,8 @@
   (is (= [[:effects/save [:ui :theme] "dark"]
           [:effects/local-storage-set "hyperopen-ui-theme" "dark"]
           [:effects/apply-ui-theme "dark"]]
-         (actions/set-ui-theme {:ui {:theme "hyperdumb"}} "not-a-theme"))))
+         (actions/set-ui-theme {:ui {:theme "hyperdegen"}} "not-a-theme"))))
 
 (deftest set-ui-theme-is-noop-when-theme-unchanged-test
-  (is (= [] (actions/set-ui-theme {:ui {:theme "hyperdumb"}} "hyperdumb")))
+  (is (= [] (actions/set-ui-theme {:ui {:theme "hyperdegen"}} "hyperdegen")))
   (is (= [] (actions/set-ui-theme {} "dark"))))

@@ -103,14 +103,40 @@
         theme-row (row-by-id sections :appearance :ui-theme)]
     (is (= :choice (:kind theme-row)))
     (is (= "trading-settings-ui-theme-row" (:data-role theme-row)))
-    (is (= ["dark" "institutional" "hyperdumb"]
+    (is (= ["dark" "institutional" "hyperdegen"]
            (mapv :value (:options theme-row))))
-    (is (= ["HyperOpen" "Institutional" "HyperDumb"]
+    (is (= ["HyperOpen" "Institutional" "HyperDegen"]
            (mapv :label (:options theme-row))))
     (is (= [false true false]
            (mapv :active? (:options theme-row))))
-    (is (= [[:actions/set-ui-theme "hyperdumb"]]
+    (is (= [[:actions/set-ui-theme "hyperdegen"]]
            (-> theme-row :options (nth 2) :action)))))
+
+(deftest header-vm-brand-voice-test
+  (let [degen (vm/header-vm {:ui {:theme "hyperdegen"}})
+        plain (vm/header-vm {})]
+    (is (= {:wordmark "HyperDegen" :mark "HD"}
+           (:brand degen)))
+    (is (= {:wordmark "HyperOpen" :mark "HO"}
+           (:brand plain)))))
+
+(deftest header-vm-degen-voice-relabels-nav-test
+  (let [degen (vm/header-vm {:ui {:theme "hyperdegen"}})
+        plain (vm/header-vm {})]
+    (is (= ["Trade (Gamble)" "Portfolio (Hope)" "Funding (Brrr)" "Vaults (LOL)"
+            "Staking (Zzz)" "Referrals (Spam)" "Leaderboard (Flex)"]
+           (mapv :label (:desktop-nav-items degen))))
+    (is (= ["Trade" "Portfolio" "Funding" "Vaults" "Staking" "Referrals"
+            "Leaderboard"]
+           (mapv :label (:desktop-nav-items plain))))
+    (is (= ["API (Nerds)" "Sub-Accounts (Alts)"]
+           (mapv :label (get-in degen [:more-nav :items]))))
+    (is (= ["Trade (Gamble)" "Portfolio (Hope)" "Funding (Brrr)" "Vaults (LOL)"]
+           (mapv :label (get-in degen [:mobile-nav :primary-items]))))
+    (is (= ["Staking (Zzz)" "Referrals (Spam)" "Leaderboard (Flex)"]
+           (mapv :label (get-in degen [:mobile-nav :secondary-items]))))
+    (is (= ["Trade" "Portfolio" "Funding" "Vaults"]
+           (mapv :label (get-in plain [:mobile-nav :primary-items]))))))
 
 (deftest header-vm-theme-choice-defaults-to-dark-test
   (let [result (vm/header-vm {:header-ui {:settings-open? true}})

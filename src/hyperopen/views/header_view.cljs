@@ -35,7 +35,7 @@
 
 (defn header-view
   [state]
-  (let [{:keys [account-selector desktop-nav-items mobile-menu-open? mobile-nav more-nav settings spectate wallet]}
+  (let [{:keys [account-selector brand desktop-nav-items mobile-menu-open? mobile-nav more-nav settings spectate wallet]}
         (vm/header-vm state)]
     [:div {:class ["contents"]
            :data-role "header-shell"}
@@ -51,11 +51,11 @@
                    :data-role "mobile-brand"}
           [:span {:class (into ["text-lg" "leading-none"]
                                brand-mark-classes)}
-           "HO"]]
+           (:mark brand)]]
          [:div {:class ["hidden" "md:flex" "items-center" "space-x-2" "sm:space-x-3"]}
           [:span {:class (into ["text-xl" "leading-none" "sm:text-3xl"]
                                brand-wordmark-classes)}
-           "HyperOpen"]]]
+           (:wordmark brand)]]]
         (navigation/render-desktop-nav desktop-nav-items more-nav)
         [:div {:class ["ml-auto" "flex" "items-center" "gap-1.5" "sm:gap-2.5" "lg:gap-4"]
                :data-parity-id "header-wallet-control"}

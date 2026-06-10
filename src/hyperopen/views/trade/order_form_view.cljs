@@ -1,5 +1,6 @@
 (ns hyperopen.views.trade.order-form-view
   (:require [hyperopen.state.trading :as trading]
+            [hyperopen.ui.voice :as voice]
             [hyperopen.views.trade.order-form-component-primitives :as primitives]
             [hyperopen.views.trade.order-form-component-sections :as sections]
             [hyperopen.views.trade.order-form-controls :as controls]
@@ -161,7 +162,10 @@
 
       (if outcome?
         (action-side-tabs side side-handlers)
-        (controls/side-row side side-handlers))
+        (controls/side-row side
+                           side-handlers
+                           {:buy-label (voice/label state :order-form/buy)
+                            :sell-label (voice/label state :order-form/sell)}))
       (when outcome?
         (controls/outcome-side-row outcome-sides
                                    outcome-side-index
@@ -226,6 +230,8 @@
         (footer/submit-row {:submitting? submitting?
                             :submit-disabled? (:disabled? submit)
                             :submit-tooltip (:tooltip submit)
+                            :submit-label (voice/label state :order-form/submit)
+                            :submitting-label (voice/label state :order-form/submitting)
                             :on-submit (:on-submit submit-handlers)}))
 
       (footer/footer-metrics display

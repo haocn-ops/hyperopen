@@ -6,6 +6,7 @@
             [hyperopen.platform :as platform]
             [hyperopen.runtime.state :as runtime-state]
             [hyperopen.trading-settings :as trading-settings]
+            [hyperopen.ui.fx :as fx]
             [hyperopen.ui.sfx :as sfx]
             [hyperopen.ui.voice :as voice]
             [hyperopen.utils.formatting :as fmt]))
@@ -454,10 +455,35 @@
                                   :auto-timeout? false))
       payload)))
 
+(defn liquidation-fill-row?
+  "True when a raw fill row is a liquidation (Hyperliquid marks these
+   with a `liquidation` payload and/or a \"Liquidated ...\" dir)."
+  [row]
+  (boolean
+   (and (map? row)
+        (or (some? (:liquidation row))
+            (when-some [dir (:dir row)]
+              (str/includes? (str/lower-case (str dir)) "liquidat"))))))
+
+(defn- celebrate-fills!
+  "Degen presentation effects for incoming fills: confetti + cha-ching
+   for ordinary fills, the REKT overlay + sad trombone for liquidations.
+   Other themes only get the plain chime (behind the sound setting)."
+  [state rows]
+  (let [degen? (voice/degen? state)
+        liquidated? (boolean (some liquidation-fill-row? rows))]
+    (when degen?
+      (if liquidated?
+        (fx/rekt-overlay!)
+        (fx/confetti!)))
+    (when (trading-settings/sound-on-fill? state)
+      (if (and degen? liquidated?)
+        (sfx/rekt!)
+        (sfx/fill! degen?)))))
+
 (defn show-user-fill-toast!
   [store rows]
-  (when (trading-settings/sound-on-fill? @store)
-    (sfx/fill! (voice/degen? @store)))
+  (celebrate-fills! @store rows)
   (when (trading-settings/fill-alerts-enabled? @store)
     (let [market-by-key (get-in @store [:asset-selector :market-by-key] {})]
       (doseq [payload (fill-toast-payloads rows market-by-key)]

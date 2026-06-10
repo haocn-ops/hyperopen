@@ -1473,3 +1473,41 @@
     display: none; /* Safari and Chrome */
   }
 }
+
+/* Degen celebration FX (hyperopen.ui.fx): emoji confetti + REKT overlay. */
+@keyframes degen-confetti-fall {
+  from {
+    transform: translate3d(0, -6vh, 0) rotate(0deg);
+    opacity: 1;
+  }
+  to {
+    transform: translate3d(var(--degen-drift, 0px), 108vh, 0)
+      rotate(var(--degen-spin, 360deg));
+    opacity: 0.9;
+  }
+}
+
+.degen-confetti-piece {
+  position: absolute;
+  top: 0;
+  animation: degen-confetti-fall linear forwards;
+  will-change: transform;
+}
+
+@keyframes degen-skull-pop {
+  0% {
+    transform: scale(0.6);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.08);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.degen-rekt-box {
+  animation: degen-skull-pop 0.45s ease-out;
+}

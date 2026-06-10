@@ -4,7 +4,9 @@
    massive BUY MOON / SELL PANIC side selectors from the HyperDegen
    prototype. Everything renders nil (or the compact default) under
    other themes."
-  (:require [hyperopen.ui.voice :as voice]))
+  (:require [hyperopen.trading-settings :as trading-settings]
+            [hyperopen.ui.sfx :as sfx]
+            [hyperopen.ui.voice :as voice]))
 
 (defn leverage-tier
   "Escalating taunt for a leverage value (prototype's LEVERAGE_WARNINGS).
@@ -63,6 +65,11 @@
   [state draft-leverage]
   (when (voice/degen? state)
     (when-some [tier (leverage-tier draft-leverage)]
+      ;; Render-side threshold tick (prototype's riskUp): idempotent per
+      ;; tier level, so re-renders are silent and only crossing a tier
+      ;; while dragging speaks.
+      (sfx/leverage-tick-on-change! (:level tier)
+                                    (trading-settings/sound-on-fill? state))
       [:div {:class (into ["rounded-md" "border" "border-dashed" "px-2.5"
                            "py-1.5" "text-xs" "font-bold" "leading-snug"]
                           (:classes tier))

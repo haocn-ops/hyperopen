@@ -88,3 +88,44 @@
       (chaching! ctx)
       (chime! ctx))
     nil))
+
+(defn rekt!
+  "Liquidation: rumble plus descending saw plus sad trombone (from the
+   HyperDegen prototype). No-ops when WebAudio is unavailable."
+  []
+  (when-some [ctx (audio-context)]
+    (noise! ctx {:dur 0.5 :peak 0.1 :freq 300})
+    (tone! ctx {:type "sawtooth" :freq 110 :slide-to 40 :dur 0.8 :peak 0.12})
+    (doseq [[i f] (map-indexed vector [233 220 208 196])]
+      (let [last? (= i 3)]
+        (tone! ctx {:type "sawtooth"
+                    :freq f
+                    :slide-to (* f (if last? 0.84 0.97))
+                    :dur (if last? 0.9 0.28)
+                    :peak 0.1
+                    :delay (* i 0.34)})))
+    nil))
+
+(defn- tick!
+  "Leverage slider threshold tick; pitch rises with the tier level."
+  [level]
+  (when-some [ctx (audio-context)]
+    (tone! ctx {:type "square"
+                :freq (+ 300 (* (or level 0) 60))
+                :dur 0.05
+                :peak 0.05})
+    nil))
+
+(defonce ^:private last-leverage-tier* (atom nil))
+
+(defn leverage-tick-on-change!
+  "Play a tick when the leverage tier crosses a threshold. Idempotent
+   per tier level (the render-side caller may fire repeatedly); never
+   plays on the first observation, only on changes, and only when
+   `enabled?`."
+  [level enabled?]
+  (let [prev @last-leverage-tier*]
+    (reset! last-leverage-tier* level)
+    (when (and enabled? (some? prev) (not= prev level))
+      (tick! level))
+    nil))

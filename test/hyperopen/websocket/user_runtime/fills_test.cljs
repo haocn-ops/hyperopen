@@ -5,6 +5,18 @@
             [hyperopen.runtime.state :as runtime-state]
             [hyperopen.websocket.user-runtime.fills :as fill-runtime]))
 
+(deftest liquidation-fill-row-detection-test
+  (is (true? (fill-runtime/liquidation-fill-row?
+              {:coin "BTC" :dir "Liquidated Cross Long"})))
+  (is (true? (fill-runtime/liquidation-fill-row?
+              {:coin "BTC" :dir "Liquidated Isolated Short"})))
+  (is (true? (fill-runtime/liquidation-fill-row?
+              {:coin "BTC" :dir "Close Long" :liquidation {:markPx "1"}})))
+  (is (false? (fill-runtime/liquidation-fill-row?
+               {:coin "BTC" :dir "Open Long"})))
+  (is (false? (fill-runtime/liquidation-fill-row? {:coin "BTC"})))
+  (is (false? (fill-runtime/liquidation-fill-row? nil))))
+
 (deftest novel-fills-dedupes-using-fallback-identity-test
   (let [existing [{:coin "ETH"
                    :side "A"

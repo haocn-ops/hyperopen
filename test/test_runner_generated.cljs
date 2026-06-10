@@ -386,6 +386,7 @@
             [hyperopen.trading.order-form-transitions-test]
             [hyperopen.trading.order-form-transitions-update-test]
             [hyperopen.ui.fonts-test]
+            [hyperopen.ui.fx-test]
             [hyperopen.ui.preferences-test]
             [hyperopen.ui.sfx-test]
             [hyperopen.ui.table.sort-kernel-test]
@@ -1094,6 +1095,7 @@
              'hyperopen.trading.order-form-transitions-test
              'hyperopen.trading.order-form-transitions-update-test
              'hyperopen.ui.fonts-test
+             'hyperopen.ui.fx-test
              'hyperopen.ui.preferences-test
              'hyperopen.ui.sfx-test
              'hyperopen.ui.table.sort-kernel-test

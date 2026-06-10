@@ -9,7 +9,8 @@ import {
   buildNightlyScenarios,
   extractInspectedAddresses,
   NIGHTLY_SPECTATE_ADDRESSES,
-  NIGHTLY_TAGS
+  NIGHTLY_TAGS,
+  summarizeNightlyCoverage
 } from "./nightly_ui_coverage.mjs";
 import { runScenarioBundle } from "./scenario_runner.mjs";
 import { safeNowIso, writeJsonFile } from "./util.mjs";
@@ -84,6 +85,34 @@ function summarizeRouteCoverage(results) {
   );
 }
 
+function mergeRouteCoverage(actualCoverage, expectedCoverage = []) {
+  const actualByKey = new Map(
+    (actualCoverage || []).map((entry) => [`${entry.route}::${entry.viewport}`, entry])
+  );
+  const expectedByKey = new Map(
+    (expectedCoverage || []).map((entry) => [`${entry.route}::${entry.viewport}`, entry])
+  );
+  const keys = new Set([...expectedByKey.keys(), ...actualByKey.keys()]);
+
+  return [...keys]
+    .map((key) => {
+      const actual = actualByKey.get(key);
+      const expected = expectedByKey.get(key);
+      return {
+        route: expected?.route || actual?.route,
+        viewport: expected?.viewport || actual?.viewport,
+        attempted: actual?.attempted || 0,
+        expectedAttempts: expected?.expectedAttempts ?? actual?.attempted ?? 0,
+        pass: actual?.pass || 0,
+        failed: actual?.failed || 0,
+        expectedSpectateAddresses: expected?.expectedSpectateAddresses || []
+      };
+    })
+    .sort((left, right) =>
+      `${left.route}/${left.viewport}`.localeCompare(`${right.route}/${right.viewport}`)
+    );
+}
+
 function summarizeStateCounts(results) {
   return (results || []).reduce(
     (acc, result) => {
@@ -143,7 +172,7 @@ async function gitBranch(repoRoot) {
   return stdout.trim();
 }
 
-function classifyNightlyFailures(summary, previousSummary) {
+function classifyNightlyFailures(summary, previousSummary, expectedRouteCoverage = []) {
   const previousResults = new Map(
     (previousSummary?.results || []).map((result) => [scenarioKey(result), result])
   );
@@ -175,11 +204,27 @@ function classifyNightlyFailures(summary, previousSummary) {
 
   const manualExceptions = results.filter((result) => result.state === "manual-exception");
   const stateCounts = summarizeStateCounts(results);
+  const routeCoverage = mergeRouteCoverage(
+    summarizeRouteCoverage(results),
+    expectedRouteCoverage
+  );
+  const coverageContractGaps = routeCoverage
+    .filter((entry) => entry.attempted !== entry.expectedAttempts)
+    .map((entry) => ({
+      route: entry.route,
+      viewport: entry.viewport,
+      attempted: entry.attempted,
+      expectedAttempts: entry.expectedAttempts
+    }));
+  const classification =
+    coverageContractGaps.length > 0 && summary.state === "pass" ? "automation-gap" : summary.state;
 
   return {
-    classification: summary.state,
+    classification,
     summary:
-      summary.state === "pass"
+      coverageContractGaps.length > 0
+        ? "Nightly scenario bundle missed part of the expected coverage contract."
+        : summary.state === "pass"
         ? "Nightly scenario bundle completed without failing scenarios."
         : `Nightly scenario bundle finished with state ${summary.state}.`,
     stateCounts,
@@ -187,7 +232,9 @@ function classifyNightlyFailures(summary, previousSummary) {
     persistentAutomationGaps,
     manualExceptions,
     inspectedAddresses: extractInspectedAddresses(results),
-    routeCoverage: summarizeRouteCoverage(results),
+    routeCoverage,
+    coverageContractSatisfied: coverageContractGaps.length === 0,
+    coverageContractGaps,
     generatedAt: safeNowIso()
   };
 }
@@ -320,13 +367,22 @@ function renderReport({
   const routeCoverageLines = classification.routeCoverage
     .map(
       (entry) =>
-        `- \`${entry.route}\` / \`${entry.viewport}\`: attempted ${entry.attempted}, pass ${entry.pass}, failed ${entry.failed}`
+        `- \`${entry.route}\` / \`${entry.viewport}\`: attempted ${entry.attempted}/${entry.expectedAttempts}, pass ${entry.pass}, failed ${entry.failed}`
     )
     .join("\n");
   const inspectedAddressLines =
     classification.inspectedAddresses.length === 0
       ? "- None."
       : classification.inspectedAddresses.map((address) => `- \`${address}\``).join("\n");
+  const coverageGapLines =
+    classification.coverageContractGaps.length === 0
+      ? "- None."
+      : classification.coverageContractGaps
+          .map(
+            (entry) =>
+              `- \`${entry.route}\` / \`${entry.viewport}\`: attempted ${entry.attempted}/${entry.expectedAttempts}`
+          )
+          .join("\n");
 
   const productRegressionLines =
     classification.newProductRegressions.length === 0
@@ -412,6 +468,10 @@ function renderReport({
 
 ${routeCoverageLines || "- None."}
 
+## Coverage contract gaps
+
+${coverageGapLines}
+
 ## Inspected spectate addresses
 
 ${inspectedAddressLines}
@@ -455,6 +515,7 @@ async function main() {
   const nightlyScenarios = await buildNightlyScenarios({
     scenarioDir: service.config.scenarioDir
   });
+  const expectedRouteCoverage = summarizeNightlyCoverage(nightlyScenarios);
 
   if (dryRun) {
     const scenarioBundle = await runScenarioBundle(service, {
@@ -509,7 +570,11 @@ async function main() {
   const previousSummary = previousRunDir
     ? await readJson(path.join(previousRunDir, "summary.json"), null)
     : null;
-  const classification = classifyNightlyFailures(summary, previousSummary);
+  const classification = classifyNightlyFailures(
+    summary,
+    previousSummary,
+    expectedRouteCoverage
+  );
   classification.overallState = overallState;
   classification.designReviewState = designReview.state;
   const reportDate = reportDateString();
@@ -521,6 +586,7 @@ async function main() {
     allowNonMain,
     tags: NIGHTLY_TAGS,
     expectedSpectateAddresses: NIGHTLY_SPECTATE_ADDRESSES,
+    expectedRouteCoverage,
     inspectedAddresses: classification.inspectedAddresses,
     previousRunDir,
     currentRunId: summary.runId,

@@ -4,7 +4,8 @@ import {
   NIGHTLY_SPECTATE_ADDRESSES,
   NIGHTLY_TAGS,
   buildNightlyScenarios,
-  extractInspectedAddresses
+  extractInspectedAddresses,
+  summarizeNightlyCoverage
 } from "../src/nightly_ui_coverage.mjs";
 import { getDefaultScenarioDir } from "../src/scenario_loader.mjs";
 
@@ -38,11 +39,57 @@ test("buildNightlyScenarios expands trade and portfolio smoke routes across the 
     const compareStep = scenario.steps.find((step) => step.type === "compare");
     assert.ok(compareStep);
     assert.equal(spectateValue(compareStep.rightUrl), spectateValue(scenario.url));
-    assert.equal(spectateValue(compareStep.leftUrl), spectateValue(scenario.url));
+    assert.equal(spectateValue(compareStep.leftUrl), null);
   }
 
   assert.ok(vaultsSmoke.length >= 2);
   assert.ok(vaultsSmoke.every((scenario) => spectateValue(scenario.url) === null));
+});
+
+test("summarizeNightlyCoverage captures the intended route and viewport attempt matrix", async () => {
+  const scenarios = await buildNightlyScenarios({
+    scenarioDir: getDefaultScenarioDir(),
+    tags: NIGHTLY_TAGS
+  });
+
+  assert.deepEqual(summarizeNightlyCoverage(scenarios), [
+    {
+      route: "/portfolio",
+      viewport: "desktop",
+      expectedAttempts: 3,
+      expectedSpectateAddresses: NIGHTLY_SPECTATE_ADDRESSES
+    },
+    {
+      route: "/portfolio",
+      viewport: "mobile",
+      expectedAttempts: 3,
+      expectedSpectateAddresses: NIGHTLY_SPECTATE_ADDRESSES
+    },
+    {
+      route: "/trade",
+      viewport: "desktop",
+      expectedAttempts: 3,
+      expectedSpectateAddresses: NIGHTLY_SPECTATE_ADDRESSES
+    },
+    {
+      route: "/trade",
+      viewport: "mobile",
+      expectedAttempts: 3,
+      expectedSpectateAddresses: NIGHTLY_SPECTATE_ADDRESSES
+    },
+    {
+      route: "/vaults",
+      viewport: "desktop",
+      expectedAttempts: 1,
+      expectedSpectateAddresses: []
+    },
+    {
+      route: "/vaults",
+      viewport: "mobile",
+      expectedAttempts: 1,
+      expectedSpectateAddresses: []
+    }
+  ]);
 });
 
 test("extractInspectedAddresses returns unique nightly spectate addresses in contract order", () => {

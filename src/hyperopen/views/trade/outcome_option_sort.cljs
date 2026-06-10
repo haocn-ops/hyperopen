@@ -102,9 +102,9 @@
                       "text-left"
                       "text-xs"
                       "font-medium"
-                      "text-[#949E9C]"
+                      "text-ho-text-secondary"
                       "transition-colors"
-                      "hover:text-[#F6FEFD]"
+                      "hover:text-ho-text"
                       "focus:outline-none"
                       "focus:ring-0"
                       "focus:ring-offset-0"]
@@ -112,4 +112,4 @@
                     {:click (on-sort column)})}
      [:span {:class ["truncate"]} label]
      (when indicator
-       [:span {:class ["text-[#50D2C1]"]} indicator])]))
+       [:span {:class ["text-ho-accent"]} indicator])]))

@@ -50,7 +50,7 @@
                           "transition-colors"]
                          (if selected?
                            ["bg-ho-surface-raised" "text-ho-accent"]
-                           ["text-[#D2DAD7]" "hover:bg-ho-surface-raised" "hover:text-ho-text"]))
+                           ["text-ho-text" "hover:bg-ho-surface-raised" "hover:text-ho-text"]))
             :role "option"
             :aria-selected (boolean selected?)
             :on {:click (on-select-mode mode)}}
@@ -71,7 +71,7 @@
                           "transition-colors"]
                          (if selected?
                            ["bg-ho-surface-raised" "text-ho-accent"]
-                           ["text-[#D2DAD7]" "hover:bg-ho-surface-raised" "hover:text-ho-text"]))
+                           ["text-ho-text" "hover:bg-ho-surface-raised" "hover:text-ho-text"]))
             :role "option"
             :aria-selected (boolean selected?)
             :on {:click (on-select-mode mode)}}
@@ -165,7 +165,7 @@
                     "border-ho-surface-raised"
                     "bg-ho-surface"
                     "p-1"
-                    "spectate-[0_10px_24px_rgba(0,0,0,0.35)]"]
+                    "spectate-[0_10px_24px_rgb(var(--ho-bg-deep)/0.35)]"]
             :style {:z-index 1202
                     :--ui-dropdown-origin "top left"}
             :data-ui-state (if dropdown-open? "open" "closed")
@@ -249,7 +249,7 @@
                     "border-ho-surface-raised"
                     "bg-ho-surface"
                     "p-1"
-                    "spectate-[0_10px_24px_rgba(0,0,0,0.35)]"]
+                    "spectate-[0_10px_24px_rgb(var(--ho-bg-deep)/0.35)]"]
             :style {:z-index 1202}
             :data-ui-state (if dropdown-open? "open" "closed")
             :role "listbox"
@@ -346,7 +346,7 @@
                     "border-base-300"
                     "bg-base-100"
                     "p-3"
-                    "spectate-[0_18px_36px_rgba(0,0,0,0.35)]"
+                    "spectate-[0_18px_36px_rgb(var(--ho-bg-deep)/0.35)]"
                     "space-y-2.5"]
             :style {:z-index 1202}
             :data-ui-state (if popover-open? "open" "closed")
@@ -558,15 +558,15 @@
                             "focus:ring-0"
                             "focus:ring-offset-0"]
                            (if (= option-id selected-option-id)
-                             ["bg-[#23383b]" "text-[#F6FEFD]"]
-                             ["text-[#F6FEFD]" "hover:bg-base-200"]))
+                             ["bg-ho-surface-raised" "text-ho-text"]
+                             ["text-ho-text" "hover:bg-base-200"]))
               :style {:grid-template-columns outcome-option-grid-template}
               :on {:click ((:on-select-outcome-option outcome-handlers) option-id)}}
      [:span {:class ["truncate" "font-semibold"]} label]
-     [:span {:class ["num" "text-[#D2DAD7]"]} (option-chance-text option)]
-     [:span {:class ["num" "text-[#D2DAD7]"]} (option-price-text option)]
-     [:span {:class ["num" "text-[#D2DAD7]"]} (option-currency-text (:volume24h option))]
-     [:span {:class ["num" "text-[#D2DAD7]"]} (option-currency-text (:openInterest option))]]))
+     [:span {:class ["num" "text-ho-text"]} (option-chance-text option)]
+     [:span {:class ["num" "text-ho-text"]} (option-price-text option)]
+     [:span {:class ["num" "text-ho-text"]} (option-currency-text (:volume24h option))]
+     [:span {:class ["num" "text-ho-text"]} (option-currency-text (:openInterest option))]]))
 
 (defn- outcome-option-dropdown
   [outcome-options selected-option-id outcome-handlers {:keys [open?
@@ -597,17 +597,17 @@
                                   "px-3"
                                   "text-sm"
                                   "font-medium"
-                                  "text-[#F6FEFD]"
+                                  "text-ho-text"
                                   "transition-colors"
-                                  "hover:border-[#6f7a88]"
+                                  "hover:border-ho-text-dim"
                                   "focus:outline-none"
                                   "focus:ring-1"
-                                  "focus:ring-[#8a96a6]/40"
+                                  "focus:ring-ho-text-muted/40"
                                   "focus:ring-offset-0"]
                           :on {:click (:on-toggle-option-dropdown outcome-handlers)
                                :keydown (:on-option-dropdown-keydown outcome-handlers)}}
                  [:span {:class ["truncate"]} selected-label]
-                 [:span {:class ["text-[#949E9C]"]} "⌄"]]
+                 [:span {:class ["text-ho-text-secondary"]} "⌄"]]
         menu [:div {:class (into ["absolute"
                                    "left-0"
                                    "top-[calc(100%+0.375rem)]"
@@ -616,12 +616,12 @@
                                    "rounded-lg"
                                    "border"
                                    "border-base-300"
-                                   "bg-[#0B151A]"
+                                   "bg-ho-bg-deep"
                                    "p-2"
-                                   "shadow-[0_18px_54px_rgba(0,0,0,0.62)]"]
+                                   "shadow-[0_18px_54px_rgb(var(--ho-bg-deep)/0.62)]"]
                                   (or menu-width-classes ["right-0"]))
                     :data-role "outcome-option-select-menu"
-                    :style (merge {:background-color "#0B151A"} menu-style) :on {:keydown (:on-option-dropdown-keydown outcome-handlers)}}
+                    :style menu-style :on {:keydown (:on-option-dropdown-keydown outcome-handlers)}}
               [:input {:type "search"
                        :value (or query "")
                        :placeholder "Search"
@@ -634,8 +634,8 @@
                                      "bg-base-200"
                                      "px-2"
                                      "text-sm"
-                                     "text-[#F6FEFD]"
-                                     "placeholder:text-[#949E9C]"]
+                                     "text-ho-text"
+                                     "placeholder:text-ho-text-secondary"]
                                     primitives/neutral-input-focus-classes)
                        :on {:input (:on-change-option-query outcome-handlers)}}]
               [:div {:class ["mt-2"
@@ -644,7 +644,7 @@
                              "px-2"
                              "text-xs"
                              "font-medium"
-                             "text-[#949E9C]"]
+                             "text-ho-text-secondary"]
                      :style {:grid-template-columns outcome-option-grid-template} :data-role "outcome-option-select-header-row"}
                (outcome-option-sort/header "Live Outcomes" :label active-sort-column active-sort-direction outcome-handlers)
                (outcome-option-sort/header "% Chance" :chance active-sort-column active-sort-direction outcome-handlers)
@@ -659,7 +659,7 @@
                        :let [option-id (outcome-option-id option)]]
                    ^{:key (str "outcome-option-menu-" option-id)}
                    (outcome-option-row-button option selected-option-id outcome-handlers))
-                 [:div {:class ["px-2" "py-3" "text-sm" "text-[#949E9C]"]}
+                 [:div {:class ["px-2" "py-3" "text-sm" "text-ho-text-secondary"]}
                   "No matching outcomes"])]]
         wrapper [:div {:class ["relative"]} trigger]]
     (cond-> wrapper

@@ -512,7 +512,8 @@
                         size-unit-dropdown-open?
                         display-size-percent
                         size-percent
-                        notch-overlap-threshold]}
+                        notch-overlap-threshold
+                        degen-risk]}
                 size-handlers]
   [:div {:class ["space-y-1.5" "sm:space-y-2"]}
    (primitives/row-input size-display
@@ -534,7 +535,9 @@
               :max 100
               :step 1
               :aria-label "Order size percentage slider"
-              :style {:--order-size-slider-progress (str size-percent "%")}
+              :style (cond-> {:--order-size-slider-progress (str size-percent "%")}
+                       (:slider-color degen-risk)
+                       (assoc :--order-size-slider-active (:slider-color degen-risk)))
               :value size-percent
               :on {:input (:on-change-percent size-handlers)}}]
      [:div {:class ["order-size-slider-notches"
@@ -593,4 +596,5 @@
                      "text-sm"
                      "font-semibold"
                      "text-gray-300"]}
-      "%"]]]])
+      "%"]]]
+   (:message degen-risk)])

@@ -116,16 +116,17 @@
                 :peak 0.05})
     nil))
 
-(defonce ^:private last-leverage-tier* (atom nil))
+(defonce ^:private last-tier-levels* (atom {}))
 
 (defn leverage-tick-on-change!
-  "Play a tick when the leverage tier crosses a threshold. Idempotent
-   per tier level (the render-side caller may fire repeatedly); never
-   plays on the first observation, only on changes, and only when
-   `enabled?`."
-  [level enabled?]
-  (let [prev @last-leverage-tier*]
-    (reset! last-leverage-tier* level)
+  "Play a tick when a risk tier crosses a threshold. `slider-key`
+   isolates independent sliders (leverage popover vs order size) so
+   they don't swallow each other's crossings. Idempotent per tier level
+   (the render-side caller may fire repeatedly); never plays on the
+   first observation, only on changes, and only when `enabled?`."
+  [slider-key level enabled?]
+  (let [prev (get @last-tier-levels* slider-key)]
+    (swap! last-tier-levels* assoc slider-key level)
     (when (and enabled? (some? prev) (not= prev level))
       (tick! level))
     nil))

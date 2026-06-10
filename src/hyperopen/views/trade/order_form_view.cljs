@@ -196,7 +196,10 @@
                           :size-unit-dropdown-open? size-unit-dropdown-open?
                           :display-size-percent display-size-percent
                           :size-percent size-percent
-                          :notch-overlap-threshold notch-overlap-threshold}
+                          :notch-overlap-threshold notch-overlap-threshold
+                          :degen-risk (degen-order-form/size-risk state
+                                                                  size-percent
+                                                                  ui-leverage)}
                          size-handlers)
 
       (sections/render-order-type-sections type

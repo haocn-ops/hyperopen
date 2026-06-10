@@ -68,13 +68,52 @@
       ;; Render-side threshold tick (prototype's riskUp): idempotent per
       ;; tier level, so re-renders are silent and only crossing a tier
       ;; while dragging speaks.
-      (sfx/leverage-tick-on-change! (:level tier)
+      (sfx/leverage-tick-on-change! :leverage
+                                    (:level tier)
                                     (trading-settings/sound-on-fill? state))
       [:div {:class (into ["rounded-md" "border" "border-dashed" "px-2.5"
                            "py-1.5" "text-xs" "font-bold" "leading-snug"]
                           (:classes tier))
              :data-role "degen-leverage-popover-message"}
        (str "⚠ " (:text tier))])))
+
+(defn effective-leverage
+  "Account leverage implied by the order size slider: using P% of the
+   available balance at Lx margin leverage levers the account ~P/100*L.
+   nil when either input is non-numeric."
+  [size-percent leverage]
+  (let [pct (js/parseFloat size-percent)
+        lev (js/parseFloat leverage)]
+    (when-not (or (js/isNaN pct) (js/isNaN lev))
+      (* (/ pct 100) lev))))
+
+(defn size-risk
+  "Degen risk feedback for the order-size slider, driven by the imputed
+   account leverage: a taunt line for under the slider and a fill color
+   for the slider track (token var forms, never raw colors). Ticks on
+   tier crossings. nil unless the degen voice is active and the size is
+   positive."
+  [state size-percent ui-leverage]
+  (when (voice/degen? state)
+    (when-some [eff (effective-leverage size-percent ui-leverage)]
+      (when (pos? eff)
+        (let [tier (leverage-tier eff)
+              all-in? (>= (js/parseFloat size-percent) 100)]
+          (sfx/leverage-tick-on-change! :order-size
+                                        (:level tier)
+                                        (trading-settings/sound-on-fill? state))
+          {:slider-color (cond
+                           (>= (:level tier) 3) "rgb(var(--ho-sell) / 0.6)"
+                           (>= (:level tier) 1) "rgb(var(--ho-warn) / 0.55)"
+                           :else "rgb(var(--ho-accent) / 0.5)")
+           :message [:div {:class (into ["rounded-md" "border" "border-dashed"
+                                         "px-2.5" "py-1.5" "text-xs" "font-bold"
+                                         "leading-snug"]
+                                        (:classes tier))
+                           :data-role "degen-size-risk-message"}
+                     (str "⚠ ≈" (.toFixed eff 1) "x account leverage. "
+                          (when all-in? "ALL IN. ")
+                          (:text tier))]})))))
 
 (defn- massive-side-button
   "Big stacked side selector with a parenthetical sublabel, per the

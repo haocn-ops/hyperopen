@@ -187,6 +187,19 @@ function parseArgsList(value) {
     .filter(Boolean);
 }
 
+function selectProvidedScenarios(scenarios = [], options = {}) {
+  const ids = new Set((options.ids || []).map((value) => String(value)));
+  const tags = new Set((options.tags || []).map((value) => String(value)));
+
+  return [...scenarios]
+    .filter((scenario) => {
+      const idMatch = ids.size === 0 || ids.has(scenario.id);
+      const tagMatch = tags.size === 0 || (scenario.tags || []).some((tag) => tags.has(tag));
+      return idMatch && tagMatch;
+    })
+    .sort((left, right) => left.id.localeCompare(right.id));
+}
+
 async function debugCall(service, sessionId, method, args = [], timeoutMs = 15000) {
   const expression = `(async () => {
     const api = globalThis.HYPEROPEN_DEBUG;
@@ -450,11 +463,16 @@ async function executeScenarioViewport({
 
 export async function runScenarioBundle(service, options = {}) {
   const scenarioDir = options.scenarioDir || getDefaultScenarioDir();
-  const selectedScenarios = await loadScenarios({
-    scenarioDir,
-    ids: options.scenarioIds || [],
-    tags: options.tags || []
-  });
+  const selectedScenarios = options.scenarios
+    ? selectProvidedScenarios(options.scenarios, {
+        ids: options.scenarioIds || [],
+        tags: options.tags || []
+      })
+    : await loadScenarios({
+        scenarioDir,
+        ids: options.scenarioIds || [],
+        tags: options.tags || []
+      });
 
   if (selectedScenarios.length === 0) {
     throw new Error("No scenarios matched the requested selection.");
@@ -467,8 +485,10 @@ export async function runScenarioBundle(service, options = {}) {
       selected: selectedScenarios.map((scenario) => ({
         id: scenario.id,
         title: scenario.title,
+        route: scenario.route || scenario.url,
         tags: scenario.tags,
-        viewports: options.viewports?.length ? options.viewports : scenario.viewports
+        viewports: options.viewports?.length ? options.viewports : scenario.viewports,
+        url: scenario.url
       }))
     };
   }

@@ -5,20 +5,16 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { BrowserInspectionService } from "./service.mjs";
 import { runDesignReview } from "./design_review_runner.mjs";
+import {
+  buildNightlyScenarios,
+  extractInspectedAddresses,
+  NIGHTLY_SPECTATE_ADDRESSES,
+  NIGHTLY_TAGS
+} from "./nightly_ui_coverage.mjs";
 import { runScenarioBundle } from "./scenario_runner.mjs";
 import { safeNowIso, writeJsonFile } from "./util.mjs";
 
 const execFileAsync = promisify(execFile);
-
-const NIGHTLY_TAGS = [
-  "critical",
-  "funding",
-  "wallet",
-  "overlay",
-  "account-surface",
-  "parity",
-  "mobile"
-];
 
 function parseArgs(argv) {
   const out = { _: [] };
@@ -190,6 +186,7 @@ function classifyNightlyFailures(summary, previousSummary) {
     newProductRegressions,
     persistentAutomationGaps,
     manualExceptions,
+    inspectedAddresses: extractInspectedAddresses(results),
     routeCoverage: summarizeRouteCoverage(results),
     generatedAt: safeNowIso()
   };
@@ -326,6 +323,10 @@ function renderReport({
         `- \`${entry.route}\` / \`${entry.viewport}\`: attempted ${entry.attempted}, pass ${entry.pass}, failed ${entry.failed}`
     )
     .join("\n");
+  const inspectedAddressLines =
+    classification.inspectedAddresses.length === 0
+      ? "- None."
+      : classification.inspectedAddresses.map((address) => `- \`${address}\``).join("\n");
 
   const productRegressionLines =
     classification.newProductRegressions.length === 0
@@ -411,6 +412,10 @@ function renderReport({
 
 ${routeCoverageLines || "- None."}
 
+## Inspected spectate addresses
+
+${inspectedAddressLines}
+
 ## New critical/high product regressions
 
 ${productRegressionLines}
@@ -447,9 +452,13 @@ async function main() {
   }
 
   const service = await BrowserInspectionService.create();
+  const nightlyScenarios = await buildNightlyScenarios({
+    scenarioDir: service.config.scenarioDir
+  });
 
   if (dryRun) {
     const scenarioBundle = await runScenarioBundle(service, {
+      scenarios: nightlyScenarios,
       tags: NIGHTLY_TAGS,
       dryRun: true,
       includeCompare: true
@@ -475,6 +484,7 @@ async function main() {
   }
 
   const summary = await runScenarioBundle(service, {
+    scenarios: nightlyScenarios,
     tags: NIGHTLY_TAGS,
     runKind: "nightly-ui-qa",
     includeCompare: true,
@@ -510,6 +520,8 @@ async function main() {
     branch,
     allowNonMain,
     tags: NIGHTLY_TAGS,
+    expectedSpectateAddresses: NIGHTLY_SPECTATE_ADDRESSES,
+    inspectedAddresses: classification.inspectedAddresses,
     previousRunDir,
     currentRunId: summary.runId,
     currentRunDir: summary.runDir,

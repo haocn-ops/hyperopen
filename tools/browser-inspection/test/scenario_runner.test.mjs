@@ -296,3 +296,39 @@ test("runScenarioBundle rebases managed-local navigation URLs to the session ori
   await fs.rm(scenarioDir, { recursive: true, force: true });
   await fs.rm(artifactRoot, { recursive: true, force: true });
 });
+
+test("runScenarioBundle accepts in-memory scenarios", async () => {
+  const artifactRoot = await fs.mkdtemp(path.join(os.tmpdir(), "hyperopen-scenario-inline-artifacts-"));
+  const service = buildFakeService(artifactRoot);
+
+  const result = await runScenarioBundle(service, {
+    scenarios: [
+      {
+        id: "inline-pass",
+        title: "Inline pass",
+        severity: "high",
+        tags: ["critical"],
+        viewports: ["desktop"],
+        url: "http://localhost:8080/trade",
+        steps: [{ type: "navigate" }]
+      },
+      {
+        id: "inline-skip",
+        title: "Inline skip",
+        severity: "high",
+        tags: ["wallet"],
+        viewports: ["desktop"],
+        url: "http://localhost:8080/trade",
+        steps: [{ type: "navigate" }]
+      }
+    ],
+    tags: ["critical"],
+    runKind: "scenario"
+  });
+
+  assert.equal(result.state, "pass");
+  assert.equal(result.results.length, 1);
+  assert.equal(result.results[0].scenarioId, "inline-pass");
+
+  await fs.rm(artifactRoot, { recursive: true, force: true });
+});

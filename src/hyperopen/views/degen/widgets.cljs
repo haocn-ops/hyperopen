@@ -8,6 +8,7 @@
   (:require [hyperopen.ui.voice :as voice]
             [hyperopen.views.account-equity.format :as equity-format]
             [hyperopen.views.account-equity.metrics :as equity-metrics]
+            [hyperopen.views.degen.illustrations :as illustrations]
             [hyperopen.wallet.core :as wallet]))
 
 (def tips
@@ -81,20 +82,22 @@
     (when-not (js/isNaN n) n)))
 
 (defn- stat-card
-  [{:keys [data-role label value value-class hint]}]
-  [:div {:class ["flex" "flex-col" "justify-center" "gap-0.5" "rounded-lg"
+  [{:keys [data-role label value value-class hint icon]}]
+  [:div {:class ["flex" "items-center" "gap-2.5" "rounded-lg"
                  "border" "border-ho-border" "bg-ho-surface" "px-3.5" "py-2"
                  "min-w-[8.5rem]" "shrink-0"]
          :data-role data-role}
-   [:span {:class ["text-xs" "uppercase" "tracking-[0.08em]"
-                   "text-ho-text-muted" "whitespace-nowrap"]}
-    label]
-   [:span {:class (conj ["text-sm" "font-bold" "whitespace-nowrap"]
-                        (or value-class "text-ho-text"))}
-    value]
-   (when hint
-     [:span {:class ["text-xs" "text-ho-text-dim" "whitespace-nowrap"]}
-      hint])])
+   icon
+   [:div {:class ["flex" "flex-col" "justify-center" "gap-0.5"]}
+    [:span {:class ["text-xs" "uppercase" "tracking-[0.08em]"
+                    "text-ho-text-muted" "whitespace-nowrap"]}
+     label]
+    [:span {:class (conj ["text-sm" "font-bold" "whitespace-nowrap"]
+                         (or value-class "text-ho-text"))}
+     value]
+    (when hint
+      [:span {:class ["text-xs" "text-ho-text-dim" "whitespace-nowrap"]}
+       hint])]])
 
 (defn- congrats-card
   [state]
@@ -126,7 +129,9 @@
                    :label "Total Value (LOL)"
                    :value (equity-format/display-currency
                            (:account-value-display metrics))
-                   :hint "(number, allegedly)"})
+                   :hint "(number, allegedly)"
+                   :icon [:span {:class ["text-ho-buy" "shrink-0"]}
+                          (illustrations/pepe "w-9")]})
        (stat-card {:data-role "degen-stat-pnl"
                    :label "Unrealized P&L (pray)"
                    :value (:text pnl)
@@ -333,17 +338,20 @@
                      :border-class "border-ho-warn"
                      :title "Shill of the Day 🗣️"}
                     (if shill
-                      [:div {:class ["flex" "flex-col" "gap-1"]}
-                       [:button {:type "button"
-                                 :class ["self-start" "text-sm" "font-bold"
-                                         "text-ho-warn" "hover:text-ho-accent-hi"
-                                         "transition-colors"]
-                                 :data-role "degen-shill-select"
-                                 :on {:click [[:actions/select-asset-by-market-key (:key shill)]]}}
-                        (str (or (:coin shill) (:key shill))
-                             " +" (.toFixed (:degen/pct shill) 2) "%")]
-                       [:p {:class ["text-xs" "text-ho-text-secondary" "leading-relaxed"]}
-                        "Definitely not a trap. (not financial advice, obviously)"]]
+                      [:div {:class ["flex" "items-start" "gap-2"]}
+                       [:span {:class ["text-ho-warn" "shrink-0" "pt-0.5"]}
+                        (illustrations/doge "w-10" {:shades? true})]
+                       [:div {:class ["flex" "flex-col" "gap-1"]}
+                        [:button {:type "button"
+                                  :class ["self-start" "text-sm" "font-bold"
+                                          "text-ho-warn" "hover:text-ho-accent-hi"
+                                          "transition-colors"]
+                                  :data-role "degen-shill-select"
+                                  :on {:click [[:actions/select-asset-by-market-key (:key shill)]]}}
+                         (str (or (:coin shill) (:key shill))
+                              " +" (.toFixed (:degen/pct shill) 2) "%")]
+                        [:p {:class ["text-xs" "text-ho-text-secondary" "leading-relaxed"]}
+                         "Definitely not a trap. (not financial advice, obviously)"]]]
                       [:p {:class ["text-xs" "text-ho-text-secondary"]}
                        "Nothing pumping. Suspicious."]))
        (widget-card {:data-role "degen-widget-tip"
@@ -354,21 +362,27 @@
        (widget-card {:data-role "degen-widget-whale"
                      :border-class "border-ho-info"
                      :title "Whale Watch 🐋"}
-                    [:p {:class ["text-xs" "text-ho-text-secondary" "leading-relaxed"]}
-                     "They bought. You exit liquidity."]
-                    [:p {:class ["text-xs" "font-bold" "text-ho-info"]}
-                     "Nice."])
+                    [:div {:class ["flex" "items-start" "gap-2"]}
+                     [:span {:class ["text-ho-info" "shrink-0"]}
+                      (illustrations/whale "w-12")]
+                     [:div {:class ["flex" "flex-col" "gap-1"]}
+                      [:p {:class ["text-xs" "text-ho-text-secondary" "leading-relaxed"]}
+                       "They bought. You exit liquidity."]
+                      [:p {:class ["text-xs" "font-bold" "text-ho-info"]}
+                       "Nice."]]])
        (widget-card {:data-role "degen-widget-motivation"
                      :title "Daily Motivation 🐕"}
-                    [:p {:class ["text-xs" "text-ho-text-secondary" "leading-relaxed"]}
-                     "Such leverage. Much risk. Very degen. Wow."])
+                    [:div {:class ["flex" "items-start" "gap-2"]}
+                     [:span {:class ["text-ho-warn" "shrink-0"]}
+                      (illustrations/doge "w-10")]
+                     [:p {:class ["text-xs" "text-ho-text-secondary" "leading-relaxed"]}
+                      "Such leverage. Much risk. Very degen. Wow."]])
        (widget-card {:data-role "degen-widget-feeling"
                      :title "Feeling Gauge"}
-                    [:div {:class ["flex" "items-baseline" "gap-2"]}
+                    [:div {:class ["flex" "items-center" "gap-2.5"]}
+                     (illustrations/feeling-gauge-dial (:unrealized-pnl metrics))
                      [:span {:class (conj ["text-sm" "font-bold"] (:class mood))}
-                      (:status mood)]
-                     [:span {:class (conj ["text-xs" "tracking-[0.2em]"] (:class mood))}
-                      (:meter mood)]]
+                      (:status mood)]]
                     [:p {:class ["text-xs" "text-ho-text-dim"]}
                      "How's it going? (derived from real P&L)"]
                     [:div {:class ["flex" "items-center" "justify-between" "gap-2" "pt-0.5"]}

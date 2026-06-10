@@ -32,7 +32,14 @@
     (is (str/includes? rendered "Degen Tip"))
     (is (str/includes? rendered "Whale Watch"))
     (is (str/includes? rendered "Such leverage. Much risk. Very degen. Wow."))
-    (is (str/includes? rendered "Feeling Gauge"))))
+    (is (str/includes? rendered "Feeling Gauge"))
+    (is (str/includes? rendered "whale mascot"))
+    (is (str/includes? rendered "shiba mascot"))
+    (is (str/includes? rendered "degen-feeling-dial"))))
+
+(deftest stats-strip-includes-pepe-test
+  (is (str/includes? (pr-str (widgets/stats-strip degen-state))
+                     "smug frog mascot")))
 
 (deftest liq-risk-tiers-test
   (is (= "NONE" (:text (widgets/liq-risk nil))))

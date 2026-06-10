@@ -473,6 +473,7 @@
             [hyperopen.views.chart.d3.model-test]
             [hyperopen.views.chart.d3.runtime-test]
             [hyperopen.views.chart.tooltip-core-test]
+            [hyperopen.views.degen.illustrations-test]
             [hyperopen.views.degen.widgets-test]
             [hyperopen.views.footer-build-id-test]
             [hyperopen.views.footer-view-test]
@@ -1177,6 +1178,7 @@
              'hyperopen.views.chart.d3.model-test
              'hyperopen.views.chart.d3.runtime-test
              'hyperopen.views.chart.tooltip-core-test
+             'hyperopen.views.degen.illustrations-test
              'hyperopen.views.degen.widgets-test
              'hyperopen.views.footer-build-id-test
              'hyperopen.views.footer-view-test

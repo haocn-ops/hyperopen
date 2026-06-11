@@ -324,3 +324,127 @@
     color: rgb(var(--ho-text-dim));
   }
 }
+
+/* --- Fidelity pass 3 (2026-06-11): trade equity actions + portfolio panels. */
+@layer components {
+  /* Trade-route Account Equity actions: rounded-[8px] is an arbitrary radius
+     the token scale cannot reach, and the teal fills are literals. Square
+     them and use the design's primary/secondary button language. */
+  :root[data-theme="institutional"] [data-role^="funding-action-"] {
+    border-radius: 0;
+    background-color: transparent;
+    border-color: rgb(var(--ho-border));
+    color: rgb(var(--ho-text));
+    box-shadow: none;
+  }
+
+  :root[data-theme="institutional"] [data-role^="funding-action-"]:hover {
+    background-color: rgb(var(--ho-surface-raised));
+    border-color: rgb(var(--ho-border-accent-muted));
+    color: rgb(var(--ho-text-hi));
+  }
+
+  :root[data-theme="institutional"] [data-role="funding-action-deposit"] {
+    background-color: rgb(var(--ho-accent));
+    border-color: rgb(var(--ho-accent));
+    color: rgb(var(--ho-bg-deep));
+    font-weight: 600;
+  }
+
+  :root[data-theme="institutional"] [data-role="funding-action-deposit"]:hover {
+    background-color: rgb(var(--ho-accent-hi));
+    border-color: rgb(var(--ho-accent-hi));
+    color: rgb(var(--ho-bg-deep));
+  }
+
+  /* Portfolio quick actions: flush joined cells, solid accent primary. */
+  :root[data-theme="institutional"] [data-role="portfolio-actions-row"] {
+    gap: 0;
+  }
+
+  :root[data-theme="institutional"] [data-role="portfolio-actions-row"] > * + * {
+    margin-left: -1px;
+  }
+
+  :root[data-theme="institutional"] [data-role="portfolio-actions-row"] .bg-ho-accent-soft-hi {
+    background-color: rgb(var(--ho-accent));
+    border-color: rgb(var(--ho-accent));
+    color: rgb(var(--ho-bg-deep));
+    font-weight: 600;
+  }
+
+  :root[data-theme="institutional"] [data-role="portfolio-actions-row"] .bg-ho-accent-soft-hi:hover {
+    background-color: rgb(var(--ho-accent-hi));
+    color: rgb(var(--ho-bg-deep));
+  }
+
+  /* Portfolio page: flat background (the root carries an inline accent
+     radial-gradient wash; inline style requires the important flag). */
+  :root[data-theme="institutional"] [data-parity-id="portfolio-root"] {
+    background-image: none !important;
+  }
+
+  /* Equity-breakdown card: uppercase selector head, hairline kv rows. */
+  :root[data-theme="institutional"] .summary-card-head button {
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-size: 11px;
+    color: rgb(var(--ho-text-muted));
+  }
+
+  :root[data-theme="institutional"] .summary-kv-row {
+    border-bottom: 1px solid rgb(var(--ho-border));
+    padding-bottom: 8px;
+  }
+
+  :root[data-theme="institutional"] .summary-kv-row:last-child {
+    border-bottom: 0;
+    padding-bottom: 0;
+  }
+
+  /* Chart card: uppercase series tabs, line swatches in the legend. */
+  :root[data-theme="institutional"] [data-role^="portfolio-chart-tab-"] {
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  :root[data-theme="institutional"] [data-role^="portfolio-chart-legend-item-"] > span:first-child {
+    height: 2px;
+    width: 10px;
+    border-radius: 0;
+  }
+
+  /* Performance table: hairline metric rows and group-head bands. The
+     group labels are generated content keyed off the stable group
+     data-roles — decorative theme chrome mirroring the design comps. */
+  :root[data-theme="institutional"] [data-role^="portfolio-performance-metrics-group-"] > div {
+    border-bottom: 1px solid rgb(var(--ho-border));
+    padding-bottom: 6px;
+  }
+
+  :root[data-theme="institutional"] [data-role^="portfolio-performance-metrics-group-"] > div:last-child {
+    border-bottom: 0;
+  }
+
+  :root[data-theme="institutional"] [data-role^="portfolio-performance-metrics-group-"]::before {
+    display: block;
+    background-color: rgb(var(--ho-bg-deep));
+    color: rgb(var(--ho-text-muted));
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    font-size: 10px;
+    padding: 6px 16px;
+    margin: 0 -16px 6px;
+  }
+
+  :root[data-theme="institutional"] [data-role="portfolio-performance-metrics-group-overview"]::before { content: "Overview"; }
+  :root[data-theme="institutional"] [data-role="portfolio-performance-metrics-group-risk-adjusted"]::before { content: "Risk-Adjusted"; }
+  :root[data-theme="institutional"] [data-role="portfolio-performance-metrics-group-drawdown-and-risk"]::before { content: "Drawdown & Risk"; }
+  :root[data-theme="institutional"] [data-role="portfolio-performance-metrics-group-expectation-and-var"]::before { content: "Expectation & VaR"; }
+  :root[data-theme="institutional"] [data-role="portfolio-performance-metrics-group-streaks-and-pain"]::before { content: "Streaks & Pain"; }
+  :root[data-theme="institutional"] [data-role="portfolio-performance-metrics-group-trade-shape"]::before { content: "Trade Shape"; }
+  :root[data-theme="institutional"] [data-role="portfolio-performance-metrics-group-period-returns"]::before { content: "Period Returns"; }
+  :root[data-theme="institutional"] [data-role="portfolio-performance-metrics-group-period-extremes"]::before { content: "Period Extremes"; }
+  :root[data-theme="institutional"] [data-role="portfolio-performance-metrics-group-win-rates"]::before { content: "Win Rates"; }
+  :root[data-theme="institutional"] [data-role="portfolio-performance-metrics-group-benchmark-relative"]::before { content: "Benchmark-Relative"; }
+}

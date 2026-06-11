@@ -94,6 +94,18 @@ nav `rgb(151,252,228)`, indicator `rgb(80,210,193)`, system UI font, no uppercas
       label treatment, raised tick-control row; `font-synthesis: none` (JetBrains Mono ships
       400/500 — synthesized bold was the perceived font mismatch) and slashed zeros
       (`"zero" 1`) on `.num`.
+- [x] (2026-06-11) Fidelity pass 3: trade-route Account Equity actions (`rounded-[8px]`
+      arbitrary radius + literal teal fills → squared primary/secondary treatment via
+      `funding-action-*` data-roles); portfolio panel chrome — flush joined quick-actions with
+      solid accent primary, flat page background (inline radial-gradient suppressed with
+      `!important`, the one such flag in the layer), hairline equity-breakdown kv rows
+      (`summary-kv-row` hook) with uppercase selector head, uppercase chart tabs, line legend
+      swatches, performance-table hairline rows and group-head bands (CSS generated content
+      keyed off the stable `portfolio-performance-metrics-group-*` data-roles; labels mirror
+      the metrics catalog group ids). Remaining mock deltas are structural, not stylistic:
+      breadcrumbs, the "Portfolio Analytics" title copy, the four-stat hero card row with
+      sparklines, and the volume/fees card column — feature-level layout work requiring a
+      product decision (theme-gated layout would follow the degen experience-layer precedent).
 
 ## Surprises & Discoveries
 

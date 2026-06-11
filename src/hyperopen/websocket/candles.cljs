@@ -290,11 +290,36 @@
       (subvec deduped (- count* max-candle-count))
       deduped)))
 
+(defn- tail-merged-rows
+  "Fast path for the common ws case: incoming rows only touch bars at or after
+   the newest existing bar, so the existing vector (kept sorted and deduped by
+   construction - every write goes through a dedupe+sort at least once) can be
+   patched at the tail instead of re-sorting up to max-candle-count rows per
+   message."
+  [existing incoming]
+  (let [last-t (:t (peek existing))]
+    (when (and (seq existing)
+               (seq incoming)
+               (number? last-t)
+               (every? (fn [row]
+                         (let [t (:t row)]
+                           (and (number? t) (>= t last-t))))
+                       incoming))
+      (let [incoming* (bounded-dedupe-sorted-rows incoming)
+            merged (if (= last-t (:t (first incoming*)))
+                     (into (pop existing) incoming*)
+                     (into existing incoming*))
+            count* (count merged)]
+        (if (> count* max-candle-count)
+          (subvec merged (- count* max-candle-count))
+          merged)))))
+
 (defn- merge-candle-rows
   [entry incoming]
-  (bounded-dedupe-sorted-rows
-   (into (extract-existing-candle-rows entry)
-         (vec incoming))))
+  (let [existing (extract-existing-candle-rows entry)
+        incoming* (vec incoming)]
+    (or (tail-merged-rows existing incoming*)
+        (bounded-dedupe-sorted-rows (into existing incoming*)))))
 
 (defn- clear-candle-entry-errors
   [entry]

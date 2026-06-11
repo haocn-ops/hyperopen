@@ -3,7 +3,7 @@
             [hyperopen.formal.effect-order-contract-vectors :as vectors]
             [hyperopen.runtime.effect-order-contract :as effect-order-contract]
             [hyperopen.runtime.validation :as validation]
-            [hyperopen.schema.contracts :as contracts]
+            [hyperopen.schema.contracts]
             [hyperopen.schema.effect-order-contracts :as effect-order-contracts]))
 
 (defn- failure-projection
@@ -100,8 +100,8 @@
        {:phase :wrapper-vector})
       (validation/clear-debug-action-effect-traces!)
       (with-redefs [validation/validation-enabled? (constantly validation-enabled?)
-                    contracts/assert-action-args! (fn [& _] true)
-                    contracts/assert-emitted-effects! (fn [& _] true)]
+                    validation/assert-action-args! (fn [& _] true)
+                    validation/assert-emitted-effects! (fn [& _] true)]
         (let [wrapped (validation/wrap-action-handler action-id (fn [_state] effects))
               actual (try
                        (wrapped {})

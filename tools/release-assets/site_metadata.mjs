@@ -536,3 +536,57 @@ export function buildReleaseSeoHeadMarkup(siteMetadata, routeMetadata) {
     `<meta name="twitter:description" content="${description}" data-hyperopen-seo="twitter:description" />`,
   ].join("\n");
 }
+
+export const PRECONNECT_ORIGINS = ["https://api.hyperliquid.xyz"];
+
+export const ROUTE_PRELOAD_MODULE_IDS = {
+  home: ["trade_chart", "account_surfaces"],
+  trade: ["trade_chart", "account_surfaces"],
+  portfolio: ["account_surfaces", "charts_shared", "portfolio_route"],
+  leaderboard: ["leaderboard_route"],
+  vaults: ["charts_shared", "vaults_route"],
+  staking: ["staking_route"],
+  "funding-comparison": ["funding_comparison_route"],
+  api: ["api_wallets_route"],
+};
+
+export function resolveModulePreloadHrefs(routeMetadata, moduleLoader) {
+  const moduleIds = ROUTE_PRELOAD_MODULE_IDS[routeMetadata?.id] || [];
+  const moduleUris = moduleLoader?.["module-uris"] || {};
+  const hrefs = [];
+
+  for (const moduleId of moduleIds) {
+    const uris = moduleUris[moduleId];
+    if (!Array.isArray(uris) || uris.length === 0) {
+      throw new Error(
+        `Route "${routeMetadata?.id}" preloads module "${moduleId}" but module-loader.json has no URI for it.`
+      );
+    }
+
+    for (const uri of uris) {
+      hrefs.push(uri);
+    }
+  }
+
+  return hrefs;
+}
+
+export function buildRoutePerformanceHintsMarkup(routeMetadata, moduleLoader) {
+  const preconnectLinks = PRECONNECT_ORIGINS.map(
+    (origin) =>
+      `<link rel="preconnect" href="${escapeHtmlAttribute(origin)}" crossorigin data-hyperopen-perf="preconnect" />`
+  );
+  const preloadLinks = resolveModulePreloadHrefs(routeMetadata, moduleLoader).map(
+    (href) =>
+      `<link rel="preload" as="script" href="${escapeHtmlAttribute(href)}" data-hyperopen-perf="module-preload" />`
+  );
+  const fontPreloadLinks = [
+    "/fonts/InterVariable.woff2",
+    "/fonts/JetBrainsMono-Regular.woff2",
+  ].map(
+    (href) =>
+      `<link rel="preload" as="font" type="font/woff2" href="${href}" crossorigin data-hyperopen-perf="font-preload" />`
+  );
+
+  return [...preconnectLinks, ...fontPreloadLinks, ...preloadLinks].join("\n");
+}

@@ -20,11 +20,20 @@
         new-loaded-at-ms (get-in new-state [:asset-selector :loaded-at-ms])]
     (not= old-loaded-at-ms new-loaded-at-ms)))
 
+(def ^:private selector-cache-write-idle-timeout-ms
+  1500)
+
 (defn install-store-cache-watchers!
   [store {:keys [persist-active-market-display!
                  persist-asset-selector-markets-cache!
-                 request-animation-frame!]
-          :or {request-animation-frame! platform/request-animation-frame!}}]
+                 schedule-cache-write!]
+          ;; The selector-cache re-serialization (sort + normalize + stringify
+          ;; of every market) is not paint-coupled work; run it at idle so it
+          ;; stays out of the busy post-load frames.
+          :or {schedule-cache-write! (fn [f]
+                                       (platform/schedule-idle-or-timeout!
+                                        f
+                                        selector-cache-write-idle-timeout-ms))}}]
   (let [pending-selector-cache-write (atom nil)
         selector-cache-write-scheduled? (atom false)
         flush-selector-cache-write!
@@ -55,7 +64,7 @@
                                                 :state new-state})
           (when-not @selector-cache-write-scheduled?
             (reset! selector-cache-write-scheduled? true)
-            (request-animation-frame!
+            (schedule-cache-write!
              (fn [_]
                (flush-selector-cache-write!))))))))))
 

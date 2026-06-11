@@ -201,24 +201,30 @@
            (route-refresh/current-route-refresh-effects state* nil)))))
 
 (defn- post-render-route-effects
+  "Effects to run right after the first paint, split by urgency: :immediate
+   effects fetch what the visible trade surface needs (the chart), while :idle
+   effects load below-the-fold surfaces whose module evaluation would otherwise
+   land in the same post-paint main-thread window as the chart's."
   [state path]
   (let [normalized-path (router/normalize-path path)]
-    (cond-> []
-      (and (router/trade-route? normalized-path)
-           (not (trade-modules/trade-chart-ready? state))
-           (not (trade-modules/trade-chart-loading? state)))
-      (conj [:effects/load-trade-chart-module])
+    {:immediate
+     (cond-> []
+       (and (router/trade-route? normalized-path)
+            (not (trade-modules/trade-chart-ready? state))
+            (not (trade-modules/trade-chart-loading? state)))
+       (conj [:effects/load-trade-chart-module])
 
-      (and (router/trade-route? normalized-path)
-           (seq (get-in state [:chart-options :active-indicators]))
-           (not (trading-indicators-modules/trading-indicators-ready? state))
-           (not (trading-indicators-modules/trading-indicators-loading? state)))
-      (conj [:effects/load-trading-indicators-module])
-
-      (and (router/trade-route? normalized-path)
-           (not (surface-modules/surface-ready? state :account-surfaces))
-           (not (surface-modules/surface-loading? state :account-surfaces)))
-      (conj [:effects/load-surface-module :account-surfaces]))))
+       (and (router/trade-route? normalized-path)
+            (seq (get-in state [:chart-options :active-indicators]))
+            (not (trading-indicators-modules/trading-indicators-ready? state))
+            (not (trading-indicators-modules/trading-indicators-loading? state)))
+       (conj [:effects/load-trading-indicators-module]))
+     :idle
+     (cond-> []
+       (and (router/trade-route? normalized-path)
+            (not (surface-modules/surface-ready? state :account-surfaces))
+            (not (surface-modules/surface-loading? state :account-surfaces)))
+       (conj [:effects/load-surface-module :account-surfaces]))}))
 
 (defn- mark-post-render-trade-secondary-panels-ready!
   [store]
@@ -307,9 +313,13 @@
                                           (initialize-remote-data-streams! system))
        :load-post-render-route-effects! (fn [startup-store]
                                           (let [path (get-in @startup-store [:router :path])
-                                                effects (post-render-route-effects @startup-store path)]
-                                            (when (seq effects)
-                                              (nxr/dispatch startup-store nil effects))))
+                                                {:keys [immediate idle]} (post-render-route-effects @startup-store path)]
+                                            (when (seq immediate)
+                                              (nxr/dispatch startup-store nil immediate))
+                                            (when (seq idle)
+                                              (schedule-idle-or-timeout!
+                                               (fn []
+                                                 (nxr/dispatch startup-store nil idle))))))
        :yield-to-main! yield-to-main!
        :schedule-post-render-startup! schedule-post-render-startup!
        :kick-render! (fn [runtime-store]

@@ -372,6 +372,9 @@
                      nil)
                     ([_store opts]
                      (reset! captured-router-opts opts)))
+                  startup-runtime/schedule-idle-or-timeout!
+                  (fn [_delay-ms f]
+                    (f))
                   nxr/dispatch
                   (fn [store-arg _ctx effects]
                     (swap! dispatch-calls conj [store-arg effects]))]
@@ -386,8 +389,8 @@
       ((:mark-post-render-trade-secondary-panels-ready! @captured-init-deps) store)
       (is (true? (get-in @store [:trade-ui :desktop-secondary-panels-ready?])))
       ((:load-post-render-route-effects! @captured-init-deps) store))
-    (is (= [[store [[:effects/load-trade-chart-module]
-                    [:effects/load-surface-module :account-surfaces]]]]
+    (is (= [[store [[:effects/load-trade-chart-module]]]
+            [store [[:effects/load-surface-module :account-surfaces]]]]
            @dispatch-calls))))
 
 (deftest init-loads-trading-indicators-post-render-when-active-indicators-are-restored-test
@@ -419,6 +422,9 @@
                   (constantly false)
                   surface-modules/surface-loading?
                   (constantly false)
+                  startup-runtime/schedule-idle-or-timeout!
+                  (fn [_delay-ms f]
+                    (f))
                   nxr/dispatch
                   (fn [store-arg _ctx effects]
                     (swap! dispatch-calls conj [store-arg effects]))]
@@ -426,6 +432,6 @@
                           :store store})
       ((:load-post-render-route-effects! @captured-init-deps) store))
     (is (= [[store [[:effects/load-trade-chart-module]
-                    [:effects/load-trading-indicators-module]
-                    [:effects/load-surface-module :account-surfaces]]]]
+                    [:effects/load-trading-indicators-module]]]
+            [store [[:effects/load-surface-module :account-surfaces]]]]
            @dispatch-calls))))

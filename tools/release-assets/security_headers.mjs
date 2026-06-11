@@ -1,6 +1,26 @@
+import crypto from "node:crypto";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
 export const SECURITY_HEADERS_FILE_PATH = "_headers";
 export const CONTROL_CACHE_CONTROL = "public, max-age=0, must-revalidate";
 export const IMMUTABLE_CACHE_CONTROL = "public, max-age=31556952, immutable";
+export const FONT_CACHE_CONTROL = "public, max-age=2592000";
+
+const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+
+// The theme restore script is inlined into every release HTML head (one less
+// render-blocking request); the CSP admits exactly that script by hash.
+export const THEME_PRELOAD_INLINE_SOURCE = fs.readFileSync(
+  path.join(REPO_ROOT, "resources", "public", "theme-preload.js"),
+  "utf8"
+);
+
+export const THEME_PRELOAD_SCRIPT_HASH = `'sha256-${crypto
+  .createHash("sha256")
+  .update(THEME_PRELOAD_INLINE_SOURCE)
+  .digest("base64")}'`;
 export const DOCUMENT_PERMISSIONS_POLICY = [
   "accelerometer=()",
   "autoplay=()",
@@ -75,7 +95,11 @@ export function buildContentSecurityPolicy() {
   appendDirective(directives, "base-uri", ["'self'"]);
   appendDirective(directives, "form-action", ["'self'"]);
   appendDirective(directives, "object-src", ["'none'"]);
-  appendDirective(directives, "script-src", ["'self'", "https://static.cloudflareinsights.com"]);
+  appendDirective(directives, "script-src", [
+    "'self'",
+    THEME_PRELOAD_SCRIPT_HASH,
+    "https://static.cloudflareinsights.com",
+  ]);
   appendDirective(directives, "style-src", ["'self'", "'unsafe-inline'"]);
   appendDirective(directives, "style-src-elem", ["'self'", "'unsafe-inline'"]);
   appendDirective(directives, "style-src-attr", ["'unsafe-inline'"]);
@@ -131,6 +155,14 @@ export function buildReleaseHeadersFile({
       { name: "Cache-Control", value: documentHeaders["cache-control"] },
     ]),
   ];
+
+  lines.push(
+    "",
+    formatHeaderBlock("/fonts/*", [
+      { detach: true, name: "Cache-Control" },
+      { name: "Cache-Control", value: FONT_CACHE_CONTROL },
+    ]),
+  );
 
   for (const assetPath of normalizedImmutableAssetPaths) {
     lines.push(

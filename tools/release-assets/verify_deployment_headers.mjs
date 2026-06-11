@@ -4,6 +4,7 @@ import {
 import {
   CONTROL_CACHE_CONTROL,
   IMMUTABLE_CACHE_CONTROL,
+  THEME_PRELOAD_INLINE_SOURCE,
   expectedDocumentHeaders,
 } from "./security_headers.mjs";
 import { fileURLToPath } from "node:url";
@@ -61,8 +62,14 @@ async function verifyDocument(fetchFn, origin, pathName) {
     assertHeaderEquals(response, headerName, expectedValue, url.pathname);
   }
 
-  if (/<script(?![^>]*\bsrc=)[^>]*>/i.test(html)) {
-    throw new Error(`${url.pathname} still contains an executable inline <script> tag.`);
+  for (const inlineScriptMatch of html.matchAll(
+    /<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi
+  )) {
+    if (inlineScriptMatch[1] !== THEME_PRELOAD_INLINE_SOURCE) {
+      throw new Error(
+        `${url.pathname} contains an inline <script> other than the CSP-hashed theme preload.`
+      );
+    }
   }
 
   const cssHref = extractRequiredMatch(

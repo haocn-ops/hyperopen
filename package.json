@@ -15,7 +15,9 @@
     "dev:portfolio": "npm run build-id:refresh && concurrently -k -n TAILWIND,CLJS \"npm run css:watch\" \"npm run cljs:watch:portfolio\"",
     "portfolio": "npm run build-id:refresh && concurrently -k -n TAILWIND,PORTFOLIO \"npm run css:watch\" \"npm run portfolio:watch\"",
     "dev:proxy": "npm run build-id:refresh && concurrently -k -n TAILWIND,CLJS,PROXY \"npm run css:watch\" \"npm run cljs:watch\" \"npm run proxy:dev\"",
-    "build": "npm run build-id:refresh && npm run css:build && npx shadow-cljs release app portfolio-worker portfolio-optimizer-worker vault-detail-worker && node tools/release-assets/generate_release_artifacts.mjs",
+    "build": "npm run build-id:refresh && npm run css:build && npx shadow-cljs release app portfolio-worker portfolio-optimizer-worker vault-detail-worker && node tools/release-assets/generate_release_artifacts.mjs && npm run lint:bundle-budget",
+    "lint:bundle-budget": "node tools/release-assets/check_bundle_budget.mjs",
+    "lint:bundle-budget:update": "node tools/release-assets/check_bundle_budget.mjs --update",
     "repl": "npx shadow-cljs cljs-repl app",
     "nrepl:port": "./tools/shadow-nrepl-port",
     "test:runner:generate": "node tools/generate-test-runner.mjs",
@@ -96,19 +98,18 @@
   "license": "AGPL-3.0",
   "dependencies": {
     "@noble/secp256k1": "^3.0.0",
-    "@openai/agents": "^0.7.2",
-    "d3": "^7.9.0",
+    "d3-shape": "^3.2.0",
     "indicatorts": "^2.2.2",
     "lightweight-charts": "^5.0.8",
     "lucide": "^0.577.0",
     "osqp": "^0.0.2",
     "quadprog": "^1.6.1",
     "shadow-cljs": "^3.1.7",
-    "smol-toml": "^1.6.0",
     "snabbdom": "3.5.1"
   },
   "devDependencies": {
     "@modelcontextprotocol/sdk": "^1.26.0",
+    "@openai/agents": "^0.7.2",
     "@playwright/test": "^1.58.2",
     "@tailwindcss/forms": "^0.5.7",
     "@tailwindcss/typography": "^0.5.10",
@@ -119,6 +120,7 @@
     "pixelmatch": "^7.1.0",
     "pngjs": "^7.0.0",
     "postcss": "^8.4.32",
+    "smol-toml": "^1.6.0",
     "tailwindcss": "^3.4.0",
     "zod": "^4.3.6"
   }

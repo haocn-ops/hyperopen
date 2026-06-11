@@ -1,9 +1,10 @@
 (ns hyperopen.api.trading.internal-seams-test
-  (:require [cljs.test :refer-macros [async deftest is]]
+  (:require [hyperopen.runtime.validation :as validation]
+            [cljs.test :refer-macros [async deftest is]]
             [hyperopen.api.trading :as trading]
             [hyperopen.api.trading.test-support :as support]
             [hyperopen.platform :as platform]
-            [hyperopen.schema.contracts :as contracts]
+            [hyperopen.schema.contracts]
             [hyperopen.wallet.agent-session :as agent-session]
             [hyperopen.wallet.agent-session-crypto :as agent-session-crypto]
             [hyperopen.utils.hl-signing :as signing]))
@@ -112,8 +113,8 @@
                         :text (fn []
                                 (resolved-thenable
                                  "{\"status\":\"ok\",\"response\":{\"data\":1}}"))}]
-      (with-redefs [contracts/validation-enabled? (constantly true)
-                    contracts/assert-exchange-response!
+      (with-redefs [validation/validation-enabled? (constantly true)
+                    validation/assert-exchange-response!
                     (fn [payload context]
                       (reset! assert-call [payload context]))]
         (-> (@#'hyperopen.api.trading/parse-json! response)
@@ -188,8 +189,8 @@
           signature {:r "0x1"
                      :s "0x2"
                      :v 27}]
-      (with-redefs [contracts/validation-enabled? (constantly true)
-                    contracts/assert-signed-exchange-payload!
+      (with-redefs [validation/validation-enabled? (constantly true)
+                    validation/assert-signed-exchange-payload!
                     (fn [payload context]
                       (reset! assert-call [payload context]))]
         (let [request (@#'hyperopen.api.trading/post-signed-action!
@@ -287,8 +288,8 @@
           signature {:r "0x1"
                      :s "0x2"
                      :v 27}]
-      (with-redefs [contracts/validation-enabled? (constantly false)
-                    contracts/assert-signed-exchange-payload!
+      (with-redefs [validation/validation-enabled? (constantly false)
+                    validation/assert-signed-exchange-payload!
                     (fn [_payload _context]
                       (swap! assert-calls inc))]
         (let [request (@#'hyperopen.api.trading/post-signed-action!

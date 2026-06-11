@@ -1,6 +1,7 @@
 (ns hyperopen.websocket.acl.hyperliquid-test
-  (:require [cljs.test :refer-macros [deftest is testing]]
-            [hyperopen.schema.contracts :as contracts]
+  (:require [hyperopen.runtime.validation :as validation]
+            [cljs.test :refer-macros [deftest is testing]]
+            [hyperopen.schema.contracts]
             [hyperopen.websocket.acl.hyperliquid :as acl]
             [hyperopen.websocket.domain.model :as model]))
 
@@ -21,7 +22,7 @@
       (is (= 42 (get-in result [:ok :socket-id]))))))
 
 (deftest parse-raw-envelope-market-fast-path-defers-full-conversion-test
-  (with-redefs [contracts/validation-enabled? (constantly false)]
+  (with-redefs [validation/validation-enabled? (constantly false)]
     (let [result (acl/parse-raw-envelope {:raw "{\"channel\":\"trades\",\"seq\":2,\"data\":[{\"coin\":\"BTC\"}]}"
                                           :socket-id 5
                                           :now-ms (constantly 200)
@@ -40,7 +41,7 @@
       (is (= "BTC" (get-in hydrated [:payload :data 0 :coin]))))))
 
 (deftest parse-raw-envelope-lossless-path-stays-eager-when-validation-disabled-test
-  (with-redefs [contracts/validation-enabled? (constantly false)]
+  (with-redefs [validation/validation-enabled? (constantly false)]
     (let [result (acl/parse-raw-envelope {:raw "{\"channel\":\"openOrders\",\"seq\":7,\"data\":{\"user\":\"0xabc\"}}"
                                           :socket-id 3
                                           :now-ms (constantly 50)
@@ -54,8 +55,8 @@
 
 (deftest parse-raw-envelope-default-source-and-validation-enabled-branches-test
   (let [assert-calls (atom [])]
-    (with-redefs [contracts/validation-enabled? (constantly true)
-                  contracts/assert-provider-message! (fn [provider-message context]
+    (with-redefs [validation/validation-enabled? (constantly true)
+                  validation/assert-provider-message! (fn [provider-message context]
                                                        (swap! assert-calls conj [provider-message context]))]
       (let [result (acl/parse-raw-envelope {:raw "{\"channel\":\"trades\",\"data\":[]}"
                                             :socket-id 7
@@ -68,7 +69,7 @@
         (is (= "trades" (get-in result [:ok :topic])))))))
 
 (deftest parse-raw-envelope-channel-shape-errors-with-validation-disabled-test
-  (with-redefs [contracts/validation-enabled? (constantly false)]
+  (with-redefs [validation/validation-enabled? (constantly false)]
     (doseq [raw ["{\"data\":[]}"
                  "{\"channel\":42,\"data\":[]}"
                  "{\"channel\":null,\"data\":[]}"]]

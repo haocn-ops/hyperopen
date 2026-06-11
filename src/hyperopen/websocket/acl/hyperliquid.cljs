@@ -1,5 +1,5 @@
 (ns hyperopen.websocket.acl.hyperliquid
-  (:require [hyperopen.schema.contracts :as contracts]
+  (:require [hyperopen.runtime.validation :as validation]
             [hyperopen.websocket.domain.model :as model]))
 
 (def ^:private channel-regex
@@ -70,7 +70,7 @@
   [{:keys [raw socket-id now-ms topic->tier source]}]
   (try
     (let [topic-fast (extract-channel-fast raw)
-          validation-enabled? (contracts/validation-enabled?)
+          validation-enabled? (validation/validation-enabled?)
           tier-fast (when (string? topic-fast)
                       (topic->tier topic-fast))]
       (if (and (string? topic-fast)
@@ -86,7 +86,7 @@
           {:ok envelope})
         (let [provider-message (parse-provider-message raw)
               _ (when validation-enabled?
-                  (contracts/assert-provider-message!
+                  (validation/assert-provider-message!
                    provider-message
                    {:boundary :ws-acl/parse-raw-envelope}))
               topic (:channel provider-message)]

@@ -185,7 +185,7 @@
         [:div.text-left (table/non-sortable-header "Terminate")])]
      (for [row rows]
        ^{:key (str "twap-active-" (:twap-id row) "-" (:creation-time-ms row))}
-       [:div {:class ["grid" "items-center" "gap-2" "py-px" "px-3" "hover:bg-base-300" "text-xs"]
+       [:div {:class ["account-table-row" "grid" "items-center" "gap-2" "py-px" "px-3" "hover:bg-base-300" "text-xs"]
               :style (if read-only?
                        active-read-only-grid-template-style
                        active-grid-template-style)}
@@ -217,7 +217,7 @@
       [:div.text-left (table/non-sortable-header "Status")]]
      (for [row rows]
        ^{:key (str "twap-history-" (:time-ms row) "-" (:coin row) "-" (:status-label row))}
-       [:div {:class ["grid" "items-center" "gap-2" "py-px" "px-3" "hover:bg-base-300" "text-xs"]
+       [:div {:class ["account-table-row" "grid" "items-center" "gap-2" "py-px" "px-3" "hover:bg-base-300" "text-xs"]
               :style history-grid-template-style}
         [:div.text-left.whitespace-nowrap (shared/format-open-orders-time (:time-ms row))]
         [:div.text-left (coin-node (:coin row) (:side row))]

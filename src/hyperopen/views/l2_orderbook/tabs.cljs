@@ -25,7 +25,7 @@
                         size-dropdown-visible?
                         show-freshness-cue?
    freshness-cue]
-  [:div.flex.items-center.justify-between.px-3.py-2.bg-base-100.border-b.border-base-300
+  [:div.ob-ctl-row.flex.items-center.justify-between.px-3.py-2.bg-base-100.border-b.border-base-300
    (precision-dropdown selected-option price-options price-dropdown-visible?)
    [:div {:class ["flex" "items-center" "gap-3"]}
     (when show-freshness-cue?

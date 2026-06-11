@@ -210,6 +210,10 @@
     background-color: rgba(31, 166, 125, 0.15);
   }
 
+  .ob-ask-bar {
+    background-color: rgb(var(--ho-sell-hi) / 0.15);
+  }
+
   .order-book-row {
     @apply flex justify-between items-center py-1 px-2 hover:bg-trading-surface/50 transition-colors;
   }

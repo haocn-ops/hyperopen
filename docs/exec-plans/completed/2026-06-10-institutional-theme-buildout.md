@@ -81,6 +81,19 @@ nav `rgb(151,252,228)`, indicator `rgb(80,210,193)`, system UI font, no uppercas
       tables, tabs, sliders, portfolio chart, nav/h1 font).
 - [x] (2026-06-10) Milestone 4 — gates green + visual acceptance vs design screenshots + dark
       regression check.
+- [x] (2026-06-11) Fidelity pass 2 (user side-by-side review): squared the side-toggle pill
+      (`rounded-[5px]` is an arbitrary value the radius tokens cannot reach) and restyled it to
+      solid signal fills with near-black text; hairline vertical dividers between market-strip
+      cells (`asset-strip-row`/`asset-stat-cell` hooks) and horizontal row dividers across all
+      eight desktop account-table row sites (`account-table-row` hook); tab-strip cell
+      separators via inset box-shadow (a real border would desync the canvas-measured
+      indicator); outlined accent asset chips and signal-colored positions chips (replacing
+      `bg-[#242924]`/emerald utilities under the theme); boxed active nav link; white upright
+      brand wordmark; uppercase tracked submit button with neutral disabled state; REDUCE as an
+      outlined uppercase micro-button; orderbook depth bars at the design's 8% alpha, SPREAD
+      label treatment, raised tick-control row; `font-synthesis: none` (JetBrains Mono ships
+      400/500 — synthesized bold was the perceived font mismatch) and slashed zeros
+      (`"zero" 1`) on `.num`.
 
 ## Surprises & Discoveries
 

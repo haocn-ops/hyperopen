@@ -236,7 +236,7 @@
         ask-classes (set (collect-all-classes (view/order-row ask-row :base)))
         bid-classes (set (collect-all-classes (view/order-row bid-row :base)))]
     (testing "ask depth bars use Hyperliquid red at 15pct translucency"
-      (is (contains? ask-classes "bg-ho-sell-hi/15"))
+      (is (contains? ask-classes "ob-ask-bar"))
       (is (not (contains? ask-classes "bg-ho-sell-hi/20")))
       (is (not (contains? ask-classes "bg-red-500/30"))))
     (testing "bid depth bars use Hyperliquid green at 15pct translucency"

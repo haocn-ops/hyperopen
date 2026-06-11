@@ -143,3 +143,184 @@
     background-color: rgb(var(--ho-surface-raised));
   }
 }
+
+/* --- Fidelity pass 2 (2026-06-11): squared chrome, dividers, type details. */
+@layer components {
+  /* JetBrains Mono ships 400/500 only; refuse synthesized bold so heavier
+     copy renders at the crisp 500 cut like the design comps. Slashed zeros
+     on all numerals per the comps' "zero" feature. */
+  :root[data-theme="institutional"] body {
+    font-synthesis: none;
+  }
+
+  :root[data-theme="institutional"] .num {
+    font-feature-settings: "tnum" 1, "lnum" 1, "zero" 1;
+  }
+
+  /* Brand: white upright wordmark, accent mark. */
+  :root[data-theme="institutional"] .brand-wordmark,
+  :root[data-theme="institutional"] .brand-mark {
+    font-style: normal;
+    letter-spacing: -0.02em;
+  }
+
+  :root[data-theme="institutional"] .brand-wordmark {
+    color: rgb(var(--ho-text-hi));
+  }
+
+  :root[data-theme="institutional"] .brand-mark {
+    color: rgb(var(--ho-accent));
+  }
+
+  /* Nav: boxed active link instead of tinted text. */
+  :root[data-theme="institutional"] .header-nav-link {
+    padding: 6px 10px;
+    border: 1px solid transparent;
+    font-weight: 500;
+  }
+
+  :root[data-theme="institutional"] .header-nav-link-active {
+    color: rgb(var(--ho-text-hi));
+    background-color: rgb(var(--ho-surface-raised));
+    border-color: rgb(var(--ho-border));
+  }
+
+  /* Market strip: raised band with hairline cell dividers. */
+  :root[data-theme="institutional"] .asset-strip-row,
+  :root[data-theme="institutional"] .ob-ctl-row {
+    background-color: rgb(var(--ho-surface));
+  }
+
+  :root[data-theme="institutional"] .asset-stat-cell {
+    border-left: 1px solid rgb(var(--ho-border));
+  }
+
+  /* SPOT/dex/leverage chips next to the asset name. */
+  :root[data-theme="institutional"] .asset-chip {
+    background-color: transparent;
+    border-color: rgb(var(--ho-border-accent));
+    color: rgb(var(--ho-accent));
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-size: 10px;
+  }
+
+  /* Chart toolbar timeframe cells get hairline separators. */
+  :root[data-theme="institutional"] [data-parity-id="chart-toolbar"] .space-x-1 > button {
+    border-right: 1px solid rgb(var(--ho-border));
+    border-radius: 0;
+  }
+
+  /* Orderbook: design depth-bar translucency and SPREAD treatment. */
+  :root[data-theme="institutional"] .ob-bid-bar {
+    background-color: rgb(var(--ho-buy) / 0.08);
+  }
+
+  :root[data-theme="institutional"] .ob-ask-bar {
+    background-color: rgb(var(--ho-sell-hi) / 0.08);
+  }
+
+  :root[data-theme="institutional"] .ob-spread-row {
+    background-color: rgb(var(--ho-surface));
+  }
+
+  :root[data-theme="institutional"] .ob-spread-row span:first-child {
+    color: rgb(var(--ho-buy));
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  /* Account tables: hairline row dividers; tab cells separated by inset
+     hairlines (box-shadow, not border — tab widths are canvas-measured and
+     a real border would desync the active indicator). */
+  :root[data-theme="institutional"] .account-table-row {
+    border-bottom: 1px solid rgb(var(--ho-border));
+  }
+
+  :root[data-theme="institutional"] .account-info-tab-strip button {
+    box-shadow: inset -1px 0 0 rgb(var(--ho-border));
+  }
+
+  /* Positions side/leverage chips: outlined, signal-colored, square. */
+  :root[data-theme="institutional"] .pos-side-chip {
+    background-color: transparent;
+    border-color: rgb(var(--ho-buy) / 0.35);
+    color: rgb(var(--ho-buy));
+    letter-spacing: 0.06em;
+  }
+
+  :root[data-theme="institutional"] .pos-side-chip.text-red-300 {
+    border-color: rgb(var(--ho-sell) / 0.35);
+    color: rgb(var(--ho-sell));
+  }
+
+  /* REDUCE: outlined uppercase micro-button per the comps. */
+  :root[data-theme="institutional"] [data-position-reduce-trigger] {
+    width: auto;
+    justify-content: center;
+    padding: 2px 10px;
+    border: 1px solid rgb(var(--ho-border));
+    color: rgb(var(--ho-text));
+    font-weight: 400;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  :root[data-theme="institutional"] [data-position-reduce-trigger]:hover {
+    border-color: rgb(var(--ho-accent));
+    color: rgb(var(--ho-accent));
+  }
+
+  /* Order ticket side toggle: square, outlined inactive, solid signal fill
+     with near-black text when active. */
+  :root[data-theme="institutional"] .of-side-row {
+    background-color: transparent;
+    padding: 0;
+    gap: 4px;
+  }
+
+  :root[data-theme="institutional"] .of-side-btn {
+    border-radius: 0;
+    border: 1px solid transparent;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-weight: 500;
+  }
+
+  :root[data-theme="institutional"] .of-side-btn.bg-ho-surface-raised {
+    background-color: transparent;
+    border-color: rgb(var(--ho-border));
+    color: rgb(var(--ho-text-muted));
+  }
+
+  :root[data-theme="institutional"] .of-side-btn.bg-ho-surface-raised:hover {
+    border-color: rgb(var(--ho-border-accent-muted));
+    color: rgb(var(--ho-text));
+  }
+
+  :root[data-theme="institutional"] .of-side-btn.bg-ho-accent {
+    background-color: rgb(var(--ho-buy));
+    border-color: rgb(var(--ho-buy));
+    color: rgb(var(--ho-bg-deep));
+  }
+
+  :root[data-theme="institutional"] .of-side-btn.bg-ho-sell-hi {
+    background-color: rgb(var(--ho-sell));
+    border-color: rgb(var(--ho-sell));
+    color: rgb(var(--ho-bg-deep));
+  }
+
+  /* Submit button: design's loud uppercase tracking; neutral disabled state
+     (the literal dark-teal disabled utilities read as default-theme). */
+  :root[data-theme="institutional"] [data-parity-id="trade-submit-order-button"] {
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    font-weight: 700;
+  }
+
+  :root[data-theme="institutional"] [data-parity-id="trade-submit-order-button"]:disabled {
+    background-color: rgb(var(--ho-surface-raised));
+    color: rgb(var(--ho-text-dim));
+  }
+}

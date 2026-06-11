@@ -468,7 +468,7 @@
                                         (assoc opts
                                                :buy-label buy-label
                                                :sell-label sell-label))
-     [:div {:class ["flex" "h-[33px]" "items-center" "gap-1.5" "rounded-lg" "bg-base-200" "p-0.5" "sm:gap-2"]}
+     [:div {:class ["of-side-row" "flex" "h-[33px]" "items-center" "gap-1.5" "rounded-lg" "bg-base-200" "p-0.5" "sm:gap-2"]}
       (primitives/side-button buy-label :buy (= side :buy) ((:on-select-side side-handlers) :buy))
       (primitives/side-button sell-label :sell (= side :sell) ((:on-select-side side-handlers) :sell))])))
 
@@ -490,7 +490,7 @@
                                                         :or {action-prefix ""
                                                              side->intent (constantly :buy)}}]
    (when (seq outcome-sides)
-     [:div {:class ["flex" "h-[33px]" "items-center" "gap-1.5" "rounded-lg" "bg-base-200" "p-0.5" "sm:gap-2"]}
+     [:div {:class ["of-side-row" "flex" "h-[33px]" "items-center" "gap-1.5" "rounded-lg" "bg-base-200" "p-0.5" "sm:gap-2"]}
       (for [side outcome-sides
             :let [side-index (outcome-side-index side)
                   side-label (or (:side-label side) (:side-name side) (str "Side " side-index))

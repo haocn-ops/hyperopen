@@ -204,7 +204,8 @@
     [:div {:class ["text-left"]} (sortable-trade-history-header "Closed PNL" sort-state)]]))
 
 (defn- trade-history-table-row [row market-by-key]
-  [:div {:class ["grid"
+  [:div {:class ["account-table-row"
+                 "grid"
                  "gap-2"
                  "py-px"
                  "px-3"

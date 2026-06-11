@@ -7,7 +7,7 @@
 ;; src/styles/surfaces/institutional.css.
 (def header-neutral-text-class "text-trading-text-secondary")
 (def body-neutral-text-class "ob-body-text")
-(def ask-depth-bar-class "bg-ho-sell-hi/15")
+(def ask-depth-bar-class "ob-ask-bar")
 (def bid-depth-bar-class "ob-bid-bar")
 (def ask-price-text-class "text-ho-sell-hi")
 (def bid-price-text-class "ob-bid-px")

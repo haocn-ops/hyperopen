@@ -31,35 +31,55 @@
                                 :maximum-fraction-digits 1
                                 :suffix "%"}))
 
-(defn- format-compact-usdc
+(defn- delta-tone-class
+  [delta]
+  (if (neg? (or delta 0))
+    "text-trading-red"
+    "text-trading-green"))
+
+(defn- delta-direction
+  [delta]
+  (cond
+    (neg? (or delta 0)) "negative"
+    (pos? (or delta 0)) "positive"
+    :else "neutral"))
+
+(defn- visible-delta-rows
+  [groups]
+  (mapcat (fn [{:keys [rows] :as group}]
+            (cons group (remove :hidden? rows)))
+          groups))
+
+(defn- max-abs-delta
+  [groups]
+  (reduce max
+          0
+          (keep (fn [{:keys [delta]}]
+                  (when (opt-format/finite-number? delta)
+                    (js/Math.abs delta)))
+                (visible-delta-rows groups))))
+
+(defn- percent-size
   [value]
-  (if (opt-format/finite-number? value)
-    (let [abs-value (js/Math.abs value)
-          sign (cond
-                 (pos? value) "+"
-                 (neg? value) "-"
-                 :else "")]
-      (cond
-        (>= abs-value 1000000)
-        (str sign "$"
-             (.toLocaleString (/ abs-value 1000000)
-                               "en-US"
-                               #js {:maximumFractionDigits 1})
-             "m")
+  (let [rounded (/ (js/Math.round (* value 10)) 10)]
+    (if (= rounded (js/Math.round rounded))
+      (str (js/Math.round rounded) "%")
+      (str rounded "%"))))
 
-        (>= abs-value 1000)
-        (str sign "$"
-             (.toLocaleString (/ abs-value 1000)
-                               "en-US"
-                               #js {:maximumFractionDigits 0})
-             "k")
+(defn- delta-bar-percent
+  [delta max-delta scale]
+  (if (and (opt-format/finite-number? delta)
+           (pos? max-delta))
+    (percent-size (min scale (* scale (/ (js/Math.abs delta) max-delta))))
+    "0%"))
 
-        :else
-        (str sign "$"
-             (.toLocaleString abs-value
-                               "en-US"
-                               #js {:maximumFractionDigits 0}))))
-    "N/A"))
+(defn- delta-bar-size
+  [delta max-delta]
+  (delta-bar-percent delta max-delta 100))
+
+(defn- delta-bar-fill-size
+  [delta max-delta]
+  (delta-bar-percent delta max-delta 50))
 
 (defn- data-role-token
   [value]
@@ -138,50 +158,73 @@
      (side-button scope role-id instrument-id position-side short-selectable? :long)
      (side-button scope role-id instrument-id position-side short-selectable? :short)]))
 
+(defn- change-cell
+  [role-token delta emphasis?]
+  [:td {:class (cond-> [(delta-tone-class delta)
+                        "font-mono" "text-right" "tabular-nums"]
+                 emphasis? (conj "font-semibold"))
+        :data-role (str "portfolio-optimizer-target-exposure-change-"
+                        role-token)}
+   (format-delta-pct delta)])
+
+(defn- delta-bar-cell
+  [role-token delta max-delta]
+  [:td {:class [(delta-tone-class delta)
+                "optimizer-target-exposure-delta-bar-cell"]
+        :data-role (str "portfolio-optimizer-target-exposure-delta-bar-cell-"
+                        role-token)}
+   [:span {:class ["optimizer-target-exposure-delta-bar"]
+           :data-role (str "portfolio-optimizer-target-exposure-delta-bar-"
+                           role-token)
+           :data-direction (delta-direction delta)
+           :style {:--optimizer-delta-bar-size (delta-bar-size delta max-delta)
+                   :--optimizer-delta-bar-fill-size (delta-bar-fill-size delta max-delta)}
+           :aria-hidden true}
+    [:span {:class ["optimizer-target-exposure-delta-bar-fill"]}]]])
+
 (defn- exposure-row
-  [{:keys [idx binding? hidden? current-sign target-sign leg-label current-weight
-           target-weight delta delta-notional excluded? status-label instrument-id asset]
-     :as row}]
-  [:tr {:class (cond-> ["optimizer-target-exposure-row" "optimizer-exposure-row"]
-                binding? (conj "bg-warning/10")
-                excluded? (conj "optimizer-target-exposure-row--excluded")
-                hidden? (conj "hidden"))
-        :data-role (str "portfolio-optimizer-target-exposure-row-" idx)
-        :data-binding (when binding? "true")
-        :data-excluded (when excluded? "true")
-        :data-current-sign current-sign
-        :data-target-sign target-sign}
-   [:td {:class ["text-trading-muted"]} ""]
-   [:td {:class ["pl-8" "text-trading-muted"]}
-    [:span {:class (cond-> ["inline-flex" "items-center" "gap-2"]
-                     excluded? (conj "line-through" "decoration-trading-muted/70"))}
-     leg-label]
-    (when excluded?
-      [:span {:class ["optimizer-target-exposure-status" "ml-2"]}
-       status-label])]
-   [:td {:class ["px-2" "text-right"]}
-    (side-control "portfolio-optimizer-target-exposure-row" row)]
-   [:td {:class (cond-> ["font-mono" "text-right" "tabular-nums"]
-                  excluded? (conj "line-through" "decoration-trading-muted/70"))}
-    (opt-format/format-pct current-weight {:minimum-fraction-digits 1 :maximum-fraction-digits 1})]
-   [:td {:class (cond-> ["font-mono" "text-right" "tabular-nums"]
-                  excluded? (conj "line-through" "decoration-trading-muted/70"))}
-    (opt-format/format-pct target-weight (if excluded?
-                                           {:minimum-fraction-digits 2
-                                            :maximum-fraction-digits 2}
-                                           {:minimum-fraction-digits 1
-                                            :maximum-fraction-digits 1}))]
-   [:td {:class [(if (neg? delta) "text-trading-red" "text-trading-green")
-                 "font-mono" "text-right" "tabular-nums"]}
-    (format-delta-pct delta)]
-   [:td {:class [(if (neg? delta) "text-trading-red" "text-trading-green")
-                 "font-mono" "text-right" "tabular-nums"]}
-    (format-compact-usdc delta-notional)]])
+  [max-delta {:keys [idx binding? hidden? current-sign target-sign leg-label current-weight
+                     target-weight delta excluded? status-label instrument-id]
+              :as row}]
+  (let [role-token (data-role-token (or instrument-id (str "row-" idx)))]
+    [:tr {:class (cond-> ["optimizer-target-exposure-row" "optimizer-exposure-row"]
+                  binding? (conj "bg-warning/10")
+                  excluded? (conj "optimizer-target-exposure-row--excluded")
+                  hidden? (conj "hidden"))
+          :data-role (str "portfolio-optimizer-target-exposure-row-" idx)
+          :data-binding (when binding? "true")
+          :data-excluded (when excluded? "true")
+          :data-current-sign current-sign
+          :data-target-sign target-sign}
+     [:td {:class ["text-trading-muted"]} ""]
+     [:td {:class ["pl-8" "text-trading-muted"]}
+      [:span {:class (cond-> ["inline-flex" "items-center" "gap-2"]
+                       excluded? (conj "line-through" "decoration-trading-muted/70"))}
+       leg-label]
+      (when excluded?
+        [:span {:class ["optimizer-target-exposure-status" "ml-2"]}
+         status-label])]
+     [:td {:class ["px-2" "text-right"]}
+      (side-control "portfolio-optimizer-target-exposure-row" row)]
+     [:td {:class (cond-> ["font-mono" "text-right" "tabular-nums"]
+                    excluded? (conj "line-through" "decoration-trading-muted/70"))}
+      (opt-format/format-pct current-weight {:minimum-fraction-digits 1 :maximum-fraction-digits 1})]
+     [:td {:class (cond-> ["font-mono" "text-right" "tabular-nums"]
+                    excluded? (conj "line-through" "decoration-trading-muted/70"))}
+      (opt-format/format-pct target-weight (if excluded?
+                                             {:minimum-fraction-digits 2
+                                              :maximum-fraction-digits 2}
+                                             {:minimum-fraction-digits 1
+                                              :maximum-fraction-digits 1}))]
+     (change-cell role-token delta false)
+     (delta-bar-cell role-token delta max-delta)]))
 
 (defn- exposure-group-row
-  [{:keys [asset current-weight target-weight delta delta-notional binding?
-           expandable? target-sign excluded? status-label instrument-id] :as group}]
-  (let [token (data-role-token (or instrument-id asset))]
+  [max-delta {:keys [asset current-weight target-weight delta binding?
+                     expandable? target-sign excluded? status-label instrument-id]
+              :as group}]
+  (let [asset-token (data-role-token asset)
+        token (data-role-token (or instrument-id asset))]
     [:tr {:class (cond-> ["optimizer-target-exposure-asset" "optimizer-exposure-row" "cursor-pointer"]
                   excluded? (conj "optimizer-target-exposure-row--excluded"))
         :data-role (str "portfolio-optimizer-target-exposure-asset-"
@@ -234,12 +277,8 @@
                                             :maximum-fraction-digits 2}
                                            {:minimum-fraction-digits 1
                                             :maximum-fraction-digits 1}))]
-   [:td {:class [(if (neg? delta) "text-trading-red" "text-trading-green")
-                 "font-mono" "text-right" "font-semibold" "tabular-nums"]}
-    (format-delta-pct delta)]
-   [:td {:class [(if (neg? delta) "text-trading-red" "text-trading-green")
-                 "font-mono" "text-right" "font-semibold" "tabular-nums"]}
-    (format-compact-usdc delta-notional)]]))
+   (change-cell asset-token delta true)
+   (delta-bar-cell asset-token delta max-delta)]))
 
 (defn- candidate-row
   [{:keys [market-key label name]} idx active-index]
@@ -381,7 +420,8 @@
    (target-exposure-table result nil))
   ([result {:keys [state draft]}]
   (let [{:keys [groups]} (rebalance-view-model/target-exposure-table-model result
-                                                                          {:draft draft})]
+                                                                            {:draft draft})
+        max-delta (max-abs-delta groups)]
     [:section {:class ["optimizer-target-exposure-table"
                        "min-h-0" "border-r" "border-base-300" "bg-base-100/95" "leading-4"]
                :data-role "portfolio-optimizer-target-exposure-table"}
@@ -411,13 +451,16 @@
          [:th {:class ["sticky" "top-0" "border-b" "border-base-300" "bg-base-100" "px-2" "py-2" "text-right" "font-mono" "text-[0.58rem]" "font-normal" "uppercase" "tracking-[0.06em]" "text-trading-muted/70"]} "Side"]
          [:th {:class ["sticky" "top-0" "border-b" "border-base-300" "bg-base-100" "px-3" "py-2" "text-right" "font-mono" "text-[0.58rem]" "font-normal" "uppercase" "tracking-[0.06em]" "text-trading-muted/70"]} "Current"]
          [:th {:class ["sticky" "top-0" "border-b" "border-base-300" "bg-base-100" "px-3" "py-2" "text-right" "font-mono" "text-[0.58rem]" "font-normal" "uppercase" "tracking-[0.06em]" "text-trading-muted/70"]} "Target"]
-         [:th {:class ["sticky" "top-0" "border-b" "border-base-300" "bg-base-100" "px-3" "py-2" "text-right" "font-mono" "text-[0.58rem]" "font-normal" "uppercase" "tracking-[0.06em]" "text-trading-muted/70"]} "Δ %"]
-         [:th {:class ["sticky" "top-0" "border-b" "border-base-300" "bg-base-100" "px-3" "py-2" "text-right" "font-mono" "text-[0.58rem]" "font-normal" "uppercase" "tracking-[0.06em]" "text-trading-muted/70"]} "Δ $"]]]
+         [:th {:class ["sticky" "top-0" "border-b" "border-base-300" "bg-base-100" "px-3" "py-2" "text-right" "font-mono" "text-[0.58rem]" "font-normal" "uppercase" "tracking-[0.06em]" "text-trading-muted/70"]
+               :data-role "portfolio-optimizer-target-exposure-change-header"} "Change"]
+         [:th {:class ["sticky" "top-0" "w-[76px]" "border-b" "border-base-300" "bg-base-100" "px-3" "py-2" "text-right" "font-mono" "text-[0.58rem]" "font-normal" "uppercase" "tracking-[0.06em]" "text-trading-muted/70"]
+               :data-role "portfolio-optimizer-target-exposure-delta-bar-header"
+               :aria-label "Rebalance magnitude"} ""]]]
 	       (into
 	        [:tbody]
 	        (mapcat
 	         (fn [{:keys [rows] :as group}]
 	            (concat
-	             [(exposure-group-row group)]
-	             (map exposure-row rows)))
+	             [(exposure-group-row max-delta group)]
+	             (map (partial exposure-row max-delta) rows)))
 	          groups))]]])))

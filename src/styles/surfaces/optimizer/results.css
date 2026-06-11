@@ -357,6 +357,54 @@
     padding: 6px 10px;
   }
 
+  .portfolio-optimizer .optimizer-target-exposure-delta-bar-cell {
+    min-width: 76px;
+    text-align: right;
+  }
+
+  .portfolio-optimizer .optimizer-target-exposure-delta-bar {
+    --optimizer-delta-bar-size: 0%;
+    --optimizer-delta-bar-fill-size: 0%;
+    position: relative;
+    display: block;
+    width: 68px;
+    height: 14px;
+    margin-left: auto;
+  }
+
+  .portfolio-optimizer .optimizer-target-exposure-delta-bar::before {
+    content: "";
+    position: absolute;
+    top: 2px;
+    bottom: 2px;
+    left: 50%;
+    width: 1px;
+    background-color: var(--optimizer-border-strong);
+    transform: translateX(-0.5px);
+  }
+
+  .portfolio-optimizer .optimizer-target-exposure-delta-bar-fill {
+    position: absolute;
+    top: 4px;
+    bottom: 4px;
+    width: var(--optimizer-delta-bar-fill-size);
+    min-width: 0;
+  }
+
+  .portfolio-optimizer
+    .optimizer-target-exposure-delta-bar[data-direction="positive"]
+    .optimizer-target-exposure-delta-bar-fill {
+    left: 50%;
+    background-color: var(--optimizer-long);
+  }
+
+  .portfolio-optimizer
+    .optimizer-target-exposure-delta-bar[data-direction="negative"]
+    .optimizer-target-exposure-delta-bar-fill {
+    right: 50%;
+    background-color: var(--optimizer-short);
+  }
+
   .portfolio-optimizer .optimizer-target-exposure-row td {
     background-color: var(--optimizer-surface-2);
   }

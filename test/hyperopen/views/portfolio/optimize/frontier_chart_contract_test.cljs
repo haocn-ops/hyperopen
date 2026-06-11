@@ -331,7 +331,7 @@
            (drag-enter-actions frontier-point)))
     (is (contains? strings "Allocation"))
     (is (contains? strings "By asset · click to expand legs"))
-    (is (contains? strings "Δ %"))
+    (is (contains? strings "Change"))
     (is (contains? strings "+15.0%"))
     (is (contains? strings "-12.0%"))
     (is (contains? strings "How much to trust this"))

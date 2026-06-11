@@ -83,14 +83,15 @@
     (is (= [[:actions/set-portfolio-optimizer-instrument-filter
              :allowlist
              "perp:BTC"
-             :event.target/checked]]
+             [:event.target/checked]]]
            (change-actions
             (node-by-role view-node
-                          "portfolio-optimizer-instrument-allowlist-input"))))
+                          "portfolio-optimizer-instrument-allowlist-input")))
+        "Placeholders interpolate only in vector form; a bare keyword reaches the action unresolved.")
     (is (= [[:actions/set-portfolio-optimizer-instrument-filter
              :blocklist
              "perp:BTC"
-             :event.target/checked]]
+             [:event.target/checked]]]
            (change-actions
             (node-by-role view-node
                           "portfolio-optimizer-instrument-blocklist-input"))))
@@ -104,7 +105,7 @@
     (is (= [[:actions/set-portfolio-optimizer-asset-override
              :held-lock?
              "perp:BTC"
-             :event.target/checked]]
+             [:event.target/checked]]]
            (change-actions
             (node-by-role view-node
                           "portfolio-optimizer-instrument-held-lock-input"))))

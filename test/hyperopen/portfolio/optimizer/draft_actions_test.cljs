@@ -410,16 +410,19 @@
                                                             :market-type :perp}
                                                            {:instrument-id "spot:PURR"
                                                             :market-type :spot}]
-                                           :constraints {:held-locks ["perp:BTC"]}}}}}]
-    (is (= [[:effects/save-many [[[:portfolio :optimizer :draft :constraints :asset-overrides "perp:ETH" :max-weight]
-                                  0.28]
+                                           :constraints {:held-locks ["perp:BTC"]
+                                                         :asset-overrides {"perp:BTC" {:max-weight 0.1}}}}}}}]
+    (is (= [[:effects/save-many [[[:portfolio :optimizer :draft :constraints :asset-overrides]
+                                  {"perp:BTC" {:max-weight 0.1}
+                                   "perp:ETH" {:max-weight 0.28}}]
                                  [[:portfolio :optimizer :draft :metadata :dirty?]
                                   true]]]]
            (actions/set-portfolio-optimizer-asset-override
             state
             :max-weight
             "perp:ETH"
-            "0.28")))
+            "0.28"))
+        "The save-many contract only allows keyword paths, so instrument-keyed maps are saved whole.")
     (is (= [[:effects/save-many [[[:portfolio :optimizer :draft :constraints :held-locks]
                                   ["perp:BTC" "perp:ETH"]]
                                  [[:portfolio :optimizer :draft :metadata :dirty?]
@@ -429,8 +432,8 @@
             :held-lock?
             "perp:ETH"
             true)))
-    (is (= [[:effects/save-many [[[:portfolio :optimizer :draft :constraints :perp-leverage "perp:ETH" :max-weight]
-                                  0.5]
+    (is (= [[:effects/save-many [[[:portfolio :optimizer :draft :constraints :perp-leverage]
+                                  {"perp:ETH" {:max-weight 0.5}}]
                                  [[:portfolio :optimizer :draft :metadata :dirty?]
                                   true]]]]
            (actions/set-portfolio-optimizer-asset-override

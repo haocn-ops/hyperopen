@@ -1,16 +1,25 @@
 (ns hyperopen.views.portfolio.optimize.instrument-overrides-panel
-  (:require [hyperopen.views.portfolio.optimize.instrument-display :as instrument-display]))
+  (:require [hyperopen.portfolio.optimizer.domain.constraints :as domain-constraints]
+            [hyperopen.views.portfolio.optimize.instrument-display :as instrument-display]
+            [hyperopen.views.portfolio.optimize.setup-controls :as controls]))
 
-(def ^:private row-shell-class
-  ["grid" "grid-cols-1" "gap-2" "rounded-lg" "border" "border-base-300" "bg-base-200/40"
-   "p-3" "lg:grid-cols-[minmax(160px,1.2fr)_repeat(5,minmax(110px,1fr))]"])
+(def ^:private row-grid-class
+  ["grid" "grid-cols-[minmax(0,1fr)_34px_34px_34px_60px_60px]" "items-center"
+   "gap-2" "px-2" "py-1.5"])
 
-(def ^:private label-class
-  ["block" "text-[0.6rem]" "font-semibold" "uppercase" "tracking-[0.16em]" "text-trading-muted"])
+(def ^:private override-help
+  {:allow "Checking Allow restricts the run: only allowed assets stay eligible. Leave the whole column clear to keep every universe asset eligible."
+   :block "Blocked assets are excluded from this run. Block wins when an asset is also allowed."
+   :lock "Pins the asset at its currently held weight, so the optimizer rebalances around the position instead of trading it."
+   :max-weight "Per-asset ceiling on the target weight, as a fraction of equity. Blank inherits the global per-asset cap."
+   :perp-cap "Tighter ceiling for this perp leg, as a fraction of equity. Blank inherits the asset's cap. Spot and vault legs have no perp cap."})
 
-(def ^:private input-class
-  ["mt-1.5" "w-full" "rounded-md" "border" "border-base-300" "bg-base-100" "px-2" "py-1.5"
-   "text-sm" "font-semibold" "tabular-nums" "outline-none" "focus:border-primary/70"])
+(def ^:private column-tooltip-ids
+  {:allow "portfolio-optimizer-override-allow-tooltip"
+   :block "portfolio-optimizer-override-block-tooltip"
+   :lock "portfolio-optimizer-override-lock-tooltip"
+   :max-weight "portfolio-optimizer-override-max-weight-tooltip"
+   :perp-cap "portfolio-optimizer-override-perp-cap-tooltip"})
 
 (defn- instrument-id
   [instrument]
@@ -34,110 +43,219 @@
     (str value)
     ""))
 
-(defn- checkbox-control
-  [label checked? data-role action]
-  [:label {:class ["rounded-md" "border" "border-base-300" "bg-base-100/70" "p-2"]}
-   [:span {:class label-class} label]
-   [:input {:type "checkbox"
-            :class ["mt-2" "h-4" "w-4" "accent-primary"]
-            :data-role data-role
-            :checked checked?
-            :on {:change [action]}}]])
+(defn- column-tooltip
+  [column]
+  [:span {:class ["pointer-events-none" "absolute" "left-0" "right-0"
+                  "top-[calc(100%+4px)]" "z-30" "border" "border-base-300"
+                  "bg-base-100" "px-2" "py-1.5" "font-sans" "text-[0.65625rem]"
+                  "font-normal" "normal-case" "leading-[1.45]" "tracking-normal"
+                  "text-trading-muted" "opacity-0"
+                  "shadow-[0_12px_32px_rgba(0,0,0,0.45)]" "transition-opacity"
+                  "duration-150" "group-hover:opacity-100"]
+          :id (column-tooltip-ids column)
+          :role "tooltip"
+          :data-role (column-tooltip-ids column)}
+   (get override-help column)])
 
-(defn- number-control
-  [label value data-role action]
-  [:label {:class ["rounded-md" "border" "border-base-300" "bg-base-100/70" "p-2"]}
-   [:span {:class label-class} label]
-   [:input {:type "text"
-            :inputmode "decimal"
-            :class input-class
-            :data-role data-role
-            :value (text-value value)
-            :on {:input [action]}}]])
+(defn- header-cell
+  [label column center?]
+  [:span {:class (cond-> ["group" "min-w-0" "cursor-help"]
+                   center? (conj "text-center"))}
+   label
+   (column-tooltip column)])
 
-(defn- disabled-number-control
-  [label value data-role]
-  [:label {:class ["rounded-md" "border" "border-base-300" "bg-base-100/50" "p-2"
-                   "opacity-60"]}
-   [:span {:class label-class} label]
-   [:input {:type "text"
-            :class input-class
-            :data-role data-role
-            :value value
-            :disabled true}]])
+(defn- header-row
+  []
+  [:div {:class (into ["relative" "border-b" "border-base-300" "bg-base-200/40"
+                       "font-mono" "text-[0.55rem]" "font-semibold" "uppercase"
+                       "tracking-[0.12em]" "text-trading-muted/70"]
+                      row-grid-class)
+         :data-role "portfolio-optimizer-instrument-overrides-header"}
+   [:span {:class ["min-w-0" "truncate"]} "Asset"]
+   (header-cell "Alw" :allow true)
+   (header-cell "Blk" :block true)
+   (header-cell "Lck" :lock true)
+   (header-cell "Max Wt" :max-weight false)
+   (header-cell "Perp" :perp-cap false)])
+
+(defn- override-checkbox
+  [{:keys [tone column checked? data-role aria-label action]}]
+  [:input {:type "checkbox"
+           :class ["optimizer-override-check" "justify-self-center"]
+           :data-tone tone
+           :data-role data-role
+           :checked checked?
+           :aria-label aria-label
+           :aria-describedby (column-tooltip-ids column)
+           :on {:change [action]}}])
+
+(defn- override-number-input
+  [{:keys [value placeholder column data-role aria-label action]}]
+  [:input {:type "text"
+           :inputmode "decimal"
+           :class controls/input-class
+           :data-role data-role
+           :value (text-value value)
+           :placeholder placeholder
+           :aria-label aria-label
+           :aria-describedby (column-tooltip-ids column)
+           :on {:input [action]}}])
+
+(defn- row-active?
+  [constraints id perp?]
+  (or (checked? (:allowlist constraints) id)
+      (checked? (:blocklist constraints) id)
+      (checked? (:held-locks constraints) id)
+      (some? (get-in constraints [:asset-overrides id :max-weight]))
+      (and perp?
+           (some? (get-in constraints [:perp-leverage id :max-weight])))))
 
 (defn- instrument-row
-  [constraints instrument]
+  [constraints global-cap instrument]
   (let [id (instrument-id instrument)
         perp? (= :perp (:market-type instrument))
         primary-label (instrument-display/primary-label instrument)
         secondary-token (or (instrument-display/base-label instrument)
-                            (:coin instrument))]
-    [:div {:class row-shell-class
-           :data-role "portfolio-optimizer-instrument-override-row"}
-     [:div
-      [:p {:class ["text-sm" "font-semibold"]} primary-label]
-      [:p {:class ["mt-1" "text-xs" "uppercase" "tracking-[0.14em]" "text-trading-muted"]}
-       (str secondary-token " / " (market-label instrument))]]
-     (checkbox-control
-      "Allow"
-      (checked? (:allowlist constraints) id)
-      "portfolio-optimizer-instrument-allowlist-input"
-      [:actions/set-portfolio-optimizer-instrument-filter
-       :allowlist
-       id
-       :event.target/checked])
-     (checkbox-control
-      "Block"
-      (checked? (:blocklist constraints) id)
-      "portfolio-optimizer-instrument-blocklist-input"
-      [:actions/set-portfolio-optimizer-instrument-filter
-       :blocklist
-       id
-       :event.target/checked])
-     (number-control
-      "Max Weight"
-      (get-in constraints [:asset-overrides id :max-weight])
-      "portfolio-optimizer-instrument-max-weight-input"
-      [:actions/set-portfolio-optimizer-asset-override
-       :max-weight
-       id
-       [:event.target/value]])
-     (checkbox-control
-      "Held Lock"
-      (checked? (:held-locks constraints) id)
-      "portfolio-optimizer-instrument-held-lock-input"
-      [:actions/set-portfolio-optimizer-asset-override
-       :held-lock?
-       id
-       :event.target/checked])
+                            (:coin instrument))
+        asset-max-weight (get-in constraints [:asset-overrides id :max-weight])]
+    [:div {:class (into ["optimizer-override-row" "border-b" "border-base-300"
+                         "last:border-b-0" "hover:bg-base-200/30"]
+                        row-grid-class)
+           :data-role "portfolio-optimizer-instrument-override-row"
+           :data-active (when (row-active? constraints id perp?) "true")}
+     [:span {:class ["min-w-0"]}
+      [:span {:class ["block" "truncate" "font-mono" "text-[0.6875rem]" "font-semibold"]}
+       primary-label]
+      [:span {:class ["block" "truncate" "font-mono" "text-[0.55rem]" "uppercase"
+                      "tracking-[0.08em]" "text-trading-muted/70"]}
+       (str secondary-token " · " (market-label instrument))]]
+     (override-checkbox
+      {:tone "allow"
+       :column :allow
+       :checked? (checked? (:allowlist constraints) id)
+       :data-role "portfolio-optimizer-instrument-allowlist-input"
+       :aria-label (str "Allow " primary-label)
+       :action [:actions/set-portfolio-optimizer-instrument-filter
+                :allowlist
+                id
+                [:event.target/checked]]})
+     (override-checkbox
+      {:tone "block"
+       :column :block
+       :checked? (checked? (:blocklist constraints) id)
+       :data-role "portfolio-optimizer-instrument-blocklist-input"
+       :aria-label (str "Block " primary-label)
+       :action [:actions/set-portfolio-optimizer-instrument-filter
+                :blocklist
+                id
+                [:event.target/checked]]})
+     (override-checkbox
+      {:tone "lock"
+       :column :lock
+       :checked? (checked? (:held-locks constraints) id)
+       :data-role "portfolio-optimizer-instrument-held-lock-input"
+       :aria-label (str "Lock held weight for " primary-label)
+       :action [:actions/set-portfolio-optimizer-asset-override
+                :held-lock?
+                id
+                [:event.target/checked]]})
+     (override-number-input
+      {:value asset-max-weight
+       :placeholder (text-value global-cap)
+       :column :max-weight
+       :data-role "portfolio-optimizer-instrument-max-weight-input"
+       :aria-label (str "Max weight for " primary-label)
+       :action [:actions/set-portfolio-optimizer-asset-override
+                :max-weight
+                id
+                [:event.target/value]]})
      (if perp?
-       (number-control
-        "Perp Cap"
-        (get-in constraints [:perp-leverage id :max-weight])
-        "portfolio-optimizer-instrument-perp-max-weight-input"
-        [:actions/set-portfolio-optimizer-asset-override
-         :perp-max-weight
-         id
-         [:event.target/value]])
-       (disabled-number-control
-        "Perp Cap"
-        "Spot"
-        "portfolio-optimizer-instrument-perp-max-weight-input"))]))
+       (override-number-input
+        {:value (get-in constraints [:perp-leverage id :max-weight])
+         :placeholder (text-value (or asset-max-weight global-cap))
+         :column :perp-cap
+         :data-role "portfolio-optimizer-instrument-perp-max-weight-input"
+         :aria-label (str "Perp cap for " primary-label)
+         :action [:actions/set-portfolio-optimizer-asset-override
+                  :perp-max-weight
+                  id
+                  [:event.target/value]]})
+       [:span {:class ["text-center" "font-mono" "text-[0.6875rem]"
+                       "text-trading-muted/60"]
+               :aria-hidden "true"}
+        "—"])]))
+
+(defn- override-count
+  [constraints]
+  (+ (count (selected-set (:allowlist constraints)))
+     (count (selected-set (:blocklist constraints)))
+     (count (selected-set (:held-locks constraints)))
+     (count (filter (comp some? :max-weight val)
+                    (or (:asset-overrides constraints) {})))
+     (count (filter (comp some? :max-weight val)
+                    (or (:perp-leverage constraints) {})))))
+
+(defn overrides-trailing-label
+  [draft]
+  (let [n (override-count (or (:constraints draft) {}))]
+    (if (pos? n)
+      (str n " active")
+      "optional")))
+
+(defn- eligibility-constraints
+  [constraints]
+  ;; The request builder drops an empty allowlist before the domain filter
+  ;; runs; mirror that here so the eligible count matches what a run uses.
+  (cond-> constraints
+    (empty? (selected-set (:allowlist constraints))) (dissoc :allowlist)))
+
+(defn- toolbar-row
+  [universe constraints]
+  (let [total (count universe)
+        eligible (count (domain-constraints/normalize-universe
+                         universe
+                         (eligibility-constraints constraints)))
+        allowlist-on? (boolean (seq (selected-set (:allowlist constraints))))
+        locked (count (selected-set (:held-locks constraints)))]
+    [:div {:class ["flex" "items-center" "gap-2" "border-b" "border-base-300"
+                   "px-2" "py-1.5"]
+           :data-role "portfolio-optimizer-instrument-overrides-toolbar"}
+     [:span {:class ["font-mono" "text-[0.6rem]" "uppercase" "tracking-[0.12em]"
+                     "text-trading-muted"]}
+      (str eligible " of " total " eligible")]
+     (when allowlist-on?
+       [:span {:class ["optimizer-chip" "border" "px-1.5" "py-[1px]" "font-mono"
+                       "text-[0.53125rem]" "font-semibold" "uppercase"
+                       "tracking-[0.12em]"]
+               :data-optimizer-chip "true"
+               :data-tone "accent"}
+        "allowlist on"])
+     (when (pos? locked)
+       [:span {:class ["ml-auto" "font-mono" "text-[0.6rem]" "uppercase"
+                       "tracking-[0.12em]" "text-trading-muted/70"]}
+        (str locked " locked")])]))
 
 (defn instrument-overrides-panel
   [draft]
   (let [universe (vec (or (:universe draft) []))
-        constraints (or (:constraints draft) {})]
-    [:section {:class ["rounded-xl" "border" "border-base-300" "bg-base-100/95" "p-4"]
-               :data-role "portfolio-optimizer-instrument-overrides-panel"}
-     [:p {:class ["text-[0.65rem]" "font-semibold" "uppercase" "tracking-[0.24em]" "text-trading-muted"]}
-      "Per-Asset Overrides"]
-     [:p {:class ["mt-2" "text-sm" "text-trading-muted"]}
-      "Set allowlist, blocklist, held-position locks, max asset weights, and per-perp caps."]
+        constraints (or (:constraints draft) {})
+        global-cap (or (:max-asset-weight constraints)
+                       domain-constraints/default-max-asset-weight)]
+    [:div {:class ["mt-3"]
+           :data-role "portfolio-optimizer-instrument-overrides-panel"}
+     [:p {:class ["text-[0.6875rem]" "leading-[1.45]" "text-trading-muted"]}
+      "Row-level eligibility and weight caps layered on top of the global constraints. Hover a column header for details."]
      (if (seq universe)
-       (into [:div {:class ["mt-4" "space-y-2"]}]
-             (map #(instrument-row constraints %) universe))
-       [:p {:class ["mt-4" "rounded-lg" "border" "border-base-300" "bg-base-200/40" "p-3"
-                    "text-sm" "text-trading-muted"]}
-        "No instruments selected. Seed the universe before editing row-level constraints."])]))
+       [:div {:class ["mt-2" "border" "border-base-300" "bg-base-100/50"]}
+        (toolbar-row universe constraints)
+        (header-row)
+        (into [:div {:class ["max-h-[21rem]" "overflow-y-auto"]
+                     :data-role "portfolio-optimizer-instrument-overrides-rows"}]
+              (map #(instrument-row constraints global-cap %) universe))]
+       [:p {:class ["mt-2" "border" "border-base-300" "bg-base-200/20" "px-2"
+                    "py-3" "text-xs" "text-trading-muted"]}
+        "No instruments selected yet. Add assets in Universe (01) to edit row-level overrides."])
+     (when (seq universe)
+       [:div {:class ["mt-2" "font-mono" "text-[0.58rem]" "leading-5"
+                      "text-trading-muted/70"]}
+        "Caps are weight fractions — 0.25 caps an asset at 25% of equity. Blank inputs inherit the global cap."])]))

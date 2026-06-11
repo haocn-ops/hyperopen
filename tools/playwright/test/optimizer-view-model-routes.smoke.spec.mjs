@@ -786,8 +786,12 @@ test("portfolio optimizer draft results render namespaced market icons on fronti
       .toBeLessThan(targetExposureOrder.indexOf("portfolio-optimizer-target-exposure-delta-bar-AAPL"));
     await expect(page.locator("[data-role='portfolio-optimizer-target-exposure-change-AAPL']"))
       .toContainText("+20.0%");
+    await expect(page.locator("[data-role='portfolio-optimizer-target-exposure-change-AAPL']"))
+      .toHaveCSS("color", "rgb(78, 166, 116)");
     await expect(page.locator("[data-role='portfolio-optimizer-target-exposure-change-GOLD']"))
       .toContainText("-15.0%");
+    await expect(page.locator("[data-role='portfolio-optimizer-target-exposure-change-GOLD']"))
+      .toHaveCSS("color", "rgb(194, 91, 91)");
     await expect(page.locator("[data-role='portfolio-optimizer-target-exposure-delta-bar-AAPL']"))
       .toHaveAttribute("data-direction", "positive");
     await expect(page.locator("[data-role='portfolio-optimizer-target-exposure-delta-bar-GOLD']"))

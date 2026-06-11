@@ -161,6 +161,7 @@
 (defn- change-cell
   [role-token delta emphasis?]
   [:td {:class (cond-> [(delta-tone-class delta)
+                        "optimizer-target-exposure-change-cell"
                         "font-mono" "text-right" "tabular-nums"]
                  emphasis? (conj "font-semibold"))
         :data-role (str "portfolio-optimizer-target-exposure-change-"

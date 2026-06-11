@@ -71,7 +71,7 @@ const themes = {
   // Default HyperOpen look. Values are the exact hexes the app used before
   // tokenization; changing one changes the default theme's rendering.
   dark: {
-    label: "HyperOpen",
+    label: "HyperLiquid",
     colors: {
       bg: "#0f1a1f",
       "bg-deep": "#06131a",

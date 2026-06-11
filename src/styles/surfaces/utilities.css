@@ -921,10 +921,11 @@
     position: fixed;
     inset: 0;
     z-index: 275;
-    background: rgba(0, 0, 0, 0.24);
+    /* No blur and only a light dim: the page must stay legible behind the
+       popover so theme changes preview live while cycling the picker. */
+    background: rgba(0, 0, 0, 0.12);
     border: 0;
     cursor: default;
-    backdrop-filter: blur(1.5px);
     animation: ts-dim-in 180ms ease;
   }
 

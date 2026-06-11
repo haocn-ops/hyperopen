@@ -7,7 +7,7 @@
   (:require [clojure.string :as str]))
 
 (def themes
-  [{:id "dark" :label "HyperOpen"}
+  [{:id "dark" :label "HyperLiquid"}
    {:id "institutional" :label "Institutional"}
    {:id "hyperdegen" :label "HyperDegen"}])
 

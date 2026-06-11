@@ -250,4 +250,68 @@
     outline: 1px solid color-mix(in srgb, var(--optimizer-accent) 72%, transparent);
     outline-offset: 2px;
   }
+
+  .portfolio-optimizer .optimizer-override-check {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 18px;
+    height: 18px;
+    min-height: 18px;
+    margin: 0;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--optimizer-border-strong);
+    border-radius: 2px;
+    background-color: var(--optimizer-bg);
+    color: transparent;
+    font-family: "JetBrains Mono", var(--font-mono);
+    font-size: 10px;
+    font-weight: 600;
+    line-height: 1;
+    cursor: pointer;
+    transition:
+      border-color 0.15s ease,
+      background-color 0.15s ease,
+      color 0.15s ease;
+  }
+
+  .portfolio-optimizer .optimizer-override-check::after {
+    content: "✓";
+  }
+
+  .portfolio-optimizer .optimizer-override-check[data-tone="block"]::after {
+    content: "✕";
+  }
+
+  .portfolio-optimizer .optimizer-override-check[data-tone="lock"]::after {
+    content: "◆";
+  }
+
+  .portfolio-optimizer .optimizer-override-check:hover {
+    border-color: color-mix(in srgb, var(--optimizer-accent) 55%, transparent);
+  }
+
+  .portfolio-optimizer .optimizer-override-check:checked[data-tone="allow"] {
+    border-color: color-mix(in srgb, var(--optimizer-long) 62%, transparent);
+    background-color: color-mix(in srgb, var(--optimizer-long) 16%, var(--optimizer-bg));
+    color: var(--optimizer-long);
+  }
+
+  .portfolio-optimizer .optimizer-override-check:checked[data-tone="block"] {
+    border-color: color-mix(in srgb, var(--optimizer-short) 62%, transparent);
+    background-color: color-mix(in srgb, var(--optimizer-short) 16%, var(--optimizer-bg));
+    color: var(--optimizer-short);
+  }
+
+  .portfolio-optimizer .optimizer-override-check:checked[data-tone="lock"] {
+    border-color: var(--optimizer-accent-border);
+    background-color: color-mix(in srgb, var(--optimizer-accent) 16%, var(--optimizer-bg));
+    color: var(--optimizer-accent);
+  }
+
+  .portfolio-optimizer .optimizer-override-row[data-active="true"] {
+    box-shadow: inset 2px 0 0 color-mix(in srgb, var(--optimizer-accent) 55%, transparent);
+  }
 }

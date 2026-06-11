@@ -402,6 +402,13 @@
           enabled?*)]])
       [])))
 
+(defn- instrument-cap-map
+  ;; The save-many effect contract only accepts keyword paths, so instrument
+  ;; keyed maps must be saved whole rather than assoc'ed via a string segment.
+  [state map-key instrument-id max-weight]
+  (-> (or (get-in state (conj contracts/draft-constraints-path map-key)) {})
+      (assoc-in [instrument-id :max-weight] max-weight)))
+
 (defn set-portfolio-optimizer-asset-override
   [state override-key instrument-id value]
   (let [override-key* (common/normalize-keyword-like override-key)
@@ -417,22 +424,16 @@
            (= :max-weight override-key*)
            (some? numeric-value))
       (common/save-draft-path-values
-       [[(conj contracts/draft-constraints-path
-               :asset-overrides
-               instrument-id*
-               :max-weight)
-         numeric-value]])
+       [[(conj contracts/draft-constraints-path :asset-overrides)
+         (instrument-cap-map state :asset-overrides instrument-id* numeric-value)]])
 
       (and instrument-id*
            (= :perp-max-weight override-key*)
            (= :perp (common/instrument-market-type state instrument-id*))
            (some? numeric-value))
       (common/save-draft-path-values
-       [[(conj contracts/draft-constraints-path
-               :perp-leverage
-               instrument-id*
-               :max-weight)
-         numeric-value]])
+       [[(conj contracts/draft-constraints-path :perp-leverage)
+         (instrument-cap-map state :perp-leverage instrument-id* numeric-value)]])
 
       (and instrument-id*
            (= :held-lock? override-key*)

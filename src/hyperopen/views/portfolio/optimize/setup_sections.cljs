@@ -19,12 +19,13 @@
    (objective-controls/objective-section draft highlighted-controls)
    (model-controls/model-section draft)
    (constraint-controls/constraints-section draft highlighted-controls)
-   [:details {:class ["optimizer-setup-panel" "border" "border-base-300" "bg-base-100/90" "p-3"]
-              :data-role "portfolio-optimizer-advanced-overrides-shell"}
-    [:summary {:class (into ["cursor-pointer" "select-none"] controls/section-title-class)}
-     "Advanced Overrides"]
-    [:div {:class ["mt-3"]}
-     (instrument-overrides-panel/instrument-overrides-panel draft)]]])
+   (controls/disclosure-panel
+    "portfolio-optimizer-advanced-overrides-shell"
+    (controls/disclosure-heading
+     "05"
+     "Advanced Overrides"
+     (instrument-overrides-panel/overrides-trailing-label draft))
+    (instrument-overrides-panel/instrument-overrides-panel draft))])
 
 (defn- summary-row
   [{:keys [label title copy]}]

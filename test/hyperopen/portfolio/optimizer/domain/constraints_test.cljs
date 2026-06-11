@@ -33,6 +33,21 @@
                                            {:allowlist ["A" "B"]
                                             :blocklist ["B"]})))))
 
+(deftest normalize-universe-excludes-spot-instruments-unless-included-test
+  (let [universe [{:instrument-id "perp:BTC"
+                   :market-type :perp}
+                  {:instrument-id "spot:PURR"
+                   :market-type :spot}
+                  {:instrument-id "vault:alpha"
+                   :market-type :vault}]]
+    (is (= ["perp:BTC" "vault:alpha"]
+           (mapv :instrument-id
+                 (constraints/normalize-universe universe {}))))
+    (is (= ["perp:BTC" "spot:PURR" "vault:alpha"]
+           (mapv :instrument-id
+                 (constraints/normalize-universe universe
+                                                 {:include-spot? true}))))))
+
 (deftest encode-long-only-bounds-applies-global-cap-overrides-and-held-locks-test
   (let [encoded (constraints/encode-constraints
                  {:universe [{:instrument-id "A"}
@@ -196,6 +211,7 @@
                              {:instrument-id "spot:FORCED"
                               :instrument-type :spot}]
                   :constraints {:long-only? false
+                                :include-spot? true
                                 :max-long-weight 0.6
                                 :max-short-weight 0.25
                                 :per-asset-overrides
@@ -216,6 +232,7 @@
                               :instrument-type :spot
                               :position-side :short}]
                   :constraints {:long-only? false
+                                :include-spot? true
                                 :max-long-weight 0.6
                                 :max-short-weight 0.25}})]
     (is (= [0 -0.25 0] (:lower-bounds encoded)))
@@ -252,6 +269,7 @@
                               :instrument-type :spot}]
                   :current-weights {"spot:LOCKED" -0.15}
                   :constraints {:long-only? false
+                                :include-spot? true
                                 :max-asset-weight 0.5
                                 :held-position-locks #{"spot:LOCKED"}}})]
     (is (= [0 -0.15] (:lower-bounds encoded)))

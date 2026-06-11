@@ -70,9 +70,6 @@
      (get-in state contracts/history-discovery-path))
     market))
 
-(def ^:private from-current-universe-cap
-  25)
-
 (def ^:private unusable-history-statuses
   #{:missing :rejected :unavailable :unsupported :disabled})
 
@@ -129,7 +126,6 @@
        (sort-by from-current-sort-key)
        (map :instrument)
        common/dedupe-instruments
-       (take from-current-universe-cap)
        vec))
 
 (defn add-portfolio-optimizer-universe-instrument

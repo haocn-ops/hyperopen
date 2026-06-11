@@ -54,7 +54,8 @@
   #{:max-turnover})
 
 (def boolean-constraint-keys
-  #{:long-only?})
+  #{:long-only?
+    :include-spot?})
 
 (def numeric-objective-parameter-keys
   #{:target-return

@@ -36,6 +36,14 @@
        (:market-type instrument)
        (:optimizer-history/instrument-kind instrument))))
 
+(defn- spot-instrument?
+  [instrument]
+  (let [id (instrument-id instrument)]
+    (or (= :spot (normalized-market-type instrument))
+        (and (string? id)
+             (or (.startsWith id "spot:")
+                 (.startsWith id "hl:spot:"))))))
+
 (defn- vault-like-instrument?
   [instrument]
   (let [id (instrument-id instrument)
@@ -56,13 +64,16 @@
 (defn normalize-universe
   [universe constraints]
   (let [allowlist (id-set (:allowlist constraints))
-        blocklist (or (id-set (:blocklist constraints)) #{})]
+        blocklist (or (id-set (:blocklist constraints)) #{})
+        include-spot? (true? (:include-spot? constraints))]
     (->> universe
          (filter (fn [instrument]
                    (let [id (instrument-id instrument)]
                      (and (or (nil? allowlist)
                               (contains? allowlist id))
-                          (not (contains? blocklist id))))))
+                          (not (contains? blocklist id))
+                          (or include-spot?
+                              (not (spot-instrument? instrument)))))))
          vec)))
 
 (defn- cap-value
@@ -443,7 +454,8 @@
 
 (defn encode-constraints
   [{:keys [universe current-weights constraints history]}]
-  (let [base-constraints (merge {:long-only? false}
+  (let [base-constraints (merge {:long-only? false
+                                 :include-spot? false}
                                 (or constraints {}))
         universe* (normalize-universe (or universe []) base-constraints)
         current-weights* (or current-weights {})

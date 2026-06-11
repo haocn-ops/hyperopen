@@ -188,10 +188,15 @@
     justify-self: end;
   }
 
+  .portfolio-optimizer .optimizer-include-spot-control {
+    justify-self: end;
+  }
+
   .portfolio-optimizer
     :is(
       .optimizer-turnover-cap-control,
-      .optimizer-long-only-control
+      .optimizer-long-only-control,
+      .optimizer-include-spot-control
     )
     .hx-toggle {
     display: inline-flex;
@@ -208,7 +213,8 @@
   .portfolio-optimizer
     :is(
       .optimizer-turnover-cap-control,
-      .optimizer-long-only-control
+      .optimizer-long-only-control,
+      .optimizer-include-spot-control
     )
     .hx-toggle.on {
     border-color: color-mix(in srgb, var(--optimizer-accent) 58%, transparent);
@@ -218,7 +224,8 @@
   .portfolio-optimizer
     :is(
       .optimizer-turnover-cap-control,
-      .optimizer-long-only-control
+      .optimizer-long-only-control,
+      .optimizer-include-spot-control
     )
     .hx-toggle
     .hx-toggle-knob {
@@ -232,7 +239,8 @@
   .portfolio-optimizer
     :is(
       .optimizer-turnover-cap-control,
-      .optimizer-long-only-control
+      .optimizer-long-only-control,
+      .optimizer-include-spot-control
     )
     .hx-toggle.on
     .hx-toggle-knob {
@@ -244,7 +252,8 @@
   .portfolio-optimizer
     :is(
       .optimizer-turnover-cap-control,
-      .optimizer-long-only-control
+      .optimizer-long-only-control,
+      .optimizer-include-spot-control
     )
     .hx-toggle:focus-visible {
     outline: 1px solid color-mix(in srgb, var(--optimizer-accent) 72%, transparent);

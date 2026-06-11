@@ -99,3 +99,22 @@ test("optimizer target exposure change cells override table body text color", ()
     /\.optimizer-target-exposure-change-cell\.text-trading-red/u,
   );
 });
+
+test("optimizer constraint toggles use the shared switch treatment", () => {
+  const setupCss = fs.readFileSync(
+    path.join(optimizerPartialDir, "setup.css"),
+    "utf8",
+  );
+
+  for (const controlClass of [
+    "optimizer-turnover-cap-control",
+    "optimizer-long-only-control",
+    "optimizer-include-spot-control",
+  ]) {
+    assert.match(
+      setupCss,
+      new RegExp(`\\.${controlClass}`, "u"),
+      `${controlClass} should be included in the optimizer hx-toggle override`,
+    );
+  }
+});

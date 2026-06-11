@@ -67,7 +67,7 @@
                               :quality-status (if missing? :failed :passed)}}])))
          coins)})
 
-(deftest set-draft-universe-from-current-holdings-caps-and-skips-known-unusable-history-test
+(deftest set-draft-universe-from-current-holdings-skips-known-unusable-history-without-truncating-test
   (let [coins (mapv #(str "COIN" %) (range 30))
         missing-coins #{"COIN29" "COIN28"}
         state {:webdata2 {:clearinghouseState
@@ -86,8 +86,8 @@
         prefetch-state (get path-values [:portfolio :optimizer :history-prefetch])
         selected-ids (mapv :instrument-id universe)
         expected-ids (mapv #(str "perp:COIN" %)
-                           (range 27 2 -1))]
-    (is (= 25 (count universe)))
+                           (range 27 -1 -1))]
+    (is (= 28 (count universe)))
     (is (= expected-ids selected-ids))
     (is (not-any? missing-coins (mapv :coin universe)))
     (is (every? #(= :available (:optimizer-history/history-status %))

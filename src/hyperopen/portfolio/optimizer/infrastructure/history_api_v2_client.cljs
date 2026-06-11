@@ -31,6 +31,46 @@
   [proxy-policy]
   (str/replace (keyword-name proxy-policy "approved-proxy-allowed") #"-" "_"))
 
+(defn- approved-proxy-allowed?
+  [proxy-policy]
+  (= "approved-proxy-allowed"
+     (keyword-name proxy-policy "approved-proxy-allowed")))
+
+(def ^:private trading-calendar-proxy-providers
+  #{"tiingo" "yahoo_finance" "yahoo-finance"})
+
+(def ^:private default-allowed-proxy-policies
+  #{"default_allowed" "default-allowed"})
+
+(defn- trading-calendar-proxy-provider?
+  [provider]
+  (contains? trading-calendar-proxy-providers
+             (keyword-name provider "")))
+
+(defn- stitched-proxy-mapping?
+  [mapping-kind]
+  (= "stitched-native-proxy"
+     (str/replace (keyword-name mapping-kind "") #"_" "-")))
+
+(defn- default-allowed-proxy?
+  [proxy]
+  (contains? default-allowed-proxy-policies
+             (keyword-name (:optimizer-proxy-policy proxy) "")))
+
+(defn- optimizer-history-request-id
+  [proxy-policy instrument]
+  (let [backend-id (coercion/non-blank-text
+                    (:optimizer-history/instrument-id instrument))
+        proxy (:optimizer-history/proxy instrument)
+        proxy-id (coercion/non-blank-text (:proxy-instrument-id proxy))]
+    (if (and (approved-proxy-allowed? proxy-policy)
+             proxy-id
+             (stitched-proxy-mapping? (:mapping-kind proxy))
+             (trading-calendar-proxy-provider? (:provider proxy))
+             (default-allowed-proxy? proxy))
+      proxy-id
+      backend-id)))
+
 (defn- interval-wire
   [interval]
   (keyword-name interval "1d"))
@@ -97,13 +137,12 @@
                    api-v2/normalize-api-map)))
 
 (defn- api-instrument-row
-  [instrument]
+  [proxy-policy instrument]
   (let [local-id (coercion/non-blank-text (:instrument-id instrument))
-        backend-id (coercion/non-blank-text
-                    (:optimizer-history/instrument-id instrument))]
-    (when (and local-id backend-id)
+        request-id (optimizer-history-request-id proxy-policy instrument)]
+    (when (and local-id request-id)
       {:client_instrument_id local-id
-       :instrument_id backend-id})))
+       :instrument_id request-id})))
 
 (defn- history-body
   [{:keys [proxy-policy include-aligned-returns?]} request]
@@ -111,7 +150,8 @@
    :interval (interval-wire (:interval request))
    :proxy_policy (proxy-policy-wire proxy-policy)
    :include_aligned_returns (true? include-aligned-returns?)
-   :instruments (mapv identity (keep api-instrument-row (:universe request)))})
+   :instruments (mapv identity (keep #(api-instrument-row proxy-policy %)
+                                      (:universe request)))})
 
 (defn request-history-bundle!
   [{:keys [fetch-fn base-url request-id] :as deps} request]

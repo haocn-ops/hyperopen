@@ -87,6 +87,86 @@
              (done)))
           (.catch (async-support/unexpected-error done))))))
 
+(deftest request-history-bundle-uses-default-allowed-trading-calendar-proxy-id-test
+  (async done
+    (let [calls (atom [])
+          fetch-fn (fn [url init]
+                     (swap! calls conj [url (js->clj init)])
+                     (js/Promise.resolve
+                      (json-response
+                       200
+                       {:contract_version "optimizer-history-api-v2"
+                        :request_id "rid-spy"
+                        :dataset_version "dv-spy"
+                        :status "ok"
+                        :series_by_instrument {}
+                        :warnings []})))]
+      (-> (client/request-history-bundle!
+           {:fetch-fn fetch-fn
+            :base-url "https://history.test"
+            :request-id (fn [] "rid-spy")
+            :proxy-policy :approved-proxy-allowed
+            :include-aligned-returns? true}
+           {:bars 365
+            :interval :1d
+            :universe [{:instrument-id "perp:xyz:SP500"
+                        :market-type :perp
+                        :optimizer-history/instrument-id "hl:hip3:xyz:SP500"
+                        :optimizer-history/proxy
+                        {:mapping-kind :stitched-native-proxy
+                         :proxy-instrument-id "external:tiingo:SPY"
+                         :provider "tiingo"
+                         :optimizer-proxy-policy "default_allowed"}}]})
+          (.then
+           (fn [_body]
+             (let [[_url init] (first @calls)
+                   body (js->clj (js/JSON.parse (get init "body")))]
+               (is (= [{"client_instrument_id" "perp:xyz:SP500"
+                        "instrument_id" "external:tiingo:SPY"}]
+                      (get body "instruments"))))
+             (done)))
+          (.catch (async-support/unexpected-error done))))))
+
+(deftest request-history-bundle-keeps-target-id-for-native-only-policy-test
+  (async done
+    (let [calls (atom [])
+          fetch-fn (fn [url init]
+                     (swap! calls conj [url (js->clj init)])
+                     (js/Promise.resolve
+                      (json-response
+                       200
+                       {:contract_version "optimizer-history-api-v2"
+                        :request_id "rid-native"
+                        :dataset_version "dv-native"
+                        :status "ok"
+                        :series_by_instrument {}
+                        :warnings []})))]
+      (-> (client/request-history-bundle!
+           {:fetch-fn fetch-fn
+            :base-url "https://history.test"
+            :request-id (fn [] "rid-native")
+            :proxy-policy :native-only
+            :include-aligned-returns? true}
+           {:bars 365
+            :interval :1d
+            :universe [{:instrument-id "perp:xyz:SP500"
+                        :market-type :perp
+                        :optimizer-history/instrument-id "hl:hip3:xyz:SP500"
+                        :optimizer-history/proxy
+                        {:mapping-kind :stitched-native-proxy
+                         :proxy-instrument-id "external:tiingo:SPY"
+                         :provider "tiingo"
+                         :optimizer-proxy-policy "default_allowed"}}]})
+          (.then
+           (fn [_body]
+             (let [[_url init] (first @calls)
+                   body (js->clj (js/JSON.parse (get init "body")))]
+               (is (= [{"client_instrument_id" "perp:xyz:SP500"
+                        "instrument_id" "hl:hip3:xyz:SP500"}]
+                      (get body "instruments"))))
+             (done)))
+          (.catch (async-support/unexpected-error done))))))
+
 (deftest request-history-bundle-rejects-http-400-without-retry-test
   (async done
     (let [calls (atom 0)

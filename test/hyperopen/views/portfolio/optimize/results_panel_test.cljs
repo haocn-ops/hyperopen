@@ -3,7 +3,7 @@
             [clojure.string :as str]
             [hyperopen.views.portfolio.optimize.results-panel :as results-panel]
             [hyperopen.views.portfolio.optimize.test-support
-             :refer [click-actions collect-strings node-attr node-by-role solved-result]]))
+             :refer [click-actions collect-strings data-role-order index-of node-attr node-by-role solved-result]]))
 
 (deftest results-panel-renders-canonical-results-workspace-shell-test
   (let [draft {:objective {:kind :target-volatility}
@@ -99,6 +99,38 @@
            (node-attr aapl-icon :src)))
     (is (= "https://app.hyperliquid.xyz/coins/xyz:SILVER.svg"
            (node-attr silver-icon :src)))))
+
+(deftest results-panel-target-exposure-renders-change-before-diverging-bar-test
+  (let [view-node (results-panel/results-panel
+                   {:result solved-result
+                    :computed-at-ms 2600}
+                   {:objective {:kind :maximum-sharpe}}
+                   {:frontier-overlay-mode :standalone})
+        order (data-role-order view-node)
+        btc-change (node-by-role view-node
+                                 "portfolio-optimizer-target-exposure-change-BTC")
+        btc-bar (node-by-role view-node
+                              "portfolio-optimizer-target-exposure-delta-bar-BTC")
+        purr-change (node-by-role view-node
+                                  "portfolio-optimizer-target-exposure-change-PURR")
+        purr-bar (node-by-role view-node
+                               "portfolio-optimizer-target-exposure-delta-bar-PURR")]
+    (is (< (index-of order "portfolio-optimizer-target-exposure-change-header")
+           (index-of order "portfolio-optimizer-target-exposure-delta-bar-header")))
+    (is (< (index-of order "portfolio-optimizer-target-exposure-change-BTC")
+           (index-of order "portfolio-optimizer-target-exposure-delta-bar-BTC")))
+    (is (< (index-of order "portfolio-optimizer-target-exposure-change-PURR")
+           (index-of order "portfolio-optimizer-target-exposure-delta-bar-PURR")))
+    (is (contains? (set (collect-strings btc-change)) "+15.0%"))
+    (is (contains? (set (node-attr btc-change :class)) "text-trading-green"))
+    (is (= "positive" (node-attr btc-bar :data-direction)))
+    (is (= "100%" (get (node-attr btc-bar :style)
+                       :--optimizer-delta-bar-size)))
+    (is (contains? (set (collect-strings purr-change)) "-12.0%"))
+    (is (contains? (set (node-attr purr-change :class)) "text-trading-red"))
+    (is (= "negative" (node-attr purr-bar :data-direction)))
+    (is (= "80%" (get (node-attr purr-bar :style)
+                      :--optimizer-delta-bar-size)))))
 
 (deftest results-panel-renders-use-my-views-editor-in-right-rail-test
   (let [draft {:universe [{:instrument-id "perp:BTC"

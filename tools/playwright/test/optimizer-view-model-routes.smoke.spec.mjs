@@ -774,6 +774,28 @@ test("portfolio optimizer draft results render namespaced market icons on fronti
       .toHaveAttribute("src", "https://app.hyperliquid.xyz/coins/xyz:AAPL.svg");
     await expect(page.locator("[data-role='portfolio-optimizer-target-exposure-asset-icon-img-SILVER']"))
       .toHaveAttribute("src", "https://app.hyperliquid.xyz/coins/xyz:SILVER.svg");
+    const targetExposureOrder = await page
+      .locator("[data-role='portfolio-optimizer-target-exposure-table']")
+      .evaluate((table) =>
+        [...table.querySelectorAll("[data-role]")]
+          .map((node) => node.getAttribute("data-role"))
+      );
+    expect(targetExposureOrder.indexOf("portfolio-optimizer-target-exposure-change-header"))
+      .toBeLessThan(targetExposureOrder.indexOf("portfolio-optimizer-target-exposure-delta-bar-header"));
+    expect(targetExposureOrder.indexOf("portfolio-optimizer-target-exposure-change-AAPL"))
+      .toBeLessThan(targetExposureOrder.indexOf("portfolio-optimizer-target-exposure-delta-bar-AAPL"));
+    await expect(page.locator("[data-role='portfolio-optimizer-target-exposure-change-AAPL']"))
+      .toContainText("+20.0%");
+    await expect(page.locator("[data-role='portfolio-optimizer-target-exposure-change-GOLD']"))
+      .toContainText("-15.0%");
+    await expect(page.locator("[data-role='portfolio-optimizer-target-exposure-delta-bar-AAPL']"))
+      .toHaveAttribute("data-direction", "positive");
+    await expect(page.locator("[data-role='portfolio-optimizer-target-exposure-delta-bar-GOLD']"))
+      .toHaveAttribute("data-direction", "negative");
+    await expect(page.locator("[data-role='portfolio-optimizer-target-exposure-delta-bar-AAPL']"))
+      .toHaveCSS("--optimizer-delta-bar-size", "100%");
+    await expect(page.locator("[data-role='portfolio-optimizer-target-exposure-delta-bar-GOLD']"))
+      .toHaveCSS("--optimizer-delta-bar-size", "75%");
     const standaloneGoldMarker = page.locator(
       "[data-role='portfolio-optimizer-frontier-overlay-symbol-standalone-hl:hip3:xyz:GOLD']"
     );

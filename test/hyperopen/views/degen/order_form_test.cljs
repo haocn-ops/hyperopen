@@ -36,15 +36,26 @@
     (is (str/includes? max* "MAXIMUM DEGEN"))
     (is (str/includes? max* "border-ho-sell"))))
 
-(deftest leverage-popover-message-test
-  (is (nil? (degen-order-form/leverage-popover-message {} 50)))
-  (is (nil? (degen-order-form/leverage-popover-message degen-state nil)))
-  (let [sensible (pr-str (degen-order-form/leverage-popover-message degen-state 3))
-        spicy (pr-str (degen-order-form/leverage-popover-message degen-state 12))]
-    (is (str/includes? sensible "Sensible. Are you lost?")
+(deftest leverage-popover-risk-test
+  (is (nil? (degen-order-form/leverage-popover-risk {} 50 100)))
+  (is (nil? (degen-order-form/leverage-popover-risk degen-state nil 100)))
+  (let [sensible (degen-order-form/leverage-popover-risk degen-state 3 40)
+        spicy (degen-order-form/leverage-popover-risk degen-state 12 40)
+        maxed (degen-order-form/leverage-popover-risk degen-state 1000 1000)]
+    (is (str/includes? (pr-str (:message sensible)) "Sensible. Are you lost?")
         "the popover speaks at every tier, including sensible")
-    (is (str/includes? spicy "Getting spicy"))
-    (is (str/includes? spicy "degen-leverage-popover-message"))))
+    (is (str/includes? (:slider-color sensible) "--ho-accent"))
+    (is (str/includes? (pr-str (:message spicy)) "Getting spicy"))
+    (is (str/includes? (pr-str (:message spicy)) "degen-leverage-popover-message"))
+    (is (str/includes? (:slider-color spicy) "--ho-warn"))
+    (is (= "text-ho-warn" (:value-class spicy)))
+    (is (str/includes? (pr-str (:marks-row spicy)) "degen-leverage-scale-marks"))
+    (is (str/includes? (pr-str (:marks-row spicy)) "\"40x\""))
+    (is (str/includes? (pr-str (:message maxed)) "MAXIMUM DEGEN"))
+    (is (= "text-ho-sell" (:value-class maxed)))
+    (is (str/includes? (:slider-color maxed) "--ho-sell"))
+    (is (str/includes? (pr-str (:marks-row maxed)) "\"250x\""))
+    (is (str/includes? (pr-str (:marks-row maxed)) "\"1000x\""))))
 
 (deftest effective-leverage-test
   (is (nil? (degen-order-form/effective-leverage nil 20)))

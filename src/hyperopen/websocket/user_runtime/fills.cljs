@@ -468,18 +468,22 @@
 (defn- celebrate-fills!
   "Degen presentation effects for incoming fills: confetti + cha-ching
    for ordinary fills, the REKT overlay + sad trombone for liquidations.
-   Other themes only get the plain chime (behind the sound setting)."
+   The degen voice implies sound on (like the prototype); the
+   Sound-on-fill setting governs the plain chime on other themes."
   [state rows]
   (let [degen? (voice/degen? state)
         liquidated? (boolean (some liquidation-fill-row? rows))]
-    (when degen?
-      (if liquidated?
-        (fx/rekt-overlay!)
-        (fx/confetti!)))
-    (when (trading-settings/sound-on-fill? state)
-      (if (and degen? liquidated?)
-        (sfx/rekt!)
-        (sfx/fill! degen?)))))
+    (cond
+      (and degen? liquidated?)
+      (do (fx/rekt-overlay!)
+          (sfx/rekt!))
+
+      degen?
+      (do (fx/confetti!)
+          (sfx/fill! true))
+
+      (trading-settings/sound-on-fill? state)
+      (sfx/fill! false))))
 
 (defn show-user-fill-toast!
   [store rows]

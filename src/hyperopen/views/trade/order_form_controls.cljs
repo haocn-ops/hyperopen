@@ -274,7 +274,9 @@
         slider-progress (if (> max-leverage* 1)
                           (* 100 (/ (- draft* 1)
                                     (- max-leverage* 1)))
-                          100)]
+                          100)
+        degen-risk (when popover-open?
+                     (degen-order-form/leverage-popover-risk state draft* max-leverage*))]
     [:div {:class ["relative" "flex-1"]
            :style (when popover-open?
                     {:z-index 1200})}
@@ -368,7 +370,9 @@
                 :max max-leverage*
                 :step 1
                 :value draft*
-                :style {:--leverage-adjust-slider-progress (str slider-progress "%")}
+                :style (cond-> {:--leverage-adjust-slider-progress (str slider-progress "%")}
+                         (:slider-color degen-risk)
+                         (assoc :--leverage-adjust-slider-active (:slider-color degen-risk)))
                 :aria-label "Leverage slider"
                 :on {:input (:on-set-leverage-draft leverage-handlers)}}]
        [:div {:class ["relative" "w-[92px]" "shrink-0"]}
@@ -383,7 +387,7 @@
                                "text-center"
                                "text-base"
                                "font-semibold"
-                               "text-gray-100"
+                               (or (:value-class degen-risk) "text-gray-100")
                                "num"
                                "appearance-none"]
                               primitives/neutral-input-focus-classes)
@@ -412,7 +416,8 @@
                   :aria-label "Close leverage menu"
                   :on {:click (:on-close-leverage-popover leverage-handlers)}}
          "x"]]]
-      (degen-order-form/leverage-popover-message state draft*)
+      (:marks-row degen-risk)
+      (:message degen-risk)
       [:button {:type "button"
                 :class ["h-10"
                         "w-full"

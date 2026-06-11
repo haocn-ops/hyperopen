@@ -4,8 +4,7 @@
    massive BUY MOON / SELL PANIC side selectors from the HyperDegen
    prototype. Everything renders nil (or the compact default) under
    other themes."
-  (:require [hyperopen.trading-settings :as trading-settings]
-            [hyperopen.ui.sfx :as sfx]
+  (:require [hyperopen.ui.sfx :as sfx]
             [hyperopen.ui.voice :as voice]))
 
 (defn leverage-tier
@@ -58,24 +57,48 @@
                :data-role "degen-leverage-warning"}
          (:text tier)]))))
 
-(defn leverage-popover-message
-  "Live taunt inside the leverage popover, driven by the slider draft —
-   updates on every notch while dragging. All tiers speak, including
-   the sensible ones."
-  [state draft-leverage]
+(defn- tier-slider-color
+  [tier]
+  (cond
+    (>= (:level tier) 3) "rgb(var(--ho-sell) / 0.6)"
+    (>= (:level tier) 1) "rgb(var(--ho-warn) / 0.55)"
+    :else "rgb(var(--ho-accent) / 0.5)"))
+
+(defn- leverage-scale-marks
+  "Evenly spaced Nx labels for the popover slider scale (the prototype's
+   1x..1000x ruler, adapted to the market's real max leverage)."
+  [max-leverage]
+  (let [m (js/Math.max 1 (js/Math.round (js/parseFloat max-leverage)))]
+    (->> [1 (* m 0.25) (* m 0.5) (* m 0.75) m]
+         (map #(js/Math.max 1 (js/Math.round %)))
+         distinct
+         vec)))
+
+(defn leverage-popover-risk
+  "Degen chrome for the leverage popover, driven live by the slider
+   draft: taunt message, slider fill color, value text class, and a
+   scale-marks row. Ticks on tier crossings. nil under other voices."
+  [state draft-leverage max-leverage]
   (when (voice/degen? state)
     (when-some [tier (leverage-tier draft-leverage)]
       ;; Render-side threshold tick (prototype's riskUp): idempotent per
       ;; tier level, so re-renders are silent and only crossing a tier
-      ;; while dragging speaks.
-      (sfx/leverage-tick-on-change! :leverage
-                                    (:level tier)
-                                    (trading-settings/sound-on-fill? state))
-      [:div {:class (into ["rounded-md" "border" "border-dashed" "px-2.5"
-                           "py-1.5" "text-xs" "font-bold" "leading-snug"]
-                          (:classes tier))
-             :data-role "degen-leverage-popover-message"}
-       (str "⚠ " (:text tier))])))
+      ;; while dragging speaks. The degen voice implies sound on.
+      (sfx/leverage-tick-on-change! :leverage (:level tier) true)
+      {:slider-color (tier-slider-color tier)
+       :value-class (second (:classes tier))
+       :marks-row [:div {:class ["flex" "items-center" "justify-between"
+                                 "px-0.5" "text-xs" "text-ho-text-dim"]
+                         :data-role "degen-leverage-scale-marks"}
+                   (for [mark (leverage-scale-marks max-leverage)]
+                     ^{:key (str "degen-lev-mark-" mark)}
+                     [:span (str mark "x")])]
+       :message [:div {:class (into ["rounded-md" "border" "border-dashed"
+                                     "px-2.5" "py-1.5" "text-xs" "font-bold"
+                                     "leading-snug"]
+                                    (:classes tier))
+                       :data-role "degen-leverage-popover-message"}
+                 (str "⚠ " (:text tier))]})))
 
 (defn effective-leverage
   "Account leverage implied by the order size slider: using P% of the
@@ -99,13 +122,10 @@
       (when (pos? eff)
         (let [tier (leverage-tier eff)
               all-in? (>= (js/parseFloat size-percent) 100)]
-          (sfx/leverage-tick-on-change! :order-size
-                                        (:level tier)
-                                        (trading-settings/sound-on-fill? state))
-          {:slider-color (cond
-                           (>= (:level tier) 3) "rgb(var(--ho-sell) / 0.6)"
-                           (>= (:level tier) 1) "rgb(var(--ho-warn) / 0.55)"
-                           :else "rgb(var(--ho-accent) / 0.5)")
+          ;; Degen voice implies sound on; the size slider only renders
+          ;; this feedback under degen.
+          (sfx/leverage-tick-on-change! :order-size (:level tier) true)
+          {:slider-color (tier-slider-color tier)
            :message [:div {:class (into ["rounded-md" "border" "border-dashed"
                                          "px-2.5" "py-1.5" "text-xs" "font-bold"
                                          "leading-snug"]

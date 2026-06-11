@@ -194,6 +194,7 @@ async function writeReleaseFixture(
   );
   const lazyRouteModuleNames = [
     "account_surfaces",
+    "charts_shared",
     "portfolio_route",
     "leaderboard_route",
     "vaults_route",
@@ -784,6 +785,7 @@ test("generateReleaseArtifacts assembles deterministic route-specific release pa
     `/css/${result.cssFileName}`,
     "/js/account_surfaces.CHUNK.js",
     "/js/api_wallets_route.CHUNK.js",
+    "/js/charts_shared.CHUNK.js",
     "/js/funding_comparison_route.CHUNK.js",
     "/js/leaderboard_route.CHUNK.js",
     "/js/main.HASH.js",
@@ -795,6 +797,7 @@ test("generateReleaseArtifacts assembles deterministic route-specific release pa
   assert.deepEqual(result.releaseJavaScriptFiles, [
     "account_surfaces.CHUNK.js",
     "api_wallets_route.CHUNK.js",
+    "charts_shared.CHUNK.js",
     "funding_comparison_route.CHUNK.js",
     "leaderboard_route.CHUNK.js",
     "main.HASH.js",

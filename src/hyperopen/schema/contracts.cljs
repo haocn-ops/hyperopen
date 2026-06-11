@@ -4,7 +4,8 @@
             [hyperopen.schema.contracts.assertions :as assertions]
             [hyperopen.schema.contracts.common :as common]
             [hyperopen.schema.contracts.effect-args :as effect-args]
-            [hyperopen.schema.runtime-registration-catalog :as runtime-registration-catalog]))
+            [hyperopen.schema.runtime-registration-catalog :as runtime-registration-catalog]
+            [hyperopen.runtime.validation :as validation]))
 
 (let [contracted-ids (set (keys action-args/action-args-spec-by-id))
       registered-ids (runtime-registration-catalog/action-ids)]
@@ -48,3 +49,17 @@
                (when (= spec ::common/any-args)
                  action-id)))
        set))
+
+;; Install the assertion functions into the runtime validation indirection.
+;; Release builds never load this namespace (no production require edge), so
+;; the whole spec tree is dead-code-eliminated; dev preloads and test
+;; namespaces load it, which activates runtime validation.
+(validation/install-contracts-impl!
+ {:validation-enabled? common/validation-enabled?
+  :assert-action-args! assertions/assert-action-args!
+  :assert-effect-args! assertions/assert-effect-args!
+  :assert-emitted-effects! assertions/assert-emitted-effects!
+  :assert-app-state! assertions/assert-app-state!
+  :assert-provider-message! assertions/assert-provider-message!
+  :assert-signed-exchange-payload! assertions/assert-signed-exchange-payload!
+  :assert-exchange-response! assertions/assert-exchange-response!})

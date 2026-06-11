@@ -2,7 +2,7 @@
   (:require [clojure.string :as str]
             [hyperopen.api.trading.debug-exchange-simulator :as debug-exchange-simulator]
             [hyperopen.platform :as platform]
-            [hyperopen.schema.contracts :as contracts]))
+            [hyperopen.runtime.validation :as validation]))
 
 (def exchange-url "https://api.hyperliquid.xyz/exchange")
 (def info-url "https://api.hyperliquid.xyz/info")
@@ -36,8 +36,8 @@
                        (js->clj payload :keywordize-keys true)))))]
     (-> parse-response-promise
         (.then (fn [parsed]
-                 (when (contracts/validation-enabled?)
-                   (contracts/assert-exchange-response!
+                 (when (validation/validation-enabled?)
+                   (validation/assert-exchange-response!
                     parsed
                     {:boundary :api-trading/parse-json}))
                  parsed)))))
@@ -112,8 +112,8 @@
     (max now monotonic-candidate)))
 
 (defn maybe-assert-signed-exchange-payload! [payload action]
-  (when (contracts/validation-enabled?)
-    (contracts/assert-signed-exchange-payload!
+  (when (validation/validation-enabled?)
+    (validation/assert-signed-exchange-payload!
      payload {:boundary :api-trading/post-signed-action
               :action-type (:type action)})))
 (defn post-signed-action!

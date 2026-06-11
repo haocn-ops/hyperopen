@@ -1,11 +1,60 @@
 (ns hyperopen.runtime.validation
   (:require [goog.object :as gobj]
-            [hyperopen.runtime.effect-order-contract :as effect-order-contract]
-            [hyperopen.schema.contracts :as contracts]))
+            [hyperopen.runtime.effect-order-contract :as effect-order-contract]))
+
+;; The cljs.spec contract tree (hyperopen.schema.contracts.*) registers hundreds
+;; of specs at namespace load and is only consulted when validation is enabled,
+;; which never happens in release (goog.DEBUG is false). To keep that tree out
+;; of the release bundle, this namespace holds no require edge into it: the
+;; contracts aggregator installs its assertion functions here when it loads
+;; (dev preload and test builds), and release builds dead-code-eliminate the
+;; whole tree because nothing references it.
+(defonce ^:private contracts-impl
+  (atom nil))
+
+(defn install-contracts-impl!
+  [impl]
+  (reset! contracts-impl impl)
+  impl)
 
 (defn validation-enabled?
   []
-  (contracts/validation-enabled?))
+  (boolean (and ^boolean goog.DEBUG
+                (when-let [enabled? (:validation-enabled? @contracts-impl)]
+                  (enabled?)))))
+
+(defn- contracts-fn
+  [impl-key]
+  (or (get @contracts-impl impl-key)
+      (fn [& _] nil)))
+
+(defn assert-action-args!
+  [action-id args context]
+  ((contracts-fn :assert-action-args!) action-id args context))
+
+(defn assert-effect-args!
+  [effect-id args context]
+  ((contracts-fn :assert-effect-args!) effect-id args context))
+
+(defn assert-emitted-effects!
+  [effects context]
+  ((contracts-fn :assert-emitted-effects!) effects context))
+
+(defn assert-app-state!
+  [state context]
+  ((contracts-fn :assert-app-state!) state context))
+
+(defn assert-provider-message!
+  [provider-message context]
+  ((contracts-fn :assert-provider-message!) provider-message context))
+
+(defn assert-signed-exchange-payload!
+  [payload context]
+  ((contracts-fn :assert-signed-exchange-payload!) payload context))
+
+(defn assert-exchange-response!
+  [response context]
+  ((contracts-fn :assert-exchange-response!) response context))
 
 (def ^:private store-state-watch-key
   ::state-schema-validation)
@@ -107,10 +156,10 @@
                                 arity-contract
                                 args
                                 {:phase :dispatch})
-        (contracts/assert-action-args! action-id (vec args) {:phase :dispatch}))
+        (assert-action-args! action-id (vec args) {:phase :dispatch}))
       (let [effects (apply handler state args)]
         (when validation?
-          (contracts/assert-emitted-effects!
+          (assert-emitted-effects!
            effects
            {:phase :action-emission
             :action-id action-id})
@@ -133,13 +182,13 @@
                                 arity-contract
                                 args
                                 {:phase :dispatch})
-        (contracts/assert-effect-args! effect-id (vec args) {:phase :dispatch})
+        (assert-effect-args! effect-id (vec args) {:phase :dispatch})
         (apply handler ctx store args)))))
 
 (defn install-store-state-validation!
   [store]
   (when (validation-enabled?)
-    (contracts/assert-app-state!
+    (assert-app-state!
      @store
      {:phase :bootstrap
       :boundary :app-store})
@@ -147,7 +196,7 @@
     (add-watch store
                store-state-watch-key
                (fn [_ _ _ new-state]
-                 (contracts/assert-app-state!
+                 (assert-app-state!
                   new-state
                   {:phase :transition
                    :boundary :app-store}))))

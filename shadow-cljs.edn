@@ -28,9 +28,11 @@
                                         :depends-on #{:main}}
                   :account_surfaces {:entries [hyperopen.views.account-surfaces-module]
                                      :depends-on #{:main}}
+                  :charts_shared {:entries [hyperopen.views.chart.d3.runtime]
+                                  :depends-on #{:main}}
                   :portfolio_route {:entries [hyperopen.views.portfolio-view
                                              hyperopen.portfolio.route-runtime-module]
-                                    :depends-on #{:account_surfaces}}
+                                    :depends-on #{:account_surfaces :charts_shared}}
                   :leaderboard_route {:entries [hyperopen.views.leaderboard-view]
                                       :depends-on #{:main}}
                   :funding_comparison_route {:entries [hyperopen.views.funding-comparison-view]
@@ -47,8 +49,9 @@
                                            hyperopen.views.vaults.detail-view
                                            hyperopen.views.vaults.startup-preview
                                            hyperopen.vaults.route-runtime-module]
-                                 :depends-on #{:main}}}
-        :devtools {:preloads [hyperopen.telemetry.console-preload]
+                                 :depends-on #{:charts_shared}}}
+        :devtools {:preloads [hyperopen.telemetry.console-preload
+                              hyperopen.dev.contracts-preload]
                    :http-root "resources/public"
                    :http-port 8080
                    :after-load hyperopen.core/reload}}
@@ -130,9 +133,11 @@
                                             :depends-on #{:main}}
                       :account_surfaces {:entries [hyperopen.views.account-surfaces-module]
                                          :depends-on #{:main}}
+                      :charts_shared {:entries [hyperopen.views.chart.d3.runtime]
+                                      :depends-on #{:main}}
                       :portfolio_route {:entries [hyperopen.views.portfolio-view
                                                  hyperopen.portfolio.route-runtime-module]
-                                        :depends-on #{:account_surfaces}}
+                                        :depends-on #{:account_surfaces :charts_shared}}
                       :leaderboard_route {:entries [hyperopen.views.leaderboard-view]
                                           :depends-on #{:main}}
                       :funding_comparison_route {:entries [hyperopen.views.funding-comparison-view]
@@ -149,5 +154,5 @@
                                                hyperopen.views.vaults.detail-view
                                                hyperopen.views.vaults.startup-preview
                                                hyperopen.vaults.route-runtime-module]
-                                     :depends-on #{:main}}}
+                                     :depends-on #{:charts_shared}}}
             :compiler-options {:optimizations :advanced}}}} 

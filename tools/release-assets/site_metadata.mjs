@@ -542,9 +542,9 @@ export const PRECONNECT_ORIGINS = ["https://api.hyperliquid.xyz"];
 export const ROUTE_PRELOAD_MODULE_IDS = {
   home: ["trade_chart", "account_surfaces"],
   trade: ["trade_chart", "account_surfaces"],
-  portfolio: ["account_surfaces", "portfolio_route"],
+  portfolio: ["account_surfaces", "charts_shared", "portfolio_route"],
   leaderboard: ["leaderboard_route"],
-  vaults: ["vaults_route"],
+  vaults: ["charts_shared", "vaults_route"],
   staking: ["staking_route"],
   "funding-comparison": ["funding_comparison_route"],
   api: ["api_wallets_route"],

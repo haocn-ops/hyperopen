@@ -3,7 +3,8 @@
             [hyperopen.views.active-asset.funding-tooltip :as funding-tooltip]
             [hyperopen.views.active-asset.icon-button :as icon-button]
             [hyperopen.views.active-asset.outcome-tooltip :as outcome-tooltip]
-            [hyperopen.views.active-asset.vm :as active-asset-vm]))
+            [hyperopen.views.active-asset.vm :as active-asset-vm]
+            [hyperopen.views.trade.order-form-controls :as order-form-controls]))
 
 (def ^:private desktop-breakpoint-px
   1024)
@@ -24,6 +25,8 @@
   (if (desktop-layout?)
     (desktop-render)
     (mobile-render)))
+
+(declare outcome-option-market-strip-selector)
 
 (defn- change-indicator [change-value change-pct & [change-raw]]
   (let [is-positive (and change-value (>= change-value 0))
@@ -212,15 +215,17 @@
            mark-raw
            change-24h
            change-24h-pct]
-    :as row-vm}]
+    :as row-vm}
+   {:keys [outcome-handlers]}]
   [:div {:class ["lg:hidden" "space-y-2" "px-3" "py-2.5"]
          :data-role "trade-mobile-asset-summary"}
    [:div {:class ["flex" "items-start" "justify-between" "gap-3"]}
-    [:div {:class ["min-w-0" "flex-1"]}
+    [:div {:class ["flex" "min-w-0" "flex-1" "items-center" "gap-2"]}
      (icon-button/asset-button icon-market
                                dropdown-visible?
                                missing-icons
-                               loaded-icons)]
+                               loaded-icons)
+     (outcome-option-market-strip-selector row-vm outcome-handlers)]
     [:div {:class ["flex" "items-start" "gap-2.5"]}
      [:div {:class ["space-y-1" "text-right"]}
       [:div {:class ["num" "text-[1.625rem]" "font-semibold" "leading-none" "text-trading-text"]}
@@ -363,6 +368,21 @@
             :data-role "outcome-open-interest-tooltip"}
       open-interest-tooltip])])
 
+(defn- outcome-option-market-strip-selector
+  [{:keys [outcome-options outcome-option-id outcome-option-ui]} outcome-handlers]
+  (when (and outcome-handlers (> (count outcome-options) 1))
+    [:div {:class ["relative" "min-w-[11rem]" "max-w-[18rem]" "flex-none"]
+           :style (when (:open? outcome-option-ui)
+                    {:z-index 260})
+           :data-role "market-strip-outcome-option-selector"}
+     (order-form-controls/outcome-option-row outcome-options
+                                             outcome-option-id
+                                             outcome-handlers
+                                             (assoc outcome-option-ui
+                                                    :menu-width-classes ["w-[min(42rem,calc(100vw-2rem))]"]
+                                                    :menu-style
+                                                    {:width "min(42rem, calc(100vw - 2rem))" :max-width "calc(100vw - 2rem)"}))]))
+
 (defn- desktop-outcome-active-asset-row
   [{:keys [icon-market
            dropdown-visible?
@@ -376,19 +396,23 @@
            open-interest-usd
            outcome-chance-label
            countdown-text]
-    :as row-vm}]
+    :as row-vm}
+   {:keys [outcome-handlers]}]
   [:div {:class ["relative" "hidden"
                  "grid-cols-[max-content_minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,0.9fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)]"
                  "items-center" "gap-2" "px-0" "py-2" "lg:grid" "md:gap-3"]}
-   [:div {:class ["relative" "group/outcome-name" "flex" "justify-start"
-                  "app-shell-gutter-left" "min-w-fit" "items-center" "gap-3"]
-          :data-role "outcome-market-name-hover-region"}
-    (icon-button/asset-button icon-market
-                              dropdown-visible?
-                              missing-icons
-                              loaded-icons
-                              {:outcome-hover-glow? true})
-    (outcome-tooltip/outcome-tooltip-panel (:outcome-tooltip row-vm))]
+   [:div {:class ["flex" "justify-start"
+                  "app-shell-gutter-left" "min-w-fit" "items-center" "gap-2"]
+          :data-role "outcome-market-selector-group"}
+    [:div {:class ["relative" "group/outcome-name" "flex" "items-center"]
+           :data-role "outcome-market-name-hover-region"}
+     (icon-button/asset-button icon-market
+                               dropdown-visible?
+                               missing-icons
+                               loaded-icons
+                               {:outcome-hover-glow? true})
+     (outcome-tooltip/outcome-tooltip-panel (:outcome-tooltip row-vm))]
+    (outcome-option-market-strip-selector row-vm outcome-handlers)]
    [:div {:class ["flex" "justify-center"]}
     (data-column "Countdown" (or countdown-text "—") {:numeric? true})]
    [:div {:class ["flex" "justify-center"]}
@@ -417,12 +441,15 @@
                  {:numeric? true})]
    (outcome-open-interest-column row-vm)])
 
-(defn active-asset-row-from-vm [row-vm]
-  [:div
-   (render-visible-branch #(mobile-active-asset-row row-vm)
-                          #(if (:is-outcome row-vm)
-                             (desktop-outcome-active-asset-row row-vm)
-                             (desktop-active-asset-row row-vm)))])
+(defn active-asset-row-from-vm
+  ([row-vm]
+   (active-asset-row-from-vm row-vm nil))
+  ([row-vm opts]
+   [:div
+    (render-visible-branch #(mobile-active-asset-row row-vm opts)
+                           #(if (:is-outcome row-vm)
+                              (desktop-outcome-active-asset-row row-vm opts)
+                              (desktop-active-asset-row row-vm)))]))
 
 (defn active-asset-row [ctx-data market dropdown-state full-state]
   (active-asset-row-from-vm

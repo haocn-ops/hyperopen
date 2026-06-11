@@ -57,11 +57,7 @@
 (defn- active-market-side-coins
   [market canonical-coin]
   (let [side-coins (when (= :outcome (:market-type market))
-                     (->> (:outcome-sides market)
-                          (keep :coin)
-                          (filter string?)
-                          distinct
-                          vec))]
+                     (markets/outcome-subscription-coins market))]
     (vec (or (seq side-coins)
              [canonical-coin]))))
 
@@ -277,15 +273,17 @@
                      (market-token (:coin market-or-coin))
                      (market-token market-or-coin))
         market (resolve-market-input market-by-key market-or-coin)
-        coin (or (:coin market) input-coin)
+        coin (or input-coin (:coin market))
         resolved-market (or market
                             (when (string? coin)
                               (markets/resolve-or-infer-market-by-coin market-by-key coin)))
-        canonical-coin (or (:coin resolved-market) coin)
+        selected-market (markets/market-with-selected-outcome-coin resolved-market coin)
+        canonical-coin (or (:coin selected-market) (:coin resolved-market) coin)
         current-asset (get-in state [:active-asset])
         current-market (:active-market state)
         current-side-coins (active-market-side-coins current-market current-asset)
-        selected-side-coins (active-market-side-coins resolved-market canonical-coin)
+        selected-side-coins (active-market-side-coins selected-market canonical-coin)
+        selected-outcome-side-index (:outcome-side-index selected-market)
         switched-asset? (and (seq canonical-coin)
                              (not= canonical-coin current-asset))
         reset-order-form (when (and switched-asset?
@@ -311,13 +309,18 @@
                                           [[:asset-selector :highlighted-market-key] nil]
                                           [[:orderbook-ui :price-aggregation-dropdown-visible?] false]
                                           [[:orderbook-ui :size-unit-dropdown-visible?] false]
-                                          [[:active-market] resolved-market]]
+                                          [[:active-asset] canonical-coin]
+                                          [[:selected-asset] canonical-coin]
+                                          [[:active-market] selected-market]]
                                    reset-order-form
                                    (conj [[:order-form] reset-order-form])
                                    reset-order-form-ui
                                    (conj [[:order-form-ui] reset-order-form-ui])
                                    reset-order-form-runtime
-                                   (conj [[:order-form-runtime] reset-order-form-runtime]))
+                                   (conj [[:order-form-runtime] reset-order-form-runtime])
+                                   (and (= :outcome (:market-type selected-market))
+                                        (some? selected-outcome-side-index))
+                                   (conj [[:order-form :outcome-side] selected-outcome-side-index]))
         immediate-ui-effects [[:effects/save-many immediate-ui-path-values]
                               sync-asset-selector-active-ctx-subscriptions-effect]
         unsubscribe-effects (if current-asset
@@ -344,6 +347,66 @@
   [state market-key]
   (if-let [market (get-in state [:asset-selector :market-by-key market-key])]
     (select-asset state market)
+    []))
+
+(defn- outcome-option-id
+  [option]
+  (parse-int-value (:outcome-id option)))
+
+(defn- selected-question-option
+  [market outcome-id]
+  (let [outcome-id* (parse-int-value outcome-id)]
+    (some (fn [option]
+            (when (= outcome-id* (outcome-option-id option))
+              option))
+          (:question-options market))))
+
+(defn- selected-outcome-side-index
+  [state market]
+  (or (parse-int-value (get-in state [:order-form :outcome-side]))
+      (parse-int-value (get-in state [:order-form :outcome-side-index]))
+      (parse-int-value (get-in state [:active-market :outcome-side-index]))
+      (parse-int-value (:side-index (first (:outcome-sides market))))
+      0))
+
+(defn- selected-option-side-coin
+  [option side-index]
+  (or (:coin (some (fn [side]
+                     (when (= side-index (parse-int-value (:side-index side)))
+                       side))
+                   (:sides option)))
+      (case side-index
+        0 (:yes-coin option)
+        1 (:no-coin option)
+        nil)
+      (:yes-coin option)
+      (:coin (first (:sides option)))))
+
+(defn- current-outcome-market
+  [state]
+  (let [active-market (:active-market state)]
+    (or (when (= :outcome (:market-type active-market))
+          active-market)
+        (when-let [active-asset (:active-asset state)]
+          (let [market-by-key (get-in state [:asset-selector :market-by-key] {})]
+            (markets/resolve-or-infer-market-by-coin market-by-key active-asset))))))
+
+(defn select-outcome-option
+  [state outcome-id]
+  (if-let [market (current-outcome-market state)]
+    (if-let [option (selected-question-option market outcome-id)]
+      (let [side-index (selected-outcome-side-index state market)
+            selected-coin (selected-option-side-coin option side-index)
+            outcome-id* (outcome-option-id option)
+            state* (cond-> (-> state
+                                (assoc-in [:order-form-ui :outcome-option-dropdown-open?] false)
+                                (assoc-in [:order-form-ui :outcome-option-query] ""))
+                     (map? (:order-form state))
+                     (assoc-in [:order-form :outcome-option-id] outcome-id*))]
+        (if (seq selected-coin)
+          (select-asset state* selected-coin)
+          []))
+      [])
     []))
 
 (defn update-asset-search

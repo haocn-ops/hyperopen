@@ -115,7 +115,11 @@
                     :outcome-details "If BTC settles above 78213, YES pays $1."}
             view-node (row/active-asset-row {} market {:visible-dropdown nil} {:asset-selector {:missing-icons #{}}
                                                                                 :now-ms 1777751495000})
-            strings (set (support/collect-strings view-node))]
+            strings (set (support/collect-strings view-node))
+            tooltip (support/find-node-by-role view-node "outcome-market-tooltip")
+            scroll-container (support/find-node-by-role view-node "outcome-tooltip-scroll-container")
+            summary-scroll (support/find-node-by-role view-node "outcome-tooltip-summary-scroll")
+            settlement-label (support/find-node-by-role view-node "outcome-tooltip-settlement-label")]
         (is (contains? strings "Countdown"))
         (is (contains? strings "10h 8m 25s"))
         (is (contains? strings "% Chance"))
@@ -124,7 +128,8 @@
         (is (contains? strings "$537,233"))
         (is (contains? strings "Two sided-open interest: the sum of Yes and No shares on this contract"))
         (is (not (contains? strings "Details")))
-        (is (some? (support/find-node-by-role view-node "outcome-market-tooltip")))
+        (is (some? tooltip))
+        (is (some? summary-scroll))
         (is (contains? strings "Outcome Details"))
         (is (contains? strings "This market resolves to YES or NO based on the following settlement condition at the specified time."))
         (is (contains? strings "Settlement Condition"))
@@ -141,20 +146,149 @@
         (is (not (contains? strings "Learn more")))
         (is (support/contains-class? view-node "group/outcome-name"))
         (is (support/contains-class? view-node "group/outcome-open-interest"))
-        (is (support/contains-class? view-node "left-3"))
-        (is (support/contains-class? view-node "right-0"))
-        (is (support/contains-class? view-node "md:left-4"))
-        (is (support/contains-class? view-node "xl:left-6"))
+        (is (support/contains-class? tooltip "left-0"))
+        (is (= {:width "min(44rem, calc(100vw - 2rem))"
+                :max-width "calc(100vw - 2rem)"}
+               (get-in tooltip [1 :style])))
+        (is (= {:max-height "min(40rem, calc(100vh - 5rem))"}
+               (get-in scroll-container [1 :style])))
+        (is (support/contains-class? scroll-container "overflow-y-auto"))
+        (is (not (support/contains-class? summary-scroll "overflow-y-auto")))
         (is (support/contains-class? view-node "shadow-[0_0_24px_rgba(45,212,191,0.10),0_18px_70px_rgba(0,0,0,0.55)]"))
-        (is (support/contains-class? view-node "whitespace-nowrap"))
+        (is (support/contains-class? settlement-label "whitespace-normal"))
+        (is (support/contains-class? settlement-label "break-words"))
+        (is (not (support/contains-class? settlement-label "whitespace-nowrap")))
         (is (support/contains-class? view-node "items-center"))
         (is (support/contains-class? view-node "group-hover/outcome-name:border-[#2dd4bf]/35"))
+        (is (not (support/contains-class? tooltip "right-0")))
         (is (not (support/contains-class? view-node "w-[min(50rem,calc(100vw-3rem))]")))
         (is (support/contains-class? view-node "group-hover/outcome-name:opacity-100"))
         (is (support/contains-class? view-node "group-hover/outcome-open-interest:opacity-100"))
         (is (support/contains-class? view-node "group-focus-within/outcome-name:opacity-100"))
         (is (support/contains-class? view-node "pointer-events-none"))
         (is (not (contains? strings "Funding / Countdown")))))))
+
+(defn- outcome-option-handlers-fixture []
+  {:on-select-outcome-option (fn [outcome-id]
+                               [[:actions/close-outcome-option-dropdown]
+                                [:actions/update-order-form [:outcome-option-id] outcome-id]])
+   :on-toggle-option-dropdown [[:actions/toggle-outcome-option-dropdown]]
+   :on-option-dropdown-keydown [[:actions/handle-outcome-option-dropdown-keydown [:event/key]]]
+   :on-change-option-query [[:actions/set-outcome-option-query [:event.target/value]]]})
+
+(defn- world-cup-row-vm
+  [option-ui]
+  {:is-outcome true
+   :icon-market {:coin "#1890"
+                 :symbol "2026 World Cup Champion"
+                 :market-type :outcome}
+   :dropdown-visible? false
+   :missing-icons #{}
+   :loaded-icons #{}
+   :outcome-options [{:outcome-id 173
+                      :label "Argentina"
+                      :mark 0.14
+                      :volume24h 2461
+                      :openInterest 35592}
+                     {:outcome-id 189
+                      :label "France"
+                      :mark 0.18
+                      :volume24h 5776
+                      :openInterest 41448}
+                     {:outcome-id 212
+                      :label "Spain"
+                      :mark 0.17
+                      :volume24h 1791
+                      :openInterest 27056}]
+   :outcome-option-id 189
+   :outcome-option-ui option-ui
+   :outcome-chance-label "18%"
+   :countdown-text "10h 8m"
+   :mark 0.17514
+   :markRaw "0.17514"
+   :change24h 0.01413
+   :change24hPct 8.78
+   :volume24h 5776
+   :open-interest-usd 41448})
+
+(deftest desktop-outcome-row-renders-option-selector-next-to-market-selector-test
+  (support/with-viewport-width
+    1280
+    (fn []
+      (let [view-node (row/active-asset-row-from-vm
+                       (world-cup-row-vm {:open? false :query ""})
+                       {:outcome-handlers (outcome-option-handlers-fixture)})
+            selector (support/find-node-by-role view-node "market-strip-outcome-option-selector")
+            hover-region (support/find-node-by-role view-node "outcome-market-name-hover-region")
+            trigger (support/find-node-by-role view-node "outcome-option-select-trigger")
+            menu (support/find-node-by-role view-node "outcome-option-select-menu")
+            strings (set (support/collect-strings view-node))
+            hover-region-strings (set (support/collect-strings hover-region))]
+        (is (some? selector))
+        (is (some? hover-region))
+        (is (some? trigger))
+        (is (= [[:actions/toggle-outcome-option-dropdown]]
+               (get-in trigger [1 :on :click])))
+        (is (contains? strings "2026 World Cup Champion"))
+        (is (contains? strings "France"))
+        (is (not (contains? hover-region-strings "France")))
+        (is (not (support/contains-class? selector "group/outcome-name")))
+        (is (not (contains? strings "Spain")))
+        (is (nil? menu))
+        (is (support/contains-class? selector "max-w-[18rem]"))))))
+
+(deftest desktop-outcome-row-renders-searchable-option-menu-from-market-strip-test
+  (support/with-viewport-width
+    1280
+    (fn []
+      (let [view-node (row/active-asset-row-from-vm
+                       (world-cup-row-vm {:open? true :query "sp"})
+                       {:outcome-handlers (outcome-option-handlers-fixture)})
+            selector (support/find-node-by-role view-node "market-strip-outcome-option-selector")
+            menu (support/find-node-by-role view-node "outcome-option-select-menu")
+            header-row (support/find-node-by-role view-node "outcome-option-select-header-row")
+            first-option-row (support/find-node-by-role view-node "outcome-option-select-row")
+            option-grid-template "minmax(0, 1.35fr) 4.5rem 5rem 5.5rem 5.75rem"
+            search-input (support/find-node
+                          #(and (vector? %)
+                                (= :input (first %)))
+                          view-node)
+            strings (set (support/collect-strings selector))]
+        (is (some? menu))
+        (is (= "sp" (get-in search-input [1 :value])))
+        (is (= [[:actions/set-outcome-option-query [:event.target/value]]]
+               (get-in search-input [1 :on :input])))
+        (is (support/contains-class? menu "w-[min(42rem,calc(100vw-2rem))]"))
+        (is (support/contains-class? menu "bg-ho-bg-deep"))
+        (is (support/contains-class? menu "z-[280]"))
+        (is (= {:width "min(42rem, calc(100vw - 2rem))"
+                :max-width "calc(100vw - 2rem)"}
+               (get-in menu [1 :style])))
+        (is (= {:z-index 260}
+               (get-in selector [1 :style])))
+        (is (= option-grid-template (get-in header-row [1 :style :grid-template-columns])))
+        (is (= option-grid-template (get-in first-option-row [1 :style :grid-template-columns])))
+        (is (contains? strings "Live Outcomes"))
+        (is (contains? strings "% Chance"))
+        (is (contains? strings "Price"))
+        (is (contains? strings "Volume"))
+        (is (contains? strings "Open Int"))
+        (is (contains? strings "Spain"))
+        (is (not (contains? strings "Argentina")))))))
+
+(deftest mobile-outcome-row-renders-option-selector-with-market-selector-test
+  (support/with-viewport-width
+    430
+    (fn []
+      (let [view-node (row/active-asset-row-from-vm
+                       (world-cup-row-vm {:open? false :query ""})
+                       {:outcome-handlers (outcome-option-handlers-fixture)})
+            selector (support/find-node-by-role view-node "market-strip-outcome-option-selector")
+            strings (set (support/collect-strings view-node))]
+        (is (some? selector))
+        (is (contains? strings "2026 World Cup Champion"))
+        (is (contains? strings "France"))
+        (is (not (contains? strings "Countdown")))))))
 
 (deftest active-asset-row-renders-coin-namespace-chip-when-dex-missing-test
   (let [ctx-data {:coin "xyz:XYZ100-USDC"

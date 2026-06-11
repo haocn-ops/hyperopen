@@ -126,12 +126,10 @@
 (s/def ::submit-unlocked-cancel-request-args
   (s/or :request-only (s/tuple ::api-submit-request)
         :request-and-path-values (s/tuple ::api-submit-request ::common/path-values)))
-
 (s/def ::set-ui-theme-args (s/tuple ::common/non-empty-string))
 
 (s/def ::action-id (s/and keyword?
                           #(= "actions" (namespace %))))
-
 (def action-args-spec-by-id
   {:actions/init-websockets ::common/no-args
    :actions/subscribe-to-asset ::common/coin-args
@@ -422,6 +420,12 @@
    :actions/toggle-tif-dropdown ::common/no-args
    :actions/close-tif-dropdown ::common/no-args
    :actions/handle-tif-dropdown-keydown ::common/key-args
+   :actions/toggle-outcome-option-dropdown ::common/no-args
+   :actions/close-outcome-option-dropdown ::common/no-args
+   :actions/set-outcome-option-query ::common/single-input-args
+   :actions/set-outcome-option-sort ::common/keyword-or-string-args
+   :actions/handle-outcome-option-dropdown-keydown ::common/key-args
+   :actions/select-outcome-option ::common/single-input-args
    :actions/set-order-ui-leverage-draft ::common/single-input-args
    :actions/confirm-order-ui-leverage ::common/no-args
    :actions/set-order-ui-leverage ::common/single-input-args

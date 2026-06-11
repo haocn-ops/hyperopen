@@ -6,6 +6,7 @@
    :close-asset-dropdown asset-actions/close-asset-dropdown
    :select-asset asset-actions/select-asset
    :select-asset-by-market-key asset-actions/select-asset-by-market-key
+   :select-outcome-option asset-actions/select-outcome-option
    :update-asset-search asset-actions/update-asset-search
    :update-asset-selector-sort asset-actions/update-asset-selector-sort
    :toggle-asset-selector-strict asset-actions/toggle-asset-selector-strict

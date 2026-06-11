@@ -55,6 +55,8 @@
   (is (false? (:size-unit-dropdown-open? (trading/default-order-form-ui))))
   (is (false? (:tpsl-unit-dropdown-open? (trading/default-order-form-ui))))
   (is (false? (:tif-dropdown-open? (trading/default-order-form-ui))))
+  (is (false? (:outcome-option-dropdown-open? (trading/default-order-form-ui))))
+  (is (= "" (:outcome-option-query (trading/default-order-form-ui))))
   (is (= "" (:size-display (trading/default-order-form-ui)))))
 
 (deftest order-form-ui-state-defaults-without-legacy-fallback-test
@@ -77,6 +79,8 @@
     (is (false? (:size-unit-dropdown-open? normalized-no-ui)))
     (is (false? (:tpsl-unit-dropdown-open? normalized-no-ui)))
     (is (false? (:tif-dropdown-open? normalized-no-ui)))
+    (is (false? (:outcome-option-dropdown-open? normalized-no-ui)))
+    (is (= "" (:outcome-option-query normalized-no-ui)))
     (is (false? (:price-input-focused? normalized-no-ui)))
     (is (false? (:tpsl-panel-open? normalized-no-ui)))
     (is (= :limit (:entry-mode normalized-no-ui)))

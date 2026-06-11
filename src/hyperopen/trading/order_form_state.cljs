@@ -102,6 +102,8 @@
    :size-unit-dropdown-open? false
    :tpsl-unit-dropdown-open? false
    :tif-dropdown-open? false
+   :outcome-option-dropdown-open? false
+   :outcome-option-query ""
    :tpsl-panel-open? false
    :price-input-focused? false
    :entry-mode :limit
@@ -194,6 +196,8 @@
            :size-unit-dropdown-open? (boolean (:size-unit-dropdown-open? ui))
            :tpsl-unit-dropdown-open? (boolean (:tpsl-unit-dropdown-open? ui))
            :tif-dropdown-open? (boolean (:tif-dropdown-open? ui))
+           :outcome-option-dropdown-open? (boolean (:outcome-option-dropdown-open? ui))
+           :outcome-option-query (str (or (:outcome-option-query ui) ""))
            :price-input-focused? (boolean (:price-input-focused? ui))
            :tpsl-panel-open? (boolean (:tpsl-panel-open? ui))
            :entry-mode entry-mode

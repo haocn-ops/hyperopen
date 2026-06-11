@@ -96,6 +96,7 @@
             [hyperopen.asset-selector.market-live-projection-test]
             [hyperopen.asset-selector.markets-cache-test]
             [hyperopen.asset-selector.markets-test]
+            [hyperopen.asset-selector.outcome-actions-test]
             [hyperopen.asset-selector.settings-test]
             [hyperopen.chart.settings-test]
             [hyperopen.config-test]
@@ -178,9 +179,11 @@
             [hyperopen.order.cancel-guard-test]
             [hyperopen.order.exchange-errors-test]
             [hyperopen.order.feedback-runtime-test]
+            [hyperopen.order.outcome-option-sort-test]
             [hyperopen.orderbook.actions-test]
             [hyperopen.orderbook.price-aggregation-test]
             [hyperopen.orderbook.settings-test]
+            [hyperopen.outcome-side-market-switch-test]
             [hyperopen.platform-test]
             [hyperopen.platform.indexed-db-test]
             [hyperopen.platform.webauthn-test]
@@ -458,6 +461,8 @@
             [hyperopen.views.active-asset.funding-tooltip-model-test]
             [hyperopen.views.active-asset.funding-tooltip-popover-test]
             [hyperopen.views.active-asset.icon-button-test]
+            [hyperopen.views.active-asset.outcome-option-sort-test]
+            [hyperopen.views.active-asset.outcome-tooltip-test]
             [hyperopen.views.active-asset.row-helpers-test]
             [hyperopen.views.active-asset.row-test]
             [hyperopen.views.active-asset.vm-test]
@@ -805,6 +810,7 @@
              'hyperopen.asset-selector.market-live-projection-test
              'hyperopen.asset-selector.markets-cache-test
              'hyperopen.asset-selector.markets-test
+             'hyperopen.asset-selector.outcome-actions-test
              'hyperopen.asset-selector.settings-test
              'hyperopen.chart.settings-test
              'hyperopen.config-test
@@ -887,9 +893,11 @@
              'hyperopen.order.cancel-guard-test
              'hyperopen.order.exchange-errors-test
              'hyperopen.order.feedback-runtime-test
+             'hyperopen.order.outcome-option-sort-test
              'hyperopen.orderbook.actions-test
              'hyperopen.orderbook.price-aggregation-test
              'hyperopen.orderbook.settings-test
+             'hyperopen.outcome-side-market-switch-test
              'hyperopen.platform-test
              'hyperopen.platform.indexed-db-test
              'hyperopen.platform.webauthn-test
@@ -1167,6 +1175,8 @@
              'hyperopen.views.active-asset.funding-tooltip-model-test
              'hyperopen.views.active-asset.funding-tooltip-popover-test
              'hyperopen.views.active-asset.icon-button-test
+             'hyperopen.views.active-asset.outcome-option-sort-test
+             'hyperopen.views.active-asset.outcome-tooltip-test
              'hyperopen.views.active-asset.row-helpers-test
              'hyperopen.views.active-asset.row-test
              'hyperopen.views.active-asset.vm-test

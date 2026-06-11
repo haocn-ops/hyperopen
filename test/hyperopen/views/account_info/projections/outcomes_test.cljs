@@ -150,6 +150,63 @@
     (is (= 0.42 (:mark-price row)))
     (is (= 2.1 (:position-value row)))))
 
+(deftest build-outcome-rows-enriches-question-option-balances-test
+  (let [question-market {:key "question:30"
+                         :coin "#1610"
+                         :title "BTC price range on Jun 6 at 2:00 AM?"
+                         :symbol "BTC price range on Jun 6 at 2:00 AM?"
+                         :quote "USDC"
+                         :market-type :outcome
+                         :outcome-kind :question
+                         :question-options [{:label "Below 61044"
+                                             :outcome-id 161
+                                             :sides [{:side-index 0
+                                                      :side-name "Yes"
+                                                      :coin "#1610"
+                                                      :asset-id 100001610
+                                                      :mark 0.612275}
+                                                     {:side-index 1
+                                                      :side-name "No"
+                                                      :coin "#1611"
+                                                      :asset-id 100001611
+                                                      :mark 0.387725}]}
+                                            {:label "61044 to 63535"
+                                             :outcome-id 162
+                                             :sides [{:side-index 0
+                                                      :side-name "Yes"
+                                                      :coin "#1620"
+                                                      :asset-id 100001620
+                                                      :mark 0.3003}
+                                                     {:side-index 1
+                                                      :side-name "No"
+                                                      :coin "#1621"
+                                                      :asset-id 100001621
+                                                      :mark 0.6997}]}]
+                         :outcome-sides [{:side-index 0
+                                          :side-name "Yes"
+                                          :coin "#1610"
+                                          :asset-id 100001610
+                                          :mark 0.612275}
+                                         {:side-index 1
+                                          :side-name "No"
+                                          :coin "#1611"
+                                          :asset-id 100001611
+                                          :mark 0.387725}]}
+        rows (projections/build-outcome-rows
+              {:clearinghouse-state {:balances [{:coin "+1620"
+                                                 :token 100001620
+                                                 :hold "0"
+                                                 :total "7"
+                                                 :entryNtl "2.8"}]}}
+              {"question:30" question-market})
+        [row] rows]
+    (is (= 1 (count rows)))
+    (is (= "BTC price range on Jun 6 at 2:00 AM?" (:title row)))
+    (is (= "61044 to 63535" (:outcome-option-label row)))
+    (is (= "Yes" (:side-name row)))
+    (is (= "#1620" (:side-coin row)))
+    (is (= 0.3003 (:mark-price row)))))
+
 (deftest outcome-token-predicate-detects-plus-and-hash-encodings-test
   (is (true? (projections/outcome-token? "+0")))
   (is (true? (projections/outcome-token? "#1")))

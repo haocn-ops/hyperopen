@@ -1,5 +1,7 @@
 (ns hyperopen.asset-selector.market-live-projection-test
   (:require [cljs.test :refer-macros [deftest is testing]]
+            [hyperopen.asset-selector.markets :as markets]
+            [hyperopen.asset-selector.outcome-fixtures :as outcome-fixtures]
             [hyperopen.asset-selector.market-live-projection :as market-live-projection]))
 
 (deftest apply-active-asset-ctx-update-patches-perp-market-columns-test
@@ -177,3 +179,51 @@
     (is (= 0.63796 (get-in next-state [:asset-selector :market-by-key "outcome:0" :mark])))
     (is (= 567696.0 (get-in next-state [:asset-selector :market-by-key "outcome:0" :openInterest])))
     (is (= 567696.0 (get-in next-state [:asset-selector :markets 0 :openInterest])))))
+
+(deftest apply-active-asset-ctx-update-refreshes-grouped-question-option-side-test
+  (let [range-market (->> (markets/build-outcome-markets outcome-fixtures/live-outcome-meta
+                                                          outcome-fixtures/live-outcome-ctxs)
+                          (filter #(= "question:30" (:key %)))
+                          first)
+        state {:asset-selector {:markets [range-market]
+                                :market-by-key {"question:30" range-market}
+                                :market-index-by-key {"question:30" 0}}}
+        next-state (market-live-projection/apply-active-asset-ctx-update
+                    state
+                    "#1620"
+                    {:markPx "0.333"
+                     :prevDayPx "0.300"
+                     :circulatingSupply "1200"
+                     :dayNtlVlm "44"})]
+    (is (= 0.333
+           (get-in next-state [:asset-selector :market-by-key "question:30" :question-options 1 :mark])))
+    (is (= 0.333
+           (get-in next-state [:asset-selector :market-by-key "question:30" :question-options 1 :sides 0 :mark])))
+    (is (= "#1620"
+           (get-in next-state [:asset-selector :market-by-key "question:30" :question-options 1 :sides 0 :coin])))
+    (is (= "Below 61044 61%  *  61044 to 63535 33%  *  Above 63535 1%"
+           (get-in next-state [:asset-selector :market-by-key "question:30" :outcome-summary])))
+    (is (= 0.333
+           (get-in next-state [:asset-selector :markets 0 :question-options 1 :mark])))))
+
+(deftest apply-active-asset-ctx-update-keeps-championship-summary-bounded-test
+  (let [world-cup (->> (markets/build-outcome-markets outcome-fixtures/live-outcome-meta
+                                                       outcome-fixtures/live-outcome-ctxs)
+                       (filter #(= "question:32" (:key %)))
+                       first)
+        state {:asset-selector {:markets [world-cup]
+                                :market-by-key {"question:32" world-cup}
+                                :market-index-by-key {"question:32" 0}}}
+        next-state (market-live-projection/apply-active-asset-ctx-update
+                    state
+                    "#2120"
+                    {:markPx "0.181"
+                     :prevDayPx "0.166"
+                     :circulatingSupply "32000"
+                     :dayNtlVlm "2600"})]
+    (is (= 0.181
+           (get-in next-state [:asset-selector :market-by-key "question:32" :question-options 4 :mark])))
+    (is (= "Spain 18%  *  France 17%  *  Argentina 14%"
+           (get-in next-state [:asset-selector :market-by-key "question:32" :outcome-summary])))
+    (is (= "Spain 18%  *  France 17%  *  Argentina 14%"
+           (get-in next-state [:asset-selector :markets 0 :outcome-summary])))))

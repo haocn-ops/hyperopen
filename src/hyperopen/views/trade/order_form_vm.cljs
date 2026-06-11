@@ -54,6 +54,25 @@
               sides)
         (first sides))))
 
+(defn- parse-outcome-option-id [value]
+  (let [parsed (cond
+                 (number? value) value
+                 (string? value) (js/parseInt value 10)
+                 :else js/NaN)]
+    (when (and (number? parsed)
+               (not (js/isNaN parsed)))
+      (int parsed))))
+
+(defn- selected-outcome-option
+  [outcome-options selected-option-id]
+  (let [options (seq outcome-options)]
+    (or (some (fn [option]
+                (when (= selected-option-id
+                         (parse-outcome-option-id (:outcome-id option)))
+                  option))
+              options)
+        (first options))))
+
 (defn order-form-vm [state]
   (let [{:keys [draft
                 ui
@@ -73,6 +92,8 @@
                 hip3?
                 outcome?
                 outcome-sides
+                outcome-options
+                outcome-option-id
                 read-only?
                 sz-decimals
                 max-leverage]}
@@ -105,8 +126,22 @@
         selected-outcome-side-label (when selected-outcome-side
                                       (outcome-side-display-label selected-outcome-side
                                                                   outcome-side-index))
-        base-symbol* (if (and outcome? selected-outcome-side-label)
+        selected-outcome-option-id (or (parse-outcome-option-id
+                                        (or (:outcome-option-id normalized-form)
+                                            (:outcome-option normalized-form)))
+                                       outcome-option-id)
+        selected-outcome-option (when outcome?
+                                  (selected-outcome-option outcome-options
+                                                           selected-outcome-option-id))
+        selected-outcome-option-label (:label selected-outcome-option)
+        base-symbol* (cond
+                       (and outcome? selected-outcome-option-label)
+                       selected-outcome-option-label
+
+                       (and outcome? selected-outcome-side-label)
                        selected-outcome-side-label
+
+                       :else
                        base-symbol)]
     {:form normalized-form
      :side side
@@ -122,6 +157,8 @@
      :outcome? (boolean outcome?)
      :outcome-sides (vec (or outcome-sides []))
      :outcome-side-index outcome-side-index
+     :outcome-options (vec (or outcome-options []))
+     :outcome-option-id (or selected-outcome-option-id 0)
      :read-only? read-only?
      :display summary-display
      :ui-leverage ui-leverage

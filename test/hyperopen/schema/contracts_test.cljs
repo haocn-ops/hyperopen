@@ -19,6 +19,8 @@
                   :outcome? false
                   :outcome-sides []
                   :outcome-side-index 0
+                  :outcome-options []
+                  :outcome-option-id 0
                   :read-only? false
                   :display {:available-to-trade "0.00 USDC"
                             :current-position "0.0000 BTC"

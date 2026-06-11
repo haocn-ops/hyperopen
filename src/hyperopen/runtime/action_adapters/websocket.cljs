@@ -13,12 +13,9 @@
   (let [market-by-key (get-in state [:asset-selector :market-by-key] {})
         market (or (matching-active-market state coin)
                    (markets/resolve-or-infer-market-by-coin market-by-key coin))
+        market* (markets/market-with-selected-outcome-coin market coin)
         side-coins (when (= :outcome (:market-type market))
-                     (->> (:outcome-sides market)
-                          (keep :coin)
-                          (filter string?)
-                          distinct
-                          vec))]
+                     (markets/outcome-subscription-coins market*))]
     (vec (or (seq side-coins)
              (when (string? coin)
                [coin])))))

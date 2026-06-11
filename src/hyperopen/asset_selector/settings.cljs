@@ -1,9 +1,36 @@
 (ns hyperopen.asset-selector.settings
-  (:require [hyperopen.platform :as platform]))
+  (:require [clojure.string :as str]
+            [hyperopen.platform :as platform]))
 
 (def valid-sort-keys #{:name :price :volume :change :openInterest :funding})
 (def valid-sort-directions #{:asc :desc})
-(def valid-tabs #{:all :perps :spot :outcome :outcome-15m :outcome-1d :crypto :tradfi :hip3})
+(def valid-tabs #{:all :perps :spot :outcome :outcome-15m :outcome-1d :outcome-economics :outcome-sports :crypto :tradfi :hip3})
+
+(defn- chain-context-value
+  [value]
+  (cond
+    (keyword? value) (name value)
+    (string? value) value
+    :else nil))
+
+(defn- testnet-chain?
+  [chain-context]
+  (let [value (if (map? chain-context)
+                (or (:hyperliquid-chain chain-context)
+                    (:hyperliquidChain chain-context)
+                    (:chain chain-context)
+                    (:environment chain-context))
+                chain-context)
+        value (chain-context-value value)
+        token (some-> value str str/trim str/lower-case)]
+    (contains? #{"testnet" "test"} token)))
+
+(defn outcome-tabs
+  ([] (outcome-tabs nil))
+  ([chain-context]
+   (cond-> [:outcome]
+     (testnet-chain? chain-context) (conj :outcome-15m)
+     true (conj :outcome-1d :outcome-economics :outcome-sports))))
 
 (defn- load-sort-setting
   "Read `ls-key` from localStorage, default to `default`,

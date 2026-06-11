@@ -2,6 +2,7 @@
   (:require [cljs.test :refer-macros [async deftest is]]
             [hyperopen.asset-selector.markets :as markets]
             [hyperopen.asset-selector.markets-cache :as markets-cache]
+            [hyperopen.asset-selector.outcome-fixtures :as outcome-fixtures]
             [hyperopen.core-bootstrap.test-support.browser-mocks :as browser-mocks]
             [hyperopen.platform :as platform]
             [hyperopen.test-support.async :as async-support]))
@@ -65,6 +66,28 @@
     (is (false? (:hip3-eligible? (nth cached 2))))
     (is (= :strict-isolated (:margin-mode (nth cached 2))))
     (is (true? (:only-isolated? (nth cached 2))))))
+
+(deftest build-asset-selector-markets-cache-preserves-grouped-outcome-question-fields-test
+  (let [outcome-markets (markets/build-outcome-markets outcome-fixtures/live-outcome-meta
+                                                        outcome-fixtures/live-outcome-ctxs)
+        range-market (first (filter #(= "question:30" (:key %)) outcome-markets))
+        cached-row (first (markets-cache/build-asset-selector-markets-cache
+                           [range-market]
+                           {:asset-selector {:sort-by :volume
+                                             :sort-direction :desc}}))]
+    (is (= "question:30" (:key cached-row)))
+    (is (= :question (:outcome-kind cached-row)))
+    (is (= :crypto (:outcome-category cached-row)))
+    (is (= 30 (:question-id cached-row)))
+    (is (= 160 (:fallback-outcome-id cached-row)))
+    (is (= [161 162 163] (:named-outcome-ids cached-row)))
+    (is (= ["Below 61044" "61044 to 63535" "Above 63535"]
+           (mapv :label (:question-options cached-row))))
+    (is (= ["#1610" "#1611" "#1620" "#1621" "#1630" "#1631"]
+           (:outcome-subscription-coins cached-row)))
+    (is (= "#1620" (get-in cached-row [:outcome-side-aliases "#1620" :coin])))
+    (is (= "question:30"
+           (:key (markets/resolve-market-by-coin {"question:30" cached-row} "#1620"))))))
 
 (deftest restore-asset-selector-markets-cache-state-hydrates-when-empty-test
   (let [cached-markets [{:key "perp:ETH"

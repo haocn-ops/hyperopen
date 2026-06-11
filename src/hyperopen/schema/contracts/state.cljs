@@ -105,6 +105,8 @@
          #(boolean? (:size-unit-dropdown-open? %))
          #(boolean? (:tpsl-unit-dropdown-open? %))
          #(boolean? (:tif-dropdown-open? %))
+         #(boolean? (:outcome-option-dropdown-open? %))
+         #(string? (:outcome-option-query %))
          #(boolean? (:price-input-focused? %))
          #(boolean? (:tpsl-panel-open? %))
          #(contains? #{:market :limit :pro} (:entry-mode %))

@@ -41,6 +41,30 @@
   (mapv #(patch-outcome-side-from-active-asset-ctx coin ctx-values %)
         (or (:outcome-sides market) [])))
 
+(defn- option-primary-side
+  [option]
+  (or (some (fn [side]
+              (when (zero? (or (:side-index side) 0))
+                side))
+            (:sides option))
+      (first (:sides option))))
+
+(defn- patch-question-option-from-active-asset-ctx
+  [coin ctx-values option]
+  (let [sides (mapv #(patch-outcome-side-from-active-asset-ctx coin ctx-values %)
+                    (or (:sides option) []))
+        primary-side (option-primary-side (assoc option :sides sides))
+        primary-side-updated? (= coin (:coin primary-side))]
+    (cond-> (assoc option :sides sides)
+      primary-side-updated? (assoc :mark (:mark primary-side)
+                                   :volume24h (:volume24h primary-side)
+                                   :openInterest (:circulatingSupply primary-side)))))
+
+(defn- patch-question-options-from-active-asset-ctx
+  [market coin ctx-values]
+  (mapv #(patch-question-option-from-active-asset-ctx coin ctx-values %)
+        (or (:question-options market) [])))
+
 (defn- patch-market-from-active-asset-ctx
   [market coin ctx]
   (let [mark-raw (:markPx ctx)
@@ -75,7 +99,11 @@
                     :volume24h volume24h
                     :change24h change24h
                     :change24h-pct change24h-pct
-                    :circulating-supply circulating-supply}]
+                    :circulating-supply circulating-supply}
+        patched-question-options (when (seq (:question-options market))
+                                   (patch-question-options-from-active-asset-ctx market coin ctx-values))
+        question-options-changed? (and (some? patched-question-options)
+                                       (not= patched-question-options (:question-options market)))]
     (cond-> market
       (and update-market-price?
            (contains? ctx :markPx))
@@ -113,6 +141,10 @@
 
       outcome?
       (assoc :outcome-sides (patch-outcome-sides-from-active-asset-ctx market coin ctx-values))
+
+      question-options-changed?
+      (assoc :question-options patched-question-options
+             :outcome-summary (markets/outcome-option-summary patched-question-options))
 
       spot?
       (assoc :openInterest nil

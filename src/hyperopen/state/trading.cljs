@@ -74,6 +74,8 @@
          market-identity
          market-max-leverage
          outcome-market?
+         selected-outcome-sides
+         selected-question-option
          cross-margin-allowed?
          active-clearinghouse-state-for-market resolved-active-market)
 
@@ -179,7 +181,13 @@
   "Return normalized market info required by order-form selectors."
   [state]
   (let [market (or (resolved-active-market state) {})
-        identity (market-identity state)]
+        identity (market-identity state)
+        form (order-form-draft state)
+        outcome-sides (if (outcome-market? market)
+                        (selected-outcome-sides market form)
+                        [])
+        selected-option (when (outcome-market? market)
+                          (selected-question-option market form))]
     (assoc identity
            :sz-decimals (or (:szDecimals market) 4)
            :max-leverage (market-max-leverage state)
@@ -187,7 +195,11 @@
            :market-type (:market-type market)
            :dex (:dex market)
            :outcome? (outcome-market? market)
-           :outcome-sides (vec (or (:outcome-sides market) [])))))
+           :outcome-sides (vec outcome-sides)
+           :outcome-options (vec (or (:question-options market) []))
+           :outcome-option-id (or (:outcome-id selected-option)
+                                  (:outcome-option-id market)
+                                  (:selected-outcome-id market)))))
 
 (defn market-identity [state]
   (trading-domain/market-identity {:active-asset (:active-asset state)
@@ -282,9 +294,40 @@
         [(:outcome-side form)
          (:outcome-side-index form)]))
 
+(defn- requested-outcome-option-id
+  [form]
+  (some parse-int-value
+        [(:outcome-option-id form)
+         (:outcome-option form)
+         (:selected-outcome-id form)]))
+
+(defn- selected-question-option
+  [market form]
+  (let [options (seq (:question-options market))
+        requested-id (requested-outcome-option-id form)
+        market-id (some parse-int-value
+                        [(:outcome-option-id market)
+                         (:selected-outcome-id market)])]
+    (when options
+      (or (some (fn [option]
+                  (when (= requested-id (:outcome-id option))
+                    option))
+                options)
+          (some (fn [option]
+                  (when (= market-id (:outcome-id option))
+                    option))
+                options)
+          (first options)))))
+
+(defn- selected-outcome-sides
+  [market form]
+  (if-let [option (selected-question-option market form)]
+    (vec (or (:sides option) []))
+    (vec (or (:outcome-sides market) []))))
+
 (defn- selected-outcome-side
   [market form]
-  (let [sides (seq (:outcome-sides market))
+  (let [sides (seq (selected-outcome-sides market form))
         requested-index (requested-outcome-side-index form)
         selected-index (or requested-index 0)]
     (when sides
@@ -304,7 +347,9 @@
       (some? (:asset-id side)) (assoc :asset-id (:asset-id side))
       (some? (:assetId side)) (assoc :assetId (:assetId side))
       (some? (:side-index side)) (assoc :outcome-side-index (:side-index side))
-      (:side-label side) (assoc :outcome-side-label (:side-label side)))
+      (:side-label side) (assoc :outcome-side-label (:side-label side))
+      (:outcome-option-label side) (assoc :selected-outcome-option-label (:outcome-option-label side)
+                                          :outcome-option-id (:outcome-id side)))
     market))
 
 (defn- trading-context

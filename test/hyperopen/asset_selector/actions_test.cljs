@@ -75,12 +75,12 @@
       (is (= [[:effects/save-many [[[:asset-selector :visible-dropdown] nil]
                                    [[:asset-selector :search-term] ""]
                                    [[:asset-selector :scroll-top] 0]
-                                   [[:asset-selector :render-limit]
-                                    actions/asset-selector-default-render-limit]
+                                   [[:asset-selector :render-limit] actions/asset-selector-default-render-limit]
                                    [[:asset-selector :last-render-limit-increase-ms] nil]
                                    [[:asset-selector :highlighted-market-key] nil]
                                    [[:orderbook-ui :price-aggregation-dropdown-visible?] false]
                                    [[:orderbook-ui :size-unit-dropdown-visible?] false]
+                                   [[:active-asset] nil] [[:selected-asset] nil]
                                    [[:active-market] nil]]]
               [:effects/sync-asset-selector-active-ctx-subscriptions]
               [:effects/subscribe-active-asset nil]
@@ -91,8 +91,7 @@
 (deftest select-outcome-asset-subscribes-both-side-books-and-trades-test
   (let [market {:key "outcome:0"
                 :coin "#0"
-                :market-type :outcome
-                :outcome-sides [{:side-index 0 :coin "#0"} {:side-index 1 :coin "#1"}]}
+                :market-type :outcome :outcome-sides [{:side-index 0 :coin "#0"} {:side-index 1 :coin "#1"}]}
         effects (actions/select-asset
                  {:active-asset "BTC"
                   :asset-selector {:market-by-key {"outcome:0" market}}}
@@ -112,7 +111,7 @@
                         :router {:path "/trade"}
                         :asset-selector {:market-by-key {"outcome:0" market}}}
                        "outcome:0")]
-      (is (= market (path-value key-effects [:active-market])))
+      (is (= (assoc market :outcome-side-index 0) (path-value key-effects [:active-market])))
       (is (= [[:effects/save [:router :path] "/trade/%230"]
               [:effects/push-state "/trade?market=%230"]]
              (subvec key-effects 2 4))))))

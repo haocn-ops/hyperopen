@@ -1,5 +1,6 @@
 (ns hyperopen.asset-selector.markets-test
   (:require [cljs.test :refer-macros [deftest is testing]]
+            [hyperopen.asset-selector.outcome-fixtures :as outcome-fixtures]
             [hyperopen.asset-selector.markets :as markets]))
 
 (deftest build-perp-markets-test
@@ -224,6 +225,90 @@
            (:key (markets/resolve-market-by-coin market-by-key "#1"))))
     (is (= (:key market)
            (:key (markets/resolve-market-by-coin market-by-key "outcome:0"))))))
+
+(deftest build-outcome-markets-normalizes-live-grouped-outcome-questions-test
+  (let [outcome-markets (markets/build-outcome-markets outcome-fixtures/live-outcome-meta
+                                                        outcome-fixtures/live-outcome-ctxs)
+        market-by-key (into {} (map (juxt :key identity) outcome-markets))
+        titles (set (map :title outcome-markets))
+        cpi (get market-by-key "question:19")
+        range-market (get market-by-key "question:30")
+        world-cup (get market-by-key "question:32")
+        fed (get market-by-key "outcome:104")
+        game (get market-by-key "outcome:141")
+        finals (get market-by-key "outcome:142")
+        btc-binary (get market-by-key "outcome:159")]
+    (is (= #{"question:19"
+             "question:30"
+             "question:32"
+             "outcome:104"
+             "outcome:141"
+             "outcome:142"
+             "outcome:159"}
+           (set (map :key outcome-markets))))
+    (is (contains? titles "BTC above 62290 on Jun 6 at 2:00 AM?"))
+    (is (contains? titles "BTC price range on Jun 6 at 2:00 AM?"))
+    (is (contains? titles "May CPI year-over-year"))
+    (is (contains? titles "2026 World Cup Champion"))
+    (is (contains? titles "June Fed rate change"))
+    (is (contains? titles "NBA Finals Game 2"))
+    (is (not (contains? titles "Fallback")))
+    (is (not (contains? titles "Recurring Fallback")))
+    (is (not (contains? titles "Recurring Named Outcome")))
+
+    (is (= :binary (:outcome-kind btc-binary)))
+    (is (= :question (:outcome-kind cpi)))
+    (is (= :economics (:outcome-category cpi)))
+    (is (= ["Below 4.3%" "Exactly 4.3%" "Above 4.3%"]
+           (mapv :label (:question-options cpi))))
+    (is (= "#1010" (:coin cpi)))
+    (is (= 100001010 (:asset-id cpi)))
+
+    (is (= :question (:outcome-kind range-market)))
+    (is (= "BTC price range on Jun 6 at 2:00 AM?" (:title range-market)))
+    (is (= "1d" (:period range-market)))
+    (is (= 30 (:question-id range-market)))
+    (is (= 160 (:fallback-outcome-id range-market)))
+    (is (= [161 162 163] (:named-outcome-ids range-market)))
+    (is (= ["Below 61044" "61044 to 63535" "Above 63535"]
+           (mapv :label (:question-options range-market))))
+    (is (= ["#1610" "#1611"] (mapv :coin (:outcome-sides range-market))))
+    (is (= ["#1610" "#1611" "#1620" "#1621" "#1630" "#1631"]
+           (markets/outcome-subscription-coins range-market)))
+    (is (= "Below 61044 61%  *  61044 to 63535 30%  *  Above 63535 1%"
+           (:outcome-summary range-market)))
+    (is (= (:key range-market)
+           (:key (markets/resolve-market-by-coin market-by-key "#1620"))))
+    (is (= (:key range-market)
+           (:key (markets/resolve-market-by-coin market-by-key "outcome:162"))))
+    (is (= (:key range-market)
+           (:key (markets/resolve-market-by-coin market-by-key "question:30"))))
+
+    (is (= :question (:outcome-kind world-cup)))
+    (is (= :sports (:outcome-category world-cup)))
+    (is (= :football (:outcome-subcategory world-cup)))
+    (is (= 32 (:question-id world-cup)))
+    (is (= 171 (:fallback-outcome-id world-cup)))
+    (is (= [172 173 178 189 212] (:named-outcome-ids world-cup)))
+    (is (= ["Algeria" "Argentina" "Brazil" "France" "Spain"]
+           (mapv :label (:question-options world-cup))))
+    (is (= "France 17%  *  Spain 17%  *  Argentina 14%"
+           (:outcome-summary world-cup)))
+    (is (= "#1890" (:coin world-cup)))
+    (is (= "#1890" (get-in world-cup [:question-options 3 :yes-coin])))
+    (is (= (:key world-cup)
+           (:key (markets/resolve-market-by-coin market-by-key "#2120"))))
+    (is (= (:key world-cup)
+           (:key (markets/resolve-market-by-coin market-by-key "outcome:173"))))
+    (is (= (:key world-cup)
+           (:key (markets/resolve-market-by-coin market-by-key "question:32"))))
+
+    (is (= :economics (:outcome-category fed)))
+    (is (= ["Change" "No Change"] (mapv :side-name (:outcome-sides fed))))
+    (is (= :sports (:outcome-category game)))
+    (is (= :basketball (:outcome-subcategory game)))
+    (is (= "San Antonio 47%  *  New York 53%"
+           (:outcome-summary finals)))))
 
 (deftest classify-market-test
   (testing "classify-market assigns crypto/tradfi/hip3"

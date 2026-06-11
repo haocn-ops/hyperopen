@@ -1,5 +1,8 @@
 (ns hyperopen.views.asset-selector.processing-test
   (:require [cljs.test :refer-macros [deftest is testing]]
+            [hyperopen.asset-selector.markets :as markets]
+            [hyperopen.asset-selector.outcome-fixtures :as outcome-fixtures]
+            [hyperopen.asset-selector.settings :as settings]
             [hyperopen.views.asset-selector.processing :as processing]
             [hyperopen.views.asset-selector.test-support :as support]))
 
@@ -50,6 +53,24 @@
              (mapv :key (processing/filter-and-sort-assets assets "" :volume :desc #{} false false :outcome-15m))))
       (is (= ["outcome:1"]
              (mapv :key (processing/filter-and-sort-assets assets "" :volume :desc #{} false false :outcome-1d))))))
+
+  (testing "outcome category subfilters include economics and sports grouped rows"
+    (let [assets (markets/build-outcome-markets outcome-fixtures/live-outcome-meta
+                                                outcome-fixtures/live-outcome-ctxs)]
+      (is (= ["question:19" "outcome:104"]
+             (mapv :key (processing/filter-and-sort-assets assets "" :volume :desc #{} false false :outcome-economics))))
+      (is (= ["outcome:142" "outcome:141" "question:32"]
+             (mapv :key (processing/filter-and-sort-assets assets "" :volume :desc #{} false false :outcome-sports))))
+      (is (= ["question:32"]
+             (mapv :key (processing/filter-and-sort-assets assets "France" :volume :desc #{} false false :outcome-sports))))
+      (is (= ["outcome:159" "question:30"]
+             (mapv :key (processing/filter-and-sort-assets assets "BTC" :volume :desc #{} false false :outcome-1d))))))
+
+  (testing "mainnet outcome tabs match Hyperliquid while testnet keeps 15m"
+    (is (= [:outcome :outcome-1d :outcome-economics :outcome-sports]
+           (settings/outcome-tabs {:hyperliquid-chain :mainnet})))
+    (is (= [:outcome :outcome-15m :outcome-1d :outcome-economics :outcome-sports]
+           (settings/outcome-tabs {:hyperliquid-chain :testnet}))))
 
   (testing "hip3 tab strict mode parity: strict off shows full HIP3 set, strict on applies eligibility"
     (let [assets [{:key "perp:xyz:USA500"
@@ -196,3 +217,16 @@
         changed-result (processing/processed-assets changed "" :volume :desc favorites false false :outcome)]
     (is (= "80000"
            (:target-price (first changed-result))))))
+
+(deftest processed-assets-invalidates-cache-when-question-options-change-test
+  (processing/reset-processed-assets-cache!)
+  (let [favorites #{}
+        initial [(first (markets/build-outcome-markets outcome-fixtures/live-outcome-meta
+                                                       outcome-fixtures/live-outcome-ctxs))]
+        changed [(-> (first initial)
+                     (assoc-in [:question-options 0 :label] "Under 4.3%")
+                     (assoc :outcome-summary "Under 4.3% 61%  *  Exactly 4.3% 37%  *  Above 4.3% 6%"))]
+        _ (processing/processed-assets initial "" :volume :desc favorites false false :outcome)
+        changed-result (processing/processed-assets changed "" :volume :desc favorites false false :outcome)]
+    (is (= "Under 4.3%"
+           (get-in changed-result [0 :question-options 0 :label])))))

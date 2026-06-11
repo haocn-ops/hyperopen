@@ -424,8 +424,496 @@ async function seedOutcomeAssetSelectorMarketsCache(page) {
   });
 }
 
-async function seedOutcomeActiveAsset(page) {
+async function seedGroupedOutcomeAssetSelectorState(page, { activeTab = null } = {}) {
+  await page.evaluate((nextActiveTab) => {
+    const c = globalThis.cljs?.core;
+    const store = globalThis.hyperopen?.system?.store;
+
+    if (!c || !store) {
+      throw new Error("Hyperopen store or cljs core unavailable");
+    }
+
+    const kw = (name) => c.keyword(name);
+    const path = (...segments) => c.PersistentVector.fromArray(segments.map(kw), true);
+    const vector = (items) => c.PersistentVector.fromArray(items, true);
+    const map = (pairs) => c.PersistentArrayMap.fromArray(pairs.flatMap(([key, value]) => [kw(key), value]), true);
+    const stringMap = (pairs) => c.PersistentArrayMap.fromArray(pairs.flatMap(([key, value]) => [key, value]), true);
+    const side = ({ sideIndex, sideName, coin, assetId, outcomeId, optionLabel, mark }) =>
+      map([
+        ["side-index", sideIndex],
+        ["side-name", sideName],
+        ["side-label", sideName],
+        ["coin", coin],
+        ["asset-id", assetId],
+        ["outcome-id", outcomeId],
+        ["outcome-option-label", optionLabel],
+        ["mark", mark]
+      ]);
+    const option = ({ label, outcomeId, yes, no, mark, volume24h, openInterest }) =>
+      map([
+        ["label", label],
+        ["outcome-id", outcomeId],
+        ["yes-coin", c.get(yes, kw("coin"))],
+        ["yes-asset-id", c.get(yes, kw("asset-id"))],
+        ["no-coin", c.get(no, kw("coin"))],
+        ["no-asset-id", c.get(no, kw("asset-id"))],
+        ["mark", mark],
+        ["volume24h", volume24h],
+        ["openInterest", openInterest],
+        ["sides", vector([yes, no])]
+      ]);
+
+    const belowYes = side({
+      sideIndex: 0,
+      sideName: "Yes",
+      coin: "#1610",
+      assetId: 100001610,
+      outcomeId: 161,
+      optionLabel: "Below 61044",
+      mark: 0.612275
+    });
+    const belowNo = side({
+      sideIndex: 1,
+      sideName: "No",
+      coin: "#1611",
+      assetId: 100001611,
+      outcomeId: 161,
+      optionLabel: "Below 61044",
+      mark: 0.387725
+    });
+    const middleYes = side({
+      sideIndex: 0,
+      sideName: "Yes",
+      coin: "#1620",
+      assetId: 100001620,
+      outcomeId: 162,
+      optionLabel: "61044 to 63535",
+      mark: 0.3003
+    });
+    const middleNo = side({
+      sideIndex: 1,
+      sideName: "No",
+      coin: "#1621",
+      assetId: 100001621,
+      outcomeId: 162,
+      optionLabel: "61044 to 63535",
+      mark: 0.6997
+    });
+    const aboveYes = side({
+      sideIndex: 0,
+      sideName: "Yes",
+      coin: "#1630",
+      assetId: 100001630,
+      outcomeId: 163,
+      optionLabel: "Above 63535",
+      mark: 0.01181
+    });
+    const aboveNo = side({
+      sideIndex: 1,
+      sideName: "No",
+      coin: "#1631",
+      assetId: 100001631,
+      outcomeId: 163,
+      optionLabel: "Above 63535",
+      mark: 0.98819
+    });
+    const cpiBelowYes = side({
+      sideIndex: 0,
+      sideName: "Yes",
+      coin: "#1010",
+      assetId: 100001010,
+      outcomeId: 101,
+      optionLabel: "Below 4.3%",
+      mark: 0.61
+    });
+    const cpiBelowNo = side({
+      sideIndex: 1,
+      sideName: "No",
+      coin: "#1011",
+      assetId: 100001011,
+      outcomeId: 101,
+      optionLabel: "Below 4.3%",
+      mark: 0.39
+    });
+    const spursYes = side({
+      sideIndex: 0,
+      sideName: "San Antonio",
+      coin: "#1420",
+      assetId: 100001420,
+      outcomeId: 142,
+      optionLabel: "San Antonio",
+      mark: 0.67
+    });
+    const spursNo = side({
+      sideIndex: 1,
+      sideName: "New York",
+      coin: "#1421",
+      assetId: 100001421,
+      outcomeId: 142,
+      optionLabel: "New York",
+      mark: 0.33
+    });
+    const worldCupSpecs = [
+      { label: "Algeria", outcomeId: 301, coinBase: 301, mark: 0.00244, volume24h: 0, openInterest: 27_779 },
+      { label: "Argentina", outcomeId: 173, coinBase: 173, mark: 0.09005, volume24h: 2_395, openInterest: 50_807 },
+      { label: "Australia", outcomeId: 302, coinBase: 302, mark: 0.00478, volume24h: 0, openInterest: 27_596 },
+      { label: "Austria", outcomeId: 303, coinBase: 303, mark: 0.00287, volume24h: 0, openInterest: 27_792 },
+      { label: "Belgium", outcomeId: 304, coinBase: 304, mark: 0.02001, volume24h: 42, openInterest: 28_913 },
+      { label: "Bosnia and Herzegovina", outcomeId: 305, coinBase: 305, mark: 0.00369, volume24h: 2, openInterest: 27_787 },
+      { label: "Brazil", outcomeId: 306, coinBase: 306, mark: 0.085, volume24h: 444, openInterest: 48_379 },
+      { label: "Canada", outcomeId: 307, coinBase: 307, mark: 0.0018, volume24h: 0, openInterest: 27_596 },
+      { label: "Cape Verde", outcomeId: 308, coinBase: 308, mark: 0.00259, volume24h: 0, openInterest: 27_792 },
+      { label: "Colombia", outcomeId: 309, coinBase: 309, mark: 0.01444, volume24h: 26, openInterest: 27_811 },
+      { label: "Congo DR", outcomeId: 310, coinBase: 310, mark: 0.00219, volume24h: 0, openInterest: 27_596 },
+      { label: "Croatia", outcomeId: 311, coinBase: 311, mark: 0.008, volume24h: 85, openInterest: 28_004 },
+      { label: "Curacao", outcomeId: 312, coinBase: 312, mark: 0.0015, volume24h: 0, openInterest: 27_500 },
+      { label: "Czechia", outcomeId: 313, coinBase: 313, mark: 0.004, volume24h: 4, openInterest: 27_640 },
+      { label: "Ecuador", outcomeId: 314, coinBase: 314, mark: 0.006, volume24h: 7, openInterest: 27_690 },
+      { label: "Egypt", outcomeId: 315, coinBase: 315, mark: 0.004, volume24h: 12, openInterest: 27_630 },
+      { label: "England", outcomeId: 316, coinBase: 316, mark: 0.1109, volume24h: 615, openInterest: 15_168 },
+      { label: "France", outcomeId: 189, coinBase: 189, mark: 0.17514, volume24h: 5_776, openInterest: 41_448 },
+      { label: "Germany", outcomeId: 317, coinBase: 317, mark: 0.05319, volume24h: 179, openInterest: 14_524 },
+      { label: "Ghana", outcomeId: 318, coinBase: 318, mark: 0.003, volume24h: 0, openInterest: 27_588 },
+      { label: "Greece", outcomeId: 319, coinBase: 319, mark: 0.002, volume24h: 0, openInterest: 27_550 },
+      { label: "Iran", outcomeId: 320, coinBase: 320, mark: 0.003, volume24h: 0, openInterest: 27_560 },
+      { label: "Italy", outcomeId: 321, coinBase: 321, mark: 0.018, volume24h: 39, openInterest: 28_210 },
+      { label: "Japan", outcomeId: 322, coinBase: 322, mark: 0.02137, volume24h: 50, openInterest: 12_230 },
+      { label: "Mexico", outcomeId: 323, coinBase: 323, mark: 0.015, volume24h: 33, openInterest: 28_100 },
+      { label: "Morocco", outcomeId: 324, coinBase: 324, mark: 0.026, volume24h: 58, openInterest: 28_840 },
+      { label: "Netherlands", outcomeId: 325, coinBase: 325, mark: 0.04064, volume24h: 415, openInterest: 12_713 },
+      { label: "Nigeria", outcomeId: 326, coinBase: 326, mark: 0.007, volume24h: 8, openInterest: 27_820 },
+      { label: "Norway", outcomeId: 327, coinBase: 327, mark: 0.0321, volume24h: 121, openInterest: 12_478 },
+      { label: "Paraguay", outcomeId: 328, coinBase: 328, mark: 0.006, volume24h: 5, openInterest: 27_780 },
+      { label: "Poland", outcomeId: 329, coinBase: 329, mark: 0.008, volume24h: 8, openInterest: 27_880 },
+      { label: "Portugal", outcomeId: 330, coinBase: 330, mark: 0.10559, volume24h: 3_092, openInterest: 22_417 },
+      { label: "Qatar", outcomeId: 331, coinBase: 331, mark: 0.001, volume24h: 0, openInterest: 27_500 },
+      { label: "Saudi Arabia", outcomeId: 332, coinBase: 332, mark: 0.004, volume24h: 3, openInterest: 27_640 },
+      { label: "Scotland", outcomeId: 333, coinBase: 333, mark: 0.006, volume24h: 5, openInterest: 27_790 },
+      { label: "Senegal", outcomeId: 334, coinBase: 334, mark: 0.006, volume24h: 7, openInterest: 27_800 },
+      { label: "Serbia", outcomeId: 335, coinBase: 335, mark: 0.005, volume24h: 3, openInterest: 27_720 },
+      { label: "South Korea", outcomeId: 336, coinBase: 336, mark: 0.008, volume24h: 8, openInterest: 27_880 },
+      { label: "Spain", outcomeId: 212, coinBase: 212, mark: 0.17098, volume24h: 1_791, openInterest: 27_056 },
+      { label: "Sweden", outcomeId: 337, coinBase: 337, mark: 0.005, volume24h: 5, openInterest: 27_720 },
+      { label: "Switzerland", outcomeId: 338, coinBase: 338, mark: 0.01, volume24h: 12, openInterest: 27_950 },
+      { label: "Tunisia", outcomeId: 339, coinBase: 339, mark: 0.003, volume24h: 0, openInterest: 27_560 },
+      { label: "Turkey", outcomeId: 340, coinBase: 340, mark: 0.009, volume24h: 10, openInterest: 27_910 },
+      { label: "Ukraine", outcomeId: 341, coinBase: 341, mark: 0.006, volume24h: 5, openInterest: 27_780 },
+      { label: "Uruguay", outcomeId: 342, coinBase: 342, mark: 0.02, volume24h: 39, openInterest: 28_300 },
+      { label: "USA", outcomeId: 343, coinBase: 343, mark: 0.015, volume24h: 20, openInterest: 28_050 },
+      { label: "Wales", outcomeId: 344, coinBase: 344, mark: 0.004, volume24h: 2, openInterest: 27_640 },
+      { label: "Ivory Coast", outcomeId: 345, coinBase: 345, mark: 0.005, volume24h: 5, openInterest: 27_700 }
+    ];
+    const makeWorldCupOption = (spec) => {
+      const yesCoin = `#${spec.coinBase}0`;
+      const noCoin = `#${spec.coinBase}1`;
+      const yes = side({
+        sideIndex: 0,
+        sideName: "Yes",
+        coin: yesCoin,
+        assetId: 100_000_000 + spec.coinBase * 10,
+        outcomeId: spec.outcomeId,
+        optionLabel: spec.label,
+        mark: spec.mark
+      });
+      const no = side({
+        sideIndex: 1,
+        sideName: "No",
+        coin: noCoin,
+        assetId: 100_000_001 + spec.coinBase * 10,
+        outcomeId: spec.outcomeId,
+        optionLabel: spec.label,
+        mark: Math.max(0, 1 - spec.mark)
+      });
+      return {
+        ...spec,
+        yes,
+        no,
+        option: option({
+          label: spec.label,
+          outcomeId: spec.outcomeId,
+          yes,
+          no,
+          mark: spec.mark,
+          volume24h: spec.volume24h,
+          openInterest: spec.openInterest
+        })
+      };
+    };
+    const worldCupRows = worldCupSpecs.map(makeWorldCupOption);
+    const worldCupOptions = vector(worldCupRows.map((row) => row.option));
+    const worldCupSubscriptionCoins = vector(
+      worldCupRows.flatMap((row) => [c.get(row.yes, kw("coin")), c.get(row.no, kw("coin"))])
+    );
+    const franceWorldCup = worldCupRows.find((row) => row.label === "France");
+
+    const questionOptions = vector([
+      option({
+        label: "Below 61044",
+        outcomeId: 161,
+        yes: belowYes,
+        no: belowNo,
+        mark: 0.612275,
+        volume24h: 20_000,
+        openInterest: 30_000
+      }),
+      option({
+        label: "61044 to 63535",
+        outcomeId: 162,
+        yes: middleYes,
+        no: middleNo,
+        mark: 0.3003,
+        volume24h: 14_000,
+        openInterest: 20_000
+      }),
+      option({
+        label: "Above 63535",
+        outcomeId: 163,
+        yes: aboveYes,
+        no: aboveNo,
+        mark: 0.01181,
+        volume24h: 352,
+        openInterest: 3_075
+      })
+    ]);
+    const rangeAliases = stringMap([
+      ["#1610", map([["coin", "#1610"], ["outcome-id", 161], ["side-index", 0], ["option-label", "Below 61044"], ["sibling-coins", vector(["#1610", "#1611"])]])],
+      ["#1611", map([["coin", "#1611"], ["outcome-id", 161], ["side-index", 1], ["option-label", "Below 61044"], ["sibling-coins", vector(["#1610", "#1611"])]])],
+      ["#1620", map([["coin", "#1620"], ["outcome-id", 162], ["side-index", 0], ["option-label", "61044 to 63535"], ["sibling-coins", vector(["#1620", "#1621"])]])],
+      ["#1621", map([["coin", "#1621"], ["outcome-id", 162], ["side-index", 1], ["option-label", "61044 to 63535"], ["sibling-coins", vector(["#1620", "#1621"])]])],
+      ["outcome:162", map([["coin", "outcome:162"], ["outcome-id", 162], ["side-index", 0], ["option-label", "61044 to 63535"], ["sibling-coins", vector(["#1620", "#1621"])]])]
+    ]);
+
+    const rangeMarket = map([
+      ["key", "question:30"],
+      ["coin", "#1610"],
+      ["symbol", "BTC price range on Jun 6 at 2:00 AM?"],
+      ["title", "BTC price range on Jun 6 at 2:00 AM?"],
+      ["base", "BTC"],
+      ["quote", "USDC"],
+      ["market-type", kw("outcome")],
+      ["category", kw("outcome")],
+      ["outcome-kind", kw("question")],
+      ["outcome-category", kw("crypto")],
+      ["question-id", 30],
+      ["fallback-outcome-id", 160],
+      ["named-outcome-ids", vector([161, 162, 163])],
+      ["period", "1d"],
+      ["question-options", questionOptions],
+      ["outcome-sides", vector([belowYes, belowNo])],
+      ["outcome-side-aliases", rangeAliases],
+      ["outcome-subscription-coins", vector(["#1610", "#1611", "#1620", "#1621", "#1630", "#1631"])],
+      ["outcome-summary", "Below 61044 61%  *  61044 to 63535 30%  *  Above 63535 1%"],
+      ["mark", 0.612275],
+      ["volume24h", 34_352],
+      ["openInterest", 53_075]
+    ]);
+    const cpiMarket = map([
+      ["key", "question:19"],
+      ["coin", "#1010"],
+      ["symbol", "May CPI year-over-year"],
+      ["title", "May CPI year-over-year"],
+      ["base", "CPI"],
+      ["quote", "USDC"],
+      ["market-type", kw("outcome")],
+      ["category", kw("outcome")],
+      ["outcome-kind", kw("question")],
+      ["outcome-category", kw("economics")],
+      ["question-id", 19],
+      ["question-options", vector([
+        option({ label: "Below 4.3%", outcomeId: 101, yes: cpiBelowYes, no: cpiBelowNo, mark: 0.61, volume24h: 4_361, openInterest: 34_654 })
+      ])],
+      ["outcome-sides", vector([cpiBelowYes, cpiBelowNo])],
+      ["outcome-subscription-coins", vector(["#1010", "#1011"])],
+      ["outcome-summary", "Below 4.3% 61%"],
+      ["mark", 0.61],
+      ["volume24h", 4_361],
+      ["openInterest", 34_654]
+    ]);
+    const worldCupMarket = map([
+      ["key", "question:32"],
+      ["coin", "#1890"],
+      ["symbol", "2026 World Cup Champion"],
+      ["title", "2026 World Cup Champion"],
+      ["base", "World Cup"],
+      ["quote", "USDC"],
+      ["market-type", kw("outcome")],
+      ["category", kw("outcome")],
+      ["outcome-kind", kw("question")],
+      ["outcome-category", kw("sports")],
+      ["outcome-subcategory", kw("football")],
+      ["question-id", 32],
+      ["fallback-outcome-id", 171],
+      ["named-outcome-ids", vector([189, 212, 173])],
+      ["question-options", worldCupOptions],
+      ["outcome-sides", vector([franceWorldCup.yes, franceWorldCup.no])],
+      ["outcome-subscription-coins", worldCupSubscriptionCoins],
+      ["outcome-summary", "France 17%  *  Spain 17%  *  Argentina 14%"],
+      ["mark", 0.17514],
+      ["volume24h", 40_000],
+      ["openInterest", 325_917]
+    ]);
+    const sportsMarket = map([
+      ["key", "outcome:142"],
+      ["coin", "#1420"],
+      ["symbol", "2026 NBA Finals champion"],
+      ["title", "2026 NBA Finals champion"],
+      ["base", "NBA"],
+      ["quote", "USDC"],
+      ["market-type", kw("outcome")],
+      ["category", kw("outcome")],
+      ["outcome-kind", kw("binary")],
+      ["outcome-category", kw("sports")],
+      ["outcome-subcategory", kw("basketball")],
+      ["outcome-id", 142],
+      ["outcome-sides", vector([spursYes, spursNo])],
+      ["outcome-side-aliases", stringMap([
+        ["#1420", map([["outcome-id", 142], ["side-index", 0], ["sibling-coins", vector(["#1420", "#1421"])]])],
+        ["#1421", map([["outcome-id", 142], ["side-index", 1], ["sibling-coins", vector(["#1420", "#1421"])]])],
+        ["outcome:142", map([["outcome-id", 142], ["side-index", 0], ["sibling-coins", vector(["#1420", "#1421"])]])]
+      ])],
+      ["outcome-subscription-coins", vector(["#1420", "#1421"])],
+      ["outcome-summary", "San Antonio 67%  *  New York 33%"],
+      ["mark", 0.67],
+      ["volume24h", 29_092],
+      ["openInterest", 50_529]
+    ]);
+    const markets = vector([rangeMarket, worldCupMarket, sportsMarket, cpiMarket]);
+    let nextState = c.deref(store);
+    nextState = c.assoc_in(nextState, path("asset-selector", "markets"), markets);
+    nextState = c.assoc_in(
+      nextState,
+      path("asset-selector", "market-by-key"),
+      stringMap([["question:30", rangeMarket], ["question:32", worldCupMarket], ["outcome:142", sportsMarket], ["question:19", cpiMarket]])
+    );
+    nextState = c.assoc_in(
+      nextState,
+      path("asset-selector", "market-index-by-key"),
+      stringMap([["question:30", 0], ["question:32", 1], ["outcome:142", 2], ["question:19", 3]])
+    );
+    if (nextActiveTab) {
+      nextState = c.assoc_in(nextState, path("asset-selector", "active-tab"), kw(nextActiveTab));
+    }
+    nextState = c.assoc_in(nextState, path("asset-selector", "phase"), kw("full"));
+    nextState = c.assoc_in(nextState, path("asset-selector", "loading?"), false);
+    nextState = c.assoc_in(nextState, path("asset-selector", "sort-by"), kw("volume"));
+    nextState = c.assoc_in(nextState, path("asset-selector", "sort-direction"), kw("desc"));
+    nextState = c.assoc_in(nextState, path("asset-selector", "live-market-subscriptions-paused?"), true);
+    c.reset_BANG_(store, nextState);
+  }, activeTab);
+}
+
+async function seedWorldCupOutcomeOrderForm(page) {
+  await seedGroupedOutcomeAssetSelectorState(page, { activeTab: "sports" });
   await page.evaluate(() => {
+    const c = globalThis.cljs?.core;
+    const store = globalThis.hyperopen?.system?.store;
+
+    if (!c || !store) {
+      throw new Error("Hyperopen store or cljs core unavailable");
+    }
+
+    const kw = (name) => c.keyword(name);
+    const path = (...segments) => c.PersistentVector.fromArray(segments, true);
+    const worldCupMarket = c.get_in(
+      c.deref(store),
+      path(kw("asset-selector"), kw("market-by-key"), "question:32")
+    );
+
+    if (!worldCupMarket) {
+      throw new Error("World Cup grouped outcome market missing from seeded state");
+    }
+
+    let nextState = c.deref(store);
+    nextState = c.assoc_in(nextState, path(kw("active-asset")), "#1890");
+    nextState = c.assoc_in(nextState, path(kw("selected-asset")), "#1890");
+    nextState = c.assoc_in(nextState, path(kw("active-market")), worldCupMarket);
+    nextState = c.assoc_in(nextState, path(kw("order-form"), kw("outcome-option-id")), 189);
+    nextState = c.assoc_in(nextState, path(kw("order-form"), kw("outcome-side")), 0);
+    nextState = c.assoc_in(
+      nextState,
+      path(kw("order-form-ui"), kw("outcome-option-dropdown-open?")),
+      false
+    );
+    nextState = c.assoc_in(
+      nextState,
+      path(kw("order-form-ui"), kw("outcome-option-query")),
+      ""
+    );
+    c.reset_BANG_(store, nextState);
+
+    const renderApp = globalThis.hyperopen?.app?.bootstrap?.render_app_BANG_;
+    if (typeof renderApp === "function") {
+      renderApp(c.deref(store));
+    }
+  });
+}
+
+async function seedSportsOutcomeOrderForm(page) {
+  await seedGroupedOutcomeAssetSelectorState(page, { activeTab: "sports" });
+  await page.evaluate(() => {
+    const c = globalThis.cljs?.core;
+    const store = globalThis.hyperopen?.system?.store;
+
+    if (!c || !store) {
+      throw new Error("Hyperopen store or cljs core unavailable");
+    }
+
+    const kw = (name) => c.keyword(name);
+    const path = (...segments) => c.PersistentVector.fromArray(segments, true);
+    const opts = c.PersistentArrayMap.fromArray([kw("keywordize-keys"), true], true);
+    const sportsMarket = c.get_in(
+      c.deref(store),
+      path(kw("asset-selector"), kw("market-by-key"), "outcome:142")
+    );
+
+    if (!sportsMarket) {
+      throw new Error("NBA Finals grouped outcome market missing from seeded state");
+    }
+
+    const orderbook = (bidPx, askPx) => c.js__GT_clj(
+      {
+        bids: [{ px: bidPx, sz: "20000.0" }, { px: "0.34000", sz: "152000.0" }],
+        asks: [{ px: askPx, sz: "28.0" }, { px: "0.49729", sz: "28.0" }]
+      },
+      opts
+    );
+    const context = (coin, mark, openInterest) => c.js__GT_clj(
+      {
+        coin,
+        mark,
+        markRaw: String(mark),
+        change24h: 0.0054,
+        change24hPct: 3.25,
+        dayNtlVlm: 5831,
+        openInterest
+      },
+      opts
+    );
+
+    let nextState = c.deref(store);
+    nextState = c.assoc_in(nextState, path(kw("active-asset")), "#1420");
+    nextState = c.assoc_in(nextState, path(kw("selected-asset")), "#1420");
+    nextState = c.assoc_in(nextState, path(kw("active-market")), sportsMarket);
+    nextState = c.assoc_in(nextState, path(kw("order-form"), kw("type")), kw("limit"));
+    nextState = c.assoc_in(nextState, path(kw("order-form"), kw("side")), kw("buy"));
+    nextState = c.assoc_in(nextState, path(kw("order-form"), kw("outcome-option-id")), 142);
+    nextState = c.assoc_in(nextState, path(kw("order-form"), kw("outcome-side")), 0);
+    nextState = c.assoc_in(nextState, path(kw("orderbooks"), "#1420"), orderbook("0.37240", "0.49864"));
+    nextState = c.assoc_in(nextState, path(kw("orderbooks"), "#1421"), orderbook("0.61760", "0.62851"));
+    nextState = c.assoc_in(nextState, path(kw("active-assets"), kw("contexts"), "#1420"), context("#1420", 0.3724, 780386));
+    nextState = c.assoc_in(nextState, path(kw("active-assets"), kw("contexts"), "#1421"), context("#1421", 0.6176, 780386));
+    nextState = c.assoc_in(nextState, path(kw("orderbook-ui"), kw("active-tab")), kw("orderbook"));
+    c.reset_BANG_(store, nextState);
+
+    const renderApp = globalThis.hyperopen?.app?.bootstrap?.render_app_BANG_;
+    if (typeof renderApp === "function") {
+      renderApp(c.deref(store));
+    }
+  });
+}
+
+async function seedOutcomeActiveAsset(page, overrides = {}) {
+  await page.evaluate((overrides) => {
     const c = globalThis.cljs?.core;
     const store = globalThis.hyperopen?.system?.store;
 
@@ -457,7 +945,8 @@ async function seedOutcomeActiveAsset(page) {
         "outcome-sides": [
           { coin: "#0", name: "YES", "side-index": 0, circulatingSupply: 537233 },
           { coin: "#1", name: "NO", "side-index": 1, circulatingSupply: 537233 }
-        ]
+        ],
+        ...overrides
       },
       opts
     );
@@ -484,7 +973,11 @@ async function seedOutcomeActiveAsset(page) {
     nextState = c.assoc_in(nextState, kwPath("now-ms"), Date.UTC(2026, 4, 2, 15, 0, 0));
 
     c.reset_BANG_(store, nextState);
-  });
+    const renderApp = globalThis.hyperopen?.app?.bootstrap?.render_app_BANG_;
+    if (typeof renderApp === "function") {
+      renderApp(c.deref(store));
+    }
+  }, overrides);
 }
 
 async function seedFundingTooltipLivePositionState(
@@ -1081,7 +1574,198 @@ test("asset selector outcome rows use full-width question copy without duplicate
   expect(textGeometry.scrollWidth).toBeLessThanOrEqual(textGeometry.clientWidth + 1);
 });
 
-test("outcome market tooltip stays within active selector width and glows on hover @regression", async ({ page }) => {
+test("asset selector outcome subtabs render grouped question markets @smoke @regression", async ({ page }) => {
+  await visitRoute(page, "/trade");
+  await dispatch(page, [":actions/toggle-asset-dropdown", ":asset-selector"]);
+  await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
+  await seedGroupedOutcomeAssetSelectorState(page, { activeTab: "outcome" });
+  await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
+
+  const rows = page.locator('[data-role="asset-selector-row"]');
+  await expect(page.getByRole("button", { name: "Crypto (1d)", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Economics", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Sports", exact: true })).toBeVisible();
+  const cryptoRangeRow = rows.filter({ hasText: "BTC price range on Jun 6 at 2:00 AM?" }).first();
+  await expect(cryptoRangeRow).toBeVisible();
+  await expect(cryptoRangeRow).toContainText("61044 to 63535");
+
+  await page.getByRole("button", { name: "Economics", exact: true }).click();
+  await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
+  await seedGroupedOutcomeAssetSelectorState(page);
+  await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
+  await expect(rows.first()).toContainText("May CPI year-over-year");
+  await expect(rows.first()).toContainText("Below 4.3%");
+
+  await page.getByRole("button", { name: "Sports", exact: true }).click();
+  await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
+  await seedGroupedOutcomeAssetSelectorState(page);
+  await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
+  const worldCupRow = rows.filter({ hasText: "2026 World Cup Champion" }).first();
+  const nbaChampionRow = rows.filter({ hasText: "2026 NBA Finals champion" }).first();
+  await expect(worldCupRow).toBeVisible();
+  await expect(worldCupRow).toContainText("France 17%");
+  await expect(worldCupRow).toContainText("Spain 17%");
+  await expect(worldCupRow).toContainText("Argentina 14%");
+  await expect(nbaChampionRow).toBeVisible();
+  await expect(nbaChampionRow).toContainText("San Antonio 67%");
+  await expect(nbaChampionRow).toContainText("New York 33%");
+  await expect(rows.first()).not.toContainText("May CPI year-over-year");
+
+  await page.getByRole("button", { name: "Crypto (1d)", exact: true }).click();
+  await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
+  await seedGroupedOutcomeAssetSelectorState(page);
+  await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
+  await expect(rows.first()).toContainText("BTC price range on Jun 6 at 2:00 AM?");
+  await expect(rows.first()).not.toContainText("NBA Finals Game 2");
+});
+
+test("market strip uses searchable dropdown for multi-option outcome markets @smoke @regression", async ({ page }) => {
+  await visitRoute(page, "/trade");
+  await seedWorldCupOutcomeOrderForm(page);
+  await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
+
+  const orderForm = page.locator('[data-parity-id="order-form"]');
+  const marketStrip = page.locator('[data-parity-id="market-strip"]');
+  const selector = marketStrip.locator('[data-role="market-strip-outcome-option-selector"]');
+  const trigger = selector.locator('[data-role="outcome-option-select-trigger"]');
+  const rows = selector.locator('[data-role="outcome-option-select-row"]');
+
+  await expect(orderForm.locator('[data-role="outcome-option-select-trigger"]')).toHaveCount(0);
+  await expect(selector).toBeVisible();
+  await expect(trigger).toBeVisible();
+  await expect(trigger).toContainText("France");
+  await expect(selector.locator('[data-role="outcome-option-select-menu"]')).toHaveCount(0);
+  await expect(rows).toHaveCount(0);
+
+  await trigger.hover();
+  await expect.poll(async () => {
+    const tooltip = marketStrip.locator('[data-role="outcome-market-tooltip"]');
+    if (await tooltip.count() === 0) {
+      return "hidden";
+    }
+    const opacity = await tooltip.first().evaluate((node) => getComputedStyle(node).opacity);
+    return opacity === "0" ? "hidden" : "visible";
+  }, { timeout: 5_000 }).toBe("hidden");
+
+  await trigger.click();
+  const menu = selector.locator('[data-role="outcome-option-select-menu"]');
+  await expect(menu).toBeVisible();
+  await expect(menu).toHaveCSS("background-color", "rgb(11, 21, 26)");
+  await expect(menu).toContainText("Live Outcomes");
+  await expect(menu).toContainText("% Chance");
+  await expect(menu).toContainText("Price");
+  await expect(menu).toContainText("Volume");
+  await expect(menu).toContainText("Open Int");
+  await expect(rows).toHaveCount(48);
+  await expect(rows.nth(0)).toContainText("Algeria");
+  await expect(rows.nth(1)).toContainText("Argentina");
+  await expect(rows.filter({ hasText: "France" })).toHaveCount(1);
+  await expect(rows.filter({ hasText: "Spain" })).toHaveCount(1);
+  await expect(menu.locator('[data-role="outcome-option-sort-label"]')).toBeVisible();
+  await expect(menu.locator('[data-role="outcome-option-sort-chance"]')).toBeVisible();
+  await expect(menu.locator('[data-role="outcome-option-sort-price"]')).toBeVisible();
+  await expect(menu.locator('[data-role="outcome-option-sort-volume"]')).toBeVisible();
+  await expect(menu.locator('[data-role="outcome-option-sort-open-interest"]')).toBeVisible();
+  await expect(menu).toHaveCSS("background-color", "rgb(11, 21, 26)");
+  const menuBox = await menu.boundingBox();
+  expect(menuBox?.width).toBeGreaterThan(560);
+  const layoutProbe = await rows.first().evaluate((row) => {
+    const rowRect = row.getBoundingClientRect();
+    const cellRects = Array.from(row.children).map((child) => child.getBoundingClientRect());
+    return {
+      templateColumns: getComputedStyle(row).gridTemplateColumns,
+      rowHeight: rowRect.height,
+      cellCount: cellRects.length,
+      maxTopDelta: Math.max(...cellRects.map((rect) => Math.abs(rect.top - cellRects[0].top))),
+      columnsIncrease: cellRects.every((rect, index) => index === 0 || rect.left > cellRects[index - 1].left)
+    };
+  });
+  expect(layoutProbe.cellCount).toBe(5);
+  expect(layoutProbe.templateColumns.split(" ").length).toBe(5);
+  expect(layoutProbe.rowHeight).toBeLessThan(40);
+  expect(layoutProbe.maxTopDelta).toBeLessThan(2);
+  expect(layoutProbe.columnsIncrease).toBe(true);
+
+  await menu.locator('[data-role="outcome-option-sort-volume"]').click();
+  await expect(rows.first()).toContainText("France");
+  await menu.locator('[data-role="outcome-option-sort-label"]').click();
+  await expect(rows.first()).toContainText("Algeria");
+
+  await menu.getByRole("searchbox", { name: "Search outcome options" }).fill("sp");
+  await expect(rows).toHaveCount(1);
+  await expect(rows.first()).toContainText("Spain");
+  await rows.first().click();
+  await waitForIdle(page, { quietMs: 200, timeoutMs: 6_000, pollMs: 50 });
+
+  await expect(trigger).toContainText("Spain");
+  await expect(menu).toHaveCount(0);
+  await expect.poll(async () => {
+    return page.evaluate(() => {
+      const c = globalThis.cljs?.core;
+      const store = globalThis.hyperopen?.system?.store;
+      if (!c || !store) {
+        throw new Error("Hyperopen store unavailable");
+      }
+      const kw = (name) => c.keyword(name);
+      const path = (...segments) => c.PersistentVector.fromArray(segments.map(kw), true);
+      const state = c.deref(store);
+      return {
+        route: c.get_in(state, path("router", "path")),
+        activeAsset: c.get(state, kw("active-asset")),
+        selectedAsset: c.get(state, kw("selected-asset")),
+        outcomeOptionId: c.get_in(state, path("order-form", "outcome-option-id"))
+      };
+    });
+  }, { timeout: 6_000 }).toEqual({
+    route: "/trade/%232120",
+    activeAsset: "#2120",
+    selectedAsset: "#2120",
+    outcomeOptionId: 212
+  });
+  await expect(page.getByRole("region", { name: "#2120 price chart, 1D timeframe" })).toBeVisible();
+});
+
+test("two-sided outcome side selector switches chart and order book market @regression", async ({ page }) => {
+  await visitRoute(page, "/trade");
+  await seedSportsOutcomeOrderForm(page);
+  await waitForIdle(page, { quietMs: 200, timeoutMs: 6_000, pollMs: 50 });
+
+  const orderForm = page.locator('[data-parity-id="order-form"]');
+  await expect(orderForm.getByRole("button", { name: "Buy San Antonio", exact: true })).toBeVisible();
+  await expect(orderForm.getByRole("button", { name: "Buy New York", exact: true })).toBeVisible();
+  await expect(page.getByRole("region", { name: "#1420 price chart, 1D timeframe" })).toBeVisible();
+  await expect(page.locator('[data-parity-id="orderbook-panel"]')).toContainText("0.3724");
+
+  await orderForm.getByRole("button", { name: "Buy New York", exact: true }).click();
+  await waitForIdle(page, { quietMs: 250, timeoutMs: 6_000, pollMs: 50 });
+
+  await expect(page.getByRole("region", { name: "#1421 price chart, 1D timeframe" })).toBeVisible();
+  await expect(page.locator('[data-parity-id="orderbook-panel"]')).toContainText("0.621");
+  await expect(page.locator('[data-parity-id="orderbook-panel"]')).not.toContainText("0.3724");
+  await expect.poll(async () => {
+    return page.evaluate(() => {
+      const c = globalThis.cljs?.core;
+      const store = globalThis.hyperopen?.system?.store;
+      if (!c || !store) {
+        throw new Error("Hyperopen store unavailable");
+      }
+      const kw = (name) => c.keyword(name);
+      const path = (...segments) => c.PersistentVector.fromArray(segments.map(kw), true);
+      const state = c.deref(store);
+      return {
+        activeAsset: c.get(state, kw("active-asset")),
+        selectedAsset: c.get(state, kw("selected-asset")),
+        outcomeSide: c.get_in(state, path("order-form", "outcome-side"))
+      };
+    });
+  }, { timeout: 6_000 }).toEqual({
+    activeAsset: "#1421",
+    selectedAsset: "#1421",
+    outcomeSide: 1
+  });
+});
+
+test("outcome market tooltip uses adaptive readable width and glows on hover @regression", async ({ page }) => {
   await visitRoute(page, "/trade");
   await seedOutcomeActiveAsset(page);
   await waitForIdle(page, { quietMs: 200, timeoutMs: 4_000, pollMs: 50 });
@@ -1090,9 +1774,19 @@ test("outcome market tooltip stays within active selector width and glows on hov
   const trigger = hoverRegion.locator("button").first();
   const tooltip = page.locator('[data-role="outcome-market-tooltip"]');
 
-  await expect(hoverRegion).toHaveCount(1);
+  await expect.poll(async () => {
+    const count = await hoverRegion.count();
+    if (count !== 1) {
+      await seedOutcomeActiveAsset(page);
+      await waitForIdle(page, { quietMs: 200, timeoutMs: 4_000, pollMs: 50 });
+      return hoverRegion.count();
+    }
+    return count;
+  }, { timeout: 8_000 }).toBe(1);
   await hoverRegion.hover();
-  await expect(tooltip).toHaveCSS("opacity", "1");
+  await expect.poll(async () => {
+    return tooltip.evaluate((node) => Number(getComputedStyle(node).opacity));
+  }, { timeout: 5_000 }).toBeGreaterThan(0.9);
 
   const geometry = await page.evaluate(() => {
     const region = document.querySelector('[data-role="outcome-market-name-hover-region"]');
@@ -1113,13 +1807,14 @@ test("outcome market tooltip stays within active selector width and glows on hov
       triggerWidth: triggerRect.width,
       panelLeft: panelRect.left,
       panelRight: panelRect.right,
-      panelWidth: panelRect.width
+      panelWidth: panelRect.width,
+      viewportWidth: window.innerWidth
     };
   });
 
   expect(Math.abs(geometry.panelLeft - geometry.triggerLeft)).toBeLessThanOrEqual(1);
-  expect(Math.abs(geometry.panelRight - geometry.triggerRight)).toBeLessThanOrEqual(1);
-  expect(Math.abs(geometry.panelWidth - geometry.triggerWidth)).toBeLessThanOrEqual(1);
+  expect(geometry.panelWidth).toBeGreaterThan(geometry.triggerWidth + 240);
+  expect(geometry.panelRight).toBeLessThanOrEqual(geometry.viewportWidth - 16 + 1);
 
   const triggerGlow = await trigger.evaluate((node) => {
     const style = getComputedStyle(node);
@@ -1129,14 +1824,98 @@ test("outcome market tooltip stays within active selector width and glows on hov
     };
   });
 
-  expect(triggerGlow.borderColor).toBe("rgba(45, 212, 191, 0.35)");
+  expect(triggerGlow.borderColor).toContain("45, 212, 191");
   expect(triggerGlow.boxShadow).toContain("45, 212, 191");
 
-  const settlementLabel = tooltip.getByText("BTC mark price is above 78,213");
-  await expect(settlementLabel).toHaveCSS("white-space", "nowrap");
+  const settlementLabel = tooltip.locator('[data-role="outcome-tooltip-settlement-label"]');
+  await expect(settlementLabel).toHaveCSS("white-space", "normal");
+  await expect(settlementLabel).toContainText("BTC mark price is above 78,213");
   await expect(tooltip.getByText("on May 03, 2026 02:00 AM UTC")).toBeVisible();
   await expect(tooltip.getByText("Payouts are in USDH.")).toBeVisible();
   await expect(tooltip.getByText("Learn more")).toHaveCount(0);
+});
+
+test("outcome market tooltip scrolls long outcome details without becoming narrow @regression", async ({ page }) => {
+  const longDetailsSection = [
+    "Each associated outcome corresponds to a team confirmed to be participating in the 2026 FIFA World Cup.",
+    "An outcome resolves to Yes if FIFA officially declares the corresponding team the champion of the 2026 FIFA World Cup.",
+    "An outcome resolves to No once it becomes impossible under FIFA tournament rules for the corresponding team to win the 2026 FIFA World Cup, including but not limited to upon elimination from the tournament.",
+    "Match results after regular time, extra time, and penalties, if applicable, are all valid for resolution purposes.",
+    "If the final is postponed or delayed, the rescheduled final will be used, provided FIFA officially declares a champion by October 14, 2026 at 23:59 UTC.",
+    "If FIFA officially declares a team as champion without a completed final match, including but not limited to following abandonment, walkover, forfeit, disqualification, or administrative decision, that team's outcome resolves to Yes accordingly.",
+    "Any outcome not already resolved shall resolve to No if FIFA cancels the 2026 FIFA World Cup, declares no champion, declares any teams as co-champions, or has not officially declared a champion by October 14, 2026 at 23:59 UTC.",
+    "FIFA is the primary resolution source, although independent reputable news sources may be used as fallback sources if FIFA has not published the relevant result.",
+    "Once resolved, subsequent appeals, corrections, reversals, or title reassignments by FIFA or any other body will not affect the resolution."
+  ].join(" ");
+  const longDetails = Array.from({ length: 3 }, () => longDetailsSection).join(" ");
+
+  await visitRoute(page, "/trade");
+  await seedOutcomeActiveAsset(page, {
+    coin: "#1890",
+    symbol: "2026 World Cup Champion",
+    title: "2026 World Cup Champion",
+    base: "World Cup",
+    underlying: null,
+    "target-price": null,
+    "expiry-ms": null,
+    "outcome-details": longDetails
+  });
+  await waitForIdle(page, { quietMs: 200, timeoutMs: 4_000, pollMs: 50 });
+
+  const hoverRegion = page.locator('[data-role="outcome-market-name-hover-region"]');
+  const trigger = hoverRegion.locator("button").first();
+  const tooltip = page.locator('[data-role="outcome-market-tooltip"]');
+  const summary = tooltip.locator('[data-role="outcome-tooltip-summary-scroll"]');
+  const scrollContainer = tooltip.locator('[data-role="outcome-tooltip-scroll-container"]');
+
+  await hoverRegion.hover();
+  await expect.poll(async () => {
+    return tooltip.evaluate((node) => Number(getComputedStyle(node).opacity));
+  }, { timeout: 5_000 }).toBeGreaterThan(0.9);
+  await expect(summary).toContainText("Each associated outcome corresponds");
+  await expect(tooltip.getByText("Settlement Condition")).toHaveCount(0);
+
+  const geometry = await page.evaluate(() => {
+    const trigger = document.querySelector('[data-role="outcome-market-name-hover-region"] button');
+    const panel = document.querySelector('[data-role="outcome-market-tooltip"]');
+    const summary = document.querySelector('[data-role="outcome-tooltip-summary-scroll"]');
+    const scrollContainer = document.querySelector('[data-role="outcome-tooltip-scroll-container"]');
+    const footer = document.querySelector('[data-role="outcome-tooltip-shield-icon"]')?.parentElement;
+    if (!trigger || !panel || !summary || !scrollContainer || !footer) {
+      throw new Error("Long outcome tooltip geometry unavailable");
+    }
+    const triggerRect = trigger.getBoundingClientRect();
+    const panelRect = panel.getBoundingClientRect();
+    const summaryStyle = getComputedStyle(summary);
+    const scrollStyle = getComputedStyle(scrollContainer);
+    scrollContainer.scrollTop = scrollContainer.scrollHeight;
+    const footerRect = footer.getBoundingClientRect();
+    return {
+      triggerWidth: triggerRect.width,
+      panelWidth: panelRect.width,
+      panelRight: panelRect.right,
+      panelBottom: panelRect.bottom,
+      viewportWidth: window.innerWidth,
+      viewportHeight: window.innerHeight,
+      summaryClientHeight: summary.clientHeight,
+      summaryScrollHeight: summary.scrollHeight,
+      summaryOverflowY: summaryStyle.overflowY,
+      scrollClientHeight: scrollContainer.clientHeight,
+      scrollScrollHeight: scrollContainer.scrollHeight,
+      scrollOverflowY: scrollStyle.overflowY,
+      footerBottom: footerRect.bottom
+    };
+  });
+
+  expect(geometry.panelWidth).toBeGreaterThan(geometry.triggerWidth + 240);
+  expect(geometry.panelRight).toBeLessThanOrEqual(geometry.viewportWidth - 16 + 1);
+  expect(geometry.panelBottom).toBeLessThanOrEqual(geometry.viewportHeight);
+  expect(geometry.summaryOverflowY).toBe("visible");
+  expect(geometry.summaryScrollHeight).toBeLessThanOrEqual(geometry.summaryClientHeight + 1);
+  expect(geometry.scrollOverflowY).toBe("auto");
+  expect(geometry.scrollScrollHeight).toBeGreaterThan(geometry.scrollClientHeight);
+  expect(geometry.footerBottom).toBeLessThanOrEqual(geometry.panelBottom);
+  await expect(scrollContainer).toContainText("Payouts are in USDH.");
 });
 
 test("disconnected stop spectate clears stale account surfaces @regression", async ({ page }) => {

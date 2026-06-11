@@ -291,10 +291,18 @@
              :active-market active-market
              :active-assets (active-assets-state state active-asset active-market tooltip-open?)
              :asset-selector (asset-selector-state state active-asset)
+             :order-form {:outcome-option-id (get-in state [:order-form :outcome-option-id])
+                          :outcome-option (get-in state [:order-form :outcome-option])}
+             :order-form-ui {:outcome-option-dropdown-open?
+                             (true? (get-in state [:order-form-ui :outcome-option-dropdown-open?]))
+                             :outcome-option-query
+                             (or (get-in state [:order-form-ui :outcome-option-query]) "")}
              :funding-ui (if tooltip-open?
-                           (open-tooltip-funding-ui-state state active-asset active-market)
-                           (funding-tooltip-ui-state state))
-             :trade-ui {:mobile-asset-details-open? (true? (get-in state [:trade-ui :mobile-asset-details-open?]))}}
+                            (open-tooltip-funding-ui-state state active-asset active-market)
+                            (funding-tooltip-ui-state state))
+             :trade-ui {:mobile-asset-details-open? (true? (get-in state [:trade-ui :mobile-asset-details-open?]))
+                        :outcome-option-sort-by (get-in state [:trade-ui :outcome-option-sort-by])
+                        :outcome-option-sort-direction (get-in state [:trade-ui :outcome-option-sort-direction])}}
       tooltip-open?
       (assoc :account (:account state)
              :perp-dex-clearinghouse (:perp-dex-clearinghouse state)
@@ -351,6 +359,10 @@
                                       (:openInterest market)))
         funding-rate (funding-policy/parse-optional-number (:fundingRate ctx-data))
         outcome? (= :outcome (:market-type market))
+        outcome-options (vec (or (:question-options market) []))
+        selected-outcome-option-id (or (get-in full-state [:order-form :outcome-option-id])
+                                       (get-in full-state [:order-form :outcome-option])
+                                       (:outcome-option-id market))
         outcome-chance-label (when (and outcome? (number? mark))
                                (str (js/Math.round (* mark 100)) "%"))
         now-ms (or (:now-ms full-state) (.now js/Date))
@@ -416,6 +428,17 @@
                               "Two sided-open interest: the sum of Yes and No shares on this contract")
      :outcome-title (or (:title market) (:symbol market))
      :outcome-details (:outcome-details market)
+     :outcome-options outcome-options
+     :outcome-option-id selected-outcome-option-id
+     :outcome-option-ui {:open? (true? (get-in full-state
+                                                [:order-form-ui :outcome-option-dropdown-open?]))
+                         :query (or (get-in full-state
+                                            [:order-form-ui :outcome-option-query])
+                                    "")
+                         :sort-by (get-in full-state
+                                          [:trade-ui :outcome-option-sort-by])
+                         :sort-direction (get-in full-state
+                                                 [:trade-ui :outcome-option-sort-direction])}
      :outcome-tooltip (outcome-tooltip-model market)
      :outcome-chance-label outcome-chance-label
      :missing-icons (get-in full-state [:asset-selector :missing-icons] #{})

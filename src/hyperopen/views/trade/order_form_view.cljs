@@ -174,16 +174,17 @@
                               :buy-sublabel (when degen? "(number go up pls)")
                               :sell-sublabel (when degen? "(get me out)")})))
       (when outcome?
-        (controls/outcome-side-row outcome-sides
-                                   outcome-side-index
-                                   outcome-handlers
-                                   {:action-prefix (if (= side :sell)
-                                                     "Sell "
-                                                     "Buy ")
-                                    :side->intent (fn [outcome-side]
-                                                    (if (= 1 (:side-index outcome-side))
-                                                      :sell
-                                                      :buy))}))
+        [:div {:class ["space-y-1.5"]}
+         (controls/outcome-side-row outcome-sides
+                                    outcome-side-index
+                                    outcome-handlers
+                                    {:action-prefix (if (= side :sell)
+                                                      "Sell "
+                                                      "Buy ")
+                                     :side->intent (fn [outcome-side]
+                                                     (if (= 1 (:side-index outcome-side))
+                                                       :sell
+                                                       :buy))})])
       (controls/balances-row display)
 
       (when show-limit-like-controls?

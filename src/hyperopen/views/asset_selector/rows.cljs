@@ -57,6 +57,7 @@
         funding-color (if funding-positive "text-success" "text-error")
         is-spot (= market-type :spot)
         is-outcome (= market-type :outcome)
+        outcome-summary (:outcome-summary asset)
         favorite? (contains? favorites key)]
     [:div
      {:class (desktop-grid-classes is-outcome)
@@ -70,7 +71,11 @@
                      (not is-outcome) (conj "col-span-3"))}
       (icons/favorite-button favorite? key)
       [:div.flex.items-center.space-x-1.5.min-w-0.overflow-hidden
-       [:div.text-sm.truncate.whitespace-nowrap symbol]
+       [:div {:class ["text-sm" "truncate" "whitespace-nowrap"]}
+        symbol]
+       (when (and is-outcome (seq outcome-summary))
+         [:div {:class ["text-xs" "truncate" "whitespace-nowrap" "text-gray-500"]}
+          outcome-summary])
        (when is-spot
          (controls/chip "SPOT" ["bg-gray-500/20" "text-gray-200" "border-gray-500/30" "shrink-0"]))
        (when dex
@@ -193,6 +198,7 @@
         change-color (if positive-change? "text-success" "text-error")
         is-spot (= market-type :spot)
         is-outcome (= market-type :outcome)
+        outcome-summary (:outcome-summary asset)
         favorite? (contains? favorites key)]
     [:div {:class ["grid"
                    "grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)_minmax(0,0.95fr)]"
@@ -212,6 +218,9 @@
       [:div {:class ["min-w-0" "space-y-1"]}
        [:div {:class ["truncate" "text-base" "font-medium" "leading-none" "text-trading-text"]}
         symbol]
+       (when (and is-outcome (seq outcome-summary))
+         [:div {:class ["truncate" "text-xs" "leading-tight" "text-trading-text-secondary"]}
+          outcome-summary])
        [:div {:class ["flex" "items-center" "gap-1.5" "overflow-hidden"]}
         (when is-outcome
           (controls/chip "OUTCOME" ["bg-sky-500/20" "text-sky-200" "border-sky-500/30" "shrink-0"]))

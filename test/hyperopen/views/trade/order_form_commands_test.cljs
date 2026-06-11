@@ -25,6 +25,11 @@
    (commands/toggle-tif-dropdown)
    (commands/close-tif-dropdown)
    (commands/handle-tif-dropdown-keydown commands/event-key)
+   (commands/toggle-outcome-option-dropdown)
+   (commands/close-outcome-option-dropdown)
+   (commands/set-outcome-option-query)
+   (commands/set-outcome-option-sort :chance)
+   (commands/handle-outcome-option-dropdown-keydown commands/event-key)
    (commands/select-pro-order-type :scale)
    (commands/set-order-ui-leverage-draft 18)
    (commands/confirm-order-ui-leverage)
@@ -33,6 +38,7 @@
    (commands/update-order-form [:side] :buy)
    (commands/set-order-side :sell)
    (commands/set-order-outcome-side 1)
+   (commands/set-order-outcome-option 162)
    (commands/set-limit-price-input)
    (commands/set-order-size-display-input)
    (commands/set-order-size-input-mode :base)
@@ -86,6 +92,15 @@
   (is (= {:command-id :order-form/toggle-tpsl-unit-dropdown
           :args []}
          (commands/toggle-tpsl-unit-dropdown)))
+  (is (= {:command-id :order-form/toggle-outcome-option-dropdown
+          :args []}
+         (commands/toggle-outcome-option-dropdown)))
+  (is (= {:command-id :order-form/set-outcome-option-query
+          :args [commands/event-target-value]}
+         (commands/set-outcome-option-query)))
+  (is (= {:command-id :order-form/set-outcome-option-sort
+          :args [:chance]}
+         (commands/set-outcome-option-sort :chance)))
   (is (= {:command-id :order-form/update-order-form
           :args [[:twap :hours] commands/event-target-value]}
          (commands/set-twap-hours-input)))
@@ -94,7 +109,10 @@
          (commands/set-order-side :sell)))
   (is (= {:command-id :order-form/update-order-form
           :args [[:outcome-side] 1]}
-         (commands/set-order-outcome-side 1))))
+         (commands/set-order-outcome-side 1)))
+  (is (= {:command-id :order-form/select-outcome-option
+          :args [162]}
+         (commands/set-order-outcome-option 162))))
 
 (deftest intent-adapter-translates-to-runtime-action-vectors-test
   (is (= [[:actions/select-order-entry-mode :limit]]
@@ -117,7 +135,13 @@
           (commands/confirm-order-ui-leverage))))
   (is (= [[:actions/update-order-form [:reduce-only] [:event.target/checked]]]
          (intent-adapter/command->actions
-          (commands/toggle-reduce-only)))))
+          (commands/toggle-reduce-only))))
+  (is (= [[:actions/select-outcome-option 162]]
+         (intent-adapter/command->actions
+          (commands/set-order-outcome-option 162))))
+  (is (= [[:actions/set-outcome-option-sort :chance]]
+         (intent-adapter/command->actions
+          (commands/set-outcome-option-sort :chance)))))
 
 (deftest command-catalog-covers-all-command-builders-test
   (let [supported-ids (command-catalog/supported-command-ids)]

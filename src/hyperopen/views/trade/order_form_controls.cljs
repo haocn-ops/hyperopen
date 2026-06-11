@@ -1,7 +1,9 @@
 (ns hyperopen.views.trade.order-form-controls
   (:require [hyperopen.state.trading :as trading]
+            [hyperopen.utils.formatting :as fmt]
             [hyperopen.views.degen.order-form :as degen-order-form]
-            [hyperopen.views.trade.order-form-component-primitives :as primitives]))
+            [hyperopen.views.trade.order-form-component-primitives :as primitives]
+            [hyperopen.views.trade.outcome-option-sort :as outcome-option-sort]))
 
 (defn- price-context-accessory [{:keys [label mid-available?]} on-set-to-mid]
   [:button {:type "button"
@@ -49,7 +51,7 @@
                           "transition-colors"]
                          (if selected?
                            ["bg-ho-surface-raised" "text-ho-accent"]
-                           ["text-[#D2DAD7]" "hover:bg-ho-surface-raised" "hover:text-ho-text"]))
+                           ["text-ho-text" "hover:bg-ho-surface-raised" "hover:text-ho-text"]))
             :role "option"
             :aria-selected (boolean selected?)
             :on {:click (on-select-mode mode)}}
@@ -70,7 +72,7 @@
                           "transition-colors"]
                          (if selected?
                            ["bg-ho-surface-raised" "text-ho-accent"]
-                           ["text-[#D2DAD7]" "hover:bg-ho-surface-raised" "hover:text-ho-text"]))
+                           ["text-ho-text" "hover:bg-ho-surface-raised" "hover:text-ho-text"]))
             :role "option"
             :aria-selected (boolean selected?)
             :on {:click (on-select-mode mode)}}
@@ -164,7 +166,7 @@
                     "border-ho-surface-raised"
                     "bg-ho-surface"
                     "p-1"
-                    "spectate-[0_10px_24px_rgba(0,0,0,0.35)]"]
+                    "spectate-[0_10px_24px_rgb(var(--ho-bg-deep)/0.35)]"]
             :style {:z-index 1202
                     :--ui-dropdown-origin "top left"}
             :data-ui-state (if dropdown-open? "open" "closed")
@@ -248,7 +250,7 @@
                     "border-ho-surface-raised"
                     "bg-ho-surface"
                     "p-1"
-                    "spectate-[0_10px_24px_rgba(0,0,0,0.35)]"]
+                    "spectate-[0_10px_24px_rgb(var(--ho-bg-deep)/0.35)]"]
             :style {:z-index 1202}
             :data-ui-state (if dropdown-open? "open" "closed")
             :role "listbox"
@@ -347,7 +349,7 @@
                     "border-base-300"
                     "bg-base-100"
                     "p-3"
-                    "spectate-[0_18px_36px_rgba(0,0,0,0.35)]"
+                    "spectate-[0_18px_36px_rgb(var(--ho-bg-deep)/0.35)]"
                     "space-y-2.5"]
             :style {:z-index 1202}
             :data-ui-state (if popover-open? "open" "closed")
@@ -497,7 +499,203 @@
         (primitives/side-button (str action-prefix side-label)
                                 intent
                                 (= side-index selected-side-index)
-                                ((:on-select-outcome-side outcome-handlers) side-index)))])))
+                                ((:on-select-outcome-side outcome-handlers) side)))])))
+
+(defn- outcome-option-id
+  [option]
+  (let [value (:outcome-id option)
+        parsed (cond
+                 (number? value) value
+                 (string? value) (js/parseInt value 10)
+                 :else js/NaN)]
+    (when (and (number? parsed)
+               (not (js/isNaN parsed)))
+      (int parsed))))
+
+(defn- selected-outcome-option
+  [outcome-options selected-option-id]
+  (or (some (fn [option]
+              (when (= selected-option-id
+                       (outcome-option-id option))
+                option))
+            outcome-options)
+      (first outcome-options)))
+
+(defn- safe-option-number
+  [value]
+  (let [parsed (cond
+                 (number? value) value
+                 (string? value) (js/parseFloat value)
+                 :else js/NaN)]
+    (when (and (number? parsed)
+               (not (js/isNaN parsed)))
+      parsed)))
+
+(defn- option-chance-text
+  [option]
+  (if-let [mark (safe-option-number (:mark option))]
+    (fmt/format-percentage (* mark 100) 0)
+    "--"))
+
+(defn- option-price-text
+  [option]
+  (if-let [mark (safe-option-number (:mark option))]
+    (.toFixed mark 5)
+    "--"))
+
+(defn- option-currency-text
+  [value]
+  (if-let [number-value (safe-option-number value)]
+    (fmt/format-large-currency number-value)
+    "--"))
+
+(def ^:private outcome-option-grid-template "minmax(0, 1.35fr) 4.5rem 5rem 5.5rem 5.75rem")
+
+(defn- outcome-option-row-button
+  [option selected-option-id outcome-handlers]
+  (let [option-id (outcome-option-id option)
+        label (or (:label option) (str "Outcome " option-id))]
+    [:button {:type "button"
+              :role "option"
+              :aria-selected (= option-id selected-option-id)
+              :data-role "outcome-option-select-row"
+              :class (into ["grid"
+                            "w-full"
+                            "items-center"
+                            "gap-3"
+                            "rounded"
+                            "px-2"
+                            "py-1"
+                            "text-left"
+                            "text-xs"
+                            "transition-colors"
+                            "focus:outline-none"
+                            "focus:ring-0"
+                            "focus:ring-offset-0"]
+                           (if (= option-id selected-option-id)
+                             ["bg-ho-surface-raised" "text-ho-text"]
+                             ["text-ho-text" "hover:bg-base-200"]))
+              :style {:grid-template-columns outcome-option-grid-template}
+              :on {:click ((:on-select-outcome-option outcome-handlers) option-id)}}
+     [:span {:class ["truncate" "font-semibold"]} label]
+     [:span {:class ["num" "text-ho-text"]} (option-chance-text option)]
+     [:span {:class ["num" "text-ho-text"]} (option-price-text option)]
+     [:span {:class ["num" "text-ho-text"]} (option-currency-text (:volume24h option))]
+     [:span {:class ["num" "text-ho-text"]} (option-currency-text (:openInterest option))]]))
+
+(defn- outcome-option-dropdown
+  [outcome-options selected-option-id outcome-handlers {:keys [open?
+                                                               query menu-width-classes menu-style
+                                                               sort-by
+                                                               sort-direction]}]
+  (let [selected-option (selected-outcome-option outcome-options selected-option-id)
+        selected-id (outcome-option-id selected-option)
+        selected-label (or (:label selected-option) (str "Outcome " selected-id))
+        sorted-options (outcome-option-sort/filtered-sorted-options outcome-options query sort-by sort-direction)
+        active-sort-column (outcome-option-sort/normalize-column sort-by)
+        active-sort-direction (outcome-option-sort/normalize-direction sort-direction)
+        trigger [:button {:type "button"
+                          :aria-haspopup "listbox"
+                          :aria-expanded (boolean open?)
+                          :aria-label "Outcome option"
+                          :data-role "outcome-option-select-trigger"
+                          :class ["flex"
+                                  "h-[33px]"
+                                  "w-full"
+                                  "items-center"
+                                  "justify-between"
+                                  "gap-2"
+                                  "rounded-lg"
+                                  "border"
+                                  "border-base-300"
+                                  "bg-base-200"
+                                  "px-3"
+                                  "text-sm"
+                                  "font-medium"
+                                  "text-ho-text"
+                                  "transition-colors"
+                                  "hover:border-ho-text-dim"
+                                  "focus:outline-none"
+                                  "focus:ring-1"
+                                  "focus:ring-ho-text-muted/40"
+                                  "focus:ring-offset-0"]
+                          :on {:click (:on-toggle-option-dropdown outcome-handlers)
+                               :keydown (:on-option-dropdown-keydown outcome-handlers)}}
+                 [:span {:class ["truncate"]} selected-label]
+                 [:span {:class ["text-ho-text-secondary"]} "⌄"]]
+        menu [:div {:class (into ["absolute"
+                                   "left-0"
+                                   "top-[calc(100%+0.375rem)]"
+                                   "z-[280]"
+                                   "isolate"
+                                   "rounded-lg"
+                                   "border"
+                                   "border-base-300"
+                                   "bg-ho-bg-deep"
+                                   "p-2"
+                                   "shadow-[0_18px_54px_rgb(var(--ho-bg-deep)/0.62)]"]
+                                  (or menu-width-classes ["right-0"]))
+                    :data-role "outcome-option-select-menu"
+                    :style menu-style :on {:keydown (:on-option-dropdown-keydown outcome-handlers)}}
+              [:input {:type "search"
+                       :value (or query "")
+                       :placeholder "Search"
+                       :aria-label "Search outcome options"
+                       :class (into ["h-8"
+                                     "w-full"
+                                     "rounded-md"
+                                     "border"
+                                     "border-base-300"
+                                     "bg-base-200"
+                                     "px-2"
+                                     "text-sm"
+                                     "text-ho-text"
+                                     "placeholder:text-ho-text-secondary"]
+                                    primitives/neutral-input-focus-classes)
+                       :on {:input (:on-change-option-query outcome-handlers)}}]
+              [:div {:class ["mt-2"
+                             "grid"
+                             "gap-3"
+                             "px-2"
+                             "text-xs"
+                             "font-medium"
+                             "text-ho-text-secondary"]
+                     :style {:grid-template-columns outcome-option-grid-template} :data-role "outcome-option-select-header-row"}
+               (outcome-option-sort/header "Live Outcomes" :label active-sort-column active-sort-direction outcome-handlers)
+               (outcome-option-sort/header "% Chance" :chance active-sort-column active-sort-direction outcome-handlers)
+               (outcome-option-sort/header "Price" :price active-sort-column active-sort-direction outcome-handlers)
+               (outcome-option-sort/header "Volume" :volume active-sort-column active-sort-direction outcome-handlers)
+               (outcome-option-sort/header "Open Int" :open-interest active-sort-column active-sort-direction outcome-handlers)]
+              [:div {:class ["mt-1" "max-h-64" "overflow-y-auto"]
+                     :role "listbox"
+                     :aria-label "Outcome options"}
+               (if (seq sorted-options)
+                 (for [option sorted-options
+                       :let [option-id (outcome-option-id option)]]
+                   ^{:key (str "outcome-option-menu-" option-id)}
+                   (outcome-option-row-button option selected-option-id outcome-handlers))
+                 [:div {:class ["px-2" "py-3" "text-sm" "text-ho-text-secondary"]}
+                  "No matching outcomes"])]]
+        wrapper [:div {:class ["relative"]} trigger]]
+    (cond-> wrapper
+      open? (conj menu))))
+
+(defn outcome-option-row
+  ([outcome-options selected-option-id outcome-handlers]
+   (outcome-option-row outcome-options selected-option-id outcome-handlers nil))
+  ([outcome-options selected-option-id outcome-handlers option-ui]
+  (when (> (count outcome-options) 1)
+    (if (> (count outcome-options) 2)
+      (outcome-option-dropdown outcome-options selected-option-id outcome-handlers option-ui)
+      [:div {:class ["flex" "min-h-[33px]" "items-center" "gap-1.5" "rounded-lg" "bg-base-200" "p-0.5" "sm:gap-2"]}
+       (for [option outcome-options
+             :let [option-id (outcome-option-id option)
+                   label (or (:label option) (str "Outcome " option-id))]]
+         ^{:key (str "outcome-option-" option-id)}
+         (primitives/side-button label
+                                 :option
+                                 (= option-id selected-option-id)
+                                 ((:on-select-outcome-option outcome-handlers) option-id)))]))))
 
 (defn balances-row [display]
   [:div {:class ["space-y-1.5"]}

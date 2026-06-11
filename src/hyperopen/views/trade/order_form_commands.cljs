@@ -73,6 +73,21 @@
 (defn handle-tif-dropdown-keydown [key]
   (command :order-form/handle-tif-dropdown-keydown key))
 
+(defn toggle-outcome-option-dropdown []
+  (command :order-form/toggle-outcome-option-dropdown))
+
+(defn close-outcome-option-dropdown []
+  (command :order-form/close-outcome-option-dropdown))
+
+(defn set-outcome-option-query []
+  (command :order-form/set-outcome-option-query event-target-value))
+
+(defn set-outcome-option-sort [column]
+  (command :order-form/set-outcome-option-sort column))
+
+(defn handle-outcome-option-dropdown-keydown [key]
+  (command :order-form/handle-outcome-option-dropdown-keydown key))
+
 (defn select-pro-order-type [order-type]
   (command :order-form/select-pro-order-type order-type))
 
@@ -99,6 +114,9 @@
 
 (defn set-order-outcome-side [side-index]
   (update-order-field [:outcome-side] side-index))
+
+(defn set-order-outcome-option [outcome-id]
+  (command :order-form/select-outcome-option outcome-id))
 
 (defn set-limit-price-input []
   (update-order-field [:price] event-target-value))

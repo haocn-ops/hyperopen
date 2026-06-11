@@ -28,6 +28,25 @@
             [:effects/sync-active-asset-funding-predictability "#0"]]
            (websocket-adapters/subscribe-to-asset state "#0")))))
 
+(deftest subscribe-to-asset-emits-question-option-book-and-trade-effects-test
+  (let [market {:key "question:30"
+                :coin "#1610"
+                :market-type :outcome
+                :outcome-kind :question
+                :outcome-subscription-coins ["#1610" "#1611" "#1620" "#1621"]}
+        state {:asset-selector {:market-by-key {"question:30" market}}}]
+    (is (= [[:effects/subscribe-active-asset "#1620"]
+            [:effects/subscribe-orderbook "#1610"]
+            [:effects/subscribe-trades "#1610"]
+            [:effects/subscribe-orderbook "#1611"]
+            [:effects/subscribe-trades "#1611"]
+            [:effects/subscribe-orderbook "#1620"]
+            [:effects/subscribe-trades "#1620"]
+            [:effects/subscribe-orderbook "#1621"]
+            [:effects/subscribe-trades "#1621"]
+            [:effects/sync-active-asset-funding-predictability "#1620"]]
+           (websocket-adapters/subscribe-to-asset state "#1620")))))
+
 (deftest subscribe-to-asset-uses-restored-active-outcome-market-when-selector-cache-is-empty-test
   (let [market {:key "outcome:1"
                 :coin "outcome:1"

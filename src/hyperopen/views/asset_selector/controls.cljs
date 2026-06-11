@@ -1,5 +1,6 @@
 (ns hyperopen.views.asset-selector.controls
   (:require [clojure.string :as str]
+            [hyperopen.asset-selector.settings :as settings]
             [hyperopen.platform :as platform]
             [hyperopen.system :as app-system]
             [nexus.registry :as nxr]))
@@ -143,22 +144,29 @@
     :on {:click [[:actions/set-asset-selector-tab tab-key]]}}
    label])
 
+(defn- outcome-tab?
+  [active-tab]
+  (contains? (set (settings/outcome-tabs :testnet)) active-tab))
+
 (defn tab-row [active-tab]
   [:div.flex.items-center.gap-2.mb-4
    (tab-button "All" (= active-tab :all) :all)
    (tab-button "Perps" (= active-tab :perps) :perps)
    (tab-button "Spot" (= active-tab :spot) :spot)
-   (tab-button "Outcome" (contains? #{:outcome :outcome-15m :outcome-1d} active-tab) :outcome)
+   (tab-button "Outcome" (outcome-tab? active-tab) :outcome)
    (tab-button "Crypto" (= active-tab :crypto) :crypto)
    (tab-button "Tradfi" (= active-tab :tradfi) :tradfi)
    (tab-button "HIP-3" (= active-tab :hip3) :hip3)])
 
 (defn outcome-subtab-row [active-tab]
-  (when (contains? #{:outcome :outcome-15m :outcome-1d} active-tab)
+  (when (outcome-tab? active-tab)
     [:div.flex.items-center.gap-4.mb-3
-     (tab-button "All" (= active-tab :outcome) :outcome)
-     (tab-button "Crypto (15m)" (= active-tab :outcome-15m) :outcome-15m)
-     (tab-button "Crypto (1d)" (= active-tab :outcome-1d) :outcome-1d)]))
+     (for [[label tab-key] [["All" :outcome]
+                            ["Crypto (1d)" :outcome-1d]
+                            ["Economics" :outcome-economics]
+                            ["Sports" :outcome-sports]]]
+       ^{:key (name tab-key)}
+       (tab-button label (= active-tab tab-key) tab-key))]))
 
 (defn sort-button [label active? direction sort-field]
   [:button.flex.items-center.space-x-1.text-xs.transition-colors
@@ -187,7 +195,7 @@
   ([sort-by sort-direction]
    (sort-controls sort-by sort-direction nil))
   ([sort-by sort-direction active-tab]
-   (let [outcome? (contains? #{:outcome :outcome-15m :outcome-1d} active-tab)]
+   (let [outcome? (outcome-tab? active-tab)]
      [:div {:class (desktop-sort-grid-classes outcome?)}
       [:div {:class (if outcome?
                       ["min-w-0"]
@@ -251,7 +259,9 @@
    [:div {:class ["flex" "items-center" "gap-5" "whitespace-nowrap"]}
     (for [[label tab-key] selector-tabs]
       ^{:key (name tab-key)}
-      (mobile-tab-button label (= active-tab tab-key) tab-key))]])
+      (mobile-tab-button label (if (= tab-key :outcome)
+                                 (outcome-tab? active-tab)
+                                 (= active-tab tab-key)) tab-key))]])
 
 (defn sort-chevron [direction]
   [:svg {:class ["h-3" "w-3"]
@@ -287,7 +297,7 @@
   ([sort-by sort-direction]
    (mobile-sort-header sort-by sort-direction nil))
   ([sort-by sort-direction active-tab]
-   (let [outcome? (contains? #{:outcome :outcome-15m :outcome-1d} active-tab)]
+   (let [outcome? (outcome-tab? active-tab)]
      [:div {:class ["grid"
                     "grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)_minmax(0,0.95fr)]"
                     "gap-3"

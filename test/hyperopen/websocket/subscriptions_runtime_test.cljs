@@ -80,6 +80,37 @@
     (is (= "#0" (:active-asset @store)))
     (is (= :outcome (get-in @store [:active-market :market-type])))))
 
+(deftest subscribe-active-asset-subscribes-question-option-contexts-test
+  (let [subscribed-coins (atom [])
+        market {:key "question:30"
+                :coin "#1610"
+                :symbol "BTC price range on Jun 6 at 2:00 AM?"
+                :market-type :outcome
+                :outcome-kind :question
+                :outcome-subscription-coins ["#1610" "#1611" "#1620" "#1621"]}
+        store (atom {:asset-selector {:market-by-key {"question:30" market}}
+                     :websocket {:migration-flags {:candle-subscriptions? true}}
+                     :chart-options {:selected-timeframe :5m}
+                     :active-assets {:contexts {}
+                                     :loading false}
+                     :active-market nil})]
+    (subscriptions-runtime/subscribe-active-asset!
+     {:store store
+      :coin "#1620"
+      :log-fn (fn [& _] nil)
+      :resolve-market-by-coin-fn (fn [_market-by-key coin]
+                                   (when (contains? #{"#1610" "#1611" "#1620" "#1621" "question:30"} coin)
+                                     market))
+      :persist-active-asset! (fn [_] nil)
+      :persist-active-market-display! (fn [_] nil)
+      :subscribe-active-asset-ctx! (fn [coin]
+                                     (swap! subscribed-coins conj coin))
+      :sync-candle-subscription! (fn [& _] nil)
+      :fetch-candle-snapshot! (fn [& _] nil)})
+    (is (= ["#1610" "#1611" "#1620" "#1621"] @subscribed-coins))
+    (is (= "#1620" (:active-asset @store)))
+    (is (= :question (get-in @store [:active-market :outcome-kind])))))
+
 (deftest unsubscribe-active-asset-unsubscribes-outcome-side-contexts-test
   (let [unsubscribed-coins (atom [])
         market {:key "outcome:0"

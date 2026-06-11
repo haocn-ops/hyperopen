@@ -2,7 +2,8 @@
   (:require ["lucide/dist/esm/icons/banknote.js" :default lucide-banknote-node]
             ["lucide/dist/esm/icons/crosshair.js" :default lucide-crosshair-node]
             ["lucide/dist/esm/icons/info.js" :default lucide-info-node]
-            ["lucide/dist/esm/icons/shield.js" :default lucide-shield-node]))
+            ["lucide/dist/esm/icons/shield.js" :default lucide-shield-node]
+            [clojure.string :as str]))
 
 (defn- lucide-node->hiccup
   [node]
@@ -38,7 +39,13 @@
     (icon icon-node icon-role)]
    [:div {:class ["text-sm" "font-medium" "leading-5" "text-slate-300"]}
     label]
-   body]))
+   [:div {:class ["min-w-0"]}
+    body]]))
+
+(defn- same-copy?
+  [left right]
+  (= (some-> left str str/trim)
+     (some-> right str str/trim)))
 
 (defn outcome-tooltip-panel
   [{:keys [title
@@ -49,14 +56,14 @@
            no-payout-label
            footer-label]}]
   (when settlement-label
-    [:div {:class ["absolute"
+    (let [summary-copy (or summary
+                           "This market resolves to YES or NO based on the following settlement condition at the specified time.")
+          show-settlement-row? (not (same-copy? summary-copy settlement-label))]
+      [:div {:class ["absolute"
                    "top-full"
                    "z-[240]"
                    "mt-3"
-                   "left-3"
-                   "right-0"
-                   "md:left-4"
-                   "xl:left-6"
+                   "left-0"
                    "rounded-lg"
                    "border"
                    "border-[#0f766e]/65"
@@ -72,9 +79,11 @@
                    "group-hover/outcome-name:pointer-events-auto"
                    "group-focus-within/outcome-name:opacity-100"
                    "group-focus-within/outcome-name:pointer-events-auto"]
+           :style {:width "min(44rem, calc(100vw - 2rem))"
+                   :max-width "calc(100vw - 2rem)"}
            :role "tooltip"
            :data-role "outcome-market-tooltip"}
-     [:div {:class ["absolute"
+       [:div {:class ["absolute"
                    "-top-[10px]"
                    "left-[48%]"
                    "h-5"
@@ -85,44 +94,59 @@
                     "border-[#0f766e]/65"
                     "bg-[#07131a]"]
             :aria-hidden true}]
-     [:div {:class ["relative" "space-y-0"]}
-      [:div {:class ["flex" "items-start" "gap-4" "px-6" "pb-5" "pt-7"]}
-       [:div {:class ["flex" "h-8" "w-8" "shrink-0" "items-center" "justify-center" "rounded-full" "text-[#2dd4bf]"]}
-        (icon lucide-info-node "outcome-tooltip-info-icon")]
-       [:div {:class ["min-w-0" "space-y-2"]}
-        [:div {:class ["text-lg" "font-semibold" "leading-6" "text-slate-100"]}
-         (or title "Outcome Details")]
-        [:div {:class ["max-w-[40rem]" "text-sm" "leading-6" "text-slate-400"]}
-         (or summary
-             "This market resolves to YES or NO based on the following settlement condition at the specified time.")]]]
-      [:div {:class ["border-t" "border-slate-700/45"]}
-       (detail-row
-        lucide-crosshair-node
-        "outcome-tooltip-settlement-icon"
-        "Settlement Condition"
-        [:div {:class ["space-y-1" "text-sm" "leading-5"]}
-         [:div {:class ["whitespace-nowrap" "font-semibold" "text-slate-100"]}
-          settlement-label]
-         [:div {:class ["text-slate-400"]}
-          settlement-time-label]])]
-      [:div {:class ["border-t" "border-slate-700/45"]}
-       (detail-row
-        lucide-banknote-node
-        "outcome-tooltip-payout-icon"
-        "Payout Rule"
-        [:div {:class ["space-y-1" "text-sm" "leading-5"]}
-         [:div {:class ["flex" "items-center" "gap-3"]}
-          [:span {:class ["font-semibold" "text-[#2dd4bf]"]} "YES"]
-          [:span {:class ["text-slate-500"]} "->"]
-          [:span {:class ["font-semibold" "text-[#2dd4bf]"]} yes-payout-label]
-          [:span {:class ["text-slate-400"]} "each"]]
-         [:div {:class ["flex" "items-center" "gap-3"]}
-         [:span {:class ["font-semibold" "text-[#fb7185]"]} "NO"]
-         [:span {:class ["text-slate-500"]} "->"]
-         [:span {:class ["font-semibold" "text-[#fb7185]"]} no-payout-label]
-          [:span {:class ["text-slate-400"]} "each"]]]
-        {:center? true})]
-      [:div {:class ["flex"
+       [:div {:class ["relative"
+                      "space-y-0"
+                      "overflow-y-auto"
+                      "scrollbar-thin"
+                      "scrollbar-thumb-slate-600/80"
+                      "scrollbar-track-transparent"]
+              :style {:max-height "min(40rem, calc(100vh - 5rem))"}
+              :data-role "outcome-tooltip-scroll-container"}
+        [:div {:class ["flex" "items-start" "gap-4" "px-6" "pb-5" "pt-7"]}
+         [:div {:class ["flex" "h-8" "w-8" "shrink-0" "items-center" "justify-center" "rounded-full" "text-[#2dd4bf]"]}
+          (icon lucide-info-node "outcome-tooltip-info-icon")]
+         [:div {:class ["min-w-0" "space-y-2"]}
+          [:div {:class ["text-lg" "font-semibold" "leading-6" "text-slate-100"]}
+           (or title "Outcome Details")]
+          [:div {:class ["pr-2"
+                         "text-sm"
+                         "leading-6"
+                         "text-slate-400"]
+                 :data-role "outcome-tooltip-summary-scroll"}
+           summary-copy]]]
+        (when show-settlement-row?
+          [:div {:class ["border-t" "border-slate-700/45"]}
+           (detail-row
+            lucide-crosshair-node
+            "outcome-tooltip-settlement-icon"
+            "Settlement Condition"
+            [:div {:class ["space-y-1" "text-sm" "leading-5"]}
+             [:div {:class ["whitespace-normal"
+                            "break-words"
+                            "font-semibold"
+                            "text-slate-100"]
+                    :data-role "outcome-tooltip-settlement-label"}
+              settlement-label]
+             [:div {:class ["text-slate-400"]}
+              settlement-time-label]])])
+        [:div {:class ["border-t" "border-slate-700/45"]}
+         (detail-row
+          lucide-banknote-node
+          "outcome-tooltip-payout-icon"
+          "Payout Rule"
+          [:div {:class ["space-y-1" "text-sm" "leading-5"]}
+           [:div {:class ["flex" "items-center" "gap-3"]}
+            [:span {:class ["font-semibold" "text-[#2dd4bf]"]} "YES"]
+            [:span {:class ["text-slate-500"]} "->"]
+            [:span {:class ["font-semibold" "text-[#2dd4bf]"]} yes-payout-label]
+            [:span {:class ["text-slate-400"]} "each"]]
+           [:div {:class ["flex" "items-center" "gap-3"]}
+            [:span {:class ["font-semibold" "text-[#fb7185]"]} "NO"]
+            [:span {:class ["text-slate-500"]} "->"]
+            [:span {:class ["font-semibold" "text-[#fb7185]"]} no-payout-label]
+            [:span {:class ["text-slate-400"]} "each"]]]
+          {:center? true})]
+        [:div {:class ["flex"
                      "items-center"
                      "gap-3"
                      "border-t"
@@ -131,5 +155,5 @@
                      "py-4"
                      "text-sm"
                      "text-slate-400"]}
-       (icon lucide-shield-node "outcome-tooltip-shield-icon")
-       [:span footer-label]]]]))
+         (icon lucide-shield-node "outcome-tooltip-shield-icon")
+         [:span footer-label]]]])))

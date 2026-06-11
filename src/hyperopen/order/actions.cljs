@@ -4,6 +4,7 @@
             [hyperopen.order.cancel-visible-confirmation :as cancel-visible-confirmation]
             [hyperopen.order.submit-confirmation :as submit-confirmation]
             [hyperopen.order.effects :as order-effects]
+            [hyperopen.order.outcome-side-selection :as outcome-side-selection]
             [hyperopen.state.trading :as trading]
             [hyperopen.trading-settings :as trading-settings]
             [hyperopen.trading.order-form-transitions :as transitions]))
@@ -162,6 +163,36 @@
                              (boolean (:tif-dropdown-open? ui-state))]]]])
     []))
 
+(defn toggle-outcome-option-dropdown [state]
+  (let [ui-state (:order-form-ui (transitions/toggle-outcome-option-dropdown state))]
+    [[:effects/save-many [[[:order-form-ui :outcome-option-dropdown-open?]
+                           (boolean (:outcome-option-dropdown-open? ui-state))]
+                          [[:order-form-ui :outcome-option-query]
+                           (:outcome-option-query ui-state)]]]]))
+
+(defn close-outcome-option-dropdown [state]
+  (let [ui-state (:order-form-ui (transitions/close-outcome-option-dropdown state))]
+    [[:effects/save-many [[[:order-form-ui :outcome-option-dropdown-open?]
+                           (boolean (:outcome-option-dropdown-open? ui-state))]
+                          [[:order-form-ui :outcome-option-query]
+                           (:outcome-option-query ui-state)]]]]))
+
+(defn set-outcome-option-query [state query]
+  (let [ui-state (:order-form-ui (transitions/set-outcome-option-query state query))]
+    [[:effects/save-many [[[:order-form-ui :outcome-option-dropdown-open?]
+                           (boolean (:outcome-option-dropdown-open? ui-state))]
+                          [[:order-form-ui :outcome-option-query]
+                           (:outcome-option-query ui-state)]]]]))
+
+(defn handle-outcome-option-dropdown-keydown [state key]
+  (if-let [transition (transitions/handle-outcome-option-dropdown-keydown state key)]
+    (let [ui-state (:order-form-ui transition)]
+      [[:effects/save-many [[[:order-form-ui :outcome-option-dropdown-open?]
+                             (boolean (:outcome-option-dropdown-open? ui-state))]
+                            [[:order-form-ui :outcome-option-query]
+                             (:outcome-option-query ui-state)]]]])
+    []))
+
 (defn set-order-ui-leverage [state leverage]
   (transition-save-many state (transitions/set-order-ui-leverage state leverage)))
 
@@ -176,7 +207,6 @@
 
 (defn set-order-size-input-mode [state mode]
   (transition-save-many state (transitions/set-order-size-input-mode state mode)))
-
 (defn focus-order-price-input [state]
   (transition-save-many state (transitions/focus-order-price-input state)))
 
@@ -192,8 +222,8 @@
     []))
 
 (defn update-order-form [state path value]
-  (transition-save-many state (transitions/update-order-form state path value)))
-
+  (let [transition (transitions/update-order-form state path value)]
+    (or (outcome-side-selection/maybe-switch-side-market state path value transition) (transition-save-many state transition))))
 (defn- current-order-feedback-toasts
   [state]
   (let [toasts (->> (or (get-in state [:ui :toasts]) [])

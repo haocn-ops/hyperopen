@@ -16,8 +16,16 @@ import {
 import {
   CONTROL_CACHE_CONTROL,
   IMMUTABLE_CACHE_CONTROL,
+  THEME_PRELOAD_INLINE_SOURCE,
+  THEME_PRELOAD_SCRIPT_HASH,
   buildContentSecurityPolicy,
 } from "./security_headers.mjs";
+
+function extractInlineScriptBodies(documentHtml) {
+  return [...documentHtml.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi)].map(
+    (match) => match[1]
+  );
+}
 import {
   collectReleaseJavaScriptFiles,
   fingerprintFileName,
@@ -106,6 +114,7 @@ function buildSampleIndexHtml() {
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="shortcut icon" href="/favicon.ico" />
     <link rel="stylesheet" href="/css/main.css" />
+    <script src="/theme-preload.js"></script>
   </head>
   <body>
     <div id="app" class="h-full">${RELEASE_APP_SHELL_PLACEHOLDER}</div>
@@ -183,6 +192,15 @@ async function writeReleaseFixture(
     ]),
     missing
   );
+  const lazyRouteModuleNames = [
+    "account_surfaces",
+    "portfolio_route",
+    "leaderboard_route",
+    "vaults_route",
+    "staking_route",
+    "funding_comparison_route",
+    "api_wallets_route",
+  ];
   await writeFixtureFile(
     sourceRoot,
     path.join("js", "module-loader.json"),
@@ -190,6 +208,12 @@ async function writeReleaseFixture(
       "module-uris": {
         main: [],
         trade_chart: ["/js/trade_chart.CHUNK.js"],
+        ...Object.fromEntries(
+          lazyRouteModuleNames.map((moduleName) => [
+            moduleName,
+            [`/js/${moduleName}.CHUNK.js`],
+          ])
+        ),
       },
     }),
     missing
@@ -206,6 +230,14 @@ async function writeReleaseFixture(
     "console.log('chunk');\n",
     missing
   );
+  for (const moduleName of lazyRouteModuleNames) {
+    await writeFixtureFile(
+      sourceRoot,
+      path.join("js", `${moduleName}.CHUNK.js`),
+      "console.log('chunk');\n",
+      missing
+    );
+  }
   await writeFixtureFile(
     sourceRoot,
     path.join("js", "portfolio_worker.js"),
@@ -288,7 +320,8 @@ test("rewriteAppIndexHtml replaces the default stylesheet href and injects route
   assert.match(rewritten, /<script defer src="\/js\/main\.HASH\.js"><\/script>/);
   assert.doesNotMatch(rewritten, /manifestUrl/);
   assert.doesNotMatch(rewritten, /hyperopen-site-metadata/);
-  assert.doesNotMatch(rewritten, /<script(?![^>]*\bsrc=)[^>]*>/i);
+  assert.deepEqual(extractInlineScriptBodies(rewritten), [THEME_PRELOAD_INLINE_SOURCE]);
+  assert.doesNotMatch(rewritten, /<script\b[^>]*src=["']\/theme-preload\.js["']/i);
   assert.doesNotMatch(rewritten, new RegExp(RELEASE_SEO_PLACEHOLDER));
   assert.doesNotMatch(rewritten, new RegExp(RELEASE_APP_SHELL_PLACEHOLDER));
   assert.match(rewritten, /data-hyperopen-route-shell="trade"/);
@@ -621,7 +654,31 @@ test("generateReleaseArtifacts assembles deterministic route-specific release pa
   assert.match(generatedTrade, /<script defer src="\/js\/main\.HASH\.js"><\/script>/);
   assert.doesNotMatch(generatedTrade, /manifestUrl/);
   assert.doesNotMatch(generatedTrade, /hyperopen-site-metadata/);
-  assert.doesNotMatch(generatedTrade, /<script(?![^>]*\bsrc=)[^>]*>/i);
+  assert.deepEqual(extractInlineScriptBodies(generatedTrade), [THEME_PRELOAD_INLINE_SOURCE]);
+  assert.match(
+    generatedTrade,
+    /<link rel="preconnect" href="https:\/\/api\.hyperliquid\.xyz" crossorigin data-hyperopen-perf="preconnect" \/>/
+  );
+  assert.match(
+    generatedTrade,
+    /<link rel="preload" as="script" href="\/js\/trade_chart\.CHUNK\.js" data-hyperopen-perf="module-preload" \/>/
+  );
+  assert.match(
+    generatedTrade,
+    /<link rel="preload" as="script" href="\/js\/account_surfaces\.CHUNK\.js" data-hyperopen-perf="module-preload" \/>/
+  );
+  assert.match(
+    generatedTrade,
+    /<link rel="preload" as="font" type="font\/woff2" href="\/fonts\/InterVariable\.woff2" crossorigin data-hyperopen-perf="font-preload" \/>/
+  );
+  assert.match(
+    generatedPortfolio,
+    /<link rel="preload" as="script" href="\/js\/portfolio_route\.CHUNK\.js" data-hyperopen-perf="module-preload" \/>/
+  );
+  assert.doesNotMatch(
+    generatedPortfolio,
+    /<link rel="preload" as="script" href="\/js\/trade_chart\.CHUNK\.js"/
+  );
 
   assert.equal(
     extractTitle(generatedTrade),
@@ -725,16 +782,30 @@ test("generateReleaseArtifacts assembles deterministic route-specific release pa
   assert.equal(siteMetadata.routes.find((route) => route.id === "api")?.path, "/api");
   assert.deepEqual(result.immutableAssetPaths, [
     `/css/${result.cssFileName}`,
+    "/js/account_surfaces.CHUNK.js",
+    "/js/api_wallets_route.CHUNK.js",
+    "/js/funding_comparison_route.CHUNK.js",
+    "/js/leaderboard_route.CHUNK.js",
     "/js/main.HASH.js",
+    "/js/portfolio_route.CHUNK.js",
+    "/js/staking_route.CHUNK.js",
     "/js/trade_chart.CHUNK.js",
+    "/js/vaults_route.CHUNK.js",
   ]);
   assert.deepEqual(result.releaseJavaScriptFiles, [
+    "account_surfaces.CHUNK.js",
+    "api_wallets_route.CHUNK.js",
+    "funding_comparison_route.CHUNK.js",
+    "leaderboard_route.CHUNK.js",
     "main.HASH.js",
     "module-loader.json",
     "portfolio_optimizer_worker.js",
+    "portfolio_route.CHUNK.js",
     "portfolio_worker.js",
+    "staking_route.CHUNK.js",
     "trade_chart.CHUNK.js",
     "vault_detail_worker.js",
+    "vaults_route.CHUNK.js",
   ]);
   assert.equal(result.releaseMetadataScriptHref, `/${RELEASE_ROUTE_METADATA_SCRIPT_PATH}`);
   assert.equal(result.securityHeadersPath, path.join(outputRoot, "_headers"));
@@ -925,7 +996,8 @@ test("rewriteAppIndexHtml works against the real tracked app entry", async () =>
   assert.match(rewritten, /rel="canonical"/);
   assert.match(rewritten, /data-hyperopen-route-shell="trade"/);
   assert.doesNotMatch(rewritten, /manifestUrl/);
-  assert.doesNotMatch(rewritten, /<script(?![^>]*\bsrc=)[^>]*>/i);
+  assert.deepEqual(extractInlineScriptBodies(rewritten), [THEME_PRELOAD_INLINE_SOURCE]);
+  assert.doesNotMatch(rewritten, /<script\b[^>]*src=["']\/theme-preload\.js["']/i);
   assert.doesNotMatch(rewritten, new RegExp(RELEASE_SEO_PLACEHOLDER));
   assert.doesNotMatch(rewritten, new RegExp(RELEASE_APP_SHELL_PLACEHOLDER));
 });

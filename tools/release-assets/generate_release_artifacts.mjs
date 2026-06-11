@@ -14,6 +14,7 @@ import {
   buildRouteLoadingShellMarkup,
   buildReleaseMetadataSyncScript,
   buildReleaseSeoHeadMarkup,
+  buildRoutePerformanceHintsMarkup,
   buildRobotsTxt,
   buildSiteMetadata,
   buildSitemapXml,
@@ -23,6 +24,7 @@ import {
 } from "./site_metadata.mjs";
 import {
   SECURITY_HEADERS_FILE_PATH,
+  THEME_PRELOAD_INLINE_SOURCE,
   buildReleaseHeadersFile,
 } from "./security_headers.mjs";
 
@@ -66,6 +68,8 @@ export function rewriteAppIndexHtml(indexHtml, {
 }) {
   const stylesheetPattern =
     /<link\b[^>]*href=["']\/css\/main\.css["'][^>]*>/;
+  const themePreloadScriptPattern =
+    /<script\b[^>]*src=["']\/theme-preload\.js["'][^>]*>\s*<\/script>/;
   const descriptionPattern =
     /<meta\b(?=[^>]*\bname=["']description["'])[^>]*>/i;
   const titlePattern = /<title>[\s\S]*?<\/title>/i;
@@ -78,6 +82,10 @@ export function rewriteAppIndexHtml(indexHtml, {
 
   if (!bootstrapScriptPattern.test(indexHtml)) {
     throw new Error("Expected app index.html to contain the dynamic main script bootstrap.");
+  }
+
+  if (!themePreloadScriptPattern.test(indexHtml)) {
+    throw new Error("Expected app index.html to contain the theme preload script tag.");
   }
 
   if (!descriptionPattern.test(indexHtml)) {
@@ -122,6 +130,10 @@ export function rewriteAppIndexHtml(indexHtml, {
     )
     .replace(RELEASE_SEO_PLACEHOLDER, releaseSeoHeadMarkup)
     .replace(RELEASE_APP_SHELL_PLACEHOLDER, releaseAppShellMarkup)
+    .replace(
+      themePreloadScriptPattern,
+      `<script>${THEME_PRELOAD_INLINE_SOURCE}</script>`
+    )
     .replace(
       bootstrapScriptPattern,
       [
@@ -457,7 +469,10 @@ export async function generateReleaseArtifacts({
       mainScriptHref: `/js/${mainModule["output-name"]}`,
       title: route.title,
       description: route.description,
-      releaseSeoHeadMarkup: buildReleaseSeoHeadMarkup(siteMetadata, route),
+      releaseSeoHeadMarkup: [
+        buildReleaseSeoHeadMarkup(siteMetadata, route),
+        buildRoutePerformanceHintsMarkup(route, moduleLoader),
+      ].join("\n"),
       releaseAppShellMarkup: buildRouteLoadingShellMarkup(route),
     });
     const routeOutputRelativePath = routePathToOutputHtmlPath(route.path);

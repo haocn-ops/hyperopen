@@ -83,3 +83,19 @@ test("optimizer CSS partials style semantic classes instead of data-role test ho
     );
   }
 });
+
+test("optimizer target exposure change cells override table body text color", () => {
+  const resultsCss = fs.readFileSync(
+    path.join(optimizerPartialDir, "results.css"),
+    "utf8",
+  );
+
+  assert.match(
+    resultsCss,
+    /\.optimizer-target-exposure-change-cell\.text-trading-green/u,
+  );
+  assert.match(
+    resultsCss,
+    /\.optimizer-target-exposure-change-cell\.text-trading-red/u,
+  );
+});

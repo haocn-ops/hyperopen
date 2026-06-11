@@ -357,6 +357,20 @@
     padding: 6px 10px;
   }
 
+  .portfolio-optimizer
+    .optimizer-target-exposure-table
+    table
+    td.optimizer-target-exposure-change-cell.text-trading-green {
+    color: var(--optimizer-long);
+  }
+
+  .portfolio-optimizer
+    .optimizer-target-exposure-table
+    table
+    td.optimizer-target-exposure-change-cell.text-trading-red {
+    color: var(--optimizer-short);
+  }
+
   .portfolio-optimizer .optimizer-target-exposure-delta-bar-cell {
     min-width: 76px;
     text-align: right;

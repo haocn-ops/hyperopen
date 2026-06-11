@@ -7,7 +7,9 @@ import {
   extractInspectedAddresses,
   summarizeNightlyCoverage
 } from "../src/nightly_ui_coverage.mjs";
-import { getDefaultScenarioDir } from "../src/scenario_loader.mjs";
+import { getDefaultScenarioDir, loadScenarios } from "../src/scenario_loader.mjs";
+
+const NIGHTLY_RICH_POSITION_ADDRESS = "0x4096d3377ae5ade578daae8188804740c8b1da3e";
 
 function spectateValue(url) {
   return new URL(url).searchParams.get("spectate");
@@ -102,4 +104,22 @@ test("extractInspectedAddresses returns unique nightly spectate addresses in con
   ]);
 
   assert.deepEqual(addresses, NIGHTLY_SPECTATE_ADDRESSES);
+});
+
+test("nightly richer mobile trade scenarios stay pinned to the populated position fixture", async () => {
+  const scenarios = await loadScenarios({
+    scenarioDir: getDefaultScenarioDir(),
+    tags: NIGHTLY_TAGS
+  });
+  const scenariosById = new Map(scenarios.map((scenario) => [scenario.id, scenario]));
+
+  for (const scenarioId of [
+    "mobile-account-surface-positions",
+    "mobile-position-margin-presentation"
+  ]) {
+    assert.equal(
+      spectateValue(scenariosById.get(scenarioId)?.url),
+      NIGHTLY_RICH_POSITION_ADDRESS
+    );
+  }
 });

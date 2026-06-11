@@ -12,7 +12,7 @@
   "viewports": [
     "mobile"
   ],
-  "url": "http://localhost:8080/trade?spectate=0x162cc7c861ebd0c06b3d72319201150482518185",
+  "url": "http://localhost:8080/trade?spectate=0x4096d3377ae5ade578daae8188804740c8b1da3e",
   "steps": [
     {
       "type": "debug_call",

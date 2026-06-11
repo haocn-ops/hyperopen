@@ -137,3 +137,30 @@
            (get-in edit-button [1 :on :click])))
     (is (= [[:actions/remove-spectate-mode-watchlist-address alternate-address]]
            (get-in remove-button [1 :on :click])))))
+
+(deftest spectate-mode-modal-filters-watchlist-by-label-and-address-test
+  (let [portfolio-address "0x4444444444444444444444444444444444444444"
+        treasury-address "0x5555555555555555555555555555555555555555"
+        watchlist [{:address portfolio-address
+                    :label "Portfolio desk"}
+                   {:address treasury-address
+                    :label "Treasury wallet"}
+                   {:address saved-address
+                    :label "Desk wallet"}]
+        render-rows (fn [search]
+                      (-> (modal/spectate-mode-modal-view
+                           (-> (modal-state {:search search
+                                             :label ""
+                                             :editing-watchlist-address nil})
+                               (assoc-in [:account-context :watchlist] watchlist)))
+                          (all-by-role "spectate-mode-watchlist-row")))
+        label-rows (render-rows "treasury")
+        address-rows (render-rows "5555")
+        empty-rows (render-rows "nomatch")]
+    (is (= 1 (count label-rows)))
+    (is (contains? (set (hiccup/collect-strings (first label-rows)))
+                   "Treasury wallet"))
+    (is (= 1 (count address-rows)))
+    (is (contains? (set (hiccup/collect-strings (first address-rows)))
+                   "Treasury wallet"))
+    (is (= 0 (count empty-rows)))))

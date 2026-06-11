@@ -55,7 +55,7 @@
                    "font-semibold"
                    "uppercase"
                    "tracking-[0.08em]"
-                   "text-[#8ea4ab]"]}
+                   "text-ho-text-muted"]}
        "Generated Private Key"]
       [:p {:class ["text-xs" "text-[#b9cbd0]"]}
        "This private key is shown once. Store it before confirming."]
@@ -182,7 +182,7 @@
                     "rounded-2xl"
                     "border"
                     "border-base-300"
-                    "bg-[#081b24]"
+                    "bg-ho-bg-deep"
                     "p-4"
                     "shadow-2xl"
                     "space-y-4"]

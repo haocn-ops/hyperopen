@@ -21,7 +21,7 @@
 (defn- tone-class
   [tone]
   (case tone
-    :negative ["text-[#ff6b8a]"]
+    :negative ["text-ho-sell-hi"]
     :positive ["text-[#36e1d3]"]
     ["text-trading-text-secondary"]))
 
@@ -30,7 +30,7 @@
   (cond
     (not (number? raw-diff)) ["text-trading-text-secondary"]
     (pos? raw-diff) ["text-[#36e1d3]"]
-    (neg? raw-diff) ["text-[#ff6b8a]"]
+    (neg? raw-diff) ["text-ho-sell-hi"]
     :else ["text-trading-text-secondary"]))
 
 (defn- sort-direction-icon
@@ -183,7 +183,7 @@
                           "focus:ring-0"
                           "focus:ring-offset-0"]
                          (if selected?
-                           ["border-[#2f7f73]" "bg-[#123a36]" "text-ho-accent-bright"]
+                           ["border-[#2f7f73]" "bg-ho-accent-soft" "text-ho-accent-bright"]
                            ["border-base-300" "text-trading-text-secondary" "hover:bg-base-200"]))
             :on {:click [[:actions/set-funding-comparison-timeframe value]]}}
    label])

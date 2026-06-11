@@ -394,7 +394,7 @@
                                               #(= [[:actions/set-vault-detail-activity-tab :positions]]
                                                   (get-in % [1 :on :click])))
         classes (set (get-in positions-tab-button [1 :class]))]
-    (is (contains? classes "border-[#303030]"))
+    (is (contains? classes "border-ho-border"))
     (is (contains? classes "text-ho-text"))
     (is (not (contains? classes "bg-base-100/50")))))
 

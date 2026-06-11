@@ -41,7 +41,7 @@
    "text-trading-text"
    "transition-colors"
    "hover:bg-transparent"
-   "hover:text-[#7fffe4]"
+   "hover:text-ho-accent-bright"
    "focus:outline-none"
    "focus:ring-0"
    "focus:ring-offset-0"
@@ -49,7 +49,7 @@
    "focus-visible:outline-none"
    "focus-visible:ring-0"
    "focus-visible:ring-offset-0"
-   "focus-visible:text-[#7fffe4]"
+   "focus-visible:text-ho-accent-bright"
    "focus-visible:underline"
    "underline-offset-2"
    "whitespace-nowrap"])

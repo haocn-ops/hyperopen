@@ -232,7 +232,7 @@
                         "rounded-2xl"
                         "border"
                         "border-ho-border-accent"
-                        "bg-[#081b24]"
+                        "bg-ho-bg-deep"
                         "p-4"
                         "shadow-[0_24px_60px_rgba(0,0,0,0.45)]"
                         "pointer-events-auto"]
@@ -282,7 +282,7 @@
                              "focus-visible:ring-2"
                              "focus-visible:ring-trading-green/70"
                              "focus-visible:ring-offset-1"
-                             "focus-visible:ring-offset-[#081b24]"]
+                             "focus-visible:ring-offset-ho-bg-deep"]
                      :aria-label "Close cancel visible orders confirmation"
                      :data-role "open-orders-cancel-visible-confirmation-close"
                      :on {:click [[:actions/close-cancel-visible-open-orders-confirmation]]}}
@@ -292,7 +292,7 @@
                 :data-role "open-orders-cancel-visible-confirmation-message"}
             (str "Cancel " (visible-order-count-label order-count)
                  " currently shown in Open Orders.")]
-           [:p {:class ["text-sm" "leading-6" "text-[#8ea4ab]"]}
+           [:p {:class ["text-sm" "leading-6" "text-ho-text-muted"]}
             "Orders hidden by the current filter or coin search will not be canceled."]]
           [:div {:class ["flex" "justify-end" "gap-2" "pt-1"]}
            [:button {:type "button"
@@ -312,7 +312,7 @@
                              "focus-visible:ring-2"
                              "focus-visible:ring-trading-green/70"
                              "focus-visible:ring-offset-1"
-                             "focus-visible:ring-offset-[#081b24]"]
+                             "focus-visible:ring-offset-ho-bg-deep"]
                      :data-role "open-orders-cancel-visible-confirmation-cancel"
                      :on {:click [[:actions/close-cancel-visible-open-orders-confirmation]]}}
             "Keep Orders"]
@@ -329,7 +329,7 @@
                                    "focus-visible:ring-2"
                                    "focus-visible:ring-ho-sell-tint/70"
                                    "focus-visible:ring-offset-1"
-                                   "focus-visible:ring-offset-[#081b24]"]
+                                   "focus-visible:ring-offset-ho-bg-deep"]
                                   (if (zero? order-count)
                                     ["border-[#5f3b46]"
                                      "bg-[#341920]/60"

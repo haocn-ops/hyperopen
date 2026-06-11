@@ -1,8 +1,44 @@
 (ns hyperopen.views.trading-chart.utils.chart-interop.series
   (:require ["lightweight-charts" :refer [AreaSeries BarSeries BaselineSeries CandlestickSeries HistogramSeries LineSeries]]
-            [hyperopen.views.trading-chart.utils.chart-interop.transforms :as transforms]))
+            [hyperopen.views.trading-chart.utils.chart-interop.transforms :as transforms]
+            [hyperopen.views.trading-chart.utils.theme-colors :as theme-colors]))
 
 (def ^:private line-type-with-steps 1)
+
+(defn themed-series-color-options
+  "Theme-token color options for direction-colored (candle-family) series:
+   solid up/down come from --ho-chart-long/short, which every theme keys
+   to its buy/sell identity (default values equal the old hardcoded
+   #26a69a/#ef5350, so the default theme is pixel-identical). nil for
+   chart types with their own fixed palettes (line/area/baseline/...).
+   Also used to restyle a mounted series when the theme switches."
+  [chart-type]
+  (let [up (theme-colors/token "--ho-chart-long")
+        down (theme-colors/token "--ho-chart-short")]
+    (case chart-type
+      (:candlestick :heikin-ashi)
+      #js {:upColor up
+           :downColor down
+           :wickUpColor up
+           :wickDownColor down}
+
+      :hollow-candles
+      ;; upColor stays the transparent body set at creation; applyOptions
+      ;; merges, so omitting it here preserves the hollow look.
+      #js {:downColor down
+           :borderUpColor up
+           :borderDownColor down
+           :wickUpColor up
+           :wickDownColor down}
+
+      :bar
+      #js {:upColor up
+           :downColor down}
+
+      :columns
+      #js {:color up}
+
+      nil)))
 
 (defn add-area-series!
   "Add an area series to the chart."
@@ -15,9 +51,7 @@
 (defn add-bar-series!
   "Add a bar series to the chart."
   [chart]
-  (let [series-options #js {:upColor "#26a69a"
-                            :downColor "#ef5350"}]
-    (.addSeries ^js chart BarSeries series-options)))
+  (.addSeries ^js chart BarSeries (themed-series-color-options :bar)))
 
 (defn add-high-low-series!
   "Add a high-low series rendered as solid floating range bars."
@@ -42,46 +76,34 @@
 (defn add-candlestick-series!
   "Add a candlestick series to the chart."
   [chart]
-  (let [series-options #js {:upColor "#26a69a"
-                            :downColor "#ef5350"
-                            :borderVisible false
-                            :wickUpColor "#26a69a"
-                            :wickDownColor "#ef5350"}]
+  (let [series-options (js/Object.assign #js {:borderVisible false}
+                                         (themed-series-color-options :candlestick))]
     (.addSeries ^js chart CandlestickSeries series-options)))
 
 (defn add-hollow-candles-series!
   "Add a hollow candlestick series to the chart."
   [chart]
-  (let [series-options #js {:upColor "rgba(0, 0, 0, 0)"
-                            :downColor "#ef5350"
-                            :borderVisible true
-                            :borderUpColor "#26a69a"
-                            :borderDownColor "#ef5350"
-                            :wickUpColor "#26a69a"
-                            :wickDownColor "#ef5350"}]
+  (let [series-options (js/Object.assign #js {:upColor "rgba(0, 0, 0, 0)"
+                                              :borderVisible true}
+                                         (themed-series-color-options :hollow-candles))]
     (.addSeries ^js chart CandlestickSeries series-options)))
 
 (defn add-heikin-ashi-series!
   "Add a candlestick series used for Heikin Ashi candles."
   [chart]
-  (let [series-options #js {:upColor "#26a69a"
-                            :downColor "#ef5350"
-                            :borderVisible false
-                            :wickUpColor "#26a69a"
-                            :wickDownColor "#ef5350"}]
+  (let [series-options (js/Object.assign #js {:borderVisible false}
+                                         (themed-series-color-options :heikin-ashi))]
     (.addSeries ^js chart CandlestickSeries series-options)))
 
 (defn add-histogram-series!
   "Add a histogram series to the chart."
   [chart]
-  (let [series-options #js {:color "#26a69a"}]
-    (.addSeries ^js chart HistogramSeries series-options)))
+  (.addSeries ^js chart HistogramSeries (themed-series-color-options :columns)))
 
 (defn add-columns-series!
   "Add a columns-style histogram series to the chart."
   [chart]
-  (let [series-options #js {:color "#26a69a"}]
-    (.addSeries ^js chart HistogramSeries series-options)))
+  (.addSeries ^js chart HistogramSeries (themed-series-color-options :columns)))
 
 (defn add-line-series!
   "Add a line series to the chart."

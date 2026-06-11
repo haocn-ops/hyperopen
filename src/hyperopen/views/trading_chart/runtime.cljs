@@ -252,10 +252,29 @@
                                                            candle-data)))
   (sync-navigation-overlay! node chart-obj candle-data))
 
+(defn- observe-theme-changes!
+  "Restyle the mounted chart when <html data-theme> changes (Phase 9 of
+   the theming plan: live re-theme without an asset/timeframe rebuild).
+   Returns the MutationObserver, or nil outside a DOM."
+  [node]
+  (when (and (exists? js/MutationObserver)
+             (exists? js/document))
+    (let [observer (js/MutationObserver.
+                    (fn [_]
+                      (let [{:keys [chart-obj chart-type]} (chart-runtime/get-state node)]
+                        (when chart-obj
+                          (ci/restyle-chart-theme! chart-obj chart-type)))))]
+      (.observe observer
+                (.-documentElement js/document)
+                #js {:attributes true
+                     :attributeFilter #js ["data-theme"]})
+      observer)))
+
 (defn- initialize-chart-runtime-state!
   [node chart-obj legend-control chart-type]
   (chart-runtime/set-state! node {:chart-obj chart-obj
                                   :legend-control legend-control
+                                  :theme-observer (observe-theme-changes! node)
                                   :chart-type chart-type
                                   :chart-accessibility-applied? false
                                   :decoration-frame-id nil
@@ -396,9 +415,11 @@
 
 (defn- unmount-chart!
   [node context]
-  (let [{:keys [chart-obj legend-control visible-range-cleanup]} (chart-runtime/get-state node)
+  (let [{:keys [chart-obj legend-control theme-observer visible-range-cleanup]} (chart-runtime/get-state node)
         chart (when chart-obj (.-chart ^js chart-obj))]
     (clear-pending-chart-decoration-pass! node context)
+    (when theme-observer
+      (.disconnect ^js theme-observer))
     (when legend-control
       (.destroy ^js legend-control))
     (ci/clear-open-order-overlays! chart-obj)

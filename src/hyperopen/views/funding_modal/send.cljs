@@ -36,7 +36,7 @@
     "Send tokens to another account on the Hyperliquid L1."]
    [:div {:class ["space-y-2"]}
     [:label {:for "funding-send-destination-input"
-             :class ["block" "text-xs" "uppercase" "tracking-[0.08em]" "text-[#8ea4ab]"]}
+             :class ["block" "text-xs" "uppercase" "tracking-[0.08em]" "text-ho-text-muted"]}
       "Destination"]
     [:input {:type "text"
              :id "funding-send-destination-input"
@@ -62,7 +62,7 @@
                            [:event.target/value]]]}}]]
    [:div {:class ["grid" "grid-cols-2" "gap-3"]}
     [:div {:class ["space-y-2"]}
-     [:label {:class ["block" "text-xs" "uppercase" "tracking-[0.08em]" "text-[#8ea4ab]"]}
+     [:label {:class ["block" "text-xs" "uppercase" "tracking-[0.08em]" "text-ho-text-muted"]}
       "Account"]
      [:div {:class ["flex"
                     "items-center"
@@ -75,7 +75,7 @@
                     "py-3"]}
       [:span {:class ["text-sm" "font-semibold" "text-[#e6eff2]"]} "Trading Account"]]]
     [:div {:class ["space-y-2"]}
-     [:label {:class ["block" "text-xs" "uppercase" "tracking-[0.08em]" "text-[#8ea4ab]"]}
+     [:label {:class ["block" "text-xs" "uppercase" "tracking-[0.08em]" "text-ho-text-muted"]}
       "Asset"]
      (send-asset-field asset)]]
    (shared/amount-input-field {:label "Amount"

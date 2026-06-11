@@ -20,7 +20,7 @@
 (defn- render-address-list [addresses]
   (when (seq addresses)
     [:div {:class ["space-y-1.5"]}
-     [:div {:class ["text-[#8da0a6]"]}
+     [:div {:class ["text-ho-text-muted"]}
       "This vault uses the following vaults as component strategies:"]
      (for [address addresses]
        ^{:key (str "component-vault-" address)}
@@ -32,17 +32,17 @@
         parent-address (:parent-address relationship)]
     [:div {:class ["space-y-3" "px-3" "pb-3" "pt-2" "text-sm"]}
      [:div
-      [:div {:class ["text-[#8da0a6]"]} "Leader"]
+      [:div {:class ["text-ho-text-muted"]} "Leader"]
       [:div {:class ["num" "font-medium" "text-trading-text"]}
        (or (wallet/short-addr leader) "—")]]
      [:div
-      [:div {:class ["text-[#8da0a6]"]} "Description"]
+      [:div {:class ["text-ho-text-muted"]} "Description"]
       [:p {:class ["mt-1" "leading-5" "text-trading-text"]}
        (if (seq description)
          description
          "No vault description available.")]]
      (when parent-address
-       [:div {:class ["text-[#8da0a6]"]}
+       [:div {:class ["text-ho-text-muted"]}
         "Parent strategy: "
         [:button {:type "button"
                   :class ["num" "text-ho-accent-hi" "hover:underline"]
@@ -53,26 +53,26 @@
 (defn- render-vault-performance-panel [{:keys [snapshot]}]
   [:div {:class ["grid" "grid-cols-2" "gap-3" "px-3" "pb-3" "pt-2" "text-sm"]}
    [:div
-    [:div {:class ["text-[#8da0a6]"]} "24H"]
+    [:div {:class ["text-ho-text-muted"]} "24H"]
     [:div {:class ["num" "font-medium" "text-trading-text"]} (vf/format-percent (:day snapshot))]]
    [:div
-    [:div {:class ["text-[#8da0a6]"]} "7D"]
+    [:div {:class ["text-ho-text-muted"]} "7D"]
     [:div {:class ["num" "font-medium" "text-trading-text"]} (vf/format-percent (:week snapshot))]]
    [:div
-    [:div {:class ["text-[#8da0a6]"]} "30D"]
+    [:div {:class ["text-ho-text-muted"]} "30D"]
     [:div {:class ["num" "font-medium" "text-trading-text"]} (vf/format-percent (:month snapshot))]]
    [:div
-    [:div {:class ["text-[#8da0a6]"]} "All-time"]
+    [:div {:class ["text-ho-text-muted"]} "All-time"]
     [:div {:class ["num" "font-medium" "text-trading-text"]} (vf/format-percent (:all-time snapshot))]]])
 
 (defn- render-your-performance-panel [metrics]
   [:div {:class ["space-y-3" "px-3" "pb-3" "pt-2" "text-sm"]}
    [:div
-    [:div {:class ["text-[#8da0a6]"]} "Your Deposits"]
+    [:div {:class ["text-ho-text-muted"]} "Your Deposits"]
     [:div {:class ["num" "font-medium" "text-trading-text"]}
      (vf/format-currency (:your-deposit metrics))]]
    [:div
-    [:div {:class ["text-[#8da0a6]"]} "All-time Earned"]
+    [:div {:class ["text-ho-text-muted"]} "All-time Earned"]
     [:div {:class ["num" "font-medium" "text-trading-text"]}
      (vf/format-currency (:all-time-earned metrics))]]])
 

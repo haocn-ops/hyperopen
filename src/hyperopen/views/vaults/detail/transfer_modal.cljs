@@ -57,7 +57,7 @@
                       "rounded-2xl"
                       "border"
                       "border-ho-border-accent"
-                      "bg-[#081b24]"
+                      "bg-ho-bg-deep"
                       "p-4"
                       "shadow-2xl"
                       "space-y-3"]
@@ -71,7 +71,7 @@
          [:h2 {:class ["text-lg" "font-semibold" "text-[#e5eef1]"]}
           title]
          [:button {:type "button"
-                   :class ["text-sm" "text-[#8ea4ab]" "hover:text-[#e5eef1]"]
+                   :class ["text-sm" "text-ho-text-muted" "hover:text-[#e5eef1]"]
                    :on {:click [[:actions/close-vault-transfer-modal]]}}
           "Close"]]
         (when (and show-deposit?
@@ -81,7 +81,7 @@
            deposit-lockup-copy])
         [:div {:class ["space-y-2"]}
          [:div {:class ["flex" "items-center" "justify-between" "gap-2"]}
-          [:label {:class ["block" "text-xs" "uppercase" "tracking-[0.08em]" "text-[#8ea4ab]"]}
+          [:label {:class ["block" "text-xs" "uppercase" "tracking-[0.08em]" "text-ho-text-muted"]}
            "Amount (USDC)"]
           (when show-deposit?
             [:button {:type "button"

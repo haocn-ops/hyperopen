@@ -29,11 +29,11 @@
                               "whitespace-nowrap"]
                              (if enabled?
                                ["text-trading-green"
-                                "hover:text-[#7fffe4]"
+                                "hover:text-ho-accent-bright"
                                 "focus:outline-none"
                                 "focus:ring-0"
                                 "focus:ring-offset-0"
-                                "focus-visible:text-[#7fffe4]"]
+                                "focus-visible:text-ho-accent-bright"]
                                ["cursor-default" "text-trading-text-secondary"]))}]
      (if (and enabled? action)
        [:button (assoc attrs

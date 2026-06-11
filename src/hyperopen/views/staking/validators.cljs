@@ -21,7 +21,7 @@
                              "focus:ring-offset-0"]
                             (if active?
                               ["text-ho-text"]
-                              ["text-[#949e9c]" "hover:text-[#c5d0ce]"]))
+                              ["text-ho-text-secondary" "hover:text-[#c5d0ce]"]))
                :data-role (str "staking-sort-header-" (name column))
                :on {:click [[:actions/set-staking-validator-sort column]]}}
       [:span label]
@@ -34,7 +34,7 @@
 (defn- validator-description-cell
   [{:keys [description]}]
   (let [description-text (or description "--")]
-    [:td {:class ["px-3" "py-1.5" "text-[#9aa3a4]"]}
+    [:td {:class ["px-3" "py-1.5" "text-ho-text-secondary"]}
      [:div {:class ["group" "relative" "max-w-[260px]"]}
       [:span {:class ["block" "truncate"]
               :title description-text}
@@ -221,7 +221,7 @@
       [:span selected-label]
       [:svg {:class (into ["h-3.5"
                            "w-3.5"
-                           "text-[#949e9c]"
+                           "text-ho-text-secondary"
                            "transition-transform"
                            "duration-150"]
                           (when open?
@@ -287,7 +287,7 @@
     [:table {:class ["min-w-full" "bg-ho-bg"]
              :data-role "staking-validator-table"}
      [:thead
-      [:tr {:class ["border-b" "border-ho-surface" "text-xs" "text-[#949e9c]"]}
+      [:tr {:class ["border-b" "border-ho-surface" "text-xs" "text-ho-text-secondary"]}
        (sortable-validator-header "Name" :name validator-sort)
        (sortable-validator-header "Description" :description validator-sort)
        (sortable-validator-header "Stake" :stake validator-sort)
@@ -303,7 +303,7 @@
           (validator-row row selected-validator))
         [:tr
          [:td {:col-span 8
-               :class ["px-3" "py-6" "text-center" "text-sm" "text-[#949e9c]"]}
+               :class ["px-3" "py-6" "text-center" "text-sm" "text-ho-text-secondary"]}
           (if loading?
             "Loading validators..."
             "No validator data available.")]])]]]

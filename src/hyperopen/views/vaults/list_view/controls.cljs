@@ -16,7 +16,7 @@
                           "text-xs"
                           "transition-colors"]
                          (concat (if active?
-                                   ["bg-[#123a36]" "text-ho-accent-bright"]
+                                   ["bg-ho-accent-soft" "text-ho-accent-bright"]
                                    ["text-trading-text-secondary" "hover:bg-base-200" "hover:text-trading-text"])
                                  format/focus-ring-classes))
             :on {:click [action]}}

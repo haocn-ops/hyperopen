@@ -39,7 +39,7 @@
                       "rounded-2xl"
                       "border"
                       "border-base-300"
-                      "bg-[#081b24]"
+                      "bg-ho-bg-deep"
                       "p-4"
                       "shadow-2xl"
                       "space-y-4"]

@@ -573,7 +573,7 @@
     (is (contains? chevron-classes "group-open:rotate-180"))
     (is (contains? panel-classes "ui-dropdown-panel"))
     (is (= "true" (get-in panel [1 :data-ui-native-details-panel])))
-    (is (contains? api-classes "bg-[#123a36]"))
+    (is (contains? api-classes "bg-ho-accent-soft"))
     (is (= "/api" (get-in api-link [1 :href])))
     (is (= [[:actions/navigate "/api"]]
            (get-in api-link [1 :on :click])))))
@@ -587,7 +587,7 @@
         subaccounts-classes (set (class-values (get-in subaccounts-link [1 :class])))]
     (is (some? subaccounts-link))
     (is (contains? trigger-classes "header-nav-link-active"))
-    (is (contains? subaccounts-classes "bg-[#123a36]"))
+    (is (contains? subaccounts-classes "bg-ho-accent-soft"))
     (is (= "/subAccounts" (get-in subaccounts-link [1 :href])))
     (is (= [[:actions/navigate "/subAccounts"]]
            (get-in subaccounts-link [1 :on :click])))))

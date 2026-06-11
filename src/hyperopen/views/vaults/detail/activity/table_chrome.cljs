@@ -13,7 +13,7 @@
                             "gap-1"
                             "text-xs"
                             "font-medium"
-                            "text-[#949e9c]"
+                            "text-ho-text-secondary"
                             "transition-colors"
                             "hover:text-ho-text"]
                            (when active?
@@ -26,7 +26,7 @@
 
 (defn table-header [tab columns sort-state]
   [:thead
-   [:tr {:class ["border-b" "border-[#1b3237]" "bg-transparent" "text-xs" "font-medium" "text-[#949e9c]"]}
+   [:tr {:class ["border-b" "border-[#1b3237]" "bg-transparent" "text-xs" "font-medium" "text-ho-text-secondary"]}
     (for [{:keys [id] :as column} columns]
       ^{:key (str "activity-header-" (name id))}
       [:th {:class ["px-4" "py-2" "text-left" "whitespace-nowrap" "font-medium"]}

@@ -62,7 +62,7 @@
                           "transition-colors"]
                          (if (= value selected-series)
                            ["border-[#2f5e58]" "bg-[#0d252f]" "text-trading-text"]
-                           ["border-transparent" "text-[#8ea4ab]" "hover:text-trading-text"]))
+                           ["border-transparent" "text-ho-text-muted" "hover:text-trading-text"]))
             :on {:click [[:actions/set-vault-detail-chart-series value]]}}
    label])
 
@@ -101,7 +101,7 @@
                             "text-xs"
                             "transition-colors"]
                            (if (= option-token selected-token)
-                             ["bg-[#123a36]" "text-ho-accent-bright"]
+                             ["bg-ho-accent-soft" "text-ho-accent-bright"]
                              ["text-[#9fb4bb]" "hover:bg-[#0d252f]" "hover:text-trading-text"]))
               :data-role (str data-role-prefix "-option-" option-token)
               :on {:click [[:actions/set-vaults-snapshot-range value]]}}
@@ -159,7 +159,7 @@
       [:span selected-label]
       [:svg {:class ["h-3.5"
                      "w-3.5"
-                     "text-[#8aa0a7]"
+                     "text-ho-text-muted"
                      "transition-transform"
                      "duration-150"
                      "ease-out"]
@@ -314,7 +314,7 @@
           (for [option candidates*]
             ^{:key (str "vault-detail-returns-benchmark-suggestion-" (:value option))}
             (returns-benchmark-suggestion-row option))
-          [:div {:class ["px-2" "py-1.5" "text-xs" "text-[#8aa0a7]"]}
+          [:div {:class ["px-2" "py-1.5" "text-xs" "text-ho-text-muted"]}
            (or empty-message "No matching symbols.")])])]))
 
 (defn- returns-benchmark-chip-rail [{:keys [selected-options]}]
@@ -370,7 +370,7 @@
          [:div {:class ["flex" "items-center" "gap-1.5"]}
           [:span {:class ["h-2" "w-2" "rounded-full"]
                   :style {:background-color stroke}}]
-          [:span {:class ["text-xs" "text-[#8aa0a7]"]}
+          [:span {:class ["text-xs" "text-ho-text-muted"]}
            label]])])))
 
 (def ^:private vault-chart-d3-theme
@@ -444,7 +444,7 @@
                           "num"
                           "text-right"
                           "text-xs"
-                          "text-[#8aa0a7]"]
+                          "text-ho-text-muted"]
                   :style {:top (str (* 100 y-ratio) "%")}}
            (format-chart-axis-value axis-kind value)])
         [:div {:class ["absolute"

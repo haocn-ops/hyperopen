@@ -32,7 +32,7 @@
   (into entry-mode-tab-button-base-classes
         (if active?
           ["text-ho-text"]
-          ["text-[#949E9C]" "hover:text-white"])))
+          ["text-ho-text-secondary" "hover:text-white"])))
 
 (defn entry-mode-tabs
   [{:keys [entry-mode
@@ -51,7 +51,7 @@
    (when pro-dropdown-open?
      [:div {:class ["fixed" "inset-0" "z-[180]"]
             :on {:click on-close-dropdown}}])
-   [:div {:class ["relative" "z-[190]" "grid" "h-[35px]" "grid-cols-3" "border-b" "border-[#303030]"]}
+   [:div {:class ["relative" "z-[190]" "grid" "h-[35px]" "grid-cols-3" "border-b" "border-ho-border"]}
     [:div {:data-role "entry-mode-active-indicator"
            :aria-hidden true
            :class ["pointer-events-none"
@@ -138,7 +138,7 @@
                           "transition-colors"]
                          (if (= selected-unit unit)
                            ["text-ho-text"]
-                           ["text-[#949E9C]" "hover:text-ho-text"]))
+                           ["text-ho-text-secondary" "hover:text-ho-text"]))
             :role "option"
             :aria-selected (boolean (= selected-unit unit))
             :title (tpsl-policy/unit-menu-label unit)
@@ -321,7 +321,7 @@
                           "transition-colors"]
                          (if (= selected-tif tif)
                            ["text-ho-text"]
-                           ["text-[#949E9C]" "hover:text-ho-text"]))
+                           ["text-ho-text-secondary" "hover:text-ho-text"]))
             :role "option"
             :aria-selected (boolean (= selected-tif tif))
             :on {:click (on-select-tif tif)}}
@@ -358,7 +358,7 @@
                        "text-sm"
                        "font-normal"
                        "leading-6"
-                       "text-[#949E9C]"
+                       "text-ho-text-secondary"
                        "transition-colors"
                        "duration-200"
                        "ease-in-out"

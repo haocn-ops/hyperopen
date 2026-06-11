@@ -123,13 +123,13 @@
 (defn summary-row
   [{:keys [label value]}]
   [:div {:class ["flex" "items-center" "justify-between"]}
-   [:span {:class ["text-[#7d94a0]"]} label]
+   [:span {:class ["text-ho-text-muted"]} label]
    [:span {:class ["text-[#dce9ee]"]} value]])
 
 (defn- lifecycle-stage-row
   [panel]
   [:div {:class ["flex" "items-center" "justify-between"]}
-   [:span {:class ["text-xs" "uppercase" "tracking-[0.08em]" "text-[#7d94a0]"]}
+   [:span {:class ["text-xs" "uppercase" "tracking-[0.08em]" "text-ho-text-muted"]}
     "Lifecycle Stage"]
    [:span {:class ["text-xs" "font-medium" "text-[#dce9ee]"]}
     (:stage-label panel)]])
@@ -144,7 +144,7 @@
   [panel]
   (when-let [{:keys [label tone]} (:outcome panel)]
     [:div {:class ["flex" "items-center" "justify-between"]}
-     [:span {:class ["text-[#7d94a0]"]} "Outcome"]
+     [:span {:class ["text-ho-text-muted"]} "Outcome"]
      [:span {:class ["text-xs"
                      "font-medium"
                      (outcome-tone-class tone)]}
@@ -167,7 +167,7 @@
   [panel]
   (when-let [destination-tx (:destination-tx panel)]
     [:div {:class ["space-y-1"]}
-     [:p {:class ["text-[#7d94a0]"]} "Destination tx hash"]
+     [:p {:class ["text-ho-text-muted"]} "Destination tx hash"]
      (lifecycle-tx-hash-content destination-tx)]))
 
 (defn- lifecycle-next-check-row
@@ -285,7 +285,7 @@
   [:div {:class ["space-y-2"]}
    [:div {:class ["flex" "items-center" "justify-between" "gap-2"]}
     [:label {:for input-id
-             :class ["block" "text-xs" "uppercase" "tracking-[0.08em]" "text-[#8ea4ab]"]}
+             :class ["block" "text-xs" "uppercase" "tracking-[0.08em]" "text-ho-text-muted"]}
      label]
     (when (and max-action (seq max-label))
       [:button {:type "button"
@@ -326,7 +326,7 @@
                                        (or input-args [])
                                        [[:event.target/value]]))]}}]
     (when (seq suffix)
-      [:span {:class ["text-sm" "text-[#7e95a0]"]} suffix])]])
+      [:span {:class ["text-sm" "text-ho-text-muted"]} suffix])]])
 
 (defn withdraw-amount-input-field
   [{:keys [input-id
@@ -339,7 +339,7 @@
            data-role]}]
   [:div {:class ["space-y-2"]}
    [:label {:for input-id
-            :class ["block" "text-xs" "uppercase" "tracking-[0.08em]" "text-[#8ea4ab]"]}
+            :class ["block" "text-xs" "uppercase" "tracking-[0.08em]" "text-ho-text-muted"]}
     "Amount"]
    [:div {:class ["flex"
                   "items-center"
@@ -395,7 +395,7 @@
                      "disabled:opacity-70"]
              :data-role data-role
              :on {:input [[input-action [:event.target/value]]]}}]
-    [:span {:class ["text-sm" "text-[#7e95a0]"]} suffix]]])
+    [:span {:class ["text-sm" "text-ho-text-muted"]} suffix]]])
 
 (defn deposit-asset-card
   [asset]
@@ -409,4 +409,4 @@
     (funding-asset-icon (:symbol asset) (asset-icon-src asset))
     [:div {:class ["flex" "flex-col"]}
      [:span {:class ["text-sm" "font-semibold" "text-[#e6eef2]"]} (:symbol asset)]
-     [:span {:class ["text-xs" "text-[#7e95a0]"]} (:network asset)]]]])
+     [:span {:class ["text-xs" "text-ho-text-muted"]} (:network asset)]]]])

@@ -1,10 +1,14 @@
 (ns hyperopen.app.document-title
   (:require [clojure.string :as str]
             [hyperopen.asset-selector.markets :as markets]
+            [hyperopen.ui.voice :as voice]
             [hyperopen.domain.market.instrument :as instrument]
             [hyperopen.utils.formatting :as fmt]))
 
-(def brand-title "HyperOpen")
+(def brand-title
+  "Fallback brand segment; the live value is voiced from state so the
+   tab title follows the active theme."
+  "HyperOpen")
 
 (defn- non-blank-text
   [value]
@@ -118,10 +122,11 @@
         mark-text (format-mark-price context active-market locale)
         asset-text (when (seq active-asset)
                      (active-asset-label active-asset active-market))
+        brand (or (voice/label state :brand/title) brand-title)
         parts (cond-> []
                 (seq mark-text) (conj mark-text)
                 (seq asset-text) (conj asset-text)
-                true (conj brand-title))]
+                true (conj brand))]
     (str/join " | " parts)))
 
 (defn sync!

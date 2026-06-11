@@ -190,7 +190,7 @@
                              "space-y-3"
                              "border"
                              "border-ho-border-accent"
-                             "bg-[#081b24]"
+                             "bg-ho-bg-deep"
                              "shadow-2xl"
                              "pointer-events-auto"]
                             (if anchored-popover?
@@ -249,7 +249,7 @@
                                         "rounded-lg"
                                         "border"
                                         "border-ho-border-accent-muted"
-                                        "bg-[#0b181d]"
+                                        "bg-ho-bg"
                                         "text-gray-300"
                                         "hover:bg-[#102229]"
                                         "hover:text-gray-100"]

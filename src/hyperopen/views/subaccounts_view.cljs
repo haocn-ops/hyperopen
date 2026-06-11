@@ -317,7 +317,7 @@
     [:tr {:data-role (str "subaccounts-row-" address)
           :class (into ["border-t" "border-base-300" "transition-colors" "hover:bg-white/[0.025]"]
                        (when selected?
-                         ["bg-[#123a36]/35"]))}
+                         ["bg-ho-accent-soft/35"]))}
      [:td {:class ["px-3" "py-4" "align-top" "font-semibold" "text-white"]} name]
      [:td {:class ["px-3" "py-4" "align-top"]}
       (address-cell address (str "subaccounts-copy-" address))]

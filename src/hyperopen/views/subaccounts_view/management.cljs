@@ -23,7 +23,7 @@
                             ["cursor-not-allowed" "border-base-300" "bg-base-200/30" "text-trading-text-secondary"]
 
                             (= :primary variant)
-                            ["border-[#54d8c6]" "bg-[#54d8c6]" "text-[#021b18]" "hover:bg-[#69e7d6]"]
+                            ["border-ho-accent" "bg-ho-accent" "text-[#021b18]" "hover:bg-[#69e7d6]"]
 
                             :else
                             ["border-base-300" "bg-[#121d20]" "text-white" "hover:border-[#2dceb3]/60" "hover:bg-[#172528]"])
@@ -153,7 +153,7 @@
                              "text-sm"
                              "text-white"
                              "transition-colors"
-                             "focus-within:border-[#54d8c6]"]
+                             "focus-within:border-ho-accent"]
                             class)}]
         children))
 
@@ -190,7 +190,7 @@
                         "text-base"
                         "font-semibold"
                         "leading-none"
-                        "text-[#54d8c6]"
+                        "text-ho-accent"
                         "transition-colors"
                         "whitespace-nowrap"
                         "hover:bg-[#12312e]"
@@ -289,7 +289,7 @@
                                           :transfer-amount
                                           [:event.target/value]]]}}]
                    [:span {:data-role (str "subaccounts-transfer-max-" address)
-                           :class ["shrink-0" "text-xs" "font-medium" "text-[#54d8c6]"]}
+                           :class ["shrink-0" "text-xs" "font-medium" "text-ho-accent"]}
                     (str "MAX: " max-label " " symbol)]]})]
      [:div {:class ["mt-6" "grid" "grid-cols-2" "gap-3"]}
       (action-button {:data-role (str "subaccounts-transfer-cancel-" address)

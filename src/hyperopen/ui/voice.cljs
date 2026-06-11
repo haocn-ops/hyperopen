@@ -17,6 +17,9 @@
    paren-free degen nouns so registry count suffixes like \" (23)\" compose."
   {:brand/wordmark {:default "HyperOpen" :degen "HyperDegen"}
    :brand/mark {:default "HO" :degen "HD"}
+   ;; :default mirrors resources/public/index.html <title>.
+   :brand/title {:default "HyperOpen"
+                 :degen "HyperDegen — Trade Like a Legend 🐸"}
 
    :nav/trade {:default "Trade" :degen "Trade (Gamble)"}
    :nav/portfolio {:default "Portfolio" :degen "Portfolio (Hope)"}

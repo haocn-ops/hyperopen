@@ -79,7 +79,7 @@
     (is (= ["Open Orders (100+)"] (hiccup/collect-strings open-orders-tab)))
     (is (= ["Balances"] (hiccup/collect-strings balances-tab)))
     (is (contains? (hiccup/node-class-set positions-tab) "text-ho-text"))
-    (is (contains? (hiccup/node-class-set performance-tab) "text-[#949e9c]"))
+    (is (contains? (hiccup/node-class-set performance-tab) "text-ho-text-secondary"))
     (is (contains? (hiccup/node-class-set performance-tab) "hover:text-ho-text"))
     (is (contains? positions-text "No active positions."))
     (is (nil? performance-card-in-positions))

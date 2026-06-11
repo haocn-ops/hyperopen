@@ -7,7 +7,7 @@
   [:div {:class ["overflow-x-auto" "rounded-[10px]" "border" "border-ho-surface"]}
    [:table {:class ["min-w-full" "bg-ho-bg"]}
     [:thead
-     [:tr {:class ["text-xs" "text-[#949e9c]"]}
+     [:tr {:class ["text-xs" "text-ho-text-secondary"]}
       (for [column columns]
         ^{:key column}
         [:th {:class ["px-3" "py-2.5" "text-left" "font-normal"]}
@@ -17,7 +17,7 @@
        (map row-render rows)
        [:tr
         [:td {:col-span (count columns)
-              :class ["px-3" "py-6" "text-center" "text-sm" "text-[#949e9c]"]}
+              :class ["px-3" "py-6" "text-center" "text-sm" "text-ho-text-secondary"]}
          empty-text]])]]])
 
 (defn rewards-history-panel

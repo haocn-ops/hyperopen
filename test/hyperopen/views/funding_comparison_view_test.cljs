@@ -95,4 +95,4 @@
                                       #(= "Short on Hyperliquid and long on Bybit"
                                           (get-in % [1 :title])))]
     (is (contains? (set (get-in positive-arb [1 :class])) "text-[#36e1d3]"))
-    (is (contains? (set (get-in negative-arb [1 :class])) "text-[#ff6b8a]"))))
+    (is (contains? (set (get-in negative-arb [1 :class])) "text-ho-sell-hi"))))

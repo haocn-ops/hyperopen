@@ -168,6 +168,18 @@
   [chart chart-type]
   (series/add-series! chart chart-type))
 
+(defn restyle-chart-theme!
+  "Re-apply theme-token paint to a mounted chart: layout/grid/scale
+   colors plus the main series' direction colors when the chart type is
+   candle-family. Volume bars keep their per-bar colors until the next
+   data sync. Used when data-theme switches under a live chart."
+  [chart-obj chart-type]
+  (when-some [chart (when chart-obj (.-chart ^js chart-obj))]
+    (.applyOptions ^js chart (clj->js (chart-options/base-chart-options))))
+  (when-some [main-series (when chart-obj (.-mainSeries ^js chart-obj))]
+    (when-some [color-options (series/themed-series-color-options chart-type)]
+      (.applyOptions ^js main-series color-options))))
+
 (defn fit-content!
   "Fit content to the chart viewport."
   [chart]

@@ -30,6 +30,12 @@
   (is (= "Trades (pain)"
          (voice/label {:ui {:theme "hyperdegen"}} :mobile-surface/trades))))
 
+(deftest brand-title-voice-test
+  (is (= "HyperOpen" (voice/label {} :brand/title)))
+  (is (= "HyperOpen" (voice/label {:ui {:theme "institutional"}} :brand/title)))
+  (is (= "HyperDegen — Trade Like a Legend 🐸"
+         (voice/label {:ui {:theme "hyperdegen"}} :brand/title))))
+
 (deftest degen-predicate-test
   (is (false? (voice/degen? {})))
   (is (false? (voice/degen? {:ui {:theme "institutional"}})))

@@ -37,7 +37,7 @@
                  "bg-ho-bg"
                  "p-4"]
          :data-role role}
-   [:div {:class ["text-xs" "uppercase" "tracking-[0.08em]" "text-[#878c8f]"]}
+   [:div {:class ["text-xs" "uppercase" "tracking-[0.08em]" "text-ho-text-secondary"]}
     label]
    [:div {:class ["mt-2" "text-2xl" "text-ho-text" "num"]}
     value]])
@@ -169,7 +169,7 @@
                           "transition-colors"]
                          (if active?
                            ["border-ho-accent" "text-ho-text"]
-                           ["border-[#303030]" "text-[#949e9c]" "hover:text-[#c5d0ce]"]))
+                           ["border-ho-border" "text-ho-text-secondary" "hover:text-[#c5d0ce]"]))
             :data-role (str "referrals-tab-" (name tab))
             :on {:click [[:actions/set-referrals-active-tab tab]]}}
    label])
@@ -242,7 +242,7 @@
                             "items-center"
                             "gap-1"
                             "font-normal"
-                            "text-[#878c8f]"
+                            "text-ho-text-secondary"
                             "transition-colors"
                             "hover:text-ho-text"
                             "focus:outline-none"
@@ -321,19 +321,19 @@
      (if (seq legacy-rows)
        [:div {:class ["overflow-x-auto"]
               :data-role "referrals-legacy-table"}
-        [:div {:class ["grid" "min-w-[680px]" "grid-cols-[minmax(0,1fr)_140px_160px_160px]" "gap-3" "px-3" "py-2" "text-xs" "uppercase" "tracking-[0.08em]" "text-[#878c8f]"]}
+        [:div {:class ["grid" "min-w-[680px]" "grid-cols-[minmax(0,1fr)_140px_160px_160px]" "gap-3" "px-3" "py-2" "text-xs" "uppercase" "tracking-[0.08em]" "text-ho-text-secondary"]}
          [:span "Date"]
          [:span {:class ["text-right"]} "Your Volume"]
          [:span {:class ["text-right"]} "Your Referral Volume"]
          [:span {:class ["text-right"]} "Total Rewards Earned"]]
         (map-indexed legacy-row legacy-rows)]
-       [:div {:class ["px-3" "py-8" "text-center" "text-sm" "text-[#878c8f]"]
+       [:div {:class ["px-3" "py-8" "text-center" "text-sm" "text-ho-text-secondary"]
               :data-role "referrals-legacy-empty"}
         "No rewards earned"])
      (if (seq referral-rows)
        [:div {:class ["overflow-x-auto"]
               :data-role "referrals-table"}
-        [:div {:class ["grid" "min-w-[860px]" referral-grid-cols "gap-3" "px-3" "py-2" "text-xs" "uppercase" "tracking-[0.08em]" "text-[#878c8f]"]
+        [:div {:class ["grid" "min-w-[860px]" referral-grid-cols "gap-3" "px-3" "py-2" "text-xs" "uppercase" "tracking-[0.08em]" "text-ho-text-secondary"]
                :data-role "referrals-table-header"}
          (sortable-referral-header "Address" :address referrals-sort :left)
          (sortable-referral-header "Date Joined" :date-joined referrals-sort :right)
@@ -341,7 +341,7 @@
          (sortable-referral-header "Fees Paid" :fees-paid referrals-sort :right)
          (sortable-referral-header "Your Rewards" :your-rewards referrals-sort :right)]
         (map-indexed referral-row referral-rows)]
-       [:div {:class ["px-3" "py-8" "text-center" "text-sm" "text-[#878c8f]"]
+       [:div {:class ["px-3" "py-8" "text-center" "text-sm" "text-ho-text-secondary"]
               :data-role "referrals-empty"}
         "No referrals yet"]))])
 

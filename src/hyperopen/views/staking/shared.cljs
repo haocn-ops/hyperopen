@@ -52,7 +52,7 @@
 
     :jailed
     [:span {:class ["group" "relative" "inline-flex" "items-center" "leading-6"]}
-     [:span {:class ["text-xs" "font-normal" "text-[#9aa3a4]" "cursor-help"]
+     [:span {:class ["text-xs" "font-normal" "text-ho-text-secondary" "cursor-help"]
              :tab-index 0
              :data-role "staking-validator-status-inactive"}
       "Inactive"]
@@ -83,7 +83,7 @@
                       "shadow-[0_4px_16px_rgba(0,0,0,0.35)]"]}
        inactive-jailed-tooltip-copy]]]
 
-    [:span {:class ["text-xs" "font-normal" "leading-6" "text-[#9aa3a4]"]}
+    [:span {:class ["text-xs" "font-normal" "leading-6" "text-ho-text-secondary"]}
      "Inactive"]))
 
 (defn summary-card
@@ -96,7 +96,7 @@
                  "py-3"
                  "space-y-2"]
          :data-role data-role}
-   [:div {:class ["text-sm" "leading-[15px]" "font-normal" "text-[#878c8f]"]}
+   [:div {:class ["text-sm" "leading-[15px]" "font-normal" "text-ho-text-secondary"]}
     label]
    [:div {:class ["text-[30px]" "sm:text-[34px]" "leading-none" "font-normal" "text-ho-text" "num"]}
     value]])
@@ -104,7 +104,7 @@
 (defn key-value-row
   [label value]
   [:div {:class ["flex" "items-start" "justify-between" "gap-3" "text-xs"]}
-   [:span {:class ["text-[#9aa3a4]" "leading-[15px]"]}
+   [:span {:class ["text-ho-text-secondary" "leading-[15px]"]}
     label]
    [:span {:class ["num" "text-ho-text" "font-normal" "leading-[15px]"]}
     value]])

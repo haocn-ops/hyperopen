@@ -6,7 +6,7 @@
                        "h-3"
                        "w-3"
                        "shrink-0"
-                       "text-[#54d8c6]"
+                       "text-ho-accent"
                        "transition-transform"
                        "duration-150"
                        "ease-out"]
@@ -42,7 +42,7 @@
                           "focus:ring-0"
                           "focus:ring-offset-0"]
                          (if selected?
-                           ["bg-[#12312e]" "text-[#54d8c6]"]
+                           ["bg-[#12312e]" "text-ho-accent"]
                            ["text-[#aab6b9]" "hover:bg-[#122124]" "hover:text-white"]))
             :on {:click [[:actions/set-subaccount-form-field
                           :transfer-account
@@ -152,7 +152,7 @@
                             "focus:ring-0"
                             "focus:ring-offset-0"]
                            (if selected?
-                             ["bg-[#12312e]" "text-[#54d8c6]"]
+                             ["bg-[#12312e]" "text-ho-accent"]
                              ["text-[#aab6b9]" "hover:bg-[#122124]" "hover:text-white"]))
               :on {:click [[:actions/set-subaccount-form-field
                             :transfer-token

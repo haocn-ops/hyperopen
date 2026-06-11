@@ -29,7 +29,7 @@
 (defn- modal-code-field
   [{:keys [id label value field placeholder disabled?]}]
   [:div {:class ["space-y-2"]}
-   [:label {:class ["block" "text-xs" "uppercase" "tracking-[0.08em]" "text-[#878c8f]"]
+   [:label {:class ["block" "text-xs" "uppercase" "tracking-[0.08em]" "text-ho-text-secondary"]
             :for id}
     label]
    [:input {:id id
@@ -125,7 +125,7 @@
          "Enter the referral code exactly as you want it submitted for this master account.")]
       (when (seq code)
         [:div {:class ["rounded-lg" "border" "border-ho-surface" "bg-ho-bg" "p-3"]}
-         [:div {:class ["text-xs" "uppercase" "tracking-[0.08em]" "text-[#878c8f]"]}
+         [:div {:class ["text-xs" "uppercase" "tracking-[0.08em]" "text-ho-text-secondary"]}
           "Normalized Code"]
          [:div {:class ["mt-1" "text-xl" "num" "text-ho-text-hi"]
                 :data-role "referrals-modal-normalized-code"}
@@ -187,13 +187,13 @@
     [:p {:class ["text-sm" "leading-5" "text-[#b7d3d0]"]}
      "Share this Hyperopen join link with traders you refer."]
     [:div {:class ["rounded-lg" "border" "border-ho-surface" "bg-ho-bg" "p-3"]}
-     [:div {:class ["text-xs" "uppercase" "tracking-[0.08em]" "text-[#878c8f]"]}
+     [:div {:class ["text-xs" "uppercase" "tracking-[0.08em]" "text-ho-text-secondary"]}
       "Referral Code"]
      [:div {:class ["mt-1" "text-xl" "num" "text-ho-text-hi"]
             :data-role "referrals-modal-own-code"}
       (or referral-code "Unavailable")]]
     [:div {:class ["rounded-lg" "border" "border-ho-surface" "bg-ho-bg" "p-3"]}
-     [:div {:class ["text-xs" "uppercase" "tracking-[0.08em]" "text-[#878c8f]"]}
+     [:div {:class ["text-xs" "uppercase" "tracking-[0.08em]" "text-ho-text-secondary"]}
       "Join Link"]
      [:div {:class ["mt-1" "break-all" "text-sm" "text-[#d3f5ef]"]
             :data-role "referrals-modal-join-link"}
@@ -216,7 +216,7 @@
       [:p {:class ["text-sm" "leading-5" "text-[#b7d3d0]"]}
        "Claimable rewards are transferred to your spot balance after the exchange accepts the signed action."]
       [:div {:class ["rounded-lg" "border" "border-ho-surface" "bg-ho-bg" "p-3"]}
-       [:div {:class ["text-xs" "uppercase" "tracking-[0.08em]" "text-[#878c8f]"]}
+       [:div {:class ["text-xs" "uppercase" "tracking-[0.08em]" "text-ho-text-secondary"]}
         "Claimable Rewards"]
        [:div {:class ["mt-1" "text-2xl" "num" "text-ho-text-hi"]
               :data-role "referrals-modal-claim-total"}

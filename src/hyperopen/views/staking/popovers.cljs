@@ -186,7 +186,7 @@
                     "top-1/2"
                     "-translate-y-1/2"
                     "text-sm"
-                    "text-[#949e9c]"
+                    "text-ho-text-secondary"
                     "focus:outline-none"
                     "focus:ring-0"
                     "focus:ring-offset-0"]
@@ -240,7 +240,7 @@
      [:span {:class ["truncate"]}
       (str (when selected? "✓ ")
            name)]
-     [:span {:class ["num" "shrink-0" "text-xs" "text-[#9aa3a4]"]}
+     [:span {:class ["num" "shrink-0" "text-xs" "text-ho-text-secondary"]}
       (if (number? stake)
         (str (shared/format-table-hype stake) " HYPE")
         "")]]))
@@ -263,7 +263,7 @@
    (if (seq filtered-options)
      (for [option filtered-options]
        (validator-option-row option selected-validator))
-     [:div {:class ["px-2" "py-2" "text-sm" "text-[#949e9c]"]}
+     [:div {:class ["px-2" "py-2" "text-sm" "text-ho-text-secondary"]}
       "No validators found"])])
 (defn- popover-validator-select
   [{:keys [selected-validator validators search-query dropdown-open?]}]
@@ -295,7 +295,7 @@
                              "pr-9"
                              "text-sm"
                              "text-[#c8d5d7]"
-                             "placeholder:text-[#9aa3a4]"]
+                             "placeholder:text-ho-text-secondary"]
                             shared/neutral-input-focus-classes)
                :on {:focus [[:actions/set-staking-form-field :validator-dropdown-open? true]]
                     :input [[:actions/set-staking-form-field :validator-search-query [:event.target/value]]
@@ -365,9 +365,9 @@
                        (shared/format-balance-hype (:available-stake balances)))]
     [:div {:class ["space-y-3"]}
      [:div {:class ["space-y-1" "text-center"]}
-      [:p {:class ["text-sm" "text-[#9aa3a4]"]}
+      [:p {:class ["text-sm" "text-ho-text-secondary"]}
        "Transfer HYPE between your staking and spot balances."]
-      [:p {:class ["text-sm" "text-[#9aa3a4]"]}
+      [:p {:class ["text-sm" "text-ho-text-secondary"]}
        "Transfers from Staking Balance to Spot Balance are locked for 7 days."]]
      (transfer-direction-toggle transfer-direction)
      (popover-amount-input {:input-id "staking-transfer-amount"
@@ -402,7 +402,7 @@
    [:div {:class ["space-y-1.5"]}
     (shared/key-value-row "Available to Stake" (shared/format-balance-hype (:available-stake balances)))
     (shared/key-value-row "Total Staked" (shared/format-balance-hype (:total-staked balances)))]
-   [:p {:class ["text-sm" "text-[#9aa3a4]"]}
+   [:p {:class ["text-sm" "text-ho-text-secondary"]}
     "The staking lockup period is 1 day."]
    (popover-cta-button {:label "Stake"
                         :submitting? (true? (:delegate? submitting))

@@ -22,7 +22,7 @@
      (shared/funding-asset-icon (:symbol asset) (shared/asset-icon-src asset))
      [:div {:class ["flex" "min-w-0" "flex-col"]}
       [:span {:class ["text-sm" "font-semibold" "text-[#e6eef2]"]} (:symbol asset)]
-      [:span {:class ["text-xs" "text-[#7e95a0]"]} (:network asset)]]]
+      [:span {:class ["text-xs" "text-ho-text-muted"]} (:network asset)]]]
     [:span {:class ["shrink-0" "text-sm" "font-medium" "text-[#dce9ee]"]}
      (:available-display asset)]]])
 
@@ -94,7 +94,7 @@
 (defn- withdraw-asset-selector
   [selected-asset]
   [:div {:class ["space-y-2"]}
-   [:label {:class ["block" "text-xs" "uppercase" "tracking-[0.08em]" "text-[#8ea4ab]"]}
+   [:label {:class ["block" "text-xs" "uppercase" "tracking-[0.08em]" "text-ho-text-muted"]}
     "Asset"]
    (shared/deposit-asset-card selected-asset)])
 
@@ -114,7 +114,7 @@
   [selected-asset flow destination submitting?]
   [:div {:class ["space-y-2"]}
    [:label {:for "funding-withdraw-destination-input"
-            :class ["block" "text-xs" "uppercase" "tracking-[0.08em]" "text-[#8ea4ab]"]}
+            :class ["block" "text-xs" "uppercase" "tracking-[0.08em]" "text-ho-text-muted"]}
     (withdraw-destination-label selected-asset flow)]
    [:input {:type "text"
             :id "funding-withdraw-destination-input"
@@ -163,7 +163,7 @@
   [flow]
   (when (hyperunit-address-flow? flow)
     [:div {:class ["flex" "items-center" "justify-between"]}
-     [:span {:class ["text-[#7d94a0]"]} "Withdrawal queue"]
+     [:span {:class ["text-ho-text-muted"]} "Withdrawal queue"]
      [:span {:class ["text-[#dce9ee]"]}
       (withdrawal-queue-copy (get-in flow [:withdrawal-queue]))]]))
 
@@ -172,7 +172,7 @@
   (when-let [tx-id (when (hyperunit-address-flow? flow)
                      (get-in flow [:withdrawal-queue :last-operation :tx-id]))]
     [:div {:class ["flex" "items-center" "justify-between" "gap-2"]}
-     [:span {:class ["text-[#7d94a0]"]} "Last queue tx"]
+     [:span {:class ["text-ho-text-muted"]} "Last queue tx"]
      (queue-operation-link-or-text (assoc (get-in flow [:withdrawal-queue :last-operation])
                                           :tx-id tx-id))]))
 
@@ -228,7 +228,7 @@
   [{:keys [selected-asset destination amount flow summary lifecycle actions]}]
   (let [submitting? (get-in actions [:submitting?])]
     [:div {:class ["space-y-3"] :data-role "funding-withdraw-detail-step"}
-     [:p {:class ["text-sm" "text-[#8ea4ab]"]}
+     [:p {:class ["text-sm" "text-ho-text-muted"]}
       (str "To the " (:network selected-asset) " network")]
      (withdraw-asset-selector selected-asset)
      (withdraw-destination-field selected-asset flow destination submitting?)

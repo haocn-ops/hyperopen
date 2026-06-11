@@ -21,7 +21,7 @@
     (shared/funding-asset-icon (:symbol asset) (shared/asset-icon-src asset))
     [:div {:class ["flex" "min-w-0" "flex-col"]}
      [:span {:class ["text-sm" "font-semibold" "text-[#e6eef2]"]} (:symbol asset)]
-     [:span {:class ["text-xs" "text-[#7e95a0]"]} (:network asset)]]]])
+     [:span {:class ["text-xs" "text-ho-text-muted"]} (:network asset)]]]])
 
 (defn deposit-select-content
   [{:keys [search assets selected-asset]}]
@@ -79,7 +79,7 @@
 (defn deposit-address-content
   [{:keys [selected-asset flow summary lifecycle actions]}]
   [:div {:class ["space-y-3"] :data-role "funding-deposit-address-step"}
-   [:p {:class ["text-sm" "text-[#8ea4ab]"]}
+   [:p {:class ["text-sm" "text-ho-text-muted"]}
     (str "From the " (:network selected-asset) " network")]
    (shared/deposit-asset-card selected-asset)
    [:div {:class ["space-y-3"]}
@@ -138,7 +138,7 @@
   [{:keys [selected-asset amount summary actions]}]
   (let [submitting? (get-in actions [:submitting?])]
     [:div {:class ["space-y-3"] :data-role "funding-deposit-amount-step"}
-     [:p {:class ["text-sm" "text-[#8ea4ab]"]}
+     [:p {:class ["text-sm" "text-ho-text-muted"]}
       (str "From the " (:network selected-asset) " network")]
      (shared/deposit-asset-card selected-asset)
      [:div {:class ["space-y-1.5"]}
@@ -198,7 +198,7 @@
                         "disabled:opacity-70"]
                 :on {:input [[:actions/enter-funding-deposit-amount
                               [:event.target/value]]]}}]
-       [:span {:class ["text-sm" "text-[#7e95a0]"]} (:symbol selected-asset)]]]
+       [:span {:class ["text-sm" "text-ho-text-muted"]} (:symbol selected-asset)]]]
      [:div {:class ["flex" "gap-2"]}
       (for [quick-amount (:quick-amounts amount)]
         ^{:key (str "deposit-quick-" quick-amount)}

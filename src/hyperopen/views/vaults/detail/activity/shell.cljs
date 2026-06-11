@@ -20,8 +20,8 @@
                           "font-normal"
                           "transition-colors"]
                          (if (= value selected-tab)
-                           ["border-[#303030]" "text-ho-text"]
-                           ["border-[#303030]" "text-[#949e9c]" "hover:text-ho-text"]))
+                           ["border-ho-border" "text-ho-text"]
+                           ["border-ho-border" "text-ho-text-secondary" "hover:text-ho-text"]))
             :on {:click [[:actions/set-vault-detail-activity-tab value]]}}
    (if-let [count-label (format-activity-count count)]
      (str label " (" count-label ")")
@@ -83,7 +83,7 @@
                                "items-center"
                                "gap-1"
                                "text-xs"
-                               "text-[#949e9c]"
+                               "text-ho-text-secondary"
                                "transition-colors"]
                               (if filter-enabled?
                                 ["cursor-pointer" "hover:text-ho-text"]

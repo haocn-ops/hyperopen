@@ -248,7 +248,7 @@
                                 "transition-colors"]
                                (if (= tab-value selected-tab)
                                  ["border-[#2f5e58]" "bg-[#0d252f]" "text-trading-text"]
-                                 ["border-transparent" "text-[#8ea4ab]" "hover:text-trading-text"]))
+                                 ["border-transparent" "text-ho-text-muted" "hover:text-trading-text"]))
                   :data-role (str "portfolio-chart-tab-" (name tab-value))
                   :aria-pressed (= tab-value selected-tab)
                   :on {:click [[:actions/select-portfolio-chart-tab tab-value]]}}

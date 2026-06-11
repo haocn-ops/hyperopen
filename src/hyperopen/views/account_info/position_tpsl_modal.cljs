@@ -51,7 +51,7 @@
                                 "rounded-lg"
                                 "border"
                                 "border-ho-border-accent-muted"
-                                (if mobile-sheet? "bg-[#0b181d]" "bg-transparent")
+                                (if mobile-sheet? "bg-ho-bg" "bg-transparent")
                                 "text-gray-300"
                                 "transition-colors"
                                 "hover:bg-base-300"

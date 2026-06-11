@@ -74,7 +74,7 @@
                           "focus:ring-offset-0"
                           "appearance-none"]
                          (if active?
-                           ["bg-[#123a36]" "text-ho-accent-bright"]
+                           ["bg-ho-accent-soft" "text-ho-accent-bright"]
                            ["text-white" "hover:bg-base-200"]))
             :href (or href route)
             :data-role more-data-role
@@ -241,7 +241,7 @@
                           "rounded-xl"
                           "border"
                           "border-[#173038]"
-                          "bg-[#0b181d]"
+                          "bg-ho-bg"
                           "text-[#d7e7e8]"
                           "transition-colors"
                           "hover:bg-[#102229]"

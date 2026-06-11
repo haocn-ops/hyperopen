@@ -91,7 +91,7 @@
   (cond
     (not (number? value)) ["text-trading-text-secondary"]
     (pos? value) ["text-[#36e1d3]"]
-    (neg? value) ["text-[#ff6b8a]"]
+    (neg? value) ["text-ho-sell-hi"]
     :else ["text-trading-text"]))
 
 (defn- sort-direction-icon

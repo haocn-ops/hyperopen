@@ -151,7 +151,7 @@
                      "rounded-md"
                      "text-[#56dcca]"
                      "transition-colors"
-                     "hover:bg-[#123a36]"
+                     "hover:bg-ho-accent-soft"
                      "hover:text-ho-accent-bright"
                      "focus:outline-none"
                      "focus-visible:ring-1"

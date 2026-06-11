@@ -326,7 +326,7 @@
                     "rounded-lg"
                     "border"
                     "border-ho-border-accent-muted"
-                    "bg-[#0b181d]"
+                    "bg-ho-bg"
                     "text-gray-300"
                     "transition-colors"
                     "hover:bg-[#102229]"

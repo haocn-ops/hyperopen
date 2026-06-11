@@ -93,7 +93,7 @@
     (shared/summary-card "Your Stake" (shared/format-summary-hype (:your-stake summary)) "staking-summary-user")]
    [:div {:class ["rounded-[10px]" "border" "border-ho-surface" "bg-ho-bg" "p-4" "space-y-2"]
           :data-role "staking-balance-panel"}
-    [:div {:class ["text-sm" "leading-[15px]" "font-normal" "text-[#878c8f]"]}
+    [:div {:class ["text-sm" "leading-[15px]" "font-normal" "text-ho-text-secondary"]}
      "Staking Balance"]
     (shared/key-value-row "Available to Transfer to Staking Balance"
                           (shared/format-balance-hype (:available-transfer balances)))
@@ -116,8 +116,8 @@
                           "focus:ring-0"
                           "focus:ring-offset-0"]
                          (if active?
-                           ["border-[#303030]" "text-ho-text"]
-                           ["border-[#303030]" "text-[#949e9c]" "hover:text-[#c5d0ce]"]))
+                           ["border-ho-border" "text-ho-text"]
+                           ["border-ho-border" "text-ho-text-secondary" "hover:text-[#c5d0ce]"]))
             :on {:click [action]}}
    label])
 

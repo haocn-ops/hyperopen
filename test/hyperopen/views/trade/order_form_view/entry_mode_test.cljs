@@ -23,8 +23,8 @@
         limit-classes (set (get-in limit-button [1 :class]))
         pro-classes (set (get-in pro-button [1 :class]))]
     (is (contains? market-classes "text-ho-text"))
-    (is (contains? limit-classes "text-[#949E9C]"))
-    (is (contains? pro-classes "text-[#949E9C]"))
+    (is (contains? limit-classes "text-ho-text-secondary"))
+    (is (contains? pro-classes "text-ho-text-secondary"))
     (is (= "0%"
            (get-in indicator [1 :style :left])))
     (is (= "33.333333%"

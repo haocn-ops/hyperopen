@@ -340,7 +340,7 @@
                      "py-2.5"]
              :style grid-style}
        [:div {:class ["flex" "min-w-0" "items-center" "justify-between" "gap-2"]}
-        [:span {:class ["text-xs" "font-medium" "uppercase" "tracking-wide" "text-[#8aa0a7]"]}
+        [:span {:class ["text-xs" "font-medium" "uppercase" "tracking-wide" "text-ho-text-muted"]}
          "Metric"]
         (when (and (seq timeframe-options)
                    (keyword? selected-timeframe))
@@ -352,12 +352,12 @@
                                        :data-role-prefix "vault-detail-performance-metrics-timeframe"}))]
        (for [[idx {:keys [coin label]}] (map-indexed vector benchmark-columns*)]
          ^{:key (str "vault-detail-performance-metrics-benchmark-label-" coin)}
-         [:span {:class ["justify-self-start" "text-xs" "font-medium" "uppercase" "tracking-wide" "text-left" "text-[#8aa0a7]"]
+         [:span {:class ["justify-self-start" "text-xs" "font-medium" "uppercase" "tracking-wide" "text-left" "text-ho-text-muted"]
                  :data-role (if (zero? idx)
                               "vault-detail-performance-metrics-benchmark-label"
                               (str "vault-detail-performance-metrics-benchmark-label-" coin))}
           label])
-       [:span {:class ["justify-self-start" "text-xs" "font-medium" "uppercase" "tracking-wide" "text-left" "text-[#8aa0a7]"]
+       [:span {:class ["justify-self-start" "text-xs" "font-medium" "uppercase" "tracking-wide" "text-left" "text-ho-text-muted"]
                :data-role "vault-detail-performance-metrics-vault-label"}
         (or (non-blank-text vault-label)
             "Vault")]]

@@ -38,7 +38,7 @@
 (defn percent-text-class
   [value]
   (if (neg? (if (number? value) value 0))
-    ["text-[#ff6b8a]"]
+    ["text-ho-sell-hi"]
     ["text-[#36e1d3]"]))
 
 (defn format-age

@@ -130,6 +130,27 @@
                                      (or (:assetPositions dex-state) [])))))]
     (vec (concat base-rows dex-rows))))
 
+(defonce ^:private market-resolution-memo
+  (volatile! nil))
+
+(defn- resolve-market-cached
+  ;; resolve-market-by-coin falls back to linear catalog scans for base
+  ;; tokens, and the snapshot resolves every position and balance on each
+  ;; rebuild. Cache resolutions per market catalog identity.
+  [market-by-key coin]
+  (let [memo @market-resolution-memo
+        memo (if (and memo (identical? (:market-by-key memo) market-by-key))
+               memo
+               {:market-by-key market-by-key :by-coin {}})]
+    (if-let [entry (find (:by-coin memo) coin)]
+      (do
+        (vreset! market-resolution-memo memo)
+        (val entry))
+      (let [market (markets/resolve-market-by-coin market-by-key coin)]
+        (vreset! market-resolution-memo
+                 (assoc-in memo [:by-coin coin] market))
+        market))))
+
 (defn- perps-instrument-id
   [dex coin]
   (let [coin* (normalize-coin coin)
@@ -149,7 +170,7 @@
   [market-by-key position-row]
   (let [position (or (:position position-row) {})
         coin (normalize-coin (:coin position))
-        market (markets/resolve-market-by-coin market-by-key coin)]
+        market (resolve-market-cached market-by-key coin)]
     (or (parse-number (:markPx position))
         (parse-number (:markPrice position))
         (parse-number (:markPx position-row))
@@ -232,7 +253,7 @@
                                            :clearinghouse)}
                                 (market-display-fields
                                  (or (get market-by-key instrument-id)
-                                     (markets/resolve-market-by-coin market-by-key coin)))))))))
+                                     (resolve-market-cached market-by-key coin)))))))))
             {:exposures []
              :warnings []}
             (position-rows state))))
@@ -245,7 +266,7 @@
   [market-by-key coin]
   (if (usdc-coin? coin)
     1
-    (market-mark-price (markets/resolve-market-by-coin market-by-key coin))))
+    (market-mark-price (resolve-market-cached market-by-key coin))))
 
 (defn- market-display-fields
   [market]
@@ -271,7 +292,7 @@
                     hold (or (parse-number (:hold balance)) 0)
                     available (when (number? total)
                                 (- total hold))
-                    market (markets/resolve-market-by-coin market-by-key coin)
+                    market (resolve-market-cached market-by-key coin)
                     price (spot-price market-by-key coin)
                     instrument-id (spot-instrument-id market coin)]
                 (cond
@@ -329,7 +350,23 @@
    :perp-dex-count (count (or (:perp-dex-clearinghouse state) {}))
    :market-count (count (or (get-in state [:asset-selector :market-by-key]) {}))})
 
-(defn current-portfolio-snapshot
+(defn- snapshot-memo-inputs
+  ;; Every state slice the snapshot reads, by result identity. Keep this in
+  ;; sync with the reads below or the memo will serve stale snapshots.
+  [state]
+  [(clearinghouse-state state)
+   (spot-balances state)
+   (:perp-dex-clearinghouse state)
+   (get-in state [:asset-selector :market-by-key])
+   (get-in state [:account :mode])
+   (account-context/effective-account-address state)
+   (account-context/inspected-account-read-only? state)
+   (account-context/mutations-blocked-message state)])
+
+(defonce ^:private snapshot-memo
+  (volatile! nil))
+
+(defn- build-current-portfolio-snapshot
   [state]
   (let [{perp-exposures :exposures
          perp-warnings :warnings} (build-perp-exposures state)
@@ -377,6 +414,19 @@
                           exposures)
      :warnings (vec (concat perp-warnings spot-warnings))
      :signature (snapshot-signature state address)}))
+
+(defn current-portfolio-snapshot
+  ;; Rebuilding exposures walks every position and balance, and the setup
+  ;; route recomputes the snapshot on every streaming render. Memoize on the
+  ;; state slices the build actually reads.
+  [state]
+  (let [inputs (snapshot-memo-inputs state)
+        cached @snapshot-memo]
+    (if (and cached (= (:inputs cached) inputs))
+      (:value cached)
+      (let [value (build-current-portfolio-snapshot state)]
+        (vreset! snapshot-memo {:inputs inputs :value value})
+        value))))
 
 (defn current-derived-constraints
   [snapshot existing-constraints]

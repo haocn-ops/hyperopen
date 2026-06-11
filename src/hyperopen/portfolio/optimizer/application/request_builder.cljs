@@ -325,21 +325,39 @@
       :market-cap-by-coin market-cap-by-coin
       :current-portfolio current-portfolio})))
 
+(def ^:private align-history-memo-capacity
+  ;; Each request aligns two universes (requested and currently held), so the
+  ;; memo must hold more than one entry to survive a single build.
+  4)
+
+(defonce ^:private align-history-memo
+  (volatile! {}))
+
 (defn- align-history
+  ;; Alignment walks every candle series and dominates request building, but
+  ;; its inputs only change when the universe, loaded history, or as-of move -
+  ;; not when draft constraints are edited. Unchanged state subtrees keep the
+  ;; memo lookup cheap because equality short-circuits on identity.
   [{:keys [universe
            history-data
            as-of-ms
            stale-after-ms
            funding-periods-per-year]}]
-  (history-loader/align-history-inputs
-   {:universe universe
-    :api-v2-history (:api-v2-history history-data)
-    :candle-history-by-coin (:candle-history-by-coin history-data)
-    :funding-history-by-coin (:funding-history-by-coin history-data)
-    :vault-details-by-address (:vault-details-by-address history-data)
-    :as-of-ms as-of-ms
-    :stale-after-ms stale-after-ms
-    :funding-periods-per-year funding-periods-per-year}))
+  (let [inputs {:universe universe
+                :api-v2-history (:api-v2-history history-data)
+                :candle-history-by-coin (:candle-history-by-coin history-data)
+                :funding-history-by-coin (:funding-history-by-coin history-data)
+                :vault-details-by-address (:vault-details-by-address history-data)
+                :as-of-ms as-of-ms
+                :stale-after-ms stale-after-ms
+                :funding-periods-per-year funding-periods-per-year}
+        memo @align-history-memo]
+    (if-let [entry (find memo inputs)]
+      (val entry)
+      (let [value (history-loader/align-history-inputs inputs)
+            memo* (if (>= (count memo) align-history-memo-capacity) {} memo)]
+        (vreset! align-history-memo (assoc memo* inputs value))
+        value))))
 
 (defn build-engine-request
   [{:keys [draft

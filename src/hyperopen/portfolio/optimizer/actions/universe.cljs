@@ -104,6 +104,44 @@
   (and (:optimizer-history/instrument-id instrument)
        (not (known-unusable-history? instrument))))
 
+(defn- spot-instrument?
+  [instrument]
+  (let [instrument-id (:instrument-id instrument)
+        market-type (ids/normalize-market-type
+                     (or (:market-type instrument)
+                         (:instrument-type instrument)
+                         (:optimizer-history/instrument-kind instrument)))]
+    (or (= :spot market-type)
+        (and (string? instrument-id)
+             (or (.startsWith instrument-id "spot:")
+                 (.startsWith instrument-id "hl:spot:"))))))
+
+(defn- include-spot-assets?
+  [state]
+  (true? (get-in state (conj contracts/draft-constraints-path :include-spot?))))
+
+(defn- draft-universe-exposures-from-current
+  [state snapshot]
+  (let [include-spot? (include-spot-assets? state)]
+    (cond->> (:exposures snapshot)
+      (not include-spot?)
+      (remove spot-instrument?)
+      :always
+      vec)))
+
+(defn- snapshot-with-exposures
+  [snapshot exposures]
+  (let [exposures* (vec exposures)
+        gross-usdc (reduce + (map :abs-notional-usdc exposures*))
+        net-usdc (reduce + (map :signed-notional-usdc exposures*))]
+    (-> snapshot
+        (assoc :exposures exposures*
+               :by-instrument (into {}
+                                    (map (juxt :instrument-id identity))
+                                    exposures*))
+        (assoc-in [:capital :gross-exposure-usdc] gross-usdc)
+        (assoc-in [:capital :net-exposure-usdc] net-usdc))))
+
 (defn- from-current-candidate
   [state idx exposure]
   (when-let [instrument (common/exposure->universe-instrument exposure)]
@@ -353,12 +391,14 @@
 (defn set-portfolio-optimizer-universe-from-current
   [state]
   (let [snapshot (current-portfolio/current-portfolio-snapshot state)
+        draft-exposures (draft-universe-exposures-from-current state snapshot)
+        draft-snapshot (snapshot-with-exposures snapshot draft-exposures)
         universe (usable-universe-from-current-exposures
                   state
-                  (:exposures snapshot))
+                  draft-exposures)
         current-derived-constraints
         (when-let [constraints (get-in state contracts/draft-constraints-path)]
-          (current-portfolio/current-derived-constraints snapshot constraints))]
+          (current-portfolio/current-derived-constraints draft-snapshot constraints))]
     (if (seq universe)
       (let [prefetch-state (history-prefetch/cleanup-to-instrument-ids
                             (history-prefetch/prefetch-state state)

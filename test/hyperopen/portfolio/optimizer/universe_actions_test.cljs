@@ -74,13 +74,25 @@
                                               :mark "2"}}}}]
     (is (= [[:effects/save-many
              [[[:portfolio :optimizer :draft :universe]
-               [btc-instrument purr-instrument]]
+               [btc-instrument]]
               [[:portfolio :optimizer :history-prefetch]
-               (queued-prefetch-state [btc-instrument purr-instrument])]
+               (queued-prefetch-state [btc-instrument])]
               [[:portfolio :optimizer :draft :metadata :dirty?]
                true]]]
             selection-prefetch-effect]
-           (actions/set-portfolio-optimizer-universe-from-current state)))))
+           (actions/set-portfolio-optimizer-universe-from-current state)))
+    (let [include-spot-effects
+          (actions/set-portfolio-optimizer-universe-from-current
+           (assoc-in state
+                     [:portfolio :optimizer :draft :constraints :include-spot?]
+                     true))
+          include-spot-values (effect-values-by-path include-spot-effects)]
+      (is (= [btc-instrument purr-instrument]
+             (get include-spot-values [:portfolio :optimizer :draft :universe])))
+      (is (= (queued-prefetch-state [btc-instrument purr-instrument])
+             (get include-spot-values [:portfolio :optimizer :history-prefetch])))
+      (is (= selection-prefetch-effect
+             (second include-spot-effects))))))
 
 (deftest set-draft-universe-from-current-holdings-ignores-empty-snapshot-test
   (is (= []

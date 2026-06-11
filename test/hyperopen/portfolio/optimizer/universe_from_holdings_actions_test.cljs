@@ -67,6 +67,28 @@
                               :quality-status (if missing? :failed :passed)}}])))
          coins)})
 
+(defn- holdings-state-with-spot
+  [include-spot?]
+  {:webdata2 {:clearinghouseState
+              {:marginSummary {:accountValue "1000"}
+               :assetPositions [(perp-position-row "BTC" 300)]}}
+   :spot {:clearinghouse-state
+          {:balances [{:coin "PURR"
+                       :total "10"
+                       :hold "0"}]}}
+   :asset-selector {:market-by-key {"perp:BTC" {:key "perp:BTC"
+                                                :market-type :perp
+                                                :coin "BTC"
+                                                :symbol "BTC"}
+                                    "spot:PURR/USDC" {:key "spot:PURR/USDC"
+                                                      :market-type :spot
+                                                      :coin "PURR/USDC"
+                                                      :symbol "PURR/USDC"
+                                                      :base "PURR"
+                                                      :quote "USDC"
+                                                      :mark "5"}}}
+   :portfolio {:optimizer {:draft {:constraints {:include-spot? include-spot?}}}}})
+
 (deftest set-draft-universe-from-current-holdings-skips-known-unusable-history-without-truncating-test
   (let [coins (mapv #(str "COIN" %) (range 30))
         missing-coins #{"COIN29" "COIN28"}
@@ -96,3 +118,21 @@
            prefetch-state))
     (is (= selection-prefetch-effect
            (second effects)))))
+
+(deftest set-draft-universe-from-current-holdings-respects-include-spot-constraint-test
+  (let [spot-excluded-effects
+        (actions/set-portfolio-optimizer-universe-from-current
+         (holdings-state-with-spot false))
+        spot-excluded-values (effect-values-by-path spot-excluded-effects)
+        spot-excluded-universe
+        (get spot-excluded-values [:portfolio :optimizer :draft :universe])
+        spot-included-effects
+        (actions/set-portfolio-optimizer-universe-from-current
+         (holdings-state-with-spot true))
+        spot-included-values (effect-values-by-path spot-included-effects)
+        spot-included-universe
+        (get spot-included-values [:portfolio :optimizer :draft :universe])]
+    (is (= ["perp:BTC"]
+           (mapv :instrument-id spot-excluded-universe)))
+    (is (= ["perp:BTC" "spot:PURR/USDC"]
+           (mapv :instrument-id spot-included-universe)))))

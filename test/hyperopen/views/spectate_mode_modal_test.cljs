@@ -164,3 +164,30 @@
     (is (contains? (set (hiccup/collect-strings (first address-rows)))
                    "Treasury wallet"))
     (is (= 0 (count empty-rows)))))
+
+(deftest spectate-mode-modal-fuzzy-filters-watchlist-by-label-test
+  (let [portfolio-address "0x4444444444444444444444444444444444444444"
+        treasury-address "0x5555555555555555555555555555555555555555"
+        watchlist [{:address portfolio-address
+                    :label "Portfolio desk"}
+                   {:address treasury-address
+                    :label "Treasury wallet"}
+                   {:address saved-address
+                    :label "Desk wallet"}]
+        render-rows (fn [search]
+                      (-> (modal/spectate-mode-modal-view
+                           (-> (modal-state {:search search
+                                             :label ""
+                                             :editing-watchlist-address nil})
+                               (assoc-in [:account-context :watchlist] watchlist)))
+                          (all-by-role "spectate-mode-watchlist-row")))
+        missing-character-rows (render-rows "trasury")
+        transposed-character-rows (render-rows "treausry")
+        empty-rows (render-rows "tresor")]
+    (is (= 1 (count missing-character-rows)))
+    (is (contains? (set (hiccup/collect-strings (first missing-character-rows)))
+                   "Treasury wallet"))
+    (is (= 1 (count transposed-character-rows)))
+    (is (contains? (set (hiccup/collect-strings (first transposed-character-rows)))
+                   "Treasury wallet"))
+    (is (= 0 (count empty-rows)))))

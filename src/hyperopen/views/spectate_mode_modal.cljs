@@ -1,6 +1,6 @@
 (ns hyperopen.views.spectate-mode-modal
-  (:require [clojure.string :as str]
-            [hyperopen.account.context :as account-context]
+  (:require [hyperopen.account.context :as account-context]
+            [hyperopen.views.spectate-mode-modal.search :as search]
             [hyperopen.views.spectate-mode-modal.watchlist :as watchlist]))
 
 (def ^:private panel-gap-px
@@ -193,29 +193,12 @@
      [:span {:data-role "spectate-mode-copy-feedback-message"}
       message]]))
 
-(defn- normalized-search-query
-  [search]
-  (let [query (some-> search str str/trim str/lower-case)]
-    (when (seq query)
-      query)))
-
-(defn- includes-search-query?
-  [query value]
-  (boolean
-   (when (and (seq query) (some? value))
-     (str/includes? (str/lower-case (str value)) query))))
-
-(defn- watchlist-entry-matches-search?
-  [query entry]
-  (or (includes-search-query? query (:label entry))
-      (includes-search-query? query (:address entry))))
-
 (defn- filter-watchlist
   [watchlist search edit-mode?]
   (if-let [query (and (not edit-mode?)
-                      (normalized-search-query search))]
+                      (search/normalized-query search))]
     (->> watchlist
-         (filter #(watchlist-entry-matches-search? query %))
+         (filter #(search/entry-matches-query? query %))
          vec)
     watchlist))
 
@@ -244,7 +227,7 @@
      :show-copy-feedback? (and (map? copy-feedback)
                                (seq (:message copy-feedback)))
      :watchlist filtered-watchlist
-     :watchlist-filter-active? (and (seq (normalized-search-query search))
+     :watchlist-filter-active? (and (seq (search/normalized-query search))
                                     (not edit-mode?))
      :has-saved-watchlist? (seq watchlist)
      :active? active?

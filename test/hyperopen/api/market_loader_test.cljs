@@ -35,20 +35,24 @@
       (-> (market-loader/request-asset-selector-markets! deps)
           (.then (fn [result]
                    (is (= {:phase :bootstrap
-                           :spot-meta {:tokens []}
+                           :spot-meta {}
                            :market-state {:markets [{:coin "BTC"}]}}
                           result))
                    (is (= [] @ensure-perp-calls))
-                   (is (= [{:priority :high}] @ensure-spot-calls))
-                   (is (= [{:priority :high}] @ensure-outcome-calls))
-                   (is (= [{:priority :high}] @ensure-webdata-calls))
+                   ;; Bootstrap is perp-only: the spot/webdata2/outcome catalogs
+                   ;; are demand-path (:full) fetches, not boot work.
+                   (is (= [] @ensure-spot-calls))
+                   (is (= [] @ensure-outcome-calls))
+                   (is (= [] @ensure-webdata-calls))
                    (is (= [[nil {:priority :high
                                  :dedupe-key :asset-contexts}]]
                           @meta-calls))
                    (is (= 1 (count @build-calls)))
                    (is (= "BTC" (first (first @build-calls))))
                    (is (= [] (nth (first @build-calls) 2)))
-                   (is (= {:outcomes [{:outcome 0}]} (nth (first @build-calls) 6)))
+                   (is (= {} (nth (first @build-calls) 3)))
+                   (is (= nil (nth (first @build-calls) 4)))
+                   (is (= {:outcomes [] :questions []} (nth (first @build-calls) 6)))
                    (done)))
           (.catch (fn [err]
                     (is false (str "Unexpected error: " err))

@@ -474,9 +474,21 @@
            mark-performance!]}]
   (-> (if (account-surface-service/portfolio-performance-metrics-route? @store)
         (js/Promise.resolve nil)
-        (js/Promise.all
-         (clj->js [(fetch-asset-contexts! store {:priority :high})
-                   (fetch-asset-selector-markets! store {:phase :bootstrap})])))
+        (-> (js/Promise.all
+             (clj->js [(fetch-asset-contexts! store {:priority :high})
+                       (fetch-asset-selector-markets! store {:phase :bootstrap})]))
+            (.then
+             (fn [results]
+               ;; The bootstrap catalog is perp-only. A cold landing on a
+               ;; non-perp pair (spot/outcome trade route) resolves no
+               ;; :active-market from it, and the trade form needs the market's
+               ;; params — chase the full catalog immediately instead of
+               ;; waiting for a demand path.
+               (let [state @store]
+                 (when (and (some? (:active-asset state))
+                            (nil? (:active-market state)))
+                   (fetch-asset-selector-markets! store {:phase :full})))
+               results))))
       (.finally
        (fn []
          (mark-performance! "app:critical-data:ready")))))

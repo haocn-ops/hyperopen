@@ -42,3 +42,10 @@
   (if (fn? (.-requestAnimationFrame js/globalThis))
     (.requestAnimationFrame js/globalThis f)
     (set-timeout! f 16)))
+
+(defn schedule-idle-or-timeout!
+  "Run f when the main thread is idle, or after timeout-ms at the latest."
+  [f timeout-ms]
+  (if (fn? (.-requestIdleCallback js/globalThis))
+    (.requestIdleCallback js/globalThis f #js {:timeout timeout-ms})
+    (set-timeout! f timeout-ms)))

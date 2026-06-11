@@ -5,6 +5,7 @@ import {
 import {
   CONTROL_CACHE_CONTROL,
   IMMUTABLE_CACHE_CONTROL,
+  THEME_PRELOAD_INLINE_SOURCE,
   expectedDocumentHeaders,
 } from "../../release-assets/security_headers.mjs";
 
@@ -60,7 +61,10 @@ test("trade direct load returns the trade-specific title @smoke", async ({ reque
     expect(response.headers()[headerName]).toBe(expectedValue);
   }
   expect(extractTitle(body)).toBe("Trade perpetuals on Hyperliquid with an open-source client");
-  expect(body).not.toMatch(/<script(?![^>]*\bsrc=)[^>]*>/i);
+  const inlineScripts = [...body.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi)].map(
+    (match) => match[1]
+  );
+  expect(inlineScripts).toEqual([THEME_PRELOAD_INLINE_SOURCE]);
 });
 
 test("portfolio direct load returns the portfolio-specific title @smoke", async ({ request }) => {

@@ -231,7 +231,7 @@
                 app-core/store
                 {:persist-active-market-display! (fn [_] nil)
                  :persist-asset-selector-markets-cache! effect-adapters/persist-asset-selector-markets-cache!
-                 :request-animation-frame! (fn [f]
+                 :schedule-cache-write! (fn [f]
                                              (f 0)
                                              :frame-id)})
                (swap! app-core/store assoc-in [:asset-selector :sort-by] :volume)

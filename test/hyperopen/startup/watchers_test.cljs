@@ -158,7 +158,7 @@
       :persist-asset-selector-markets-cache! (fn [markets state]
                                                (swap! persisted conj {:markets markets
                                                                       :sort-by (get-in state [:asset-selector :sort-by])}))
-      :request-animation-frame! (fn [f]
+      :schedule-cache-write! (fn [f]
                                   (reset! queued-frame f)
                                   :frame-id)})
     (swap! store (fn [state]
@@ -188,7 +188,7 @@
       :persist-asset-selector-markets-cache! (fn [markets state]
                                                (swap! persisted conj {:markets markets
                                                                       :loaded-at-ms (get-in state [:asset-selector :loaded-at-ms])}))
-      :request-animation-frame! (fn [f]
+      :schedule-cache-write! (fn [f]
                                   (reset! queued-frame f)
                                   :frame-id)})
     (swap! store (fn [state]
@@ -215,7 +215,7 @@
      {:persist-active-market-display! (fn [_] nil)
       :persist-asset-selector-markets-cache! (fn [markets _state]
                                                (swap! persisted conj markets))
-      :request-animation-frame! (fn [f]
+      :schedule-cache-write! (fn [f]
                                   (swap! frame-callbacks conj f)
                                   :frame-id-1)})
     (watchers/install-store-cache-watchers!
@@ -223,7 +223,7 @@
      {:persist-active-market-display! (fn [_] nil)
       :persist-asset-selector-markets-cache! (fn [markets _state]
                                                (swap! persisted conj markets))
-      :request-animation-frame! (fn [f]
+      :schedule-cache-write! (fn [f]
                                   (swap! frame-callbacks conj f)
                                   :frame-id-2)})
     (swap! store (fn [state]

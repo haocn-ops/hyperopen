@@ -3,6 +3,8 @@ import { mobileViewport, visitRoute, waitForIdle } from "../support/hyperopen.mj
 
 const WATCHLIST_ADDRESS = "0x2222222222222222222222222222222222222222";
 const WATCHLIST_LABEL = "Playwright desk";
+const SECOND_WATCHLIST_ADDRESS = "0x3333333333333333333333333333333333333333";
+const SECOND_WATCHLIST_LABEL = "Treasury wallet";
 
 async function expectWithinViewport(page, locator) {
   const box = await locator.boundingBox();
@@ -71,6 +73,30 @@ async function exerciseSpectateModal(page, mode) {
 
   await addButton.click();
   await waitForIdle(page, { quietMs: 150, timeoutMs: 5_000, pollMs: 50 });
+
+  await searchInput.fill(SECOND_WATCHLIST_ADDRESS);
+  await labelInput.fill(SECOND_WATCHLIST_LABEL);
+  await expect(addButton).toBeEnabled();
+  await addButton.click();
+  await waitForIdle(page, { quietMs: 150, timeoutMs: 5_000, pollMs: 50 });
+
+  const rows = modal.locator("[data-role='spectate-mode-watchlist-row']");
+  await expect(rows).toHaveCount(1);
+  await expect(rows.first()).toContainText(SECOND_WATCHLIST_LABEL);
+
+  await searchInput.fill("");
+  await expect(rows).toHaveCount(2);
+
+  await searchInput.fill("treasury");
+  await expect(rows).toHaveCount(1);
+  await expect(rows.first()).toContainText(SECOND_WATCHLIST_LABEL);
+
+  await searchInput.fill("0x3333333333");
+  await expect(rows).toHaveCount(1);
+  await expect(rows.first()).toContainText(SECOND_WATCHLIST_LABEL);
+
+  await searchInput.fill("");
+  await expect(rows).toHaveCount(2);
 
   const row = modal.locator("[data-role='spectate-mode-watchlist-row']", {
     hasText: WATCHLIST_LABEL

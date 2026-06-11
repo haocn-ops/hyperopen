@@ -52,6 +52,9 @@
       true
       (assoc :blocklist blocklist)
 
+      true
+      (assoc :include-spot? (true? (:include-spot? constraints*)))
+
       (empty? allowlist)
       (dissoc :allowlist)
 

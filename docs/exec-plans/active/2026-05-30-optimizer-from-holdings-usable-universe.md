@@ -6,9 +6,9 @@ This document is maintained in accordance with `/hyperopen/docs/PLANS.md` and `/
 
 ## Purpose / Big Picture
 
-Users should be able to open the portfolio optimizer, click `From holdings`, and get a universe that is small enough and sane enough to run. The current action imports every current exposure. In the usability audit this produced a 132-asset universe while the UI still said `cap: 25 assets`, then failed waiting for optimizer history. After this change, `From holdings` should select at most 25 holdings, prefer holdings with optimizer history discovery metadata that is not known-missing or rejected, and rank selected holdings by largest absolute current exposure.
+Users should be able to open the portfolio optimizer, click `From holdings`, and get a universe that reflects their usable holdings without a fixed asset-count cap. In the usability audit this previously produced a 132-asset universe while the UI still said `cap: 25 assets`, then failed waiting for optimizer history. The cap was first enforced to make the flow usable, then removed by explicit user request on 2026-06-11. Current behavior should prefer holdings with optimizer history discovery metadata that is not known-missing or rejected, rank selected holdings by largest absolute current exposure, and import all holdings that survive that known-unusable-history filter.
 
-The user-visible proof is simple: a portfolio with many holdings should produce a capped optimizer universe instead of importing everything. A portfolio with discovery metadata that marks some holdings as missing or rejected should skip those known-unusable holdings when building the draft universe.
+The user-visible proof is simple: a portfolio with many holdings should no longer be truncated to 25 assets, and the setup UI should no longer show a 25-asset cap. A portfolio with discovery metadata that marks some holdings as missing or rejected should still skip those known-unusable holdings when building the draft universe.
 
 ## Context References
 
@@ -36,6 +36,7 @@ Local scratch refs, non-authoritative:
 - [x] (2026-05-30) Ran focused optimizer action tests after implementation.
 - [x] (2026-05-30) Moved the new test into a dedicated namespace after the namespace-size guard flagged the existing universe action test file.
 - [x] (2026-05-30) Ran required validation attempts and recorded outcomes.
+- [x] (2026-06-11) Removed the fixed From holdings asset-count cap by explicit user request while keeping the known-unusable-history filter and notional ranking.
 - [ ] Resolve or explicitly accept unrelated repo documentation/namespace-size blockers before moving this plan to completed.
 
 ## Surprises & Discoveries
@@ -58,9 +59,13 @@ Local scratch refs, non-authoritative:
   Rationale: The user requested the From holdings import behavior. Manual search ranking is a separate usability issue from the audit and should be handled independently.
   Date/Author: 2026-05-30 / Codex
 
-- Decision: Enforce a 25-instrument cap in the action rather than only changing display copy.
+- Decision: Superseded on 2026-06-11 - enforce a 25-instrument cap in the action rather than only changing display copy.
   Rationale: The setup UI already says `cap: 25 assets`; importing more than 25 contradicts the UI and creates slow, failure-prone history prefetch.
   Date/Author: 2026-05-30 / Codex
+
+- Decision: Remove the fixed From holdings asset-count cap.
+  Rationale: The user explicitly requested no asset-count limit on 2026-06-11. The action should still filter known-unusable history rows and preserve deterministic largest-notional ordering, but it should not truncate otherwise usable holdings.
+  Date/Author: 2026-06-11 / Codex
 
 - Decision: Skip holdings that discovery metadata marks as known-unusable, but keep holdings whose history status is unknown.
   Rationale: Discovery may not have loaded when a user clicks From holdings. Unknown rows can still prefetch and prove themselves. Rows already known as missing, rejected, unavailable, unsupported, or disabled should not be selected when building a usable universe.
@@ -86,11 +91,11 @@ Optimizer history API discovery is stored under `[:portfolio :optimizer :history
 
 ## Plan of Work
 
-First, add a failing unit test in `test/hyperopen/portfolio/optimizer/universe_from_holdings_actions_test.cljs`. The test should build a state with 30 current perp positions and history discovery metadata that marks the two largest positions as `:missing`. It should assert that `set-portfolio-optimizer-universe-from-current` saves exactly 25 instruments, skips the known-missing top two positions, selects the next largest positions in descending notional order, and queues history prefetch only for the selected universe. This dedicated namespace keeps the already-large general universe action test namespace from growing further.
+First, add/update a failing unit test in `test/hyperopen/portfolio/optimizer/universe_from_holdings_actions_test.cljs`. The test should build a state with 30 current perp positions and history discovery metadata that marks the two largest positions as `:missing`. It should assert that `set-portfolio-optimizer-universe-from-current` saves all 28 usable instruments, skips the known-missing top two positions, preserves descending notional order, and queues history prefetch only for the selected universe. This dedicated namespace keeps the already-large general universe action test namespace from growing further.
 
-Second, update `src/hyperopen/portfolio/optimizer/actions/universe.cljs`. Add a private cap constant set to `25`, private helpers for known-unusable history status, absolute notional ranking, and conversion from snapshot exposure to discovery-enriched universe candidate. Change `set-portfolio-optimizer-universe-from-current` to build candidates from current exposures, drop known-unusable candidates, sort the remainder by history priority and descending absolute notional, take 25, and then save only those instruments. Preserve the existing Black-Litterman cleanup and history-prefetch behavior for the selected universe.
+Second, update `src/hyperopen/portfolio/optimizer/actions/universe.cljs`. Keep the private helpers for known-unusable history status, absolute notional ranking, and conversion from snapshot exposure to discovery-enriched universe candidate. Change `set-portfolio-optimizer-universe-from-current` to build candidates from current exposures, drop known-unusable candidates, sort the remainder by history priority and descending absolute notional, and save the full remaining instrument set. Preserve the existing Black-Litterman cleanup and history-prefetch behavior for the selected universe.
 
-Third, run focused tests. The new test should fail before implementation and pass after implementation. Existing tests should continue to pass because small portfolios under the cap should still import the same instruments and preserve discovery metadata.
+Third, run focused tests. The new test should fail before implementation and pass after implementation. Existing tests should continue to pass because small portfolios should still import the same instruments and preserve discovery metadata.
 
 Fourth, run the required repository validation gates because this is a production behavior change: `npm run check`, `npm test`, and `npm run test:websocket`. If browser route behavior or UI copy changes later, add the smallest relevant Playwright optimizer assertion and run browser cleanup.
 
@@ -177,12 +182,13 @@ Full validation transcripts:
 
 Revision note, 2026-05-30 / Codex: Added red/green action-test evidence after implementing the capped From holdings selection policy.
 Revision note, 2026-05-30 / Codex: Updated the plan after moving the new test to a dedicated namespace and after running required validation attempts.
+Revision note, 2026-06-11 / Codex: Removed the fixed 25-asset From holdings cap by user request and updated the plan to reflect uncapped import behavior.
 
 ## Interfaces and Dependencies
 
 No new public action names or effect names are introduced. The existing public function `hyperopen.portfolio.optimizer.actions.universe/set-portfolio-optimizer-universe-from-current` keeps returning optimizer effects in the same shape as before. The changed private policy is:
 
-- maximum selected From holdings instruments: 25
+- maximum selected From holdings instruments: no fixed asset-count cap
 - known-unusable history statuses: `:missing`, `:rejected`, `:unavailable`, `:unsupported`, and `:disabled`
 - known-unusable quality statuses: `:failed`, `:rejected`, and `:missing`
 - selected sorting: known available history before unknown history, then descending absolute current notional, then original snapshot order

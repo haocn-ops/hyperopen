@@ -293,6 +293,14 @@
           {}
           :long-only?
           true)))
+  (is (= [[:effects/save-many [[[:portfolio :optimizer :draft :constraints :include-spot?]
+                                true]
+                               [[:portfolio :optimizer :draft :metadata :dirty?]
+                                true]]]]
+         (actions/set-portfolio-optimizer-constraint
+          {}
+          :include-spot?
+          true)))
   (is (= [[:effects/save-many [[[:portfolio :optimizer :draft :constraints :max-turnover]
                                 nil]
                                [[:portfolio :optimizer :draft :metadata :dirty?]

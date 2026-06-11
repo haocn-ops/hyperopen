@@ -183,9 +183,7 @@
    [:div {:class ["flex" "items-center" "border-b" "border-base-300" "px-2" "py-1.5"]}
     [:span {:class ["font-mono" "text-[0.6rem]" "uppercase" "tracking-[0.12em]"
                     "text-trading-muted"]}
-     (str (count universe) " included")]
-    [:span {:class ["ml-auto" "font-mono" "text-[0.6rem]" "text-trading-muted/70"]}
-     "cap: 25 assets"]]
+     (str (count universe) " included")]]
    (if (seq universe)
      (into [:div {:class ["text-xs"]}]
            (cons (selected-table-header)

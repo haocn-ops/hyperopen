@@ -144,6 +144,7 @@
                                {:instrument-id "spot:B"}]
                     :current-weights {"spot:A" 0.25}
                     :constraints {:long-only? true
+                                  :include-spot? true
                                   :held-position-locks #{"spot:A"}}
                     :objective {:kind :minimum-variance}
                     :expected-returns [0 0]
@@ -181,6 +182,7 @@
                  {:universe [{:instrument-id "spot:A"}
                              {:instrument-id "spot:B"}]
                   :constraints {:long-only? true
+                                :include-spot? true
                                 :max-asset-weight 0.7}})
         plan (objectives/build-solver-plan
               {:objective {:kind :target-return

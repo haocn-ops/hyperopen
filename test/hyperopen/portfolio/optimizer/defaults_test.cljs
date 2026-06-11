@@ -10,6 +10,7 @@
     (is (= :diagonal-shrink (get-in draft [:risk-model :kind])))
     (is (= false (get-in draft [:metadata :dirty?])))
     (is (= false (get-in draft [:constraints :long-only?])))
+    (is (= false (get-in draft [:constraints :include-spot?])))
     (is (= 2.0 (get-in draft [:constraints :gross-max])))
     (is (= 1.0 (get-in draft [:constraints :net-min])))
     (is (= 1.0 (get-in draft [:constraints :net-max])))
@@ -26,7 +27,8 @@
     (is (contains? (:constraints draft) :allowlist))
     (is (contains? (:constraints draft) :blocklist))
     (is (contains? (:constraints draft) :max-turnover))
-    (is (contains? (:constraints draft) :rebalance-tolerance))))
+    (is (contains? (:constraints draft) :rebalance-tolerance))
+    (is (contains? (:constraints draft) :include-spot?))))
 
 (deftest default-optimizer-state-preserves-run-and-scenario-contract-test
   (is (= {:status :idle

@@ -288,6 +288,7 @@
         constraints (:constraints request)]
     (is (nil? (:allowlist constraints)))
     (is (= [] (:blocklist constraints)))
+    (is (= false (:include-spot? constraints)))
     (is (= 2.0 (:gross-leverage constraints)))
     (is (= {:min 1.0 :max 1.0} (:net-exposure constraints)))
     (is (= 1.0 (:max-turnover constraints)))))

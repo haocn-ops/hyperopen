@@ -66,6 +66,16 @@
            (get-in (node-by-role view-node
                                  "portfolio-optimizer-constraint-long-only-input")
                    [1 :aria-checked])))
+    (is (= "false"
+           (get-in (node-by-role view-node
+                                 "portfolio-optimizer-constraint-include-spot-input")
+                   [1 :aria-checked])))
+    (is (= [[:actions/set-portfolio-optimizer-constraint
+             :include-spot?
+             true]]
+           (click-actions
+            (node-by-role view-node
+                          "portfolio-optimizer-constraint-include-spot-input"))))
     (is (= "0.5"
            (get-in (node-by-role view-node
                                  "portfolio-optimizer-constraint-max-asset-weight-input")
@@ -142,6 +152,7 @@
       (is (not (contains? strings "Load History")))
       (is (contains? strings "Max Asset Weight"))
       (is (contains? strings "Gross Leverage"))
+      (is (contains? strings "Include Spot Assets"))
       (is (contains? strings "Rebalance Tolerance"))
       (is (not (contains? strings "Execution Assumptions")))
       (is (not (contains? strings "Fallback Slippage")))

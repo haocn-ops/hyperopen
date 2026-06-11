@@ -7,6 +7,7 @@
 
 (def ^:private constraint-help
   {:long-only? "Restricts target weights to zero or positive values. Turn this off when short or hedged perp exposure is allowed."
+   :include-spot? "Allows spot instruments in optimizer recommendations. Leave this off to restrict target legs to perps and vaults."
    :max-asset-weight "Maximum target portfolio weight any single asset can receive. 0.5 means no asset can exceed 50%."
    :gross-max "Maximum total absolute exposure across all legs. 1 means long exposure plus short exposure can total up to 100% of capital."
    :net-min "Minimum signed net exposure allowed after optimization. Leave blank when only the maximum net exposure matters."
@@ -128,6 +129,26 @@
                                    :long-only?
                                    (not enabled?)]]})]]))
 
+(defn- include-spot-row
+  [constraints]
+  (let [enabled? (true? (:include-spot? constraints))
+        tooltip-id "portfolio-optimizer-constraint-include-spot-tooltip"]
+    [:div {:class ["group" "relative" "grid" "grid-cols-[minmax(0,1fr)_auto]"
+                   "items-center" "gap-2" "border" "border-base-300"
+                   "bg-base-200/20" "px-2" "py-1.5"]}
+     [:span {:class ["min-w-0"]}
+      (constraint-label "Include Spot Assets"
+                        tooltip-id
+                        (:include-spot? constraint-help))]
+     [:span {:class ["optimizer-include-spot-control" "inline-flex" "items-center"]}
+      (toggle/toggle {:on? enabled?
+                      :aria-label "Toggle include spot assets"
+                      :aria-describedby tooltip-id
+                      :data-role "portfolio-optimizer-constraint-include-spot-input"
+                      :on-change [[:actions/set-portfolio-optimizer-constraint
+                                   :include-spot?
+                                   (not enabled?)]]})]]))
+
 (defn constraints-section
   [draft highlighted-controls]
   (let [constraints (:constraints draft)]
@@ -136,6 +157,7 @@
      (controls/disclosure-heading "04" "Constraints" "mandatory")
      [:div {:class ["mt-3" "grid" "grid-cols-1" "gap-2"]}
       (long-only-row constraints)
+      (include-spot-row constraints)
       (constraint-row "Per-asset cap" "Max Asset Weight"
                       :max-asset-weight (:max-asset-weight constraints)
                       "portfolio-optimizer-constraint-max-asset-weight-input"

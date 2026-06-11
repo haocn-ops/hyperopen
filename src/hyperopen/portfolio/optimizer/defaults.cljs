@@ -12,6 +12,7 @@
    :return-model {:kind :historical-mean}
    :risk-model {:kind :diagonal-shrink}
    :constraints {:long-only? false
+                 :include-spot? false
                  :gross-max 2.0
                  :net-min 1.0
                  :net-max 1.0

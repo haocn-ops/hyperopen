@@ -45,13 +45,28 @@
   [blocklist instrument]
   (boolean (some blocklist (ids/instrument-id-candidates instrument))))
 
+(defn- spot-instrument?
+  [instrument]
+  (let [instrument-id (:instrument-id instrument)
+        market-type (ids/normalize-market-type
+                     (or (:market-type instrument)
+                         (:instrument-type instrument)
+                         (:optimizer-history/instrument-kind instrument)))]
+    (or (= :spot market-type)
+        (and (string? instrument-id)
+             (or (.startsWith instrument-id "spot:")
+                 (.startsWith instrument-id "hl:spot:"))))))
+
 (defn- active-universe
   [request]
   (let [allowlist (id-set (get-in request [:constraints :allowlist]))
-        blocklist (or (id-set (get-in request [:constraints :blocklist])) #{})]
+        blocklist (or (id-set (get-in request [:constraints :blocklist])) #{})
+        include-spot? (true? (get-in request [:constraints :include-spot?]))]
     (filterv (fn [instrument]
                (and (instrument-allowed? allowlist instrument)
-                    (not (instrument-blocked? blocklist instrument))))
+                    (not (instrument-blocked? blocklist instrument))
+                    (or include-spot?
+                        (not (spot-instrument? instrument)))))
              (:universe request))))
 
 (defn- first-available-id

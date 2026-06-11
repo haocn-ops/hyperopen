@@ -52,10 +52,17 @@
     :rejected
     :validation-failed})
 
+(def ^:private fallback-as-of-bucket-ms
+  ;; Quantize the wall-clock fallback so request building can memoize across
+  ;; streaming renders. Staleness windows are minutes long, so a five second
+  ;; as-of granularity is immaterial to readiness output.
+  5000)
+
 (defn- current-as-of-ms
   [state]
   (or (get-in state contracts/runtime-as-of-ms-path)
-      (.now js/Date)))
+      (let [now-ms (.now js/Date)]
+        (- now-ms (mod now-ms fallback-as-of-bucket-ms)))))
 
 (def ^:private positive-number? coercion/positive-number?)
 
@@ -80,19 +87,30 @@
                           :message "Manual capital base is being used for preview sizing."})))
       snapshot)))
 
+(defonce ^:private build-request-memo
+  (volatile! nil))
+
 (defn- build-request
+  ;; Request building re-aligns the full instrument history, which is far too
+  ;; expensive to redo on every streaming render. The snapshot is memoized on
+  ;; its own inputs, so comparing these resolved inputs by value stays cheap.
   [state draft]
-  (request-builder/build-engine-request
-   {:draft draft
-    :current-portfolio (with-manual-capital
-                         (current-portfolio/current-portfolio-snapshot state)
-                         draft)
-    :history-data (get-in state contracts/history-data-path)
-    :market-cap-by-coin (get-in state contracts/market-cap-by-coin-path)
-    :as-of-ms (current-as-of-ms state)
-    :stale-after-ms (get-in state contracts/runtime-stale-after-ms-path)
-    :funding-periods-per-year (get-in state
-                                      contracts/runtime-funding-periods-per-year-path)}))
+  (let [inputs {:draft draft
+                :current-portfolio (with-manual-capital
+                                     (current-portfolio/current-portfolio-snapshot state)
+                                     draft)
+                :history-data (get-in state contracts/history-data-path)
+                :market-cap-by-coin (get-in state contracts/market-cap-by-coin-path)
+                :as-of-ms (current-as-of-ms state)
+                :stale-after-ms (get-in state contracts/runtime-stale-after-ms-path)
+                :funding-periods-per-year
+                (get-in state contracts/runtime-funding-periods-per-year-path)}
+        cached @build-request-memo]
+    (if (and cached (= (:inputs cached) inputs))
+      (:value cached)
+      (let [value (request-builder/build-engine-request inputs)]
+        (vreset! build-request-memo {:inputs inputs :value value})
+        value))))
 
 (defn- orderbook-cost-contexts
   [state request]

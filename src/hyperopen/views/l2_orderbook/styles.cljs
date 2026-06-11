@@ -2,13 +2,16 @@
 
 (def orderbook-columns-class "grid-cols-[1fr_2fr_2fr]")
 (def mobile-split-columns-class "grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,1.2fr)]")
-(def header-neutral-text-class "text-[rgb(148,158,156)]")
-(def body-neutral-text-class "text-[rgb(210,218,215)]")
-(def ask-depth-bar-class "bg-[rgba(237,112,136,0.15)]")
-(def bid-depth-bar-class "bg-[rgba(31,166,125,0.15)]")
-(def ask-price-text-class "text-[rgb(237,112,136)]")
-(def bid-price-text-class "text-[rgb(31,166,125)]")
-(def orderbook-tab-indicator-class "bg-[rgb(80,210,193)]")
+;; ob-* classes are styled in src/styles/surfaces/trading-controls.css with the
+;; legacy literal colors (no near token exists) and re-themed by
+;; src/styles/surfaces/institutional.css.
+(def header-neutral-text-class "text-trading-text-secondary")
+(def body-neutral-text-class "ob-body-text")
+(def ask-depth-bar-class "bg-ho-sell-hi/15")
+(def bid-depth-bar-class "ob-bid-bar")
+(def ask-price-text-class "text-ho-sell-hi")
+(def bid-price-text-class "ob-bid-px")
+(def orderbook-tab-indicator-class "bg-ho-accent")
 (def desktop-breakpoint-px 1024)
 (def depth-bar-transition-classes
   ["transition-all"

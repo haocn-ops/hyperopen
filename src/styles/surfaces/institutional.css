@@ -1,0 +1,145 @@
+/*
+ * Institutional theme chrome.
+ *
+ * Treatments the token palette alone cannot express: uppercase tracked
+ * micro-labels on data-dense chrome, the accent slider fill, re-themes of the
+ * legacy literals carried by ob-* classes, and the design's structural-sans
+ * exceptions (nav, page titles) to the mono-first UI face.
+ *
+ * Every rule is scoped to :root[data-theme="institutional"]; colors only as
+ * rgb(var(--ho-*)) / var(--ho-chart-*) so the color-ratchet stays clean and
+ * other themes are untouched. See
+ * docs/exec-plans/active/2026-06-10-institutional-theme-buildout.md.
+ */
+
+@layer components {
+  /* Portfolio d3 chart chrome; read by chart_view.cljs / vm.chart via
+     getComputedStyle with the legacy literals as fallback. */
+  :root[data-theme="institutional"] {
+    --portfolio-strategy-stroke: rgb(var(--ho-accent));
+    --portfolio-chart-baseline: var(--ho-chart-grid-strong);
+    --portfolio-chart-hover-line: var(--ho-chart-text);
+  }
+
+  /* Structural sans exceptions to the mono-first UI face. */
+  :root[data-theme="institutional"] .header-nav-link {
+    font-family: "Inter Variable", var(--font-ui-system);
+  }
+
+  :root[data-theme="institutional"] h1 {
+    font-family: "Inter Variable", var(--font-ui-system);
+    letter-spacing: -0.02em;
+  }
+
+  /* Market stats strip kickers (hook class in active_asset/row.cljs). */
+  :root[data-theme="institutional"] .asset-stat-label {
+    color: rgb(var(--ho-text-muted));
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    font-size: 10px;
+    border-color: rgb(var(--ho-border-accent-muted));
+  }
+
+  /* Chart toolbar: hairline chrome, muted mono tools, uppercase intervals. */
+  :root[data-theme="institutional"] [data-parity-id="chart-toolbar"] {
+    border-color: rgb(var(--ho-border));
+    background-color: rgb(var(--ho-bg-deep));
+  }
+
+  :root[data-theme="institutional"] [data-parity-id="chart-toolbar"] button {
+    color: rgb(var(--ho-text-muted));
+    background-color: transparent;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-size: 12px;
+  }
+
+  :root[data-theme="institutional"] [data-parity-id="chart-toolbar"] button:hover {
+    color: rgb(var(--ho-text));
+    background-color: rgb(var(--ho-surface-raised));
+  }
+
+  :root[data-theme="institutional"] [data-parity-id="chart-toolbar"] button.text-trading-green,
+  :root[data-theme="institutional"] [data-parity-id="chart-toolbar"] button.bg-gray-800 {
+    color: rgb(var(--ho-text-hi));
+    background-color: rgb(var(--ho-surface));
+  }
+
+  :root[data-theme="institutional"] [data-parity-id="chart-toolbar"] .bg-gray-700 {
+    background-color: rgb(var(--ho-border));
+  }
+
+  /* Orderbook: design colors for the legacy literal classes, uppercase
+     column heads and panel tabs. */
+  :root[data-theme="institutional"] .ob-body-text {
+    color: rgb(var(--ho-text));
+  }
+
+  :root[data-theme="institutional"] .ob-bid-px {
+    color: rgb(var(--ho-buy));
+  }
+
+  :root[data-theme="institutional"] .ob-bid-bar {
+    background-color: rgb(var(--ho-buy) / 0.15);
+  }
+
+  :root[data-theme="institutional"] [data-role="orderbook-column-headers-row"] span,
+  :root[data-theme="institutional"] [data-role="orderbook-mobile-split-headers"] span {
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    font-size: 10px;
+  }
+
+  :root[data-theme="institutional"] [data-role="orderbook-tabs-row"] button {
+    color: rgb(var(--ho-text-muted));
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: 12px;
+  }
+
+  :root[data-theme="institutional"] [data-role="orderbook-tabs-row"] button:hover {
+    color: rgb(var(--ho-text));
+  }
+
+  :root[data-theme="institutional"] [data-role="orderbook-tabs-row"] button.text-white {
+    color: rgb(var(--ho-text-hi));
+  }
+
+  /* Account-info tab strip and table heads. Uppercase only (no
+     letter-spacing): tab widths are canvas-measured from the label text, and
+     under the mono UI face an uppercase transform keeps glyph advances
+     unchanged while extra tracking would not. */
+  :root[data-theme="institutional"] .account-info-tab-strip button {
+    text-transform: uppercase;
+  }
+
+  :root[data-theme="institutional"] .account-table-head {
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: 11px;
+  }
+
+  /* Order-size / leverage sliders: accent fill per the design. */
+  :root[data-theme="institutional"] .order-size-slider.range,
+  :root[data-theme="institutional"] .leverage-adjust-slider.range {
+    --slider-accent-rgb: var(--ho-accent);
+  }
+
+  :root[data-theme="institutional"] .order-size-slider.range {
+    --order-size-slider-active: rgb(var(--ho-accent));
+  }
+
+  :root[data-theme="institutional"] .leverage-adjust-slider.range {
+    --leverage-adjust-slider-active: rgb(var(--ho-accent));
+  }
+
+  :root[data-theme="institutional"] .order-size-slider-notch-active {
+    --slider-accent-rgb: var(--ho-accent);
+  }
+
+  /* Portfolio chart range/series tabs: tinted hairline active state. */
+  :root[data-theme="institutional"] [data-role^="portfolio-chart-tab-"][aria-pressed="true"] {
+    border-color: rgb(var(--ho-border-accent));
+    background-color: rgb(var(--ho-surface-raised));
+  }
+}

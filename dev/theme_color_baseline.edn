@@ -41,7 +41,6 @@
  "src/hyperopen/views/header/spectate.cljs" 7
  "src/hyperopen/views/header/wallet.cljs" 2
  "src/hyperopen/views/header_view.cljs" 1
- "src/hyperopen/views/l2_orderbook/styles.cljs" 7
  "src/hyperopen/views/leaderboard/controls.cljs" 1
  "src/hyperopen/views/leaderboard/rows.cljs" 7
  "src/hyperopen/views/leaderboard/states.cljs" 11
@@ -51,11 +50,11 @@
  "src/hyperopen/views/order_submit_confirmation_modal.cljs" 35
  "src/hyperopen/views/portfolio/chart_view.cljs" 12
  "src/hyperopen/views/portfolio/fee_schedule.cljs" 4
- "src/hyperopen/views/portfolio/header.cljs" 16
+ "src/hyperopen/views/portfolio/header.cljs" 14
  "src/hyperopen/views/portfolio/low_confidence.cljs" 5
  "src/hyperopen/views/portfolio/montecarlo/chart.cljs" 2
  "src/hyperopen/views/portfolio/montecarlo/chart/model.cljs" 6
- "src/hyperopen/views/portfolio/performance_metrics_view.cljs" 3
+ "src/hyperopen/views/portfolio/performance_metrics_view.cljs" 1
  "src/hyperopen/views/portfolio/vm/chart.cljs" 7
  "src/hyperopen/views/portfolio/vm/constants.cljs" 5
  "src/hyperopen/views/portfolio_view.cljs" 2
@@ -72,10 +71,8 @@
  "src/hyperopen/views/subaccounts_view/transfer_dropdowns.cljs" 13
  "src/hyperopen/views/trade/order_form_component_primitives.cljs" 2
  "src/hyperopen/views/trade/order_form_component_sections.cljs" 3
- "src/hyperopen/views/trade/order_form_controls.cljs" 5
  "src/hyperopen/views/trade/order_form_feedback.cljs" 8
  "src/hyperopen/views/trade/order_form_footer.cljs" 4
- "src/hyperopen/views/trade/order_form_view.cljs" 1
  "src/hyperopen/views/trading_chart/utils/chart_interop/chart_context_menu_overlay.cljs" 11
  "src/hyperopen/views/trading_chart/utils/chart_interop/chart_navigation_overlay.cljs" 5
  "src/hyperopen/views/trading_chart/utils/chart_interop/indicators.cljs" 2
@@ -106,8 +103,8 @@
  "src/hyperopen/views/vaults/route_shell.cljs" 12
  "src/styles/base.css" 18
  "src/styles/surfaces/account.css" 5
- "src/styles/surfaces/app-shell.css" 86
+ "src/styles/surfaces/app-shell.css" 85
  "src/styles/surfaces/chart.css" 11
  "src/styles/surfaces/montecarlo.css" 21
- "src/styles/surfaces/trading-controls.css" 53
+ "src/styles/surfaces/trading-controls.css" 7
  "src/styles/surfaces/utilities.css" 96}

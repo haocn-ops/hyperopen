@@ -73,7 +73,7 @@
   }
 
   .header-nav-link-active {
-    color: rgb(151 252 228);
+    color: rgb(var(--ho-accent-bright));
   }
 
   .ui-dropdown-panel {

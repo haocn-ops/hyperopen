@@ -46,7 +46,7 @@
                                                (when (:numeric? options) ["num"]))}
                            value])]
     [:div {:class ["text-center"]}
-     [:div {:class (into ["mb-1" "text-xs" "text-gray-400"]
+     [:div {:class (into ["asset-stat-label" "mb-1" "text-xs" "text-gray-400"]
                          (when underlined? ["border-b" "border-dashed" "border-gray-600"]))}
       label]
      [:div {:class (into ["text-xs"]

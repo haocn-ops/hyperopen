@@ -1,0 +1,157 @@
+# Raise PageSpeed desktop performance from 74 to 90+ by shrinking and rescheduling startup JavaScript
+
+## Purpose and user-visible outcome
+
+PageSpeed Insights (desktop, 2026-06-11, https://pagespeed.web.dev/analysis/https-hyperopen-xyz/51fq5cfou3?form_factor=desktop) scores https://hyperopen.xyz at 74. The page paints fast (First Contentful Paint 0.3s, Largest Contentful Paint 0.4s, Cumulative Layout Shift 0.022 — all green) but the main thread is blocked while JavaScript loads and executes: Total Blocking Time is 590ms (red) and Speed Index is 1.7s (orange). In Lighthouse's desktop scoring, TBT carries 30% of the weight and SI 10%; with the other three metrics already near-perfect, TBT is responsible for nearly all of the missing 26 points.
+
+After this plan, a cold desktop visit to the trade route becomes interactive sooner: the browser parses and executes roughly a third less JavaScript before settling, the chart and account modules download in parallel with the main bundle instead of after it, and boot-time data crunching is deferred or sliced so it no longer forms long main-thread tasks. The measurable proof is a PageSpeed desktop re-run scoring 90 or above (TBT at or below ~200ms, SI at or below ~1.4s), plus the repository's own profiler (`npm run browser:profile:trade-startup`) and bundle benchmarks showing the reductions described per milestone.
+
+Target: **90–93 desktop** after Milestones 1–3. Stretch to **95** would additionally require worker-side payload parsing and render memoization (recorded as deferred follow-ups, not in scope here).
+
+## How the score decomposes (why 90+ is realistic)
+
+Lighthouse v13 desktop weights: TBT 30%, LCP 25%, CLS 25%, FCP 10%, SI 10%. FCP/LCP/CLS already score ~1.0, contributing ~60 points. The observed 74 implies TBT (590ms) scores ~0.27 and SI (1.7s) ~0.75. The desktop scoring curve gives TBT ≤ 200ms a score of ~0.83 (+17 points) and TBT ≤ 150ms ~0.90 (+19 points); SI ≤ 1.3s scores ~0.90 (+1.5 points). So the entire plan is one sentence: cut TBT from 590ms to under 200ms. Everything below is in service of that, ordered by expected payoff per unit of risk.
+
+## What the audit established (baseline evidence, 2026-06-11)
+
+All numbers below were measured on this branch (`claude/wonderful-nightingale-6d169c`, HyperDegen merge at dfeff2d2) via a local `npm run build`, sourcemap decoding of `.shadow-cljs/release-snapshots/app/latest/main.js.map`, a shadow-cljs build report, and live requests against https://hyperopen.xyz and https://api.hyperliquid.xyz. Re-derive any of them the same way; the benchmark script is embedded in Milestone 0.
+
+The deployed page loads exactly three scripts, all `defer`: `/js/release-route-metadata.js` (2.3KB), the hashed `main.*.js`, and the Cloudflare beacon. Delivery is already good — brotli, `cache-control: immutable` on fingerprinted assets, Cloudflare CDN — so this is an execution problem, not a network problem. The live main module is 3,066,465 bytes raw (~726KB compressed transfer); the local build of this branch produces 2,927,705 raw / 691,020 gzip. Parsing and top-level-evaluating ~3MB of advanced-compiled ClojureScript in one shot is the single largest main-thread task and the dominant TBT contributor. For history: the April 2026 bundle-diet plan (docs/exec-plans/completed/2026-04-20-root-main-bundle-diet.md) recorded main at 624KB gzip, got it to ~559KB after splits, and it has since regrown past where it started — there is no size budget gate to stop regrowth.
+
+Sourcemap decomposition of main.js (raw mapped bytes): hyperopen/views 622KB, cljs.core+stdlib 305KB, hyperopen/schema 246KB (contracts/action_args.cljs alone 77KB), hyperopen/portfolio 228KB (optimizer 123KB including contracts/specs.cljs 36KB), hyperopen/websocket 192KB, hyperopen/api 157KB, hyperopen/funding 161KB (of which only ~11KB — history_cache + predictability for the trade-route funding tooltip — is needed at boot), hyperopen/account 123KB, asset_selector 85KB, plus staking 28KB, subaccounts 40KB, vaults 40KB, leaderboard 16KB, api_wallets 15KB, referrals 10KB, d3-shape (npm) 49KB, views/chart/d3 23KB, montecarlo views 43KB. Conservatively ~730–900KB (25–31%) of main is code the cold trade route never executes.
+
+Three mechanisms put that code there:
+
+First, the Nexus action/effect registry is wired eagerly for every route at boot. `src/hyperopen/app/effects.cljs:84-124` statically references staking, referrals, subaccounts, api-wallets, and funding effect adapters; `src/hyperopen/app/actions.cljs:1-12` requires api-wallets/referrals/subaccounts/vaults actions; `src/hyperopen/runtime/collaborators.cljs:13-15` requires staking effects; `src/hyperopen/runtime/collaborators/chart.cljs:1-7` requires portfolio and montecarlo actions; `src/hyperopen/runtime/effect_adapters/funding.cljs:9` requires the whole funding application tree. Each require drags a domain's full implementation into :main even though its views live in lazy modules. A lazy pattern already exists and works — `lazy-route-effect-leaf-deps` in `src/hyperopen/route_modules.cljs:326-369`, used by portfolio-optimizer and vault API handlers (`app/effects.cljs:16-39`) — it just was never extended to the other domains. (The April plan deferred exactly this as "route/action/effect aggregator splitting" because of runtime ordering risk.)
+
+Second, ~280KB of cljs.spec contract registration ships and executes at boot but is dead in release: `hyperopen.runtime.validation` only validates when explicitly enabled, yet the spec registration side effects in hyperopen/schema/contracts/* and portfolio optimizer contracts/specs run unconditionally as top-level code.
+
+Third, code shared by two lazy modules hoists into their common ancestor, which is :main. d3-shape is imported by exactly one file, `src/hyperopen/views/chart/d3/runtime.cljs`, whose consumers are only in :portfolio_route and :vaults_route — but because no intermediate module exists, shadow-cljs hoists d3-shape, chart/d3, montecarlo chart code, and most of portfolio/metrics (~150KB combined) into :main.
+
+Beyond the bundle itself, the boot schedule stacks more work into the TBT window. `trade_chart` (420KB raw / 118KB gz, contains lightweight-charts) and `account_surfaces` (280KB / 57KB) are fetched and evaluated via setTimeout(0) immediately after first paint; with no preload hints, the browser discovers them only after main.js has fully downloaded and executed — a strict three-hop waterfall that also delays the chart's first draw (the SI driver). There is no preconnect to api.hyperliquid.xyz. An already-finished follow-up that cuts account_surfaces by 57% (account-tab lazy split) sits unmerged in another worktree (referenced in docs/exec-plans as the 662c worktree).
+
+On the data plane: roughly 440KB of /info JSON (measured live: metaAndAssetCtxs 71KB, spotMeta 126KB, public webData2 168KB, outcomeMeta 29KB, candleSnapshot 47KB) is parsed and then recursively keywordized via `js->clj` on the main thread inside the TBT window (`src/hyperopen/api/info_client/flow.cljs:160-163`, applied at :206). Bootstrap then builds the full ~540-market perp+spot+outcome catalog (`build-market-state`, `src/hyperopen/api/endpoints/market.cljs:363-405`) although the trade route needs only the active perp's params; of webData2's 168KB only the 96KB spotAssetCtxs slice is ever read (`src/hyperopen/api/market_loader.cljs:52`). The selector cache is then re-sorted/normalized/stringified back to storage on a requestAnimationFrame (`src/hyperopen/startup/watchers.cljs:46-60`, `src/hyperopen/asset_selector/markets_cache.cljs:343-405`). Candle websocket messages bypass the rAF market-projection coalescer and re-sort up to 5000 rows per update (`src/hyperopen/websocket/candles.cljs:277-297, 322-329`).
+
+Render-blocking (the flagged 160ms): today it is exactly one resource, the single 294KB raw / 48.5KB gz `css/main.css` containing all routes and all themes. Note for the next deploy: `theme-preload.js` (522 bytes, synchronous head script, added 2026-06-10 as a CSP-driven external file) is not yet on production; once deployed it becomes a second blocking request. Fonts: InterVariable (352KB) is not preloaded, JetBrains Mono ships as uncompressed TTF, a dead 1.47MB Splash-Regular.ttf ships in every release, and fonts get max-age=0.
+
+Claims checked and rejected during verification, so nobody re-litigates them: the dev index.html's manifest-fetch boot waterfall does not exist in production (the release pipeline bakes static defer script tags — `tools/release-assets/generate_release_artifacts.mjs:58-131`); render churn is already coalesced to one render per rAF and is a minor TBT contributor on desktop; inlining theme-preload.js requires adding a sha256 hash to the CSP in `tools/release-assets/security_headers.mjs:78` (script-src has no 'unsafe-inline'); and deferring the full catalog build must keep building default-dex perp markets from the (already deduped) metaAndAssetCtxs response at boot, because on a cold load `apply-asset-selector-success` is the only source of `:active-market`, which the trade form needs for leverage/size params (`src/hyperopen/state/trading.cljs:390-406`).
+
+Dependency placement is otherwise exemplary: lightweight-charts, indicatorts, @noble/secp256k1, osqp, quadprog are all correctly isolated or worker-only; lucide is tree-shaken via per-icon imports. Hygiene only: snabbdom is entirely unused; @openai/agents and smol-toml are node-tooling deps misfiled as runtime dependencies; "d3" could be replaced by "d3-shape" since only d3-shape is imported.
+
+## Milestone 0 — Baselines and a regrowth ratchet (half a day)
+
+Scope: record the numbers this plan will be judged against, and stop the documented main.js regrowth (624KB → 559KB → 691KB gzip) from ever recurring silently.
+
+From the repo root run `npm run build`, then benchmark the artifacts with the same script the April plan used (run from repo root):
+
+    node -e '
+    const fs = require("fs"), zlib = require("zlib"), path = require("path");
+    const dir = "resources/public/js";
+    for (const file of fs.readdirSync(dir).filter(f => f.endsWith(".js"))) {
+      const bytes = fs.readFileSync(path.join(dir, file));
+      const gzip = zlib.gzipSync(bytes, {level: 9});
+      const brotli = zlib.brotliCompressSync(bytes);
+      console.log(`${file}\traw=${bytes.length}\tgzip=${gzip.length}\tbrotli=${brotli.length}`);
+    }'
+
+Record the output in this plan's Progress section. Also run `npm run browser:profile:trade-startup:cached` (uses the existing build) and record `blockingTimeProxyMs` and the module load timeline; the last recorded healthy baseline was 53ms on 2026-06-10, before the HyperDegen merge — if this branch profiles materially worse, the degen additions (sounds, mascots, theming) are themselves a regression to chase in Milestone 2.
+
+Then add a size-budget gate: a small node script (suggested: `tools/release-assets/check_bundle_budget.mjs`, wired into `npm run gates` / `check`) that gzips `resources/public/js/main.*.js` and fails if it exceeds a committed budget file. Seed the budget at the current measurement, and ratchet it down at the end of each milestone. Acceptance: `npm run check` fails if main.js gzip grows past the budget, passes today.
+
+## Milestone 1 — Delivery quick wins: preload, preconnect, fonts (one to two days)
+
+Scope: eliminate the network dead-time around the module waterfall and fonts. No CLJS changes; everything lives in the release pipeline. Expected effect: SI 1.7s → ~1.3–1.4s, TBT −30–60ms (earlier, better-overlapped module eval), score roughly +3–5.
+
+In `tools/release-assets/generate_release_artifacts.mjs`, add a route→modules map (trade/home → trading_crypto, trade_chart, trading_indicators, account_surfaces; portfolio → account_surfaces, portfolio_route; etc.), resolve hashed filenames from the build manifest, and inject `<link rel="preload" as="script" href="/js/<hashed>.js">` into the head of each generated route HTML. Add `<link rel="preconnect" href="https://api.hyperliquid.xyz" crossorigin>` likewise. The modules then download in parallel with main.js instead of after its full execution.
+
+Fonts: add `<link rel="preload" as="font" type="font/woff2" href="/fonts/InterVariable.woff2" crossorigin>`; convert the two JetBrains Mono TTFs to woff2 and update `src/styles/base.css`; delete the dead `resources/public/fonts/Splash-Regular.ttf` (1.47MB shipped per release, referenced by no @font-face); add a `/fonts/*` long-lived Cache-Control block in `tools/release-assets/security_headers.mjs` and extend `verify_deployment_headers.mjs` to assert it plus `content-encoding: br` on main.js.
+
+theme-preload.js (pre-emptive, lands with the next deploy): inline its 13 lines into the release HTML with a CSP sha256 hash added to script-src in `security_headers.mjs`, and update the release-asset tests (`npm run test:release-assets`) and `REQUIRED_ROOT_PUBLIC_PATHS` in `tools/release-assets/site_metadata.mjs` accordingly. This keeps the anti-flash semantics without adding a render-blocking request to production.
+
+Dependency hygiene (zero user-visible risk): remove snabbdom; move @openai/agents and smol-toml to devDependencies; replace "d3" with "d3-shape".
+
+Acceptance: view-source of the generated release HTML for `/` shows the preload and preconnect links with correct hashed URLs; `npm run test:playwright:seo` and `npm run test:release-assets` pass; a Lighthouse run (local `npx lighthouse https://hyperopen.xyz --preset=desktop` after deploy, or against a local static serve of `out/release-public`) shows the module fetches starting during main.js download.
+
+## Milestone 2 — Main bundle diet, wave two: ~170–210KB gzip out of main (three to five days)
+
+Scope: the big TBT lever. Move the three classes of wrongly-eager code out of :main, re-measuring after each step with the Milestone 0 benchmark so each change's contribution is recorded. Expected end state: main.js ~2.0–2.2MB raw / ~480–520KB gzip; TBT −150–250ms. This is the riskiest milestone — it touches the action/effect registry, which is governed by contract gates (`npm run formal:sync` and the Lean contract surface; see the repo memory and `docs/exec-plans/completed/2026-04-20-root-bundle-follow-up-surfaces-and-runtime-aggregators.md`) — so it proceeds domain by domain, keeping `npm run check` green after each.
+
+Step 2a, lazy effect/action registries. For each of funding, staking, referrals, subaccounts, api-wallets: replace the static adapter requires (`app/effects.cljs:84-124`, `app/actions.cljs:1-12`, `runtime/collaborators.cljs:13-15`, `runtime/collaborators/chart.cljs:1-7`) with the existing `lazy-route-effect-leaf-deps` pattern from `route_modules.cljs:326-369`, moving each domain's application namespaces into its route/modal module's :entries in shadow-cljs.edn. Caveat verified during the audit: `sync-active-asset-funding-predictability` (`app/effects.cljs:97`) serves the trade-route funding tooltip, so `hyperopen.funding.history-cache` + predictability (~11KB) stay eager; only the ~145KB modal workflow tree moves. Lazy action handlers throw if dispatched before their module loads — use the route-load gating precedent (`eager-vault-action-keys`, `app/actions.cljs:14-17`) and add a Playwright smoke per moved surface (open funding modal, visit staking/referrals/subaccounts/api-wallets routes) proving the module loads on demand. Expected: ~250–350KB raw out of main.
+
+Step 2b, strip release-dead spec registration. Gate the hyperopen.schema.contracts.* and portfolio optimizer contracts/specs registration behind `goog.DEBUG` (a macro emitting nil in release) or move it to `:devtools :preloads` like the existing `hyperopen.telemetry.console-preload`, keeping the data catalogs release code actually reads (schema/runtime_registration). Verify `npm run formal:sync` and the validation-enabled dev path still work (`runtime/validation` resolves specs only when enabled). Expected: ~280KB raw out of main.
+
+Step 2c, shared chart module. Add `:charts_shared {:entries [hyperopen.views.chart.d3.runtime] :depends-on #{:main}}` and make :portfolio_route and :vaults_route depend on it, so d3-shape + chart/d3 + montecarlo + portfolio/metrics stop hoisting into :main. Expected: ~120–150KB raw out of main.
+
+Step 2d, port the finished account-tab lazy split from the 662c worktree (57% cut of account_surfaces, which evaluates at boot on the trade route), fixing its noted secondary-tab export validation gap so :outcomes/:order-history/:twap surfaces error instead of hanging.
+
+Acceptance per step: benchmark delta recorded in Progress; `npm run check`, `npm test`, `npm run test:websocket`, and the Playwright smokes pass; `npm run browser:profile:trade-startup` shows blockingTimeProxyMs not regressing. Acceptance for the milestone: main.js gzip ≤ 540KB (ratchet the Milestone 0 budget down to lock it in).
+
+## Milestone 3 — Boot scheduling and data-plane slicing (three to five days)
+
+Scope: spread the post-paint work so no single task crosses Lighthouse's 50ms long-task threshold, and stop doing all-assets work the trade route doesn't need. Expected: TBT −100–200ms further, SI −0.1–0.2s.
+
+Stagger module loads: load :trade_chart immediately after first paint (it is the LCP-adjacent content), then :account_surfaces on requestIdleCallback or after the chart's first draw, with a `scheduler.yield`/setTimeout boundary between module evaluation and `initialize-remote-data-streams!` (`src/hyperopen/startup/init.cljs:126-144`).
+
+Bootstrap catalog: in `start-critical-bootstrap!` (`src/hyperopen/startup/runtime.cljs:470-482`) keep fetch-asset-contexts! and build only the default-dex perp markets from it (`build-perp-markets`, `src/hyperopen/asset_selector/markets.cljs:1171-1183`, needs no spot-meta — quote falls back to "USDC") so the cold-load trade form still gets `:active-market`; defer the spotMeta/webData2/outcomeMeta fetches and the spot/outcome catalog build to requestIdleCallback or first selector-open via the existing `run-deferred-bootstrap!` hook (`runtime.cljs:484-495`). Also hoist the per-market `:outcome-meta-signature` recompute out of the map fn (`markets.cljs:1066-1075`) — small, but free.
+
+Payload conversion: stop `js->clj`-keywordizing whole /info responses (`flow.cljs:160-163`); keep responses as JS objects and convert only consumed slices via goog.object (webData2 → spotAssetCtxs only). The response cache (`flow.cljs:266-271`) stores whatever parse-json! returns, so it works unchanged. The worker-offload variant (post normalized plain-JS back from a worker, pattern exists in shadow-cljs.edn:84-99) is the stretch follow-up, not the first move.
+
+Cache persist: move the selector-cache re-serialization from requestAnimationFrame to requestIdleCallback with a timeout (`startup/watchers.cljs:46-60`), and take the async IndexedDB restore path off the pre-render critical path.
+
+Candle stream: route candle ws updates through `queue-market-projection!` (`src/hyperopen/websocket/market_projection_runtime.cljs:205-264`) like orderbook/activeAssetCtx so they coalesce per frame, and replace `bounded-dedupe-sorted-rows`'s full 5000-row map+sort with an append/patch of the newest bar (`candles.cljs:277-297`).
+
+Acceptance: `npm run browser:profile:trade-startup` shows no main-thread task over 50ms after first paint in the release profile (or documents the remaining ones); the trade form on a cold load (cleared storage) still shows correct leverage/size params for BTC before the selector is opened; selector opens and full catalog appears (idle-hydrated) without error; `npm run check` and websocket tests pass.
+
+## Milestone 4 — Optional: critical CSS split (two to three days, do only if the score re-run lands under 90)
+
+The single 294KB raw / 48.5KB gz stylesheet is today's only render-blocking resource (~160ms flagged). Split the Tailwind build into a critical sheet (base + trade-route surfaces + default dark theme) kept blocking, and a deferred sheet (portfolio/optimizer/montecarlo/vaults surfaces + non-default themes) loaded with the `media="print" onload` pattern or by the theme switcher. This trades build-pipeline complexity (two tailwind passes in `css:build`, theming-doc updates per docs/THEMING.md) for ~100–160ms of FCP/SI — worthwhile only if Milestones 1–3 leave the score short, since FCP/LCP are already green and TBT dominates.
+
+## Milestone 5 — Verify, record, ratchet
+
+Deploy, re-run PageSpeed desktop three times (Lighthouse variance is real; record all three), update this plan's Outcomes section with before/after metric pairs, ratchet the bundle budget to the new size, and record the new `blockingTimeProxyMs` baseline next to the profiler. If the score is 90+, move this plan to completed; if not, Milestone 4 and the deferred worker-offload/memoization follow-ups are the remaining levers.
+
+## Score forecast
+
+Baseline 74 = ~60 (FCP/LCP/CLS) + ~8 (TBT 590ms ≈ 0.27 × 30) + ~7.5 (SI 1.7s ≈ 0.75 × 10). After Milestone 1: TBT ~530–560ms, SI ~1.3–1.4s → ~77–79. After Milestone 2: TBT ~300–380ms → ~83–87. After Milestone 3: TBT ~150–250ms, SI ~1.2–1.3s → ~90–94. Committed target: ≥90. Stretch (worker parsing, render memoization, CSS split): 95. These are forecasts against Lighthouse's public desktop scoring curves with ±2–3 points of run-to-run variance; the per-milestone acceptance numbers (bundle bytes, blockingTimeProxyMs) are the controllable proxies.
+
+## Risks and constraints
+
+The action/effect registry split (2a) is the highest-risk step — the April wave deferred it for runtime ordering risk; mitigate by going one domain at a time behind the existing lazy pattern with per-surface Playwright smokes, and by keeping `npm run formal:sync` and the contract gates green (the Lean contract surface tracks `:actions/*`/`:effects/*` changes). CSP changes (theme-preload inlining) must update `security_headers.mjs`, `verify_deployment_headers.mjs`, and release-asset tests together or deploys will fail verification. The HyperDegen branch has no recorded perf evidence; Milestone 0's profile run determines whether degen assets (sounds, mascot art) added eager weight that also needs the lazy-surface treatment. Desktop is the measured target; the mobile score will remain substantially lower (mobile Lighthouse applies 4× CPU throttling) and is out of scope.
+
+## Progress
+
+- [x] (M0, 2026-06-11) Recorded bundle benchmark baseline on this branch: `main.97EDB0167F0DB3C4EB22CF3ED6C1C175.js` raw=2,927,705 gzip=685,013 brotli=527,296 (node zlib level 9; the CLI `gzip -9` measures 691,020 — use the node numbers, they are what the gate measures). Other boot-path artifacts: trade_chart raw=419,683 gzip≈118,337; account_surfaces raw=280,523; css/main.css raw=294,511 gzip≈48,543.
+- [x] (M0, 2026-06-11) Added main.js gzip budget gate: `tools/release-assets/check_bundle_budget.mjs` + `bundle-budget.json` (seeded 692,000 = baseline +1% rebuild headroom) + tests in `check_bundle_budget.test.mjs`; wired as `npm run lint:bundle-budget` and appended to `npm run build` so every release build fails closed on regrowth. Decision: gated in `build`, not `check`, because `check` only produces dev compiles and the budget must measure hashed release artifacts (the script rejects unhashed output-names).
+- [ ] (M0, deferred) trade-startup profile baseline: `npm run browser:profile:trade-startup:cached` — run before/after M3 lands
+- [ ] (M1) Route→module preload injection + api.hyperliquid.xyz preconnect in release HTML
+- [ ] (M1) Font preload + JetBrains Mono woff2 + delete Splash-Regular.ttf + /fonts/* cache headers
+- [ ] (M1) theme-preload.js CSP-hash inline (with security_headers + verifier + tests updated)
+- [ ] (M1) Dep hygiene: drop snabbdom, devDep moves, d3→d3-shape
+- [ ] (M2a) Lazy effect/action registries: funding (keep predictability eager), staking, referrals, subaccounts, api-wallets — one domain per commit with benchmark delta
+- [ ] (M2b) Release-strip cljs.spec contract registration (~280KB)
+- [ ] (M2c) :charts_shared module for d3/chart/montecarlo/metrics hoist
+- [ ] (M2d) Port account-tab lazy split from worktree 662c
+- [ ] (M3) Stagger trade_chart → account_surfaces with idle scheduling + yields
+- [ ] (M3) Perp-only critical bootstrap; defer spot/outcome catalog to idle/selector-open
+- [ ] (M3) goog.object payload slicing instead of full js->clj keywordization
+- [ ] (M3) Selector cache persist → requestIdleCallback; candle ws through rAF coalescer + last-bar patch
+- [ ] (M5) Deploy, 3× PageSpeed desktop re-run, record, ratchet budget
+- [ ] (M4, only if <90) Critical/deferred CSS split
+
+## Surprises & Discoveries
+
+- The production index.html does NOT have the dev manifest-fetch boot waterfall — `generate_release_artifacts.mjs` bakes static defer script tags. Several "obvious" delivery fixes were already done; the audit's verification pass refuted them before they cost implementation time.
+- main.js regrew past its pre-diet size (624KB gzip April baseline → 559KB after the diet → 691KB on this branch) with no gate to catch it; the ratchet in M0 exists because of this.
+- Only ~31KB of npm code is in main.js; the weight is almost entirely first-party CLJS plus ~280KB of release-dead spec registration.
+- webData2 is fetched (168KB) but only its 96KB spotAssetCtxs slice is ever read; the rest is keywordized into CLJS structures and discarded at boot.
+
+## Decision Log
+
+- Decision: target desktop ≥90, not 95. Rationale: 90–94 is reachable with bundle/scheduling work already proven feasible in this codebase (the lazy patterns exist); 95+ needs worker-side parsing and render memoization whose payoff was verifier-downgraded to low/medium for desktop TBT.
+- Decision: order milestones delivery → bundle → scheduling rather than biggest-first. Rationale: M1 is near-zero-risk and independently deployable; M2 carries the contract-gate risk and benefits from M0's ratchet + profiler being in place first.
+- Decision: keep funding predictability (~11KB) eager during the funding registry split. Rationale: the trade-route funding tooltip reads it synchronously (`app/effects.cljs:97`); verified during the audit's adversarial pass.
+- Decision: perp-only bootstrap catalog instead of dropping catalog work entirely. Rationale: cold loads have no cache, and `apply-asset-selector-success` is the only `:active-market` source the trade form depends on; building perp markets from the already-deduped metaAndAssetCtxs keeps correctness with ~25% of the work.
+
+## Outcomes & Retrospective
+
+(To be filled per milestone: bundle benchmark deltas, blockingTimeProxyMs, PageSpeed before/after triples, and whether complexity rose or fell.)

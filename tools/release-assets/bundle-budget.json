@@ -1,0 +1,8 @@
+{
+  "comment": "Gzip byte ceiling for the release main module. Ratcheted by docs/exec-plans/active/2026-06-11-pagespeed-desktop-performance-90.md; lower it after each diet milestone, never raise it without review.",
+  "main": {
+    "gzipBytes": 692000,
+    "recordedAt": "2026-06-11T13:00:00.000Z",
+    "recordedOutputName": "main.97EDB0167F0DB3C4EB22CF3ED6C1C175.js"
+  }
+}

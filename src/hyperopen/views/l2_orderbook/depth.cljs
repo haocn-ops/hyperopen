@@ -72,7 +72,7 @@
 
 ;; Spread component
 (defn spread-row [spread]
-  [:div {:class ["flex" "items-center" "justify-center" "h-[23px]" "bg-base-100" "border-y" "border-base-300" "text-xs"]}
+  [:div {:class ["ob-spread-row" "flex" "items-center" "justify-center" "h-[23px]" "bg-base-100" "border-y" "border-base-300" "text-xs"]}
    [:div {:class ["flex" "items-center" "space-x-3" "text-white" "num" "orderbook-level-value"]}
     [:span "Spread"]
     [:span (or (:absolute-label spread)

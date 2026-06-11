@@ -365,7 +365,7 @@
         [:div.text-left (sortable-funding-history-header "Rate" sort-state)]]
        (for [funding-row rows]
          ^{:key (funding-row-sort-id funding-row)}
-         [:div.grid.grid-cols-6.gap-2.py-px.px-3.hover:bg-base-300.text-sm
+         [:div.account-table-row.grid.grid-cols-6.gap-2.py-px.px-3.hover:bg-base-300.text-sm
           [:div (shared/format-funding-history-time (funding-row-time funding-row))]
           [:div.text-left (funding-coin-node (:coin funding-row))]
           [:div.text-left.num (funding-size-text funding-row)]

@@ -34,7 +34,7 @@
                             "focus:ring-offset-0"]
                            (if active?
                              active-classes
-                             ["border-transparent" "text-ho-text-secondary" "hover:text-[#D2DAD7]"]))
+                             ["border-transparent" "text-ho-text-secondary" "hover:text-ho-text"]))
               :on {:click on-click}}
      (when active?
        [:span {:class ["h-1.5" "w-1.5" "rounded-full" dot-class]

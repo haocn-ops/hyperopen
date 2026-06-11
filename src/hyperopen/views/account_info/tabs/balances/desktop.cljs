@@ -63,7 +63,8 @@
                                  (balances-shared/transfer-enabled? row))
          transfer-action (when transfer-enabled?*
                            (balances-shared/balance-row-transfer-action row))]
-     (into [:div {:class ["grid"
+     (into [:div {:class ["account-table-row"
+                          "grid"
                           (desktop-grid-template-class read-only?)
                           "gap-x-4"
                           "items-center"

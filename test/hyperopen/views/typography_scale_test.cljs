@@ -100,7 +100,7 @@
       (is (re-find #"\(def \^:private balances-desktop-grid-template-class\s+\"grid-cols-\["
                    balances-desktop-source)))
     (testing "balance row wrapper includes text-sm for 12px baseline"
-      (is (re-find #"\[:div\s+\{:class\s+\[\"grid\"\s+(?:\(desktop-grid-template-class read-only\?\)|balances-desktop-grid-template-class)[\s\S]*?\"text-sm\""
+      (is (re-find #"\[:div\s+\{:class\s+\[(?:\"account-table-row\"\s+)?\"grid\"\s+(?:\(desktop-grid-template-class read-only\?\)|balances-desktop-grid-template-class)[\s\S]*?\"text-sm\""
                    balances-desktop-source)))))
 
 (deftest header-nav-link-css-uses-14px-and-600-weight-test
@@ -109,13 +109,13 @@
       (is (re-find #"\.header-nav-link\s*\{[\s\S]*?font-weight:\s*600;[\s\S]*?font-size:\s*14px;[\s\S]*?line-height:\s*15px;[\s\S]*?font-feature-settings:\s*\"calt\"\s*off;[\s\S]*?font-variant-ligatures:\s*no-contextual;[\s\S]*?\}"
                    styles-source)))
     (testing "active header link color matches target accent"
-      (is (re-find #"\.header-nav-link-active\s*\{[\s\S]*?color:\s*rgb\(151 252 228\);[\s\S]*?\}"
+      (is (re-find #"\.header-nav-link-active\s*\{[\s\S]*?color:\s*rgb\(var\(--ho-accent-bright\)\);[\s\S]*?\}"
                    styles-source)))))
 
 (deftest order-size-slider-css-uses-progress-track-and-no-filler-trail-test
   (let [styles-source (styles-source)]
     (testing "order size slider active fill stays darker than notch accents"
-      (is (re-find #"\.order-size-slider\.range\s*\{[^}]*--order-size-slider-active:\s*rgb\(15,\s*51,\s*51\);"
+      (is (re-find #"\.order-size-slider\.range\s*\{[^}]*--order-size-slider-active:\s*rgb\(var\(--ho-accent-soft\)\);"
                    styles-source)))
     (testing "order size slider allows aura to render outside control bounds"
       (is (re-find #"\.order-size-slider\.range\s*\{[^}]*overflow:\s*visible;"
@@ -135,9 +135,9 @@
                    styles-source))
       (is (re-find #"\.order-size-slider\.range::-moz-range-thumb\s*\{[^}]*transition:\s*box-shadow\s*180ms\s*cubic-bezier\(0\.16,\s*1,\s*0\.3,\s*1\);"
                    styles-source))
-      (is (re-find #"\.order-size-slider\.range:active::-webkit-slider-thumb\s*\{[^}]*0 0 0 12px rgba\(0,\s*212,\s*170,\s*0\.18\);"
+      (is (re-find #"\.order-size-slider\.range:active::-webkit-slider-thumb\s*\{[^}]*0 0 0 12px rgb\(var\(--slider-accent-rgb, var\(--ho-buy\)\) / 0\.18\);"
                    styles-source))
-      (is (re-find #"\.order-size-slider\.range:active::-moz-range-thumb\s*\{[^}]*0 0 0 12px rgba\(0,\s*212,\s*170,\s*0\.18\);"
+      (is (re-find #"\.order-size-slider\.range:active::-moz-range-thumb\s*\{[^}]*0 0 0 12px rgb\(var\(--slider-accent-rgb, var\(--ho-buy\)\) / 0\.18\);"
                    styles-source)))
     (testing "order size slider focus-visible state stays smaller than active aura"
       (is (not (re-find #"\.order-size-slider\.range:focus-visible::-webkit-slider-thumb\s*\{[^}]*0 0 0 12px"

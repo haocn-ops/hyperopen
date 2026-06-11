@@ -12,8 +12,22 @@
    {:value 1 :y-ratio (/ 2 3)}
    {:value 0 :y-ratio 1}])
 
-(def ^:private strategy-series-stroke
+(def ^:private default-strategy-series-stroke
   "#f5f7f8")
+
+(defn- strategy-series-stroke
+  "Portfolio line color. Themes may override via the
+  --portfolio-strategy-stroke CSS variable (set in
+  src/styles/surfaces/institutional.css); without a DOM or an override the
+  legacy default applies."
+  []
+  (or (when (and (exists? js/window) (exists? js/document))
+        (let [value (-> (.getComputedStyle js/window (.-documentElement js/document))
+                        (.getPropertyValue "--portfolio-strategy-stroke")
+                        str
+                        (.trim))]
+          (when (seq value) value)))
+      default-strategy-series-stroke))
 
 (def ^:private benchmark-series-strokes
   ["#f2cf66"
@@ -72,7 +86,7 @@
   (let [palette-size (count benchmark-series-strokes)]
     (if (pos? palette-size)
       (nth benchmark-series-strokes (mod idx palette-size))
-      strategy-series-stroke)))
+      (strategy-series-stroke))))
 
 (defn build-chart-model
   [state summary-entry summary-scope _summary-time-range returns-benchmark-selector benchmark-context]
@@ -109,7 +123,7 @@
                            [])
         raw-series (cond-> [{:id :strategy
                              :label "Portfolio"
-                             :stroke strategy-series-stroke
+                             :stroke (strategy-series-stroke)
                              :raw-points strategy-points}]
                      (seq benchmark-series)
                      (into benchmark-series))

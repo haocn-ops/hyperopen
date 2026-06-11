@@ -8,7 +8,8 @@
             [hyperopen.views.asset-icon :as asset-icon-view]))
 
 (def ^:private active-asset-chip-classes
-  ["px-1.5"
+  ["asset-chip"
+   "px-1.5"
    "py-0.5"
    "text-xs"
    "font-medium"

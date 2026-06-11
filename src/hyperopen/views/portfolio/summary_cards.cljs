@@ -77,7 +77,7 @@
         children))
 
 (defn- summary-row [label value & [value-class]]
-  [:div {:class ["grid" "grid-cols-[1fr_auto]" "items-center" "gap-3"]}
+  [:div {:class ["summary-kv-row" "grid" "grid-cols-[1fr_auto]" "items-center" "gap-3"]}
    [:span {:class ["text-sm" "text-trading-text-secondary"]}
     label]
    [:span {:class (into ["num" "text-sm" "text-trading-text"] (or value-class []))}
@@ -102,7 +102,7 @@
         summary-time-range (:summary-time-range selectors)]
     (section-card
      "portfolio-account-summary-card"
-     [:div {:class ["flex" "items-center" "justify-between" "border-b" "border-base-300" "px-4" "py-3"]}
+     [:div {:class ["summary-card-head" "flex" "items-center" "justify-between" "border-b" "border-base-300" "px-4" "py-3"]}
       (summary-selector summary-scope
                         :actions/toggle-portfolio-summary-scope-dropdown
                         :actions/select-portfolio-summary-scope

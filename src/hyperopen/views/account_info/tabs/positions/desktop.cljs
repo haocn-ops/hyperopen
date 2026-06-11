@@ -55,7 +55,8 @@
         (and (not read-only?)
              (position-margin/open? margin-modal)
              (= row-key (:position-key margin-modal)))]
-    (into [:div {:class ["grid"
+    (into [:div {:class ["account-table-row"
+                         "grid"
                          (positions-layout/positions-grid-template-class read-only?)
                          "gap-2"
                          "py-0"

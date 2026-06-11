@@ -197,11 +197,25 @@
           [:span {:class ["text-xs" "text-trading-text-secondary"]}
            label]])])))
 
-(def ^:private portfolio-chart-d3-theme
+(defn- chart-theme-css-var
+  "Themes may recolor the d3 chart chrome via --portfolio-chart-* CSS
+  variables (set in src/styles/surfaces/institutional.css); without a DOM or
+  an override the legacy default applies."
+  [var-name fallback]
+  (or (when (and (exists? js/window) (exists? js/document))
+        (let [value (-> (.getComputedStyle js/window (.-documentElement js/document))
+                        (.getPropertyValue var-name)
+                        str
+                        (.trim))]
+          (when (seq value) value)))
+      fallback))
+
+(defn- portfolio-chart-d3-theme
+  []
   {:data-role-prefix "portfolio-chart"
-   :baseline-stroke "#28414a"
+   :baseline-stroke (chart-theme-css-var "--portfolio-chart-baseline" "#28414a")
    :baseline-stroke-width 0.8
-   :hover-line-stroke "#9fb3be"
+   :hover-line-stroke (chart-theme-css-var "--portfolio-chart-hover-line" "#9fb3be")
    :line-stroke-width 1.4
    :line-linecap "round"
    :line-linejoin "round"
@@ -216,7 +230,7 @@
                    :points (:points chart)
                    :series (:series chart)
                    :y-ticks (:y-ticks chart)
-                   :theme portfolio-chart-d3-theme}]
+                   :theme (portfolio-chart-d3-theme)}]
     (assoc base-spec
            :update-key (chart-d3-runtime/spec-update-key base-spec)
            :build-tooltip (fn [hover series]

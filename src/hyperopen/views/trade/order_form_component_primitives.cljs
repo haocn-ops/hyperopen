@@ -320,7 +320,8 @@
                          ["bg-primary" "text-primary-content"])]
     [:button (bind-event
               {:type "button"
-               :class (into ["flex-1"
+               :class (into ["of-side-btn"
+                             "flex-1"
                              "inline-flex"
                              "h-[29px]"
                              "items-center"

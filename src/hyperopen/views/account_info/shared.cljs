@@ -194,7 +194,8 @@
     [:span.text-trading-text "--"]))
 
 (def position-chip-classes
-  ["px-3"
+  ["pos-side-chip"
+   "px-3"
    "py-[1px]"
    "text-xs"
    "leading-none"
@@ -206,7 +207,8 @@
    "border-ho-surface-raised"])
 
 (def position-short-chip-classes
-  ["px-3"
+  ["pos-side-chip"
+   "px-3"
    "py-[1px]"
    "text-xs"
    "leading-none"

@@ -450,7 +450,7 @@
                                                                        "tracking-tight"]})]]
        (for [row rows]
          ^{:key (order-history-row-sort-id row)}
-         [:div {:class ["grid" "gap-2" "py-px" "px-3" "hover:bg-base-300" "text-xs" order-history-grid-template-class]}
+         [:div {:class ["account-table-row" "grid" "gap-2" "py-px" "px-3" "hover:bg-base-300" "text-xs" order-history-grid-template-class]}
           [:div.pr-2.whitespace-nowrap (or (shared/format-open-orders-time (:time-ms row)) "--")]
           [:div.pl-1.text-left (title-case-label (:type row))]
           [:div.pr-4.text-left (order-history-coin-node (:coin row) market-by-key (:side row))]

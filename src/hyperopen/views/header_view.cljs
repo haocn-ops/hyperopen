@@ -6,14 +6,16 @@
             [hyperopen.views.header.wallet :as wallet]))
 
 (def brand-mark-classes
-  ["text-primary"
+  ["brand-mark"
+   "text-primary"
    "font-black"
    "tracking-[-0.12em]"
    "italic"
    "select-none"])
 
 (def brand-wordmark-classes
-  ["text-primary"
+  ["brand-wordmark"
+   "text-primary"
    "font-black"
    "tracking-[-0.06em]"
    "italic"

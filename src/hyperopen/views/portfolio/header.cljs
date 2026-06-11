@@ -46,7 +46,7 @@
                            "sm:px-3"
                            "sm:text-xs"]
                           (when primary?
-                            ["bg-[#1f5b55]" "text-trading-text" "hover:bg-[#267067]"]))
+                            ["bg-ho-accent-soft-hi" "text-trading-text" "hover:bg-ho-accent-soft-hi/80"]))
              :data-role data-role
              :on {:click [action]}}
             (focus-return/data-role-return-focus-props data-role

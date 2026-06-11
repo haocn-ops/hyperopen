@@ -105,7 +105,7 @@
     (is (= "trading-settings-ui-theme-row" (:data-role theme-row)))
     (is (= ["dark" "institutional" "hyperdegen"]
            (mapv :value (:options theme-row))))
-    (is (= ["HyperOpen" "Institutional" "HyperDegen"]
+    (is (= ["HyperLiquid" "Institutional" "HyperDegen"]
            (mapv :label (:options theme-row))))
     (is (= [false true false]
            (mapv :active? (:options theme-row))))

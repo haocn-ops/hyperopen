@@ -126,10 +126,10 @@
                      "inline-flex"
                      "items-center"
                      "gap-1"
-                     "text-sm"]
-             :style {:color (if estimated-row?
-                              "#94A3B8"
-                              "#F5F7F8")}
+                     "text-sm"
+                     (if estimated-row?
+                       "text-ho-text-muted"
+                       "text-ho-text")]
              :data-role (str "portfolio-performance-metric-" (name key) "-label")}
       label
       (when estimated-row?

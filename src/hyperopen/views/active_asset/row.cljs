@@ -46,7 +46,7 @@
                                                (when (:numeric? options) ["num"]))}
                            value])]
     [:div {:class ["text-center"]}
-     [:div {:class (into ["mb-1" "text-xs" "text-gray-400"]
+     [:div {:class (into ["asset-stat-label" "mb-1" "text-xs" "text-gray-400"]
                          (when underlined? ["border-b" "border-dashed" "border-gray-600"]))}
       label]
      [:div {:class (into ["text-xs"]
@@ -290,7 +290,7 @@
            open-interest-usd
            is-spot]
     :as row-vm}]
-  [:div {:class ["relative"
+  [:div {:class ["asset-strip-row" "relative"
                  "hidden"
                  "grid-cols-7"
                  "items-center"
@@ -305,21 +305,21 @@
                               dropdown-visible?
                               missing-icons
                               loaded-icons)]
-   [:div {:class ["flex" "justify-center"]}
+   [:div {:class ["asset-stat-cell" "flex" "justify-center"]}
     (data-column "Mark"
                  (if (some? mark)
                    (fmt/format-trade-price mark mark-raw)
                    "Loading...")
                  {:underlined true
                   :numeric? true})]
-   [:div {:class ["flex" "justify-center"]}
+   [:div {:class ["asset-stat-cell" "flex" "justify-center"]}
     (data-column "Oracle"
                  (if (and (not is-spot) (some? oracle))
                    (fmt/format-trade-price oracle oracle-raw)
                    (if is-spot "—" "Loading..."))
                  {:underlined true
                   :numeric? true})]
-   [:div {:class ["flex" "justify-center"]}
+   [:div {:class ["asset-stat-cell" "flex" "justify-center"]}
     (data-column "24h Change"
                  (if (some? change-24h) nil "Loading...")
                  {:change? (some? change-24h)
@@ -327,13 +327,13 @@
                   :change-pct change-24h-pct
                   :change-raw nil
                   :numeric? true})]
-   [:div {:class ["flex" "justify-center"]}
+   [:div {:class ["asset-stat-cell" "flex" "justify-center"]}
     (data-column "24h Volume"
                  (if (some? volume-24h)
                    (fmt/format-large-currency volume-24h)
                    "Loading...")
                  {:numeric? true})]
-   [:div {:class ["flex" "justify-center"]}
+   [:div {:class ["asset-stat-cell" "flex" "justify-center"]}
     (data-column "Open Interest"
                  (cond
                    is-spot "—"
@@ -341,7 +341,7 @@
                    :else "Loading...")
                  {:underlined true
                   :numeric? true})]
-   [:div {:class ["flex" "justify-center"]}
+   [:div {:class ["asset-stat-cell" "flex" "justify-center"]}
     (desktop-funding-cell row-vm)]])
 
 (defn- outcome-open-interest-column
@@ -398,7 +398,7 @@
            countdown-text]
     :as row-vm}
    {:keys [outcome-handlers]}]
-  [:div {:class ["relative" "hidden"
+  [:div {:class ["asset-strip-row" "relative" "hidden"
                  "grid-cols-[max-content_minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,0.9fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)]"
                  "items-center" "gap-2" "px-0" "py-2" "lg:grid" "md:gap-3"]}
    [:div {:class ["flex" "justify-start"
@@ -413,19 +413,19 @@
                                {:outcome-hover-glow? true})
      (outcome-tooltip/outcome-tooltip-panel (:outcome-tooltip row-vm))]
     (outcome-option-market-strip-selector row-vm outcome-handlers)]
-   [:div {:class ["flex" "justify-center"]}
+   [:div {:class ["asset-stat-cell" "flex" "justify-center"]}
     (data-column "Countdown" (or countdown-text "—") {:numeric? true})]
-   [:div {:class ["flex" "justify-center"]}
+   [:div {:class ["asset-stat-cell" "flex" "justify-center"]}
     (data-column "% Chance"
                  (or outcome-chance-label "—")
                  {:numeric? true})]
-   [:div {:class ["flex" "justify-center"]}
+   [:div {:class ["asset-stat-cell" "flex" "justify-center"]}
     (data-column "Price (Yes)"
                  (if (some? mark)
                    (fmt/format-trade-price mark mark-raw)
                    "Loading...")
                  {:numeric? true})]
-   [:div {:class ["flex" "justify-center"]}
+   [:div {:class ["asset-stat-cell" "flex" "justify-center"]}
     (data-column "24h Change"
                  (if (some? change-24h) nil "Loading...")
                  {:change? (some? change-24h)
@@ -433,7 +433,7 @@
                   :change-pct change-24h-pct
                   :change-raw nil
                   :numeric? true})]
-   [:div {:class ["flex" "justify-center"]}
+   [:div {:class ["asset-stat-cell" "flex" "justify-center"]}
     (data-column "24h Volume"
                  (if (some? volume-24h)
                    (fmt/format-large-currency volume-24h)
@@ -477,7 +477,7 @@
 
 (defn- desktop-select-asset-row
   [dropdown-visible?]
-  [:div {:class ["relative"
+  [:div {:class ["asset-strip-row" "relative"
                  "hidden"
                  "grid-cols-7"
                  "items-center"
@@ -489,17 +489,17 @@
                  active-asset-grid-template]}
    [:div {:class ["flex" "justify-start" "app-shell-gutter-left" "min-w-fit"]}
     (asset-selector-trigger dropdown-visible?)]
-   [:div {:class ["flex" "justify-center"]}
+   [:div {:class ["asset-stat-cell" "flex" "justify-center"]}
     (data-column "Mark" "—" {:underlined true})]
-   [:div {:class ["flex" "justify-center"]}
+   [:div {:class ["asset-stat-cell" "flex" "justify-center"]}
     (data-column "Oracle" "—" {:underlined true})]
-   [:div {:class ["flex" "justify-center"]}
+   [:div {:class ["asset-stat-cell" "flex" "justify-center"]}
     (data-column "24h Change" "—")]
-   [:div {:class ["flex" "justify-center"]}
+   [:div {:class ["asset-stat-cell" "flex" "justify-center"]}
     (data-column "24h Volume" "—")]
-   [:div {:class ["flex" "justify-center"]}
+   [:div {:class ["asset-stat-cell" "flex" "justify-center"]}
     (data-column "Open Interest" "—" {:underlined true})]
-   [:div {:class ["flex" "justify-center"]}
+   [:div {:class ["asset-stat-cell" "flex" "justify-center"]}
     [:div {:class ["text-center"]}
      [:div {:class ["mb-1" "text-xs" "text-gray-400"]} "Funding / Countdown"]
      [:div {:class ["text-xs" "text-gray-400"]} "— / —"]]]])

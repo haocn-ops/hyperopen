@@ -167,6 +167,89 @@
     (is (= #{:proxy-history-used :stale-history}
            (set (map :code (:warnings aligned)))))))
 
+(deftest align-api-v2-history-keeps-selected-id-for-proxy-requested-equity-calendar-test
+  (let [friday (day-start-ms "2026-05-08")
+        saturday (+ friday day-ms)
+        sunday (+ friday (* 2 day-ms))
+        monday (+ friday (* 3 day-ms))
+        universe [{:instrument-id "perp:xyz:SP500"
+                   :market-type :perp
+                   :coin "xyz:SP500"
+                   :optimizer-history/instrument-id "hl:hip3:xyz:SP500"
+                   :optimizer-history/proxy
+                   {:mapping-kind :stitched-native-proxy
+                    :proxy-instrument-id "external:tiingo:SPY"
+                    :provider "tiingo"
+                    :optimizer-proxy-policy "default_allowed"}}
+                  {:instrument-id "perp:BTC"
+                   :market-type :perp
+                   :coin "BTC"
+                   :optimizer-history/instrument-id "hl:perp:BTC"}]
+        normalized (api-v2/normalize-history-bundle
+                    {:universe universe}
+                    {:contract_version "optimizer-history-api-v2"
+                     :request_id "rid-spy-aligned"
+                     :dataset_version "dv-spy"
+                     :status "partial"
+                     :common_calendar [friday monday]
+                     :return_calendar [monday]
+                     :aligned_returns_by_instrument
+                     {"perp:xyz:SP500" {:instrument_id "external:tiingo:SPY"
+                                        :returns [0.005]}
+                      "perp:BTC" {:instrument_id "hl:perp:BTC"
+                                  :returns [0.01]}}
+                     :series_by_instrument
+                     {"perp:xyz:SP500" {:instrument_id "external:tiingo:SPY"
+                                        :lineage_kind "external"
+                                        :series_kind "external_proxy_price"
+                                        :points [{:time_ms friday
+                                                  :close 600
+                                                  :return nil
+                                                  :component "external"}
+                                                 {:time_ms monday
+                                                  :close 603
+                                                  :return 0.005
+                                                  :component "external"}]
+                                        :funding {:status "not_applicable"}
+                                        :warnings [{:code "insufficient-candle-history"
+                                                    :instrument_id "external:tiingo:SPY"}]}
+                      "perp:BTC" {:instrument_id "hl:perp:BTC"
+                                  :lineage_kind "native"
+                                  :series_kind "market_price"
+                                  :points [{:time_ms friday
+                                            :close 100
+                                            :return nil}
+                                           {:time_ms saturday
+                                            :close 101
+                                            :return 0.01}
+                                           {:time_ms sunday
+                                            :close 102
+                                            :return (/ 1 101)}
+                                           {:time_ms monday
+                                            :close 103
+                                            :return 0.01}]
+                                  :funding {:status "available"
+                                            :annualized_carry 0.02}
+                                  :warnings []}}
+                     :warnings [{:code "insufficient-candle-history"
+                                 :instrument_id "external:tiingo:SPY"}]})
+        aligned (api-v2/align-api-v2-history-inputs
+                 {:universe universe
+                  :api-v2-history normalized
+                  :min-observations 2})]
+    (is (= :api-v2-aligned-returns
+           (get-in aligned [:alignment-source :kind])))
+    (is (= ["perp:xyz:SP500" "perp:BTC"]
+           (mapv :instrument-id (:eligible-instruments aligned))))
+    (is (= [friday monday] (:calendar aligned)))
+    (is (= [monday] (:return-calendar aligned)))
+    (is (= {"perp:xyz:SP500" [0.005]
+            "perp:BTC" [0.01]}
+           (:return-series-by-instrument aligned)))
+    (is (= []
+           (filterv #(= :insufficient-candle-history (:code %))
+                    (:warnings aligned))))))
+
 (deftest align-api-v2-history-preserves-native-raw-history-for-mixed-frequency-risk-test
   (let [d0 (day-start-ms "2025-05-28")
         vault-id "vault:0xdfc24b077bc1425ad1dea75bcb6f8158e10df303"

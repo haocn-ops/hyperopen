@@ -141,7 +141,8 @@
              (fn [result]
                (is (= selected-bundle
                       (dissoc result :current-portfolio-history-data)))
-               (is (= current-bundle
+               (is (= (assoc current-bundle
+                             :requested-instrument-ids ["perp:HYPE"])
                       (:current-portfolio-history-data result)))
                (is (= [["perp:BTC"] ["perp:HYPE"]]
                       (mapv (fn [request]

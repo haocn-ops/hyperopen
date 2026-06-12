@@ -42,3 +42,9 @@
                                    {:step "not-a-step"
                                     :status :running
                                     :percent 10}))))
+
+(deftest default-steps-list-frontier-sweep-before-diagnostics-test
+  ;; The engine runs the frontier sweep before assembling diagnostics, so the
+  ;; panel rows must follow the same order.
+  (is (= [:fetch-returns :risk-model :return-model :solve :frontier :diagnostics]
+         (mapv :id (:steps sample-progress)))))

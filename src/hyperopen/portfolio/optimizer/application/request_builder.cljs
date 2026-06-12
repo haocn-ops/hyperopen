@@ -391,12 +391,15 @@
                                                      requested-universe)
         current-history (when (and (seq current-universe)
                                    current-history-data)
-                          (align-history
-                           {:universe current-universe
-                            :history-data current-history-data
-                            :as-of-ms as-of-ms
-                            :stale-after-ms stale-after-ms
-                            :funding-periods-per-year funding-periods-per-year}))
+                          (cond-> (align-history
+                                   {:universe current-universe
+                                    :history-data current-history-data
+                                    :as-of-ms as-of-ms
+                                    :stale-after-ms stale-after-ms
+                                    :funding-periods-per-year funding-periods-per-year})
+                            (seq (:requested-instrument-ids current-history-data))
+                            (assoc :requested-instrument-ids
+                                   (:requested-instrument-ids current-history-data))))
         universe-filtered-return-model (filter-black-litterman-views-for-universe
                                         return-model
                                         eligible-universe)

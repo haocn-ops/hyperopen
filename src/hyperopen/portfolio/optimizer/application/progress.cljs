@@ -69,14 +69,14 @@
       :detail "OSQP"
       :status :pending
       :percent 0}
-     {:id :diagnostics
-      :label "diagnostics + rebalance preview"
-      :detail "signed exposure"
-      :status :pending
-      :percent 0}
      {:id :frontier
       :label "frontier sweep"
       :detail (str frontier-count " points")
+      :status :pending
+      :percent 0}
+     {:id :diagnostics
+      :label "diagnostics + rebalance preview"
+      :detail "signed exposure"
       :status :pending
       :percent 0}]))
 

@@ -167,6 +167,71 @@
              (done)))
           (.catch (async-support/unexpected-error done))))))
 
+(deftest request-history-bundle-chunks-universes-over-backend-limit-test
+  (async done
+    (let [universe (mapv (fn [i]
+                           {:instrument-id (str "perp:A" i)
+                            :market-type :perp
+                            :optimizer-history/instrument-id (str "hl:perp:A" i)})
+                         (range 105))
+          calls (atom [])
+          chunk-1-payload {:contract_version "optimizer-history-api-v2"
+                           :request_id "rid-chunk-1"
+                           :dataset_version "dv-chunk"
+                           :status "ok"
+                           :common_calendar [1000 2000 3000]
+                           :return_calendar [2000 3000]
+                           :series_by_instrument {"perp:A0" {:points []}}
+                           :warnings []}
+          chunk-2-payload {:contract_version "optimizer-history-api-v2"
+                           :request_id "rid-chunk-2"
+                           :dataset_version "dv-chunk"
+                           :status "ok"
+                           :common_calendar [2000 3000 4000]
+                           :return_calendar [3000 4000]
+                           :series_by_instrument {"perp:A104" {:points []}}
+                           :warnings [{:code "missing_candle_history"
+                                       :instrument_id "perp:A104"}]}
+          fetch-fn (fn [url init]
+                     (swap! calls conj [url (js->clj init)])
+                     (js/Promise.resolve
+                      (json-response
+                       200
+                       (if (= 1 (count @calls))
+                         chunk-1-payload
+                         chunk-2-payload))))]
+      (-> (client/request-history-bundle!
+           {:fetch-fn fetch-fn
+            :base-url "https://history.test"
+            :request-id (fn [] "rid-chunk")
+            :proxy-policy :approved-proxy-allowed
+            :include-aligned-returns? true}
+           {:bars 365
+            :interval :1d
+            :universe universe})
+          (.then
+           (fn [body]
+             (let [bodies (mapv (fn [[_url init]]
+                                  (js->clj (js/JSON.parse (get init "body"))))
+                                @calls)
+                   instrument-ids (fn [request-body]
+                                    (mapv #(get % "client_instrument_id")
+                                          (get request-body "instruments")))]
+               (is (= 2 (count @calls)))
+               (is (= 100 (count (instrument-ids (first bodies)))))
+               (is (= "perp:A0" (first (instrument-ids (first bodies)))))
+               (is (= "perp:A99" (last (instrument-ids (first bodies)))))
+               (is (= ["perp:A100" "perp:A101" "perp:A102" "perp:A103" "perp:A104"]
+                      (instrument-ids (second bodies))))
+               (is (= #{"perp:A0" "perp:A104"}
+                      (set (keys (:series-by-instrument body)))))
+               (is (= [2000 3000] (:common-calendar body)))
+               (is (= [3000] (:return-calendar body)))
+               (is (= :ok (:status body)))
+               (is (= 1 (count (:warnings body)))))
+             (done)))
+          (.catch (async-support/unexpected-error done))))))
+
 (deftest request-history-bundle-rejects-http-400-without-retry-test
   (async done
     (let [calls (atom 0)

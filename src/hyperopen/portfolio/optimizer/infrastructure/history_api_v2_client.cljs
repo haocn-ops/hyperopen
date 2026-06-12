@@ -144,17 +144,69 @@
       {:client_instrument_id local-id
        :instrument_id request-id})))
 
-(defn- history-body
+(def max-instruments-per-history-request
+  "The optimizer history API rejects history-bundle requests with more
+  than 100 instruments, so larger universes are fetched in chunks and
+  the chunk bodies merged."
+  100)
+
+(defn- history-body-base
   [{:keys [proxy-policy include-aligned-returns?]} request]
   {:lookback_days (or (:bars request) 365)
    :interval (interval-wire (:interval request))
    :proxy_policy (proxy-policy-wire proxy-policy)
-   :include_aligned_returns (true? include-aligned-returns?)
-   :instruments (mapv identity (keep #(api-instrument-row proxy-policy %)
-                                      (:universe request)))})
+   :include_aligned_returns (true? include-aligned-returns?)})
 
-(defn request-history-bundle!
-  [{:keys [fetch-fn base-url request-id] :as deps} request]
+(defn- instrument-rows
+  [{:keys [proxy-policy]} request]
+  (vec (keep #(api-instrument-row proxy-policy %)
+             (:universe request))))
+
+(defn- instrument-row-chunks
+  [rows]
+  (if (seq rows)
+    (mapv vec (partition-all max-instruments-per-history-request rows))
+    [[]]))
+
+(defn- intersect-preserving-order
+  [xs ys]
+  (let [keep? (set ys)]
+    (filterv keep? xs)))
+
+(defn- merged-calendar
+  [calendars]
+  (reduce intersect-preserving-order
+          (vec (first calendars))
+          (rest calendars)))
+
+(defn- merged-status
+  [statuses]
+  (or (some #(when (not= :ok %) %) statuses)
+      :ok))
+
+(defn- merge-history-bodies
+  [bodies]
+  (if (<= (count bodies) 1)
+    (first bodies)
+    (let [head (first bodies)]
+      {:contract-version (:contract-version head)
+       :request-id (:request-id head)
+       :dataset-version (:dataset-version head)
+       :error (some :error bodies)
+       :message (some :message bodies)
+       :status (merged-status (map :status bodies))
+       :common-calendar (merged-calendar (map :common-calendar bodies))
+       :return-calendar (merged-calendar (map :return-calendar bodies))
+       :aligned-returns-by-instrument (into {}
+                                            (map :aligned-returns-by-instrument)
+                                            bodies)
+       :series-by-instrument (into {}
+                                   (map :series-by-instrument)
+                                   bodies)
+       :warnings (vec (mapcat :warnings bodies))})))
+
+(defn- request-history-bundle-chunk!
+  [{:keys [fetch-fn base-url request-id]} body-base instruments]
   (let [rid (request-id-value request-id)]
     (request-json! fetch-fn
                    (str (normalize-base-url base-url)
@@ -163,5 +215,15 @@
                     :headers (cond-> {"content-type" "application/json"}
                                rid (assoc "x-request-id" rid))
                     :body (js/JSON.stringify
-                           (clj->js (history-body deps request)))}
+                           (clj->js (assoc body-base :instruments instruments)))}
                    api-v2/normalize-history-body)))
+
+(defn request-history-bundle!
+  [deps request]
+  (let [body-base (history-body-base deps request)
+        chunks (instrument-row-chunks (instrument-rows deps request))]
+    (-> (js/Promise.all
+         (to-array (map #(request-history-bundle-chunk! deps body-base %)
+                        chunks)))
+        (.then (fn [bodies]
+                 (merge-history-bodies (vec bodies)))))))

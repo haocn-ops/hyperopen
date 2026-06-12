@@ -273,6 +273,84 @@
                    (done)))
           (.catch (async-support/unexpected-error done))))))
 
+(deftest run-portfolio-optimizer-pipeline-waits-for-prefetch-without-idle-env-config-test
+  (async done
+    (let [calls (atom [])
+          btc-instrument {:instrument-id "perp:BTC"
+                          :market-type :perp
+                          :coin "BTC"}
+          store (atom {:portfolio {:optimizer
+                                    {:draft {:id "draft-prefetch-defaults"
+                                             :universe [btc-instrument]
+                                             :objective {:kind :minimum-variance}
+                                             :return-model {:kind :historical-mean}
+                                             :risk-model {:kind :diagonal-shrink}
+                                             :constraints {:long-only? true
+                                                           :max-asset-weight 1.0}}
+                                     :history-data {:candle-history-by-coin {}
+                                                    :funding-history-by-coin {}}
+                                     :history-load-state
+                                     {:status :loading
+                                      :request-signature {:universe [btc-instrument]
+                                                          :source :selection-prefetch}}
+                                     :history-prefetch
+                                     {:queue []
+                                      :active-instrument-id "perp:BTC"
+                                      :by-instrument-id
+                                      {"perp:BTC" {:status :loading
+                                                   :started-at-ms 900
+                                                   :completed-at-ms nil
+                                                   :error nil
+                                                   :warnings []}}}
+                                     :runtime {:as-of-ms 3000
+                                               :stale-after-ms 60000}}}
+                       :webdata2 {:clearinghouseState
+                                  {:marginSummary {:accountValue "1000"}
+                                   :assetPositions []}}})
+          env {:now-ms (constantly 1000)
+               :next-run-id (constantly "pipeline-run-prefetch-defaults")
+               :load-history! (fn [_store _opts]
+                                (swap! calls conj [:history])
+                                (js/Promise.resolve nil))
+               :request-run! (fn [payload]
+                               (swap! calls conj [:run
+                                                  (:run-id payload)
+                                                  (:request payload)])
+                               (:run-id payload))}]
+      (js/setTimeout
+       (fn []
+         (swap! store
+                (fn [state]
+                  (-> state
+                      (assoc-in [:portfolio :optimizer :history-data]
+                                {:candle-history-by-coin
+                                 {"BTC" [{:time 1000 :close "100"}
+                                         {:time 2000 :close "110"}]}
+                                 :funding-history-by-coin
+                                 {"BTC" [{:time-ms 1000
+                                          :funding-rate-raw 0}]}
+                                 :loaded-at-ms 1005})
+                      (assoc-in [:portfolio :optimizer :history-load-state]
+                                {:status :succeeded
+                                 :request-signature {:universe [btc-instrument]
+                                                     :source :selection-prefetch}
+                                 :warnings []})
+                      (assoc-in [:portfolio :optimizer :history-prefetch :active-instrument-id]
+                                nil)))))
+       60)
+      (-> (pipeline/run-portfolio-optimizer-pipeline-effect env nil store)
+          (.then (fn [run-id]
+                   (is (nil? (get-in @store
+                                     [:portfolio
+                                      :optimizer
+                                      :optimization-progress
+                                      :error]))
+                       "run must not fail with a spurious prefetch idle timeout")
+                   (is (= "pipeline-run-prefetch-defaults" run-id))
+                   (is (= [:run] (mapv first @calls)))
+                   (done)))
+          (.catch (async-support/unexpected-error done))))))
+
 (deftest run-portfolio-optimizer-pipeline-loads-missing-current-history-before-run-test
   (async done
     (let [calls (atom [])

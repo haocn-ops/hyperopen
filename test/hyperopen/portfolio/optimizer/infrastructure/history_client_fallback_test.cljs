@@ -102,7 +102,7 @@
                                                     backend-events))
                    info-started (first (filter #(= :started (:status %))
                                                info-events))]
-               (is (= [:started :succeeded]
+               (is (= [:started :loading :succeeded]
                       (mapv :status backend-events)))
                (is (= {:requested-count 2
                        :returned-count 2

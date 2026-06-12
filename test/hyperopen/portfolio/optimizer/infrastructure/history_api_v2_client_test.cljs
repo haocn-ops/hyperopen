@@ -232,6 +232,47 @@
              (done)))
           (.catch (async-support/unexpected-error done))))))
 
+(deftest request-history-bundle-reports-chunk-progress-test
+  (async done
+    (let [universe (mapv (fn [i]
+                           {:instrument-id (str "perp:A" i)
+                            :market-type :perp
+                            :optimizer-history/instrument-id (str "hl:perp:A" i)})
+                         (range 105))
+          progress-events (atom [])
+          chunk-payload {:contract_version "optimizer-history-api-v2"
+                         :request_id "rid-chunk-progress"
+                         :dataset_version "dv-chunk"
+                         :status "ok"
+                         :common_calendar [1000 2000]
+                         :return_calendar [2000]
+                         :series_by_instrument {}
+                         :warnings []}
+          fetch-fn (fn [_url _init]
+                     (js/Promise.resolve (json-response 200 chunk-payload)))]
+      (-> (client/request-history-bundle!
+           {:fetch-fn fetch-fn
+            :base-url "https://history.test"
+            :request-id (fn [] "rid-chunk-progress")
+            :proxy-policy :approved-proxy-allowed
+            :include-aligned-returns? true
+            :on-chunk-progress (fn [payload]
+                                 (swap! progress-events conj payload))}
+           {:bars 365
+            :interval :1d
+            :universe universe})
+          (.then
+           (fn [_body]
+             (is (= 2 (count @progress-events)))
+             (is (= [1 2] (mapv :completed @progress-events)))
+             (is (= {:completed 2
+                     :total 2
+                     :loaded-count 105
+                     :requested-count 105}
+                    (last @progress-events)))
+             (done)))
+          (.catch (async-support/unexpected-error done))))))
+
 (deftest request-history-bundle-rejects-http-400-without-retry-test
   (async done
     (let [calls (atom 0)

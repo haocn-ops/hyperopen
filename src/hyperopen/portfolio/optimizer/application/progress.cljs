@@ -155,7 +155,8 @@
 
 (defn worker-progress
   [progress payload]
-  (let [step-id (:step payload)]
+  ;; :step is not an enum wire key, so it arrives from the worker as a string.
+  (let [step-id (some-> (:step payload) keyword)]
     (if step-id
       (mark-step progress
                  step-id

@@ -36,7 +36,7 @@
           on-progress
           {:step :solve
            :status :running
-           :percent 0
+           :percent solve/solve-start-percent
            :detail (str (count (:problems solver-plan)) " problems")})
          (-> (solve/solve-plan-async solver-plan
                                      solve-problem*
@@ -50,6 +50,12 @@
                                               :status :running
                                               :percent 80
                                               :detail "selecting frontier"})
+                                            (context/report-progress!
+                                             on-progress
+                                             {:step :diagnostics
+                                              :status :running
+                                              :percent 50
+                                              :detail "signed exposure"})
                                             (let [result (payload/result-from-solver-results
                                                           request
                                                           optimization-context
@@ -71,6 +77,7 @@
                         (if (seq display-frontier-plans)
                           (-> (solve/solve-display-frontier-plans-async
                                display-frontier-plans
-                               solve-problem*)
+                               solve-problem*
+                               on-progress)
                               (.then finish-result))
                           (finish-result {})))))))))))

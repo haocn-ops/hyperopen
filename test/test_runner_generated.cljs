@@ -209,6 +209,7 @@
             [hyperopen.portfolio.optimizer.application.engine-blocklist-test]
             [hyperopen.portfolio.optimizer.application.engine-current-portfolio-test]
             [hyperopen.portfolio.optimizer.application.engine-history-window-test]
+            [hyperopen.portfolio.optimizer.application.engine-progress-test]
             [hyperopen.portfolio.optimizer.application.engine-solver-diagnostics-test]
             [hyperopen.portfolio.optimizer.application.engine-sparse-caps-test]
             [hyperopen.portfolio.optimizer.application.engine-test]
@@ -225,6 +226,7 @@
             [hyperopen.portfolio.optimizer.application.instrument-labels-test]
             [hyperopen.portfolio.optimizer.application.orderbook-loader-test]
             [hyperopen.portfolio.optimizer.application.pipeline-workflow-test]
+            [hyperopen.portfolio.optimizer.application.progress-test]
             [hyperopen.portfolio.optimizer.application.rebalance-snapshot-test]
             [hyperopen.portfolio.optimizer.application.request-builder-test]
             [hyperopen.portfolio.optimizer.application.return-inputs-test]
@@ -923,6 +925,7 @@
              'hyperopen.portfolio.optimizer.application.engine-blocklist-test
              'hyperopen.portfolio.optimizer.application.engine-current-portfolio-test
              'hyperopen.portfolio.optimizer.application.engine-history-window-test
+             'hyperopen.portfolio.optimizer.application.engine-progress-test
              'hyperopen.portfolio.optimizer.application.engine-solver-diagnostics-test
              'hyperopen.portfolio.optimizer.application.engine-sparse-caps-test
              'hyperopen.portfolio.optimizer.application.engine-test
@@ -939,6 +942,7 @@
              'hyperopen.portfolio.optimizer.application.instrument-labels-test
              'hyperopen.portfolio.optimizer.application.orderbook-loader-test
              'hyperopen.portfolio.optimizer.application.pipeline-workflow-test
+             'hyperopen.portfolio.optimizer.application.progress-test
              'hyperopen.portfolio.optimizer.application.rebalance-snapshot-test
              'hyperopen.portfolio.optimizer.application.request-builder-test
              'hyperopen.portfolio.optimizer.application.return-inputs-test

@@ -250,6 +250,12 @@
   ([request]
    (optimization-context request nil))
   ([request on-progress]
+   (report-progress!
+    on-progress
+    {:step :risk-model
+     :status :running
+     :percent 25
+     :detail "estimating covariance"})
    (let [raw-risk-result (risk/estimate-risk-model
                           {:risk-model (:risk-model request)
                            :periods-per-year (:periods-per-year request)
@@ -263,6 +269,12 @@
              :percent 100
              :detail (or (some-> (:model risk-result) name)
                          "estimated")})
+         _ (report-progress!
+            on-progress
+            {:step :return-model
+             :status :running
+             :percent 25
+             :detail "estimating expected returns"})
          return-result (expected-return-result request risk-result)
          _ (report-progress!
             on-progress
@@ -272,6 +284,12 @@
              :detail (or (some-> (:model return-result) name)
                          "estimated")})
          expected-returns (expected-return-vector return-result instrument-ids)
+         _ (report-progress!
+            on-progress
+            {:step :solve
+             :status :running
+             :percent 0
+             :detail "encoding constraints"})
          current-portfolio-analysis* (current-portfolio-analysis request
                                                                  return-result)]
      (if (= :invalid (:status return-result))

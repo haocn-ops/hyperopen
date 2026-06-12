@@ -28,10 +28,19 @@
 (defn- backend-progress-detail
   [backend]
   (let [requested-count (count-value (:requested-count backend))
+        loaded-count (count-value (:loaded-count backend))
         usable-count (count-value (:usable-count backend))]
     (case (:status backend)
       :started
       (str "backend API: loading "
+           requested-count
+           " "
+           (plural requested-count "asset" "assets"))
+
+      :loading
+      (str "backend API: "
+           loaded-count
+           "/"
            requested-count
            " "
            (plural requested-count "asset" "assets"))
@@ -73,6 +82,23 @@
        ", "
        (info-progress-detail (:info source-state))))
 
+(defn- backend-phase-percent
+  "Maps backend bundle progress onto the fetch step: 5 on request start,
+  chunk completions filling 5-95. Terminal statuses that hand off to the
+  legacy /info fallback settle at 50 so the fallback phase owns the rest;
+  a clean success holds at 95 until the worker run takes the step over."
+  [backend]
+  (let [total (count-value (:total backend))
+        completed (count-value (:completed backend))
+        fallback-count (count-value (:fallback-asset-count backend))]
+    (case (:status backend)
+      :started 5
+      :loading (if (pos? total)
+                 (+ 5 (* 90 (/ completed total)))
+                 5)
+      :succeeded (if (pos? fallback-count) 50 95)
+      50)))
+
 (defn- source-progress-percent
   [source-state payload]
   (let [backend (:backend source-state)
@@ -83,11 +109,8 @@
       (and backend (pos? info-total))
       (+ 50 (/ info-percent 2))
 
-      (= :started (:status backend))
-      5
-
       backend
-      50
+      (backend-phase-percent backend)
 
       (pos? info-total)
       info-percent
@@ -115,17 +138,26 @@
 
 (defn- fetch-progress-callback
   [store run-id]
-  (let [source-state (atom {})]
+  (let [source-state (atom {})
+        ;; The fetch step spans sequential phases (selected universe, then
+        ;; current portfolio, then legacy fallback); keep the bar monotonic
+        ;; across their restarts.
+        max-percent (atom 0)
+        monotonic-percent! (fn [percent]
+                             (swap! max-percent max (percent-value percent)))]
     (fn [{:keys [percent completed total source] :as payload}]
       (if source
         (let [[source-state* attrs] (source-progress-attrs @source-state payload)]
           (reset! source-state source-state*)
-          (mark-progress-step! store run-id :fetch-returns attrs))
+          (mark-progress-step! store
+                               run-id
+                               :fetch-returns
+                               (update attrs :percent monotonic-percent!)))
         (mark-progress-step! store
                              run-id
                              :fetch-returns
                              {:status :running
-                              :percent percent
+                              :percent (monotonic-percent! percent)
                               :detail (str completed "/" total " requests")})))))
 
 (defn- wait-for-history-load-idle!

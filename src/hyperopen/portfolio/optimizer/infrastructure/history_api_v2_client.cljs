@@ -218,12 +218,35 @@
                            (clj->js (assoc body-base :instruments instruments)))}
                    api-v2/normalize-history-body)))
 
+(defn- report-chunk-progress!
+  [on-chunk-progress progress total-chunks total-instruments]
+  (when (fn? on-chunk-progress)
+    (on-chunk-progress {:completed (:completed progress)
+                        :total total-chunks
+                        :loaded-count (:loaded-count progress)
+                        :requested-count total-instruments})))
+
 (defn request-history-bundle!
-  [deps request]
+  [{:keys [on-chunk-progress] :as deps} request]
   (let [body-base (history-body-base deps request)
-        chunks (instrument-row-chunks (instrument-rows deps request))]
+        rows (instrument-rows deps request)
+        chunks (instrument-row-chunks rows)
+        total-chunks (count chunks)
+        total-instruments (count rows)
+        progress-state (atom {:completed 0 :loaded-count 0})]
     (-> (js/Promise.all
-         (to-array (map #(request-history-bundle-chunk! deps body-base %)
+         (to-array (map (fn [chunk]
+                          (-> (request-history-bundle-chunk! deps body-base chunk)
+                              (.then (fn [body]
+                                       (report-chunk-progress!
+                                        on-chunk-progress
+                                        (swap! progress-state
+                                               #(-> %
+                                                    (update :completed inc)
+                                                    (update :loaded-count + (count chunk))))
+                                        total-chunks
+                                        total-instruments)
+                                       body))))
                         chunks)))
         (.then (fn [bodies]
                  (merge-history-bodies (vec bodies)))))))

@@ -52,6 +52,10 @@
 (defn- step-row
   [idx step]
   (let [percent (clamp-percent (:percent step))
+        running? (= :running (:status step))
+        ;; Keep a visible sliver of bar while a step is running so the
+        ;; pulse reads as activity even at 0%.
+        bar-percent (if running? (max percent 3) percent)
         row-id (or (:id step) idx)
         row-token (if (keyword? row-id)
                     (name row-id)
@@ -67,8 +71,13 @@
       [:span {:class ["font-mono" "text-[0.625rem]" "text-trading-muted"]}
        (str (.toFixed percent 0) "%")]]
      [:div {:class ["h-1.5" "overflow-hidden" "rounded-full" "bg-base-300/60"]}
-      [:div {:class ["h-full" (step-tone-class step)]
-             :style {:width (str percent "%")}}]]]))
+      [:div {:class ["h-full"
+                     "transition-[width]"
+                     "duration-500"
+                     "ease-out"
+                     (step-tone-class step)
+                     (when running? "animate-pulse")]
+             :style {:width (str bar-percent "%")}}]]]))
 
 (defn progress-panel
   [progress]

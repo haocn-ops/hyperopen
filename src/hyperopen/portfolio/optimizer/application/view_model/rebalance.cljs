@@ -44,29 +44,41 @@
           not-empty))
 
 (defn- instrument-market
-  [labels-by-instrument instrument-id]
+  [labels-by-instrument instrument-id draft-instrument]
   (let [instrument-id* (str instrument-id)
         label (instrument-label labels-by-instrument instrument-id)
-        [kind raw-coin] (str/split instrument-id* #":" 2)
-        market-type (case kind
-                      "spot" :spot
-                      "perp" :perp
-                      nil)
-        coin (or (when market-type
+        source-id (or (coercion/non-blank-text (:instrument-id draft-instrument))
+                      instrument-id*)
+        [kind raw-coin] (str/split source-id #":" 2)
+        market-type (or (ids/normalize-market-type (:market-type draft-instrument))
+                        (case kind
+                          "spot" :spot
+                          "perp" :perp
+                          nil))
+        coin (or (coercion/non-blank-text (:coin draft-instrument))
+                 (when market-type
                    (not-empty raw-coin))
                  (not-empty instrument-id*)
                  (base-symbol label))
-        base (or (base-symbol coin)
-                 (base-symbol label))]
-    {:key instrument-id*
-     :coin coin
-     :symbol (or (when (= :spot market-type)
-                   (when base
-                     (str base "/USDC")))
-                 base
-                 label)
-     :base base
-     :market-type market-type}))
+        base (or (coercion/non-blank-text (:base draft-instrument))
+                 (base-symbol coin)
+                 (base-symbol label))
+        symbol (or (coercion/non-blank-text (:symbol draft-instrument))
+                   (when (= :spot market-type)
+                     (when base
+                       (str base "/USDC")))
+                   base
+                   label)]
+    (cond-> {:key source-id
+             :coin coin
+             :symbol symbol
+             :base base
+             :market-type market-type}
+      (coercion/non-blank-text (:dex draft-instrument))
+      (assoc :dex (coercion/non-blank-text (:dex draft-instrument)))
+      (and (map? draft-instrument)
+           (contains? draft-instrument :hip3?))
+      (assoc :hip3? (boolean (:hip3? draft-instrument))))))
 
 (defn- leg-label
   [labels-by-instrument instrument-id current-weight target-weight]
@@ -164,7 +176,7 @@
                            instrument-id
                            current-weight*
                            target-weight*)
-     :market (instrument-market labels-by-instrument instrument-id)}))
+     :market (instrument-market labels-by-instrument instrument-id draft-instrument)}))
 
 (defn- grouped-rows
   [rows]

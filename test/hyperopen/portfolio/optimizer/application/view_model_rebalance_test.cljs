@@ -92,3 +92,44 @@
             :status-label "sell to 0"}
            (select-keys eth-row
                         [:instrument-id :target-weight :excluded? :status-label])))))
+
+(deftest target-exposure-table-model-preserves-draft-market-identity-for-icon-rendering-test
+  (let [draft {:universe [{:instrument-id "perp:XYZ100"
+                           :market-type :perp
+                           :coin "XYZ100-USDC"
+                           :symbol "XYZ100-USDC"
+                           :base "XYZ100"
+                           :dex "xyz"
+                           :hip3? true}
+                          {:instrument-id "perp:xyz:SP500"
+                           :market-type :perp
+                           :coin "SP500-USDC"
+                           :symbol "SP500-USDC"
+                           :base "SP500"
+                           :dex "xyz"
+                           :hip3? true
+                           :optimizer-history/instrument-id "external:tiingo:SPY"}]}
+        result {:instrument-ids ["perp:XYZ100" "external:tiingo:SPY"]
+                :current-weights [0.1 0.2]
+                :target-weights [0.4 0.6]
+                :labels-by-instrument {"perp:XYZ100" "XYZ100"
+                                       "external:tiingo:SPY" "SP500"}
+                :rebalance-preview {:capital-usd 10000}}
+        model (rebalance/target-exposure-table-model result {:draft draft})
+        groups-by-asset (into {} (map (juxt :asset identity) (:groups model)))]
+    (is (= {:key "perp:XYZ100"
+            :coin "XYZ100-USDC"
+            :symbol "XYZ100-USDC"
+            :base "XYZ100"
+            :dex "xyz"
+            :market-type :perp}
+           (select-keys (:market (get groups-by-asset "XYZ100"))
+                        [:key :coin :symbol :base :dex :market-type])))
+    (is (= {:key "perp:xyz:SP500"
+            :coin "SP500-USDC"
+            :symbol "SP500-USDC"
+            :base "SP500"
+            :dex "xyz"
+            :market-type :perp}
+           (select-keys (:market (get groups-by-asset "SP500"))
+                        [:key :coin :symbol :base :dex :market-type])))))

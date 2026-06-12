@@ -78,23 +78,33 @@
 
 (defn point-market
   [point]
-  (let [instrument-id (non-blank-text (:instrument-id point))
+  (let [source (or (:icon-market point) point)
+        instrument-id (non-blank-text (or (:instrument-id source)
+                                          (:instrument-id point)))
         label (non-blank-text (:label point))
         [kind raw-coin] (when instrument-id
                           (str/split instrument-id #":" 2))
-        market-type (case kind
-                      "spot" :spot
-                      "perp" :perp
-                      nil)
-        coin (or (when market-type
+        market-type (or (ids/normalize-market-type (:market-type source))
+                        (case kind
+                          "spot" :spot
+                          "perp" :perp
+                          nil))
+        coin (or (non-blank-text (:coin source))
+                 (when market-type
                    (non-blank-text raw-coin))
                  instrument-id
                  label)
-        base (or (base-symbol coin)
+        base (or (non-blank-text (:base source))
+                 (base-symbol coin)
                  (base-symbol label))]
-    {:key instrument-id
-     :coin coin
-     :symbol (or (when (= :spot market-type) coin)
-                 base)
-     :base base
-     :market-type market-type}))
+    (cond-> {:key instrument-id
+             :coin coin
+             :symbol (or (non-blank-text (:symbol source))
+                         (when (= :spot market-type) coin)
+                         base)
+             :base base
+             :market-type market-type}
+      (non-blank-text (:dex source))
+      (assoc :dex (non-blank-text (:dex source)))
+      (contains? source :hip3?)
+      (assoc :hip3? (boolean (:hip3? source))))))

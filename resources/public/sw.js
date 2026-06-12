@@ -3,8 +3,8 @@
 const ICON_HOST = "app.hyperliquid.xyz";
 const ICON_PATH_PREFIX = "/coins/";
 const ICON_FILE_SUFFIX = ".svg";
-const ICON_CACHE_NAME = "hyperopen-icon-cache-v1";
-const ICON_META_CACHE_NAME = "hyperopen-icon-meta-v1";
+const ICON_CACHE_NAME = "hyperopen-icon-cache-v2";
+const ICON_META_CACHE_NAME = "hyperopen-icon-meta-v2";
 const ICON_CACHE_PREFIX = "hyperopen-icon-";
 const ICON_TTL_MS = 10 * 24 * 60 * 60 * 1000;
 
@@ -23,6 +23,23 @@ function isIconRequest(request) {
 
 function iconMetaRequest(url) {
   return new Request(`/__hyperopen_icon_meta__?u=${encodeURIComponent(url)}`);
+}
+
+function responseContentType(response) {
+  if (!response || !response.headers || typeof response.headers.get !== "function") {
+    return "";
+  }
+
+  return String(response.headers.get("content-type") || "").toLowerCase();
+}
+
+function isCacheableIconResponse(response) {
+  return Boolean(
+    response &&
+      response.ok &&
+      response.type !== "opaque" &&
+      responseContentType(response).includes("image/svg+xml")
+  );
 }
 
 async function readCachedAt(url) {
@@ -47,7 +64,7 @@ async function writeCachedAt(url, timestampMs) {
 }
 
 async function cacheIconResponse(request, response) {
-  if (!response || !(response.ok || response.type === "opaque")) {
+  if (!isCacheableIconResponse(response)) {
     return;
   }
 

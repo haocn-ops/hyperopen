@@ -23,7 +23,8 @@
 (defn- spot-market?
   [coin symbol market-type]
   (or (= :spot market-type)
-      (some-> coin non-blank-text (str/starts-with? "@"))
+      (and (nil? market-type)
+           (some-> coin non-blank-text (str/starts-with? "@")))
       (some-> coin non-blank-text (str/includes? "/"))
       (some-> symbol non-blank-text (str/includes? "/"))))
 
@@ -99,8 +100,15 @@
       (non-blank-text underlying)
       (non-blank-text base)))
 
+(defn- dex-candidate-icon-key
+  [dex base]
+  (let [dex* (non-blank-text dex)
+        base* (non-blank-text base)]
+    (when (and dex* base*)
+      (str dex* ":" base*))))
+
 (defn market-icon-key
-  [{:keys [coin symbol base market-type underlying underlying-for-icon]}]
+  [{:keys [coin symbol base market-type underlying underlying-for-icon dex]}]
   (let [coin* (non-blank-text coin)
         symbol* (non-blank-text symbol)
         base* (non-blank-text base)
@@ -110,6 +118,8 @@
                         (outcome-candidate-icon-key underlying-for-icon underlying base*))
                       (when spot?
                         (spot-candidate-icon-key coin* symbol* base*))
+                      (when-not outcome?
+                        (dex-candidate-icon-key dex base*))
                       (when-not (or outcome?
                                     (str/starts-with? (or coin* "") "@"))
                         coin*)

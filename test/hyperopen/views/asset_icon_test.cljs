@@ -24,7 +24,17 @@
     (is (= "ADA" (asset-icon/market-icon-key {:coin "hyna:ADA" :base "ADA"}))))
 
   (testing "retains namespaced keys when no alias is needed"
-    (is (= "xyz:XYZ100" (asset-icon/market-icon-key {:coin "xyz:XYZ100" :base "XYZ100"}))))
+    (is (= "xyz:XYZ100" (asset-icon/market-icon-key {:coin "xyz:XYZ100" :base "XYZ100"})))
+    (is (= "xyz:XYZ100" (asset-icon/market-icon-key {:coin "XYZ100-USDC"
+                                                      :symbol "XYZ100-USDC"
+                                                      :base "XYZ100"
+                                                      :dex "xyz"
+                                                      :market-type :perp})))
+    (is (= "xyz:SP500" (asset-icon/market-icon-key {:coin "SP500-USDC"
+                                                     :symbol "SP500-USDC"
+                                                     :base "SP500"
+                                                     :dex "xyz"
+                                                     :market-type :perp}))))
 
   (testing "normalizes local and backend instrument prefixes before building icon keys"
     (is (= "BTC" (asset-icon/market-icon-key {:coin "perp:BTC"})))

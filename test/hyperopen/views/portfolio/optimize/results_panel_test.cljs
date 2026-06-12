@@ -100,6 +100,47 @@
     (is (= "https://app.hyperliquid.xyz/coins/xyz:SILVER.svg"
            (node-attr silver-icon :src)))))
 
+(deftest results-panel-target-exposure-renders-draft-hip3-market-icons-for-result-ids-test
+  (let [result (assoc solved-result
+                      :instrument-ids ["perp:XYZ100" "external:tiingo:SPY"]
+                      :target-weights [0.4 0.6]
+                      :current-weights [0.1 0.2]
+                      :target-weights-by-instrument {"perp:XYZ100" 0.4
+                                                     "external:tiingo:SPY" 0.6}
+                      :current-weights-by-instrument {"perp:XYZ100" 0.1
+                                                      "external:tiingo:SPY" 0.2}
+                      :labels-by-instrument {"perp:XYZ100" "XYZ100"
+                                             "external:tiingo:SPY" "SP500"})
+        draft {:objective {:kind :maximum-sharpe}
+               :universe [{:instrument-id "perp:XYZ100"
+                           :market-type :perp
+                           :coin "XYZ100-USDC"
+                           :symbol "XYZ100-USDC"
+                           :base "XYZ100"
+                           :dex "xyz"
+                           :hip3? true}
+                          {:instrument-id "perp:xyz:SP500"
+                           :market-type :perp
+                           :coin "SP500-USDC"
+                           :symbol "SP500-USDC"
+                           :base "SP500"
+                           :dex "xyz"
+                           :hip3? true
+                           :optimizer-history/instrument-id "external:tiingo:SPY"}]}
+        view-node (results-panel/results-panel
+                   {:result result
+                    :computed-at-ms 2600}
+                   draft
+                   {:frontier-overlay-mode :standalone})
+        xyz100-icon (node-by-role view-node
+                                  "portfolio-optimizer-target-exposure-asset-icon-img-XYZ100")
+        sp500-icon (node-by-role view-node
+                                 "portfolio-optimizer-target-exposure-asset-icon-img-SP500")]
+    (is (= "https://app.hyperliquid.xyz/coins/xyz:XYZ100.svg"
+           (node-attr xyz100-icon :src)))
+    (is (= "https://app.hyperliquid.xyz/coins/xyz:SP500.svg"
+           (node-attr sp500-icon :src)))))
+
 (deftest results-panel-target-exposure-renders-change-before-diverging-bar-test
   (let [view-node (results-panel/results-panel
                    {:result solved-result

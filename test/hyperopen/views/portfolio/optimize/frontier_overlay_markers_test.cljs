@@ -111,6 +111,58 @@
     (is (= (node-attr gold-image :y)
            (- (node-attr gold-clip-circle :cy) 7)))))
 
+(deftest frontier-overlays-render-draft-hip3-icons-for-result-ids-test
+  (let [result (assoc (fixtures/sample-solved-result)
+                      :frontier-overlays
+                      {:standalone [{:instrument-id "perp:XYZ100"
+                                     :label "XYZ100"
+                                     :target-weight 0.5
+                                     :expected-return 0.2
+                                     :volatility 0.16}]
+                       :contribution [{:instrument-id "external:tiingo:SPY"
+                                       :label "SP500"
+                                       :target-weight 0.5
+                                       :expected-return 0.05
+                                       :volatility 0.08}]})
+        draft {:objective {:kind :minimum-variance}
+               :universe [{:instrument-id "perp:XYZ100"
+                           :market-type :perp
+                           :coin "XYZ100-USDC"
+                           :symbol "XYZ100-USDC"
+                           :base "XYZ100"
+                           :dex "xyz"
+                           :hip3? true}
+                          {:instrument-id "perp:xyz:SP500"
+                           :market-type :perp
+                           :coin "SP500-USDC"
+                           :symbol "SP500-USDC"
+                           :base "SP500"
+                           :dex "xyz"
+                           :hip3? true
+                           :optimizer-history/instrument-id "external:tiingo:SPY"}]}
+        standalone-node (results-panel/results-panel
+                         {:result result
+                          :computed-at-ms 2600}
+                         draft
+                         {:frontier-overlay-mode :standalone})
+        contribution-node (results-panel/results-panel
+                           {:result result
+                            :computed-at-ms 2600}
+                           draft
+                           {:frontier-overlay-mode :contribution})
+        xyz100-symbol (node-by-role
+                       standalone-node
+                       "portfolio-optimizer-frontier-overlay-symbol-standalone-perp:XYZ100")
+        sp500-symbol (node-by-role
+                      contribution-node
+                      "portfolio-optimizer-frontier-overlay-symbol-contribution-external:tiingo:SPY")
+        xyz100-image (first (nodes-by-tag xyz100-symbol :image))
+        sp500-image (first (nodes-by-tag sp500-symbol :image))]
+    (is (= "https://app.hyperliquid.xyz/coins/xyz:XYZ100.svg"
+           (node-attr xyz100-image :href)))
+    (is (= "https://app.hyperliquid.xyz/coins/xyz:SP500.svg"
+           (node-attr sp500-image :href)))))
+
 (deftest results-panel-renders-vault-frontier-overlays-with-inline-marker-and-name-test
   (let [vault-address "0x1111111111111111111111111111111111111111"
         vault-id (str "vault:" vault-address)

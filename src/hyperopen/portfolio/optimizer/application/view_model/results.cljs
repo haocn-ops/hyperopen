@@ -41,6 +41,34 @@
                   [(ids/instrument-id-key instrument-id) label])))
         (or labels-by-instrument {})))
 
+(defn- universe-by-id
+  [universe]
+  (into {}
+        (mapcat (fn [instrument]
+                  (map (fn [instrument-id]
+                         [instrument-id instrument])
+                       (ids/instrument-id-candidates instrument))))
+        (or universe [])))
+
+(def ^:private icon-market-keys
+  [:instrument-id
+   :market-type
+   :coin
+   :symbol
+   :base
+   :quote
+   :dex
+   :hip3?
+   :hip3-eligible?
+   :optimizer-history/instrument-id
+   :optimizer-history/display-symbol
+   :optimizer-history/instrument-kind])
+
+(defn- icon-market
+  [instrument]
+  (when (map? instrument)
+    (select-keys instrument icon-market-keys)))
+
 (defn instrument-label
   [labels-by-instrument instrument-id]
   (if (vault-address-from-instrument-id instrument-id)
@@ -50,16 +78,19 @@
     (str instrument-id)))
 
 (defn- enriched-overlay-point
-  [labels-by-instrument point]
+  [labels-by-instrument draft-by-id point]
   (let [instrument-id (:instrument-id point)
-        label (label-map-value labels-by-instrument instrument-id)]
-    (if-let [label* (and (vault-address-from-instrument-id instrument-id)
-                         (display-label instrument-id label))]
-      (assoc point :label label*)
-      point)))
+        label (label-map-value labels-by-instrument instrument-id)
+        draft-instrument (get draft-by-id instrument-id)]
+    (cond-> point
+      (and (vault-address-from-instrument-id instrument-id)
+           (display-label instrument-id label))
+      (assoc :label (display-label instrument-id label))
+      draft-instrument
+      (assoc :icon-market (icon-market draft-instrument)))))
 
 (defn- enrich-frontier-overlays
-  [result labels-by-instrument]
+  [result labels-by-instrument draft-by-id]
   (update result
           :frontier-overlays
           (fn [overlays]
@@ -67,7 +98,8 @@
               (into {}
                     (map (fn [[mode points]]
                            [mode (mapv (partial enriched-overlay-point
-                                                 labels-by-instrument)
+                                                 labels-by-instrument
+                                                 draft-by-id)
                                        points)]))
                     overlays)
               overlays))))
@@ -77,6 +109,7 @@
   (if (map? result)
     (let [instrument-ids (vec (:instrument-ids result))
           result-labels (normalize-label-map (:labels-by-instrument result))
+          draft-by-id (universe-by-id (:universe draft))
           draft-labels (when (seq (:universe draft))
                          (instrument-labels/labels-by-instrument (:universe draft)
                                                                  instrument-ids))
@@ -97,5 +130,5 @@
                               instrument-ids)]
       (-> result
           (assoc :labels-by-instrument merged-labels)
-          (enrich-frontier-overlays merged-labels)))
+          (enrich-frontier-overlays merged-labels draft-by-id)))
     result))

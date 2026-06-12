@@ -105,6 +105,10 @@ test("optimizer constraint toggles use the shared switch treatment", () => {
     path.join(optimizerPartialDir, "setup.css"),
     "utf8",
   );
+  const utilitiesCss = fs.readFileSync(
+    path.join(repoRoot, "src/styles/surfaces/utilities.css"),
+    "utf8",
+  );
 
   for (const controlClass of [
     "optimizer-turnover-cap-control",
@@ -116,5 +120,28 @@ test("optimizer constraint toggles use the shared switch treatment", () => {
       new RegExp(`\\.${controlClass}`, "u"),
       `${controlClass} should be included in the optimizer hx-toggle override`,
     );
+    assert.match(
+      utilitiesCss,
+      new RegExp(`\\.${controlClass}`, "u"),
+      `${controlClass} should be protected in the utilities-layer hx-toggle override`,
+    );
   }
+
+  assert.match(
+    utilitiesCss,
+    /\.portfolio-optimizer[\s\S]*\.hx-toggle:focus-visible[\s\S]*outline:\s*none/u,
+  );
+  assert.match(
+    utilitiesCss,
+    /\.portfolio-optimizer[\s\S]*\.hx-toggle:focus-visible[\s\S]*box-shadow:\s*0 0 0 1px/u,
+  );
+  assert.ok(
+    utilitiesCss.indexOf(".portfolio-optimizer") > utilitiesCss.indexOf(".hx-toggle {"),
+    "optimizer switch treatment should live after the global hx-toggle rule",
+  );
+  assert.doesNotMatch(
+    setupCss,
+    /\.hx-toggle/u,
+    "setup partial should only place constraint controls; utilities layer owns switch chrome",
+  );
 });

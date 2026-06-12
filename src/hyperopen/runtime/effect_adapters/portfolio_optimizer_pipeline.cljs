@@ -129,10 +129,13 @@
                               :detail (str completed "/" total " requests")})))))
 
 (defn- wait-for-history-load-idle!
-  [store {:keys [poll-ms timeout-ms]
-          :or {poll-ms 50
-               timeout-ms 30000}}]
-  (let [started-at-ms (.now js/Date)]
+  [store {:keys [poll-ms timeout-ms]}]
+  ;; Callers thread these through from env and may pass present-but-nil
+  ;; values, which bypass :or destructuring defaults; in JS (> elapsed nil)
+  ;; is elapsed > 0, turning a nil timeout into an instant failure.
+  (let [poll-ms (or poll-ms 50)
+        timeout-ms (or timeout-ms 30000)
+        started-at-ms (.now js/Date)]
     (js/Promise.
      (fn [resolve reject]
        (letfn [(tick []

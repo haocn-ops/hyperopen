@@ -2,6 +2,7 @@
   (:require [hyperopen.portfolio.optimizer.actions.draft :as draft]
             [hyperopen.portfolio.optimizer.actions.execution :as execution]
             [hyperopen.portfolio.optimizer.actions.run :as run]
+            [hyperopen.portfolio.optimizer.actions.target-sigma :as target-sigma]
             [hyperopen.portfolio.optimizer.actions.tracking :as tracking]
             [hyperopen.portfolio.optimizer.actions.universe :as universe]))
 
@@ -52,6 +53,21 @@
 
 (def set-portfolio-optimizer-objective-parameter
   draft/set-portfolio-optimizer-objective-parameter)
+
+(def set-portfolio-optimizer-objective-parameter-percent
+  target-sigma/set-portfolio-optimizer-objective-parameter-percent)
+
+(def set-portfolio-optimizer-target-sigma-draft
+  target-sigma/set-portfolio-optimizer-target-sigma-draft)
+
+(def set-portfolio-optimizer-objective-menu-target-sigma
+  target-sigma/set-portfolio-optimizer-objective-menu-target-sigma)
+
+(def reset-portfolio-optimizer-target-sigma-draft
+  target-sigma/reset-portfolio-optimizer-target-sigma-draft)
+
+(def rerun-portfolio-optimizer-at-target-sigma
+  target-sigma/rerun-portfolio-optimizer-at-target-sigma)
 
 (def set-portfolio-optimizer-execution-assumption
   draft/set-portfolio-optimizer-execution-assumption)

@@ -40,6 +40,16 @@
     actions/set-portfolio-optimizer-constraint
     :set-portfolio-optimizer-objective-parameter
     actions/set-portfolio-optimizer-objective-parameter
+    :set-portfolio-optimizer-objective-parameter-percent
+    actions/set-portfolio-optimizer-objective-parameter-percent
+    :set-portfolio-optimizer-target-sigma-draft
+    actions/set-portfolio-optimizer-target-sigma-draft
+    :set-portfolio-optimizer-objective-menu-target-sigma
+    actions/set-portfolio-optimizer-objective-menu-target-sigma
+    :reset-portfolio-optimizer-target-sigma-draft
+    actions/reset-portfolio-optimizer-target-sigma-draft
+    :rerun-portfolio-optimizer-at-target-sigma
+    actions/rerun-portfolio-optimizer-at-target-sigma
     :set-portfolio-optimizer-execution-assumption
     actions/set-portfolio-optimizer-execution-assumption
     :add-portfolio-optimizer-black-litterman-view

@@ -77,10 +77,14 @@
   (conj optimizer-ui-path :objective-menu-view-order))
 (def ui-objective-menu-view-drafts-path
   (conj optimizer-ui-path :objective-menu-view-drafts))
+(def ui-objective-menu-target-sigma-path
+  (conj optimizer-ui-path :objective-menu-target-sigma))
 (def ui-black-litterman-editor-path
   (conj optimizer-ui-path :black-litterman-editor))
 (def ui-frontier-overlay-mode-path
   (conj optimizer-ui-path :frontier-overlay-mode))
+(def ui-target-sigma-draft-path
+  (conj optimizer-ui-path :target-sigma-draft))
 (def ui-constrain-frontier-path (conj optimizer-ui-path :constrain-frontier?))
 (def ui-stale-auto-recompute-path
   (conj optimizer-ui-path :stale-auto-recompute))
@@ -155,8 +159,10 @@
    :optimizer-ui/objective-menu-selection ui-objective-menu-selection-path
    :optimizer-ui/objective-menu-view-order ui-objective-menu-view-order-path
    :optimizer-ui/objective-menu-view-drafts ui-objective-menu-view-drafts-path
+   :optimizer-ui/objective-menu-target-sigma ui-objective-menu-target-sigma-path
    :optimizer-ui/black-litterman-editor ui-black-litterman-editor-path
    :optimizer-ui/frontier-overlay-mode ui-frontier-overlay-mode-path
+   :optimizer-ui/target-sigma-draft ui-target-sigma-draft-path
    :optimizer-ui/constrain-frontier ui-constrain-frontier-path
    :optimizer-ui/stale-auto-recompute ui-stale-auto-recompute-path})
 

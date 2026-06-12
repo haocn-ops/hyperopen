@@ -7,9 +7,20 @@
             [hyperopen.system :as app-system]
             [hyperopen.views.asset-icon :as asset-icon]
             [hyperopen.views.portfolio.optimize.instrument-display :as instrument-display]
+            [hyperopen.views.portfolio.optimize.target-sigma :as target-sigma]
             [nexus.registry :as nxr]))
 
-(def ^:private objective-menu-options
+(defn- target-volatility-menu-sigma
+  ;; The menu preset is 12%, but applying the option preserves a user-chosen
+  ;; sigma when target-volatility is already the active objective — the label
+  ;; reflects the value Apply & re-run would actually use.
+  [draft]
+  (or (when (= :target-volatility (get-in draft [:objective :kind]))
+        (get-in draft [:objective :target-volatility]))
+      target-sigma/menu-default-sigma))
+
+(defn- objective-menu-options
+  []
   [{:key :max-sharpe
     :title "Maximum Sharpe"
     :description "Best risk-adjusted return"}
@@ -20,8 +31,8 @@
     :title "Use my views"
     :description "Black-Litterman: combine market reference with beliefs"}
    {:key :target-volatility
-    :title "Target volatility · 12%"
-    :description "Pin to a fixed level, max return at that sigma"}
+    :title "Target volatility"
+    :description "Pin σ to a fixed level, max return at that σ"}
    {:key :maximum-return
     :title "Maximum return"
     :description "Aggressive. Drives toward the right of the frontier"}])
@@ -39,17 +50,23 @@
       :else :max-sharpe)))
 
 (defn objective-label
-  [objective-key]
-  (or (:title (some #(when (= objective-key (:key %)) %)
-                    objective-menu-options))
-      "Maximum Sharpe"))
+  ([objective-key]
+   (objective-label objective-key nil))
+  ([objective-key draft]
+   (if (= :target-volatility objective-key)
+     (str "Target volatility · "
+          (or (target-sigma/sigma-label (target-volatility-menu-sigma draft))
+              "12%"))
+     (or (:title (some #(when (= objective-key (:key %)) %)
+                       (objective-menu-options)))
+         "Maximum Sharpe"))))
 
 (defn- rendered-objective-menu-options
-  [current-key pending-key]
+  [options current-key pending-key]
   (if (and (= :use-my-views pending-key)
            (not= :use-my-views current-key))
-    (filter #(= :use-my-views (:key %)) objective-menu-options)
-    objective-menu-options))
+    (filter #(= :use-my-views (:key %)) options)
+    options))
 
 (defn objective-menu-open?
   [state]
@@ -79,21 +96,20 @@
    [:span {:class ["optimizer-provenance-objective-label"]} label]
    [:span {:class ["text-[0.6rem]" "text-trading-muted"]} "›"]])
 
-(defn- objective-menu-option
-  [{:keys [key title description]} current-key pending-key]
+(defn- objective-option-row
+  [{:keys [key title description]} {:keys [state draft current-key pending-key]}]
   (let [selected? (= key pending-key)
         current? (= key current-key)
         role (str "portfolio-optimizer-objective-menu-option-" (name key))]
     [:button {:type "button"
-              :class ["optimizer-objective-menu-option"
-                      "flex"
+              :class ["flex"
                       "w-full"
                       "items-start"
                       "gap-3"
-                      "border"
-                      "p-3"
+                      "border-0"
+                      "bg-transparent"
+                      "p-0"
                       "text-left"
-                      "transition-colors"
                       "focus:outline-none"
                       "focus:ring-0"
                       "focus:ring-offset-0"]
@@ -117,9 +133,34 @@
       (when selected? "✓")]
      [:span {:class ["min-w-0"]}
       [:span {:class ["block" "text-[0.8125rem]" "font-semibold" "text-trading-text"]}
-       title]
+       title
+       (when (and (= :target-volatility key) (not selected?))
+         [:span {:class ["ml-1.5" "font-mono" "text-[0.6875rem]" "font-normal"
+                         "text-trading-muted"]}
+          (str "· " (target-sigma/sigma-label
+                     (target-sigma/menu-pending-sigma state draft)))])]
       [:span {:class ["mt-1" "block" "text-[0.6875rem]" "text-trading-muted"]}
        (str description (when current? ". Current."))]]]))
+
+(defn- objective-menu-option
+  [{:keys [key] :as option}
+   {:keys [state draft pending-key sigma-bounds] :as ctx}]
+  (let [selected? (= key pending-key)
+        sigma-editor? (and (= :target-volatility key) selected?)]
+    ;; The whole padded card selects (per spec); editor clicks bubbling here
+    ;; re-select the already-selected option, which is a harmless no-op.
+    [:div {:class ["optimizer-objective-menu-option"
+                   "cursor-pointer"
+                   "border"
+                   "p-3"
+                   "transition-colors"]
+           :data-selected (str selected?)
+           :on {:click [[:actions/select-portfolio-optimizer-objective-menu-option key]]}}
+     (objective-option-row option ctx)
+     ;; Inline σ editor — expands when Target volatility is the pending
+     ;; selection so the level is set before the first run (designer spec).
+     (when sigma-editor?
+       (target-sigma/menu-sigma-editor state draft sigma-bounds))]))
 
 (defn- absolute-view?
   [view]
@@ -481,9 +522,19 @@
         current-key (current-objective-menu-key draft result)
         pending-key (or (get-in state optimizer-contracts/ui-objective-menu-selection-path)
                         current-key)
-        rendered-options (rendered-objective-menu-options current-key pending-key)
+        rendered-options (rendered-objective-menu-options
+                          (objective-menu-options)
+                          current-key
+                          pending-key)
+        option-ctx {:state state
+                    :draft draft
+                    :current-key current-key
+                    :pending-key pending-key
+                    :sigma-bounds (target-sigma/frontier-sigma-bounds result)}
         apply-disabled? (and (= current-key pending-key)
-                             (not= :use-my-views pending-key))]
+                             (not= :use-my-views pending-key)
+                             (not (and (= :target-volatility pending-key)
+                                       (target-sigma/menu-sigma-changed? state draft))))]
     (when open?
       [:section {:class ["optimizer-objective-menu"
                          "optimizer-objective-popover"
@@ -535,7 +586,7 @@
                       "overflow-y-auto"]}
         (into
          [:div {:class ["shrink-0" "space-y-2" "px-3" "py-3"]}]
-         (map #(objective-menu-option % current-key pending-key)
+         (map #(objective-menu-option % option-ctx)
               rendered-options))
         (when (= :use-my-views pending-key)
           (views-editor-section draft state result readiness))]

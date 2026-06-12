@@ -1,5 +1,6 @@
 (ns hyperopen.views.portfolio.optimize.setup-sections
   (:require [hyperopen.portfolio.optimizer.application.view-model :as optimizer-view-model]
+            [hyperopen.portfolio.optimizer.contracts :as optimizer-contracts]
             [hyperopen.views.portfolio.optimize.instrument-overrides-panel :as instrument-overrides-panel]
             [hyperopen.views.portfolio.optimize.setup-constraint-controls :as constraint-controls]
             [hyperopen.views.portfolio.optimize.setup-controls :as controls]
@@ -7,7 +8,8 @@
             [hyperopen.views.portfolio.optimize.setup-objective-controls :as objective-controls]
             [hyperopen.views.portfolio.optimize.setup-actions :as setup-actions]
             [hyperopen.views.portfolio.optimize.setup-universe :as setup-universe]
-            [hyperopen.views.portfolio.optimize.setup-use-my-views-workspace :as use-my-views-workspace]))
+            [hyperopen.views.portfolio.optimize.setup-use-my-views-workspace :as use-my-views-workspace]
+            [hyperopen.views.portfolio.optimize.target-sigma :as target-sigma]))
 
 (defn control-rail
   [{:keys [state draft highlighted-controls readiness history-load-state]}]
@@ -16,7 +18,11 @@
    (setup-universe/universe-section state draft
                                        {:readiness readiness
                                         :history-load-state history-load-state})
-   (objective-controls/objective-section draft highlighted-controls)
+   (objective-controls/objective-section
+    draft
+    highlighted-controls
+    (target-sigma/frontier-sigma-bounds
+     (get-in state optimizer-contracts/last-successful-run-result-path)))
    (model-controls/model-section draft)
    (constraint-controls/constraints-section draft highlighted-controls)
    (controls/disclosure-panel

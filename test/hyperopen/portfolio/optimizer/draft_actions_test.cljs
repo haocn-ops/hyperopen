@@ -10,7 +10,8 @@
                :portfolio-ui {:optimizer {:objective-menu-selection :minimum-volatility}}}]
     (is (= [[:effects/save-many
              [[[:portfolio-ui :optimizer :objective-menu-open?] true]
-              [[:portfolio-ui :optimizer :objective-menu-selection] :max-sharpe]]]]
+              [[:portfolio-ui :optimizer :objective-menu-selection] :max-sharpe]
+              [[:portfolio-ui :optimizer :objective-menu-target-sigma] nil]]]]
            (actions/open-portfolio-optimizer-objective-menu state)))
     (is (= [[:effects/save
              [:portfolio-ui :optimizer :objective-menu-selection]
@@ -20,11 +21,13 @@
             "targetVolatility")))
     (is (= [[:effects/save-many
              [[[:portfolio-ui :optimizer :objective-menu-open?] false]
-              [[:portfolio-ui :optimizer :objective-menu-selection] nil]]]]
+              [[:portfolio-ui :optimizer :objective-menu-selection] nil]
+              [[:portfolio-ui :optimizer :objective-menu-target-sigma] nil]]]]
            (actions/close-portfolio-optimizer-objective-menu state)))
     (is (= [[:effects/save-many
              [[[:portfolio-ui :optimizer :objective-menu-open?] false]
-              [[:portfolio-ui :optimizer :objective-menu-selection] nil]]]]
+              [[:portfolio-ui :optimizer :objective-menu-selection] nil]
+              [[:portfolio-ui :optimizer :objective-menu-target-sigma] nil]]]]
            (actions/handle-portfolio-optimizer-objective-menu-keydown
             state
             "Escape")))
@@ -37,10 +40,33 @@
                {:kind :minimum-variance}]
               [[:portfolio-ui :optimizer :objective-menu-open?] false]
               [[:portfolio-ui :optimizer :objective-menu-selection] nil]
+              [[:portfolio-ui :optimizer :objective-menu-target-sigma] nil]
+              [[:portfolio-ui :optimizer :target-sigma-draft] nil]
               [[:portfolio :optimizer :draft :metadata :dirty?] true]]]
             [:effects/run-portfolio-optimizer-pipeline]]
            (actions/apply-portfolio-optimizer-objective-menu-selection-and-run
             state)))))
+
+(deftest objective-menu-apply-preserves-current-objective-parameter-test
+  (let [state {:portfolio {:optimizer {:draft {:universe [{:instrument-id "perp:BTC"}]
+                                               :objective {:kind :target-volatility
+                                                           :target-volatility 0.22}
+                                               :return-model {:kind :historical-mean}
+                                               :metadata {:dirty? false}}}}
+               :portfolio-ui {:optimizer {:objective-menu-selection :target-volatility}}}]
+    (is (= [[:effects/save-many
+             [[[:portfolio :optimizer :draft :objective]
+               {:kind :target-volatility
+                :target-volatility 0.22}]
+              [[:portfolio-ui :optimizer :objective-menu-open?] false]
+              [[:portfolio-ui :optimizer :objective-menu-selection] nil]
+              [[:portfolio-ui :optimizer :objective-menu-target-sigma] nil]
+              [[:portfolio-ui :optimizer :target-sigma-draft] nil]
+              [[:portfolio :optimizer :draft :metadata :dirty?] true]]]
+            [:effects/run-portfolio-optimizer-pipeline]]
+           (actions/apply-portfolio-optimizer-objective-menu-selection-and-run
+            state))
+        "re-applying target-volatility keeps the user-chosen sigma instead of the 12% preset")))
 
 (deftest objective-menu-apply-use-my-views-updates-return-model-and-reruns-test
   (let [state {:portfolio {:optimizer {:draft {:universe [{:instrument-id "perp:BTC"}]
@@ -68,6 +94,8 @@
                          :weights {"perp:BTC" 1}}]}]
               [[:portfolio-ui :optimizer :objective-menu-open?] false]
               [[:portfolio-ui :optimizer :objective-menu-selection] nil]
+              [[:portfolio-ui :optimizer :objective-menu-target-sigma] nil]
+              [[:portfolio-ui :optimizer :target-sigma-draft] nil]
               [[:portfolio :optimizer :draft :metadata :dirty?] true]]]
             [:effects/run-portfolio-optimizer-pipeline]]
            (actions/apply-portfolio-optimizer-objective-menu-selection-and-run
@@ -90,6 +118,8 @@
                {:kind :historical-mean}]
               [[:portfolio-ui :optimizer :objective-menu-open?] false]
               [[:portfolio-ui :optimizer :objective-menu-selection] nil]
+              [[:portfolio-ui :optimizer :objective-menu-target-sigma] nil]
+              [[:portfolio-ui :optimizer :target-sigma-draft] nil]
               [[:portfolio :optimizer :draft :metadata :dirty?] true]]]
             [:effects/run-portfolio-optimizer-pipeline]]
            (actions/apply-portfolio-optimizer-objective-menu-selection-and-run
@@ -184,6 +214,8 @@
                          :weights {"perp:HYPE" 1}}]}]
               [[:portfolio-ui :optimizer :objective-menu-open?] false]
               [[:portfolio-ui :optimizer :objective-menu-selection] nil]
+              [[:portfolio-ui :optimizer :objective-menu-target-sigma] nil]
+              [[:portfolio-ui :optimizer :target-sigma-draft] nil]
               [[:portfolio :optimizer :draft :metadata :dirty?] true]]]
             [:effects/run-portfolio-optimizer-pipeline]]
            (actions/apply-portfolio-optimizer-objective-menu-selection-and-run

@@ -143,32 +143,64 @@
             preserved-views
             order)))
 
+(defn- preserve-objective-parameters
+  ;; Menu models carry preset parameter values (e.g. target-volatility 0.12);
+  ;; applying an option must not clobber a user-chosen value. The chosen sigma
+  ;; additionally rides along as a dormant key across kind switches so picking
+  ;; target-volatility again remembers the level (per the designer spec).
+  [state objective]
+  (let [current (get-in state contracts/draft-objective-path)
+        preserved-keys (if (= (:kind current) (:kind objective))
+                         draft-options/numeric-objective-parameter-keys
+                         [:target-volatility])]
+    (if (map? objective)
+      (merge objective (select-keys current preserved-keys))
+      objective)))
+
+(defn- with-objective-menu-target-sigma
+  ;; The menu's inline sigma editor stages a pending value; applying the
+  ;; target-volatility option commits it over the preset/preserved sigma.
+  [state objective]
+  (let [pending (get-in state contracts/ui-objective-menu-target-sigma-path)]
+    (if (and (map? objective)
+             (= :target-volatility (:kind objective))
+             (number? pending))
+      (assoc objective :target-volatility pending)
+      objective)))
+
 (defn- objective-menu-model-for-state
   [state value]
   (when-let [model (objective-menu-model value)]
-    (if (= :black-litterman (:return-model-kind model))
-      (-> model
-          (dissoc :return-model-kind)
-          (assoc :return-model
-                 {:kind :black-litterman
-                  :views (objective-menu-inline-views state)}))
-      (cond-> model
-        (= :black-litterman
-           (get-in state (conj contracts/draft-return-model-path :kind)))
-        (assoc :return-model {:kind :historical-mean})))))
+    (let [model (update model :objective
+                        (fn [objective]
+                          (->> objective
+                               (preserve-objective-parameters state)
+                               (with-objective-menu-target-sigma state))))]
+      (if (= :black-litterman (:return-model-kind model))
+        (-> model
+            (dissoc :return-model-kind)
+            (assoc :return-model
+                   {:kind :black-litterman
+                    :views (objective-menu-inline-views state)}))
+        (cond-> model
+          (= :black-litterman
+             (get-in state (conj contracts/draft-return-model-path :kind)))
+          (assoc :return-model {:kind :historical-mean}))))))
 
 (defn open-portfolio-optimizer-objective-menu
   [state]
   [[:effects/save-many
     [[contracts/ui-objective-menu-open-path true]
      [contracts/ui-objective-menu-selection-path
-      (current-objective-menu-option state)]]]])
+      (current-objective-menu-option state)]
+     [contracts/ui-objective-menu-target-sigma-path nil]]]])
 
 (defn close-portfolio-optimizer-objective-menu
   [_state]
   [[:effects/save-many
     [[contracts/ui-objective-menu-open-path false]
-     [contracts/ui-objective-menu-selection-path nil]]]])
+     [contracts/ui-objective-menu-selection-path nil]
+     [contracts/ui-objective-menu-target-sigma-path nil]]]])
 
 (defn handle-portfolio-optimizer-objective-menu-keydown
   [state key]
@@ -295,7 +327,9 @@
 
                           :always
                           (conj [contracts/ui-objective-menu-open-path false]
-                                [contracts/ui-objective-menu-selection-path nil]))
+                                [contracts/ui-objective-menu-selection-path nil]
+                                [contracts/ui-objective-menu-target-sigma-path nil]
+                                [contracts/ui-target-sigma-draft-path nil]))
             effects (common/save-draft-path-values path-values)
             state* (projected-state-after-save-effects state effects)]
         (into effects

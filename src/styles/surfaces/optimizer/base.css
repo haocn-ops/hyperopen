@@ -114,6 +114,19 @@
     outline: none;
   }
 
+  /* Target-sigma dial sliders render the bare native range control: the
+     input chrome above (background box, fixed height, amber focus ring)
+     reads as a border wall around the track, and the accent fill already
+     signals the control's state. */
+  .portfolio-optimizer input.optimizer-target-sigma-slider,
+  .portfolio-optimizer input.optimizer-target-sigma-slider:focus {
+    background-color: transparent;
+    border-color: transparent;
+    box-shadow: none;
+    height: auto;
+    min-height: 0;
+  }
+
   .portfolio-optimizer button:not(:disabled):hover {
     border-color: var(--optimizer-border-strong);
     background-color: var(--optimizer-surface-3);

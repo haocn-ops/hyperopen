@@ -69,14 +69,14 @@
       :detail "OSQP"
       :status :pending
       :percent 0}
-     {:id :diagnostics
-      :label "diagnostics + rebalance preview"
-      :detail "signed exposure"
-      :status :pending
-      :percent 0}
      {:id :frontier
       :label "frontier sweep"
       :detail (str frontier-count " points")
+      :status :pending
+      :percent 0}
+     {:id :diagnostics
+      :label "diagnostics + rebalance preview"
+      :detail "signed exposure"
       :status :pending
       :percent 0}]))
 
@@ -155,7 +155,8 @@
 
 (defn worker-progress
   [progress payload]
-  (let [step-id (:step payload)]
+  ;; :step is not an enum wire key, so it arrives from the worker as a string.
+  (let [step-id (some-> (:step payload) keyword)]
     (if step-id
       (mark-step progress
                  step-id

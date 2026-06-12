@@ -312,6 +312,19 @@
       :total 1
       :percent 0})))
 
+(defn- report-api-loading!
+  [on-progress {:keys [completed total loaded-count requested-count]}]
+  (report-api-progress!
+   on-progress
+   {:status :loading
+    :requested-count requested-count
+    :loaded-count loaded-count
+    :completed completed
+    :total total
+    :percent (if (pos? (or total 0))
+               (* 100 (/ completed total))
+               100)}))
+
 (defn- report-api-succeeded!
   [on-progress api-request normalized fallback-universe]
   (let [requested-count (count (:universe api-request))
@@ -381,7 +394,8 @@
               :base-url (:base-url optimizer-history-api)
               :request-id request-id
               :proxy-policy (:proxy-policy optimizer-history-api)
-              :include-aligned-returns? (:include-aligned-returns? optimizer-history-api)}
+              :include-aligned-returns? (:include-aligned-returns? optimizer-history-api)
+              :on-chunk-progress (partial report-api-loading! on-progress)}
              api-request)
           (.then (fn [body]
                    (let [normalized (api-v2/normalize-history-bundle request body)]

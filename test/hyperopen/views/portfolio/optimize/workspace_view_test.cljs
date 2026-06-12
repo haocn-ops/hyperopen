@@ -296,14 +296,25 @@
                                            :percent 0}]
                                   :error nil}}}})
         run-button (node-by-role view-node "portfolio-optimizer-run-draft")
-        strings (set (collect-strings view-node))]
+        strings (set (collect-strings view-node))
+        bar-fill (fn [step-role]
+                   (let [step-node (node-by-role view-node step-role)]
+                     {:classes (set (remove nil? (get-in step-node [3 2 1 :class])))
+                      :width (get-in step-node [3 2 1 :style :width])}))
+        running-fill (bar-fill "portfolio-optimizer-progress-step-fetch-returns")
+        pending-fill (bar-fill "portfolio-optimizer-progress-step-solve")]
     (is (= true (get-in run-button [1 :disabled])))
     (is (some? (node-by-role view-node "portfolio-optimizer-progress-panel")))
     (is (some? (node-by-role view-node "portfolio-optimizer-progress-step-fetch-returns")))
     (is (contains? strings "Optimization In Progress"))
     (is (contains? strings "Computing"))
     (is (contains? strings "fetch returns matrix"))
-    (is (contains? strings "QP solve"))))
+    (is (contains? strings "QP solve"))
+    (is (contains? (:classes running-fill) "animate-pulse"))
+    (is (contains? (:classes running-fill) "transition-[width]"))
+    (is (= "50%" (:width running-fill)))
+    (is (not (contains? (:classes pending-fill) "animate-pulse")))
+    (is (= "0%" (:width pending-fill)))))
 
 (deftest portfolio-optimizer-workspace-renders-infeasible-result-and-highlights-controls-test
   (let [view-node (portfolio-view/portfolio-view

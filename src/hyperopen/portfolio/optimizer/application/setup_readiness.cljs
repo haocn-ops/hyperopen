@@ -320,16 +320,19 @@
 (defn current-portfolio-history-load-needed?
   [readiness]
   (let [request (:request readiness)
+        current-history (:current-portfolio-history request)
         current-ids (instrument-ids (:current-portfolio-universe request))
         selected-ids (instrument-ids (:requested-universe request))
-        current-history-ids (instrument-ids
-                             (get-in request
-                                     [:current-portfolio-history
-                                      :eligible-instruments]))]
+        ;; A holding counts as covered when it aligned OR when the last
+        ;; current-portfolio fetch already requested it; holdings with no
+        ;; usable backend history must not force a reload on every run.
+        covered-ids (set/union (instrument-ids
+                                (:eligible-instruments current-history))
+                               (set (:requested-instrument-ids current-history)))]
     (and (:runnable? readiness)
          (seq current-ids)
          (not (set/subset? current-ids selected-ids))
-         (not (set/subset? current-ids current-history-ids)))))
+         (not (set/subset? current-ids covered-ids)))))
 
 (defn readiness-error-message
   [readiness]

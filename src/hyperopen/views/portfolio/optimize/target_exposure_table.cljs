@@ -416,34 +416,12 @@
        (when open?
          (add-asset-popover state draft))])))
 
-(defn target-exposure-table
-  ([result]
-   (target-exposure-table result nil))
-  ([result {:keys [state draft]}]
+(defn- exposure-table-body
+  [result draft]
   (let [{:keys [groups]} (rebalance-view-model/target-exposure-table-model result
                                                                             {:draft draft})
         max-delta (max-abs-delta groups)]
-    [:section {:class ["optimizer-target-exposure-table"
-                       "min-h-0" "border-r" "border-base-300" "bg-base-100/95" "leading-4"]
-               :data-role "portfolio-optimizer-target-exposure-table"}
-     [:div {:class ["flex" "items-center" "justify-between" "gap-3" "border-b"
-                    "border-base-300" "px-4" "py-3"]}
-      [:div
-       [:p {:class ["font-mono" "text-[0.62rem]" "uppercase" "tracking-[0.08em]" "text-trading-muted/70"]}
-        "Allocation"]
-       [:p {:class ["mt-1" "text-xs" "text-trading-text"]}
-        "By asset · click to expand legs"]]
-      [:div {:class ["flex" "items-center" "gap-2"]}
-       [:div {:class ["flex" "border" "border-base-300" "text-[0.62rem]" "font-semibold"
-                      "uppercase" "tracking-[0.06em]"]}
-        [:button {:type "button"
-                  :class ["border-r" "border-base-300" "bg-base-200/60" "px-3" "py-1" "text-trading-text"]}
-         "By Asset"]
-        [:button {:type "button"
-                  :class ["px-3" "py-1" "text-trading-muted"]}
-         "By Leg"]]
-       (add-asset-controls state draft)]]
-     [:div {:class ["overflow-auto"]}
+    [:div {:class ["overflow-auto"]}
       [:table {:class ["w-full" "border-collapse" "text-[0.6875rem]"]}
        [:thead
         [:tr
@@ -464,4 +442,46 @@
 	            (concat
 	             [(exposure-group-row max-delta group)]
 	             (map (partial exposure-row max-delta) rows)))
-	          groups))]]])))
+	          groups))]]))
+
+;; The row hiccup scales with the universe (100+ assets on levered accounts)
+;; and depends only on result + draft, both identity-stable across streaming
+;; ticks and target-sigma dial events — a single-entry memo keeps those
+;; renders cheap. Same pattern as the frontier-chart memo.
+(def ^:private exposure-table-memo (volatile! nil))
+
+(defn- memoized-exposure-table-body
+  [result draft]
+  (let [inputs [result draft]
+        cached @exposure-table-memo]
+    (if (and cached (= inputs (:inputs cached)))
+      (:hiccup cached)
+      (let [hiccup (exposure-table-body result draft)]
+        (vreset! exposure-table-memo {:inputs inputs :hiccup hiccup})
+        hiccup))))
+
+(defn target-exposure-table
+  ([result]
+   (target-exposure-table result nil))
+  ([result {:keys [state draft]}]
+   [:section {:class ["optimizer-target-exposure-table"
+                      "min-h-0" "border-r" "border-base-300" "bg-base-100/95" "leading-4"]
+              :data-role "portfolio-optimizer-target-exposure-table"}
+    [:div {:class ["flex" "items-center" "justify-between" "gap-3" "border-b"
+                   "border-base-300" "px-4" "py-3"]}
+     [:div
+      [:p {:class ["font-mono" "text-[0.62rem]" "uppercase" "tracking-[0.08em]" "text-trading-muted/70"]}
+       "Allocation"]
+      [:p {:class ["mt-1" "text-xs" "text-trading-text"]}
+       "By asset · click to expand legs"]]
+     [:div {:class ["flex" "items-center" "gap-2"]}
+      [:div {:class ["flex" "border" "border-base-300" "text-[0.62rem]" "font-semibold"
+                     "uppercase" "tracking-[0.06em]"]}
+       [:button {:type "button"
+                 :class ["border-r" "border-base-300" "bg-base-200/60" "px-3" "py-1" "text-trading-text"]}
+        "By Asset"]
+       [:button {:type "button"
+                 :class ["px-3" "py-1" "text-trading-muted"]}
+        "By Leg"]]
+      (add-asset-controls state draft)]]
+    (memoized-exposure-table-body result draft)]))

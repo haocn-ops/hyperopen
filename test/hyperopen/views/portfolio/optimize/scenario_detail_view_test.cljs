@@ -636,7 +636,7 @@
     (is (contains? strings "Re-runs the solver with the same universe and constraints"))
     (is (contains? strings "Minimum volatility"))
     (is (contains? strings "Maximum Sharpe"))
-    (is (contains? strings "Target volatility · 12%"))
+    (is (contains? strings "· 12%"))
     (is (contains? strings "Maximum return"))
     (is (contains? strings "Use my views"))
     (is (= ["portfolio-optimizer-objective-menu-option-max-sharpe"

@@ -91,6 +91,16 @@
    [:actions/apply-portfolio-optimizer-setup-preset :apply-portfolio-optimizer-setup-preset]
    [:actions/set-portfolio-optimizer-constraint :set-portfolio-optimizer-constraint]
    [:actions/set-portfolio-optimizer-objective-parameter :set-portfolio-optimizer-objective-parameter]
+   [:actions/set-portfolio-optimizer-objective-parameter-percent
+    :set-portfolio-optimizer-objective-parameter-percent]
+   [:actions/set-portfolio-optimizer-target-sigma-draft
+    :set-portfolio-optimizer-target-sigma-draft]
+   [:actions/set-portfolio-optimizer-objective-menu-target-sigma
+    :set-portfolio-optimizer-objective-menu-target-sigma]
+   [:actions/reset-portfolio-optimizer-target-sigma-draft
+    :reset-portfolio-optimizer-target-sigma-draft]
+   [:actions/rerun-portfolio-optimizer-at-target-sigma
+    :rerun-portfolio-optimizer-at-target-sigma]
    [:actions/set-portfolio-optimizer-execution-assumption :set-portfolio-optimizer-execution-assumption]
    [:actions/add-portfolio-optimizer-black-litterman-view
     :add-portfolio-optimizer-black-litterman-view]

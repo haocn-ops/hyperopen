@@ -167,6 +167,16 @@
           :actions/set-portfolio-optimizer-objective-parameter
           [:target-return "0.18"]
           {:phase :test})))
+  (is (= [:target-volatility "22"]
+         (contracts/assert-action-args!
+          :actions/set-portfolio-optimizer-objective-parameter-percent
+          [:target-volatility "22"]
+          {:phase :test})))
+  (is (= ["31"]
+         (contracts/assert-action-args!
+          :actions/set-portfolio-optimizer-target-sigma-draft
+          ["31"]
+          {:phase :test})))
   (is (= [:fallback-slippage-bps "35"]
          (contracts/assert-action-args!
           :actions/set-portfolio-optimizer-execution-assumption

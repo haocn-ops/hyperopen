@@ -2,7 +2,8 @@
   (:require [cljs.test :refer-macros [deftest is]]
             [hyperopen.views.portfolio-view :as portfolio-view]
             [hyperopen.views.portfolio.optimize.test-support
-             :refer [click-actions collect-strings input-actions node-by-role]]))
+             :refer [change-actions click-actions collect-strings input-actions
+                     node-by-role]]))
 
 (defn- portfolio-optimizer-setup-view
   [objective]
@@ -183,9 +184,32 @@
         view-for #(portfolio-optimizer-setup-view {:kind % :target-return 0.18 :target-volatility 0.25})
         action-for #(input-actions (node-by-role (view-for %1) %2))]
     (is (= [[:actions/set-portfolio-optimizer-objective-parameter :target-return [:event.target/value]]] (action-for :target-return return-role)))
-    (is (= [[:actions/set-portfolio-optimizer-objective-parameter :target-volatility [:event.target/value]]] (action-for :target-volatility volatility-role)))
+    (is (= [[:actions/set-portfolio-optimizer-objective-parameter-percent :target-volatility [:event.target/value]]]
+           (change-actions (node-by-role (view-for :target-volatility) volatility-role)))
+        "sigma text input commits on change so the dial clamp cannot rewrite mid-typing")
     (doseq [[kind role] [[:target-return volatility-role] [:target-volatility return-role] [:max-sharpe return-role] [:max-sharpe volatility-role]]]
       (is (nil? (node-by-role (view-for kind) role))))))
+
+(deftest portfolio-optimizer-target-sigma-setup-block-renders-percent-controls-test
+  (let [view-node (portfolio-optimizer-setup-view {:kind :target-volatility
+                                                   :target-volatility 0.22})
+        input (node-by-role view-node "portfolio-optimizer-objective-target-volatility-input")
+        slider (node-by-role view-node "portfolio-optimizer-objective-target-volatility-slider")
+        strings (set (collect-strings view-node))]
+    (is (= "22" (get-in input [1 :value])))
+    (is (= "range" (get-in slider [1 :type])))
+    (is (= 4 (get-in slider [1 :min])))
+    (is (= 40 (get-in slider [1 :max])))
+    (is (= "22" (get-in slider [1 :value])))
+    (is (= [[:actions/set-portfolio-optimizer-objective-parameter-percent
+             :target-volatility
+             [:event.target/value]]]
+           (input-actions slider)))
+    (is (contains? strings "Target σ (annualized)"))
+    (is (contains? strings "4% · defensive"))
+    (is (contains? strings "40% · aggressive"))
+    (is (contains? strings "Solver maximizes expected return at exactly σ = 22%. Sits between min-vol and max-return on the frontier."))
+    (is (contains? strings "Pin σ to a fixed level, max return at that σ"))))
 
 (deftest portfolio-optimizer-setup-route-shows-use-my-views-context-for-black-litterman-test
   (let [view-node (portfolio-view/portfolio-view

@@ -198,6 +198,21 @@
 (def set-portfolio-optimizer-objective-parameter-action
   portfolio-optimizer-actions/set-portfolio-optimizer-objective-parameter)
 
+(def set-portfolio-optimizer-objective-parameter-percent-action
+  portfolio-optimizer-actions/set-portfolio-optimizer-objective-parameter-percent)
+
+(def set-portfolio-optimizer-target-sigma-draft-action
+  portfolio-optimizer-actions/set-portfolio-optimizer-target-sigma-draft)
+
+(def set-portfolio-optimizer-objective-menu-target-sigma-action
+  portfolio-optimizer-actions/set-portfolio-optimizer-objective-menu-target-sigma)
+
+(def reset-portfolio-optimizer-target-sigma-draft-action
+  portfolio-optimizer-actions/reset-portfolio-optimizer-target-sigma-draft)
+
+(def rerun-portfolio-optimizer-at-target-sigma-action
+  portfolio-optimizer-actions/rerun-portfolio-optimizer-at-target-sigma)
+
 (def set-portfolio-optimizer-execution-assumption-action
   portfolio-optimizer-actions/set-portfolio-optimizer-execution-assumption)
 

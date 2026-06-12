@@ -283,6 +283,7 @@
             [hyperopen.portfolio.optimizer.instrument-keyed-codec-test]
             [hyperopen.portfolio.optimizer.query-state-test]
             [hyperopen.portfolio.optimizer.runtime-catalog-test]
+            [hyperopen.portfolio.optimizer.target-sigma-actions-test]
             [hyperopen.portfolio.optimizer.tracking-actions-test]
             [hyperopen.portfolio.optimizer.universe-actions-test]
             [hyperopen.portfolio.optimizer.universe-exclusion-actions-test]
@@ -531,6 +532,7 @@
             [hyperopen.views.portfolio.optimize.setup-use-my-views-cards-test]
             [hyperopen.views.portfolio.optimize.setup-use-my-views-workspace-test]
             [hyperopen.views.portfolio.optimize.setup-view-test]
+            [hyperopen.views.portfolio.optimize.target-sigma-test]
             [hyperopen.views.portfolio.optimize.tracking-panel-test]
             [hyperopen.views.portfolio.optimize.universe-panel-test]
             [hyperopen.views.portfolio.optimize.unsaved-draft-route-test]
@@ -1000,6 +1002,7 @@
              'hyperopen.portfolio.optimizer.instrument-keyed-codec-test
              'hyperopen.portfolio.optimizer.query-state-test
              'hyperopen.portfolio.optimizer.runtime-catalog-test
+             'hyperopen.portfolio.optimizer.target-sigma-actions-test
              'hyperopen.portfolio.optimizer.tracking-actions-test
              'hyperopen.portfolio.optimizer.universe-actions-test
              'hyperopen.portfolio.optimizer.universe-exclusion-actions-test
@@ -1248,6 +1251,7 @@
              'hyperopen.views.portfolio.optimize.setup-use-my-views-cards-test
              'hyperopen.views.portfolio.optimize.setup-use-my-views-workspace-test
              'hyperopen.views.portfolio.optimize.setup-view-test
+             'hyperopen.views.portfolio.optimize.target-sigma-test
              'hyperopen.views.portfolio.optimize.tracking-panel-test
              'hyperopen.views.portfolio.optimize.universe-panel-test
              'hyperopen.views.portfolio.optimize.unsaved-draft-route-test

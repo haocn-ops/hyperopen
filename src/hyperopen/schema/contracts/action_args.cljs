@@ -265,6 +265,11 @@
    :actions/apply-portfolio-optimizer-setup-preset ::portfolio-optimizer-model-kind-args
    :actions/set-portfolio-optimizer-constraint ::portfolio-optimizer-constraint-args
    :actions/set-portfolio-optimizer-objective-parameter ::portfolio-optimizer-key-value-args
+   :actions/set-portfolio-optimizer-objective-parameter-percent ::portfolio-optimizer-key-value-args
+   :actions/set-portfolio-optimizer-target-sigma-draft ::common/single-input-args
+   :actions/set-portfolio-optimizer-objective-menu-target-sigma ::common/single-input-args
+   :actions/reset-portfolio-optimizer-target-sigma-draft ::common/no-args
+   :actions/rerun-portfolio-optimizer-at-target-sigma ::common/no-args
    :actions/set-portfolio-optimizer-execution-assumption ::portfolio-optimizer-key-value-args
    :actions/add-portfolio-optimizer-black-litterman-view ::portfolio-optimizer-model-kind-args
    :actions/set-portfolio-optimizer-black-litterman-view-parameter ::portfolio-optimizer-view-key-value-args

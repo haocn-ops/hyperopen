@@ -9,6 +9,7 @@
             [hyperopen.views.portfolio.optimize.rebalance-tab :as rebalance-tab-view]
             [hyperopen.views.portfolio.optimize.results-panel :as results-panel]
             [hyperopen.views.portfolio.optimize.scenario-objective-menu :as objective-menu]
+            [hyperopen.views.portfolio.optimize.target-sigma :as target-sigma]
             [hyperopen.views.portfolio.optimize.tracking-panel :as tracking-panel]
             [nexus.registry :as nxr]))
 
@@ -279,7 +280,7 @@
   (let [result* result
         constraints (:constraints draft)
         objective-key (objective-menu/current-objective-menu-key draft result*)
-        objective-label (objective-menu/objective-label objective-key)]
+        objective-label (objective-menu/objective-label objective-key draft)]
     (let [field (fn [label value]
                   [:div {:class ["border-r" "border-base-300" "px-3" "py-2"]}
                    [:span {:class ["block" "font-mono" "text-[0.56rem]" "uppercase" "tracking-[0.08em]" "text-trading-muted/70"]}
@@ -455,6 +456,7 @@
      (scenario-header model)
      (provenance-strip model)
      (scenario-tabs scenario-id selected-tab)
+     (target-sigma/target-sigma-strip model)
      (kpi-strip result)
      (stale-banner (and stale? (not running?)))
      (if loading?

@@ -63,16 +63,16 @@
                                                           display-frontier-results)]
                                               (context/report-progress!
                                                on-progress
-                                               {:step :diagnostics
-                                                :status :succeeded
-                                                :percent 100
-                                                :detail "complete"})
-                                              (context/report-progress!
-                                               on-progress
                                                {:step :frontier
                                                 :status :succeeded
                                                 :percent 100
                                                 :detail (str (count (:frontier result)) " points")})
+                                              (context/report-progress!
+                                               on-progress
+                                               {:step :diagnostics
+                                                :status :succeeded
+                                                :percent 100
+                                                :detail "complete"})
                                               result))]
                         (if (seq display-frontier-plans)
                           (-> (solve/solve-display-frontier-plans-async

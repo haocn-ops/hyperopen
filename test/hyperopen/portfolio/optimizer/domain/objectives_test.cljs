@@ -1,5 +1,6 @@
 (ns hyperopen.portfolio.optimizer.domain.objectives-test
   (:require [cljs.test :refer-macros [deftest is]]
+            [hyperopen.portfolio.optimizer.domain.closed-form :as closed-form]
             [hyperopen.portfolio.optimizer.domain.constraints :as constraints]
             [hyperopen.portfolio.optimizer.domain.objectives :as objectives]))
 
@@ -8,6 +9,9 @@
   (< (js/Math.abs (- expected actual)) 0.0000001))
 
 (deftest minimum-variance-builds-single-qp-with-net-equality-and-bounds-test
+  ;; The low-variance asset dominates the unconstrained GMV (~0.99 weight),
+  ;; which violates the 0.8 cap, so the closed-form candidate is rejected and
+  ;; planning falls back to the single QP whose encoding this test pins.
   (let [encoded (constraints/encode-constraints
                  {:universe [{:instrument-id "A"}
                              {:instrument-id "B"}]
@@ -17,8 +21,8 @@
               {:objective {:kind :minimum-variance}
                :instrument-ids ["A" "B"]
                :expected-returns [0.1 0.2]
-               :covariance [[1 0.2]
-                            [0.2 2]]
+               :covariance [[0.01 0]
+                            [0 1]]
                :encoded-constraints encoded})]
     (is (= :single-qp (:strategy plan)))
     (is (= :minimum-variance (get-in plan [:problems 0 :objective-kind])))
@@ -52,7 +56,11 @@
                      :covariance [[1 0]
                                   [0 1]]
                      :encoded-constraints encoded})]
-    (is (= :single-qp (:strategy feasible)))
+    ;; The min-variance-at-0.16 portfolio [0.4 0.6] sits inside the 0.7 cap, so
+    ;; the closed-form candidate is accepted; the closed-form problem still
+    ;; carries the same target-return floor inequality for downstream checks.
+    (is (= :closed-form (:strategy feasible)))
+    (is (= :closed-form-portfolio (get-in feasible [:problems 0 :kind])))
     (is (= [{:code :target-return
              :coefficients [0.1 0.2]
              :lower 0.16}]
@@ -209,6 +217,148 @@
              :current-weights [0.3 -0.1]
              :requires-split-variables? true}]
            (get-in plan [:problems 0 :l1-constraints])))))
+
+(def ^:private unbounded-encoded
+  {:status :ok
+   :long-only? false
+   :net-target 1
+   :lower-bounds [js/Number.NEGATIVE_INFINITY js/Number.NEGATIVE_INFINITY]
+   :upper-bounds [js/Number.POSITIVE_INFINITY js/Number.POSITIVE_INFINITY]
+   :locked-weights []})
+
+(defn- closed-form-opts
+  [objective]
+  {:objective objective
+   :instrument-ids ["A" "B"]
+   :expected-returns [0.1 0.2]
+   :covariance [[0.04 0]
+                [0 0.09]]
+   :encoded-constraints unbounded-encoded})
+
+(deftest closed-form-eligible-objectives-plan-one-closed-form-problem-test
+  (doseq [objective [{:kind :minimum-variance}
+                     {:kind :target-return :target-return 0.16}
+                     {:kind :max-sharpe}
+                     {:kind :target-volatility :target-volatility 0.2}]]
+    (let [plan (objectives/build-solver-plan (closed-form-opts objective))
+          problem (get-in plan [:problems 0])]
+      (is (= :ok (:status plan)) (str objective))
+      (is (= :closed-form (:strategy plan)) (str objective))
+      (is (= objective (:selection-objective plan)) (str objective))
+      (is (= 1 (count (:problems plan))) (str objective))
+      (is (= :closed-form-portfolio (:kind problem)) (str objective))
+      (is (= (:kind objective) (:objective-kind problem)) (str objective))
+      (is (= {:eligible? true :net-target 1}
+             (:closed-form-eligibility problem))
+          (str objective))
+      (is (= [{:code :net-exposure
+               :coefficients [1 1]
+               :target 1}]
+             (:equalities problem))
+          (str objective)))))
+
+(deftest constrained-infeasible-candidates-keep-existing-qp-strategies-test
+  ;; A tight max-asset-weight (0.5) means the unconstrained optima for these
+  ;; diagonal inputs (min-var w1=0.69, max-sharpe w1=0.53, target-vol w2=0.62)
+  ;; all violate the box, so post-validation rejects the closed-form candidate
+  ;; and planning falls back to the existing QP strategies.
+  (let [encoded (constraints/encode-constraints
+                 {:universe [{:instrument-id "A"}
+                             {:instrument-id "B"}]
+                  :constraints {:long-only? true
+                                :max-asset-weight 0.5}})
+        constrained-opts (fn [objective]
+                           (assoc (closed-form-opts objective)
+                                  :encoded-constraints encoded))
+        max-sharpe-plan (objectives/build-solver-plan
+                         (constrained-opts {:kind :max-sharpe}))
+        target-volatility-plan (objectives/build-solver-plan
+                                (constrained-opts {:kind :target-volatility
+                                                   :target-volatility 0.2}))
+        minimum-variance-plan (objectives/build-solver-plan
+                               (constrained-opts {:kind :minimum-variance}))]
+    (is (= :frontier-sweep (:strategy max-sharpe-plan)))
+    (is (= :frontier-sweep (:strategy target-volatility-plan)))
+    (is (= :single-qp (:strategy minimum-variance-plan)))
+    (is (every? #(= :quadratic-program (:kind %))
+                (mapcat :problems [max-sharpe-plan
+                                   target-volatility-plan
+                                   minimum-variance-plan])))))
+
+(deftest long-only-feasible-requests-use-closed-form-test
+  ;; The widened fast path: a long-only request whose unconstrained optimum
+  ;; already lands inside the default [0,1] box is solved in closed form,
+  ;; because a feasible candidate is provably optimal for the constrained
+  ;; problem. This is the latency win for the common case.
+  (let [encoded (constraints/encode-constraints
+                 {:universe [{:instrument-id "A"}
+                             {:instrument-id "B"}]
+                  :constraints {:long-only? true}})
+        plan-for (fn [objective]
+                   (objectives/build-solver-plan
+                    (assoc (closed-form-opts objective)
+                           :encoded-constraints encoded)))]
+    (is (= [0 0] (:lower-bounds encoded)))
+    (is (= [1 1] (:upper-bounds encoded)))
+    (doseq [objective [{:kind :minimum-variance}
+                       {:kind :max-sharpe}
+                       {:kind :target-volatility :target-volatility 0.2}]]
+      (let [plan (plan-for objective)]
+        (is (= :closed-form (:strategy plan)) (str objective))
+        (is (= :closed-form-portfolio (get-in plan [:problems 0 :kind]))
+            (str objective))))))
+
+(deftest signed-leveraged-request-without-net-equality-stays-on-frontier-sweep-test
+  ;; Mirrors a real leveraged Max-Sharpe / Target-Volatility run: signed (not
+  ;; long-only), a finite gross-leverage cap, a large per-asset cap, and NO
+  ;; net-exposure equality. The closed-form formulas need a single net target
+  ;; b (sum of weights), which only long-only or an equal net-exposure min/max
+  ;; supplies, so this is core-ineligible (:missing-net-equality) and correctly
+  ;; runs the existing QP frontier sweep (40 problems by default).
+  (let [encoded (constraints/encode-constraints
+                 {:universe [{:instrument-id "A" :market-type :perp}
+                             {:instrument-id "B" :market-type :perp}
+                             {:instrument-id "C" :market-type :perp}]
+                  :constraints {:long-only? false
+                                :gross-leverage 33.06
+                                :max-asset-weight 11.66}})
+        opts {:objective {:kind :max-sharpe}
+              :instrument-ids ["A" "B" "C"]
+              :expected-returns [0.10 0.20 0.15]
+              :covariance [[0.04 0 0]
+                           [0 0.09 0]
+                           [0 0 0.06]]
+              :encoded-constraints encoded}]
+    (is (= :missing-net-equality (:reason (closed-form/eligible? opts))))
+    (is (= :frontier-sweep (:strategy (objectives/build-solver-plan opts))))
+    (is (= objectives/default-frontier-point-count
+           (count (:problems (objectives/build-solver-plan opts)))))))
+
+(deftest explicit-return-tilts-keep-frontier-sweep-for-eligible-requests-test
+  (let [plan (objectives/build-solver-plan
+              (assoc (closed-form-opts {:kind :max-sharpe})
+                     :return-tilts [0 0.5 1]))]
+    (is (= :frontier-sweep (:strategy plan)))
+    (is (= [0 0.5 1] (mapv :return-tilt (:problems plan))))))
+
+(deftest target-volatility-below-gmv-falls-back-to-frontier-sweep-test
+  (let [plan (objectives/build-solver-plan
+              (closed-form-opts {:kind :target-volatility
+                                 :target-volatility 0.1}))]
+    (is (= :frontier-sweep (:strategy plan)))
+    (is (= objectives/default-frontier-point-count (count (:problems plan))))
+    (is (every? #(= :quadratic-program (:kind %)) (:problems plan)))))
+
+(deftest numeric-frontier-failure-falls-back-to-qp-test
+  ;; Negative-definite (indefinite) covariance is symmetric and non-singular,
+  ;; so eligibility's structural checks pass but the moment guards reject it;
+  ;; planning must fall back to the existing single QP rather than closed form.
+  (let [plan (objectives/build-solver-plan
+              (assoc (closed-form-opts {:kind :minimum-variance})
+                     :covariance [[-0.04 0]
+                                  [0 -0.09]]))]
+    (is (= :single-qp (:strategy plan)))
+    (is (= :quadratic-program (get-in plan [:problems 0 :kind])))))
 
 (deftest solver-plan-omits-turnover-l1-constraint-when-cap-disabled-test
   (let [encoded (constraints/encode-constraints

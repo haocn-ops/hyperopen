@@ -1,5 +1,5 @@
 (ns hyperopen.views.portfolio.optimize.target-sigma
-  "Target-volatility (σ) selection controls per the v4 designer spec: the
+  "Target-volatility (σ) selection controls per the target-σ designer spec: the
    setup-card parameter block, the objective-menu inline σ editor, and the
    scenario-detail TARGET Σ dial strip. Pending values live in UI state and
    commit to the draft only on Apply / Re-run — never silently (a dirty draft

@@ -2,6 +2,7 @@
   (:require [hyperopen.account.history.position-margin :as position-margin]
             [hyperopen.account.history.position-reduce :as position-reduce]
             [hyperopen.account.history.position-tpsl :as position-tpsl]
+            [hyperopen.account-tab-modules :as account-tab-modules]
             [hyperopen.account.context :as account-context]
             [hyperopen.account-tab-modules :as account-tab-modules]
             [hyperopen.api-wallets.application.ui-state :as api-wallets-ui-state]

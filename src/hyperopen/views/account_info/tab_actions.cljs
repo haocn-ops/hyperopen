@@ -1,10 +1,7 @@
 (ns hyperopen.views.account-info.tab-actions
   (:require [hyperopen.ui.fonts :as fonts]
             [hyperopen.views.account-info.tab-registry :as tab-registry]
-            [hyperopen.views.account-info.tabs.open-orders :as open-orders-tab]
-            [hyperopen.views.account-info.tabs.order-history :as order-history-tab]
-            [hyperopen.views.account-info.tabs.positions :as positions-tab]
-            [hyperopen.views.account-info.tabs.trade-history :as trade-history-tab]))
+            [hyperopen.views.account-info.tab-filters :as tab-filters]))
 
 (defn- freshness-cue-text-classes
   [tone]
@@ -74,14 +71,14 @@
     "Export as CSV"]])
 
 (def order-history-status-options
-  order-history-tab/order-history-status-options)
+  tab-filters/order-history-status-options)
 
 (def order-history-status-labels
-  order-history-tab/order-history-status-labels)
+  tab-filters/order-history-status-labels)
 
 (defn- order-history-status-filter-key
   [order-history-state]
-  (order-history-tab/order-history-status-filter-key order-history-state))
+  (tab-filters/order-history-status-filter-key order-history-state))
 
 (defn- chevron-caret-icon
   [open?]
@@ -219,14 +216,14 @@
              [:span {:class ["text-trading-text"]} "*"])])])]))
 
 (def positions-direction-filter-options
-  positions-tab/positions-direction-filter-options)
+  tab-filters/positions-direction-filter-options)
 
 (def positions-direction-filter-labels
-  positions-tab/positions-direction-filter-labels)
+  tab-filters/positions-direction-filter-labels)
 
 (defn- positions-direction-filter-key
   [positions-state]
-  (positions-tab/positions-direction-filter-key positions-state))
+  (tab-filters/positions-direction-filter-key positions-state))
 
 (defn- positions-header-actions
   [positions-state freshness-cue]
@@ -261,14 +258,14 @@
              [:span {:class ["text-trading-text"]} "*"])])])]))
 
 (def open-orders-direction-filter-options
-  open-orders-tab/open-orders-direction-filter-options)
+  tab-filters/open-orders-direction-filter-options)
 
 (def open-orders-direction-filter-labels
-  open-orders-tab/open-orders-direction-filter-labels)
+  tab-filters/open-orders-direction-filter-labels)
 
 (defn- open-orders-direction-filter-key
   [open-orders-state]
-  (open-orders-tab/open-orders-direction-filter-key open-orders-state))
+  (tab-filters/open-orders-direction-filter-key open-orders-state))
 
 (defn- balances-header-actions
   [hide-small? coin-search]
@@ -330,14 +327,14 @@
              [:span {:class ["text-trading-text"]} "*"])])])]))
 
 (def trade-history-direction-filter-options
-  trade-history-tab/trade-history-direction-filter-options)
+  tab-filters/trade-history-direction-filter-options)
 
 (def trade-history-direction-filter-labels
-  trade-history-tab/trade-history-direction-filter-labels)
+  tab-filters/trade-history-direction-filter-labels)
 
 (defn- trade-history-direction-filter-key
   [trade-history-state]
-  (trade-history-tab/trade-history-direction-filter-key trade-history-state))
+  (tab-filters/trade-history-direction-filter-key trade-history-state))
 
 (defn- trade-history-header-actions
   [trade-history-state]

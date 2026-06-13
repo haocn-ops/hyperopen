@@ -1,5 +1,6 @@
 (ns hyperopen.portfolio.optimizer.domain.objectives
-  (:require [hyperopen.portfolio.optimizer.coercion :as coercion]))
+  (:require [hyperopen.portfolio.optimizer.coercion :as coercion]
+            [hyperopen.portfolio.optimizer.domain.closed-form :as closed-form]))
 
 (def default-frontier-point-count
   40)
@@ -266,6 +267,50 @@
      :max-turnover (:max-turnover encoded-constraints)
      :rebalance-tolerance (:rebalance-tolerance encoded-constraints)}))
 
+(defn- unbounded-bound-vector
+  [bounds n unbounded-value]
+  (if (and (sequential? bounds)
+           (= n (count bounds)))
+    (vec bounds)
+    (vec (repeat n unbounded-value))))
+
+(defn- closed-form-problem
+  [{:keys [objective instrument-ids expected-returns covariance encoded-constraints]}
+   eligibility]
+  (let [n (count instrument-ids)
+        target-return (target-return-inequality expected-returns objective)]
+    {:kind :closed-form-portfolio
+     :objective-kind (:kind objective)
+     :objective objective
+     :instrument-ids instrument-ids
+     :expected-returns expected-returns
+     :covariance covariance
+     :encoded-constraints encoded-constraints
+     :closed-form-eligibility eligibility
+     :return-tilt 0
+     ;; The QP-equivalent constraint encoding lets existing solver-result
+     ;; validation in target selection check closed-form weights unchanged.
+     :equalities (equality-constraints encoded-constraints n)
+     :inequalities (vec (concat (net-inequalities encoded-constraints n)
+                                (when target-return [target-return])))
+     :l1-constraints (l1-constraints encoded-constraints)
+     :lower-bounds (unbounded-bound-vector (:lower-bounds encoded-constraints)
+                                           n
+                                           js/Number.NEGATIVE_INFINITY)
+     :upper-bounds (unbounded-bound-vector (:upper-bounds encoded-constraints)
+                                           n
+                                           js/Number.POSITIVE_INFINITY)
+     :locked-weights (vec (or (:locked-weights encoded-constraints) []))}))
+
+(defn- closed-form-plan
+  [{:keys [objective] :as opts}]
+  (let [eligibility (closed-form/eligible? opts)]
+    (when (:eligible? eligibility)
+      {:status :ok
+       :strategy :closed-form
+       :selection-objective objective
+       :problems [(closed-form-problem opts eligibility)]})))
+
 (defn- target-return-infeasible
   [{:keys [objective expected-returns encoded-constraints]}]
   (when (and (= :target-return (:kind objective))
@@ -354,6 +399,26 @@
 
     nil))
 
+;; Follow-up design note: selected-portfolio solving should stay separate
+;; from display-frontier building as solver strategies grow.
+;; - Unrestricted/equality-only selected portfolios: closed-form solve
+;;   (implemented below via domain.closed-form).
+;; - Constrained minimum variance / target return: existing single QP.
+;; - Constrained Max Sharpe: future direct Schaible-transformed QP when the
+;;   encoded constraints stay compatible with the transform.
+;; - Constrained Target Volatility: future bisection over target-return QPs,
+;;   or QCQP/SOCP solver support.
+;; - Display frontier: future adaptive target-return refinement under the
+;;   existing hard point cap, instead of the static return-tilt grid.
+;; - True adaptive refinement needs a sequential strategy runner; the current
+;;   solve engine maps over a pre-built vector of problems.
+;;
+;; Closed-form firing: the fast path solves the equality-core candidate and
+;; accepts it only when post-validation confirms it already satisfies every
+;; encoded constraint (bounds, long-only, gross/L1, turnover, locks). Because
+;; the candidate is optimal over a superset of the constrained region, a
+;; feasible candidate is optimal for the constrained problem too; an infeasible
+;; one falls back to the QP/frontier plan below. See domain.closed-form.
 (defn build-solver-plan
   [{:keys [objective encoded-constraints] :as opts}]
   (let [target-return-failure (target-return-infeasible opts)]
@@ -367,7 +432,9 @@
       target-return-failure
 
       :else
-      (case (:kind objective)
+      (or
+       (closed-form-plan opts)
+       (case (:kind objective)
         :minimum-variance
         {:status :ok
          :strategy :single-qp
@@ -386,4 +453,4 @@
 
         {:status :infeasible
          :reason :unknown-objective
-         :details {:objective (:kind objective)}}))))
+         :details {:objective (:kind objective)}})))))

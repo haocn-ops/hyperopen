@@ -210,6 +210,7 @@
             [hyperopen.portfolio.optimizer.application.engine-current-portfolio-test]
             [hyperopen.portfolio.optimizer.application.engine-history-window-test]
             [hyperopen.portfolio.optimizer.application.engine-progress-test]
+            [hyperopen.portfolio.optimizer.application.engine-solve-test]
             [hyperopen.portfolio.optimizer.application.engine-solver-diagnostics-test]
             [hyperopen.portfolio.optimizer.application.engine-sparse-caps-test]
             [hyperopen.portfolio.optimizer.application.engine-test]
@@ -255,6 +256,7 @@
             [hyperopen.portfolio.optimizer.current-portfolio-constraint-actions-test]
             [hyperopen.portfolio.optimizer.defaults-test]
             [hyperopen.portfolio.optimizer.domain.black-litterman-test]
+            [hyperopen.portfolio.optimizer.domain.closed-form-test]
             [hyperopen.portfolio.optimizer.domain.constraints-test]
             [hyperopen.portfolio.optimizer.domain.diagnostics-test]
             [hyperopen.portfolio.optimizer.domain.frontier-overlays-test]
@@ -929,6 +931,7 @@
              'hyperopen.portfolio.optimizer.application.engine-current-portfolio-test
              'hyperopen.portfolio.optimizer.application.engine-history-window-test
              'hyperopen.portfolio.optimizer.application.engine-progress-test
+             'hyperopen.portfolio.optimizer.application.engine-solve-test
              'hyperopen.portfolio.optimizer.application.engine-solver-diagnostics-test
              'hyperopen.portfolio.optimizer.application.engine-sparse-caps-test
              'hyperopen.portfolio.optimizer.application.engine-test
@@ -974,6 +977,7 @@
              'hyperopen.portfolio.optimizer.current-portfolio-constraint-actions-test
              'hyperopen.portfolio.optimizer.defaults-test
              'hyperopen.portfolio.optimizer.domain.black-litterman-test
+             'hyperopen.portfolio.optimizer.domain.closed-form-test
              'hyperopen.portfolio.optimizer.domain.constraints-test
              'hyperopen.portfolio.optimizer.domain.diagnostics-test
              'hyperopen.portfolio.optimizer.domain.frontier-overlays-test

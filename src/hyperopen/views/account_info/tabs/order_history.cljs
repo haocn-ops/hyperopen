@@ -5,17 +5,16 @@
             [hyperopen.views.account-info.history-pagination :as history-pagination]
             [hyperopen.views.account-info.projections :as projections]
             [hyperopen.views.account-info.shared :as shared]
+            [hyperopen.views.account-info.tab-filters :as tab-filters]
             [hyperopen.views.account-info.table :as table]
             [hyperopen.views.account-info.tabs.open-orders :as open-orders-tab]
             [hyperopen.utils.formatting :as fmt]))
 
 (def order-history-status-options
-  [[:all "All"]
-   [:long "Long"]
-   [:short "Short"]])
+  tab-filters/order-history-status-options)
 
 (def order-history-status-labels
-  (into {} order-history-status-options))
+  tab-filters/order-history-status-labels)
 
 (def order-history-page-size-options
   history-pagination/order-history-page-size-options)
@@ -32,11 +31,8 @@
 (def ^:private order-history-status-tooltip-width-class
   "w-max")
 
-(defn order-history-status-filter-key [order-history-state]
-  (let [status-filter (:status-filter order-history-state)]
-    (if (contains? order-history-status-labels status-filter)
-      status-filter
-      :all)))
+(def order-history-status-filter-key
+  tab-filters/order-history-status-filter-key)
 
 (defn order-history-sort-state [order-history-state]
   (merge default-order-history-sort

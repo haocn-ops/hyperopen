@@ -3,28 +3,20 @@
             [hyperopen.ui.table.sort-kernel :as sort-kernel]
             [hyperopen.views.account-info.cache-keys :as cache-keys]
             [hyperopen.views.account-info.projections :as projections]
-            [hyperopen.views.account-info.shared :as shared]))
+            [hyperopen.views.account-info.shared :as shared]
+            [hyperopen.views.account-info.tab-filters :as tab-filters]))
 
 (def default-trade-history-sort
   {:column "Time" :direction :desc})
 
 (def trade-history-direction-filter-options
-  [[:all "All"]
-   [:long "Long"]
-   [:short "Short"]])
+  tab-filters/trade-history-direction-filter-options)
 
 (def trade-history-direction-filter-labels
-  (into {} trade-history-direction-filter-options))
+  tab-filters/trade-history-direction-filter-labels)
 
-(defn trade-history-direction-filter-key [trade-history-state]
-  (let [raw-direction (:direction-filter trade-history-state)
-        direction-filter (cond
-                           (keyword? raw-direction) raw-direction
-                           (string? raw-direction) (keyword (str/lower-case raw-direction))
-                           :else :all)]
-    (if (contains? trade-history-direction-filter-labels direction-filter)
-      direction-filter
-      :all)))
+(def trade-history-direction-filter-key
+  tab-filters/trade-history-direction-filter-key)
 
 (defn trade-history-sort-state [trade-history-state]
   (merge default-trade-history-sort

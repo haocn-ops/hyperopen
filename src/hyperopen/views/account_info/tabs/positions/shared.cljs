@@ -1,28 +1,18 @@
 (ns hyperopen.views.account-info.tabs.positions.shared
   (:require ["lucide/dist/esm/icons/pencil.js" :default lucide-pencil-node]
-            [clojure.string :as str]
             [hyperopen.utils.formatting :as fmt]
             [hyperopen.views.account-info.positions-vm :as positions-vm]
-            [hyperopen.views.account-info.shared :as shared]))
+            [hyperopen.views.account-info.shared :as shared]
+            [hyperopen.views.account-info.tab-filters :as tab-filters]))
 
 (def positions-direction-filter-options
-  [[:all "All"]
-   [:long "Long"]
-   [:short "Short"]])
+  tab-filters/positions-direction-filter-options)
 
 (def positions-direction-filter-labels
-  (into {} positions-direction-filter-options))
+  tab-filters/positions-direction-filter-labels)
 
-(defn positions-direction-filter-key
-  [positions-state]
-  (let [raw-direction (:direction-filter positions-state)
-        direction-filter (cond
-                           (keyword? raw-direction) raw-direction
-                           (string? raw-direction) (keyword (str/lower-case raw-direction))
-                           :else :all)]
-    (if (contains? positions-direction-filter-labels direction-filter)
-      direction-filter
-      :all)))
+(def positions-direction-filter-key
+  tab-filters/positions-direction-filter-key)
 
 (defn display-coin
   [position-data]

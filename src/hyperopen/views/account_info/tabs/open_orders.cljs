@@ -3,6 +3,7 @@
             [hyperopen.order.cancel-visible-confirmation :as cancel-visible-confirmation]
             [hyperopen.views.account-info.projections :as projections]
             [hyperopen.views.account-info.shared :as shared]
+            [hyperopen.views.account-info.tab-filters :as tab-filters]
             [hyperopen.views.account-info.table :as table]
             [hyperopen.views.account-info.tabs.open-orders.sorting :as sorting]
             [hyperopen.views.ui.anchored-popover :as anchored-popover]))
@@ -11,14 +12,12 @@
 (def ^:private sell-coin-color "rgb(234, 175, 184)")
 
 (def open-orders-direction-filter-options
-  [[:all "All"]
-   [:long "Long"]
-   [:short "Short"]])
+  tab-filters/open-orders-direction-filter-options)
 
 (def open-orders-direction-filter-labels
-  (into {} open-orders-direction-filter-options))
+  tab-filters/open-orders-direction-filter-labels)
 
-(def open-orders-direction-filter-key sorting/open-orders-direction-filter-key)
+(def open-orders-direction-filter-key tab-filters/open-orders-direction-filter-key)
 (def order-value sorting/order-value)
 (def sort-open-orders-by-column sorting/sort-open-orders-by-column)
 (def reset-open-orders-sort-cache! sorting/reset-open-orders-sort-cache!)

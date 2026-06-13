@@ -48,6 +48,8 @@
            (-> path-values first first)))
     (is (= :funding-history
            (-> path-values first second)))
+    (is (= [account-tab-module-effect-id :funding-history]
+           (second effects)))
     (is (effect-extractors/projection-before-heavy? effects account-tab-heavy-effect-ids))
     (is (effect-extractors/phase-order-valid? effects account-tab-heavy-effect-ids))
     (is (empty? (effect-extractors/duplicate-heavy-effect-ids effects account-tab-heavy-effect-ids)))

@@ -1,14 +1,23 @@
-(ns hyperopen.portfolio.optimizer.application.engine.solve)
+(ns hyperopen.portfolio.optimizer.application.engine.solve
+  (:require [hyperopen.portfolio.optimizer.domain.closed-form :as closed-form]))
 
 (defn default-solve-problem
   [_problem]
   {:status :error
    :reason :solver-not-configured})
 
+(defn solve-one
+  "Solves a single planned problem. Closed-form problems are computed by the
+  pure domain solver and never reach the injected QP solver."
+  [problem solve-problem]
+  (if (= :closed-form-portfolio (:kind problem))
+    (closed-form/solve-portfolio problem)
+    (solve-problem problem)))
+
 (defn solve-plan
   [solver-plan solve-problem]
   (mapv (fn [problem]
-          (let [result (solve-problem problem)]
+          (let [result (solve-one problem solve-problem)]
             (assoc result :problem problem)))
         (:problems solver-plan)))
 
@@ -32,7 +41,7 @@
        (clj->js
         (mapv
          (fn [problem]
-           (-> (js/Promise.resolve (solve-problem problem))
+           (-> (js/Promise.resolve (solve-one problem solve-problem))
                (.then
                 (fn [result]
                   (when on-problem-result!

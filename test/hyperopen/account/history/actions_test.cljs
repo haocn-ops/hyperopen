@@ -196,7 +196,9 @@
                                                 :loaded-for-address spectate-address
                                                 :error nil}}}]
       (is (= [[:effects/save [:account-info :selected-tab] :order-history]]
-             (history-actions/select-account-info-tab state :order-history))))))
+             (take 1 (history-actions/select-account-info-tab state :order-history))))
+      (is (= [[:effects/load-account-tab-module :order-history]]
+             (subvec (history-actions/select-account-info-tab state :order-history) 1 2))))))
 
 (deftest select-account-info-tab-syncs-trade-url-with-market-and-tab-query-test
   (let [state {:router {:path "/trade"}
@@ -204,6 +206,7 @@
                :account-info {:selected-tab :balances}}
         effects (history-actions/select-account-info-tab state :outcomes)]
     (is (= [[:effects/save [:account-info :selected-tab] :outcomes]
+            [:effects/load-account-tab-module :outcomes]
             [:effects/push-state "/trade?market=ETH&tab=outcomes"]]
            effects))))
 
@@ -216,6 +219,7 @@
                                                  :address spectate-address}}}
         effects (history-actions/select-account-info-tab state :positions)]
     (is (= [[:effects/save [:account-info :selected-tab] :positions]
+            [:effects/load-account-tab-module :positions]
             [:effects/push-state
              "/trade?market=ETH&tab=positions&spectate=0xdddddddddddddddddddddddddddddddddddddddd"]]
            effects))))

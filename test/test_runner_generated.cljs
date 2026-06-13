@@ -2,6 +2,7 @@
 ;; Do not edit by hand; run `node tools/generate-test-runner.mjs`.
 (ns test-runner-generated
   (:require [cljs.test :as cljs-test :refer-macros [run-tests]]
+            [hyperopen.account-tab-modules-test]
             [hyperopen.account.context-test]
             [hyperopen.account.history.actions-test]
             [hyperopen.account.history.effects-test]
@@ -721,7 +722,8 @@
   ([]
    (run-generated-tests (cljs-test/empty-env)))
   ([env]
-    (run-tests env 'hyperopen.account.context-test
+    (run-tests env 'hyperopen.account-tab-modules-test
+             'hyperopen.account.context-test
              'hyperopen.account.history.actions-test
              'hyperopen.account.history.effects-test
              'hyperopen.account.history.position-margin-test

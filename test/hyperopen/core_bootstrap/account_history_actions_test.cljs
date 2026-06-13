@@ -9,8 +9,29 @@
 (def ^:private account-tab-heavy-effect-ids
   #{:effects/api-fetch-user-funding-history
     :effects/api-fetch-historical-orders})
+(def ^:private account-tab-module-effect-id
+  :effects/load-account-tab-module)
 (def ^:private funding-history-heavy-effect-ids
   #{:effects/api-fetch-user-funding-history})
+
+(deftest select-account-info-tab-loads-lazy-module-for-non-default-tabs-test
+  (let [state {:account-info {:selected-tab :balances}
+               :router {:path "/trade"}
+               :active-asset "BTC"}
+        effects (core/select-account-info-tab state :positions)]
+    (is (= [[:effects/save [:account-info :selected-tab] :positions]
+            [account-tab-module-effect-id :positions]
+            [:effects/push-state "/trade?market=BTC&tab=positions"]]
+           effects))))
+
+(deftest select-account-info-tab-skips-lazy-module-load-for-default-balances-tab-test
+  (let [state {:account-info {:selected-tab :positions}
+               :router {:path "/trade"}
+               :active-asset "BTC"}
+        effects (core/select-account-info-tab state :balances)]
+    (is (= [[:effects/save [:account-info :selected-tab] :balances]
+            [:effects/push-state "/trade?market=BTC&tab=balances"]]
+           effects))))
 
 (deftest select-account-info-tab-funding-history-saves-selection-before-fetch-test
   (let [state {:account-info {:selected-tab :balances
@@ -30,8 +51,10 @@
     (is (effect-extractors/projection-before-heavy? effects account-tab-heavy-effect-ids))
     (is (effect-extractors/phase-order-valid? effects account-tab-heavy-effect-ids))
     (is (empty? (effect-extractors/duplicate-heavy-effect-ids effects account-tab-heavy-effect-ids)))
+    (is (= [account-tab-module-effect-id :funding-history]
+           (second effects)))
     (is (= [:effects/api-fetch-user-funding-history 3]
-           (second effects)))))
+           (nth effects 2)))))
 
 (deftest apply-funding-history-filters-resets-pagination-and-refetches-only-on-time-range-change-test
   (let [base-state {:account-info {:funding-history {:filters {:coin-set #{}
@@ -327,8 +350,10 @@
     (is (effect-extractors/projection-before-heavy? effects account-tab-heavy-effect-ids))
     (is (effect-extractors/phase-order-valid? effects account-tab-heavy-effect-ids))
     (is (empty? (effect-extractors/duplicate-heavy-effect-ids effects account-tab-heavy-effect-ids)))
+    (is (= [account-tab-module-effect-id :order-history]
+           (second effects)))
     (is (= [:effects/api-fetch-historical-orders 3]
-           (second effects)))))
+           (nth effects 2)))))
 
 (deftest select-account-info-tab-order-history-skips-fetch-when-preloaded-data-is-fresh-test
   (with-redefs [platform/now-ms (constantly 200000)]
@@ -340,7 +365,8 @@
                                                 :error nil}}
                  :orders {:order-history []}}
           effects (core/select-account-info-tab state :order-history)]
-      (is (= [[:effects/save [:account-info :selected-tab] :order-history]]
+      (is (= [[:effects/save [:account-info :selected-tab] :order-history]
+              [account-tab-module-effect-id :order-history]]
              effects)))))
 
 (deftest select-account-info-tab-order-history-refetches-when-preload-is-stale-or-address-mismatched-test
@@ -359,10 +385,14 @@
                                                               :error nil}}}
           stale-effects (core/select-account-info-tab stale-state :order-history)
           wrong-address-effects (core/select-account-info-tab wrong-address-state :order-history)]
-      (is (= [:effects/api-fetch-historical-orders 3]
+      (is (= [account-tab-module-effect-id :order-history]
              (second stale-effects)))
       (is (= [:effects/api-fetch-historical-orders 3]
-             (second wrong-address-effects))))))
+             (nth stale-effects 2)))
+      (is (= [account-tab-module-effect-id :order-history]
+             (second wrong-address-effects)))
+      (is (= [:effects/api-fetch-historical-orders 3]
+             (nth wrong-address-effects 2))))))
 
 (deftest sort-order-history-toggles-direction-on-same-column-test
   (let [state {:account-info {:order-history {:sort {:column "Time"

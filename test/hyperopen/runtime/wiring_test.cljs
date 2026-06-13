@@ -79,6 +79,7 @@
     (is (identical? effect-adapters/load-trading-indicators-module-effect
                     (get-in deps [:navigation :load-trading-indicators-module])))
     (is (fn? (get-in deps [:navigation :load-surface-module])))
+    (is (fn? (get-in deps [:navigation :load-account-tab-module])))
     (is (identical? effect-adapters/replace-shareable-route-query
                     (get-in deps [:navigation :replace-shareable-route-query])))
     (is (identical? effect-adapters/fetch-candle-snapshot
@@ -154,6 +155,7 @@
     (is (identical? effect-adapters/save
                     (get-in deps [:effect-handlers :save])))
     (is (fn? (get-in deps [:effect-handlers :load-surface-module])))
+    (is (fn? (get-in deps [:effect-handlers :load-account-tab-module])))
     (is (fn? (get-in deps [:action-handlers :run-portfolio-optimizer])))
     (is (fn? (get-in deps [:action-handlers :load-portfolio-optimizer-route])))
     (is (fn? (get-in deps [:action-handlers :load-vault-route])))

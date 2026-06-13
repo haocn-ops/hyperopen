@@ -50,6 +50,7 @@
                   :replace-shareable-route-query effect-adapters/replace-shareable-route-query
                   :load-route-module effect-adapters/load-route-module-effect
                   :load-surface-module effect-adapters/load-surface-module-effect
+                  :load-account-tab-module effect-adapters/load-account-tab-module-effect
                   :load-trade-chart-module effect-adapters/load-trade-chart-module-effect
                   :load-trading-indicators-module effect-adapters/load-trading-indicators-module-effect}
      :websocket {:init-websocket effect-adapters/init-websocket

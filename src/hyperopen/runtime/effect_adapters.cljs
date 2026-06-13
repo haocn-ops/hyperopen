@@ -4,6 +4,7 @@
             [hyperopen.api.projections :as api-projections]
             [hyperopen.api-wallets.effects :as api-wallets-effects]
             [hyperopen.account.context :as account-context]
+            [hyperopen.account-tab-modules :as account-tab-modules]
             [hyperopen.account.history.effects :as account-history-effects]
             [hyperopen.runtime.effect-adapters.asset-selector :as asset-adapters]
             [hyperopen.runtime.effect-adapters.common :as common]
@@ -92,6 +93,10 @@
 (defn load-surface-module-effect
   [_ store surface-id]
   (surface-modules/load-surface-module! store surface-id))
+
+(defn load-account-tab-module-effect
+  [_ store tab]
+  (account-tab-modules/load-account-tab-module! store tab))
 
 (defn load-trade-chart-module-effect
   [_ store]

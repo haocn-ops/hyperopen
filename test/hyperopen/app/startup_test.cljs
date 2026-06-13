@@ -435,3 +435,42 @@
                     [:effects/load-trading-indicators-module]]]
             [store [[:effects/load-surface-module :account-surfaces]]]]
            @dispatch-calls))))
+
+(deftest init-loads-selected-lazy-account-tab-post-render-on-initial-trade-startup-test
+  (let [store (atom {:router {:path "/trade"}
+                     :account-info {:selected-tab :positions}})
+        runtime (atom {})
+        captured-init-deps (atom nil)
+        dispatch-calls (atom [])]
+    (with-redefs [startup-collaborators/startup-base-deps
+                  (fn [deps]
+                    (merge
+                     {:store (:store deps)
+                      :runtime (:runtime deps)
+                      :dispatch! (fn [& _] nil)
+                      :log-fn (fn [& _] nil)}
+                     deps))
+                  startup-init/init!
+                  (fn [deps]
+                    (reset! captured-init-deps deps))
+                  trade-modules/trade-chart-ready?
+                  (constantly false)
+                  trade-modules/trade-chart-loading?
+                  (constantly false)
+                  surface-modules/surface-ready?
+                  (constantly false)
+                  surface-modules/surface-loading?
+                  (constantly false)
+                  startup-runtime/schedule-idle-or-timeout!
+                  (fn [_delay-ms f]
+                    (f))
+                  nxr/dispatch
+                  (fn [store-arg _ctx effects]
+                    (swap! dispatch-calls conj [store-arg effects]))]
+      (app-startup/init! {:runtime runtime
+                          :store store})
+      ((:load-post-render-route-effects! @captured-init-deps) store))
+    (is (= [[store [[:effects/load-trade-chart-module]]]
+            [store [[:effects/load-surface-module :account-surfaces]
+                    [:effects/load-account-tab-module :positions]]]]
+           @dispatch-calls))))

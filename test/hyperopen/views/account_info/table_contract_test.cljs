@@ -2,7 +2,11 @@
   (:require [cljs.test :refer-macros [deftest is]]
             [hyperopen.views.account-info.test-support.fixtures :as fixtures]
             [hyperopen.views.account-info.test-support.hiccup :as hiccup]
+            [hyperopen.views.account-info.tabs.funding-history :as funding-history-tab]
             [hyperopen.views.account-info.tabs.open-orders :as open-orders-tab]
+            [hyperopen.views.account-info.tabs.order-history :as order-history-tab]
+            [hyperopen.views.account-info.tabs.positions :as positions-tab]
+            [hyperopen.views.account-info.tabs.trade-history :as trade-history-tab]
             [hyperopen.views.account-info-view :as view]))
 
 (defn- sample-open-orders
@@ -35,24 +39,24 @@
 (defn- tab-contents
   []
   [(view/balances-tab-content [fixtures/sample-balance-row] false fixtures/default-sort-state)
-   (view/positions-tab-content {:webdata2 {:clearinghouseState {:assetPositions [fixtures/sample-position-data]}}
-                                :sort-state fixtures/default-sort-state
-                                :perp-dex-states {}})
+   (positions-tab/positions-tab-content {:webdata2 {:clearinghouseState {:assetPositions [fixtures/sample-position-data]}}
+                                         :sort-state fixtures/default-sort-state
+                                         :perp-dex-states {}})
    (open-orders-tab/open-orders-tab-content (sample-open-orders) {:column "Time" :direction :desc})
-   (view/trade-history-tab-content (sample-fills))
-   (view/funding-history-tab-content (sample-fundings))
-   (view/order-history-tab-content (sample-order-history))])
+   (trade-history-tab/trade-history-tab-content (sample-fills))
+   (funding-history-tab/funding-history-tab-content (sample-fundings))
+   (order-history-tab/order-history-tab-content (sample-order-history))])
 
 (defn- keyed-tab-contents
   []
   [[:balances (view/balances-tab-content [fixtures/sample-balance-row] false fixtures/default-sort-state)]
-   [:positions (view/positions-tab-content {:webdata2 {:clearinghouseState {:assetPositions [fixtures/sample-position-data]}}
-                                            :sort-state fixtures/default-sort-state
-                                            :perp-dex-states {}})]
+   [:positions (positions-tab/positions-tab-content {:webdata2 {:clearinghouseState {:assetPositions [fixtures/sample-position-data]}}
+                                                     :sort-state fixtures/default-sort-state
+                                                     :perp-dex-states {}})]
    [:open-orders (open-orders-tab/open-orders-tab-content (sample-open-orders) {:column "Time" :direction :desc})]
-   [:trade-history (view/trade-history-tab-content (sample-fills))]
-   [:funding-history (view/funding-history-tab-content (sample-fundings))]
-   [:order-history (view/order-history-tab-content (sample-order-history))]])
+   [:trade-history (trade-history-tab/trade-history-tab-content (sample-fills))]
+   [:funding-history (funding-history-tab/funding-history-tab-content (sample-fundings))]
+   [:order-history (order-history-tab/order-history-tab-content (sample-order-history))]])
 
 (deftest tab-content-uses-scrollable-row-viewport-test
   (doseq [content (tab-contents)
@@ -107,7 +111,7 @@
 (deftest account-info-numeric-cells-use-num-utility-test
   (let [balance-node (view/balance-row fixtures/sample-balance-row)
         balance-cells (vec (hiccup/node-children balance-node))
-        position-node (view/position-row fixtures/sample-position-data)
+        position-node (positions-tab/position-row fixtures/sample-position-data)
         position-cells (vec (hiccup/node-children position-node))]
     (doseq [idx [1 2 3 4]]
       (is (contains? (hiccup/node-class-set (nth balance-cells idx)) "num")))
@@ -115,13 +119,13 @@
       (is (contains? (hiccup/node-class-set (nth position-cells idx)) "num")))))
 
 (deftest history-tables-trade-history-left-aligns-value-columns-test
-  (let [trade-node (view/trade-history-tab-content (sample-fills))
+  (let [trade-node (trade-history-tab/trade-history-tab-content (sample-fills))
         trade-header-cells (vec (hiccup/node-children (hiccup/tab-header-node trade-node)))
         trade-row-cells (vec (hiccup/node-children (hiccup/first-viewport-row trade-node)))
-        funding-node (view/funding-history-tab-content (sample-fundings))
+        funding-node (funding-history-tab/funding-history-tab-content (sample-fundings))
         funding-header-cells (vec (hiccup/node-children (hiccup/tab-header-node funding-node)))
         funding-row-cells (vec (hiccup/node-children (hiccup/first-viewport-row funding-node)))
-        order-node (view/order-history-tab-content (sample-order-history))
+        order-node (order-history-tab/order-history-tab-content (sample-order-history))
         order-header-cells (vec (hiccup/node-children (hiccup/tab-header-node order-node)))
         order-row-cells (vec (hiccup/node-children (hiccup/first-viewport-row order-node)))]
     (doseq [idx [1 2 3 4 5 6 7]]

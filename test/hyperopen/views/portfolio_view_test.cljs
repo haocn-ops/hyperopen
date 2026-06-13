@@ -1,7 +1,9 @@
 (ns hyperopen.views.portfolio-view-test
   (:require [clojure.string :as str]
             [cljs.test :refer-macros [deftest is use-fixtures]]
+            [hyperopen.account-tab-modules :as account-tab-modules]
             [hyperopen.views.account-info.test-support.fixtures :as fixtures]
+            [hyperopen.views.account-info.test-support.lazy-modules :as lazy-modules]
             [hyperopen.views.chart.d3.hover-state :as chart-hover-state]
             [hyperopen.views.portfolio.test-support :refer [button-with-text
                                                             class-values
@@ -423,47 +425,55 @@
     (is (not (contains? all-text "Account Activity")))))
 
 (deftest portfolio-view-composes-trader-read-only-account-info-tabs-test
-  (doseq [{:keys [label view-node required-text forbidden-texts forbidden-buttons forbidden-aria-labels]}
-          [{:label "balances"
-            :view-node (portfolio-view/portfolio-view (trader-balances-state))
-            :required-text "MEOW"
-            :forbidden-texts ["Send" "Transfer" "Repay"]}
-           {:label "positions"
-            :view-node (portfolio-view/portfolio-view (trader-positions-state))
-            :required-text "HYPE"
-            :forbidden-texts ["Close All"]
-            :forbidden-buttons ["Reduce"]
-            :forbidden-aria-labels ["Edit Margin" "Edit TP/SL"]}
-           {:label "open orders"
-            :view-node (portfolio-view/portfolio-view (trader-open-orders-state))
-            :required-text "BTC"
-            :forbidden-texts ["Cancel All"]
-            :forbidden-buttons ["Cancel"]}
-           {:label "twap"
-            :view-node (portfolio-view/portfolio-view (trader-twap-state))
-            :required-text "Active (1)"
-            :forbidden-texts ["Terminate"]}]]
-    (let [account-table (find-first-node view-node #(= "portfolio-account-table" (get-in % [1 :data-role])))
-          table-strings (set (collect-strings account-table))]
-      (is (contains? table-strings required-text) label)
-      (doseq [forbidden-text forbidden-texts]
-        (is (not (contains? table-strings forbidden-text))
-            (str label " omits " forbidden-text)))
-      (doseq [forbidden-button forbidden-buttons]
-        (is (nil? (button-with-text account-table forbidden-button))
-            (str label " omits button " forbidden-button)))
-      (doseq [aria-label forbidden-aria-labels]
-        (is (nil? (find-first-node account-table #(= aria-label (get-in % [1 :aria-label]))))
-            (str label " omits aria-label " aria-label))))))
+  (with-redefs [account-tab-modules/resolved-tab-renderer lazy-modules/tab-renderer
+                account-tab-modules/tab-ready? lazy-modules/tab-ready?
+                account-tab-modules/tab-loading? lazy-modules/tab-loading?
+                account-tab-modules/tab-error lazy-modules/tab-error]
+    (doseq [{:keys [label view-node required-text forbidden-texts forbidden-buttons forbidden-aria-labels]}
+            [{:label "balances"
+              :view-node (portfolio-view/portfolio-view (trader-balances-state))
+              :required-text "MEOW"
+              :forbidden-texts ["Send" "Transfer" "Repay"]}
+             {:label "positions"
+              :view-node (portfolio-view/portfolio-view (trader-positions-state))
+              :required-text "HYPE"
+              :forbidden-texts ["Close All"]
+              :forbidden-buttons ["Reduce"]
+              :forbidden-aria-labels ["Edit Margin" "Edit TP/SL"]}
+             {:label "open orders"
+              :view-node (portfolio-view/portfolio-view (trader-open-orders-state))
+              :required-text "BTC"
+              :forbidden-texts ["Cancel All"]
+              :forbidden-buttons ["Cancel"]}
+             {:label "twap"
+              :view-node (portfolio-view/portfolio-view (trader-twap-state))
+              :required-text "Active (1)"
+              :forbidden-texts ["Terminate"]}]]
+      (let [account-table (find-first-node view-node #(= "portfolio-account-table" (get-in % [1 :data-role])))
+            table-strings (set (collect-strings account-table))]
+        (is (contains? table-strings required-text) label)
+        (doseq [forbidden-text forbidden-texts]
+          (is (not (contains? table-strings forbidden-text))
+              (str label " omits " forbidden-text)))
+        (doseq [forbidden-button forbidden-buttons]
+          (is (nil? (button-with-text account-table forbidden-button))
+              (str label " omits button " forbidden-button)))
+        (doseq [aria-label forbidden-aria-labels]
+          (is (nil? (find-first-node account-table #(= aria-label (get-in % [1 :aria-label]))))
+              (str label " omits aria-label " aria-label)))))))
 
 (deftest portfolio-view-positions-coin-cell-navigates-to-trade-market-test
-  (let [view-node (portfolio-view/portfolio-view (portfolio-positions-state))
-        account-table (find-first-node view-node #(= "portfolio-account-table" (get-in % [1 :data-role])))
-        coin-button (find-first-node account-table #(= "positions-coin-select" (get-in % [1 :data-role])))]
-    (is (some? coin-button))
-    (is (= [[:actions/select-asset "HYPE"]
-            [:actions/navigate "/trade/HYPE"]]
-           (get-in coin-button [1 :on :click])))))
+  (with-redefs [account-tab-modules/resolved-tab-renderer lazy-modules/tab-renderer
+                account-tab-modules/tab-ready? lazy-modules/tab-ready?
+                account-tab-modules/tab-loading? lazy-modules/tab-loading?
+                account-tab-modules/tab-error lazy-modules/tab-error]
+    (let [view-node (portfolio-view/portfolio-view (portfolio-positions-state))
+          account-table (find-first-node view-node #(= "portfolio-account-table" (get-in % [1 :data-role])))
+          coin-button (find-first-node account-table #(= "positions-coin-select" (get-in % [1 :data-role])))]
+      (is (some? coin-button))
+      (is (= [[:actions/select-asset "HYPE"]
+              [:actions/navigate "/trade/HYPE"]]
+             (get-in coin-button [1 :on :click]))))))
 
 (deftest portfolio-view-funding-actions-pass-explicit-anchor-bounds-test
   (let [view-node (portfolio-view/portfolio-view sample-state)

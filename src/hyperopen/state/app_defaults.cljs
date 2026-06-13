@@ -3,6 +3,7 @@
             [hyperopen.account.history.position-reduce :as position-reduce]
             [hyperopen.account.history.position-tpsl :as position-tpsl]
             [hyperopen.account.context :as account-context]
+            [hyperopen.account-tab-modules :as account-tab-modules]
             [hyperopen.api-wallets.application.ui-state :as api-wallets-ui-state]
             [hyperopen.funding.actions :as funding-actions]
             [hyperopen.i18n.locale :as i18n-locale]
@@ -449,6 +450,7 @@
                    :loading nil
                    :errors {}}
    :surface-modules (surface-modules/default-state)
+   :account-tab-modules (account-tab-modules/default-state)
    :trade-modules (trade-modules/default-state)
    :order-form (or default-order-form {})
    :order-form-ui (or default-order-form-ui {})

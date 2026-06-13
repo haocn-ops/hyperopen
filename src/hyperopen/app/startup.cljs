@@ -2,6 +2,7 @@
   (:require [hyperopen.account.history.funding-actions :as funding-actions]
             [hyperopen.account.history.order-actions :as order-actions]
             [hyperopen.account.history.surface-actions :as surface-actions]
+            [hyperopen.account-tab-modules :as account-tab-modules]
             [hyperopen.asset-selector.settings :as asset-selector-settings]
             [hyperopen.chart.settings :as chart-settings]
             [nexus.registry :as nxr]
@@ -170,12 +171,17 @@
    (route-change-effects state path {}))
   ([state path {:keys [defer-trade-chart?
                        defer-trading-indicators?
-                       defer-account-surfaces?]
+                       defer-account-surfaces?
+                       defer-account-tab-modules?]
                 :or {defer-trade-chart? false
                      defer-trading-indicators? false
-                     defer-account-surfaces? false}}]
+                     defer-account-surfaces? false
+                     defer-account-tab-modules? false}}]
    (let [normalized-path (router/normalize-path path)
-         state* (assoc-in state [:router :path] normalized-path)]
+         state* (assoc-in state [:router :path] normalized-path)
+         account-tab-module-effect
+         (when-not defer-account-tab-modules?
+           (account-tab-modules/route-tab-module-effect state normalized-path))]
      (into (cond-> []
              (some? (route-modules/route-module-id normalized-path))
              (conj [:effects/load-route-module normalized-path])
@@ -197,7 +203,10 @@
                   (router/trade-route? normalized-path)
                   (not (surface-modules/surface-ready? state :account-surfaces))
                   (not (surface-modules/surface-loading? state :account-surfaces)))
-             (conj [:effects/load-surface-module :account-surfaces]))
+             (conj [:effects/load-surface-module :account-surfaces])
+
+             account-tab-module-effect
+             (conj account-tab-module-effect))
            (route-refresh/current-route-refresh-effects state* nil)))))
 
 (defn- post-render-route-effects
@@ -206,7 +215,8 @@
    effects load below-the-fold surfaces whose module evaluation would otherwise
    land in the same post-paint main-thread window as the chart's."
   [state path]
-  (let [normalized-path (router/normalize-path path)]
+  (let [normalized-path (router/normalize-path path)
+        account-tab-module-effect (account-tab-modules/route-tab-module-effect state normalized-path)]
     {:immediate
      (cond-> []
        (and (router/trade-route? normalized-path)
@@ -224,7 +234,10 @@
        (and (router/trade-route? normalized-path)
             (not (surface-modules/surface-ready? state :account-surfaces))
             (not (surface-modules/surface-loading? state :account-surfaces)))
-       (conj [:effects/load-surface-module :account-surfaces]))}))
+       (conj [:effects/load-surface-module :account-surfaces])
+
+       account-tab-module-effect
+       (conj account-tab-module-effect))}))
 
 (defn- mark-post-render-trade-secondary-panels-ready!
   [store]
@@ -241,7 +254,8 @@
                      path
                      {:defer-trade-chart? @defer-initial-trade-module-loads?*
                       :defer-trading-indicators? @defer-initial-trade-module-loads?*
-                      :defer-account-surfaces? @defer-initial-trade-module-loads?*})]
+                      :defer-account-surfaces? @defer-initial-trade-module-loads?*
+                      :defer-account-tab-modules? @defer-initial-trade-module-loads?*})]
         (reset! defer-initial-trade-module-loads?* false)
         (when (seq effects)
           (nxr/dispatch startup-store nil effects))))))

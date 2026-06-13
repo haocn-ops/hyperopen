@@ -248,6 +248,7 @@
    :effects/replace-shareable-route-query ::common/no-args
    :effects/load-route-module ::common/path-args
    :effects/load-surface-module ::common/keyword-args
+   :effects/load-account-tab-module ::common/keyword-args
    :effects/load-trade-chart-module ::common/no-args
    :effects/load-trading-indicators-module ::common/no-args
    :effects/init-websocket ::common/no-args

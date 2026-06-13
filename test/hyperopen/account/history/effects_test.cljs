@@ -2,11 +2,13 @@
   (:require [clojure.string :as str]
             [cljs.test :refer-macros [async deftest is]]
             [goog.object :as gobj]
+            [hyperopen.account-tab-modules :as account-tab-modules]
             [hyperopen.account.history.actions :as history-actions]
             [hyperopen.account.history.effects :as history-effects]
             [hyperopen.api.default :as api]
             [hyperopen.domain.funding-history :as funding-history]
             [hyperopen.platform :as platform]
+            [hyperopen.views.account-info.test-support.lazy-modules :as lazy-modules]
             [hyperopen.views.account-info-view :as account-info-view]))
 
 (defn- apply-save-many-effect!
@@ -120,7 +122,7 @@
                        :webdata2 {}})
           effects (history-actions/select-account-info-tab @store :funding-history)
           save-effect (first effects)
-          fetch-effect (second effects)
+          fetch-effect (nth effects 2)
           request-id (second fetch-effect)
           funding-row (funding-history/normalize-info-funding-row
                        {:time 1700000000000
@@ -137,7 +139,11 @@
                                                          (js/Promise.resolve [funding-row])))]
         (-> (history-effects/api-fetch-user-funding-history-effect nil store request-id)
             (.then (fn [_]
-                     (let [panel (account-info-view/account-info-panel @store)
+                     (let [panel (with-redefs [account-tab-modules/resolved-tab-renderer lazy-modules/tab-renderer
+                                               account-tab-modules/tab-ready? lazy-modules/tab-ready?
+                                               account-tab-modules/tab-loading? lazy-modules/tab-loading?
+                                               account-tab-modules/tab-error lazy-modules/tab-error]
+                                   (account-info-view/account-info-panel @store))
                            strings (set (collect-strings panel))]
                        (is (= :funding-history (get-in @store [:account-info :selected-tab])))
                        (is (= 1 (count (get-in @store [:orders :fundings]))))

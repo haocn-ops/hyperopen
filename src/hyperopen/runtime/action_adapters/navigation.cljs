@@ -1,5 +1,6 @@
 (ns hyperopen.runtime.action-adapters.navigation
-  (:require [hyperopen.account.spectate-mode-links :as spectate-mode-links]
+  (:require [hyperopen.account-tab-modules :as account-tab-modules]
+            [hyperopen.account.spectate-mode-links :as spectate-mode-links]
             [hyperopen.api-wallets.actions :as api-wallets-actions]
             [hyperopen.funding-comparison.actions :as funding-comparison-actions]
             [hyperopen.leaderboard.actions :as leaderboard-actions]
@@ -76,6 +77,10 @@
              (not (surface-modules/surface-loading? state :account-surfaces)))
     [:effects/load-surface-module :account-surfaces]))
 
+(defn- account-tab-module-effect
+  [state normalized-path]
+  (account-tab-modules/route-tab-module-effect state normalized-path))
+
 (defn- route-loader-effects
   [state normalized-path]
   (into []
@@ -102,12 +107,14 @@
                         [:effects/load-route-module normalized-path])
         trade-chart-effect (trade-chart-module-effect state normalized-path)
         trading-indicators-effect (trading-indicators-module-effect state normalized-path)
-        account-surfaces-effect (account-surfaces-module-effect state normalized-path)]
+        account-surfaces-effect (account-surfaces-module-effect state normalized-path)
+        account-tab-effect (account-tab-module-effect state normalized-path)]
     (cond-> []
       module-effect (conj module-effect)
       trade-chart-effect (conj trade-chart-effect)
       trading-indicators-effect (conj trading-indicators-effect)
-      account-surfaces-effect (conj account-surfaces-effect))))
+      account-surfaces-effect (conj account-surfaces-effect)
+      account-tab-effect (conj account-tab-effect))))
 
 (defn- browser-navigation-effect
   [browser-path replace?]

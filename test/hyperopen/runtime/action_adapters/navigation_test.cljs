@@ -147,6 +147,22 @@
             [:effects/load-surface-module :account-surfaces]]
            (navigation-adapters/navigate {} "/trade")))))
 
+(deftest navigate-trade-route-loads-selected-lazy-account-tab-module-test
+  (with-redefs [vault-actions/load-vault-route (fn [_state _path] [])
+                funding-comparison-actions/load-funding-comparison-route (fn [_state _path] [])
+                api-wallets-actions/load-api-wallet-route (fn [_state _path] [])
+                staking-actions/load-staking-route (fn [_state _path] [])
+                trade-modules/trade-chart-ready? (constantly false)
+                trade-modules/trade-chart-loading? (constantly false)
+                surface-modules/surface-ready? (constantly false)
+                surface-modules/surface-loading? (constantly false)]
+    (is (= [[:effects/save [:router :path] "/trade"]
+            [:effects/push-state "/trade"]
+            [:effects/load-trade-chart-module]
+            [:effects/load-surface-module :account-surfaces]
+            [:effects/load-account-tab-module :positions]]
+           (navigation-adapters/navigate {:account-info {:selected-tab :positions}} "/trade")))))
+
 (deftest navigate-trade-route-loads-indicator-runtime-when-active-indicators-exist-test
   (with-redefs [vault-actions/load-vault-route (fn [_state _path] [])
                 funding-comparison-actions/load-funding-comparison-route (fn [_state _path] [])

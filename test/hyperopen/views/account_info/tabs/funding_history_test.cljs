@@ -1,10 +1,13 @@
 (ns hyperopen.views.account-info.tabs.funding-history-test
   (:require [clojure.string :as str]
             [cljs.test :refer-macros [deftest is testing use-fixtures]]
+            [hyperopen.account-tab-modules :as account-tab-modules]
             [hyperopen.test-support.hiccup-selectors :as selectors]
             [hyperopen.views.account-info.test-support.fixtures :as fixtures]
             [hyperopen.views.account-info.test-support.hiccup :as hiccup]
+            [hyperopen.views.account-info.test-support.lazy-modules :as lazy-modules]
             [hyperopen.views.account-info.tabs.funding-history :as funding-history-tab]
+            [hyperopen.views.account-info.tabs.order-history :as order-history-tab]
             [hyperopen.views.account-info-view :as view]))
 
 (defn- reset-funding-history-sort-cache-fixture
@@ -16,7 +19,7 @@
 (use-fixtures :each reset-funding-history-sort-cache-fixture)
 
 (deftest funding-history-sortable-header-uses-secondary-text-hover-and-action-test
-  (let [header-node (view/sortable-funding-history-header "Time" {:column "Time" :direction :asc})
+  (let [header-node (funding-history-tab/sortable-funding-history-header "Time" {:column "Time" :direction :asc})
         sort-icon-node (second (vec (hiccup/node-children header-node)))]
     (is (contains? (hiccup/node-class-set header-node) "text-trading-text-secondary"))
     (is (contains? (hiccup/node-class-set header-node) "hover:text-trading-text"))
@@ -34,16 +37,16 @@
                   (fn [rows _column _direction]
                     (swap! sort-calls inc)
                     rows)]
-      (view/funding-history-tab-content fundings table-state fundings)
-      (view/funding-history-tab-content fundings table-state fundings)
+      (funding-history-tab/funding-history-tab-content fundings table-state fundings)
+      (funding-history-tab/funding-history-tab-content fundings table-state fundings)
       (is (= 1 @sort-calls))
 
       (let [asc-state (assoc-in table-state [:sort :direction] :asc)]
-        (view/funding-history-tab-content fundings asc-state fundings)
-        (view/funding-history-tab-content fundings asc-state fundings)
+        (funding-history-tab/funding-history-tab-content fundings asc-state fundings)
+        (funding-history-tab/funding-history-tab-content fundings asc-state fundings)
         (is (= 2 @sort-calls))
 
-        (view/funding-history-tab-content (into [] fundings) asc-state fundings)
+        (funding-history-tab/funding-history-tab-content (into [] fundings) asc-state fundings)
         (is (= 3 @sort-calls))))))
 
 (deftest sort-funding-history-by-column-respects-direction-and-deterministic-fallback-test
@@ -65,11 +68,11 @@
                :position-size-raw 0.5
                :payment-usdc-raw -0.3
                :funding-rate-raw 0.0004}]
-        coin-asc (view/sort-funding-history-by-column rows "Coin" :asc)
-        payment-desc (view/sort-funding-history-by-column rows "Payment" :desc)
+        coin-asc (funding-history-tab/sort-funding-history-by-column rows "Coin" :asc)
+        payment-desc (funding-history-tab/sort-funding-history-by-column rows "Payment" :desc)
         missing-values [{:id "b" :coin "ETH"}
                         {:id "a" :coin "BTC"}]
-        missing-asc (view/sort-funding-history-by-column missing-values "Payment" :asc)]
+        missing-asc (funding-history-tab/sort-funding-history-by-column missing-values "Payment" :asc)]
     (is (= ["BTC" "ETH" "SOL"] (mapv :coin coin-asc)))
     (is (= [1.2 0.5 -0.3] (mapv :payment-usdc-raw payment-desc)))
     (is (= ["a" "b"] (mapv :id missing-asc)))))
@@ -108,7 +111,7 @@
                    :position-size-raw 120.0
                    :payment-usdc-raw -0.42
                    :funding-rate-raw 0.0006}]
-        content (@#'view/funding-history-table fundings {:sort {:column "Time" :direction :desc}})
+        content (@#'funding-history-tab/funding-history-table fundings {:sort {:column "Time" :direction :desc}})
         header-cells (vec (hiccup/node-children (hiccup/tab-header-node content)))
         columns ["Time" "Coin" "Size" "Position Side" "Payment" "Rate"]]
     (doseq [[idx column-name] (map-indexed vector columns)]
@@ -138,10 +141,10 @@
                :position-size-raw 0.5
                :payment-usdc-raw -0.3
                :funding-rate-raw 0.0004}]
-        coin-sorted (@#'view/funding-history-table rows {:sort {:column "Coin" :direction :asc}})
+        coin-sorted (@#'funding-history-tab/funding-history-table rows {:sort {:column "Coin" :direction :asc}})
         coin-row (hiccup/first-viewport-row coin-sorted)
         coin-value (nth (vec (hiccup/node-children coin-row)) 1)
-        default-sorted (@#'view/funding-history-table rows {})
+        default-sorted (@#'funding-history-tab/funding-history-table rows {})
         default-row (hiccup/first-viewport-row default-sorted)
         default-coin (nth (vec (hiccup/node-children default-row)) 1)]
     (is (contains? (set (hiccup/collect-strings coin-value)) "BTC"))
@@ -154,7 +157,7 @@
                :position-size-raw 0.5
                :payment-usdc-raw -0.42
                :funding-rate-raw 0.0006}]
-        content (@#'view/funding-history-table rows {:sort {:column "Time" :direction :desc}})
+        content (@#'funding-history-tab/funding-history-table rows {:sort {:column "Time" :direction :desc}})
         row (hiccup/first-viewport-row content)
         row-cells (vec (hiccup/node-children row))
         coin-cell (nth row-cells 1)
@@ -172,7 +175,7 @@
     (is (= #{"0.500 NVDA"} size-strings))
     (is (some? coin-base))
     (is (contains? (hiccup/node-class-set coin-base) "font-semibold"))
-    (is (= view/order-history-long-coin-color
+    (is (= order-history-tab/order-history-long-coin-color
            (get-in coin-base [1 :style :color])))
     (is (some? xyz-chip))
     (is (contains? (hiccup/node-class-set xyz-chip) "bg-[#242924]"))))
@@ -184,7 +187,7 @@
                :position-size-raw 0.5
                :payment-usdc-raw -0.42
                :funding-rate-raw 0.0006}]
-        content (@#'view/funding-history-table rows {:sort {:column "Time" :direction :desc}})
+        content (@#'funding-history-tab/funding-history-table rows {:sort {:column "Time" :direction :desc}})
         row-node (hiccup/first-viewport-row content)
         coin-cell (nth (vec (hiccup/node-children row-node)) 1)
         coin-button (hiccup/find-first-node coin-cell #(= :button (first %)))]
@@ -194,7 +197,7 @@
 
 (deftest funding-history-pagination-renders-only-current-page-rows-test
   (let [rows (mapv fixtures/funding-history-row (range 55))
-        content (@#'view/funding-history-table rows {:sort {:column "Time" :direction :desc}
+        content (@#'funding-history-tab/funding-history-table rows {:sort {:column "Time" :direction :desc}
                                                      :page-size 25
                                                      :page 2
                                                      :page-input "2"
@@ -208,14 +211,14 @@
 
 (deftest funding-history-pagination-controls-disable-prev-next-at-edges-test
   (let [rows (mapv fixtures/funding-history-row (range 51))
-        first-page (@#'view/funding-history-table rows {:sort {:column "Time" :direction :desc}
+        first-page (@#'funding-history-tab/funding-history-table rows {:sort {:column "Time" :direction :desc}
                                                         :page-size 25
                                                         :page 1
                                                         :page-input "1"
                                                         :loading? false})
         first-prev (hiccup/find-first-node first-page selectors/prev-button-predicate)
         first-next (hiccup/find-first-node first-page selectors/next-button-predicate)
-        last-page (@#'view/funding-history-table rows {:sort {:column "Time" :direction :desc}
+        last-page (@#'funding-history-tab/funding-history-table rows {:sort {:column "Time" :direction :desc}
                                                        :page-size 25
                                                        :page 3
                                                        :page-input "3"
@@ -229,7 +232,7 @@
 
 (deftest funding-history-pagination-controls-wire-actions-test
   (let [rows (mapv fixtures/funding-history-row (range 12))
-        content (@#'view/funding-history-table rows {:sort {:column "Time" :direction :desc}
+        content (@#'funding-history-tab/funding-history-table rows {:sort {:column "Time" :direction :desc}
                                                      :page-size 25
                                                      :page 1
                                                      :page-input "4"
@@ -250,7 +253,7 @@
 
 (deftest funding-history-pagination-clamps-page-when-data-shrinks-test
   (let [rows (mapv fixtures/funding-history-row (range 10))
-        content (@#'view/funding-history-table rows {:sort {:column "Time" :direction :desc}
+        content (@#'funding-history-tab/funding-history-table rows {:sort {:column "Time" :direction :desc}
                                                      :page-size 25
                                                      :page 4
                                                      :page-input "4"
@@ -285,7 +288,11 @@
                              :error nil})
                   (assoc-in [:orders :fundings-raw] [funding-row])
                   (assoc-in [:orders :fundings] [funding-row]))
-        panel (view/account-info-panel state)]
+        panel (with-redefs [account-tab-modules/resolved-tab-renderer lazy-modules/tab-renderer
+                            account-tab-modules/tab-ready? lazy-modules/tab-ready?
+                            account-tab-modules/tab-loading? lazy-modules/tab-loading?
+                            account-tab-modules/tab-error lazy-modules/tab-error]
+                (view/account-info-panel state))]
     (is (some? (hiccup/find-first-node panel #(contains? (hiccup/direct-texts %) "Filter"))))
     (is (some? (hiccup/find-first-node panel #(contains? (hiccup/direct-texts %) "View All"))))
     (is (some? (hiccup/find-first-node panel #(contains? (hiccup/direct-texts %) "Export as CSV"))))
@@ -294,7 +301,7 @@
     (is (some? (hiccup/find-first-node panel #(contains? (hiccup/direct-texts %) "Long"))))))
 
 (deftest funding-history-controls-renders-status-without-header-actions-test
-  (let [controls (@#'view/funding-history-controls {:loading? true
+  (let [controls (@#'funding-history-tab/funding-history-controls {:loading? true
                                                     :error "Boom"
                                                     :filters {:coin-set #{}}
                                                     :draft-filters {:coin-set #{}}}
@@ -329,7 +336,11 @@
                              :error nil})
                   (assoc-in [:orders :fundings-raw] [funding-row])
                   (assoc-in [:orders :fundings] [funding-row]))
-        panel (view/account-info-panel state)
+        panel (with-redefs [account-tab-modules/resolved-tab-renderer lazy-modules/tab-renderer
+                            account-tab-modules/tab-ready? lazy-modules/tab-ready?
+                            account-tab-modules/tab-loading? lazy-modules/tab-loading?
+                            account-tab-modules/tab-error lazy-modules/tab-error]
+                (view/account-info-panel state))
         datetime-input (hiccup/find-first-node panel #(= "datetime-local" (get-in % [1 :type])))
         apply-button (hiccup/find-first-node panel #(contains? (hiccup/direct-texts %) "Apply"))
         cancel-button (hiccup/find-first-node panel #(contains? (hiccup/direct-texts %) "Cancel"))
@@ -379,8 +390,8 @@
                                :filter-open? true
                                :loading? false
                                :error nil}
-        controls (@#'view/funding-history-controls funding-history-state
-                                                   [funding-row-hype funding-row-sol funding-row-stx])
+        controls (@#'funding-history-tab/funding-history-controls funding-history-state
+                                                                  [funding-row-hype funding-row-sol funding-row-stx])
         search-input (hiccup/find-first-node controls #(= "funding-history-coin-search" (get-in % [1 :id])))
         suggestion-buttons (hiccup/find-all-nodes controls
                                                   (fn [node]
@@ -421,8 +432,8 @@
                                :filter-open? true
                                :loading? false
                                :error nil}
-        controls (@#'view/funding-history-controls funding-history-state
-                                                   [funding-row-pump funding-row-xyz])
+        controls (@#'funding-history-tab/funding-history-controls funding-history-state
+                                                                  [funding-row-pump funding-row-xyz])
         xyz-label (hiccup/find-first-node controls #(contains? (hiccup/direct-texts %) "xyz"))
         googl-label (hiccup/find-first-node controls #(contains? (hiccup/direct-texts %) "GOOGL"))
         remove-button (hiccup/find-first-node controls #(= "Remove xyz:GOOGL filter" (get-in % [1 :aria-label])))

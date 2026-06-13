@@ -8,6 +8,16 @@ After this plan, a cold desktop visit to the trade route becomes interactive soo
 
 Target: **90–93 desktop** after Milestones 1–3. Stretch to **95** would additionally require worker-side payload parsing and render memoization (recorded as deferred follow-ups, not in scope here).
 
+## Context References
+
+Direct user request:
+- 2026-06-11 performance-audit automation scope: audit performance regressions and propose highest-leverage fixes, grounded in measurements/traces where available.
+- 2026-06-11 maintainer request in `/Users/barry/.codex/worktrees/dfb0/hyperopen`: "First: port the already-split account-tab loader from the 662c worktree, especially account_tab_modules.cljs and its related modules/tests. This checkout still eagerly binds non-trade surfaces through app/actions.cljs (line 79) and app/effects.cljs (line 80), and the measured account_surfaces chunk is mostly unused at startup."
+
+Repo artifacts:
+- parent ExecPlan context: `docs/exec-plans/completed/2026-04-20-root-bundle-follow-up-surfaces-and-runtime-aggregators.md`
+- startup profiler artifact root: `tmp/browser-inspection/`
+
 ## How the score decomposes (why 90+ is realistic)
 
 Lighthouse v13 desktop weights: TBT 30%, LCP 25%, CLS 25%, FCP 10%, SI 10%. FCP/LCP/CLS already score ~1.0, contributing ~60 points. The observed 74 implies TBT (590ms) scores ~0.27 and SI (1.7s) ~0.75. The desktop scoring curve gives TBT ≤ 200ms a score of ~0.83 (+17 points) and TBT ≤ 150ms ~0.90 (+19 points); SI ≤ 1.3s scores ~0.90 (+1.5 points). So the entire plan is one sentence: cut TBT from 590ms to under 200ms. Everything below is in service of that, ordered by expected payoff per unit of risk.
@@ -118,6 +128,21 @@ Baseline 74 = ~60 (FCP/LCP/CLS) + ~8 (TBT 590ms ≈ 0.27 × 30) + ~7.5 (SI 1.7s 
 
 The action/effect registry split (2a) is the highest-risk step — the April wave deferred it for runtime ordering risk; mitigate by going one domain at a time behind the existing lazy pattern with per-surface Playwright smokes, and by keeping `npm run formal:sync` and the contract gates green (the Lean contract surface tracks `:actions/*`/`:effects/*` changes). CSP changes (theme-preload inlining) must update `security_headers.mjs`, `verify_deployment_headers.mjs`, and release-asset tests together or deploys will fail verification. The HyperDegen branch has no recorded perf evidence; Milestone 0's profile run determines whether degen assets (sounds, mascot art) added eager weight that also needs the lazy-surface treatment. Desktop is the measured target; the mobile score will remain substantially lower (mobile Lighthouse applies 4× CPU throttling) and is out of scope.
 
+## Validation and Acceptance
+
+Required repo gates for this slice:
+- `npm test`
+- `npm run test:websocket`
+- `npm run check`
+
+Validation results on 2026-06-11 / 2026-06-12:
+- `npm ci` passed.
+- `npm test` passed: 4,595 tests, 25,615 assertions, 0 failures, 0 errors.
+- `npm run test:websocket` passed: 536 tests, 3,101 assertions, 0 failures, 0 errors.
+- `npm run check` failed in `lint:docs`, but the remaining failures are documentation-governance issues outside the account-tab port itself: one stale product spec, one malformed unrelated active ExecPlan, and one already-complete active ExecPlan that should move out of `docs/exec-plans/active/`.
+- `npm run browser:profile:trade-startup` passed on the release build and recorded `blockingTimeProxyMs=65` and `maxSingleBlockingTaskMs=110` in `tmp/browser-inspection/trade-startup-profile-2026-06-12T01-58-57-047Z-94cee9e6/profile.json`.
+- Release artifact evidence from the same build: current `main` gzip is 610,694 bytes (within the 616,000-byte bundle budget); current `account_surfaces` is 115,798 raw / 26,336 gzip; split lazy account chunks are `account_positions_outcomes` 84,068 raw / 14,725 gzip, `account_orders` 35,429 / 7,786, `account_activity` 32,008 / 6,398, and `account_funding_history` 16,262 / 3,624.
+
 ## Progress
 
 - [x] (M0, 2026-06-11) Recorded bundle benchmark baseline on this branch: `main.97EDB0167F0DB3C4EB22CF3ED6C1C175.js` raw=2,927,705 gzip=685,013 brotli=527,296 (node zlib level 9; the CLI `gzip -9` measures 691,020 — use the node numbers, they are what the gate measures). Other boot-path artifacts: trade_chart raw=419,683 gzip≈118,337; account_surfaces raw=280,523; css/main.css raw=294,511 gzip≈48,543.
@@ -131,7 +156,7 @@ The action/effect registry split (2a) is the highest-risk step — the April wav
 - [x] (M2b, 2026-06-11) Release-stripped cljs.spec contract registration by inverting the dependency: `hyperopen.runtime.validation` no longer requires `hyperopen.schema.contracts`; it holds a `contracts-impl` indirection that the contracts aggregator installs when IT loads (dev preload `hyperopen.dev.contracts-preload` wired into :app :devtools :preloads; test namespaces load contracts directly). websocket ACL + api/trading/http switched from contracts/* to validation/* indirections. Tests that with-redefs'd aggregator vars repointed at the validation indirection (effect_order_contract_formal_conformance_test, hyperliquid_test, internal_seams_test). Measured: ~105KB raw out of main (the audit's ~280KB overcounted — runtime-registration catalogs that release code reads stay, correctly).
 - [x] (M2c, 2026-06-11) :charts_shared shadow module ({:entries [hyperopen.views.chart.d3.runtime] :depends-on #{:main}}; portfolio_route + vaults_route depend on it) — moved 214,932 raw bytes of cross-route shared chart code (d3-shape, montecarlo, portfolio metrics) out of :main, confirmed previously hoisted there (portfolio_route size unchanged). ROUTE_PRELOAD_MODULE_IDS updated so portfolio/vaults preload it.
 - **(M2b+M2c measured)** main.js 2,927,705 → 2,607,868 raw (−319,837, −10.9%); 685,013 → 609,049 gzip (−75,964). Both CLJS suites green: 4,579 tests / 25,532 assertions + 536 ws tests, 0 failures 0 errors. Verified by string-scan: "schema.contracts"/"coin-args" absent from release main; d3 curve code present in charts_shared.
-- [ ] (M2d) Port account-tab lazy split from worktree 662c
+- [x] (M2d, 2026-06-11) Ported the 662c account-tab lazy split: added `hyperopen.account-tab-modules`, split account tab implementations into `account_positions_outcomes`, `account_orders`, `account_activity`, and `account_funding_history`, and wired lazy module effects through startup, navigation, and account-history action flows. Measured release output: the current `account_surfaces` module shrank to 115,798 raw / 26,336 gzip from the pre-split ~280,523 raw / ~55,957 gzip baseline, and the cold `/trade` startup trace requested only `main`, `trade_chart`, and the trimmed `account_surfaces` shell, not any of the split account-tab modules.
 - [x] (M3, 2026-06-11) Staggered post-render module loads: `post-render-route-effects` (src/hyperopen/app/startup.cljs) now returns {:immediate [...trade_chart, indicators...] :idle [...account_surfaces...]}; the idle batch dispatches via schedule-idle-or-timeout!, so the 280KB account_surfaces eval no longer competes with the chart's post-paint window. Route-change loads (post-boot) unchanged.
 - [x] (M3, 2026-06-11) Perp-only critical bootstrap: market_loader's :bootstrap phase no longer fetches spotMeta/webData2/outcomeMeta (~320KB of /info JSON eliminated from the boot window — also obsoleting the planned webData2 goog.object slicing, since the payload isn't fetched at boot at all); it builds the default-dex perp catalog from the metaAndAssetCtxs request the critical path already dedupes. start-critical-bootstrap! chases the :full catalog immediately if the active asset resolves no :active-market (cold spot/outcome-pair landing); selector-open demand path (toggle-asset-dropdown, phase ≠ :full) covers the rest. Guarded api_effects so the bootstrap's empty spot-meta cannot clobber [:spot :meta].
 - [x] (M3, 2026-06-11) Selector cache persist moved from requestAnimationFrame to platform/schedule-idle-or-timeout! (1500ms ceiling) via the renamed injectable `schedule-cache-write!` in startup/watchers.
@@ -157,7 +182,7 @@ The action/effect registry split (2a) is the highest-risk step — the April wav
 
 ## Outcomes & Retrospective
 
-2026-06-11 (M0–M3 implemented in one pass; M2a deferred): main.js went from 2,927,705 raw / 685,013 gzip to 2,608,000 raw / 609,468 gzip (−11%) via the spec-contract strip (−105KB raw — the audit's ~280KB estimate overcounted the registration catalogs release code legitimately reads) and the :charts_shared module (−215KB raw of cross-route hoisting). Delivery now preloads the trade-route module chain and fonts, preconnects to the API, and inlines the theme script under a CSP hash; the dead 1.47MB Splash font is gone and mono fonts are woff2. Boot work shrank in two dimensions: ~320KB of /info JSON (spotMeta/webData2/outcomeMeta) left the critical window entirely (perp-only bootstrap, full catalog on demand), and account_surfaces evaluation moved to idle. The release profiler reads blockingTimeProxyMs=62 / maxSingleBlockingTask=112ms on this machine. All gates green: 4,579-test main suite, 536-test ws suite, 36 release-asset node tests, 6 release Playwright smokes, namespace boundary/size lints, and the new bundle-budget ratchet (seeded 692,000, ratcheted to 616,000).
+2026-06-11 / 2026-06-12 (M0–M3 plus M2d account-tab split implemented; M2a deferred): main.js went from 2,927,705 raw / 685,013 gzip to 2,616,348 raw / 610,694 gzip (roughly −10.6% raw / −10.9% gzip at current release output) via the spec-contract strip (−105KB raw — the audit's ~280KB estimate overcounted the registration catalogs release code legitimately reads), the :charts_shared module (−215KB raw of cross-route hoisting), and the account-tab shell split. Delivery now preloads the trade-route module chain and fonts, preconnects to the API, and inlines the theme script under a CSP hash; the dead 1.47MB Splash font is gone and mono fonts are woff2. Boot work shrank in three dimensions: ~320KB of /info JSON (spotMeta/webData2/outcomeMeta) left the critical window entirely (perp-only bootstrap, full catalog on demand), account_surfaces evaluation moved to idle, and the current `account_surfaces` shell fell from ~280,523 raw / ~55,957 gzip to 115,798 raw / 26,336 gzip while its tab-specific code moved behind four on-demand modules. The fresh release profiler reads blockingTimeProxyMs=65 / maxSingleBlockingTask=110ms on this machine, and its cold `/trade` network trace shows only `main`, `trade_chart`, and the trimmed `account_surfaces` shell loading at startup, not the split account-tab modules. Validation on the final code state: `npm test` passed (4,595 tests), `npm run test:websocket` passed (536 tests), the release build/profile path passed, and the bundle-budget ratchet remained green at 616,000 bytes. `npm run check` remains blocked by unrelated docs-governance failures outside this slice.
 
 Complexity assessment: net reduction in startup complexity (boot fetches fewer catalogs, one fewer render-blocking request class, regrowth now gated) at the cost of two new indirections — the validation contracts-impl registry (which replaced a hard require edge, arguably simpler dependency-wise) and the immediate/idle split in post-render effects. The candle tail-merge adds a fast path with an exactness argument documented in code.
 

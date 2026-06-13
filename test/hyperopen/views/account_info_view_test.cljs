@@ -1,7 +1,9 @@
 (ns hyperopen.views.account-info-view-test
   (:require [cljs.test :refer-macros [deftest is]]
+            [hyperopen.account-tab-modules :as account-tab-modules]
             [hyperopen.views.account-info.test-support.fixtures :as fixtures]
             [hyperopen.views.account-info.test-support.hiccup :as hiccup]
+            [hyperopen.views.account-info.test-support.lazy-modules :as lazy-modules]
             [hyperopen.views.account-info-view :as view]))
 
 (def ^:private spectate-address
@@ -119,24 +121,41 @@
     (is (contains? content-classes "overflow-hidden"))))
 
 (deftest account-info-panel-renders-twap-tab-content-instead-of-placeholder-test
-  (let [state {:account-info {:selected-tab :twap}
-               :orders {:twap-states [[17 {:coin "BTC"
-                                           :side "B"
-                                           :sz "1.0"
-                                           :executedSz "0.4"
-                                           :executedNtl "40.0"
-                                           :minutes 30
-                                           :timestamp 1700000000000
-                                           :reduceOnly false}]]}
-               :spot {:meta nil
-                      :clearinghouse-state nil}
-               :account {:mode :classic}
-               :perp-dex-clearinghouse {}}
-        panel (view/account-info-panel state)
-        strings (set (hiccup/collect-strings panel))]
-    (is (contains? strings "Terminate"))
-    (is (contains? strings "Active (1)"))
-    (is (not (contains? strings "TWAP coming soon")))))
+  (with-redefs [account-tab-modules/resolved-tab-renderer lazy-modules/tab-renderer
+                account-tab-modules/tab-ready? lazy-modules/tab-ready?
+                account-tab-modules/tab-loading? lazy-modules/tab-loading?
+                account-tab-modules/tab-error lazy-modules/tab-error]
+    (let [state {:account-info {:selected-tab :twap}
+                 :orders {:twap-states [[17 {:coin "BTC"
+                                             :side "B"
+                                             :sz "1.0"
+                                             :executedSz "0.4"
+                                             :executedNtl "40.0"
+                                             :minutes 30
+                                             :timestamp 1700000000000
+                                             :reduceOnly false}]]}
+                 :spot {:meta nil
+                        :clearinghouse-state nil}
+                 :account {:mode :classic}
+                 :perp-dex-clearinghouse {}}
+          panel (view/account-info-panel state)
+          strings (set (hiccup/collect-strings panel))]
+      (is (contains? strings "Terminate"))
+      (is (contains? strings "Active (1)"))
+      (is (not (contains? strings "TWAP coming soon"))))))
+
+(deftest account-info-panel-shows-loading-spinner-while-a-lazy-tab-module-is-pending-test
+  (with-redefs [account-tab-modules/tab-ready? (constantly false)
+                account-tab-modules/tab-loading? (fn [_state tab]
+                                                   (= :positions tab))
+                account-tab-modules/resolved-tab-renderer (constantly nil)]
+    (let [panel (view/account-info-panel (assoc-in fixtures/sample-account-info-state
+                                                   [:account-info :selected-tab]
+                                                   :positions))
+          spinner (hiccup/find-first-node panel #(contains? (hiccup/node-class-set %) "animate-spin"))
+          strings (set (hiccup/collect-strings panel))]
+      (is (some? spinner))
+      (is (not (contains? strings "No active positions"))))))
 
 (deftest format-pnl-percentage-renders-signed-and-neutral-states-test
   (let [positive (view/format-pnl-percentage "1.234")
@@ -190,71 +209,83 @@
     (is (not (contains? panel-classes "lg:h-[29rem]")))))
 
 (deftest account-info-panel-composes-spectate-read-only-state-into-shared-tab-content-test
-  (doseq [{:keys [label panel required-text forbidden-texts forbidden-buttons forbidden-aria-labels]}
-          [{:label "balances"
-            :panel (view/account-info-panel (spectate-balances-state))
-            :required-text "MEOW"
-            :forbidden-texts ["Send" "Transfer" "Repay"]}
-           {:label "positions"
-            :panel (view/account-info-panel (spectate-positions-state))
-            :required-text "HYPE"
-            :forbidden-texts ["Close All"]
-            :forbidden-buttons ["Reduce"]
-            :forbidden-aria-labels ["Edit Margin" "Edit TP/SL"]}
-           {:label "open orders"
-            :panel (view/account-info-panel (spectate-open-orders-state))
-            :required-text "BTC"
-            :forbidden-texts ["Cancel All"]
-            :forbidden-buttons ["Cancel"]}
-           {:label "twap"
-            :panel (view/account-info-panel (spectate-twap-state))
-            :required-text "Active (1)"
-            :forbidden-texts ["Terminate"]}]]
-    (let [strings (set (hiccup/collect-strings panel))]
-      (is (contains? strings required-text) label)
-      (doseq [forbidden-text forbidden-texts]
-        (is (not (contains? strings forbidden-text))
-            (str label " omits " forbidden-text)))
-      (doseq [forbidden-button forbidden-buttons]
-        (is (nil? (button-with-text panel forbidden-button))
-            (str label " omits button " forbidden-button)))
-      (doseq [aria-label forbidden-aria-labels]
-        (is (nil? (hiccup/find-first-node panel #(= aria-label (get-in % [1 :aria-label]))))
-            (str label " omits aria-label " aria-label))))))
+  (with-redefs [account-tab-modules/resolved-tab-renderer lazy-modules/tab-renderer
+                account-tab-modules/tab-ready? lazy-modules/tab-ready?
+                account-tab-modules/tab-loading? lazy-modules/tab-loading?
+                account-tab-modules/tab-error lazy-modules/tab-error]
+    (doseq [{:keys [label panel required-text forbidden-texts forbidden-buttons forbidden-aria-labels]}
+            [{:label "balances"
+              :panel (view/account-info-panel (spectate-balances-state))
+              :required-text "MEOW"
+              :forbidden-texts ["Send" "Transfer" "Repay"]}
+             {:label "positions"
+              :panel (view/account-info-panel (spectate-positions-state))
+              :required-text "HYPE"
+              :forbidden-texts ["Close All"]
+              :forbidden-buttons ["Reduce"]
+              :forbidden-aria-labels ["Edit Margin" "Edit TP/SL"]}
+             {:label "open orders"
+              :panel (view/account-info-panel (spectate-open-orders-state))
+              :required-text "BTC"
+              :forbidden-texts ["Cancel All"]
+              :forbidden-buttons ["Cancel"]}
+             {:label "twap"
+              :panel (view/account-info-panel (spectate-twap-state))
+              :required-text "Active (1)"
+              :forbidden-texts ["Terminate"]}]]
+      (let [strings (set (hiccup/collect-strings panel))]
+        (is (contains? strings required-text) label)
+        (doseq [forbidden-text forbidden-texts]
+          (is (not (contains? strings forbidden-text))
+              (str label " omits " forbidden-text)))
+        (doseq [forbidden-button forbidden-buttons]
+          (is (nil? (button-with-text panel forbidden-button))
+              (str label " omits button " forbidden-button)))
+        (doseq [aria-label forbidden-aria-labels]
+          (is (nil? (hiccup/find-first-node panel #(= aria-label (get-in % [1 :aria-label]))))
+              (str label " omits aria-label " aria-label)))))))
 
 (deftest account-info-panel-renders-empty-disconnected-surfaces-after-account-reset-test
-  (doseq [{:keys [label selected-tab expected-text]} [{:label "balances"
-                                                       :selected-tab :balances
-                                                       :expected-text "No balance data available"}
-                                                      {:label "positions"
-                                                       :selected-tab :positions
-                                                       :expected-text "No active positions"}
-                                                      {:label "open orders"
-                                                       :selected-tab :open-orders
-                                                       :expected-text "No open orders"}]]
-    (let [panel (view/account-info-panel (disconnected-cleared-account-info-state selected-tab))
-          strings (set (hiccup/collect-strings panel))]
-      (is (contains? strings expected-text) label))))
+  (with-redefs [account-tab-modules/resolved-tab-renderer lazy-modules/tab-renderer
+                account-tab-modules/tab-ready? lazy-modules/tab-ready?
+                account-tab-modules/tab-loading? lazy-modules/tab-loading?
+                account-tab-modules/tab-error lazy-modules/tab-error]
+    (doseq [{:keys [label selected-tab expected-text]} [{:label "balances"
+                                                         :selected-tab :balances
+                                                         :expected-text "No balance data available"}
+                                                        {:label "positions"
+                                                         :selected-tab :positions
+                                                         :expected-text "No active positions"}
+                                                        {:label "open orders"
+                                                         :selected-tab :open-orders
+                                                         :expected-text "No open orders"}]]
+      (let [panel (view/account-info-panel (disconnected-cleared-account-info-state selected-tab))
+            strings (set (hiccup/collect-strings panel))]
+        (is (contains? strings expected-text) label)))))
 
 (deftest account-info-panel-renders-open-orders-cancel-error-feedback-test
-  (let [state (-> fixtures/sample-account-info-state
-                  (assoc-in [:account-info :selected-tab] :open-orders)
-                  (assoc-in [:orders :open-orders]
-                            [{:coin "BTC"
-                              :oid 101
-                              :side "B"
-                              :sz "1.0"
-                              :origSz "1.0"
-                              :limitPx "100.0"
-                              :orderType "Limit"
-                              :timestamp 1700000000000
-                              :reduceOnly false
-                              :isTrigger false
-                              :isPositionTpsl false}])
-                  (assoc-in [:orders :cancel-error] "Missing asset or order id."))
-        panel (view/account-info-panel state)
-        error-node (hiccup/find-by-data-role panel "open-orders-cancel-error")]
-    (is (some? error-node))
-    (is (= "alert" (get-in error-node [1 :role])))
-    (is (contains? (set (hiccup/collect-strings error-node))
-                   "Missing asset or order id."))))
+  (with-redefs [account-tab-modules/resolved-tab-renderer lazy-modules/tab-renderer
+                account-tab-modules/tab-ready? lazy-modules/tab-ready?
+                account-tab-modules/tab-loading? lazy-modules/tab-loading?
+                account-tab-modules/tab-error lazy-modules/tab-error]
+    (let [state (-> fixtures/sample-account-info-state
+                    (assoc-in [:account-info :selected-tab] :open-orders)
+                    (assoc-in [:orders :open-orders]
+                              [{:coin "BTC"
+                                :oid 101
+                                :side "B"
+                                :sz "1.0"
+                                :origSz "1.0"
+                                :limitPx "100.0"
+                                :orderType "Limit"
+                                :timestamp 1700000000000
+                                :reduceOnly false
+                                :isTrigger false
+                                :isPositionTpsl false}])
+                    (assoc-in [:orders :cancel-error] "Missing asset or order id."))
+          panel (view/account-info-panel state)
+          error-node (hiccup/find-by-data-role panel "open-orders-cancel-error")]
+      (is (some? error-node))
+      (is (= "alert" (get-in error-node [1 :role])))
+      (is (contains? (set (hiccup/collect-strings error-node))
+                     "Missing asset or order id.")))))

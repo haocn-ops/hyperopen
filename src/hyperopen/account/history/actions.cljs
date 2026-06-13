@@ -1,6 +1,7 @@
 (ns hyperopen.account.history.actions
   (:require [clojure.string :as str]
             [hyperopen.account.context :as account-context]
+            [hyperopen.account-tab-modules :as account-tab-modules]
             [hyperopen.account.history.funding-actions :as funding-actions]
             [hyperopen.account.history.order-actions :as order-actions]
             [hyperopen.account.history.position-overlay-actions :as position-overlay-actions]
@@ -71,6 +72,25 @@
         [[:effects/push-state browser-route]])
       [])))
 
+(def ^:private projection-effect-ids
+  #{:effects/save
+    :effects/save-many})
+
+(defn- projection-effect?
+  [effect]
+  (contains? projection-effect-ids (first effect)))
+
+(defn- split-projection-effects
+  [effects]
+  (let [effects* (vec (or effects []))]
+    {:projection-effects (into [] (filter projection-effect? effects*))
+     :follow-up-effects (into [] (remove projection-effect? effects*))}))
+
+(defn- lazy-tab-module-effect
+  [tab]
+  (when (account-tab-modules/lazy-tab? tab)
+    [[:effects/load-account-tab-module tab]]))
+
 (defn select-account-info-tab [state tab]
   (let [base-effects (cond
                        (= tab :funding-history)
@@ -80,9 +100,14 @@
                        (order-actions/select-order-history-tab state)
 
                        :else
-                       [[:effects/save [:account-info :selected-tab] tab]])]
-    (into (vec base-effects)
-          (trade-route-tab-sync-effects state tab))))
+                       [[:effects/save [:account-info :selected-tab] tab]])
+        {:keys [projection-effects follow-up-effects]}
+        (split-projection-effects base-effects)]
+    (into []
+          (concat projection-effects
+                  (lazy-tab-module-effect tab)
+                  follow-up-effects
+                  (trade-route-tab-sync-effects state tab)))))
 
 (def set-funding-history-filters
   funding-actions/set-funding-history-filters)

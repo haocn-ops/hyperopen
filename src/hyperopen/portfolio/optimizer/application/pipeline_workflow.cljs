@@ -2,7 +2,17 @@
   (:require [hyperopen.portfolio.optimizer.application.progress :as progress]
             [hyperopen.portfolio.optimizer.application.run-identity :as run-identity]
             [hyperopen.portfolio.optimizer.application.setup-readiness :as setup-readiness]
-            [hyperopen.portfolio.optimizer.contracts :as contracts]))
+            [hyperopen.portfolio.optimizer.contracts :as contracts]
+            [hyperopen.portfolio.optimizer.defaults :as defaults]))
+
+(defn- clear-stale-refinement
+  ;; A non-refine run (Rerun / auto-recompute) drops back to draft density and dismisses
+  ;; any lingering before/after baseline. The refine action sets :active? true just before
+  ;; emitting the pipeline effect, so a refine run keeps its higher-density override.
+  [state]
+  (if (get-in state contracts/refinement-active-path)
+    state
+    (assoc-in state contracts/refinement-path (defaults/default-refinement-state))))
 
 (defn progress-error
   [code message]
@@ -63,7 +73,8 @@
 
 (defn begin-run
   [{:keys [state run-id started-at-ms history-idle-poll-ms history-idle-timeout-ms]}]
-  (let [draft (get-in state contracts/draft-path)
+  (let [state (clear-stale-refinement state)
+        draft (get-in state contracts/draft-path)
         universe (vec (:universe draft))
         initial-readiness (setup-readiness/build-readiness state)
         initial-request (or (:request initial-readiness)

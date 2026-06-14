@@ -1,6 +1,7 @@
 (ns hyperopen.views.portfolio.optimize.results-panel
   (:require [hyperopen.portfolio.optimizer.application.view-model.results :as results-model]
             [hyperopen.views.portfolio.optimize.frontier-chart :as frontier-chart]
+            [hyperopen.views.portfolio.optimize.refinement-status-card :as refinement-card]
             [hyperopen.views.portfolio.optimize.results-diagnostics-rail :as diagnostics-rail]
             [hyperopen.views.portfolio.optimize.results-rebalance-preview :as rebalance-preview]
             [hyperopen.views.portfolio.optimize.results-summary :as summary]
@@ -29,7 +30,8 @@
    (results-panel last-successful-run draft nil))
   ([last-successful-run draft {:keys [state stale? include-rebalance? frontier-overlay-mode
                                       readiness
-                                      constrain-frontier?]
+                                      constrain-frontier?
+                                      refinement]
                                :or {include-rebalance? true
                                     frontier-overlay-mode :standalone}}]
    (let [result (results-model/enrich-result-labels (:result last-successful-run) draft)]
@@ -46,8 +48,10 @@
           (target-exposure-table/target-exposure-table result
                                                         {:state state
                                                          :draft draft})]
-         [:div {:class ["optimizer-results-center-panel" "min-h-0" "bg-base-100" "p-6"]
+         [:div {:class ["optimizer-results-center-panel" "min-h-0" "bg-base-100" "p-6"
+                        "space-y-4"]
                 :data-role "portfolio-optimizer-results-center-panel"}
+          (refinement-card/refinement-status-card refinement)
           (frontier-chart/frontier-chart
            draft
            result
@@ -57,6 +61,7 @@
                         "xl:col-span-2" "2xl:col-span-1"]
                 :data-role "portfolio-optimizer-results-right-panel"}
           (active-views-editor state draft result readiness)
+          (diagnostics-rail/result-confidence-rail refinement)
           (diagnostics-rail/trust-diagnostics-rail result)]]
         (when include-rebalance?
           (rebalance-preview/rebalance-preview result))]))))

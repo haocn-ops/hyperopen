@@ -137,7 +137,17 @@
     :auto-recompute-stale-portfolio-optimizer-scenario
     actions/auto-recompute-stale-portfolio-optimizer-scenario
     :run-portfolio-optimizer-from-draft
-    actions/run-portfolio-optimizer-from-draft}})
+    actions/run-portfolio-optimizer-from-draft
+    :open-portfolio-optimizer-refinement
+    actions/open-portfolio-optimizer-refinement
+    :close-portfolio-optimizer-refinement
+    actions/close-portfolio-optimizer-refinement
+    :set-portfolio-optimizer-refinement-depth
+    actions/set-portfolio-optimizer-refinement-depth
+    :refine-portfolio-optimizer
+    actions/refine-portfolio-optimizer
+    :stop-portfolio-optimizer-refinement
+    actions/stop-portfolio-optimizer-refinement}})
 
 (defn effect-deps
   [runtime]

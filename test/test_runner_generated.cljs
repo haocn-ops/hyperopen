@@ -230,6 +230,8 @@
             [hyperopen.portfolio.optimizer.application.pipeline-workflow-test]
             [hyperopen.portfolio.optimizer.application.progress-test]
             [hyperopen.portfolio.optimizer.application.rebalance-snapshot-test]
+            [hyperopen.portfolio.optimizer.application.refinement-view-model-test]
+            [hyperopen.portfolio.optimizer.application.request-builder-refinement-test]
             [hyperopen.portfolio.optimizer.application.request-builder-test]
             [hyperopen.portfolio.optimizer.application.return-inputs-test]
             [hyperopen.portfolio.optimizer.application.run-bridge-boundary-test]
@@ -285,6 +287,8 @@
             [hyperopen.portfolio.optimizer.infrastructure.wire-test]
             [hyperopen.portfolio.optimizer.instrument-keyed-codec-test]
             [hyperopen.portfolio.optimizer.query-state-test]
+            [hyperopen.portfolio.optimizer.refinement-actions-test]
+            [hyperopen.portfolio.optimizer.refinement-domain-test]
             [hyperopen.portfolio.optimizer.runtime-catalog-test]
             [hyperopen.portfolio.optimizer.target-sigma-actions-test]
             [hyperopen.portfolio.optimizer.tracking-actions-test]
@@ -952,6 +956,8 @@
              'hyperopen.portfolio.optimizer.application.pipeline-workflow-test
              'hyperopen.portfolio.optimizer.application.progress-test
              'hyperopen.portfolio.optimizer.application.rebalance-snapshot-test
+             'hyperopen.portfolio.optimizer.application.refinement-view-model-test
+             'hyperopen.portfolio.optimizer.application.request-builder-refinement-test
              'hyperopen.portfolio.optimizer.application.request-builder-test
              'hyperopen.portfolio.optimizer.application.return-inputs-test
              'hyperopen.portfolio.optimizer.application.run-bridge-boundary-test
@@ -1007,6 +1013,8 @@
              'hyperopen.portfolio.optimizer.infrastructure.wire-test
              'hyperopen.portfolio.optimizer.instrument-keyed-codec-test
              'hyperopen.portfolio.optimizer.query-state-test
+             'hyperopen.portfolio.optimizer.refinement-actions-test
+             'hyperopen.portfolio.optimizer.refinement-domain-test
              'hyperopen.portfolio.optimizer.runtime-catalog-test
              'hyperopen.portfolio.optimizer.target-sigma-actions-test
              'hyperopen.portfolio.optimizer.tracking-actions-test

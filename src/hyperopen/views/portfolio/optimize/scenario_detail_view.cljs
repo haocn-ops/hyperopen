@@ -403,7 +403,7 @@
    [:p {:class ["font-semibold"]} "Recomputing recommendation"]
    [:p {:class ["mt-1" "text-trading-muted"]}
     "Keeping the previous allocation visible until the new run finishes."]
-   (optimization-progress-panel/progress-panel optimization-progress)])
+   (optimization-progress-panel/progress-panel optimization-progress {:show-header? false})])
 
 (defn- recommendation-tab
   [{:keys [last-successful-run

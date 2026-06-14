@@ -280,6 +280,7 @@
             [hyperopen.portfolio.optimizer.infrastructure.history-client-test]
             [hyperopen.portfolio.optimizer.infrastructure.persistence-test]
             [hyperopen.portfolio.optimizer.infrastructure.prior-data-test]
+            [hyperopen.portfolio.optimizer.infrastructure.progress-ticker-test]
             [hyperopen.portfolio.optimizer.infrastructure.run-bridge-test]
             [hyperopen.portfolio.optimizer.infrastructure.solver-adapter-modules-test]
             [hyperopen.portfolio.optimizer.infrastructure.solver-adapter-parity-test]
@@ -530,6 +531,7 @@
             [hyperopen.views.portfolio.optimize.frontier-overlay-markers-test]
             [hyperopen.views.portfolio.optimize.index-view-test]
             [hyperopen.views.portfolio.optimize.inputs-tab-test]
+            [hyperopen.views.portfolio.optimize.optimization-progress-panel-test]
             [hyperopen.views.portfolio.optimize.result-vault-labels-test]
             [hyperopen.views.portfolio.optimize.results-panel-test]
             [hyperopen.views.portfolio.optimize.scenario-detail-view-test]
@@ -1006,6 +1008,7 @@
              'hyperopen.portfolio.optimizer.infrastructure.history-client-test
              'hyperopen.portfolio.optimizer.infrastructure.persistence-test
              'hyperopen.portfolio.optimizer.infrastructure.prior-data-test
+             'hyperopen.portfolio.optimizer.infrastructure.progress-ticker-test
              'hyperopen.portfolio.optimizer.infrastructure.run-bridge-test
              'hyperopen.portfolio.optimizer.infrastructure.solver-adapter-modules-test
              'hyperopen.portfolio.optimizer.infrastructure.solver-adapter-parity-test
@@ -1256,6 +1259,7 @@
              'hyperopen.views.portfolio.optimize.frontier-overlay-markers-test
              'hyperopen.views.portfolio.optimize.index-view-test
              'hyperopen.views.portfolio.optimize.inputs-tab-test
+             'hyperopen.views.portfolio.optimize.optimization-progress-panel-test
              'hyperopen.views.portfolio.optimize.result-vault-labels-test
              'hyperopen.views.portfolio.optimize.results-panel-test
              'hyperopen.views.portfolio.optimize.scenario-detail-view-test

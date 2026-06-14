@@ -316,6 +316,10 @@
     (is (not (contains? (:classes pending-fill) "animate-pulse")))
     (is (= "0%" (:width pending-fill)))))
 
+;; The single-bar summary, trickled display percent, and failed-state behaviour
+;; of the progress panel are covered directly in
+;; hyperopen.views.portfolio.optimize.optimization-progress-panel-test.
+
 (deftest portfolio-optimizer-workspace-renders-infeasible-result-and-highlights-controls-test
   (let [view-node (portfolio-view/portfolio-view
                    {:router {:path "/portfolio/optimize/new"}

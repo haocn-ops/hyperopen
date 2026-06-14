@@ -9,6 +9,8 @@
             [hyperopen.runtime.state :as runtime-state]
             [hyperopen.runtime.validation :as runtime-validation]
             [hyperopen.runtime.wiring :as runtime-wiring]
+            [hyperopen.portfolio.optimizer.contracts :as optimizer-contracts]
+            [hyperopen.portfolio.optimizer.infrastructure.progress-ticker :as optimizer-progress-ticker]
             [hyperopen.platform :as platform]
             [hyperopen.telemetry :as telemetry]
             [hyperopen.startup.watchers :as startup-watchers]
@@ -64,7 +66,11 @@
                                  :force? force?
                                  :projected-fingerprint projected-fingerprint))
       :on-websocket-connected! address-watcher/on-websocket-connected!
-      :on-websocket-disconnected! address-watcher/on-websocket-disconnected!}}
+      :on-websocket-disconnected! address-watcher/on-websocket-disconnected!}
+     :install-optimization-progress-ticker! optimizer-progress-ticker/install-optimization-progress-ticker!
+     :optimization-progress-ticker-deps
+     {:store store
+      :progress-path optimizer-contracts/optimization-progress-path}}
     :validation-deps
     {:store store
      :install-store-state-validation! runtime-validation/install-store-state-validation!}}))

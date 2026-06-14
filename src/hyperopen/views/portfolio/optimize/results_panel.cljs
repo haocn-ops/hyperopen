@@ -51,12 +51,12 @@
          [:div {:class ["optimizer-results-center-panel" "min-h-0" "bg-base-100" "p-6"
                         "space-y-4"]
                 :data-role "portfolio-optimizer-results-center-panel"}
-          (refinement-card/refinement-status-card refinement)
           (frontier-chart/frontier-chart
            draft
            result
            frontier-overlay-mode
-           constrain-frontier?)]
+           constrain-frontier?)
+          (refinement-card/refinement-status-card refinement)]
          [:div {:class ["optimizer-results-right-panel" "min-h-0"
                         "xl:col-span-2" "2xl:col-span-1"]
                 :data-role "portfolio-optimizer-results-right-panel"}

@@ -27,19 +27,71 @@
     :succeeded "Optimization Complete"
     "Optimization In Progress"))
 
+(defn- headline-label
+  [status]
+  (case status
+    :failed "Optimization failed"
+    :succeeded "Optimization complete"
+    "Optimizing portfolio…"))
+
 (defn- elapsed-seconds
   [progress]
   (let [started (:started-at-ms progress)
         completed (:completed-at-ms progress)
         end-ms (or completed (.now js/Date))]
     (when (number? started)
-      (/ (- end-ms started) 1000))))
+      ;; Floor at 0 so client clock skew can't render a negative elapsed.
+      (max 0 (/ (- end-ms started) 1000)))))
 
 (defn- format-seconds
   [seconds]
   (if (number? seconds)
     (str (.toFixed seconds 1) "s")
     "n/a"))
+
+(defn- eta-seconds
+  "Rough linear estimate of seconds remaining. Hedged with a leading ~ at the
+  call site; only meaningful while running and past a little progress."
+  [progress elapsed]
+  (let [percent (clamp-percent (:overall-percent progress))]
+    (when (and (= :running (:status progress))
+               (number? elapsed)
+               (> percent 5)
+               (< percent 100))
+      (max 1 (js/Math.round (/ (* elapsed (- 100 percent)) percent))))))
+
+(defn- active-step-label
+  [progress]
+  (let [active (:active-step progress)]
+    (some (fn [step]
+            (when (= active (:id step))
+              (:label step)))
+          (:steps progress))))
+
+(defn- summary-text
+  "Quiet one-liner: remaining · elapsed · current sub-step."
+  [progress elapsed]
+  (let [eta (eta-seconds progress elapsed)
+        step-label (active-step-label progress)]
+    (->> [(when eta (str "~" eta "s remaining"))
+          (when (number? elapsed) (str (format-seconds elapsed) " elapsed"))
+          (when (and (= :running (:status progress)) (seq step-label)) step-label)]
+         (remove nil?)
+         (str/join " · "))))
+
+(defn- overall-tone-class
+  [status]
+  (case status
+    :succeeded "bg-primary"
+    :failed "bg-error"
+    "bg-warning"))
+
+(defn- percent-tone-class
+  [status]
+  (case status
+    :succeeded "text-primary"
+    :failed "text-error"
+    "text-warning"))
 
 (defn- step-tone-class
   [step]
@@ -80,56 +132,117 @@
              :style {:width (str bar-percent "%")}}]]]))
 
 (defn progress-panel
-  [progress]
-  (let [status (:status progress)
-        visible? (contains? #{:running :succeeded :failed} status)
-        steps (vec (:steps progress))
-        elapsed (elapsed-seconds progress)]
-    (when visible?
-      [:section {:class ["mt-4"
-                         "rounded-lg"
-                         "border"
-                         "border-base-300"
-                         "bg-base-100/95"
-                         "p-3"
-                         "shadow-[0_0_0_1px_rgba(255,255,255,0.02)]"]
-                 :data-role "portfolio-optimizer-progress-panel"}
-       [:div {:class ["flex" "items-center" "justify-between" "gap-3" "border-b" "border-base-300" "pb-2"]}
-        [:p {:class ["font-mono"
-                     "text-[0.625rem]"
-                     "font-semibold"
-                     "uppercase"
-                     "tracking-[0.08em]"
-                     "text-trading-muted"]}
-         (title-label status)]
-        [:span {:class ["rounded-sm"
-                        "border"
-                        (if (= :failed status) "border-error/60" "border-warning/60")
-                        "px-1.5"
-                        "py-0.5"
-                        "font-mono"
-                        "text-[0.59375rem]"
+  "Compact single-bar optimization progress. Renders one overall bar driven by
+  :overall-percent, the current sub-step in fine print, and the full per-step
+  breakdown tucked inside a collapsible 'details' disclosure.
+
+  opts:
+    :show-header? (default true) — when false, omit the eyebrow + status badge
+                  (used when an enclosing banner already provides that context)."
+  ([progress]
+   (progress-panel progress nil))
+  ([progress {:keys [show-header?] :or {show-header? true}}]
+   (let [status (:status progress)
+         visible? (contains? #{:running :succeeded :failed} status)
+         steps (vec (:steps progress))
+         elapsed (elapsed-seconds progress)
+         percent (clamp-percent (:overall-percent progress))
+         running? (= :running status)]
+     (when visible?
+       [:section {:class ["mt-4"
+                          "rounded-lg"
+                          "border"
+                          "border-base-300"
+                          "bg-base-100/95"
+                          "p-3"
+                          "shadow-[0_0_0_1px_rgba(255,255,255,0.02)]"]
+                  :data-role "portfolio-optimizer-progress-panel"}
+        (when show-header?
+          [:div {:class ["flex" "items-center" "justify-between" "gap-3"]}
+           [:p {:class ["font-mono"
+                        "text-[0.625rem]"
                         "font-semibold"
                         "uppercase"
                         "tracking-[0.08em]"
-                        (if (= :failed status) "text-error" "text-warning")]}
-         (status-label status)]]
-       (into
-        [:div {:class ["mt-3" "space-y-3"]}]
-        (map-indexed step-row steps))
-       [:p {:class ["mt-3" "font-mono" "text-[0.625rem]" "text-trading-muted"]
-            :data-role "portfolio-optimizer-progress-footer"}
-        (str "elapsed " (format-seconds elapsed)
-             " · overall " (.toFixed (clamp-percent (:overall-percent progress)) 0) "%")]
-       (when-let [message (get-in progress [:error :message])]
-         [:p {:class ["mt-2"
-                      "rounded-md"
-                      "border"
-                      "border-error/40"
-                      "bg-error/10"
-                      "px-2"
-                      "py-1.5"
-                      "text-[0.6875rem]"
-                      "text-error"]
-              :data-role "portfolio-optimizer-progress-error"}
-          message])])))
+                        "text-trading-muted"]}
+            (title-label status)]
+           [:span {:class ["rounded-sm"
+                           "border"
+                           (if (= :failed status) "border-error/60" "border-warning/60")
+                           "px-1.5"
+                           "py-0.5"
+                           "font-mono"
+                           "text-[0.59375rem]"
+                           "font-semibold"
+                           "uppercase"
+                           "tracking-[0.08em]"
+                           (if (= :failed status) "text-error" "text-warning")]}
+            (status-label status)]])
+        [:div {:class [(when show-header? "mt-3")
+                       "flex"
+                       "items-baseline"
+                       "justify-between"
+                       "gap-3"]}
+         [:p {:class ["text-sm" "font-semibold" "text-trading-text"]}
+          (headline-label status)]
+         ;; A partial percent on a failed run isn't a meaningful completion
+         ;; fraction, so omit it; the "Optimization failed" headline + error
+         ;; message carry the state instead.
+         (when-not (= :failed status)
+           [:span {:class ["font-mono"
+                           "text-sm"
+                           "font-semibold"
+                           "tabular-nums"
+                           (percent-tone-class status)]}
+            (str (.toFixed percent 0) "%")])]
+        [:div {:class ["mt-2" "h-1.5" "overflow-hidden" "rounded-full" "bg-base-300/60"]
+               :role "progressbar"
+               :aria-label "Optimization progress"
+               :aria-valuemin "0"
+               :aria-valuemax "100"
+               :aria-valuenow (.toFixed percent 0)}
+         [:div {:class ["h-full"
+                        "transition-[width]"
+                        "duration-500"
+                        "ease-out"
+                        (overall-tone-class status)
+                        (when running? "animate-pulse")]
+                :style {:width (str (if running? (max percent 3) percent) "%")}}]]
+        [:details {:class ["mt-2" "group"]
+                   :data-role "portfolio-optimizer-progress-details"}
+         [:summary {:class ["flex"
+                            "items-center"
+                            "justify-between"
+                            "gap-3"
+                            "cursor-pointer"
+                            "select-none"
+                            "list-none"
+                            "[&::-webkit-details-marker]:hidden"
+                            "font-mono"
+                            "text-[0.625rem]"
+                            "text-trading-muted"]
+                    :data-role "portfolio-optimizer-progress-footer"}
+          [:span {:class ["min-w-0" "truncate"]}
+           (summary-text progress elapsed)]
+          [:span {:class ["shrink-0"
+                          "text-trading-muted/70"
+                          "underline"
+                          "decoration-dotted"
+                          "underline-offset-2"
+                          "group-hover:text-trading-text"]}
+           "details"]]
+         (into
+          [:div {:class ["mt-3" "space-y-3"]}]
+          (map-indexed step-row steps))]
+        (when-let [message (get-in progress [:error :message])]
+          [:p {:class ["mt-2"
+                       "rounded-md"
+                       "border"
+                       "border-error/40"
+                       "bg-error/10"
+                       "px-2"
+                       "py-1.5"
+                       "text-[0.6875rem]"
+                       "text-error"]
+               :data-role "portfolio-optimizer-progress-error"}
+           message])]))))

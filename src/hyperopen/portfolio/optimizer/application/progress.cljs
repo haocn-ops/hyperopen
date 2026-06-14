@@ -162,3 +162,39 @@
                  step-id
                  (select-keys payload [:status :percent :detail :message]))
       progress)))
+
+(def display-trickle-headroom
+  "Percent points the smoothed display bar may run ahead of true progress while a
+  step's work is in flight. The worker solves each batch synchronously and only
+  flushes its progress messages afterwards, so without a trickle the bar freezes
+  between bursts; this lets it keep gliding without overstating progress much."
+  10)
+
+(def ^:private display-trickle-ease-rate
+  "Fraction of the gap to the soft cap closed per ticker frame (~120ms)."
+  0.08)
+
+(defn smooth-display-percent
+  "Eased trickle value for the progress bar. Monotonic (never below the previous
+  display or true progress) and capped just under 100 at true+headroom, so it
+  parks near the cap during a long stall and snaps up whenever true progress
+  overtakes it."
+  [previous real]
+  (let [real (clamp-percent real)
+        previous (clamp-percent (if (number? previous) previous real))
+        target (min 99 (+ real display-trickle-headroom))
+        base (max previous real)
+        eased (+ base (* (- target base) display-trickle-ease-rate))]
+    (clamp-percent (max base eased))))
+
+(defn tick-progress
+  "Advance a running run's smoothed display percent and wall clock by one ticker
+  frame. Non-running progress is returned unchanged so completed/failed runs keep
+  their final numbers."
+  [progress now-ms]
+  (if (= :running (:status progress))
+    (assoc progress
+           :display-percent (smooth-display-percent (:display-percent progress)
+                                                    (:overall-percent progress))
+           :now-ms now-ms)
+    progress))

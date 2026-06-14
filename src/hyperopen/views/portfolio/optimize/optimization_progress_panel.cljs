@@ -38,27 +38,29 @@
   [progress]
   (let [started (:started-at-ms progress)
         completed (:completed-at-ms progress)
-        end-ms (or completed (.now js/Date))]
+        ;; While running, the ticker writes a fresh :now-ms each frame so the
+        ;; clock advances smoothly between the worker's bursty messages; fall
+        ;; back to the live wall clock before the first tick.
+        end-ms (or completed (:now-ms progress) (.now js/Date))]
     (when (number? started)
       ;; Floor at 0 so client clock skew can't render a negative elapsed.
       (max 0 (/ (- end-ms started) 1000)))))
+
+(defn- display-percent
+  "Percent for the bar + headline number: the eased trickle value while running
+  (so it keeps moving between the worker's bursty updates), else true progress."
+  [progress status]
+  (let [real (clamp-percent (:overall-percent progress))]
+    (if (and (= :running status)
+             (number? (:display-percent progress)))
+      (max real (clamp-percent (:display-percent progress)))
+      real)))
 
 (defn- format-seconds
   [seconds]
   (if (number? seconds)
     (str (.toFixed seconds 1) "s")
     "n/a"))
-
-(defn- eta-seconds
-  "Rough linear estimate of seconds remaining. Hedged with a leading ~ at the
-  call site; only meaningful while running and past a little progress."
-  [progress elapsed]
-  (let [percent (clamp-percent (:overall-percent progress))]
-    (when (and (= :running (:status progress))
-               (number? elapsed)
-               (> percent 5)
-               (< percent 100))
-      (max 1 (js/Math.round (/ (* elapsed (- 100 percent)) percent))))))
 
 (defn- active-step-label
   [progress]
@@ -69,12 +71,11 @@
           (:steps progress))))
 
 (defn- summary-text
-  "Quiet one-liner: remaining · elapsed · current sub-step."
+  "Quiet one-liner: elapsed · current sub-step. No remaining-time estimate — a
+  stateless linear guess drifts badly while the worker stalls mid-step."
   [progress elapsed]
-  (let [eta (eta-seconds progress elapsed)
-        step-label (active-step-label progress)]
-    (->> [(when eta (str "~" eta "s remaining"))
-          (when (number? elapsed) (str (format-seconds elapsed) " elapsed"))
+  (let [step-label (active-step-label progress)]
+    (->> [(when (number? elapsed) (str (format-seconds elapsed) " elapsed"))
           (when (and (= :running (:status progress)) (seq step-label)) step-label)]
          (remove nil?)
          (str/join " · "))))
@@ -146,7 +147,7 @@
          visible? (contains? #{:running :succeeded :failed} status)
          steps (vec (:steps progress))
          elapsed (elapsed-seconds progress)
-         percent (clamp-percent (:overall-percent progress))
+         percent (display-percent progress status)
          running? (= :running status)]
      (when visible?
        [:section {:class ["mt-4"

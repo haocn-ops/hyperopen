@@ -1,6 +1,7 @@
 (ns hyperopen.portfolio.optimizer.actions
   (:require [hyperopen.portfolio.optimizer.actions.draft :as draft]
             [hyperopen.portfolio.optimizer.actions.execution :as execution]
+            [hyperopen.portfolio.optimizer.actions.refinement :as refinement]
             [hyperopen.portfolio.optimizer.actions.run :as run]
             [hyperopen.portfolio.optimizer.actions.target-sigma :as target-sigma]
             [hyperopen.portfolio.optimizer.actions.tracking :as tracking]
@@ -167,3 +168,18 @@
 
 (def run-portfolio-optimizer
   run/run-portfolio-optimizer)
+
+(def open-portfolio-optimizer-refinement
+  refinement/open-portfolio-optimizer-refinement)
+
+(def close-portfolio-optimizer-refinement
+  refinement/close-portfolio-optimizer-refinement)
+
+(def set-portfolio-optimizer-refinement-depth
+  refinement/set-portfolio-optimizer-refinement-depth)
+
+(def refine-portfolio-optimizer
+  refinement/refine-portfolio-optimizer)
+
+(def stop-portfolio-optimizer-refinement
+  refinement/stop-portfolio-optimizer-refinement)

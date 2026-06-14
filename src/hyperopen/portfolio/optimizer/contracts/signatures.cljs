@@ -24,12 +24,21 @@
   (when (map? history)
     (dissoc history :freshness)))
 
+(defn- stable-objective
+  [objective]
+  ;; :frontier-points is a sampling-density knob injected by refinement, not a
+  ;; problem-defining input. Stripping it keeps a draft result and a refined result of
+  ;; the same scenario sharing one input-signature (no false staleness / no dup-suppression).
+  (when (map? objective)
+    (dissoc objective :frontier-points)))
+
 (defn optimizer-input-signature
   [request]
   (when (map? request)
     (-> (select-keys request optimizer-input-keys)
         (update :execution-assumptions stable-execution-assumptions)
-        (update :history stable-history))))
+        (update :history stable-history)
+        (update :objective stable-objective))))
 
 (defn build-request-signature
   [request]

@@ -35,7 +35,8 @@
            run-state
            running?
            scenario-save-state
-           current-result?]}]
+           current-result?
+           refinement]}]
   (let [status (:status active-scenario)
         read-only? (true? (:read-only? active-scenario))
         running? (or running?
@@ -43,7 +44,8 @@
         save-state (:status scenario-save-state)
         saving? (= :saving save-state)
         save-disabled? (or saving?
-                           (not current-result?))]
+                           (not current-result?))
+        can-refine? (boolean (:can-refine? refinement))]
     [:header {:class ["optimizer-scenario-header"
                       "border-b"
                       "border-base-300"
@@ -92,6 +94,28 @@
                          "text-trading-muted"]
                  :aria-label "More scenario actions"}
         "..."]
+       [:button {:type "button"
+                 :class ["optimizer-refine-action"
+                         "rounded-lg"
+                         "border"
+                         "border-primary/60"
+                         "bg-primary/20"
+                         "px-2.5"
+                         "py-1"
+                         "text-[0.65625rem]"
+                         "font-semibold"
+                         "text-primary"
+                         "transition-colors"
+                         "hover:bg-primary/30"
+                         "disabled:cursor-not-allowed"
+                         "disabled:border-base-300"
+                         "disabled:bg-base-200/40"
+                         "disabled:text-trading-muted"]
+                 :data-role "portfolio-optimizer-scenario-refine"
+                 :disabled (not can-refine?)
+                 :on (when can-refine?
+                       {:click [[:actions/refine-portfolio-optimizer]]})}
+        "Refine optimization"]
        [:button {:type "button"
                  :class ["optimizer-primary-action"
                          "rounded-lg"
@@ -390,7 +414,8 @@
            frontier-overlay-mode
            state
            readiness
-           constrain-frontier?] :as model}]
+           constrain-frontier?
+           refinement] :as model}]
   (into
    [:section {:class ["space-y-0"]
               :data-role "portfolio-optimizer-recommendation-tab"}]
@@ -406,6 +431,7 @@
                     :stale? (and stale? (not running?))
                     :frontier-overlay-mode frontier-overlay-mode
                     :constrain-frontier? constrain-frontier?
+                    :refinement refinement
                     :include-rebalance? false})))
 
      :else

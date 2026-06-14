@@ -2,6 +2,7 @@
   (:require [clojure.string :as str]
             [hyperopen.portfolio.optimizer.application.rebalance-preview :as rebalance-preview]
             [hyperopen.portfolio.optimizer.application.setup-readiness :as setup-readiness]
+            [hyperopen.portfolio.optimizer.application.view-model.refinement :as refinement-vm]
             [hyperopen.portfolio.optimizer.application.view-model.workspace :as workspace]
             [hyperopen.portfolio.optimizer.coercion :as coercion]
             [hyperopen.portfolio.optimizer.contracts :as contracts]
@@ -114,7 +115,13 @@
      :running? running?
      :scenario-save-state (get-in state* contracts/scenario-save-state-path)
      :frontier-overlay-mode (get-in state* contracts/ui-frontier-overlay-mode-path)
-     :constrain-frontier? (get-in state* contracts/ui-constrain-frontier-path)}))
+     :constrain-frontier? (get-in state* contracts/ui-constrain-frontier-path)
+     :refinement (refinement-vm/refinement-model
+                  {:state state*
+                   :result (:result last-successful-run)
+                   :run-state run-state
+                   :running? running?
+                   :progress optimization-progress})}))
 
 (defn- vault-label
   [instrument]

@@ -305,3 +305,59 @@
         (summary/summary-card "Net" (opt-format/format-multiple (:net-exposure diagnostics)))
         (summary/summary-card "Turnover" (opt-format/format-pct (:turnover diagnostics)))
         (summary/summary-card "Condition #" (opt-format/format-decimal (:condition-number conditioning)))]]]]))
+
+(defn- quality-status
+  [quality]
+  (case quality
+    :high :ok
+    :medium :ok
+    :caution))
+
+(defn- stability-status
+  [stability]
+  (case stability
+    :provisional :caution
+    :ok))
+
+(defn- confidence-row
+  [{:keys [label status value subtext value-class]}]
+  (let [{status-label :label status-class :class} (when status (status-token status))]
+    [:div {:class ["border-b" "border-base-300" "px-4" "py-3"]}
+     [:div {:class ["flex" "items-center" "justify-between" "gap-3"]}
+      [:span {:class ["text-[0.62rem]" "font-semibold" "uppercase" "tracking-[0.06em]" "text-trading-muted"]}
+       label]
+      (when status
+        [:span {:class [status-class "text-[0.62rem]" "font-semibold" "uppercase"]}
+         (str "● " status-label)])]
+     [:p {:class ["mt-1" "font-mono" "text-sm" "font-semibold" "tabular-nums"
+                  (or value-class "text-trading-text")]}
+      value]
+     (when subtext
+       [:p {:class ["mt-0.5" "text-[0.6rem]" "text-trading-muted/70"]} subtext])]))
+
+(defn result-confidence-rail
+  [refinement]
+  (when-let [assessment (:assessment refinement)]
+    (let [next-step (:next-step assessment)]
+      [:aside {:class ["optimizer-result-confidence-panel"
+                       "min-h-0" "border-l" "border-base-300" "bg-base-100/95"]
+               :data-role "portfolio-optimizer-result-confidence-panel"}
+       [:div {:class ["border-b" "border-base-300" "px-4" "py-3"]}
+        [:p {:class ["font-mono" "text-[0.62rem]" "uppercase" "tracking-[0.08em]" "text-trading-muted/70"]}
+         "Result confidence"]]
+       (confidence-row {:label "Frontier quality"
+                        :status (quality-status (:frontier-quality assessment))
+                        :value (opt-format/refinement-quality-label (:frontier-quality assessment))
+                        :subtext "Density of the solved efficient-frontier sample."})
+       (confidence-row {:label "Selection stability"
+                        :status (stability-status (:selection-stability assessment))
+                        :value (opt-format/refinement-stability-label (:selection-stability assessment))
+                        :subtext (if (:exact-selection? assessment)
+                                   "Selected portfolio is solved exactly for this objective."
+                                   "Selected portfolio is sampled from the frontier grid.")})
+       (confidence-row {:label "Stop reason"
+                        :value (opt-format/refinement-stop-reason-label (:stop-reason assessment))
+                        :subtext "Why the current result is where it is."})
+       (confidence-row {:label "Next step"
+                        :value (opt-format/refinement-next-step-label next-step)
+                        :value-class (when (not= :none next-step) "text-primary")})])))

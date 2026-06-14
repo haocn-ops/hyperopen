@@ -121,3 +121,63 @@
                           :hour "2-digit"
                           :minute "2-digit"})
     "N/A"))
+
+(defn format-duration
+  "Compact runtime label, e.g. 3800 -> \"3.8s\"."
+  [ms]
+  (if (and (number? ms) (>= ms 0))
+    (str (locale-number (/ ms 1000) {:maximumFractionDigits 1}) "s")
+    "—"))
+
+;; --- Refinement labels (shared by the status card and the confidence rail) ---
+
+(defn refinement-quality-label
+  [quality]
+  (case quality
+    :high "High"
+    :medium "Medium"
+    :low "Low"
+    "—"))
+
+(defn refinement-stability-label
+  [stability]
+  (case stability
+    :stable "Stable"
+    :moderate "Moderate"
+    :provisional "Provisional"
+    "—"))
+
+(defn refinement-tier-label
+  [tier]
+  (case tier
+    :draft "Draft result"
+    :refined "Refined result"
+    :maximum "Maximum density"
+    :partial "Partial result"
+    "Result"))
+
+(defn refinement-tier-ready-label
+  [tier]
+  (case tier
+    :draft "Draft result ready"
+    :refined "Refined result ready"
+    :maximum "Refined to maximum density"
+    :partial "Partial result ready"
+    "Result ready"))
+
+(defn refinement-stop-reason-label
+  [stop-reason]
+  (case stop-reason
+    :draft-budget-reached "Draft budget reached"
+    :refined-density-reached "Refined density reached"
+    :maximum-density-reached "Maximum density reached"
+    :frontier-sweep-incomplete "Frontier sweep incomplete"
+    "—"))
+
+(defn refinement-next-step-label
+  [next-step]
+  (case next-step
+    :refine-optimization "Refine optimization"
+    :refine-further "Refine further"
+    :none "At maximum density"
+    "—"))

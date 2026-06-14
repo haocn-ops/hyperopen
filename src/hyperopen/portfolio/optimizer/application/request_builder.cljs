@@ -369,13 +369,18 @@
            market-cap-by-coin
            as-of-ms
            stale-after-ms
-           funding-periods-per-year]}]
+           funding-periods-per-year
+           frontier-points-override]}]
   (let [draft* (contracts/migrate-draft draft)
         requested-universe (draft-universe draft*)
         normalized-return-model (normalize-return-model (:return-model draft*))
         return-model (:return-model normalized-return-model)
         risk-model (or (:risk-model draft*) default-risk-model)
-        objective (or (:objective draft*) default-objective)
+        ;; Refinement raises the frontier point budget on the objective; the engine
+        ;; clamps to its [2,80] cap (domain.objectives/bounded-frontier-point-count).
+        objective (cond-> (or (:objective draft*) default-objective)
+                    (coercion/finite-number? frontier-points-override)
+                    (assoc :frontier-points frontier-points-override))
         constraints (normalize-constraints (:constraints draft*))
         history (align-history
                  {:universe requested-universe

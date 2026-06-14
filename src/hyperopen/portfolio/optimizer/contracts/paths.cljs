@@ -50,6 +50,11 @@
 (def scenario-save-modal-error-path (conj scenario-save-modal-path :error))
 (def last-successful-run-path (conj optimizer-path :last-successful-run))
 (def last-successful-run-result-path (conj last-successful-run-path :result))
+(def refinement-path (conj optimizer-path :refinement))
+(def refinement-active-path (conj refinement-path :active?))
+(def refinement-depth-path (conj refinement-path :depth))
+(def refinement-requested-points-path (conj refinement-path :requested-points))
+(def refinement-baseline-result-path (conj refinement-path :baseline-result))
 (def execution-modal-path (conj optimizer-path :execution-modal))
 (def execution-modal-error-path (conj execution-modal-path :error))
 (def execution-modal-submitting-path (conj execution-modal-path :submitting?))
@@ -88,6 +93,8 @@
 (def ui-constrain-frontier-path (conj optimizer-ui-path :constrain-frontier?))
 (def ui-stale-auto-recompute-path
   (conj optimizer-ui-path :stale-auto-recompute))
+(def ui-refinement-open-path (conj optimizer-ui-path :refinement-open?))
+(def ui-refinement-depth-path (conj optimizer-ui-path :refinement-depth))
 
 (def path-catalog
   {:optimizer/root optimizer-path
@@ -138,6 +145,11 @@
    :optimizer/scenario-save-modal-error scenario-save-modal-error-path
    :optimizer/last-successful-run last-successful-run-path
    :optimizer/last-successful-run-result last-successful-run-result-path
+   :optimizer/refinement refinement-path
+   :optimizer/refinement-active refinement-active-path
+   :optimizer/refinement-depth refinement-depth-path
+   :optimizer/refinement-requested-points refinement-requested-points-path
+   :optimizer/refinement-baseline-result refinement-baseline-result-path
    :optimizer/execution-modal execution-modal-path
    :optimizer/execution-modal-error execution-modal-error-path
    :optimizer/execution-modal-submitting execution-modal-submitting-path
@@ -164,7 +176,9 @@
    :optimizer-ui/frontier-overlay-mode ui-frontier-overlay-mode-path
    :optimizer-ui/target-sigma-draft ui-target-sigma-draft-path
    :optimizer-ui/constrain-frontier ui-constrain-frontier-path
-   :optimizer-ui/stale-auto-recompute ui-stale-auto-recompute-path})
+   :optimizer-ui/stale-auto-recompute ui-stale-auto-recompute-path
+   :optimizer-ui/refinement-open ui-refinement-open-path
+   :optimizer-ui/refinement-depth ui-refinement-depth-path})
 
 (defn optimizer-state-path
   [& segments]

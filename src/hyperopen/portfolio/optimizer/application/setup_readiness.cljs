@@ -104,7 +104,14 @@
                 :as-of-ms (current-as-of-ms state)
                 :stale-after-ms (get-in state contracts/runtime-stale-after-ms-path)
                 :funding-periods-per-year
-                (get-in state contracts/runtime-funding-periods-per-year-path)}
+                (get-in state contracts/runtime-funding-periods-per-year-path)
+                ;; A user-triggered refinement re-runs at a higher frontier density. The
+                ;; budget is injected onto the solved objective only while a refinement is
+                ;; active; it is stripped from the input-signature so it never reads as
+                ;; stale relative to the draft (see contracts.signatures/stable-objective).
+                :frontier-points-override
+                (when (get-in state contracts/refinement-active-path)
+                  (get-in state contracts/refinement-requested-points-path))}
         cached @build-request-memo]
     (if (and cached (= (:inputs cached) inputs))
       (:value cached)

@@ -74,6 +74,18 @@
          contracts/run-state-path))
   (is (= [:portfolio :optimizer :last-successful-run :result]
          contracts/last-successful-run-result-path))
+  (is (= [:portfolio :optimizer :refinement]
+         contracts/refinement-path))
+  (is (= [:portfolio :optimizer :refinement :active?]
+         contracts/refinement-active-path))
+  (is (= [:portfolio :optimizer :refinement :requested-points]
+         contracts/refinement-requested-points-path))
+  (is (= [:portfolio :optimizer :refinement :baseline-result]
+         contracts/refinement-baseline-result-path))
+  (is (= [:portfolio-ui :optimizer :refinement-open?]
+         contracts/ui-refinement-open-path))
+  (is (= [:portfolio-ui :optimizer :refinement-depth]
+         contracts/ui-refinement-depth-path))
   (is (= [:portfolio :optimizer :history-load-state :request-signature]
          contracts/history-load-state-request-signature-path))
   (is (= [:portfolio :optimizer :history-discovery]
@@ -100,6 +112,19 @@
          (:optimizer/request-signature contracts/contract-specs)))
   (is (= ::contracts/worker-envelope
          (:optimizer/worker-envelope contracts/contract-specs))))
+
+(deftest refinement-frontier-points-excluded-from-input-signature-test
+  (testing "a refined run (higher :frontier-points) shares an input-signature with its draft"
+    (let [draft-request (assoc sample-request
+                              :objective {:kind :max-sharpe})
+          refined-request (assoc sample-request
+                                :objective {:kind :max-sharpe :frontier-points 72})]
+      (is (= (contracts/optimizer-input-signature draft-request)
+             (contracts/optimizer-input-signature refined-request)))
+      (testing "but a genuine objective change still differs"
+        (is (not= (contracts/optimizer-input-signature draft-request)
+                  (contracts/optimizer-input-signature
+                   (assoc sample-request :objective {:kind :minimum-variance}))))))))
 
 (deftest draft-and-record-migrations-stamp-current-versions-test
   (testing "drafts"

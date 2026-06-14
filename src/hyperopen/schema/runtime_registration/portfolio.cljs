@@ -175,4 +175,13 @@
 	   [:actions/auto-recompute-stale-portfolio-optimizer-scenario
 	    :auto-recompute-stale-portfolio-optimizer-scenario]
 	   [:actions/run-portfolio-optimizer-from-draft :run-portfolio-optimizer-from-draft]
-   [:actions/run-portfolio-optimizer :run-portfolio-optimizer]])
+   [:actions/run-portfolio-optimizer :run-portfolio-optimizer]
+   [:actions/open-portfolio-optimizer-refinement
+    :open-portfolio-optimizer-refinement]
+   [:actions/close-portfolio-optimizer-refinement
+    :close-portfolio-optimizer-refinement]
+   [:actions/set-portfolio-optimizer-refinement-depth
+    :set-portfolio-optimizer-refinement-depth]
+   [:actions/refine-portfolio-optimizer :refine-portfolio-optimizer]
+   [:actions/stop-portfolio-optimizer-refinement
+    :stop-portfolio-optimizer-refinement]])

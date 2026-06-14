@@ -151,9 +151,17 @@
    :snapshots []
    :error nil})
 
+(defn default-refinement-state
+  []
+  {:active? false
+   :depth nil
+   :requested-points nil
+   :baseline-result nil})
+
 (defn default-optimizer-state
   []
   {:draft (default-draft)
+   :refinement (default-refinement-state)
    :active-scenario {:loaded-id nil
                      :status :idle
                      :read-only? false}
@@ -195,6 +203,8 @@
    :diagnostics-tab :conditioning
    :frontier-overlay-mode :standalone
    :constrain-frontier? false
+   :refinement-open? false
+   :refinement-depth nil
    :stale-auto-recompute {:request-signature nil
                           :input-signature nil
                           :scenario-id nil}})

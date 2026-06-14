@@ -123,6 +123,9 @@
                          :result payload
                          :computed-at-ms computed-at-ms})
               (assoc-in contracts/draft-dirty-path false)
+              ;; A finished refinement is no longer in flight; the baseline + depth are
+              ;; retained so the before/after card can render against the refined result.
+              (assoc-in contracts/refinement-active-path false)
               (update-in contracts/active-scenario-path
                          (fn [active-scenario]
                            (cond-> (assoc (or active-scenario {})

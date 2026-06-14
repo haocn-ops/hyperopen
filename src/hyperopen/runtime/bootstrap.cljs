@@ -81,14 +81,18 @@
            install-agent-safety-watch!
            agent-safety-watch-deps
            install-websocket-watchers!
-           websocket-watchers-deps]}]
+           websocket-watchers-deps
+           install-optimization-progress-ticker!
+           optimization-progress-ticker-deps]}]
   (install-store-cache-watchers!
    store
    store-cache-watchers-deps)
   (when (fn? install-agent-safety-watch!)
     (install-agent-safety-watch! agent-safety-watch-deps))
   (install-websocket-watchers!
-   websocket-watchers-deps))
+   websocket-watchers-deps)
+  (when (fn? install-optimization-progress-ticker!)
+    (install-optimization-progress-ticker! optimization-progress-ticker-deps)))
 
 (defn install-state-validation!
   [{:keys [store

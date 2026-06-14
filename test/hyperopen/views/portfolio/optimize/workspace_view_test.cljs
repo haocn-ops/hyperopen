@@ -316,74 +316,9 @@
     (is (not (contains? (:classes pending-fill) "animate-pulse")))
     (is (= "0%" (:width pending-fill)))))
 
-(deftest portfolio-optimizer-workspace-progress-panel-shows-compact-summary-test
-  (let [view-node (portfolio-view/portfolio-view
-                   {:router {:path "/portfolio/optimize/new"}
-                    :portfolio {:optimizer
-                                {:draft {:universe [{:instrument-id "perp:BTC"
-                                                     :market-type :perp
-                                                     :coin "BTC"}]}
-                                 :optimization-progress
-                                 {:status :running
-                                  :run-id "run-1"
-                                  :scenario-id "draft-1"
-                                  :started-at-ms 1000
-                                  :active-step :fetch-returns
-                                  :overall-percent 25
-                                  :steps [{:id :fetch-returns
-                                           :label "fetch returns matrix"
-                                           :detail "1/2 requests"
-                                           :status :running
-                                           :percent 50}
-                                          {:id :solve
-                                           :label "QP solve"
-                                           :detail "OSQP"
-                                           :status :pending
-                                           :percent 0}]
-                                  :error nil}}}})
-        strings (set (collect-strings view-node))
-        footer (node-by-role view-node "portfolio-optimizer-progress-footer")
-        footer-text (str/join " " (collect-strings footer))]
-    ;; Single quiet headline + overall percent instead of a stack of bars.
-    (is (contains? strings "Optimizing portfolio…"))
-    (is (contains? strings "25%"))
-    ;; Per-step breakdown is preserved behind a 'details' disclosure.
-    (is (some? (node-by-role view-node "portfolio-optimizer-progress-details")))
-    ;; Fine-print footer: remaining estimate, elapsed, and the current sub-step.
-    (is (str/includes? footer-text "remaining"))
-    (is (str/includes? footer-text "elapsed"))
-    (is (str/includes? footer-text "fetch returns matrix"))
-    (is (str/includes? footer-text "details"))))
-
-(deftest portfolio-optimizer-workspace-progress-panel-failed-omits-stale-percent-test
-  (let [view-node (portfolio-view/portfolio-view
-                   {:router {:path "/portfolio/optimize/new"}
-                    :portfolio {:optimizer
-                                {:draft {:universe [{:instrument-id "perp:BTC"
-                                                     :market-type :perp
-                                                     :coin "BTC"}]}
-                                 :optimization-progress
-                                 {:status :failed
-                                  :run-id "run-1"
-                                  :started-at-ms 1000
-                                  :completed-at-ms 2000
-                                  :active-step nil
-                                  :overall-percent 63
-                                  :error {:message "solver diverged"}
-                                  :steps [{:id :fetch-returns
-                                           :label "fetch returns matrix"
-                                           :status :succeeded
-                                           :percent 100}
-                                          {:id :solve
-                                           :label "QP solve"
-                                           :status :failed
-                                           :percent 0}]}}}})
-        strings (set (collect-strings view-node))]
-    (is (some? (node-by-role view-node "portfolio-optimizer-progress-panel")))
-    (is (contains? strings "Optimization failed"))
-    (is (contains? strings "solver diverged"))
-    ;; A partial completion fraction is not shown next to a failure.
-    (is (not (contains? strings "63%")))))
+;; The single-bar summary, trickled display percent, and failed-state behaviour
+;; of the progress panel are covered directly in
+;; hyperopen.views.portfolio.optimize.optimization-progress-panel-test.
 
 (deftest portfolio-optimizer-workspace-renders-infeasible-result-and-highlights-controls-test
   (let [view-node (portfolio-view/portfolio-view

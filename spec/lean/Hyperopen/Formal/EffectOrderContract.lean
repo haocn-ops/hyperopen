@@ -119,6 +119,7 @@ def policyCorpus : List (String × Policy) :=
   ,("actions/set-vaults-snapshot-range", defaultPolicy true ["effects/fetch-candle-snapshot"])
   ,("actions/submit-cancel-visible-open-orders-confirmation", defaultPolicy false ["effects/api-cancel-order"])
   ,("actions/submit-funding-deposit", defaultPolicy false ["effects/api-submit-funding-deposit"])
+  ,("actions/submit-funding-repay", heavyOnlyPolicy false ["effects/api-submit-funding-repay"])
   ,("actions/submit-funding-send", defaultPolicy false ["effects/api-submit-funding-send"])
   ,("actions/submit-funding-transfer", defaultPolicy false ["effects/api-submit-funding-transfer"])
   ,("actions/submit-funding-withdraw", defaultPolicy false ["effects/api-submit-funding-withdraw"])

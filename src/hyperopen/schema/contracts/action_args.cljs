@@ -18,6 +18,7 @@
         :orders-and-anchor (s/tuple ::common/non-empty-map-vector any?)))
 (s/def ::funding-modal-args (s/tuple any?))
 (s/def ::funding-modal-field-args (s/tuple ::common/state-path any?))
+(s/def ::submit-funding-repay-args (s/tuple number?))
 (s/def ::api-wallet-form-field #{:name :address :days-valid})
 (s/def ::api-wallet-form-field-args (s/tuple ::api-wallet-form-field any?))
 (s/def ::api-wallet-row-args (s/tuple map?))
@@ -491,6 +492,7 @@
    :actions/set-funding-amount-to-max ::common/no-args
    :actions/submit-funding-send ::common/no-args
    :actions/submit-funding-transfer ::common/no-args
+   :actions/submit-funding-repay ::submit-funding-repay-args
    :actions/submit-funding-withdraw ::common/no-args
    :actions/submit-funding-deposit ::common/no-args
    :actions/load-leaderboard-route ::common/path-args

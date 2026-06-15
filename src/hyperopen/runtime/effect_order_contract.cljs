@@ -171,6 +171,14 @@
     :allow-duplicate-heavy-effects? false
     :heavy-effect-ids #{:effects/api-submit-funding-send}}
 
+   ;; Repay emits only the heavy borrowLend submit effect (no projection/persistence),
+   ;; so it uses a heavy-only policy like request-chart-candle-backfill.
+   :actions/submit-funding-repay
+   {:required-phase-order [:heavy-io]
+    :require-projection-before-heavy? false
+    :allow-duplicate-heavy-effects? false
+    :heavy-effect-ids #{:effects/api-submit-funding-repay}}
+
    :actions/submit-funding-withdraw
    {:required-phase-order [:projection :persistence :heavy-io]
     :require-projection-before-heavy? true

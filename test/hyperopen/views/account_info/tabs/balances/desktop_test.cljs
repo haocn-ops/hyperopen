@@ -183,7 +183,7 @@
     (is (contains? tooltip-bubble-classes "text-left"))
     (is (str/includes? tooltip-text "201.38936500 USDC is available to withdraw or transfer."))))
 
-(deftest balance-row-renders-balance-units-and-placeholder-repay-column-test
+(deftest balance-row-renders-balance-units-and-disabled-repay-for-non-borrow-test
   (let [row-node (balances-tab/balance-row (assoc fixtures/sample-balance-row :selection-coin "USDC"))
         row-cells (vec (hiccup/node-children row-node))
         total-cell (nth row-cells 1)
@@ -198,7 +198,33 @@
            (->> (hiccup/collect-strings available-cell)
                 (remove str/blank?)
                 (str/join " "))))
-    (is (empty? (remove str/blank? (hiccup/collect-strings repay-cell))))))
+    ;; A positive (non-borrow) balance shows a disabled, non-interactive Repay label.
+    (is (= "Repay"
+           (->> (hiccup/collect-strings repay-cell)
+                (remove str/blank?)
+                (str/join " "))))
+    (is (nil? (hiccup/find-first-node repay-cell #(= :button (first %)))))))
+
+(deftest balance-row-renders-repay-button-for-borrow-test
+  (let [borrow-row (assoc fixtures/sample-balance-row
+                          :coin "USDH"
+                          :selection-coin "USDH"
+                          :token 2
+                          :total-balance -42.5
+                          :available-balance -42.5)
+        row-node (balances-tab/balance-row borrow-row)
+        row-cells (vec (hiccup/node-children row-node))
+        repay-cell (nth row-cells 7)
+        button-node (hiccup/find-first-node repay-cell #(= :button (first %)))]
+    ;; A negative balance is a borrow; Repay becomes a clickable button that
+    ;; dispatches the repay action with the borrowed asset's token index.
+    (is (some? button-node))
+    (is (= "Repay"
+           (->> (hiccup/collect-strings repay-cell)
+                (remove str/blank?)
+                (str/join " "))))
+    (is (= [:actions/submit-funding-repay 2]
+           (first (get-in (second button-node) [:on :click]))))))
 
 (deftest balances-tab-content-first-row-tooltip-falls-back-below-test
   (let [rows [{:key "unified-usdc"

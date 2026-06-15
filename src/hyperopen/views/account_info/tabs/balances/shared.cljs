@@ -311,3 +311,22 @@
    nil
    {:dex (or (some-> transfer-dex str str/trim) "")
     :to-perp? (balance-row-transfer-to-perp? row)}])
+
+(defn balance-row-borrow?
+  "A negative total balance is a portfolio-margin borrow (an outstanding debt in
+  that asset) that can be repaid."
+  [{:keys [total-balance]}]
+  (let [amount (shared/parse-num total-balance)]
+    (and (number? amount)
+         (neg? amount))))
+
+(defn repay-enabled?
+  "Repay applies to borrow rows whose token index is known, so we can target the
+  borrowed asset in the `borrowLend` repay action."
+  [{:keys [token] :as row}]
+  (and (number? token)
+       (balance-row-borrow? row)))
+
+(defn balance-row-repay-action
+  [{:keys [token]}]
+  [:actions/submit-funding-repay token])

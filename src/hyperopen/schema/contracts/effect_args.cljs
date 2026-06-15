@@ -26,6 +26,7 @@
 (s/def ::api-submit-vault-transfer-args (s/tuple ::api-submit-request))
 (s/def ::api-submit-funding-transfer-args (s/tuple ::api-submit-request))
 (s/def ::api-submit-funding-send-args (s/tuple ::api-submit-request))
+(s/def ::api-submit-funding-repay-args (s/tuple ::api-submit-request))
 (s/def ::api-submit-funding-withdraw-args (s/tuple ::api-submit-request))
 (s/def ::api-submit-funding-deposit-args (s/tuple ::api-submit-request))
 
@@ -330,6 +331,7 @@
    :effects/api-fetch-hyperunit-withdrawal-queue ::common/no-args
    :effects/api-submit-funding-send ::api-submit-funding-send-args
    :effects/api-submit-funding-transfer ::api-submit-funding-transfer-args
+   :effects/api-submit-funding-repay ::api-submit-funding-repay-args
    :effects/api-submit-funding-withdraw ::api-submit-funding-withdraw-args
    :effects/api-submit-funding-deposit ::api-submit-funding-deposit-args
    :effects/run-portfolio-optimizer ::portfolio-optimizer-run-args

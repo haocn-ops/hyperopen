@@ -8,6 +8,7 @@
    [:effects/api-fetch-hyperunit-withdrawal-queue :api-fetch-hyperunit-withdrawal-queue]
    [:effects/api-submit-funding-send :api-submit-funding-send]
    [:effects/api-submit-funding-transfer :api-submit-funding-transfer]
+   [:effects/api-submit-funding-repay :api-submit-funding-repay]
    [:effects/api-submit-funding-withdraw :api-submit-funding-withdraw]
    [:effects/api-submit-funding-deposit :api-submit-funding-deposit]])
 
@@ -16,6 +17,7 @@
     :actions/view-all-funding-history
     :actions/submit-funding-send
     :actions/submit-funding-transfer
+    :actions/submit-funding-repay
     :actions/submit-funding-withdraw
     :actions/submit-funding-deposit})
 
@@ -63,5 +65,6 @@
    [:actions/set-funding-amount-to-max :set-funding-amount-to-max]
    [:actions/submit-funding-send :submit-funding-send]
    [:actions/submit-funding-transfer :submit-funding-transfer]
+   [:actions/submit-funding-repay :submit-funding-repay]
    [:actions/submit-funding-withdraw :submit-funding-withdraw]
    [:actions/submit-funding-deposit :submit-funding-deposit]])

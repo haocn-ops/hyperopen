@@ -41,3 +41,16 @@
 (def submit-funding-withdraw modal-actions/submit-funding-withdraw)
 (def submit-funding-deposit modal-actions/submit-funding-deposit)
 (def set-funding-modal-compat modal-actions/set-funding-modal-compat)
+
+(defn submit-funding-repay
+  "Repays a Hyperliquid spot/portfolio-margin borrow for `token` (the spot token
+   index of the borrowed asset, e.g. USDH). Emits the heavy submit effect with a
+   fully-built `borrowLend` repay action; `amount` is nil to repay the maximum
+   (the lesser of the outstanding borrow and available balance). The effect
+   resolves the owner/subaccount routing from state."
+  [_state token]
+  [[:effects/api-submit-funding-repay
+    {:action {:type "borrowLend"
+              :operation "repay"
+              :token token
+              :amount nil}}]])

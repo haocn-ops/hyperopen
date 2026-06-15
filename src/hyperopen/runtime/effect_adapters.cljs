@@ -603,6 +603,14 @@
           request
           {:show-toast! show-order-feedback-toast!}]))
 
+(defn api-submit-funding-repay-effect
+  [_ store request]
+  (apply funding-adapters/api-submit-funding-repay-effect
+         [nil
+          store
+          request
+          {:show-toast! show-order-feedback-toast!}]))
+
 (defn api-submit-funding-withdraw-effect
   [_ store request]
   (apply funding-adapters/api-submit-funding-withdraw-effect

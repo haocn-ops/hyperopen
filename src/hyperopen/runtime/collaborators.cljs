@@ -46,6 +46,7 @@
           :api-fetch-hyperunit-withdrawal-queue funding-effects/api-fetch-hyperunit-withdrawal-queue!
           :api-submit-funding-send funding-effects/api-submit-funding-send!
           :api-submit-funding-transfer funding-effects/api-submit-funding-transfer!
+          :api-submit-funding-repay funding-effects/api-submit-funding-repay!
           :api-submit-funding-withdraw funding-effects/api-submit-funding-withdraw!
           :api-submit-funding-deposit funding-effects/api-submit-funding-deposit!}}
    effect-overrides))

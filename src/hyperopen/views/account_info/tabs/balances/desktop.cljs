@@ -114,7 +114,12 @@
 
                   :else
                   (balances-shared/balance-row-disabled-action "Transfer"))]
-               [:div.text-left]])
+               [:div.text-left
+                (if (balances-shared/repay-enabled? row)
+                  (balances-shared/balance-row-action-button
+                   "Repay"
+                   (balances-shared/balance-row-repay-action row))
+                  (balances-shared/balance-row-disabled-action "Repay"))]])
             [[:div.text-left
               (balances-shared/balance-contract-node contract-id)]])))))
 

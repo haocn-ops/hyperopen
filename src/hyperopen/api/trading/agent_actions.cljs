@@ -276,6 +276,16 @@
   ([store address action options]
    (sign-and-post-agent-action! store address action options)))
 
+(defn submit-borrow-lend!
+  "Signs and posts a Hyperliquid `borrowLend` L1 action (deposit/withdraw/borrow/
+   repay) using the active agent session. `action` is the fully-built action map
+   (e.g. `{:type \"borrowLend\" :operation \"repay\" :token N :amount nil}`); pass
+   `:vault-address` in `options` to target a subaccount."
+  ([store address action]
+   (submit-borrow-lend! store address action {}))
+  ([store address action options]
+   (sign-and-post-agent-action! store address action options)))
+
 (defn- management-action-options
   [options]
   (assoc (or options {}) :vault-address nil))

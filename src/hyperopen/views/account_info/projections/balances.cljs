@@ -467,6 +467,7 @@
                                    (cond-> {:key (str "spot-" (or token-idx coin))
                                             :selection-coin coin
                                             :coin coin-label
+                                            :token token
                                             :total-balance total-num
                                             :available-balance available-num
                                             :usdc-value usdc-value

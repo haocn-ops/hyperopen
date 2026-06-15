@@ -88,4 +88,5 @@
    :submit-funding-send funding-actions/submit-funding-send
    :submit-funding-transfer funding-actions/submit-funding-transfer
    :submit-funding-withdraw funding-actions/submit-funding-withdraw
-   :submit-funding-deposit funding-actions/submit-funding-deposit})
+   :submit-funding-deposit funding-actions/submit-funding-deposit
+   :submit-funding-repay funding-actions/submit-funding-repay})

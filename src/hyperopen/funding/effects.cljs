@@ -1,5 +1,7 @@
 (ns hyperopen.funding.effects
-  (:require [hyperopen.api.trading :as trading-api]
+  (:require [clojure.string :as str]
+            [hyperopen.account.context :as account-context]
+            [hyperopen.api.trading :as trading-api]
             [hyperopen.funding.actions :as funding-actions]
             [hyperopen.funding.application.hyperunit-query :as hyperunit-query]
             [hyperopen.funding.application.modal-state :as modal-state]
@@ -127,6 +129,54 @@
     :set-funding-submit-error! set-funding-submit-error!
     :close-funding-modal! close-funding-modal!
     :refresh-after-funding-submit! refresh-after-funding-submit!}))
+
+(defn api-submit-funding-repay!
+  "Submits a `borrowLend` repay L1 action. The action map is pre-built by the
+   `submit-funding-repay` action; here we resolve the signing owner and, when a
+   subaccount is selected, route the action to it via `:vault-address`."
+  [{:keys [store
+           request
+           dispatch!
+           submit-borrow-lend!
+           exchange-response-error
+           runtime-error-message
+           show-toast!]
+    :or {submit-borrow-lend! trading-api/submit-borrow-lend!
+         exchange-response-error common/fallback-exchange-response-error
+         runtime-error-message common/fallback-runtime-error-message
+         show-toast! (fn [_store _kind _message] nil)}}]
+  (let [spectate-mode-message (account-context/mutations-blocked-message @store)
+        address (get-in @store [:wallet :address])
+        vault-address (account-context/exchange-vault-address @store)
+        refresh-address (or (account-context/effective-account-address @store) address)
+        action (:action request)
+        options (cond-> {}
+                  vault-address (assoc :vault-address vault-address))]
+    (cond
+      (seq spectate-mode-message)
+      (show-toast! store :error spectate-mode-message)
+
+      (nil? address)
+      (show-toast! store :error "Connect your wallet before repaying.")
+
+      :else
+      (-> (submit-borrow-lend! store address action options)
+          (.then (fn [resp]
+                   (if (= "ok" (:status resp))
+                     (do
+                       (show-toast! store :success "Repay submitted.")
+                       (refresh-after-funding-submit! store dispatch! refresh-address)
+                       resp)
+                     (let [error-text (str/trim (str (exchange-response-error resp)))
+                           message (str "Repay failed: "
+                                        (if (seq error-text) error-text "Unknown exchange error"))]
+                       (show-toast! store :error message)
+                       resp))))
+          (.catch (fn [err]
+                    (let [error-text (str/trim (str (runtime-error-message err)))
+                          message (str "Repay failed: "
+                                       (if (seq error-text) error-text "Unknown runtime error"))]
+                      (show-toast! store :error message))))))))
 
 (defn api-submit-funding-withdraw!
   [{:keys [store

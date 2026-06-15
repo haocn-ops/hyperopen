@@ -100,6 +100,12 @@
   ([store address action options]
    (agent-actions/submit-vault-transfer! store address action options)))
 
+(defn submit-borrow-lend!
+  ([store address action]
+   (agent-actions/submit-borrow-lend! store address action))
+  ([store address action options]
+   (agent-actions/submit-borrow-lend! store address action options)))
+
 (defn create-sub-account!
   ([store address name]
    (agent-actions/create-sub-account! store address name))

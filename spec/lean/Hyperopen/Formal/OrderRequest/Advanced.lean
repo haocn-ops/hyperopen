@@ -117,6 +117,16 @@ def btcPerpTwoDpContext : Context :=
     market := { marketType := some Standard.MarketType.perp
                 szDecimals := 2 } }
 
+def spotPurrContext : Context :=
+  { activeAsset := some "PURR/USDC"
+    -- Spot wire asset id = 10000 + spotMeta pair index (PURR/USDC pair 0).
+    -- Mirror real spot markets, which carry the encoded id on :asset-id.
+    assetIdx := some 10000
+    market := { marketType := some Standard.MarketType.spot
+                coin := some "PURR/USDC"
+                szDecimals := 0
+                assetId := some 10000 } }
+
 def mkRatio (numerator : Int) (denominator : Nat) : Ratio :=
   { numerator := numerator
     denominator := if denominator = 0 then 1 else denominator }
@@ -351,11 +361,28 @@ def buildScaleLegs? (context : Context) (form : Form) : Option (List ScaleLeg) :
         none
     (List.range orderCount).mapM buildLeg
 
+def spotMarket (context : Context) : Bool :=
+  match context.market.marketType with
+  | some Standard.MarketType.spot => true
+  | some Standard.MarketType.perp => false
+  | none =>
+      match context.market.coin with
+      | some coin => Standard.containsSlash coin
+      | none =>
+          match context.activeAsset with
+          | some asset => Standard.containsSlash asset
+          | none => false
+
+-- Reduce-only is perp-only; spot markets force it false (mirrors the CLJS
+-- builders' spot gate).
+def effectiveReduceOnly (context : Context) (form : Form) : Bool :=
+  if spotMarket context then false else form.reduceOnly
+
 def scaleOrders? (context : Context) (form : Form) : Option (List WireOrder) := do
   let assetIdx ← context.assetIdx
   let legs ← buildScaleLegs? context form
   let tif := if form.postOnly then "Alo" else "Gtc"
-  let reduceOnly := Standard.reduceOnlyFlag form.reduceOnly
+  let reduceOnly := Standard.reduceOnlyFlag (effectiveReduceOnly context form)
   let toOrder (leg : ScaleLeg) : Option WireOrder := do
     let priceText ← positiveRatioToWireString? leg.price
     let sizeText ← positiveRatioToWireString? leg.size
@@ -387,7 +414,7 @@ def buildTwapRequest (context : Context) (form : Form) : Option AdvancedRequest 
             { asset := assetIdx
               isBuy := Standard.sideIsBuy form.side
               size := sizeText
-              reduceOnly := form.reduceOnly
+              reduceOnly := effectiveReduceOnly context form
               minutes := minutes
               randomize := form.twap.randomize }
         assetIdx := assetIdx }
@@ -500,6 +527,28 @@ def twapMissingActiveAssetForm : Form :=
               minutes := .nat 15
               randomize := true } }
 
+def spotScaleForm : Form :=
+  -- reduceOnly := true must be forced false for a spot scale ladder.
+  { orderType := .scale
+    side := Standard.Side.buy
+    size := "9"
+    reduceOnly := true
+    postOnly := false
+    scale := { start := "100"
+               finish := "90"
+               count := 3
+               skew := .text "1.00" } }
+
+def spotTwapForm : Form :=
+  -- reduceOnly := true must be forced false for a spot TWAP.
+  { orderType := .twap
+    side := Standard.Side.buy
+    size := "3"
+    reduceOnly := true
+    twap := { hours := some (.nat 1)
+              minutes := .nat 30
+              randomize := false } }
+
 def advancedVectors : List AdvancedVector :=
   [ { id := "scale-order-request"
       contract := .submitReady
@@ -550,7 +599,17 @@ def advancedVectors : List AdvancedVector :=
       contract := .rawBuilder
       context := missingActiveAssetContext
       form := twapMissingActiveAssetForm
-      expected := buildAdvancedRequest missingActiveAssetContext twapMissingActiveAssetForm } ]
+      expected := buildAdvancedRequest missingActiveAssetContext twapMissingActiveAssetForm }
+  , { id := "spot-scale-encoded-asset-id-suppresses-reduce-only"
+      contract := .submitReady
+      context := spotPurrContext
+      form := spotScaleForm
+      expected := buildAdvancedRequest spotPurrContext spotScaleForm }
+  , { id := "spot-twap-encoded-asset-id-suppresses-reduce-only"
+      contract := .submitReady
+      context := spotPurrContext
+      form := spotTwapForm
+      expected := buildAdvancedRequest spotPurrContext spotTwapForm } ]
 
 def advancedOrderTypeKeyword : AdvancedOrderType → String
   | .scale => "scale"
@@ -781,6 +840,7 @@ theorem twap_missing_active_asset_fails_closed :
 def generatedSource : String :=
   renderNamespace "hyperopen.formal.order-request-advanced-vectors"
     [("btc-perp-context", contextToClj btcPerpContext)
+    ,("spot-purr-context", contextToClj spotPurrContext)
     ,("order-request-advanced-vectors", .vector (advancedVectors.map vectorEntryToClj))]
 
 def verify : IO Unit := do

@@ -1,5 +1,6 @@
 (ns hyperopen.websocket.orderbook
   (:require [hyperopen.telemetry :as telemetry]
+            [hyperopen.trading.order-form-context-sync :as order-form-context-sync]
             [hyperopen.websocket.client :as ws-client]
             [hyperopen.websocket.market-projection-runtime :as market-projection-runtime]
             [hyperopen.websocket.orderbook-policy :as policy]))
@@ -68,7 +69,14 @@
                {:store store
                 :coalesce-key [:orderbook coin]
                 :apply-update-fn (fn [state]
-                                   (assoc-in state [:orderbooks coin] next-book))}))))))))
+                                   (let [next-state (assoc-in state [:orderbooks coin] next-book)]
+                                     ;; Re-project the active order form against the new book so
+                                     ;; the committed size the user sees stays coherent with the
+                                     ;; live best-ask that affordability validation uses (avoids
+                                     ;; false "Not enough USDC" rejects when the ask moves up).
+                                     (if (= coin (:active-asset next-state))
+                                       (order-form-context-sync/reconcile-active-order-form next-state)
+                                       next-state)))}))))))))
 
 ;; Get current subscriptions
 (defn get-subscriptions []

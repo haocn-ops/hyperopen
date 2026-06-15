@@ -1,6 +1,9 @@
 (ns hyperopen.websocket.orderbook-test
   (:require [cljs.test :refer-macros [deftest is]]
             [hyperopen.platform :as platform]
+            [hyperopen.state.trading :as trading]
+            [hyperopen.state.trading.test-support :as support]
+            [hyperopen.trading.order-form-transitions :as transitions]
             [hyperopen.websocket.market-projection-runtime :as market-runtime]
             [hyperopen.websocket.orderbook :as orderbook]
             [hyperopen.websocket.orderbook-policy :as policy]
@@ -66,6 +69,40 @@
             (is (= {:px "102" :sz "5" :px-num 102 :sz-num 5}
                    (get-in book [:render :best-ask]))))))
       (remove-watch store watch-key))
+    (finally
+      (reset-orderbook-state!)
+      (market-runtime/reset-market-projection-runtime!))))
+
+(deftest create-orderbook-data-handler-reprojects-active-order-form-on-ask-tick-test
+  (reset-orderbook-state!)
+  (market-runtime/reset-market-projection-runtime!)
+  (try
+    (let [base (support/spot-buy-state {:ask "1.00" :usdc "100"})
+          ;; Classic spot account with a committed 100 USDC buy at best-ask 1.00.
+          committed (support/apply-order-form-transition
+                     base
+                     (transitions/set-order-size-display base "100"))
+          store (atom committed)
+          scheduled-callback (atom nil)]
+      (with-redefs [platform/request-animation-frame! (fn [f]
+                                                        (reset! scheduled-callback f)
+                                                        :raf-id)]
+        (let [handler (orderbook/create-orderbook-data-handler store)]
+          ;; Best-ask for the active spot market ticks up ~1%.
+          (handler {:channel "l2Book"
+                    :data {:coin "PURR"
+                           :levels [[{:px "0.99" :sz "1000"}]
+                                    [{:px "1.01" :sz "1000"}]]
+                           :time 2}})
+          (@scheduled-callback 16)
+          (let [form (trading/order-form-draft @store)]
+            (is (= [{:px "1.01" :sz "1000"}]
+                   (:asks (get-in @store [:orderbooks "PURR"]))))
+            ;; The displayed commitment is preserved while the canonical size is
+            ;; re-projected, so the affordability check no longer false-rejects.
+            (is (= "100" (:size-display form)))
+            (is (empty? (support/validation-codes
+                         (trading/validate-order-form @store form))))))))
     (finally
       (reset-orderbook-state!)
       (market-runtime/reset-market-projection-runtime!))))

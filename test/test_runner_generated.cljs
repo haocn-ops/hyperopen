@@ -403,6 +403,7 @@
             [hyperopen.trading-crypto.module-exports-test]
             [hyperopen.trading-indicators-modules-test]
             [hyperopen.trading-indicators.module-exports-test]
+            [hyperopen.trading.order-form-context-sync-test]
             [hyperopen.trading.order-form-tpsl-policy-test]
             [hyperopen.trading.order-form-transitions-test]
             [hyperopen.trading.order-form-transitions-update-test]
@@ -1137,6 +1138,7 @@
              'hyperopen.trading-crypto.module-exports-test
              'hyperopen.trading-indicators-modules-test
              'hyperopen.trading-indicators.module-exports-test
+             'hyperopen.trading.order-form-context-sync-test
              'hyperopen.trading.order-form-tpsl-policy-test
              'hyperopen.trading.order-form-transitions-test
              'hyperopen.trading.order-form-transitions-update-test

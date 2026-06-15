@@ -3,7 +3,9 @@
             [hyperopen.domain.trading.core :as trading-core]
             [hyperopen.formal.order-request-advanced-vectors :as advanced-vectors]
             [hyperopen.state.trading :as trading]
-            [hyperopen.state.trading.test-support :as support]))
+            [hyperopen.state.trading.test-support :as support]
+            [hyperopen.trading.order-form-context-sync :as context-sync]
+            [hyperopen.trading.order-form-transitions :as transitions]))
 
 (defn- approx= [a b]
   (support/approx= a b))
@@ -78,6 +80,54 @@
       (is (= #{:twap/suborder-notional-too-small}
              (validation-codes (trading/validate-order-form support/base-state too-small))))
       (is (empty? (trading/validate-order-form support/base-state valid))))))
+
+(deftest spot-quote-buy-frozen-size-false-reject-and-coherent-after-reprojection-test
+  (testing "a committed quote-denominated spot buy that becomes affordable again
+            once re-projected against the live best-ask"
+    (let [state0 (support/spot-buy-state {:ask "1.00" :usdc "100"})
+          ;; User commits a 100 USDC buy while the best-ask is 1.00.
+          committed (support/apply-order-form-transition
+                     state0
+                     (transitions/set-order-size-display state0 "100"))]
+      (testing "the committed buy validates cleanly at the price it was sized for"
+        (is (empty? (validation-codes
+                     (trading/validate-order-form committed
+                                                  (trading/order-form-draft committed))))))
+      (let [;; Best-ask ticks up ~1%; the canonical :size is frozen but the
+            ;; displayed Size notional still reads 100 USDC.
+            ticked (support/set-active-best-ask committed "1.01")
+            frozen-form (trading/order-form-draft ticked)]
+        (testing "frozen size produces a false insufficient-USDC reject"
+          (is (= "100" (:size-display frozen-form)))
+          (is (contains? (validation-codes
+                          (trading/validate-order-form ticked frozen-form))
+                         :spot/insufficient-usdc)))
+        (testing "re-projecting the form on the book tick keeps it coherent"
+          (let [reconciled (context-sync/reconcile-active-order-form ticked)
+                form (trading/order-form-draft reconciled)]
+            ;; Displayed commitment is preserved...
+            (is (= "100" (:size-display form)))
+            ;; ...while the canonical base size is re-derived against the new ask.
+            (is (not= (:size frozen-form) (:size form)))
+            (is (empty? (validation-codes
+                         (trading/validate-order-form reconciled form))))))))))
+
+(deftest spot-percent-buy-reprojects-on-best-ask-tick-test
+  (let [state0 (support/spot-buy-state {:ask "1.00" :usdc "100"})
+        ;; Commit a max (100%) spot buy at ask 1.00.
+        committed (support/apply-order-form-transition
+                   state0
+                   (transitions/set-order-size-percent state0 100))
+        ;; Best-ask jumps 5%; the frozen percent-derived size is now unaffordable.
+        ticked (support/set-active-best-ask committed "1.05")
+        frozen-form (trading/order-form-draft ticked)]
+    (is (contains? (validation-codes
+                    (trading/validate-order-form ticked frozen-form))
+                   :spot/insufficient-usdc))
+    (let [reconciled (context-sync/reconcile-active-order-form ticked)
+          form (trading/order-form-draft reconciled)]
+      (is (empty? (validation-codes
+                   (trading/validate-order-form reconciled form)))))))
 
 (deftest enabled-tpsl-legs-require-their-own-triggers-test
   (let [form (assoc (trading/default-order-form)

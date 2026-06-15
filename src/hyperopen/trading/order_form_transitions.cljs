@@ -119,7 +119,7 @@
       :else
       (assoc updated :size-percent 0))))
 
-(defn- reconcile-size-after-context-change
+(defn reconcile-size-after-context-change
   [state form]
   (cond
     (and (percent-sized? form)

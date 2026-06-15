@@ -439,3 +439,19 @@
 (defn reset-blocked?
   [state health now-ms]
   (:disabled? (reset-availability state health now-ms)))
+
+(defn info-rate-limit-model
+  "Drawer model for HTTP /info endpoint rate-limiting. Returns nil when the
+   session has never been rate-limited; otherwise reports the cumulative count,
+   whether a cooldown is currently active, and the remaining retry seconds."
+  [state now-ms]
+  (let [{:keys [until-ms last-at-ms]
+         rate-limited-count :count} (get-in state [:websocket-ui :info-rate-limit])]
+    (when (and (number? rate-limited-count)
+               (pos? rate-limited-count))
+      (let [cooldown-remaining-ms (remaining-cooldown-ms until-ms now-ms)
+            active? (number? cooldown-remaining-ms)]
+        {:active? active?
+         :count rate-limited-count
+         :retry-in-seconds (when active? (seconds-label cooldown-remaining-ms))
+         :last-at-ms last-at-ms}))))

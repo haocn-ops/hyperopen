@@ -1,6 +1,31 @@
 (ns hyperopen.websocket.diagnostics-runtime
   (:require [hyperopen.websocket.diagnostics.policy :as diagnostics-policy]))
 
+(defn record-info-rate-limit
+  "Folds an info-endpoint rate-limit (HTTP 429) event into the
+   `[:websocket-ui :info-rate-limit]` summary the diagnostics drawer reads.
+   Keeps the max cooldown deadline seen, the authoritative cumulative count
+   (falling back to a local increment), and the most recent event time."
+  [prev {:keys [cooldown-until-ms at-ms]
+         rate-limited-count :count}]
+  (let [prev* (or prev {})]
+    {:count (or rate-limited-count
+                (inc (or (:count prev*) 0)))
+     :until-ms (max (or (:until-ms prev*) 0)
+                    (or cooldown-until-ms 0))
+     :last-at-ms (or at-ms (:last-at-ms prev*))}))
+
+(defn install-info-rate-limit-listener!
+  "Wires the info-client's store-agnostic rate-limit callback to fold events into
+   app-state via a plain swap! (same pattern as the reconnect/reset counters)."
+  [store set-on-rate-limit!]
+  (when (fn? set-on-rate-limit!)
+    (set-on-rate-limit!
+     (fn [event]
+       (swap! store update-in [:websocket-ui :info-rate-limit]
+              record-info-rate-limit
+              event)))))
+
 (defn- reset-group-match?
   [stream group]
   (case group

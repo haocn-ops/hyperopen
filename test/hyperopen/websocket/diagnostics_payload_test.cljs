@@ -50,6 +50,20 @@
                             :flush-duration-ms 5}]}
            (:market-projection payload)))))
 
+(deftest diagnostics-copy-payload-includes-info-rate-limit-test
+  (let [state {:websocket-ui {:info-rate-limit {:count 3
+                                                :until-ms 1700000005000
+                                                :last-at-ms 1700000000000}}}
+        health {:generated-at-ms 1700000000000
+                :transport {:state :connected}
+                :groups {}
+                :streams {}}
+        payload (diagnostics-payload/diagnostics-copy-payload state health "0.1.0")]
+    (is (= {:count 3
+            :until-ms 1700000005000
+            :last-at-ms 1700000000000}
+           (:info-rate-limit payload)))))
+
 (deftest copy-status-helpers-return-expected-shapes-test
   (let [health {:generated-at-ms 1700000000000}
         error-status (diagnostics-payload/copy-error-status health "{json}")

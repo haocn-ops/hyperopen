@@ -179,6 +179,56 @@
                     (is (true? (aget err "inactiveRequest")))
                     (done)))))))
 
+(deftest request-info-invokes-on-rate-limit-listener-on-429-test
+  (async done
+    (let [events (atom [])
+          fetch-calls (atom 0)
+          client (info-client/make-info-client
+                  {:fetch-fn (fn [_ _]
+                               (let [call-number (swap! fetch-calls inc)]
+                                 (js/Promise.resolve
+                                  (if (= call-number 1)
+                                    (info-support/fake-http-response 429 {:error "rate-limited"})
+                                    (info-support/fake-http-response 200 {:ok true})))))
+                   :sleep-ms-fn (fn [_] (js/Promise.resolve nil))
+                   :now-ms-fn (constantly 1000)
+                   :log-fn (fn [& _] nil)})
+          set-on-rate-limit! (:set-on-rate-limit! client)
+          request-info! (:request-info! client)]
+      (set-on-rate-limit! (fn [event] (swap! events conj event)))
+      (-> (request-info! {"type" "meta"} {:dedupe-key :meta})
+          (.then (fn [response]
+                   (is (= {:ok true} response))
+                   (is (= 2 @fetch-calls))
+                   (is (= 1 (count @events)))
+                   (is (= {:at-ms 1000
+                           :delay-ms 400
+                           :cooldown-until-ms 1400
+                           :count 1}
+                          (first @events)))
+                   (done)))
+          (.catch (fn [err]
+                    (is false (str "Unexpected error: " err))
+                    (done)))))))
+
+(deftest request-info-does-not-invoke-listener-without-rate-limit-test
+  (async done
+    (let [events (atom [])
+          client (info-client/make-info-client
+                  {:fetch-fn (fn [_ _]
+                               (js/Promise.resolve
+                                (info-support/fake-http-response 200 {:ok true})))
+                   :sleep-ms-fn (fn [_] (js/Promise.resolve nil))
+                   :log-fn (fn [& _] nil)})]
+      ((:set-on-rate-limit! client) (fn [event] (swap! events conj event)))
+      (-> ((:request-info! client) {"type" "meta"} {:dedupe-key :meta})
+          (.then (fn [_]
+                   (is (= [] @events))
+                   (done)))
+          (.catch (fn [err]
+                    (is false (str "Unexpected error: " err))
+                    (done)))))))
+
 (deftest fetch-with-timeout-aborts-and-rejects-when-fetch-stalls-test
   (async done
     (let [abort-calls (atom 0)

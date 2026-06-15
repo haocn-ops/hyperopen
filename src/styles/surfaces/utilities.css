@@ -724,7 +724,8 @@
     color: var(--o-buy);
   }
 
-  .hx-copy-error {
+  .hx-copy-error,
+  .hx-rate-limit {
     margin: 0 16px 14px;
     padding: 9px 11px;
     color: var(--o-amber, #f5b54a);
@@ -743,6 +744,20 @@
     font-family: "JetBrains Mono", var(--font-mono);
     white-space: pre-wrap;
     word-break: break-all;
+  }
+
+  .hx-rate-limit {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .hx-rate-limit-title {
+    font-weight: 600;
+  }
+
+  .hx-rate-limit-detail {
+    color: var(--o-text);
   }
 
   .hx-groups {

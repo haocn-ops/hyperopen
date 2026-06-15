@@ -201,17 +201,22 @@
 (defn- summary-counter-rows
   [state]
   (let [reset-counts (merge {:market_data 0 :orders_oms 0 :all 0}
-                            (get-in state [:websocket-ui :reset-counts]))]
-    [{:label "Reconnect count"
-      :value (str (or (get-in state [:websocket-ui :reconnect-count]) 0))}
-     {:label "Reset count"
-      :value (str (get reset-counts :market_data 0)
-                  " / "
-                  (get reset-counts :orders_oms 0)
-                  " / "
-                  (get reset-counts :all 0))}
-     {:label "Auto-recover count"
-      :value (str (or (get-in state [:websocket-ui :auto-recover-count]) 0))}]))
+                            (get-in state [:websocket-ui :reset-counts]))
+        rate-limited-count (get-in state [:websocket-ui :info-rate-limit :count] 0)]
+    (cond-> [{:label "Reconnect count"
+              :value (str (or (get-in state [:websocket-ui :reconnect-count]) 0))}
+             {:label "Reset count"
+              :value (str (get reset-counts :market_data 0)
+                          " / "
+                          (get reset-counts :orders_oms 0)
+                          " / "
+                          (get reset-counts :all 0))}
+             {:label "Auto-recover count"
+              :value (str (or (get-in state [:websocket-ui :auto-recover-count]) 0))}]
+      (and (number? rate-limited-count)
+           (pos? rate-limited-count))
+      (conj {:label "Rate-limited (info)"
+             :value (str rate-limited-count)}))))
 
 (defn- popover-stream-groups
   [health now-ms]
@@ -285,6 +290,7 @@
         state* (popover-state health meter)
         stream-groups (popover-stream-groups health display-now-ms)
         stream-preview (popover-stream-preview stream-groups)
+        rate-limit (policy/info-rate-limit-model state effective-now-ms)
         copy (get state-copy state*)]
     {:state state*
      :tone (case state*
@@ -293,6 +299,7 @@
              :warn)
      :title (:title copy)
      :reason (:reason copy)
+     :rate-limit rate-limit
      :last-update-label (popover-last-update-label health display-now-ms)
      :developer-open? (not= :online state*)
      :reconnect-control reconnect-availability

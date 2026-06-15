@@ -59,6 +59,9 @@
    :auto-recover-cooldown-until-ms nil
    :auto-recover-count 0
    :reconnect-count 0
+   :info-rate-limit {:count 0
+                     :until-ms 0
+                     :last-at-ms nil}
    :diagnostics-timeline []})
 
 (defn default-orders-state

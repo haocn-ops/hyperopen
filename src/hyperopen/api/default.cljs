@@ -23,6 +23,7 @@
 (defn reset-api-service! [] (state/reset-api-service!))
 (defn make-api [opts] (state/make-api opts))
 (defn get-request-stats [] (state/get-request-stats))
+(defn set-on-rate-limit! [listener] (state/set-on-rate-limit! listener))
 (defn reset-request-runtime! [] (state/reset-request-runtime!))
 
 (defn- post-info!

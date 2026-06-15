@@ -10,6 +10,32 @@
           :at-ms at-ms
           :details details}))
 
+(deftest record-info-rate-limit-folds-event-into-summary-test
+  ;; First event seeds the summary.
+  (is (= {:count 1 :until-ms 1400 :last-at-ms 1000}
+         (diagnostics-runtime/record-info-rate-limit
+          nil
+          {:at-ms 1000 :delay-ms 400 :cooldown-until-ms 1400 :count 1})))
+  ;; Later event keeps the max deadline and uses the authoritative count.
+  (is (= {:count 3 :until-ms 1400 :last-at-ms 1300}
+         (diagnostics-runtime/record-info-rate-limit
+          {:count 1 :until-ms 1400 :last-at-ms 1000}
+          {:at-ms 1300 :delay-ms 100 :cooldown-until-ms 1200 :count 3})))
+  ;; Missing count falls back to a local increment.
+  (is (= 2 (:count (diagnostics-runtime/record-info-rate-limit
+                    {:count 1 :until-ms 0 :last-at-ms nil}
+                    {:at-ms 1500 :cooldown-until-ms 1900})))))
+
+(deftest install-info-rate-limit-listener-swaps-events-into-store-test
+  (let [store (atom {})
+        installed (atom nil)
+        set-on-rate-limit! (fn [listener] (reset! installed listener))]
+    (diagnostics-runtime/install-info-rate-limit-listener! store set-on-rate-limit!)
+    (is (fn? @installed) "the listener must be registered with the setter")
+    (@installed {:at-ms 1000 :delay-ms 400 :cooldown-until-ms 1400 :count 1})
+    (is (= {:count 1 :until-ms 1400 :last-at-ms 1000}
+           (get-in @store [:websocket-ui :info-rate-limit])))))
+
 (deftest ws-reset-subscriptions-sends-deduped-descriptors-test
   (let [sends (atom [])
         health {:generated-at-ms 1700000000000

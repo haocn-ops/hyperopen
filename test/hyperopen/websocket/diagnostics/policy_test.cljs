@@ -50,6 +50,30 @@
     (is (= 20 (:penalty network-row)))
     (is (re-find #"3g" (:detail network-row)))))
 
+(deftest info-rate-limit-model-reports-active-throttle-and-clears-after-cooldown-test
+  ;; Never rate-limited -> nil (drawer shows nothing).
+  (is (nil? (policy/info-rate-limit-model {} 1700000000000)))
+  (is (nil? (policy/info-rate-limit-model
+             {:websocket-ui {:info-rate-limit {:count 0 :until-ms 0 :last-at-ms nil}}}
+             1700000000000)))
+  ;; Active cooldown -> active? true with remaining retry seconds.
+  (let [state {:websocket-ui {:info-rate-limit {:count 2
+                                                :until-ms 1700000005000
+                                                :last-at-ms 1700000000000}}}
+        model (policy/info-rate-limit-model state 1700000000000)]
+    (is (true? (:active? model)))
+    (is (= 2 (:count model)))
+    (is (= 5 (:retry-in-seconds model)))
+    (is (= 1700000000000 (:last-at-ms model))))
+  ;; Cooldown expired -> not active, counter still reported, no retry seconds.
+  (let [state {:websocket-ui {:info-rate-limit {:count 2
+                                                :until-ms 1700000005000
+                                                :last-at-ms 1700000000000}}}
+        model (policy/info-rate-limit-model state 1700000009000)]
+    (is (false? (:active? model)))
+    (is (= 2 (:count model)))
+    (is (nil? (:retry-in-seconds model)))))
+
 (deftest reconnect-and-reset-availability-models-use-deterministic-cooldown-labels-test
   (let [state {:websocket-ui {:reconnect-cooldown-until-ms 1700000005000
                               :reset-cooldown-until-ms 1700000004000}

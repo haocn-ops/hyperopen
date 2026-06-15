@@ -75,6 +75,35 @@
     (is (not (.includes (:details-text timeline-row) address)))
     (is (.includes (:details-text timeline-row) "0x1234...45678"))))
 
+(deftest footer-view-model-surfaces-info-rate-limit-test
+  (let [vm (diagnostics-vm/footer-view-model
+            (assoc-in (base-state) [:websocket-ui :info-rate-limit]
+                      {:count 2 :until-ms 1700000005000 :last-at-ms 1700000000500})
+            {:app-version "0.1.0"
+             :build-id "build-123"
+             :wall-now-ms 1700000001000
+             :diagnostics-timeline-limit 10})
+        diagnostics (:diagnostics vm)
+        rate-limit (:rate-limit diagnostics)
+        counter-labels (mapv :label (:counter-rows diagnostics))]
+    (is (s/valid? ::diagnostics-schema/footer-vm vm))
+    (is (true? (:active? rate-limit)))
+    (is (= 2 (:count rate-limit)))
+    (is (= 4 (:retry-in-seconds rate-limit)))
+    (is (some #{"Rate-limited (info)"} counter-labels))))
+
+(deftest footer-view-model-omits-info-rate-limit-when-never-throttled-test
+  (let [vm (diagnostics-vm/footer-view-model
+            (base-state)
+            {:app-version "0.1.0"
+             :build-id "build-123"
+             :wall-now-ms 1700000001000
+             :diagnostics-timeline-limit 10})
+        diagnostics (:diagnostics vm)
+        counter-labels (mapv :label (:counter-rows diagnostics))]
+    (is (nil? (:rate-limit diagnostics)))
+    (is (not (some #{"Rate-limited (info)"} counter-labels)))))
+
 (deftest footer-view-model-hides-market-projection-from-visible-diagnostics-test
   (let [vm (diagnostics-vm/footer-view-model
             (base-state)

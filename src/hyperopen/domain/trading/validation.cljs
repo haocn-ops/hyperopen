@@ -112,11 +112,18 @@
    balances are loaded (fail-open on missing data so the exchange remains the
    source of truth). Buys require USDC available >= order value; sells require
    base-token available >= size. Fees are not reserved here (lenient by design
-   to avoid false rejects); the exchange enforces the precise margin."
+   to avoid false rejects); the exchange enforces the precise margin.
+
+   Skipped entirely for unified (portfolio-margin) accounts: there, buying power
+   is the unified collateral base (the exchange auto-borrows USDC against
+   collateral, and acquiring/selling the borrowed asset is how a borrow is
+   repaid), so idle spot-wallet USDC / held base balance is the wrong cap and
+   would false-reject legitimate borrow-repaying trades."
   [context form size]
   (or
    (when (and context
               (core/spot-market-context? context)
+              (not (market/unified-account-mode? context))
               (number? size)
               (pos? size)
               (seq (get-in context [:spot :clearinghouse-state :balances])))

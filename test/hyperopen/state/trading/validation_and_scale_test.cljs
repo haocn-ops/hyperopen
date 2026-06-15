@@ -1,6 +1,7 @@
 (ns hyperopen.state.trading.validation-and-scale-test
   (:require [cljs.test :refer-macros [deftest is testing]]
             [hyperopen.domain.trading.core :as trading-core]
+            [hyperopen.domain.trading.validation :as domain-validation]
             [hyperopen.formal.order-request-advanced-vectors :as advanced-vectors]
             [hyperopen.state.trading :as trading]
             [hyperopen.state.trading.test-support :as support]))
@@ -78,6 +79,40 @@
       (is (= #{:twap/suborder-notional-too-small}
              (validation-codes (trading/validate-order-form support/base-state too-small))))
       (is (empty? (trading/validate-order-form support/base-state valid))))))
+
+(deftest spot-affordability-skips-unified-portfolio-margin-test
+  (let [spot-context (fn [mode]
+                       {:market {:market-type "spot" :mark "1"}
+                        :account {:mode mode}
+                        :spot {:clearinghouse-state
+                               {:balances [{:coin "USDC" :total "10" :hold "0"}]}}})
+        buy-over (fn [mode]
+                   (domain-validation/validate-order-form
+                    (spot-context mode)
+                    {:type :market :side :buy :size "100"}))
+        sell-over (fn [mode]
+                    (domain-validation/validate-order-form
+                     (spot-context mode)
+                     {:type :market :side :sell :size "5"}))]
+    (testing "classic account caps a spot buy at idle USDC"
+      (is (= #{:spot/insufficient-usdc}
+             (validation-codes (buy-over :classic)))))
+
+    (testing "classic account caps a spot sell at held base balance"
+      (is (= #{:spot/insufficient-base-balance}
+             (validation-codes (sell-over :classic)))))
+
+    (testing "unified (portfolio-margin) account skips the spot affordability cap"
+      ;; In PM the exchange auto-borrows USDC against unified collateral, and
+      ;; buying/selling the borrowed asset is how a borrow is repaid, so idle
+      ;; spot USDC / held base is the wrong cap — the exchange enforces margin.
+      (is (empty? (buy-over :unified)))
+      (is (empty? (sell-over :unified))))
+
+    (testing "classic account still allows an affordable spot buy"
+      (is (empty? (domain-validation/validate-order-form
+                   (spot-context :classic)
+                   {:type :market :side :buy :size "5"}))))))
 
 (deftest enabled-tpsl-legs-require-their-own-triggers-test
   (let [form (assoc (trading/default-order-form)

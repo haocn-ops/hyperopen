@@ -5,7 +5,7 @@
             [hyperopen.domain.trading.core :as core]
             [hyperopen.domain.trading.fees :as fees]))
 
-(defn- unified-account-mode? [context]
+(defn unified-account-mode? [context]
   (= :unified (get-in context [:account :mode])))
 
 (defn- usdc-coin? [coin]

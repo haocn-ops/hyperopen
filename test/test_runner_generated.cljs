@@ -5,8 +5,12 @@
             [hyperopen.account-tab-modules-test]
             [hyperopen.account.context-test]
             [hyperopen.account.history.actions-test]
-            [hyperopen.account.history.effects-test]
+            [hyperopen.account.history.effects-csv-export-test]
+            [hyperopen.account.history.effects-funding-fetch-test]
+            [hyperopen.account.history.effects-funding-merge-test]
+            [hyperopen.account.history.effects-order-history-test]
             [hyperopen.account.history.position-margin-test]
+            [hyperopen.account.history.position-modal-actions-test]
             [hyperopen.account.history.position-reduce-test]
             [hyperopen.account.history.position-tpsl-test]
             [hyperopen.account.lifecycle-invariants-test]
@@ -101,7 +105,8 @@
             [hyperopen.asset-selector.settings-test]
             [hyperopen.chart.settings-test]
             [hyperopen.config-test]
-            [hyperopen.core-bootstrap.account-history-actions-test]
+            [hyperopen.core-bootstrap.account-history-pagination-test]
+            [hyperopen.core-bootstrap.account-history-tab-loading-test]
             [hyperopen.core-bootstrap.agent-trading-lifecycle-test]
             [hyperopen.core-bootstrap.asset-cache-persistence-test]
             [hyperopen.core-bootstrap.asset-selector-actions-test]
@@ -733,8 +738,12 @@
     (run-tests env 'hyperopen.account-tab-modules-test
              'hyperopen.account.context-test
              'hyperopen.account.history.actions-test
-             'hyperopen.account.history.effects-test
+             'hyperopen.account.history.effects-csv-export-test
+             'hyperopen.account.history.effects-funding-fetch-test
+             'hyperopen.account.history.effects-funding-merge-test
+             'hyperopen.account.history.effects-order-history-test
              'hyperopen.account.history.position-margin-test
+             'hyperopen.account.history.position-modal-actions-test
              'hyperopen.account.history.position-reduce-test
              'hyperopen.account.history.position-tpsl-test
              'hyperopen.account.lifecycle-invariants-test
@@ -829,7 +838,8 @@
              'hyperopen.asset-selector.settings-test
              'hyperopen.chart.settings-test
              'hyperopen.config-test
-             'hyperopen.core-bootstrap.account-history-actions-test
+             'hyperopen.core-bootstrap.account-history-pagination-test
+             'hyperopen.core-bootstrap.account-history-tab-loading-test
              'hyperopen.core-bootstrap.agent-trading-lifecycle-test
              'hyperopen.core-bootstrap.asset-cache-persistence-test
              'hyperopen.core-bootstrap.asset-selector-actions-test

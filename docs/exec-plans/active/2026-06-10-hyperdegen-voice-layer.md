@@ -1,10 +1,10 @@
 # HyperDegen voice layer (theme-keyed UI copy)
 
-## Why
+## Purpose
 
 The `hyperdegen` theme (tokens: colors/type/radius, see `docs/THEMING.md`) matches the HyperDegen reference prototype's palette, but most of the prototype's identity is its parody copy — "TRADE (GAMBLE)", "Buy / Moon", "Positions (hope and dreams)". Tokens deliberately cannot carry copy. Direct user request on 2026-06-10: deliver the prototype experience behind the existing theme toggle (no fork, no separate build).
 
-## Outcome
+## Outcomes & Retrospective
 
 A pure copy catalog, `hyperopen.ui.voice`, keyed off the active theme: `hyperdegen` → the `:degen` voice, every other theme → `:default` (canonical strings, pixel-identical behavior). Switching themes in Settings → Appearance relabels the header nav (desktop/mobile/more), the account-info tabs (trade + portfolio), and the order-form buy/sell/submit buttons in the same gesture that recolors them. No new actions, effects, or persistence — the voice rides `[:ui :theme]`.
 
@@ -20,7 +20,7 @@ A pure copy catalog, `hyperopen.ui.voice`, keyed off the active theme: `hyperdeg
 - Memoization correctness: `trade_view` memoizes panel renders on selected state subsets; `ui-voice-state` (`{:ui {:theme …}}`) is merged into `account-info-view-state` and `order-form-view-state` so a theme switch busts those memos. Any future voiced surface rendered through a selected-state memo must include this slice.
 - Counted tabs (`:balances :positions :outcomes :open-orders :twap`) use paren-free degen nouns ("Hope & Dreams") so registry count suffixes ("… (3)") compose.
 
-## Status
+## Progress
 
 - [x] (2026-06-10) `hyperopen.ui.voice` catalog + lookups; unit tests incl. nav/tab-registry sync tests and catalog hygiene.
 - [x] (2026-06-10) Header nav wiring (desktop/mobile/more) + vm tests for both voices.
@@ -37,8 +37,22 @@ A pure copy catalog, `hyperopen.ui.voice`, keyed off the active theme: `hyperdeg
 - [x] (2026-06-10) Size-slider risk feedback — the order-size percent slider doubles as the prototype's leverage slider via imputed account leverage (`degen.order-form/effective-leverage` = size% × margin leverage): live tier taunt line under the slider ("≈12.0x account leverage. Getting spicy. 🌶️"; "ALL IN." flavor at 100%), slider fill tinted by tier through the existing `--order-size-slider-active` var with token forms (`rgb(var(--ho-warn) / 0.55)` — the ratchet only counts hex literals), and tier-crossing ticks via the now-keyed `sfx/leverage-tick-on-change!` (`:leverage` vs `:order-size` atoms so the two sliders don't swallow each other's crossings).
 - [ ] Follow-up — book-depth ratio bar under the order book (needs panel snapshot plumbing); the prototype's purely-fake controls (YOLO toggles, weapons, DEGEN LVL, IQ chip, roulette, meme feed, coin modal, nav joke toasts) stay unimplemented by design in a real-money product.
 
-## Decisions
+## Surprises & Discoveries
+
+- Memoization is the sharp edge: voiced surfaces render through selected-state memos (`trade_view`), so a theme switch only relabels if the `{:ui {:theme …}}` slice is merged into that surface's selected state — any future voiced surface behind a memo must include it or it silently won't re-render.
+- New Tailwind classes in new namespaces need `npm run css:build` (JIT); a stale CSS bundle silently drops them.
+- Destructuring a `:when` option key shadows the `when` macro, so the decor option is named `:delay`.
+- Data-style `:on` handlers can't be wrapped, so the render side owns the prototype's `lastThresh` ref for leverage tick crossings (`sfx/leverage-tick-on-change!`, keyed per slider so the two sliders don't swallow each other's crossings).
+- Illustration hexes are exempt-by-design via a `dev/theme_color_baseline.edn` entry; the PNL gauge dial is UI and stays token-colored (test-enforced) so the color ratchet stays clean.
+
+## Decision Log
 
 - Voice derives from theme rather than a separate preference: one toggle, one persistence path; revisit only if product wants voice and palette decoupled.
 - The most specific override wins: caller `tab-label-overrides` > voice > registry default.
 - Existing tests assert default-voice strings and stay untouched; degen assertions are additive.
+
+## Validation
+
+- The `:default` voice catalog is sync-tested against the surfaces that own those strings (`views.header.nav` items, `views.account-info.tab-registry/tab-labels`), so catalog and surface cannot drift; catalog hygiene unit tests cover lookups and fallbacks.
+- vm tests assert both voices for the header nav (desktop/mobile/more), account-info tabs (trade + portfolio), and order-form buy/sell/submit labels.
+- Acceptance: switching themes in Settings → Appearance relabels nav, account-info tabs, and order-form buttons in the same gesture that recolors them; under the degen voice, fills trigger sfx/confetti and liquidation fills trigger the REKT overlay, with no behavior change under any other theme.

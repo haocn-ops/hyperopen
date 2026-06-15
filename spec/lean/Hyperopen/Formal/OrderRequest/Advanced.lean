@@ -383,8 +383,17 @@ def scaleOrders? (context : Context) (form : Form) : Option (List WireOrder) := 
   let legs ← buildScaleLegs? context form
   let tif := if form.postOnly then "Alo" else "Gtc"
   let reduceOnly := Standard.reduceOnlyFlag (effectiveReduceOnly context form)
+  let priceContext := leverageContext context
   let toOrder (leg : ScaleLeg) : Option WireOrder := do
-    let priceText ← positiveRatioToWireString? leg.price
+    -- Interpolated ladder prices come out raw (e.g. "99.66666666666667"), which
+    -- exceeds the exchange price precision the canonical formatter enforces
+    -- (5 sig figs / (8 or 6 - szDecimals) decimals). Mirror the CLJS builder:
+    -- render the raw wire string, then run it through the same standard canonical
+    -- price formatter. The .getD keeps the raw rendering only on the degenerate
+    -- sub-tick case where canonicalization would floor to zero (mirrors the CLJS
+    -- if-let "keep order" branch); realistic ladders never hit it.
+    let rawPriceText ← positiveRatioToWireString? leg.price
+    let priceText := (Standard.canonicalPriceText? priceContext rawPriceText).getD rawPriceText
     let sizeText ← positiveRatioToWireString? leg.size
     some
       { asset := assetIdx
@@ -782,7 +791,7 @@ theorem scale_flooring_drops_remainder :
              preActions := [] } := by
   native_decide
 
-theorem scale_repeating_price_step_uses_float_boundary_rendering :
+theorem scale_repeating_price_step_canonicalizes_leg_prices :
     buildAdvancedRequest btcPerpContext scaleRepeatingPriceStepForm =
       some { payload :=
                .scale
@@ -794,13 +803,13 @@ theorem scale_repeating_price_step_uses_float_boundary_rendering :
                     terms := Standard.OrderTerms.limit "Gtc" }
                  ,{ asset := 5
                     isBuy := true
-                    price := "99.66666666666667"
+                    price := "99.66"
                     size := "3"
                     reduceOnly := none
                     terms := Standard.OrderTerms.limit "Gtc" }
                  ,{ asset := 5
                     isBuy := true
-                    price := "99.33333333333333"
+                    price := "99.33"
                     size := "3"
                     reduceOnly := none
                     terms := Standard.OrderTerms.limit "Gtc" }

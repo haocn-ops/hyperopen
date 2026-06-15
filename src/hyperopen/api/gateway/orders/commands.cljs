@@ -250,11 +250,15 @@
                   (get scale :end)
                   (effective-reduce-only command-context form)
                   (:post-only form)))
-        ;; Spot scale-leg prices must respect spot tick/precision (8 - szDecimals),
-        ;; but interpolated ladder prices come out raw from scale-order-legs, so
-        ;; canonicalize each spot leg price here. (Perp scale legs are left as-is
-        ;; pending a broader, separately-reviewed scale-precision fix.)
-        orders (if (and (seq orders) (spot-market-command? command-context))
+        ;; Interpolated ladder prices come out raw from scale-order-legs (e.g.
+        ;; 99.66666666666667), exceeding the wire precision the exchange accepts:
+        ;; perp = 5 sig figs / (6 - szDecimals) decimals, spot = (8 - szDecimals)
+        ;; decimals. Canonicalize every leg price (both perp and spot) so the
+        ;; exchange does not reject ladder legs. Adjacent legs may canonicalize to
+        ;; the same price on very tight ladders; duplicates are left as-is (the
+        ;; exchange accepts multiple resting orders at one price, and dropping
+        ;; would silently under-fill the requested total size).
+        orders (if (seq orders)
                  (mapv (fn [order]
                          (if-let [p (canonical-price-text command-context
                                                           (trading-domain/parse-num (:p order)))]

@@ -55,6 +55,31 @@
       ;; full-precision interpolation string
       (is (every? #(re-matches #"\d+(\.\d{1,8})?" %) leg-prices)))))
 
+(deftest perp-scale-leg-prices-are-canonicalized-test
+  (testing "perp scale ladder leg prices respect perp precision (5 sig figs / (6 - szDecimals) decimals)"
+    (let [perp-context {:active-asset "BTC"
+                        :asset-idx 5
+                        :market {:market-type :perp :szDecimals 4}}
+          ;; start 100 -> end 99 over 4 legs yields raw 99.6666.../99.3333... mids;
+          ;; szDecimals 4 => max 2 price decimals, so they canonicalize to 99.66/99.33.
+          request (commands/build-order-request perp-context
+                                                {:type :scale
+                                                 :side :buy
+                                                 :reduce-only true
+                                                 :size "12"
+                                                 :scale {:start "100"
+                                                         :end "99"
+                                                         :count 4
+                                                         :skew "1.00"}})
+          orders (get-in request [:action :orders])
+          leg-prices (mapv :p orders)]
+      (is (= 4 (count orders)))
+      ;; canonicalized to perp tick/sig-fig precision, not the raw interpolation
+      (is (= ["100" "99.66" "99.33" "99"] leg-prices))
+      ;; perp keeps the encoded asset id and (unlike spot) preserves reduce-only
+      (is (every? #(= 5 (:a %)) orders))
+      (is (every? #(true? (:r %)) orders)))))
+
 (deftest build-tpsl-orders-builds-enabled-legs-test
   (let [orders (commands/build-tpsl-orders
                 5

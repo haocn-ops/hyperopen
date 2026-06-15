@@ -105,4 +105,7 @@
      :quote-symbol (resolve-quote-symbol instrument market)
      :spot? (boolean spot?)
      :hip3? (boolean hip3?)
-     :read-only? (boolean spot?)}))
+     ;; Spot markets are tradable now, so the instrument itself is never
+     ;; read-only. Spectate / inspected-account read-only is enforced elsewhere
+     ;; (the submit policy's :spectate-mode-read-only reason), not here.
+     :read-only? false}))

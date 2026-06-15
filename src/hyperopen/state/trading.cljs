@@ -262,10 +262,16 @@
                                 [(:asset-id market*)
                                  (:assetId market*)])
         idx (some parse-int-value [(:idx market*)])
-        named-dex? (named-dex-market? market*)]
+        named-dex? (named-dex-market? market*)
+        spot? (= :spot (:market-type market*))]
     (or explicit-asset-id
+        ;; Spot wire ids are offset (10000 + pair index); the raw :idx is only a
+        ;; metadata/lookup key and collides 1:1 with low-index perps (raw idx 0
+        ;; is the SOL perp). Require the explicit encoded :asset-id for spot
+        ;; rather than leaking the raw index.
         (when (and (some? idx)
-                   (not named-dex?))
+                   (not named-dex?)
+                   (not spot?))
           idx))))
 
 (defn- asset-context-idx
@@ -279,9 +285,14 @@
   (let [active-market (or (resolved-active-market state) {})
         active-asset (:active-asset state)
         market-idx (market-asset-id active-market)
-        named-dex? (named-dex-market? active-market)]
+        named-dex? (named-dex-market? active-market)
+        spot? (= :spot (:market-type active-market))]
     (or market-idx
-        (when-not named-dex?
+        ;; asset-context idx is the raw (un-offset) index — safe for perps but
+        ;; would leak the colliding raw spot index, so never use it for spot.
+        ;; A spot market without an encoded :asset-id resolves to nil and the
+        ;; order fails closed rather than targeting the wrong asset.
+        (when-not (or named-dex? spot?)
           (asset-context-idx state active-asset)))))
 
 (defn- outcome-market?

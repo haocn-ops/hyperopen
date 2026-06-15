@@ -141,7 +141,7 @@
         baseline]])]])
 
 (defn footer-metrics
-  [display show-liquidation-row? show-slippage-row? fee-copy scale-preview-lines]
+  [display show-liquidation-row? show-margin-row? show-slippage-row? fee-copy scale-preview-lines]
   (let [liquidation-price (:liquidation-price display)
         liquidation-tooltip (when (= liquidation-price "N/A")
                               liquidation-price-tooltip)]
@@ -157,9 +157,11 @@
                                 nil
                                 liquidation-tooltip)])
       [(primitives/metric-row "Order Value"
-                              (:order-value display))
-       (primitives/metric-row "Margin Required"
-                              (:margin-required display))]
+                              (:order-value display))]
+      ;; Margin Required is perp-only; hidden for spot.
+      (when show-margin-row?
+        [(primitives/metric-row "Margin Required"
+                                (:margin-required display))])
       (when show-slippage-row?
         [(primitives/metric-row "Slippage"
                                 (:slippage display)

@@ -47,14 +47,18 @@ def crossMarginAllowed (market : MarketFlags) : Bool :=
 def effectiveMarginMode (market : MarketFlags) (mode : MarginMode) : MarginMode :=
   if mode = .cross && !crossMarginAllowed market then .isolated else mode
 
+-- `_spot` is intentionally ignored: spot order submission is supported, so the
+-- former `spot -> spotReadOnly` gate has been removed from both arms. The
+-- parameter is retained so the policy input shape (and the CLJS mirror in
+-- hyperopen.trading.submit-policy) stays unchanged. `spotReadOnly` remains in
+-- `Reason` for back-compat but is no longer produced.
 def submitReason
     (mode : SubmitMode)
-    (submitting spectate spot marketPriceMissing hasErrors requestAvailable agentReady : Bool) :
+    (submitting spectate _spot marketPriceMissing hasErrors requestAvailable agentReady : Bool) :
     Option Reason :=
   match mode with
   | .submit =>
       if spectate then some .spectateModeReadOnly
-      else if spot then some .spotReadOnly
       else if marketPriceMissing then some .marketPriceMissing
       else if hasErrors then some .validationErrors
       else if !requestAvailable then some .requestUnavailable
@@ -63,7 +67,6 @@ def submitReason
   | .view =>
       if submitting then some .submitting
       else if spectate then some .spectateModeReadOnly
-      else if spot then some .spotReadOnly
       else if marketPriceMissing then some .marketPriceMissing
       else if hasErrors then some .validationErrors
       else none
@@ -85,11 +88,15 @@ theorem only_isolated_forces_isolated :
     effectiveMarginMode { marginMode := some .normal, onlyIsolated := true } .cross = .isolated := by
   native_decide
 
+-- Spot no longer gates submission, so `reason = none` no longer implies
+-- `spot = false`. The theorem still proves the remaining read-only reasons are
+-- sound: a ready submit implies no spectate / price-missing / validation block.
+-- `spot` is quantified and threaded through `submitReason` to prove the result
+-- holds for either spot value.
 theorem submit_ready_reason_none_sound :
     ∀ spectate spot marketPriceMissing hasErrors,
       submitReason .submit false spectate spot marketPriceMissing hasErrors true true = none →
         spectate = false ∧
-          spot = false ∧
           marketPriceMissing = false ∧
           hasErrors = false := by
   native_decide
@@ -440,16 +447,16 @@ def submitPolicyVectors : Clj :=
                                       (some "Spectate Mode is read-only. Stop Spectate Mode to place trades or move funds.")
                                       true)]
     ,mapClj
-       [kv "id" (.keyword "submit-spot-read-only")
+       [kv "id" (.keyword "submit-spot-submittable")
        ,kv "context" spotContext
        ,kv "identity" (identity true)
        ,kv "spectate-mode-message" .nil
        ,kv "form" (form "limit" "buy" "1" "100" none none none none none none)
        ,kv "options" (options "submit" none (some true))
+       -- Spot is now submittable: a spot identity with a ready form yields no
+       -- reason and is not disabled (the former :spot-read-only gate is gone).
        ,kv "expected" (submitExpected "limit" "buy" "1" "100" false [] []
-                                      (some "spot-read-only") true
-                                      (some "Spot trading is not supported yet.")
-                                      true)]
+                                      none false none true)]
     ,mapClj
        [kv "id" (.keyword "submit-market-price-missing")
        ,kv "context" missingDataContext

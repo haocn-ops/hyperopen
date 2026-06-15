@@ -332,6 +332,21 @@
                (* dex-idx builder-deployed-perp-asset-id-stride)
                idx*))))
 
+(def ^:private spot-asset-id-offset
+  ;; Hyperliquid encodes a spot order's wire asset as 10000 + the spotMeta pair
+  ;; index (perp orders use the raw perp universe index). Verified against
+  ;; testnet: PURR/USDC idx 0 -> 10000, @1 idx 1 -> 10001, HYPE/USDC @1035 ->
+  ;; 11035. The raw pair index collides 1:1 with low-index perps (raw idx 0 is
+  ;; the SOL perp), so the offset MUST be applied before the index is used as a
+  ;; wire asset id.
+  10000)
+
+(defn- spot-asset-id
+  [idx]
+  (let [idx* (parse-int-value idx)]
+    (when (some? idx*)
+      (+ spot-asset-id-offset idx*))))
+
 (def ^:private hip3-min-open-interest-usd
   1000000)
 
@@ -1254,8 +1269,10 @@
           :market-type :spot
           :dex nil
           :stable-pair? (stable-pair? base quote)
+          ;; :idx stays the raw spotMeta pair index (token-list / asset-context
+          ;; lookup key); :asset-id carries the offset wire id used for orders.
           :idx idx
-          :asset-id idx
+          :asset-id (spot-asset-id idx)
           :mark mark
           :markRaw mark-raw
           :volume24h volume

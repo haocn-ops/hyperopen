@@ -2,10 +2,6 @@
   (:require [hyperopen.state.trading :as trading]
             [hyperopen.trading.order-form-tpsl-policy :as tpsl-policy]))
 
-(defn unsupported-market-banner [message]
-  [:div {:class ["px-3" "py-2" "bg-base-200" "border" "border-base-300" "rounded-lg" "text-xs" "text-gray-300"]}
-   message])
-
 (defn- twap-runtime-label [total-minutes]
   (if (number? total-minutes)
     (let [hours (quot total-minutes 60)

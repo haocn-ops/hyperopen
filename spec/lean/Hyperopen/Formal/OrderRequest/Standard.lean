@@ -885,7 +885,12 @@ def wireOrderToClj (order : WireOrder) : Clj :=
     ,(.keyword "r",
       match order.reduceOnly with
       | some flag => .bool flag
-      | none => .nil)
+      -- Hyperliquid's order wire always carries `r` as a boolean (default
+      -- false); there is no "omitted"/null reduce-only on the wire. Render an
+      -- unset reduce-only as `false` so the generated vectors match the CLJS
+      -- builder (`:r (boolean ...)`) and the wire contract (`reduce-only-flag?`
+      -- requires boolean?).
+      | none => .bool false)
     ,(.keyword "t", orderTermsToClj order.terms)]
 
 def updateLeverageActionToClj (action : UpdateLeverageAction) : Clj :=

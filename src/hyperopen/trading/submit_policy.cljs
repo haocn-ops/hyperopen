@@ -106,7 +106,6 @@
                   :submit
                   (cond
                     (seq spectate-mode-message) :spectate-mode-read-only
-                    (:spot? identity) :spot-read-only
                     market-price-missing? :market-price-missing
                     (seq errors) :validation-errors
                     (nil? request) :request-unavailable
@@ -117,7 +116,6 @@
                   (cond
                     submitting? :submitting
                     (seq spectate-mode-message) :spectate-mode-read-only
-                    (:spot? identity) :spot-read-only
                     market-price-missing? :market-price-missing
                     (seq errors) :validation-errors
                     :else nil)
@@ -125,7 +123,6 @@
                   nil)
          error-message (case reason
                          :spectate-mode-read-only spectate-mode-message
-                         :spot-read-only "Spot trading is not supported yet."
                          :market-price-missing "Market price unavailable. Load order book first."
                          :validation-errors (trading-domain/validation-error-message (first errors))
                          :request-unavailable "Select an asset and ensure market data is loaded."

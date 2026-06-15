@@ -20,7 +20,7 @@
       (is (false? (:hip3? identity)))
       (is (false? (:read-only? identity)))))
 
-  (testing "infers spot and read-only when active-asset is spot-style"
+  (testing "infers spot when active-asset is spot-style (spot is tradable, not read-only)"
     (let [state {:active-asset "ETH/USDC"
                  :active-market {:symbol "ETH-USDC"}}
           identity (trading/market-identity state)]
@@ -28,7 +28,7 @@
       (is (= "USDC" (:quote-symbol identity)))
       (is (true? (:spot? identity)))
       (is (false? (:hip3? identity)))
-      (is (true? (:read-only? identity)))))
+      (is (false? (:read-only? identity)))))
 
   (testing "canonical market metadata takes precedence over slash heuristics"
     (let [state {:active-asset "ETH/USDC"
@@ -181,12 +181,24 @@
       (is (= 110005 (get-in policy [:request :action :orders 0 :a]))))))
 
 (deftest submit-policy-additional-branch-coverage-test
-  (testing "submit mode returns spot-read-only for spot market identity"
-    (let [state {:active-asset "ETH/USDC"
-                 :active-market {:symbol "ETH-USDC"}
-                 :orderbooks {"ETH/USDC" {:bids [{:px "99"}]
-                                        :asks [{:px "101"}]}}
-                 :webdata2 {}}
+  (testing "spot market identity is submittable with the encoded (10000 + idx) wire asset id"
+    (let [state {:active-asset "PURR/USDC"
+                 :active-market {:coin "PURR/USDC"
+                                 :symbol "PURR/USDC"
+                                 :base "PURR"
+                                 :quote "USDC"
+                                 :market-type :spot
+                                 :asset-id 10000
+                                 :idx 0
+                                 :mark 100
+                                 :szDecimals 0}
+                 :orderbooks {"PURR/USDC" {:bids [{:px "99"}]
+                                           :asks [{:px "101"}]}}
+                 :spot {:clearinghouse-state {:balances [{:coin "USDC" :total "1000" :hold "0"}
+                                                         {:coin "PURR" :total "0" :hold "0"}]}}
+                 :asset-contexts {}
+                 :order-form (trading/default-order-form)
+                 :order-form-ui (trading/default-order-form-ui)}
           form (assoc (trading/default-order-form)
                       :type :limit
                       :side :buy
@@ -194,8 +206,10 @@
                       :price "100")
           policy (trading/submit-policy state form {:mode :submit
                                                     :agent-ready? true})]
-      (is (= :spot-read-only (:reason policy)))
-      (is (= "Spot trading is not supported yet." (:error-message policy)))))
+      (is (nil? (:reason policy)))
+      (is (false? (:disabled? policy)))
+      (is (order-request-contracts/order-request-valid? (:request policy)))
+      (is (= 10000 (get-in policy [:request :action :orders 0 :a])))))
 
   (testing "submit mode returns market-price-missing when market price cannot be derived"
     (let [state {:active-asset "BTC"

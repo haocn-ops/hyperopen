@@ -16,7 +16,9 @@
     :twap/runtime-invalid
     :twap/suborder-notional-too-small
     :tpsl/tp-trigger-required
-    :tpsl/sl-trigger-required})
+    :tpsl/sl-trigger-required
+    :spot/insufficient-usdc
+    :spot/insufficient-base-balance})
 
 (def ^:private submit-reason-values
   #{nil

@@ -22,7 +22,11 @@
    :tpsl/tp-trigger-required {:message "TP trigger price is required when TP is enabled."
                               :fields [:tp-trigger]}
    :tpsl/sl-trigger-required {:message "SL trigger price is required when SL is enabled."
-                              :fields [:sl-trigger]}})
+                              :fields [:sl-trigger]}
+   :spot/insufficient-usdc {:message "Not enough USDC available to buy this size."
+                            :fields [:size]}
+   :spot/insufficient-base-balance {:message "Not enough balance to sell this size."
+                                    :fields [:size]}})
 
 (defn- validation-error [code]
   (when-let [spec (get validation-error-specs code)]
@@ -102,6 +106,30 @@
         (< start-notional core/scale-min-endpoint-notional)
         (< end-notional core/scale-min-endpoint-notional))
     (conj (validation-error :scale/endpoint-notional-too-small))))
+
+(defn- spot-affordability-errors
+  "Spot affordability check, applied only to spot markets and only when spot
+   balances are loaded (fail-open on missing data so the exchange remains the
+   source of truth). Buys require USDC available >= order value; sells require
+   base-token available >= size. Fees are not reserved here (lenient by design
+   to avoid false rejects); the exchange enforces the precise margin."
+  [context form size]
+  (or
+   (when (and context
+              (core/spot-market-context? context)
+              (number? size)
+              (pos? size)
+              (seq (get-in context [:spot :clearinghouse-state :balances])))
+     (if (= :sell (:side form))
+       (when (> size (market/spot-base-available context))
+         [(validation-error :spot/insufficient-base-balance)])
+       (let [ref-price (market/reference-price context form)
+             order-value (when (and (number? ref-price) (pos? ref-price))
+                           (* size ref-price))]
+         (when (and (number? order-value)
+                    (> order-value (market/spot-usdc-available context)))
+           [(validation-error :spot/insufficient-usdc)]))))
+   []))
 
 (defn- validate-twap [{:keys [twap-minutes
                               twap-suborder-notional] :as parsed}]
@@ -185,8 +213,9 @@
                        (conj (validation-error :tpsl/tp-trigger-required))
 
                        (and sl-enabled? (invalid-positive? sl-trigger))
-                       (conj (validation-error :tpsl/sl-trigger-required)))]
-     (into [] (concat type-errors tpsl-errors)))))
+                       (conj (validation-error :tpsl/sl-trigger-required)))
+         spot-errors (spot-affordability-errors context form size)]
+     (into [] (concat type-errors tpsl-errors spot-errors)))))
 
 (def ^:private required-field-rank
   {:price 0

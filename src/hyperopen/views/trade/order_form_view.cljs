@@ -136,13 +136,10 @@
                    "gap-2"
                    "sm:gap-2.5"]
            :data-parity-id "order-form"}
-     (when spot?
-       (feedback/unsupported-market-banner
-        "Spot trading is not supported yet. You can still view spot charts and order books."))
-
      [:div {:class (into ["flex" "flex-col" "gap-2" "sm:gap-2.5"]
                          (when read-only? ["opacity-60" "pointer-events-none"]))}
-      (when-not outcome?
+      ;; Leverage/margin is perp-only — spot has no leverage.
+      (when (and (not outcome?) (not spot?))
         (controls/leverage-row state
                                (:margin-mode form)
                                cross-margin-allowed?
@@ -152,7 +149,7 @@
                                leverage-draft
                                max-leverage
                                leverage-handlers))
-      (when-not outcome?
+      (when (and (not outcome?) (not spot?))
         (degen-order-form/leverage-warning-banner state ui-leverage))
 
       (sections/entry-mode-tabs {:entry-mode entry-mode
@@ -209,7 +206,8 @@
 
       (when (or (not outcome?) show-limit-like-controls?)
         [:div {:class ["flex" "items-center" "justify-between" "gap-3"]}
-         (when-not outcome?
+         ;; Reduce-only is perp-only (spot has no position to reduce).
+         (when (and (not outcome?) (not spot?))
            (primitives/row-toggle "Reduce Only"
                                   (:reduce-only form)
                                   (:on-toggle-reduce-only toggle-handlers)))
@@ -218,12 +216,14 @@
                                         (assoc tif-handlers
                                                :dropdown-open? tif-dropdown-open?)))])
 
-      (when (and (not outcome?) show-tpsl-toggle?)
+      ;; TP/SL brackets are perp-only (they place reduce-only legs against a
+      ;; position); spot has no position, so the toggle/panel are hidden.
+      (when (and (not outcome?) (not spot?) show-tpsl-toggle?)
         (primitives/row-toggle "Take Profit / Stop Loss"
                                show-tpsl-panel?
                                (:on-toggle-tpsl-panel toggle-handlers)))
 
-      (when (and (not outcome?) show-tpsl-panel?)
+      (when (and (not outcome?) (not spot?) show-tpsl-panel?)
         (sections/tp-sl-panel tpsl-panel tp-sl-handlers))
 
       (when (and (not outcome?) show-post-only?)
@@ -246,7 +246,8 @@
                             :on-submit (:on-submit submit-handlers)}))
 
       (footer/footer-metrics display
-                             show-liquidation-row?
+                             (and show-liquidation-row? (not spot?))
+                             (not spot?)
                              show-slippage-row?
                              fee-copy
                              (when show-scale-preview? scale-preview-lines))]]))

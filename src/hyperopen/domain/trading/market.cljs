@@ -55,6 +55,36 @@
              (number? withdrawable) withdrawable
              :else fallback-available))))
 
+(defn- normalize-balance-coin [coin]
+  (some-> coin str str/upper-case str/trim))
+
+(defn- spot-balance-available
+  "Available (total - hold) for the spot balance whose coin matches `coin`,
+   or nil when absent. Reads spot balances regardless of account mode, so it
+   works in the default :classic mode (unlike unified-spot-usdc-available)."
+  [context coin]
+  (let [coin* (normalize-balance-coin coin)]
+    (when (seq coin*)
+      (some (fn [balance]
+              (when (= coin* (normalize-balance-coin (:coin balance)))
+                (let [total (core/parse-num (:total balance))
+                      hold (core/parse-num (:hold balance))]
+                  (when (number? total)
+                    (max 0 (- total (or hold 0)))))))
+            (get-in context [:spot :clearinghouse-state :balances])))))
+
+(defn spot-usdc-available
+  "USDC buying power for spot orders (quote-side balance)."
+  [context]
+  (or (spot-balance-available context "USDC") 0))
+
+(defn spot-base-available
+  "Base-token balance available to sell for the active spot market."
+  [context]
+  (let [base (:base-symbol (market-identity {:active-asset (:active-asset context)
+                                             :market (:market context)}))]
+    (or (spot-balance-available context base) 0)))
+
 (defn position-for-market
   [context]
   (position-lookup/position-for-market context))
@@ -375,44 +405,60 @@
                (pos? mid-price))
       (core/number->clean-string mid-price 6))))
 
+(defn- max-order-base-size
+  "Maximum order size in BASE units for the current side.
+   - perp: notional capacity (available * leverage) / price
+   - spot buy: USDC available / price (no leverage)
+   - spot sell: base-token available (no leverage, no price division)
+   Returns nil when it can't be computed (e.g. no reference price)."
+  [context form]
+  (let [ref-price (reference-price context form)]
+    (if (spot-market? context)
+      (if (= (:side form) :sell)
+        (let [base-available (spot-base-available context)]
+          (when (pos? base-available) base-available))
+        (when (and (number? ref-price) (pos? ref-price))
+          (let [usdc (spot-usdc-available context)]
+            (when (pos? usdc) (/ usdc ref-price)))))
+      (let [available (available-to-trade context)
+            leverage (core/normalize-ui-leverage context (:ui-leverage form))
+            capacity (* available leverage)]
+        (when (and (number? ref-price) (pos? ref-price) (pos? capacity))
+          (/ capacity ref-price))))))
+
 (defn size-from-percent [context form percent]
   (let [pct (core/clamp-percent percent)
-        available (available-to-trade context)
-        leverage (core/normalize-ui-leverage context (:ui-leverage form))
-        ref-price (reference-price context form)
-        notional (* available leverage (/ pct 100))]
+        max-size (max-order-base-size context form)]
     (when (and (pos? pct)
-               (number? ref-price)
-               (pos? ref-price)
-               (pos? notional))
-      (/ notional ref-price))))
+               (number? max-size)
+               (pos? max-size))
+      (* max-size (/ pct 100)))))
 
 (defn percent-from-size [context form size]
   (let [size-value (core/parse-num size)
-        available (available-to-trade context)
-        leverage (core/normalize-ui-leverage context (:ui-leverage form))
-        ref-price (reference-price context form)
-        notional-capacity (* available leverage)]
+        max-size (max-order-base-size context form)]
     (when (and (number? size-value)
                (pos? size-value)
-               (number? ref-price)
-               (pos? ref-price)
-               (pos? notional-capacity))
-      (core/clamp-percent (* 100 (/ (* size-value ref-price) notional-capacity))))))
+               (number? max-size)
+               (pos? max-size))
+      (core/clamp-percent (* 100 (/ size-value max-size))))))
 
 (defn apply-size-percent [context form percent]
   (let [pct (core/clamp-percent percent)
-        available (available-to-trade context)
-        leverage (core/normalize-ui-leverage context (:ui-leverage form))
-        notional (* available leverage (/ pct 100))
         normalized-form (assoc form
                                :size-percent pct
                                :ui-leverage (core/normalize-ui-leverage context (:ui-leverage form)))
         computed-size (size-from-percent context normalized-form pct)
+        ref-price (reference-price context normalized-form)
         quantized-size (when (number? computed-size)
                          (base-size-string context computed-size))
-        display-notional (when (and (number? notional) (pos? notional))
-                           (core/number->clean-string notional 2))]
+        ;; Notional (USDC value) = size * price, which equals the perp
+        ;; available*leverage*pct/100 capacity for perps and the USDC commit for
+        ;; spot buys / sale proceeds for spot sells.
+        display-notional (when (and (number? computed-size)
+                                    (number? ref-price)
+                                    (pos? (* computed-size ref-price)))
+                           (core/number->clean-string (* computed-size ref-price) 2))]
     (cond
       (zero? pct) (assoc normalized-form :size "" :size-display "")
       (seq quantized-size) (assoc normalized-form
@@ -472,20 +518,26 @@
    (order-summary context form (context->fee-context context)))
   ([context form fee-context]
    (let [fee-context* (or fee-context (context->fee-context context))
+         spot? (spot-market? context)
          size (core/parse-num (:size form))
          ref-price (reference-price context form)
-         available (available-to-trade context)
+         available (if spot?
+                     (spot-usdc-available context)
+                     (available-to-trade context))
          order-value (when (and (number? size)
                                 (pos? size)
                                 (number? ref-price)
                                 (pos? ref-price))
                        (* size ref-price))
          leverage (core/normalize-ui-leverage context (:ui-leverage form))
-         margin-required (when (and (number? order-value) (pos? leverage))
+         ;; Margin and liquidation are perp-only — spot has no leverage and no
+         ;; position to liquidate, so they are omitted (nil) for spot markets.
+         margin-required (when (and (not spot?) (number? order-value) (pos? leverage))
                            (/ order-value leverage))
          position (current-position-summary context)
-         liquidation-price (or (:liquidation-price position)
-                               (projected-liquidation-price context form available ref-price order-value))
+         liquidation-price (when-not spot?
+                             (or (:liquidation-price position)
+                                 (projected-liquidation-price context form available ref-price order-value)))
          requested-type (core/normalize-order-type (or (:requested-type form) (:type form)))
          market-order? (= :market requested-type)
          slippage-est (if market-order?

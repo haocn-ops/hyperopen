@@ -179,6 +179,17 @@ def spotLikeContext : Context :=
     market := { coin := some "ETH/USDC"
                 szDecimals := 4 } }
 
+def spotPurrContext : Context :=
+  { activeAsset := "PURR/USDC"
+    -- Spot wire asset id = 10000 + spotMeta pair index (PURR/USDC pair 0).
+    -- Real spot markets carry the encoded id on :asset-id (build-spot-market-entry);
+    -- mirror that so asset-id resolution finds it without the raw-idx fallback.
+    assetIdx := some 10000
+    market := { marketType := some .spot
+                coin := some "PURR/USDC"
+                szDecimals := 0
+                assetId := some 10000 } }
+
 def isolatedOnlyContext : Context :=
   { activeAsset := "BTC"
     assetIdx := some 5
@@ -513,12 +524,18 @@ def buildStandardOrderRequest (context : Context) (form : Form) : Option OrderRe
   let sizeText ← normalizedSizeText? form.size
   let priceText := canonicalPriceText? context form.price
   let triggerText := canonicalPriceText? context form.triggerPx
+  -- Reduce-only and TP/SL brackets are perp-only: spot markets have no
+  -- position to reduce, so reduce-only is forced false and no bracket legs are
+  -- emitted (grouping stays "na"). Mirrors the CLJS builders' spot gate.
+  let isSpot := spotMarket context
+  let reduceOnly := if isSpot then false else form.reduceOnly
   let mainOrder ←
-    mainOrderShape? form.orderType assetIdx form.side sizeText (reduceOnlyFlag form.reduceOnly)
+    mainOrderShape? form.orderType assetIdx form.side sizeText (reduceOnlyFlag reduceOnly)
       priceText triggerText form.postOnly form.tif
-  let tpslOrders ← buildTpslOrders context assetIdx form.side sizeText form.tp form.sl
+  let tpslOrders ← if isSpot then (some ([] : List WireOrder))
+                   else buildTpslOrders context assetIdx form.side sizeText form.tp form.sl
   let orders := mainOrder :: tpslOrders
-  let grouping := if groupedWithTpsl form then "normalTpsl" else "na"
+  let grouping := if (!isSpot && groupedWithTpsl form) then "normalTpsl" else "na"
   some { action := { orders := orders, grouping := grouping }
          assetIdx := assetIdx
          orders := orders }
@@ -687,6 +704,20 @@ def stopMarketMissingTriggerForm : Form :=
     price := ""
     triggerPx := "" }
 
+def spotLimitReduceOnlyForm : Form :=
+  -- reduceOnly := true on the form must be forced false for a spot market.
+  { orderType := .limit
+    side := .buy
+    size := "1"
+    price := "100"
+    reduceOnly := true }
+
+def spotMarketSellForm : Form :=
+  { orderType := .market
+    side := .sell
+    size := "2"
+    price := "100" }
+
 def standardVectors : List StandardVector :=
   [ { id := "limit-post-only"
       contract := .submitReady
@@ -743,6 +774,16 @@ def standardVectors : List StandardVector :=
       context := spotLikeContext
       form := crossLeveragePreActionForm
       expected := buildOrderRequest spotLikeContext crossLeveragePreActionForm }
+  , { id := "spot-encoded-asset-id-suppresses-reduce-only"
+      contract := .submitReady
+      context := spotPurrContext
+      form := spotLimitReduceOnlyForm
+      expected := buildOrderRequest spotPurrContext spotLimitReduceOnlyForm }
+  , { id := "spot-market-encoded-asset-id"
+      contract := .submitReady
+      context := spotPurrContext
+      form := spotMarketSellForm
+      expected := buildOrderRequest spotPurrContext spotMarketSellForm }
   , { id := "named-dex-uses-canonical-asset-id"
       contract := .submitReady
       context := namedDexContext
@@ -885,7 +926,12 @@ def wireOrderToClj (order : WireOrder) : Clj :=
     ,(.keyword "r",
       match order.reduceOnly with
       | some flag => .bool flag
-      | none => .nil)
+      -- Hyperliquid's order wire always carries `r` as a boolean (default
+      -- false); there is no "omitted"/null reduce-only on the wire. Render an
+      -- unset reduce-only as `false` so the generated vectors match the CLJS
+      -- builder (`:r (boolean ...)`) and the wire contract (`reduce-only-flag?`
+      -- requires boolean?).
+      | none => .bool false)
     ,(.keyword "t", orderTermsToClj order.terms)]
 
 def updateLeverageActionToClj (action : UpdateLeverageAction) : Clj :=
@@ -1040,6 +1086,7 @@ def generatedSource : String :=
     ,("named-dex-context", contextToClj namedDexContext)
     ,("named-dex-missing-asset-id-context", contextToClj namedDexMissingCanonicalAssetIdContext)
     ,("spot-like-context", contextToClj spotLikeContext)
+    ,("spot-purr-context", contextToClj spotPurrContext)
     ,("isolated-only-context", contextToClj isolatedOnlyContext)
     ,("standard-order-request-vectors", .vector (standardVectors.map vectorEntryToClj))]
 

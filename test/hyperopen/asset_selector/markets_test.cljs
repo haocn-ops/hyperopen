@@ -85,7 +85,9 @@
       (is (= "USDC" (:quote purr-market)))
       (is (false? (:stable-pair? purr-market)))
       (is (= 0 (:szDecimals purr-market)))
-      (is (= 0 (:asset-id purr-market)))
+      ;; Spot wire asset id is offset by 10000; raw pair index is kept on :idx.
+      (is (= 0 (:idx purr-market)))
+      (is (= 10000 (:asset-id purr-market)))
       (is (= :spot (:market-type purr-market)))
       (is (= "0.5" (:markRaw purr-market)))
       (is (= "0.4" (:prevDayRaw purr-market)))
@@ -94,9 +96,22 @@
       (is (= "USDC" (:quote hype-market)))
       (is (= 2 (:szDecimals hype-market)))
       (is (false? (:stable-pair? hype-market)))
-      (is (= 1 (:asset-id hype-market)))
+      (is (= 1 (:idx hype-market)))
+      (is (= 10001 (:asset-id hype-market)))
       (is (= "USDT/USDC" (:symbol stable-market)))
       (is (true? (:stable-pair? stable-market))))))
+
+(deftest build-spot-markets-asset-id-offset-test
+  (testing "spot wire asset id = 10000 + raw pair index (testnet: @1035 HYPE/USDC -> 11035)"
+    (let [idx 1035
+          spot-meta {:tokens [{:index 0 :name "USDC" :szDecimals 8}
+                              {:index 1105 :name "HYPE" :szDecimals 2}]
+                     :universe [{:name "@1035" :index idx :tokens [1105 0]}]}
+          spot-ctxs (assoc (vec (repeat (inc idx) nil))
+                           idx {:markPx "1" :prevDayPx "1" :dayNtlVlm "1"})
+          market (first (markets/build-spot-markets spot-meta spot-ctxs))]
+      (is (= idx (:idx market)))
+      (is (= 11035 (:asset-id market))))))
 
 (deftest build-spot-markets-token-id-lookup-test
   (let [spot-meta {:tokens [{:index 0 :tokenId 100 :name "USDC" :szDecimals 6}

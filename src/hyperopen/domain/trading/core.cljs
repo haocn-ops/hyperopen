@@ -241,16 +241,26 @@
       candidate
       :stop-market)))
 
+(defn spot-market-context?
+  "True when the trading context's market is a spot market (keyword or string)."
+  [context]
+  (= "spot" (some-> (get-in context [:market :market-type]) name str/lower-case)))
+
 (defn market-max-leverage [context]
   (let [max-lev (parse-num (get-in context [:market :maxLeverage]))]
     (when (and (number? max-lev) (pos? max-lev))
       max-lev)))
 
 (defn normalize-ui-leverage [context leverage]
-  (let [raw (or (parse-num leverage) 20)
-        max-lev (or (market-max-leverage context) 100)]
-    (-> (clamp-num raw 1 max-lev)
-        js/Math.round)))
+  (if (spot-market-context? context)
+    ;; Spot has no leverage. Forcing 1 here also stops percent-sizing from
+    ;; multiplying by the perp fallback (100) for spot markets, which would
+    ;; otherwise oversize spot orders ~100x (spot :maxLeverage is nil).
+    1
+    (let [raw (or (parse-num leverage) 20)
+          max-lev (or (market-max-leverage context) 100)]
+      (-> (clamp-num raw 1 max-lev)
+          js/Math.round))))
 
 (defn order-side->is-buy [side]
   (= side :buy))

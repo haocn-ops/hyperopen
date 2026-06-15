@@ -2,6 +2,7 @@
   (:require [hyperopen.runtime.validation :as validation]
             [cljs.test :refer-macros [async deftest is]]
             [hyperopen.api.trading :as trading]
+            [hyperopen.api.gateway.orders.commands :as commands]
             [hyperopen.api.trading.test-support :as support]
             [hyperopen.platform :as platform]
             [hyperopen.schema.contracts]
@@ -272,6 +273,59 @@
            (fn []
              (trading/clear-debug-exchange-simulator!)
              (restore-fetch!)))))))
+
+;; WS6 — simulator-only transport proof: the encoded spot wire asset id (and the
+;; spot reduce-only suppression) survive the real build -> post-signed-action!
+;; seam end to end, without any live exchange round-trip.
+
+(deftest spot-order-signed-payload-carries-encoded-asset-id-test
+  (async done
+    (let [command-context {:active-asset "PURR/USDC"
+                           :asset-idx 10000
+                           :market {:market-type :spot :szDecimals 0}}
+          form {:type :limit :side :buy :size "1" :price "100"}
+          {:keys [action]} (commands/build-order-action command-context form)
+          signature {:r "0x1" :s "0x2" :v 27}]
+      (trading/set-debug-exchange-simulator!
+       {:signedActions {"order" {:responses [{:status "ok"}]}}})
+      (-> (@#'hyperopen.api.trading/post-signed-action! action 1700000007777 signature)
+          (.then (fn [_resp]
+                   (let [call (first (:calls (trading/debug-exchange-simulator-snapshot)))]
+                     (is (= "order" (get-in call [:request :action :type])))
+                     (is (= 10000 (get-in call [:request :action :orders 0 :a])))
+                     (is (false? (get-in call [:request :action :orders 0 :r])))
+                     (done))))
+          (.catch (fn [err]
+                    (is false (str "Unexpected error: " err))
+                    (done)))
+          (.finally
+           (fn []
+             (trading/clear-debug-exchange-simulator!)))))))
+
+(deftest spot-twap-signed-payload-carries-encoded-asset-id-and-suppresses-reduce-only-test
+  (async done
+    (let [command-context {:active-asset "PURR/USDC"
+                           :asset-idx 10000
+                           :market {:market-type :spot :szDecimals 0}}
+          ;; reduce-only true on the form must be forced false for spot.
+          form {:type :twap :side :buy :size "10" :reduce-only true :twap {:minutes "30"}}
+          {:keys [action]} (commands/build-twap-action command-context form)
+          signature {:r "0x1" :s "0x2" :v 27}]
+      (trading/set-debug-exchange-simulator!
+       {:signedActions {"twapOrder" {:responses [{:status "ok"}]}}})
+      (-> (@#'hyperopen.api.trading/post-signed-action! action 1700000007777 signature)
+          (.then (fn [_resp]
+                   (let [call (first (:calls (trading/debug-exchange-simulator-snapshot)))]
+                     (is (= "twapOrder" (get-in call [:request :action :type])))
+                     (is (= 10000 (get-in call [:request :action :twap :a])))
+                     (is (false? (get-in call [:request :action :twap :r])))
+                     (done))))
+          (.catch (fn [err]
+                    (is false (str "Unexpected error: " err))
+                    (done)))
+          (.finally
+           (fn []
+             (trading/clear-debug-exchange-simulator!)))))))
 
 (deftest post-signed-action-private-helper-preserves-safe-integer-nonce-test
   (async done

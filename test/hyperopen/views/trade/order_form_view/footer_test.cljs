@@ -36,6 +36,7 @@
         vm (order-form-vm/order-form-vm state)
         footer-node (footer/footer-metrics (:display vm)
                                            true
+                                           true
                                            false
                                            (footer/fee-row-copy (get-in vm [:display :fees]))
                                            {:start "84.00"

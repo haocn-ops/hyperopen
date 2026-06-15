@@ -33,6 +33,23 @@
     (when (contains? #{:perp :spot :outcome} candidate)
       candidate)))
 
+(defn- suppress-reduce-only?
+  "Reduce-only is perp-only: spot and outcome markets have no position to
+   reduce, so the wire :r is forced false for them across all order types."
+  [command-context]
+  (contains? #{:spot :outcome}
+             (normalize-market-type (get-in command-context [:market :market-type]))))
+
+(defn- spot-market-command?
+  [command-context]
+  (= :spot (normalize-market-type (get-in command-context [:market :market-type]))))
+
+(defn- effective-reduce-only
+  [command-context form]
+  (if (suppress-reduce-only? command-context)
+    false
+    (boolean (:reduce-only form))))
+
 (defn build-scale-orders [asset-idx side total-size start end reduce-only post-only]
   (let [legs (trading-domain/scale-order-legs (get total-size :size)
                                               (get total-size :count)
@@ -160,10 +177,8 @@
         size (trading-domain/parse-num (:size form))
         price (trading-domain/parse-num (:price form))
         trigger (trading-domain/parse-num (:trigger-px form))
-        reduce-only (if (contains? #{:spot :outcome}
-                                   (normalize-market-type (get-in command-context [:market :market-type])))
-                      false
-                      (boolean (:reduce-only form)))
+        reduce-only (effective-reduce-only command-context form)
+        spot? (spot-market-command? command-context)
         post-only (:post-only form)
         tif (tif->wire (:tif form))
         price-text (canonical-price-text command-context price)
@@ -178,9 +193,11 @@
         wire-values-valid? (order-wire-values-valid? order-type
                                                      {:price-text price-text
                                                       :trigger-text trigger-text})
-        grouping (if (or (get-in form [:tp :enabled?]) (get-in form [:sl :enabled?]))
-                   "normalTpsl"
-                   "na")]
+        ;; TP/SL brackets are perp-only (their legs are reduce-only against a
+        ;; position); spot suppresses them, keeping grouping "na".
+        tpsl-enabled? (and (not spot?)
+                           (or (get-in form [:tp :enabled?]) (get-in form [:sl :enabled?])))
+        grouping (if tpsl-enabled? "normalTpsl" "na")]
     (when (and shape-builder
                (string? active-asset)
                (number? asset-idx)
@@ -196,7 +213,9 @@
                                   :tif tif
                                   :trigger-text trigger-text
                                   :price-text price-text})
-            tpsl-orders (build-tpsl-orders asset-idx side (assoc form :size size) command-context)]
+            tpsl-orders (if spot?
+                          []
+                          (build-tpsl-orders asset-idx side (assoc form :size size) command-context))]
         (when (some? tpsl-orders)
           (let [orders (cond-> [order]
                          (seq tpsl-orders) (into tpsl-orders))]
@@ -229,8 +248,20 @@
                    :sz-decimals sz-decimals}
                   (get scale :start)
                   (get scale :end)
-                  (:reduce-only form)
-                  (:post-only form)))]
+                  (effective-reduce-only command-context form)
+                  (:post-only form)))
+        ;; Spot scale-leg prices must respect spot tick/precision (8 - szDecimals),
+        ;; but interpolated ladder prices come out raw from scale-order-legs, so
+        ;; canonicalize each spot leg price here. (Perp scale legs are left as-is
+        ;; pending a broader, separately-reviewed scale-precision fix.)
+        orders (if (and (seq orders) (spot-market-command? command-context))
+                 (mapv (fn [order]
+                         (if-let [p (canonical-price-text command-context
+                                                          (trading-domain/parse-num (:p order)))]
+                           (assoc order :p p)
+                           order))
+                       orders)
+                 orders)]
     (when (seq orders)
       {:action (array-map :type "order"
                           :orders (vec orders)
@@ -253,7 +284,7 @@
                           :twap (array-map :a asset-idx
                                            :b (trading-domain/order-side->is-buy side)
                                            :s (str size)
-                                           :r (boolean (:reduce-only form))
+                                           :r (effective-reduce-only command-context form)
                                            :m (int minutes)
                                            :t randomize))
        :asset-idx asset-idx})))

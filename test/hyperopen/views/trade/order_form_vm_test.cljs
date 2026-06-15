@@ -120,7 +120,8 @@
                                      :market-type :spot})
         view-model (vm/order-form-vm state)]
     (is (true? (:spot? view-model)))
-    (is (true? (:read-only? view-model)))
+    ;; Spot markets are writable now; read-only? is decoupled from spot?.
+    (is (false? (:read-only? view-model)))
     (is (= "ETH" (:base-symbol view-model)))
     (is (= :quote (:size-input-mode view-model)))
     (is (= "USDC" (:quote-symbol view-model)))))

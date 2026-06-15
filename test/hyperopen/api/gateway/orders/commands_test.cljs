@@ -31,6 +31,30 @@
     (is (= "Gtc" (get-in regular-orders [0 :t :limit :tif])))
     (is (= true (get-in regular-orders [0 :b])))))
 
+(deftest spot-scale-leg-prices-are-canonicalized-test
+  (testing "spot scale ladder leg prices respect spot precision (raw interpolation canonicalized)"
+    (let [spot-context {:active-asset "PURR/USDC"
+                        :asset-idx 10000
+                        :market {:market-type :spot :szDecimals 0 :asset-id 10000}}
+          ;; start 2 -> end 1 over 4 legs yields raw 1.6666.../1.3333... mid prices.
+          request (commands/build-order-request spot-context
+                                                {:type :scale
+                                                 :side :buy
+                                                 :size "9"
+                                                 :scale {:start "2"
+                                                         :end "1"
+                                                         :count 4
+                                                         :skew "1.00"}})
+          orders (get-in request [:action :orders])
+          leg-prices (mapv :p orders)]
+      (is (= 4 (count orders)))
+      ;; every leg carries the encoded spot asset id and reduce-only is suppressed
+      (is (every? #(= 10000 (:a %)) orders))
+      (is (every? #(false? (:r %)) orders))
+      ;; canonicalized: <= 8 decimal places (spot szDecimals 0), never the raw
+      ;; full-precision interpolation string
+      (is (every? #(re-matches #"\d+(\.\d{1,8})?" %) leg-prices)))))
+
 (deftest build-tpsl-orders-builds-enabled-legs-test
   (let [orders (commands/build-tpsl-orders
                 5

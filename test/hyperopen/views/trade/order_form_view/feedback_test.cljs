@@ -7,11 +7,6 @@
             [hyperopen.views.trade.order-form-view :as view]
             [hyperopen.views.trade.order-form-vm :as order-form-vm]))
 
-(deftest unsupported-market-banner-renders-copy-test
-  (let [banner (feedback/unsupported-market-banner "Spot trading is not supported yet.")
-        strings (set (collect-strings banner))]
-    (is (contains? strings "Spot trading is not supported yet."))))
-
 (deftest twap-preview-formats-runtime-and-suborder-details-test
   (let [state (base-state {:type :twap
                            :size "6"

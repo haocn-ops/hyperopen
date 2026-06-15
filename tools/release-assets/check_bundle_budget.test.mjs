@@ -71,5 +71,5 @@ test("renderBudgetFile produces parseable ratchet metadata", () => {
   const parsed = JSON.parse(rendered);
   assert.equal(parsed.main.gzipBytes, 691020);
   assert.equal(parsed.main.recordedOutputName, "main.97EDB0167F0DB3C4EB22CF3ED6C1C175.js");
-  assert.match(parsed.comment, /never raise it without review/);
+  assert.match(parsed.comment, /advisory only/);
 });

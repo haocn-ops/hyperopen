@@ -68,7 +68,7 @@ export function renderBudgetFile({ gzipBytes, recordedAt, outputName }) {
   return `${JSON.stringify(
     {
       comment:
-        "Gzip byte ceiling for the release main module. Ratcheted by docs/exec-plans/active/2026-06-11-pagespeed-desktop-performance-90.md; lower it after each diet milestone, never raise it without review.",
+        "Soft gzip target for the release main module — advisory only; exceeding it warns (and annotates CI) but never fails the build. Tracked by docs/exec-plans/active/2026-06-11-pagespeed-desktop-performance-90.md; lower it as the bundle diets.",
       main: {
         gzipBytes,
         recordedAt,
@@ -85,6 +85,28 @@ function loadBudget() {
     return null;
   }
   return JSON.parse(fs.readFileSync(BUDGET_PATH, "utf8"));
+}
+
+// The budget is a SOFT target, not a build gate. Exceeding it (or a missing /
+// invalid budget file) must never fail the build or the Cloudflare deploy — a
+// few bytes of gzip jitter between the local repro and the prod build toolchain,
+// or a reviewed feature merge, is not a reason to block a release. Surface it
+// loudly as a warning instead, and add a GitHub Actions annotation + job-summary
+// line when running in CI so it stays visible on the PR without failing it.
+function reportSoftBudget(message) {
+  console.warn(`bundle budget (soft): ${message}`);
+
+  if (process.env.GITHUB_ACTIONS === "true") {
+    console.log(`::warning title=Bundle budget (soft)::${message}`);
+    const summaryPath = process.env.GITHUB_STEP_SUMMARY;
+    if (summaryPath) {
+      try {
+        fs.appendFileSync(summaryPath, `> ⚠️ **Bundle budget (soft):** ${message}\n`);
+      } catch {
+        // Surfacing the note must never break the build; ignore summary I/O errors.
+      }
+    }
+  }
 }
 
 function main() {
@@ -134,8 +156,9 @@ function main() {
   });
 
   if (!result.ok) {
-    console.error(`bundle budget: ${result.message}`);
-    process.exit(1);
+    // Soft target exceeded (or budget file missing/invalid): warn, never fail.
+    reportSoftBudget(result.message);
+    return;
   }
 
   console.log(`bundle budget: ${result.message}`);

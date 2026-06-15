@@ -203,3 +203,46 @@
       (is (= [:effects/replace-state
               "/trade?market=ETH&tab=positions"]
              (second (spectate-mode-actions/stop-spectate-mode state)))))))
+
+(deftest export-spectate-mode-watchlist-downloads-and-confirms-test
+  (with-redefs [platform/now-ms (fn [] 1710000000000)]
+    (let [state {:account-context {:watchlist [{:address spectated-address
+                                                :label "Assistance"}]}}]
+      (is (= [[:effects/download-spectate-watchlist-file
+               {:filename "spectate-watchlist-1710000000000.json"
+                :count 1
+                :document {:type "hyperopen-spectate-watchlist"
+                           :version 1
+                           :exported-at 1710000000000
+                           :entries [{:address spectated-address
+                                      :label "Assistance"}]}}]
+              [:effects/spectate-watchlist-feedback :success "Exported 1 address."]]
+             (spectate-mode-actions/export-spectate-mode-watchlist state))))))
+
+(deftest export-spectate-mode-watchlist-empty-reports-nothing-to-export-test
+  (let [state {:account-context {:watchlist []}}]
+    (is (= [[:effects/spectate-watchlist-feedback :error "No saved addresses to export."]]
+           (spectate-mode-actions/export-spectate-mode-watchlist state)))))
+
+(deftest import-spectate-mode-watchlist-opens-file-picker-test
+  (is (= [[:effects/pick-spectate-watchlist-file]]
+         (spectate-mode-actions/import-spectate-mode-watchlist {}))))
+
+(deftest apply-imported-spectate-watchlist-merges-persists-and-confirms-test
+  (let [state {:account-context {:watchlist [{:address spectated-address
+                                              :label "Assistance"}]}}
+        data [{"address" secondary-address "label" "Wintermute"}]
+        merged [{:address spectated-address :label "Assistance"}
+                {:address secondary-address :label "Wintermute"}]]
+    (is (= [[:effects/save-many [[[:account-context :watchlist] merged]]]
+            [:effects/spectate-watchlist-feedback :success "Imported 1 address. 2 saved."]
+            [:effects/local-storage-set-json "spectate-mode-watchlist:v1" merged]]
+           (spectate-mode-actions/apply-imported-spectate-watchlist state data)))))
+
+(deftest apply-imported-spectate-watchlist-rejects-invalid-json-test
+  (let [state {:account-context {:watchlist [{:address spectated-address
+                                              :label "Assistance"}]}}]
+    (is (= [[:effects/spectate-watchlist-feedback
+             :error
+             "Import failed: file is not valid JSON."]]
+           (spectate-mode-actions/apply-imported-spectate-watchlist state nil)))))

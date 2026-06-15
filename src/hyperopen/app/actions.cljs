@@ -121,7 +121,10 @@
                      :clear-spectate-mode-watchlist-edit action-adapters/clear-spectate-mode-watchlist-edit
                      :copy-spectate-mode-watchlist-address action-adapters/copy-spectate-mode-watchlist-address
                      :copy-spectate-mode-watchlist-link action-adapters/copy-spectate-mode-watchlist-link
-                     :start-spectate-mode-watchlist-address action-adapters/start-spectate-mode-watchlist-address}
+                     :start-spectate-mode-watchlist-address action-adapters/start-spectate-mode-watchlist-address
+                     :export-spectate-mode-watchlist action-adapters/export-spectate-mode-watchlist
+                     :import-spectate-mode-watchlist action-adapters/import-spectate-mode-watchlist
+                     :apply-imported-spectate-watchlist action-adapters/apply-imported-spectate-watchlist}
      :orders {:load-user-data action-adapters/load-user-data
               :set-funding-modal action-adapters/set-funding-modal}
      :portfolio-optimizer

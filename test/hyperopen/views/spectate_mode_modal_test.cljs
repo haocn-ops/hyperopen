@@ -138,6 +138,35 @@
     (is (= [[:actions/remove-spectate-mode-watchlist-address alternate-address]]
            (get-in remove-button [1 :on :click])))))
 
+(deftest spectate-mode-modal-renders-import-export-toolbar-test
+  (let [view-node (modal/spectate-mode-modal-view (modal-state {}))
+        toolbar (by-role view-node "spectate-mode-watchlist-toolbar")
+        import-button (by-role view-node "spectate-mode-watchlist-import")
+        export-button (by-role view-node "spectate-mode-watchlist-export")]
+    (is (some? toolbar))
+    (is (contains? (set (hiccup/collect-strings toolbar)) "Import"))
+    (is (contains? (set (hiccup/collect-strings toolbar)) "Export"))
+    (is (= [[:actions/import-spectate-mode-watchlist]]
+           (get-in import-button [1 :on :click])))
+    (is (= [[:actions/export-spectate-mode-watchlist]]
+           (get-in export-button [1 :on :click])))
+    (is (not (true? (get-in export-button [1 :disabled]))))))
+
+(deftest spectate-mode-modal-disables-export-when-watchlist-empty-test
+  (let [view-node (modal/spectate-mode-modal-view
+                   (-> (modal-state {:search ""
+                                     :label ""
+                                     :editing-watchlist-address nil})
+                       (assoc-in [:account-context :watchlist] [])
+                       (assoc-in [:account-context :spectate-mode :active?] false)
+                       (assoc-in [:account-context :spectate-mode :address] nil)))
+        import-button (by-role view-node "spectate-mode-watchlist-import")
+        export-button (by-role view-node "spectate-mode-watchlist-export")]
+    (is (= [[:actions/import-spectate-mode-watchlist]]
+           (get-in import-button [1 :on :click])))
+    (is (true? (get-in export-button [1 :disabled])))
+    (is (nil? (get-in export-button [1 :on])))))
+
 (deftest spectate-mode-modal-filters-watchlist-by-label-and-address-test
   (let [portfolio-address "0x4444444444444444444444444444444444444444"
         treasury-address "0x5555555555555555555555555555555555555555"

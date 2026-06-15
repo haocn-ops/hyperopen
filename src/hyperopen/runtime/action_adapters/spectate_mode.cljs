@@ -33,3 +33,12 @@
 
 (def start-spectate-mode-watchlist-address
   spectate-mode-actions/start-spectate-mode-watchlist-address)
+
+(def export-spectate-mode-watchlist
+  spectate-mode-actions/export-spectate-mode-watchlist)
+
+(def import-spectate-mode-watchlist
+  spectate-mode-actions/import-spectate-mode-watchlist)
+
+(def apply-imported-spectate-watchlist
+  spectate-mode-actions/apply-imported-spectate-watchlist)

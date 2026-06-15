@@ -2,7 +2,10 @@
 
 (def effect-binding-rows
   [[:effects/copy-spectate-link :copy-spectate-link]
-   [:effects/clear-disconnected-account-lifecycle :clear-disconnected-account-lifecycle]])
+   [:effects/clear-disconnected-account-lifecycle :clear-disconnected-account-lifecycle]
+   [:effects/download-spectate-watchlist-file :download-spectate-watchlist-file]
+   [:effects/pick-spectate-watchlist-file :pick-spectate-watchlist-file]
+   [:effects/spectate-watchlist-feedback :spectate-watchlist-feedback]])
 
 (def action-binding-rows
   [[:actions/open-spectate-mode-mobile-header-menu :open-spectate-mode-mobile-header-menu]
@@ -18,4 +21,7 @@
    [:actions/clear-spectate-mode-watchlist-edit :clear-spectate-mode-watchlist-edit]
    [:actions/copy-spectate-mode-watchlist-address :copy-spectate-mode-watchlist-address]
    [:actions/copy-spectate-mode-watchlist-link :copy-spectate-mode-watchlist-link]
-   [:actions/start-spectate-mode-watchlist-address :start-spectate-mode-watchlist-address]])
+   [:actions/start-spectate-mode-watchlist-address :start-spectate-mode-watchlist-address]
+   [:actions/export-spectate-mode-watchlist :export-spectate-mode-watchlist]
+   [:actions/import-spectate-mode-watchlist :import-spectate-mode-watchlist]
+   [:actions/apply-imported-spectate-watchlist :apply-imported-spectate-watchlist]])

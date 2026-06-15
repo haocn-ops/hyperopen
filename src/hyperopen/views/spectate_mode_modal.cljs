@@ -1,5 +1,6 @@
 (ns hyperopen.views.spectate-mode-modal
   (:require [hyperopen.account.context :as account-context]
+            [hyperopen.views.spectate-mode-modal.import-export :as import-export]
             [hyperopen.views.spectate-mode-modal.search :as search]
             [hyperopen.views.spectate-mode-modal.watchlist :as watchlist]))
 
@@ -517,6 +518,7 @@
          :data-role "spectate-mode-modal"
          :data-spectate-mode-surface "true"}
    (modal-controls model)
+   (import-export/import-export-toolbar model)
    (watchlist-section model)
    (copy-feedback-slot model)])
 

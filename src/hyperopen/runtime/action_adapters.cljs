@@ -56,6 +56,15 @@
 (def start-spectate-mode-watchlist-address
   spectate-mode-adapters/start-spectate-mode-watchlist-address)
 
+(def export-spectate-mode-watchlist
+  spectate-mode-adapters/export-spectate-mode-watchlist)
+
+(def import-spectate-mode-watchlist
+  spectate-mode-adapters/import-spectate-mode-watchlist)
+
+(def apply-imported-spectate-watchlist
+  spectate-mode-adapters/apply-imported-spectate-watchlist)
+
 (def navigate navigation-adapters/navigate)
 
 (def load-vault-route-action navigation-adapters/load-vault-route-action)

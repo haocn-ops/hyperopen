@@ -18,6 +18,7 @@
             [hyperopen.account.spectate-mode-actions-search-test]
             [hyperopen.account.spectate-mode-actions-test]
             [hyperopen.account.spectate-mode-links-test]
+            [hyperopen.account.spectate-watchlist-io-test]
             [hyperopen.account.surface-policy-test]
             [hyperopen.account.surface-service-test]
             [hyperopen.api-wallets.actions-test]
@@ -751,6 +752,7 @@
              'hyperopen.account.spectate-mode-actions-search-test
              'hyperopen.account.spectate-mode-actions-test
              'hyperopen.account.spectate-mode-links-test
+             'hyperopen.account.spectate-watchlist-io-test
              'hyperopen.account.surface-policy-test
              'hyperopen.account.surface-service-test
              'hyperopen.api-wallets.actions-test

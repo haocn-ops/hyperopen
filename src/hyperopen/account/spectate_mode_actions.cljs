@@ -3,6 +3,7 @@
             [hyperopen.account.context :as account-context]
             [hyperopen.account.history.shared :as history-shared]
             [hyperopen.account.spectate-mode-links :as spectate-mode-links]
+            [hyperopen.account.spectate-watchlist-io :as watchlist-io]
             [hyperopen.router :as router]
             [hyperopen.platform :as platform]))
 
@@ -291,3 +292,32 @@
                             (assoc-in [:account-context :spectate-ui :search] address)
                             (assoc-in [:account-context :spectate-ui :label] (or (:label entry) "")))
                         address))))
+
+(defn export-spectate-mode-watchlist
+  [state]
+  (let [entries (watchlist state)]
+    (if (seq entries)
+      [[:effects/download-spectate-watchlist-file
+        (watchlist-io/export-payload entries (platform/now-ms))]
+       [:effects/spectate-watchlist-feedback
+        :success
+        (watchlist-io/export-success-message (count entries))]]
+      [[:effects/spectate-watchlist-feedback :error watchlist-io/export-empty-message]])))
+
+(defn import-spectate-mode-watchlist
+  [_state]
+  [[:effects/pick-spectate-watchlist-file]])
+
+(defn apply-imported-spectate-watchlist
+  [state data]
+  (let [result (watchlist-io/merge-imported (watchlist state) data)]
+    (if (= :ok (:status result))
+      (let [{merged :watchlist :keys [new-count total]} result]
+        (into [[:effects/save-many [[[:account-context :watchlist] merged]]]
+               [:effects/spectate-watchlist-feedback
+                :success
+                (watchlist-io/import-success-message new-count total)]]
+              (persist-watchlist-effects merged)))
+      [[:effects/spectate-watchlist-feedback
+        :error
+        (watchlist-io/import-error-message (:reason result))]])))

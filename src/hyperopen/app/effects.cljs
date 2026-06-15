@@ -4,6 +4,7 @@
             [hyperopen.route-modules :as route-modules]
             [hyperopen.runtime.collaborators :as runtime-collaborators]
             [hyperopen.runtime.effect-adapters :as effect-adapters]
+            [hyperopen.runtime.effect-adapters.spectate-mode :as spectate-mode-effects]
             [hyperopen.runtime.state :as runtime-state]
             [hyperopen.schema.runtime-registration.portfolio :as portfolio-registration]
             [hyperopen.schema.runtime-registration.vaults :as vault-registration]))
@@ -74,7 +75,10 @@
               :unlock-agent-trading effect-adapters/unlock-agent-trading
               :copy-wallet-address (effect-adapters/make-copy-wallet-address runtime)
               :copy-spectate-link (effect-adapters/make-copy-spectate-link runtime)}
-     :spectate-mode {:clear-disconnected-account-lifecycle effect-adapters/clear-disconnected-account-lifecycle}
+     :spectate-mode {:clear-disconnected-account-lifecycle effect-adapters/clear-disconnected-account-lifecycle
+                     :download-spectate-watchlist-file spectate-mode-effects/download-spectate-watchlist-file
+                     :pick-spectate-watchlist-file spectate-mode-effects/pick-spectate-watchlist-file
+                     :spectate-watchlist-feedback spectate-mode-effects/spectate-watchlist-feedback}
      :diagnostics {:confirm-ws-diagnostics-reveal effect-adapters/confirm-ws-diagnostics-reveal
                    :copy-websocket-diagnostics effect-adapters/copy-websocket-diagnostics
                    :ws-reset-subscriptions effect-adapters/ws-reset-subscriptions}

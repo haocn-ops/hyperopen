@@ -72,6 +72,7 @@
 (s/def ::spectate-mode-open-args
   (s/or :none ::common/no-args
         :anchor-only (s/tuple any?)))
+(s/def ::apply-imported-spectate-watchlist-args (s/tuple any?))
 (s/def ::portfolio-volume-history-open-args
   (s/or :none ::common/no-args
         :anchor-only (s/tuple any?)))
@@ -171,6 +172,9 @@
    :actions/copy-spectate-mode-watchlist-address ::common/address-args
    :actions/copy-spectate-mode-watchlist-link ::common/address-args
    :actions/start-spectate-mode-watchlist-address ::common/address-args
+   :actions/export-spectate-mode-watchlist ::common/no-args
+   :actions/import-spectate-mode-watchlist ::common/no-args
+   :actions/apply-imported-spectate-watchlist ::apply-imported-spectate-watchlist-args
    :actions/enable-agent-trading ::common/no-args
    :actions/unlock-agent-trading ::common/unlock-agent-trading-args
    :actions/close-agent-recovery-modal ::common/no-args

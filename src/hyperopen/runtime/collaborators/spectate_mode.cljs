@@ -41,4 +41,7 @@
    :copy-spectate-mode-watchlist-address spectate-mode-actions/copy-spectate-mode-watchlist-address
    :copy-spectate-mode-watchlist-link spectate-mode-actions/copy-spectate-mode-watchlist-link
    :start-spectate-mode-watchlist-address
-   spectate-mode-actions/start-spectate-mode-watchlist-address})
+   spectate-mode-actions/start-spectate-mode-watchlist-address
+   :export-spectate-mode-watchlist spectate-mode-actions/export-spectate-mode-watchlist
+   :import-spectate-mode-watchlist spectate-mode-actions/import-spectate-mode-watchlist
+   :apply-imported-spectate-watchlist spectate-mode-actions/apply-imported-spectate-watchlist})

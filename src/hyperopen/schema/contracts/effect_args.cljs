@@ -231,6 +231,9 @@
 
 (s/def ::apply-ui-theme-args (s/tuple ::common/non-empty-string))
 
+(s/def ::download-spectate-watchlist-file-args (s/tuple map?))
+(s/def ::spectate-watchlist-feedback-args (s/tuple keyword? string?))
+
 (s/def ::effect-id (s/and keyword?
                           #(= "effects" (namespace %))))
 
@@ -272,6 +275,9 @@
    :effects/copy-wallet-address ::common/optional-address-args
    :effects/copy-spectate-link ::common/path-and-address-args
    :effects/clear-disconnected-account-lifecycle ::common/address-args
+   :effects/download-spectate-watchlist-file ::download-spectate-watchlist-file-args
+   :effects/pick-spectate-watchlist-file ::common/no-args
+   :effects/spectate-watchlist-feedback ::spectate-watchlist-feedback-args
    :effects/reconnect-websocket ::common/no-args
    :effects/refresh-websocket-health ::common/no-args
    :effects/confirm-ws-diagnostics-reveal ::common/no-args

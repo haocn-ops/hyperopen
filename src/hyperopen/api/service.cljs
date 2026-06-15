@@ -51,6 +51,13 @@
   [service]
   ((:get-request-stats (api-runtime/info-client (runtime service)))))
 
+(defn set-on-rate-limit!
+  "Installs a store-agnostic listener invoked on each /info rate-limit (HTTP 429)."
+  [service listener]
+  (when-let [setter (:set-on-rate-limit! (api-runtime/info-client (runtime service)))]
+    (setter listener))
+  nil)
+
 (defn reset-service!
   [service]
   ((:reset! (api-runtime/info-client (runtime service))))

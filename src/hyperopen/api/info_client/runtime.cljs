@@ -190,7 +190,8 @@
         cooldown-until-ms (atom 0)
         single-flight-promises (atom {})
         response-cache (atom {})
-        request-runtime (atom (stats/default-request-runtime))]
+        request-runtime (atom (stats/default-request-runtime))
+        on-rate-limit (atom nil)]
     (letfn [(dequeue-request-task-fn []
               (dequeue-request-task! request-runtime
                                      now-ms-fn
@@ -249,7 +250,19 @@
             (mark-rate-limit-cooldown-fn [delay-ms]
               (mark-rate-limit-cooldown! cooldown-until-ms
                                          now-ms-fn
-                                         delay-ms))
+                                         delay-ms)
+              ;; Push a store-agnostic rate-limit event to whoever installed a
+              ;; listener (the app wires this to app-state at startup). Guarded so
+              ;; a misbehaving listener can never break the retry/backoff path.
+              (when-let [on-rate-limit-fn @on-rate-limit]
+                (try
+                  (on-rate-limit-fn {:at-ms (now-ms-fn)
+                                     :delay-ms delay-ms
+                                     :cooldown-until-ms @cooldown-until-ms
+                                     :count (get-in @request-runtime
+                                                    [:stats :rate-limited]
+                                                    0)})
+                  (catch :default _ nil))))
             (with-single-flight-fn [dedupe-key promise-fn]
               (flow/with-single-flight! single-flight-promises
                                         dedupe-key
@@ -306,4 +319,5 @@
        :mark-rate-limit-cooldown! mark-rate-limit-cooldown-fn
        :with-single-flight! with-single-flight-fn
        :get-request-stats get-request-stats-fn
+       :set-on-rate-limit! (fn [listener] (reset! on-rate-limit listener))
        :reset! reset-client-fn})))

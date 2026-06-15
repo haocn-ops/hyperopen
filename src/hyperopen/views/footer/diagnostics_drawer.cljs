@@ -178,6 +178,19 @@
      [:strong "Copy diagnostics"]
      " payload."]]])
 
+(defn- rate-limit-notice
+  [{:keys [active? retry-in-seconds]}]
+  (when active?
+    [:div {:class ["hx-rate-limit"]
+           :data-role "connection-diagnostics-rate-limit"}
+     [:span {:class ["hx-rate-limit-title"]} "Rate limited"]
+     [:span {:class ["hx-rate-limit-detail"]}
+      (if retry-in-seconds
+        (str "Market data requests are being throttled. Retrying in "
+             retry-in-seconds
+             "s.")
+        "Market data requests are being throttled. Retrying automatically.")]]))
+
 (defn- copy-status-view
   [copy-status]
   (when (= :error (:kind copy-status))
@@ -217,6 +230,7 @@
                  :on {:click [[:actions/close-ws-diagnostics]]}}
         (icon-close)]]
       [:div {:class ["hx-reason"]} (:reason diagnostics)]
+      (rate-limit-notice (:rate-limit diagnostics))
       [:div {:class ["hx-actions"]}
        (reconnect-button diagnostics)
        (copy-button (:copy-status diagnostics))]

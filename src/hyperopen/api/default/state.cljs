@@ -64,6 +64,10 @@
   []
   (api-service/get-request-stats (active-api-service)))
 
+(defn set-on-rate-limit!
+  [listener]
+  (api-service/set-on-rate-limit! (active-api-service) listener))
+
 (defn reset-request-runtime!
   []
   (api-service/reset-service! (active-api-service)))

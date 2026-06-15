@@ -3,8 +3,10 @@
             [hyperopen.account.history.order-actions :as order-actions]
             [hyperopen.account.history.surface-actions :as surface-actions]
             [hyperopen.account-tab-modules :as account-tab-modules]
+            [hyperopen.api.default :as api-default]
             [hyperopen.asset-selector.settings :as asset-selector-settings]
             [hyperopen.chart.settings :as chart-settings]
+            [hyperopen.websocket.diagnostics-runtime :as diagnostics-runtime]
             [nexus.registry :as nxr]
             [hyperopen.orderbook.settings :as orderbook-settings]
             [hyperopen.portfolio.actions :as portfolio-actions]
@@ -275,6 +277,12 @@
 (defn init!
   [system]
   (let [base-deps (startup-base-deps system)]
+    ;; Surface info-endpoint rate-limiting (HTTP 429) in the network diagnostics
+    ;; drawer. Installed before bootstrap fetches fire so early throttling is
+    ;; captured. The info-client stays store-agnostic; only a listener fn crosses.
+    (diagnostics-runtime/install-info-rate-limit-listener!
+     (:store base-deps)
+     api-default/set-on-rate-limit!)
     (startup-init/init!
      (merge
       base-deps

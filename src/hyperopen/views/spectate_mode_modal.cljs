@@ -194,8 +194,9 @@
       message]]))
 
 (defn- filter-watchlist
-  [watchlist search edit-mode?]
+  [watchlist search edit-mode? search-auto-prefilled?]
   (if-let [query (and (not edit-mode?)
+                      (not search-auto-prefilled?)
                       (search/normalized-query search))]
     (->> watchlist
          (filter #(search/entry-matches-query? query %))
@@ -216,7 +217,11 @@
         active-address (account-context/spectate-address state)
         valid-search? (some? (account-context/normalize-address search))
         edit-mode? (some? editing-address)
-        filtered-watchlist (filter-watchlist watchlist search edit-mode?)]
+        search-auto-prefilled? (true? (:search-auto-prefilled? ui-state))
+        filtered-watchlist (filter-watchlist watchlist
+                                             search
+                                             edit-mode?
+                                             search-auto-prefilled?)]
     {:open? (true? (:modal-open? ui-state))
      :anchor (:anchor ui-state)
      :search search
@@ -228,6 +233,7 @@
                                (seq (:message copy-feedback)))
      :watchlist filtered-watchlist
      :watchlist-filter-active? (and (seq (search/normalized-query search))
+                                    (not search-auto-prefilled?)
                                     (not edit-mode?))
      :has-saved-watchlist? (seq watchlist)
      :active? active?

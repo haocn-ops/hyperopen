@@ -49,6 +49,7 @@
                                  [[:account-context :spectate-ui :search] ""]
                                  [[:account-context :spectate-ui :label] ""]
                                  [[:account-context :spectate-ui :editing-watchlist-address] nil]
+                                 [[:account-context :spectate-ui :search-auto-prefilled?] false]
                                  [[:account-context :spectate-ui :search-error] nil]]]]
            effects))))
 

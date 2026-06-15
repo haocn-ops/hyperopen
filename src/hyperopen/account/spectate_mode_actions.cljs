@@ -107,6 +107,10 @@
       (label-value state)
       ""))
 
+(defn- search-auto-prefilled?
+  [search]
+  (not (str/blank? (str (or search "")))))
+
 (defn- spectate-mode-modal-prefill
   [state]
   (let [watchlist* (watchlist state)
@@ -126,6 +130,8 @@
                           [[:account-context :spectate-ui :search] search*]
                           [[:account-context :spectate-ui :label] label*]
                           [[:account-context :spectate-ui :editing-watchlist-address] nil]
+                          [[:account-context :spectate-ui :search-auto-prefilled?]
+                           (search-auto-prefilled? search*)]
                           [[:account-context :spectate-ui :search-error] nil]]]]))
 
 (defn close-spectate-mode-modal
@@ -149,6 +155,7 @@
                                                                   "")]
                           [[:account-context :spectate-ui :editing-watchlist-address] (when editing-active?
                                                                                       editing-address*)]
+                          [[:account-context :spectate-ui :search-auto-prefilled?] false]
                           [[:account-context :spectate-ui :search-error] nil]]]]))
 
 (defn set-spectate-mode-label

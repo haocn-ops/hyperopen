@@ -14,11 +14,13 @@
                                                :editing-watchlist-address editing-address
                                                :search-error "old error"}}}]
     (is (= [[:effects/save-many [[[:account-context :spectate-ui :search]
-                                  "0xABCDEFABCDEFABCDEFABCDEFABCDEFABCDEFABCD"]
+                                 "0xABCDEFABCDEFABCDEFABCDEFABCDEFABCDEFABCD"]
                                  [[:account-context :spectate-ui :label]
                                   "Assistance"]
                                  [[:account-context :spectate-ui :editing-watchlist-address]
                                   editing-address]
+                                 [[:account-context :spectate-ui :search-auto-prefilled?]
+                                  false]
                                  [[:account-context :spectate-ui :search-error]
                                   nil]]]]
            (spectate-mode-actions/set-spectate-mode-search
@@ -36,6 +38,8 @@
                                   ""]
                                  [[:account-context :spectate-ui :editing-watchlist-address]
                                   nil]
+                                 [[:account-context :spectate-ui :search-auto-prefilled?]
+                                  false]
                                  [[:account-context :spectate-ui :search-error]
                                   nil]]]]
            (spectate-mode-actions/set-spectate-mode-search state different-address)))))

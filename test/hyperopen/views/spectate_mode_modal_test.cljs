@@ -47,6 +47,23 @@
   (is (nil? (modal/spectate-mode-modal-view
              (modal-state {:modal-open? false})))))
 
+(deftest spectate-mode-modal-does-not-filter-watchlist-for-auto-prefilled-search-test
+  (let [view-node (modal/spectate-mode-modal-view
+                   (-> (modal-state {:search active-address
+                                     :label ""
+                                     :editing-watchlist-address nil
+                                     :search-auto-prefilled? true})
+                       (assoc-in [:account-context :watchlist]
+                                 [{:address active-address
+                                   :label "Active wallet"}
+                                  {:address saved-address
+                                   :label "Desk wallet"}])))
+        rows (all-by-role view-node "spectate-mode-watchlist-row")
+        strings (set (hiccup/collect-strings view-node))]
+    (is (= 2 (count rows)))
+    (is (contains? strings "Active wallet"))
+    (is (contains? strings "Desk wallet"))))
+
 (deftest spectate-mode-modal-renders-active-editing-watchlist-contract-test
   (let [view-node (modal/spectate-mode-modal-view (modal-state {}))
         strings (set (hiccup/collect-strings view-node))

@@ -136,6 +136,7 @@
     (is (= "" (get-in state [:account-context :spectate-ui :search])))
     (is (= "" (get-in state [:account-context :spectate-ui :label])))
     (is (nil? (get-in state [:account-context :spectate-ui :editing-watchlist-address])))
+    (is (= false (get-in state [:account-context :spectate-ui :search-auto-prefilled?])))
     (is (= "" (get-in state [:account-context :spectate-ui :last-search])))
     (is (nil? (get-in state [:account-context :spectate-ui :search-error])))
     (is (= [] (get-in state [:account-context :watchlist])))

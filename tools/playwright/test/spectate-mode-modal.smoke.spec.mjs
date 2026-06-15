@@ -125,6 +125,10 @@ async function exerciseSpectateModal(page, mode) {
   await expect(activeModal.locator("[data-role='spectate-mode-active-summary']"))
     .toContainText(WATCHLIST_ADDRESS);
   await expect(activeModal.locator("[data-role='spectate-mode-start']")).toHaveText("Switch");
+  await expect(activeModal.locator("[data-role='spectate-mode-watchlist-row']")).toHaveCount(2);
+  await expect(activeModal.locator("[data-role='spectate-mode-watchlist-row']", {
+    hasText: SECOND_WATCHLIST_LABEL
+  })).toBeVisible();
 
   await activeModal.locator("[data-role='spectate-mode-stop']").click();
   await waitForIdle(page, { quietMs: 150, timeoutMs: 5_000, pollMs: 50 });

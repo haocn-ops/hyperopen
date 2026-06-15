@@ -320,11 +320,12 @@
                  :renaming-address nil
                  :transferring-address nil}
    :spectate-ui {:modal-open? false
-              :anchor nil
-              :search ""
-              :label ""
-              :editing-watchlist-address nil
-              :last-search ""
-              :search-error nil}
+                 :anchor nil
+                 :search ""
+                 :label ""
+                 :editing-watchlist-address nil
+                 :search-auto-prefilled? false
+                 :last-search ""
+                 :search-error nil}
    :watchlist []
    :watchlist-loaded? false})

@@ -69,6 +69,18 @@ jobs:
           set -o pipefail
           npm run test:websocket | tee .github/badges/test-websocket.log
 
+      - name: Run Bundle Budget Gate
+        id: bundle_budget
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          # The budget checker measures the hashed release main.js, so a real
+          # release :app build is required (dev compiles produce unhashed names
+          # the checker rejects). This catches main.js regrowth at PR time
+          # instead of only at the Cloudflare Pages deploy.
+          npx shadow-cljs release app
+          npm run lint:bundle-budget
+
       - name: Generate Coverage Report
         id: coverage
         continue-on-error: true
@@ -138,6 +150,7 @@ jobs:
         run: |
           if [ "${{ steps.test_main.outcome }}" = "failure" ] || \
              [ "${{ steps.test_websocket.outcome }}" = "failure" ] || \
+             [ "${{ steps.bundle_budget.outcome }}" = "failure" ] || \
              [ "${{ steps.coverage.outcome }}" = "failure" ]; then
             exit 1
           fi

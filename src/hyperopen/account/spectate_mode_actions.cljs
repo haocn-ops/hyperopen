@@ -179,6 +179,7 @@
                                   [[:account-context :spectate-ui :anchor] nil]
                                   [[:account-context :spectate-ui :search] address*]
                                   [[:account-context :spectate-ui :last-search] address*]
+                                  [[:account-context :spectate-ui :search-auto-prefilled?] true]
                                   [[:account-context :spectate-ui :label] ""]
                                   [[:account-context :spectate-ui :editing-watchlist-address] nil]
                                   [[:account-context :spectate-ui :search-error] nil]

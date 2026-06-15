@@ -249,7 +249,19 @@
                   (get scale :start)
                   (get scale :end)
                   (effective-reduce-only command-context form)
-                  (:post-only form)))]
+                  (:post-only form)))
+        ;; Spot scale-leg prices must respect spot tick/precision (8 - szDecimals),
+        ;; but interpolated ladder prices come out raw from scale-order-legs, so
+        ;; canonicalize each spot leg price here. (Perp scale legs are left as-is
+        ;; pending a broader, separately-reviewed scale-precision fix.)
+        orders (if (and (seq orders) (spot-market-command? command-context))
+                 (mapv (fn [order]
+                         (if-let [p (canonical-price-text command-context
+                                                          (trading-domain/parse-num (:p order)))]
+                           (assoc order :p p)
+                           order))
+                       orders)
+                 orders)]
     (when (seq orders)
       {:action (array-map :type "order"
                           :orders (vec orders)

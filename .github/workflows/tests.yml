@@ -69,15 +69,17 @@ jobs:
           set -o pipefail
           npm run test:websocket | tee .github/badges/test-websocket.log
 
-      - name: Run Bundle Budget Gate
+      - name: Release build + bundle budget check (soft)
         id: bundle_budget
         continue-on-error: true
         run: |
           set -o pipefail
-          # The budget checker measures the hashed release main.js, so a real
-          # release :app build is required (dev compiles produce unhashed names
-          # the checker rejects). This catches main.js regrowth at PR time
-          # instead of only at the Cloudflare Pages deploy.
+          # The release :app build doubles as a compile smoke (advanced-optimization
+          # failures don't surface in the dev `compile` the test gate runs). The
+          # budget checker then measures the hashed release main.js, but it is a
+          # SOFT check: over-target prints a warning + PR annotation and exits 0,
+          # so bundle size never fails CI or the Cloudflare deploy. Only a real
+          # release build failure trips this step.
           npx shadow-cljs release app
           npm run lint:bundle-budget
 

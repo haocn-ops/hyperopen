@@ -18,6 +18,7 @@
                                           (:status history-load-state))
                                (contains? #{:no-eligible-history
                                             :incomplete-history
+                                            :missing-history-assumptions
                                             :history-loading}
                                           (:reason readiness))
                                (seq (:warnings readiness)))

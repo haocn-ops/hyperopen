@@ -78,6 +78,20 @@
     actions/set-portfolio-optimizer-instrument-filter
     :set-portfolio-optimizer-asset-override
     actions/set-portfolio-optimizer-asset-override
+    :set-portfolio-optimizer-history-assumption-mode
+    actions/set-portfolio-optimizer-history-assumption-mode
+    :set-portfolio-optimizer-history-assumption-expected-return
+    actions/set-portfolio-optimizer-history-assumption-expected-return
+    :set-portfolio-optimizer-history-assumption-expected-volatility
+    actions/set-portfolio-optimizer-history-assumption-expected-volatility
+    :set-portfolio-optimizer-history-assumption-max-weight-cap
+    actions/set-portfolio-optimizer-history-assumption-max-weight-cap
+    :set-portfolio-optimizer-history-assumption-proxy-instrument
+    actions/set-portfolio-optimizer-history-assumption-proxy-instrument
+    :set-portfolio-optimizer-history-assumption-proxy-relationship
+    actions/set-portfolio-optimizer-history-assumption-proxy-relationship
+    :clear-portfolio-optimizer-history-assumption
+    actions/clear-portfolio-optimizer-history-assumption
     :set-portfolio-optimizer-universe-search-query
     actions/set-portfolio-optimizer-universe-search-query
     :set-portfolio-optimizer-draft-add-asset-open

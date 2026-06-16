@@ -381,7 +381,10 @@
                                         [(conj contracts/draft-constraints-path :asset-overrides)
                                          (dissoc (or (:asset-overrides constraints) {}) instrument-id*)]
                                         [(conj contracts/draft-constraints-path :perp-leverage)
-                                         (dissoc (or (:perp-leverage constraints) {}) instrument-id*)]]
+                                         (dissoc (or (:perp-leverage constraints) {}) instrument-id*)]
+                                        [contracts/draft-history-assumptions-path
+                                         (dissoc (or (get-in state contracts/draft-history-assumptions-path) {})
+                                                 instrument-id*)]]
                                        (black-litterman-universe-path-values state universe*))
                           prefetch-changed?
                           (conj [contracts/history-prefetch-path prefetch-state]))]

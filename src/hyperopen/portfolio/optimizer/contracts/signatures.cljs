@@ -12,6 +12,7 @@
    :constraints
    :execution-assumptions
    :history
+   :history-assumptions
    :black-litterman-prior])
 
 (defn- stable-execution-assumptions

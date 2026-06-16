@@ -47,3 +47,31 @@
     (is (str/includes? text "Alpha Yield"))
     (is (not (str/includes? text vault-id)))
     (is (not (str/includes? text vault-address)))))
+
+(deftest inputs-tab-renders-history-assumptions-summary-test
+  (let [view-node (inputs-tab/inputs-tab
+                   {:portfolio {:optimizer
+                                {:active-scenario {:loaded-id "scn_assumptions"
+                                                   :status :saved}
+                                 :draft {:id "scn_assumptions"
+                                         :universe [{:instrument-id "perp:BTC"
+                                                     :market-type :perp
+                                                     :coin "BTC"}
+                                                    {:instrument-id "perp:NEW"
+                                                     :market-type :perp
+                                                     :coin "NEW"}]
+                                         :objective {:kind :minimum-variance}
+                                         :return-model {:kind :historical-mean}
+                                         :risk-model {:kind :diagonal-shrink}
+                                         :constraints {:long-only? true}
+                                         :execution-assumptions {}
+                                         :history-assumptions
+                                         {"perp:NEW" {:behavior :conservative
+                                                      :expected-return 0.25
+                                                      :volatility 0.9
+                                                      :max-weight 0.03
+                                                      :correlation-floor 0.75}}}}}})
+        text (node-text view-node)]
+    (is (str/includes? text "History Assumptions Used"))
+    (is (str/includes? text "NEW"))
+    (is (str/includes? text "Conservative"))))

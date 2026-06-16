@@ -190,6 +190,9 @@
                   contract-fixtures/v1-scenario-record)
         tracking (contracts/migrate-tracking-record
                   contract-fixtures/v1-tracking-record)]
+    (testing "history assumptions are backfilled for drafts persisted before the key existed"
+      (is (not (contains? contract-fixtures/v1-draft :history-assumptions)))
+      (is (= {} (:history-assumptions draft))))
     (is (s/valid? ::contracts/draft draft)
         (s/explain-str ::contracts/draft draft))
     (is (s/valid? ::contracts/scenario-record scenario)
@@ -284,10 +287,56 @@
                         (assoc-in draft [:execution-assumptions
                                          :default-order-type]
                                   :iceberg)
-                        (assoc-in draft [:metadata :dirty?] "false")]]
+                        (assoc-in draft [:metadata :dirty?] "false")
+                        (assoc draft :history-assumptions
+                               {"perp:NEW" {:behavior :unknown
+                                            :volatility 0.9
+                                            :max-weight 0.03}})
+                        (assoc draft :history-assumptions
+                               {"perp:NEW" {:behavior :conservative
+                                            :volatility 0.9
+                                            :max-weight 0.03}})
+                        (assoc draft :history-assumptions
+                               {"perp:NEW" {:behavior :proxy
+                                            :volatility 0.9
+                                            :max-weight 0.05
+                                            :relationship :extreme}})
+                        (assoc draft :history-assumptions
+                               {" " {:behavior :conservative
+                                     :volatility 0.9
+                                     :max-weight 0.03
+                                     :correlation-floor 0.75}})]]
     (doseq [invalid-draft invalid-drafts]
       (is (false? (s/valid? ::contracts/draft invalid-draft))
           (s/explain-str ::contracts/draft invalid-draft)))))
+
+(deftest history-assumptions-draft-contract-accepts-supported-shapes-test
+  (let [draft (contract-fixtures/valid-draft)
+        valid [["empty map" {}]
+               ["conservative entry"
+                {"perp:NEW" {:behavior :conservative
+                             :expected-return 0.25
+                             :volatility 0.9
+                             :max-weight 0.03
+                             :correlation-floor 0.75}}]
+               ["proxy entry"
+                {"perp:NEW" {:behavior :proxy
+                             :expected-return 0.25
+                             :volatility 0.9
+                             :proxy-instrument-id "perp:BTC"
+                             :relationship :medium
+                             :max-weight 0.05}}]
+               ["blank return/vol still structurally valid (readiness enforces completeness)"
+                {"perp:NEW" {:behavior :conservative
+                             :expected-return nil
+                             :volatility nil
+                             :max-weight 0.03
+                             :correlation-floor 0.75}}]]]
+    (doseq [[label assumptions] valid]
+      (is (s/valid? ::contracts/draft (assoc draft :history-assumptions assumptions))
+          (str label ": "
+               (s/explain-str ::contracts/draft
+                              (assoc draft :history-assumptions assumptions)))))))
 
 (deftest black-litterman-view-contract-accepts-supported-shapes-test
   (let [valid-views [["absolute instrument view"

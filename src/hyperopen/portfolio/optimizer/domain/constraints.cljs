@@ -163,7 +163,7 @@
            :reason :missing-native-history-metadata})
         (aligned-cadence-for history instrument-id))))
 
-(defn- merge-max-weight-override
+(defn merge-max-weight-override
   [override max-weight]
   (let [override* (or override {})
         merge-cap (fn [existing]

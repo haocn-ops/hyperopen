@@ -6,6 +6,7 @@
             [hyperopen.portfolio.optimizer.application.request-builder :as request-builder]
             [hyperopen.portfolio.optimizer.contracts :as contracts]
             [hyperopen.portfolio.optimizer.coercion :as coercion]
+            [hyperopen.portfolio.optimizer.domain.history-assumptions :as history-assumptions]
             [hyperopen.portfolio.optimizer.domain.risk :as risk]
             [hyperopen.portfolio.optimizer.ids :as ids]))
 
@@ -24,7 +25,15 @@
     :instrument-kind-mismatch
     :proxy-mapping-unapproved
     :proxy-validation-failed
-    :validation-failed})
+    :validation-failed
+    :history-assumption-required
+    :history-assumption-incomplete
+    :history-assumption-proxy-not-applied})
+
+(def ^:private history-assumption-warning-codes
+  #{:history-assumption-required
+    :history-assumption-incomplete
+    :history-assumption-proxy-not-applied})
 
 (def ^:private missing-history-warning-codes
   #{:missing-history-coin
@@ -260,6 +269,22 @@
       :source-fetch-failed
       (str label ": source refresh failed; cached optimizer history may be stale.")
 
+      :history-assumption-required
+      (str label " needs a history assumption. Choose proxy behavior or conservative assumption.")
+
+      :history-assumption-incomplete
+      (str label
+           (case (:missing warning)
+             :volatility " needs an expected annual volatility."
+             :expected-return " needs an expected annual return for this objective."
+             :max-weight " needs a max weight cap."
+             :proxy-instrument " is set to proxy behavior but no proxy asset is selected."
+             :relationship " needs a relationship strength."
+             " needs more history-assumption details."))
+
+      :history-assumption-proxy-not-applied
+      (str label "'s proxy assumption is saved but isn't applied to the risk model yet, so it is excluded from this optimization.")
+
       (or (some-> (:code warning) name)
           "Optimizer warning."))))
 
@@ -269,15 +294,85 @@
           (assoc warning :message (warning-display-message request warning)))
         warnings))
 
+(defn- first-missing-assumption-field
+  [entry return-required?]
+  (cond
+    (not (positive-number? (:volatility entry)))
+    :volatility
+
+    (and return-required? (not (coercion/finite-number? (:expected-return entry))))
+    :expected-return
+
+    (not (positive-number? (:max-weight entry)))
+    :max-weight
+
+    (and (history-assumptions/proxy? entry)
+         (not (non-blank-text (:proxy-instrument-id entry))))
+    :proxy-instrument
+
+    (and (history-assumptions/proxy? entry)
+         (not (contains? history-assumptions/relationships (:relationship entry))))
+    :relationship
+
+    :else nil))
+
+(defn- history-assumption-warning
+  [entry return-required? instrument-id]
+  (cond
+    ;; A complete proxy assumption is collected but not yet folded into the
+    ;; covariance model, so the run must say so rather than silently exclude it.
+    (and (history-assumptions/proxy? entry)
+         (history-assumptions/proxy-assumption-complete? entry return-required?))
+    {:code :history-assumption-proxy-not-applied
+     :instrument-id instrument-id
+     :behavior :proxy}
+
+    ;; A mode is chosen but required fields are still missing.
+    :else
+    {:code :history-assumption-incomplete
+     :instrument-id instrument-id
+     :behavior (:behavior entry)
+     :missing (first-missing-assumption-field entry return-required?)}))
+
+(defn- history-assumption-warnings
+  "Honest guidance for dropped assets the user has started configuring. Assets with
+  no assumption draft are left to the existing incomplete-history path."
+  [requested-universe request draft]
+  (let [aligned-ids (instrument-ids (:universe request))
+        return-required? (history-assumptions/return-required-for-objective?
+                          (get-in request [:objective :kind]))
+        assumptions (:history-assumptions draft)]
+    (->> requested-universe
+         (keep (fn [instrument]
+                 (let [id (:instrument-id instrument)
+                       entry (get assumptions id)]
+                   (when (and id
+                              (not (contains? aligned-ids id))
+                              (some? (:behavior entry)))
+                     (history-assumption-warning entry return-required? id)))))
+         vec)))
+
 (defn- blocking-history-warnings
   [requested-universe request]
   (let [missing-ids (set/difference (instrument-ids requested-universe)
-                                    (instrument-ids (:universe request)))]
-    (->> (:warnings request)
-         (filter (fn [warning]
-                   (or (contains? missing-ids (:instrument-id warning))
-                       (contains? history-blocking-warning-codes
-                                  (:code warning)))))
+                                    (instrument-ids (:universe request)))
+        warnings (filter (fn [warning]
+                           (or (contains? missing-ids (:instrument-id warning))
+                               (contains? history-blocking-warning-codes
+                                          (:code warning))))
+                         (:warnings request))
+        ;; Prefer actionable assumption guidance over the lower-level raw history
+        ;; warnings for the same asset.
+        assumption-ids (set (keep (fn [warning]
+                                    (when (contains? history-assumption-warning-codes
+                                                     (:code warning))
+                                      (:instrument-id warning)))
+                                  warnings))]
+    (->> warnings
+         (remove (fn [warning]
+                   (and (contains? assumption-ids (:instrument-id warning))
+                        (not (contains? history-assumption-warning-codes
+                                        (:code warning))))))
          (with-warning-messages request))))
 
 (defn- warning-history-status
@@ -358,6 +453,9 @@
       :incomplete-history
       (with-details "History is incomplete for this universe."
                     "History is incomplete")
+      :missing-history-assumptions
+      (with-details "Some assets need history assumptions before running."
+                    "History assumptions needed")
       "Optimizer inputs are not ready to run.")))
 
 (defn build-readiness
@@ -379,24 +477,34 @@
             request (cond-> request
                       (seq risk-blocking-warnings)
                       (update :warnings into risk-blocking-warnings))
+            assumption-warnings (history-assumption-warnings requested-universe
+                                                            request
+                                                            draft)
+            request (cond-> request
+                      (seq assumption-warnings)
+                      (update :warnings into assumption-warnings))
             eligible? (boolean (seq (:universe request)))
             incomplete? (incomplete-history? requested-universe request)
             risk-history-incomplete? (boolean (seq risk-blocking-warnings))
+            assumptions-flagged? (boolean (seq assumption-warnings))
             missing-bl-views? (missing-black-litterman-views? request)
             runnable? (and eligible?
                            (not incomplete?)
                            (not risk-history-incomplete?)
+                           (not assumptions-flagged?)
                            (not history-loading?)
                            (not missing-bl-views?))
             blocking-warnings (if (or (not eligible?)
                                       incomplete?
-                                      risk-history-incomplete?)
+                                      risk-history-incomplete?
+                                      assumptions-flagged?)
                                 (blocking-history-warnings requested-universe
                                                           request)
                                 [])]
         {:status (if runnable? :ready :blocked)
          :reason (cond
                    history-loading? :history-loading
+                   assumptions-flagged? :missing-history-assumptions
                    (not eligible?) :no-eligible-history
                    (or incomplete? risk-history-incomplete?) :incomplete-history
                    missing-bl-views? :missing-black-litterman-views

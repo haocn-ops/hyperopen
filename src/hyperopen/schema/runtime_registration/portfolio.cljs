@@ -126,6 +126,20 @@
     :confirm-clear-portfolio-optimizer-black-litterman-views]
    [:actions/set-portfolio-optimizer-instrument-filter :set-portfolio-optimizer-instrument-filter]
    [:actions/set-portfolio-optimizer-asset-override :set-portfolio-optimizer-asset-override]
+   [:actions/set-portfolio-optimizer-history-assumption-mode
+    :set-portfolio-optimizer-history-assumption-mode]
+   [:actions/set-portfolio-optimizer-history-assumption-expected-return
+    :set-portfolio-optimizer-history-assumption-expected-return]
+   [:actions/set-portfolio-optimizer-history-assumption-expected-volatility
+    :set-portfolio-optimizer-history-assumption-expected-volatility]
+   [:actions/set-portfolio-optimizer-history-assumption-max-weight-cap
+    :set-portfolio-optimizer-history-assumption-max-weight-cap]
+   [:actions/set-portfolio-optimizer-history-assumption-proxy-instrument
+    :set-portfolio-optimizer-history-assumption-proxy-instrument]
+   [:actions/set-portfolio-optimizer-history-assumption-proxy-relationship
+    :set-portfolio-optimizer-history-assumption-proxy-relationship]
+   [:actions/clear-portfolio-optimizer-history-assumption
+    :clear-portfolio-optimizer-history-assumption]
    [:actions/set-portfolio-optimizer-universe-search-query
     :set-portfolio-optimizer-universe-search-query]
    [:actions/set-portfolio-optimizer-draft-add-asset-open

@@ -34,6 +34,7 @@
 (def draft-risk-model-path paths/draft-risk-model-path)
 (def draft-constraints-path paths/draft-constraints-path)
 (def draft-execution-assumptions-path paths/draft-execution-assumptions-path)
+(def draft-history-assumptions-path paths/draft-history-assumptions-path)
 (def draft-metadata-path paths/draft-metadata-path)
 (def draft-dirty-path paths/draft-dirty-path)
 (def active-scenario-path paths/active-scenario-path)

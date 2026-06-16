@@ -3,7 +3,8 @@
             [hyperopen.portfolio.optimizer.ids :as ids]))
 
 (def enum-value-keys
-  #{:code
+  #{:behavior
+    :code
     :default-order-type
     :fee-mode
     :funding-source
@@ -14,6 +15,7 @@
     :objective-kind
     :order-type
     :reason
+    :relationship
     :side
     :source
     :status
@@ -30,6 +32,7 @@
     :expected-return-intervals-by-instrument
     :funding-by-instrument
     :weights-by-instrument
+    :history-assumptions
     :per-asset-overrides
     :per-perp-leverage-caps
     :prices-by-id

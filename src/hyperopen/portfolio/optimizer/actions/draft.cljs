@@ -5,7 +5,9 @@
             [hyperopen.portfolio.optimizer.application.return-inputs :as return-inputs]
             [hyperopen.portfolio.optimizer.application.setup-readiness :as setup-readiness]
             [hyperopen.portfolio.optimizer.actions.run :as run-actions]
-            [hyperopen.portfolio.optimizer.contracts :as contracts]))
+            [hyperopen.portfolio.optimizer.coercion :as coercion]
+            [hyperopen.portfolio.optimizer.contracts :as contracts]
+            [hyperopen.portfolio.optimizer.domain.history-assumptions :as history-assumptions]))
 
 (defn- set-draft-model
   [path models value]
@@ -480,3 +482,95 @@
           boolean-value)]])
 
       :else [])))
+
+;; --- History assumptions (per-asset, instrument-keyed) ----------------------
+;;
+;; The :history-assumptions map is keyed by instrument-id (a string), so every
+;; mutation saves the WHOLE map under the single keyword path -- :effects/save-many
+;; only accepts keyword path segments (same constraint as instrument-cap-map).
+;; A behavior (mode) must be chosen first, which seeds the entry; the field
+;; setters operate on an existing entry so partial behavior-less entries never
+;; reach the draft.
+
+(defn- history-assumptions-map
+  [state]
+  (or (get-in state contracts/draft-history-assumptions-path) {}))
+
+(defn- save-history-assumptions
+  [assumptions]
+  (common/save-draft-path-values
+   [[contracts/draft-history-assumptions-path assumptions]]))
+
+(defn- update-history-assumption-field
+  [state instrument-id field value*]
+  (let [instrument-id* (common/non-blank-text instrument-id)
+        assumptions (history-assumptions-map state)]
+    (if (and instrument-id*
+             (some? value*)
+             (contains? assumptions instrument-id*))
+      (save-history-assumptions (assoc-in assumptions [instrument-id* field] value*))
+      [])))
+
+(defn set-portfolio-optimizer-history-assumption-mode
+  [state instrument-id behavior]
+  (let [instrument-id* (common/non-blank-text instrument-id)
+        behavior* (common/normalize-keyword-like behavior)]
+    (if (and instrument-id*
+             (contains? history-assumptions/behaviors behavior*))
+      (let [assumptions (history-assumptions-map state)
+            existing (get assumptions instrument-id*)]
+        (if (= behavior* (:behavior existing))
+          ;; already in this mode; preserve the user's input untouched.
+          []
+          ;; switching modes preserves expected return/volatility and reseeds only
+          ;; the mode-specific fields.
+          (let [entry (cond-> (history-assumptions/default-assumption behavior*)
+                        (some? (:expected-return existing))
+                        (assoc :expected-return (:expected-return existing))
+
+                        (some? (:volatility existing))
+                        (assoc :volatility (:volatility existing)))]
+            (save-history-assumptions (assoc assumptions instrument-id* entry)))))
+      [])))
+
+(defn set-portfolio-optimizer-history-assumption-expected-return
+  [state instrument-id value]
+  (update-history-assumption-field state instrument-id :expected-return
+                                   (coercion/parse-percent-text value)))
+
+(defn set-portfolio-optimizer-history-assumption-expected-volatility
+  [state instrument-id value]
+  (update-history-assumption-field state instrument-id :volatility
+                                   (coercion/parse-percent-text value)))
+
+(defn set-portfolio-optimizer-history-assumption-max-weight-cap
+  [state instrument-id value]
+  (update-history-assumption-field state instrument-id :max-weight
+                                   (coercion/parse-percent-text value)))
+
+(defn set-portfolio-optimizer-history-assumption-proxy-instrument
+  [state instrument-id proxy-instrument-id]
+  (let [instrument-id* (common/non-blank-text instrument-id)
+        proxy* (common/non-blank-text proxy-instrument-id)]
+    ;; a proxy must be a different instrument.
+    (if (and instrument-id*
+             proxy*
+             (not= instrument-id* proxy*))
+      (update-history-assumption-field state instrument-id :proxy-instrument-id proxy*)
+      [])))
+
+(defn set-portfolio-optimizer-history-assumption-proxy-relationship
+  [state instrument-id relationship]
+  (let [relationship* (common/normalize-keyword-like relationship)]
+    (if (contains? history-assumptions/relationships relationship*)
+      (update-history-assumption-field state instrument-id :relationship relationship*)
+      [])))
+
+(defn clear-portfolio-optimizer-history-assumption
+  [state instrument-id]
+  (let [instrument-id* (common/non-blank-text instrument-id)
+        assumptions (history-assumptions-map state)]
+    (if (and instrument-id*
+             (contains? assumptions instrument-id*))
+      (save-history-assumptions (dissoc assumptions instrument-id*))
+      [])))

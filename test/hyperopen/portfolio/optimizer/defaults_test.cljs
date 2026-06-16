@@ -28,7 +28,27 @@
     (is (contains? (:constraints draft) :blocklist))
     (is (contains? (:constraints draft) :max-turnover))
     (is (contains? (:constraints draft) :rebalance-tolerance))
-    (is (contains? (:constraints draft) :include-spot?))))
+    (is (contains? (:constraints draft) :include-spot?))
+    (is (contains? draft :history-assumptions))
+    (is (= {} (:history-assumptions draft)))))
+
+(deftest default-history-assumption-seeds-mode-specific-fields-test
+  (let [proxy (defaults/default-history-assumption :proxy)
+        conservative (defaults/default-history-assumption :conservative)]
+    (is (= {:behavior :proxy
+            :expected-return nil
+            :volatility nil
+            :proxy-instrument-id nil
+            :relationship :medium
+            :max-weight 0.05}
+           proxy))
+    (is (= {:behavior :conservative
+            :expected-return nil
+            :volatility nil
+            :max-weight 0.03
+            :correlation-floor 0.75}
+           conservative))
+    (is (nil? (defaults/default-history-assumption :unknown)))))
 
 (deftest default-optimizer-state-preserves-run-and-scenario-contract-test
   (is (= {:status :idle

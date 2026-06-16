@@ -45,6 +45,13 @@
     (update draft :universe #(mapv migrate-universe-instrument %))
     draft))
 
+(defn- migrate-draft-history-assumptions
+  [draft]
+  ;; Additive backfill: drafts persisted before history assumptions existed lack
+  ;; the key, which the strengthened ::draft spec now requires. Default to an
+  ;; empty map; no schema-version bump is needed for a purely additive key.
+  (update draft :history-assumptions #(or % {})))
+
 (defn migrate-draft
   [draft]
   (let [draft* (or draft {})
@@ -52,6 +59,7 @@
     (case version
       1 (-> draft*
             migrate-draft-universe
+            migrate-draft-history-assumptions
             (assoc :schema-version draft-schema-version))
       (throw (ex-info "Unsupported optimizer draft schema version."
                       {:contract :optimizer/draft

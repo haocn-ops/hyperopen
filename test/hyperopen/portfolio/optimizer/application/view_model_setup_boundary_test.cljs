@@ -199,3 +199,154 @@
               (:rows output-card)))
     (is (str/includes? (:copy output-note)
                        "Low confidence on BTC means your view:0.3 view only pulls posterior to pct:0.21"))))
+
+(def ^:private new-perp-instrument
+  {:instrument-id "perp:NEW"
+   :market-type :perp
+   :coin "NEW"})
+
+;; History assumption cards are load-aware: an asset is only carded once its history
+;; has actually been fetched (a succeeded load that requested it), so a fully-historied
+;; asset never flashes a card while history is still loading.
+(def ^:private loaded-state-with-new
+  {:status :succeeded
+   :request-signature {:universe [btc-instrument new-perp-instrument]}})
+
+(deftest history-assumption-cards-projects-render-ready-cards-test
+  (let [draft {:universe [btc-instrument new-perp-instrument]
+               :objective {:kind :minimum-variance}
+               :history-assumptions
+               {"perp:NEW" {:behavior :conservative
+                            :expected-return nil
+                            :volatility nil
+                            :max-weight 0.03
+                            :correlation-floor 0.75}}}
+        readiness {:request {:requested-universe [btc-instrument new-perp-instrument]
+                             :universe [btc-instrument]
+                             :objective {:kind :minimum-variance}}
+                   :blocking-warnings [{:code :history-assumption-incomplete
+                                        :instrument-id "perp:NEW"
+                                        :missing :volatility
+                                        :message "NEW needs an expected annual volatility."}]}
+        model (view-model/history-assumption-cards
+               {} draft readiness loaded-state-with-new
+               {:percent-label (fn [value] (str (js/Math.round (* 100 value)) "%"))})
+        card (first (:cards model))]
+    (is (true? (:applicable? model)))
+    (is (= 1 (count (:cards model))))
+    (is (= "perp:NEW" (:instrument-id card)))
+    (is (= :conservative (:mode card)))
+    (is (= :incomplete (:status card)))
+    (is (= "Needs assumptions" (:status-label card)))
+    (is (= [{:value :conservative :label "Use conservative assumption"}
+            {:value :proxy :label "Use proxy behavior"}]
+           (:mode-options card)))
+    (is (= "3%" (get-in card [:max-weight :percent-label])))
+    (is (nil? (get-in card [:volatility :value])))
+    (is (= ["NEW needs an expected annual volatility."] (:errors card)))
+    (is (false? (:engine-applied? card)))
+    (is (= :actions/set-portfolio-optimizer-history-assumption-mode
+           (get-in card [:actions :set-mode])))
+    (is (= :actions/clear-portfolio-optimizer-history-assumption
+           (get-in card [:actions :clear])))))
+
+(deftest history-assumption-cards-projects-proxy-options-test
+  (let [draft {:universe [btc-instrument new-perp-instrument]
+               :objective {:kind :minimum-variance}
+               :history-assumptions
+               {"perp:NEW" {:behavior :proxy
+                            :expected-return 0.25
+                            :volatility 0.9
+                            :proxy-instrument-id "perp:BTC"
+                            :relationship :medium
+                            :max-weight 0.05}}}
+        readiness {:request {:requested-universe [btc-instrument new-perp-instrument]
+                             :universe [btc-instrument]
+                             :objective {:kind :minimum-variance}}
+                   :blocking-warnings [{:code :history-assumption-proxy-not-applied
+                                        :instrument-id "perp:NEW"
+                                        :message "NEW's proxy assumption is saved but isn't applied to the risk model yet, so it is excluded from this optimization."}]}
+        model (view-model/history-assumption-cards
+               {} draft readiness loaded-state-with-new
+               {:percent-label (fn [value] (str (js/Math.round (* 100 value)) "%"))})
+        card (first (:cards model))]
+    (is (= :proxy (:mode card)))
+    (is (= :proxy-not-applied (:status card)))
+    (is (= "Using proxy" (:status-label card)))
+    (is (= "perp:BTC" (get-in card [:proxy :selected-id])))
+    (is (= [{:value "perp:BTC" :label "BTC"}]
+           (get-in card [:proxy :options]))
+        "Proxy options are the other selected instruments that have usable history.")
+    (is (= :medium (get-in card [:relationship :value])))
+    (is (= [] (:errors card)))
+    (is (str/includes? (:note card) "saved but isn't applied"))))
+
+(deftest history-assumption-cards-hidden-while-history-still-loading-test
+  ;; Regression: before history loads, readiness reports every asset as :missing
+  ;; (nothing aligned yet). A fully-historied asset (e.g. DOGE) must NOT be carded
+  ;; until its history has actually been fetched.
+  (let [draft {:universe [btc-instrument new-perp-instrument]
+               :objective {:kind :minimum-variance}
+               :history-assumptions {}}
+        readiness {:request {:requested-universe [btc-instrument new-perp-instrument]
+                             :universe []
+                             :objective {:kind :minimum-variance}}
+                   :blocking-warnings []}
+        loading (view-model/history-assumption-cards
+                 {} draft readiness {:status :loading} {})
+        idle (view-model/history-assumption-cards
+              {} draft readiness {:status :idle} {})]
+    (is (false? (:applicable? loading)))
+    (is (empty? (:cards loading)))
+    (is (false? (:applicable? idle)))
+    (is (empty? (:cards idle)))))
+
+(deftest history-assumption-cards-flag-short-but-present-history-test
+  ;; An asset with thin-but-present history (e.g. SKR's ~75 daily candles) clears the
+  ;; engine's tiny minimum (status :sufficient) but is below the user-facing threshold,
+  ;; so it should still be offered a card; an asset with ample history should not.
+  (let [skr {:instrument-id "perp:SKR" :market-type :perp :coin "SKR"}
+        draft {:universe [btc-instrument skr]
+               :objective {:kind :minimum-variance}
+               :history-assumptions {}}
+        readiness {:request {:requested-universe [btc-instrument skr]
+                             :universe [btc-instrument skr]
+                             :objective {:kind :minimum-variance}}
+                   :blocking-warnings []}
+        state {:portfolio
+               {:optimizer
+                {:history-data
+                 ;; SKR has only ~75 daily candles; BTC has the full ~1-year fetch cap.
+                 {:candle-history-by-coin
+                  {"SKR" (vec (repeat 75 {:time 1 :close "1"}))
+                   "BTC" (vec (repeat 365 {:time 1 :close "1"}))}}}}}
+        load-state {:status :succeeded
+                    :request-signature {:universe [btc-instrument skr]}}
+        model (view-model/history-assumption-cards state draft readiness load-state {})
+        carded-ids (set (map :instrument-id (:cards model)))]
+    (is (contains? carded-ids "perp:SKR")
+        "Short-but-present history is flagged for assumptions.")
+    (is (not (contains? carded-ids "perp:BTC"))
+        "An asset with ample history is not flagged.")))
+
+(deftest universe-row-carries-assumption-badge-test
+  (let [draft {:universe [btc-instrument new-perp-instrument]
+               :objective {:kind :minimum-variance}
+               :history-assumptions
+               {"perp:NEW" {:behavior :conservative
+                            :expected-return nil
+                            :volatility 0.9
+                            :max-weight 0.03
+                            :correlation-floor 0.75}}}
+        model (view-model/universe-section-model
+               {}
+               draft
+               {:readiness {:request {:universe [btc-instrument]
+                                      :objective {:kind :minimum-variance}}}
+                :history-load-state {:status :idle}
+                :history-status-by-id {"perp:BTC" :aligned}})
+        badge-by-id (into {} (map (juxt :instrument-id :assumption-badge-label))
+                          (:selected-rows model))]
+    (is (= "Ready" (get badge-by-id "perp:BTC")))
+    (is (= "Conservative" (get badge-by-id "perp:NEW"))
+        "A complete conservative assumption shows the Conservative badge.")))

@@ -12,6 +12,7 @@
 (def draft-risk-model-path (conj draft-path :risk-model))
 (def draft-constraints-path (conj draft-path :constraints))
 (def draft-execution-assumptions-path (conj draft-path :execution-assumptions))
+(def draft-history-assumptions-path (conj draft-path :history-assumptions))
 (def draft-metadata-path (conj draft-path :metadata))
 (def draft-dirty-path (conj draft-metadata-path :dirty?))
 (def active-scenario-path (conj optimizer-path :active-scenario))
@@ -109,6 +110,7 @@
    :optimizer/draft-risk-model draft-risk-model-path
    :optimizer/draft-constraints draft-constraints-path
    :optimizer/draft-execution-assumptions draft-execution-assumptions-path
+   :optimizer/draft-history-assumptions draft-history-assumptions-path
    :optimizer/draft-metadata draft-metadata-path
    :optimizer/draft-dirty draft-dirty-path
    :optimizer/active-scenario active-scenario-path

@@ -1,7 +1,10 @@
 (ns hyperopen.portfolio.optimizer.application.view-model.setup
   (:require [clojure.string :as str]
+            [hyperopen.portfolio.optimizer.application.instrument-labels :as instrument-labels]
             [hyperopen.portfolio.optimizer.application.setup-readiness :as setup-readiness]
-            [hyperopen.portfolio.optimizer.application.view-model.universe :as universe]))
+            [hyperopen.portfolio.optimizer.application.view-model.universe :as universe]
+            [hyperopen.portfolio.optimizer.coercion :as coercion]
+            [hyperopen.portfolio.optimizer.domain.history-assumptions :as history-assumptions]))
 
 (defn- warning-code-label
   [warning]
@@ -19,6 +22,7 @@
     :missing-universe "Select a universe before running."
     :no-eligible-history "History starts loading as assets are included. Run Optimization retries anything still missing."
     :incomplete-history "History is incomplete for this universe. Run Optimization retries anything still missing."
+    :missing-history-assumptions "Some assets need history assumptions before this universe can run."
     :history-loading "History is loading for the selected assets."
     :missing-black-litterman-views "Add a view before running Use my views."
     "Optimizer inputs are ready to run."))
@@ -145,3 +149,179 @@
                     "Constraints are enforced before the recommendation is accepted.")
        (summary-row "Horizon" "Annualized"
                     "Displayed return and volatility metrics use the optimizer annualization convention.")]})))
+
+;; --- History-assumption cards ------------------------------------------------
+;;
+;; Views render these rows and dispatch the carried action ids; they never touch
+;; the raw draft or raw history. A card is shown for any selected asset that is
+;; missing/short on history or that the user has already started configuring.
+
+(def ^:private mode-options
+  [{:value :conservative :label "Use conservative assumption"}
+   {:value :proxy :label "Use proxy behavior"}])
+
+(def ^:private relationship-options
+  [{:value :low :label "Low"}
+   {:value :medium :label "Medium"}
+   {:value :high :label "High"}])
+
+(def ^:private mode-labels
+  {:conservative "Use conservative assumption"
+   :proxy "Use proxy behavior"})
+
+(def ^:private assumption-action-ids
+  {:set-mode :actions/set-portfolio-optimizer-history-assumption-mode
+   :set-expected-return :actions/set-portfolio-optimizer-history-assumption-expected-return
+   :set-expected-volatility :actions/set-portfolio-optimizer-history-assumption-expected-volatility
+   :set-max-weight-cap :actions/set-portfolio-optimizer-history-assumption-max-weight-cap
+   :set-proxy-instrument :actions/set-portfolio-optimizer-history-assumption-proxy-instrument
+   :set-proxy-relationship :actions/set-portfolio-optimizer-history-assumption-proxy-relationship
+   :clear :actions/clear-portfolio-optimizer-history-assumption})
+
+(def ^:private card-needing-adequacy
+  ;; universe/history-adequacy values that warrant a card: no usable history, or
+  ;; thin-but-present history below the user-facing short threshold. :pending (still
+  ;; loading) and :ok (enough history) are excluded.
+  #{:none :short})
+
+(defn- percent-field
+  [percent-label* value]
+  {:value value
+   :percent-label (when (some? value) (percent-label* value))
+   ;; editable percent text (decimal 0.25 -> "25"); the action parses it back.
+   :input-text (when (some? value) (coercion/decimal->percent-text value))})
+
+(defn- proxy-options
+  [universe history-status-by-id instrument-id]
+  (let [usable (->> universe
+                    (keep :instrument-id)
+                    (filter (fn [id]
+                              (and (not= id instrument-id)
+                                   (= :aligned (get history-status-by-id id)))))
+                    vec)
+        labels (instrument-labels/labels-by-instrument universe usable)]
+    (mapv (fn [id]
+            {:value id
+             :label (get labels id id)})
+          usable)))
+
+(defn- card-status
+  [entry complete? proxy?]
+  (cond
+    (nil? (:behavior entry)) :needs-assumptions
+    (and complete? proxy?) :proxy-not-applied
+    complete? :complete
+    :else :incomplete))
+
+(def ^:private card-status-labels
+  {:needs-assumptions "Needs assumptions"
+   :incomplete "Needs assumptions"
+   :complete "Conservative"
+   :proxy-not-applied "Using proxy"})
+
+(defn- card-summary
+  [entry percent-label* proxy-label]
+  (let [vol (some-> (:volatility entry) percent-label*)
+        cap (some-> (:max-weight entry) percent-label*)]
+    (case (:behavior entry)
+      :conservative (str "conservative" (when vol (str " - " vol " vol"))
+                         (when cap (str " - " cap " cap")))
+      :proxy (str "using " (or proxy-label "proxy") " proxy"
+                  (when (:relationship entry)
+                    (str " - " (name (:relationship entry)) " relationship"))
+                  (when vol (str " - " vol " vol"))
+                  (when cap (str " - " cap " cap")))
+      nil)))
+
+(defn- history-assumption-card
+  [{:keys [instrument label entry complete? errors note percent-label* universe
+           history-status-by-id]}]
+  (let [id (:instrument-id instrument)
+        behavior (:behavior entry)
+        proxy? (= :proxy behavior)
+        status (card-status entry complete? proxy?)
+        proxy-id (:proxy-instrument-id entry)
+        proxy-label (when proxy-id
+                      (get (instrument-labels/labels-by-instrument universe [proxy-id])
+                           proxy-id proxy-id))]
+    (cond-> {:instrument-id id
+             :label label
+             :role (str "portfolio-optimizer-history-assumption-card-" id)
+             :status status
+             :status-label (get card-status-labels status "Needs assumptions")
+             :mode behavior
+             :mode-label (get mode-labels behavior)
+             :mode-options mode-options
+             :expected-return (percent-field percent-label* (:expected-return entry))
+             :volatility (percent-field percent-label* (:volatility entry))
+             :max-weight (percent-field percent-label* (:max-weight entry))
+             :errors (vec errors)
+             :note note
+             :engine-applied? (and complete? (not proxy?))
+             :summary (when complete? (card-summary entry percent-label* proxy-label))
+             :actions assumption-action-ids}
+      proxy?
+      (assoc :proxy {:selected-id proxy-id
+                     :label proxy-label
+                     :options (proxy-options universe history-status-by-id id)}
+             :relationship {:value (:relationship entry)
+                            :options relationship-options}))))
+
+(defn history-assumption-cards
+  ([state draft readiness history-load-state]
+   (history-assumption-cards state draft readiness history-load-state nil))
+  ([state draft readiness history-load-state {:keys [percent-label]}]
+   (let [universe (vec (or (get-in readiness [:request :requested-universe])
+                           (:universe draft)
+                           []))
+         assumptions (or (:history-assumptions draft) {})
+         history-status-by-id (if readiness
+                                (setup-readiness/history-status-by-instrument readiness)
+                                {})
+         load-state (or history-load-state {})
+         objective-kind (or (get-in readiness [:request :objective :kind])
+                            (get-in draft [:objective :kind]))
+         return-required? (history-assumptions/return-required-for-objective? objective-kind)
+         percent-label* #(apply-percent-label percent-label %)
+         warnings-by-id (group-by :instrument-id (:blocking-warnings readiness))
+         cards (->> universe
+                    (keep (fn [instrument]
+                            (let [id (:instrument-id instrument)
+                                  entry (get assumptions id)
+                                  ;; Same adequacy signal as the universe-row badge:
+                                  ;; :pending until history loads (so a historied asset
+                                  ;; never flashes a card), and :short for thin-but-
+                                  ;; present history below the user-facing threshold.
+                                  status (universe/selected-history-status
+                                          state readiness load-state
+                                          history-status-by-id instrument)
+                                  adequacy (universe/history-adequacy status state instrument)]
+                              (when (and id
+                                         (or (some? entry)
+                                             (contains? card-needing-adequacy adequacy)))
+                                (let [complete? (and entry
+                                                     (history-assumptions/assumption-complete?
+                                                      entry return-required?))
+                                      id-warnings (get warnings-by-id id)
+                                      errors (->> id-warnings
+                                                  (remove #(= :history-assumption-proxy-not-applied
+                                                              (:code %)))
+                                                  (keep :message))
+                                      note (some (fn [warning]
+                                                   (when (= :history-assumption-proxy-not-applied
+                                                            (:code warning))
+                                                     (:message warning)))
+                                                 id-warnings)]
+                                  (history-assumption-card
+                                   {:instrument instrument
+                                    :label (universe/instrument-primary-label instrument)
+                                    :entry entry
+                                    :complete? complete?
+                                    :errors errors
+                                    :note note
+                                    :percent-label* percent-label*
+                                    :universe universe
+                                    :history-status-by-id history-status-by-id}))))))
+                    vec)]
+     {:cards cards
+      :applicable? (boolean (seq cards))})))

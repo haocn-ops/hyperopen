@@ -79,6 +79,27 @@
 (def set-portfolio-optimizer-asset-override
   draft/set-portfolio-optimizer-asset-override)
 
+(def set-portfolio-optimizer-history-assumption-mode
+  draft/set-portfolio-optimizer-history-assumption-mode)
+
+(def set-portfolio-optimizer-history-assumption-expected-return
+  draft/set-portfolio-optimizer-history-assumption-expected-return)
+
+(def set-portfolio-optimizer-history-assumption-expected-volatility
+  draft/set-portfolio-optimizer-history-assumption-expected-volatility)
+
+(def set-portfolio-optimizer-history-assumption-max-weight-cap
+  draft/set-portfolio-optimizer-history-assumption-max-weight-cap)
+
+(def set-portfolio-optimizer-history-assumption-proxy-instrument
+  draft/set-portfolio-optimizer-history-assumption-proxy-instrument)
+
+(def set-portfolio-optimizer-history-assumption-proxy-relationship
+  draft/set-portfolio-optimizer-history-assumption-proxy-relationship)
+
+(def clear-portfolio-optimizer-history-assumption
+  draft/clear-portfolio-optimizer-history-assumption)
+
 (def set-portfolio-optimizer-universe-search-query
   universe/set-portfolio-optimizer-universe-search-query)
 

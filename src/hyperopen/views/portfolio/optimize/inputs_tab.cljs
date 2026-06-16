@@ -77,6 +77,43 @@
     [:p (str "Rebalance tolerance: " (opt-format/format-pct (:rebalance-tolerance constraints)))]
     [:p (str "Dust: " (or (:dust-usdc constraints) "N/A"))]]))
 
+(defn- history-assumption-mode-label
+  [mode]
+  (case mode
+    :conservative "Conservative"
+    :proxy "Proxy"
+    "--"))
+
+(defn- history-assumption-summary
+  [{:keys [mode proxy-label relationship volatility max-weight]}]
+  (case mode
+    :conservative (str "conservative · " (opt-format/format-pct volatility) " vol · "
+                       (opt-format/format-pct max-weight) " cap")
+    :proxy (str (or proxy-label "proxy") " proxy"
+                (when relationship (str " · " (name relationship) " relationship"))
+                " · " (opt-format/format-pct volatility) " vol · "
+                (opt-format/format-pct max-weight) " cap (saved, not yet applied)")
+    "--"))
+
+(defn- history-assumptions-audit
+  [{:keys [history-assumption-rows]}]
+  (when (seq history-assumption-rows)
+    (audit-card
+     "portfolio-optimizer-inputs-history-assumptions"
+     "History Assumptions Used"
+     (into [:div {:class ["space-y-1"]}]
+           (map (fn [row]
+                  [:div {:class ["rounded-md" "border" "border-base-300" "bg-base-100/70"
+                                 "px-2" "py-1" "text-xs"]
+                         :data-role (str "portfolio-optimizer-inputs-history-assumption-"
+                                         (:instrument-id row))}
+                   [:p {:class ["font-semibold" "tabular-nums"]}
+                    (str (:label row) " — " (history-assumption-mode-label (:mode row)))]
+                   [:p {:class ["mt-0.5" "text-trading-muted"]}
+                    (str "Return " (opt-format/format-pct (:expected-return row))
+                         " · " (history-assumption-summary row))]])
+                history-assumption-rows)))))
+
 (defn- execution-audit
   [execution-assumptions]
   (audit-card
@@ -113,4 +150,5 @@
       (universe-audit model)
       (models-audit model)
       (constraints-audit constraints)
-      (execution-audit execution-assumptions)]]))
+      (execution-audit execution-assumptions)
+      (history-assumptions-audit model)]]))

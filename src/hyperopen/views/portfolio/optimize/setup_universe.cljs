@@ -1,5 +1,6 @@
 (ns hyperopen.views.portfolio.optimize.setup-universe
-  (:require [hyperopen.portfolio.optimizer.application.view-model :as optimizer-view-model]))
+  (:require [hyperopen.portfolio.optimizer.application.view-model :as optimizer-view-model]
+            [hyperopen.views.portfolio.optimize.setup-history-assumptions :as setup-history-assumptions]))
 
 (def ^:private eyebrow-class
   ["font-mono" "text-[0.625rem]" "font-semibold" "uppercase" "tracking-[0.08em]" "text-trading-muted/70"])
@@ -91,6 +92,17 @@
        (when-let [market-type-label (some-> market-type name)]
          (str " " market-type-label))))
 
+(defn- assumption-badge-chip
+  [instrument-id badge badge-label]
+  (when (and badge (not= :ready badge))
+    [:span {:class ["optimizer-chip" "mt-0.5" "inline-block" "border" "px-1.5"
+                    "py-[1px]" "font-mono" "text-[0.53125rem]" "font-semibold"
+                    "uppercase" "tracking-[0.1em]"]
+            :data-optimizer-chip "true"
+            :data-tone (if (contains? #{:conservative :using-proxy} badge) "accent" "warn")
+            :data-role (str "portfolio-optimizer-universe-assumption-badge-" instrument-id)}
+     badge-label]))
+
 (defn- selected-row
   [{:keys [instrument-id
            market-type
@@ -98,6 +110,8 @@
            secondary-label
            history-label
            history-tone
+           assumption-badge
+           assumption-badge-label
            position-side
            short-selectable?]}]
     [:div {:class ["optimizer-universe-row"
@@ -110,7 +124,8 @@
       [:span {:class ["block" "truncate" "font-mono" "text-[0.6875rem]" "font-semibold"]}
        primary-label]
       [:span {:class ["block" "truncate" "text-[0.65625rem]" "text-trading-muted"]}
-       secondary-label]]
+       secondary-label]
+      (assumption-badge-chip instrument-id assumption-badge assumption-badge-label)]
      [:span {:class ["min-w-0"]} (market-type-tags market-type)]
      [:span {:class ["min-w-0"]} (tag history-label history-tone)]
      (side-control instrument-id position-side short-selectable?)
@@ -289,6 +304,11 @@
                :data-role "portfolio-optimizer-universe-search-results-empty"}
            "No matching unused instruments found."]))]
      (selected-table selected-rows universe)
+     (setup-history-assumptions/history-assumptions-section
+      {:state state
+       :draft draft
+       :readiness readiness
+       :history-load-state history-load-state})
      [:div {:class ["mt-2" "font-mono" "text-[0.58rem]" "leading-5"
                     "text-trading-muted/70"]}
       "Search adds tradeable spot, perp, or vault return legs. Symbols with limited history use stabilized covariance with a longer pull toward the market reference."

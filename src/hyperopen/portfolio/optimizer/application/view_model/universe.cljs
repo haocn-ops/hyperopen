@@ -5,6 +5,7 @@
             [hyperopen.portfolio.optimizer.coercion :as coercion]
             [hyperopen.portfolio.optimizer.contracts :as contracts]
             [hyperopen.portfolio.optimizer.defaults :as optimizer-defaults]
+            [hyperopen.portfolio.optimizer.domain.history-assumptions :as history-assumptions]
             [hyperopen.portfolio.optimizer.ids :as ids]))
 
 (def ^:private normalized-text coercion/non-blank-text)
@@ -175,34 +176,101 @@
 
     :else false))
 
-(declare selected-history-label)
+(declare selected-history-status)
+
+(def ^:private assumption-badge-labels
+  {:ready "Ready"
+   :short-history "Short history"
+   :no-history "No history"
+   :needs-assumptions "Needs assumptions"
+   :using-proxy "Using proxy"
+   :conservative "Conservative"})
+
+(defn- native-observation-count
+  [state instrument]
+  (let [rows (history-rows state instrument)]
+    (when (sequential? rows)
+      (count rows))))
+
+(defn history-adequacy
+  "Card/badge adequacy: layers the user-facing short-history threshold on top of the
+  load-aware history status. The engine's own minimum is only 1-2 observations, so a
+  thin-but-present asset (e.g. 75 daily candles) reads as :sufficient there; here it
+  is reclassified :short when its native history is below the threshold."
+  [history-status state instrument]
+  (case history-status
+    (:missing :rejected) :none
+    (:insufficient :shared-gap) :short
+    (:queued :loading :pending) :pending
+    ;; :sufficient / :stale -> adequate unless the native history is below the bar.
+    (let [observations (native-observation-count state instrument)]
+      (if (and observations
+               (< observations history-assumptions/short-history-min-observations))
+        :short
+        :ok))))
+
+(def ^:private adequacy-badges
+  {:none :no-history
+   :short :short-history
+   :ok :ready})
+
+(defn- assumption-badge
+  [entry adequacy return-required?]
+  (cond
+    (and entry
+         (history-assumptions/conservative? entry)
+         (history-assumptions/conservative-assumption-complete? entry return-required?))
+    :conservative
+
+    (and entry
+         (history-assumptions/proxy? entry)
+         (history-assumptions/proxy-assumption-complete? entry return-required?))
+    :using-proxy
+
+    (some? (:behavior entry))
+    :needs-assumptions
+
+    :else
+    (get adequacy-badges adequacy)))
 
 (defn selected-row-model
-  [state readiness history-load-state history-status-by-id instrument]
-  (let [instrument-id (:instrument-id instrument)
-        history-label (selected-history-label state
-                                              readiness
-                                              history-load-state
-                                              history-status-by-id
-                                              instrument)
-        primary-label (instrument-primary-label instrument)
-        {:keys [name base-label]} (universe-candidates/market-display instrument)
-        secondary-label (or (normalized-text (:name instrument))
-                            (normalized-text (:full-name instrument))
-                            (when (symbol-first? instrument)
-                              base-label)
-                            name)]
-    {:instrument instrument
-     :instrument-id instrument-id
-     :coin (:coin instrument)
-     :market-type (:market-type instrument)
-     :primary-label primary-label
-     :secondary-label secondary-label
-     :history-label history-label
-     :history-tone (if (= "sufficient" history-label) :long :warn)
-     :liquidity-label (liquidity-label instrument)
-     :position-side (position-side instrument)
-     :short-selectable? (short-selectable? instrument)}))
+  ([state readiness history-load-state history-status-by-id instrument]
+   (selected-row-model state readiness history-load-state history-status-by-id
+                       instrument nil))
+  ([state readiness history-load-state history-status-by-id instrument assumption-context]
+   (let [instrument-id (:instrument-id instrument)
+         history-status (selected-history-status state
+                                                 readiness
+                                                 history-load-state
+                                                 history-status-by-id
+                                                 instrument)
+         history-label (get history-status-labels history-status "pending")
+         primary-label (instrument-primary-label instrument)
+         {:keys [name base-label]} (universe-candidates/market-display instrument)
+         secondary-label (or (normalized-text (:name instrument))
+                             (normalized-text (:full-name instrument))
+                             (when (symbol-first? instrument)
+                               base-label)
+                             name)
+         entry (get (:assumptions assumption-context) instrument-id)
+         adequacy (history-adequacy history-status state instrument)
+         badge (assumption-badge entry
+                                 adequacy
+                                 (:return-required? assumption-context))]
+     (cond-> {:instrument instrument
+              :instrument-id instrument-id
+              :coin (:coin instrument)
+              :market-type (:market-type instrument)
+              :primary-label primary-label
+              :secondary-label secondary-label
+              :history-label history-label
+              :history-tone (if (= :sufficient history-status) :long :warn)
+              :liquidity-label (liquidity-label instrument)
+              :position-side (position-side instrument)
+              :short-selectable? (short-selectable? instrument)}
+       badge
+       (assoc :assumption-badge badge
+              :assumption-badge-label (get assumption-badge-labels badge))))))
 
 (defn candidate-row-model
   [market idx active-index]
@@ -319,11 +387,17 @@
          market-keys (if query-candidates?
                        (mapv :key markets)
                        [])
+         assumption-context {:assumptions (or (:history-assumptions draft) {})
+                             :return-required?
+                             (history-assumptions/return-required-for-objective?
+                              (or (get-in readiness [:request :objective :kind])
+                                  (get-in draft [:objective :kind])))}
          selected-rows (mapv #(selected-row-model state
                                                   readiness
                                                   history-load-state*
                                                   history-status-by-id*
-                                                  %)
+                                                  %
+                                                  assumption-context)
                              universe)
          candidate-rows (mapv #(candidate-row-model %1 %2 active-index)
                               markets

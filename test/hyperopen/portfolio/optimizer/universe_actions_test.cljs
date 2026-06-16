@@ -521,7 +521,17 @@
                                 :held-locks ["perp:ETH"]
                                 :asset-overrides {"perp:ETH" {:max-weight 0.2}
                                                   "perp:BTC" {:max-weight 0.5}}
-                                :perp-leverage {"perp:ETH" {:max-weight 0.4}}}}}}}]
+                                :perp-leverage {"perp:ETH" {:max-weight 0.4}}}
+                  :history-assumptions {"perp:ETH" {:behavior :conservative
+                                                    :expected-return nil
+                                                    :volatility 0.9
+                                                    :max-weight 0.03
+                                                    :correlation-floor 0.75}
+                                        "perp:BTC" {:behavior :conservative
+                                                    :expected-return nil
+                                                    :volatility 0.8
+                                                    :max-weight 0.03
+                                                    :correlation-floor 0.75}}}}}}]
     (is (= [[:effects/save-many
              [[[:portfolio :optimizer :draft :universe]
                [{:instrument-id "perp:BTC"
@@ -537,6 +547,12 @@
                {"perp:BTC" {:max-weight 0.5}}]
               [[:portfolio :optimizer :draft :constraints :perp-leverage]
                {}]
+              [[:portfolio :optimizer :draft :history-assumptions]
+               {"perp:BTC" {:behavior :conservative
+                            :expected-return nil
+                            :volatility 0.8
+                            :max-weight 0.03
+                            :correlation-floor 0.75}}]
               [[:portfolio :optimizer :draft :metadata :dirty?]
                true]]]]
            (actions/remove-portfolio-optimizer-universe-instrument

@@ -470,3 +470,104 @@
                   :instrument-id "hl:perp:BTC"})]
     (is (= "Bitcoin: approved proxy history is included."
            message))))
+
+;; --- History assumptions (no-history asset: perp:ETH has no candle history) ---
+
+(defn- assumptions-state
+  [eth-assumption objective]
+  (optimizer-state
+   {:portfolio
+    {:optimizer
+     {:draft
+      {:objective objective
+       :history-assumptions {"perp:ETH" eth-assumption}}
+      :history-data
+      {:candle-history-by-coin
+       {"BTC" [{:time 1000 :close "100"}
+               {:time 2000 :close "110"}]}
+       :funding-history-by-coin {}}}}}))
+
+(deftest readiness-allows-complete-conservative-history-assumption-test
+  (let [readiness (setup-readiness/build-readiness
+                   (assumptions-state {:behavior :conservative
+                                       :expected-return nil
+                                       :volatility 0.9
+                                       :max-weight 0.03
+                                       :correlation-floor 0.75}
+                                      {:kind :minimum-variance}))]
+    (is (= :ready (:status readiness)))
+    (is (nil? (:reason readiness)))
+    (is (true? (:runnable? readiness)))
+    (is (contains? (set (map :instrument-id (get-in readiness [:request :universe])))
+                   "perp:ETH")
+        "A complete conservative assumption re-admits the no-history asset, so the run is allowed.")))
+
+(deftest readiness-blocks-conservative-missing-volatility-test
+  (let [readiness (setup-readiness/build-readiness
+                   (assumptions-state {:behavior :conservative
+                                       :expected-return nil
+                                       :volatility nil
+                                       :max-weight 0.03
+                                       :correlation-floor 0.75}
+                                      {:kind :minimum-variance}))
+        warning (first (filter #(= "perp:ETH" (:instrument-id %))
+                               (:blocking-warnings readiness)))]
+    (is (= :blocked (:status readiness)))
+    (is (= :missing-history-assumptions (:reason readiness)))
+    (is (= false (:runnable? readiness)))
+    (is (= :history-assumption-incomplete (:code warning)))
+    (is (= :volatility (:missing warning)))
+    (is (= "ETH needs an expected annual volatility." (:message warning)))))
+
+(deftest readiness-blocks-complete-proxy-as-not-applied-test
+  (let [readiness (setup-readiness/build-readiness
+                   (assumptions-state {:behavior :proxy
+                                       :expected-return 0.2
+                                       :volatility 0.9
+                                       :proxy-instrument-id "perp:BTC"
+                                       :relationship :medium
+                                       :max-weight 0.05}
+                                      {:kind :minimum-variance}))
+        warning (first (filter #(= "perp:ETH" (:instrument-id %))
+                               (:blocking-warnings readiness)))]
+    (is (= :missing-history-assumptions (:reason readiness)))
+    (is (= false (:runnable? readiness)))
+    (is (= :history-assumption-proxy-not-applied (:code warning)))
+    (is (= "ETH's proxy assumption is saved but isn't applied to the risk model yet, so it is excluded from this optimization."
+           (:message warning)))))
+
+(deftest readiness-blocks-proxy-without-proxy-instrument-test
+  (let [readiness (setup-readiness/build-readiness
+                   (assumptions-state {:behavior :proxy
+                                       :expected-return 0.2
+                                       :volatility 0.9
+                                       :proxy-instrument-id nil
+                                       :relationship :medium
+                                       :max-weight 0.05}
+                                      {:kind :minimum-variance}))
+        warning (first (filter #(= "perp:ETH" (:instrument-id %))
+                               (:blocking-warnings readiness)))]
+    (is (= :missing-history-assumptions (:reason readiness)))
+    (is (= :history-assumption-incomplete (:code warning)))
+    (is (= :proxy-instrument (:missing warning)))
+    (is (= "ETH is set to proxy behavior but no proxy asset is selected."
+           (:message warning)))))
+
+(deftest readiness-requires-expected-return-only-for-return-seeking-objectives-test
+  (let [conservative {:behavior :conservative
+                      :expected-return nil
+                      :volatility 0.9
+                      :max-weight 0.03
+                      :correlation-floor 0.75}
+        return-seeking (setup-readiness/build-readiness
+                        (assumptions-state conservative {:kind :max-sharpe}))
+        return-seeking-warning (first (filter #(= "perp:ETH" (:instrument-id %))
+                                              (:blocking-warnings return-seeking)))]
+    (is (= :missing-history-assumptions (:reason return-seeking))
+        "A return-seeking objective blocks until an expected return is supplied.")
+    (is (= :expected-return (:missing return-seeking-warning)))
+    (let [supplied (setup-readiness/build-readiness
+                    (assumptions-state (assoc conservative :expected-return 0.25)
+                                       {:kind :max-sharpe}))]
+      (is (= :ready (:status supplied))
+          "With the expected return supplied, the return-seeking run is allowed."))))

@@ -1,5 +1,6 @@
 (ns hyperopen.portfolio.optimizer.application.view-model.scenario
   (:require [clojure.string :as str]
+            [hyperopen.portfolio.optimizer.application.instrument-labels :as instrument-labels]
             [hyperopen.portfolio.optimizer.application.rebalance-preview :as rebalance-preview]
             [hyperopen.portfolio.optimizer.application.setup-readiness :as setup-readiness]
             [hyperopen.portfolio.optimizer.application.view-model.refinement :as refinement-vm]
@@ -171,11 +172,33 @@
          :comparator-label (draft-instrument-label draft
                                                    (audit-view-comparator-id view))))
 
+(defn- history-assumption-audit-rows
+  [draft]
+  (let [universe (vec (or (:universe draft) []))
+        labels (instrument-labels/labels-by-instrument universe
+                                                       (keep :instrument-id universe))]
+    (->> (:history-assumptions draft)
+         (map (fn [[instrument-id entry]]
+                (let [proxy-id (:proxy-instrument-id entry)]
+                  {:instrument-id instrument-id
+                   :label (get labels instrument-id instrument-id)
+                   :mode (:behavior entry)
+                   :expected-return (:expected-return entry)
+                   :volatility (:volatility entry)
+                   :max-weight (:max-weight entry)
+                   :proxy-instrument-id proxy-id
+                   :proxy-label (when proxy-id (get labels proxy-id proxy-id))
+                   :relationship (:relationship entry)
+                   :correlation-floor (:correlation-floor entry)})))
+         (sort-by :label)
+         vec)))
+
 (defn inputs-audit-model
   [state]
   (let [draft (workspace/optimizer-draft state)
         views (vec (or (get-in draft [:return-model :views]) []))]
     {:draft draft
+     :history-assumption-rows (history-assumption-audit-rows draft)
      :scenario-id (or (get-in state contracts/active-scenario-loaded-id-path)
                       (:id draft))
      :universe (vec (or (:universe draft) []))

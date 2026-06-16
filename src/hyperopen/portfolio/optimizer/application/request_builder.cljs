@@ -3,6 +3,8 @@
             [hyperopen.portfolio.optimizer.application.history-loader :as history-loader]
             [hyperopen.portfolio.optimizer.contracts :as contracts]
             [hyperopen.portfolio.optimizer.coercion :as coercion]
+            [hyperopen.portfolio.optimizer.domain.constraints :as domain-constraints]
+            [hyperopen.portfolio.optimizer.domain.history-assumptions :as history-assumptions]
             [hyperopen.portfolio.optimizer.infrastructure.prior-data :as prior-data]))
 
 (def default-return-model
@@ -85,6 +87,22 @@
       (some? fallback-slippage-bps)
       (assoc :fallback-slippage-bps fallback-slippage-bps))))
 
+(defn- normalize-history-assumptions
+  "Engine-shaped per-asset assumptions: carry the draft entry through and resolve a
+  proxy relationship strength to its implied correlation. Decimals already; the
+  engine only consumes conservative entries today (see domain.history-assumptions)."
+  [assumptions]
+  (when (seq assumptions)
+    (reduce-kv (fn [acc id entry]
+                 (assoc acc id
+                        (cond-> entry
+                          (history-assumptions/proxy? entry)
+                          (assoc :implied-correlation
+                                 (history-assumptions/resolve-implied-correlation
+                                  (:relationship entry))))))
+               {}
+               assumptions)))
+
 (def ^:private finite-number? coercion/finite-number?)
 
 (defn- non-zero-current-row?
@@ -124,6 +142,46 @@
 (defn- instrument-id-set
   [universe]
   (set (keep :instrument-id universe)))
+
+(defn- engine-backed-assumption-ids
+  "Instrument-ids whose conservative assumption is complete enough to fold into the
+  optimization for this objective. Proxy assumptions are collected but not yet
+  engine-backed, so they are excluded."
+  [assumptions objective]
+  (let [return-required? (history-assumptions/return-required-for-objective?
+                          (:kind objective))]
+    (->> assumptions
+         (keep (fn [[id entry]]
+                 (when (history-assumptions/conservative-assumption-complete?
+                        entry return-required?)
+                   id)))
+         set)))
+
+(defn- readmit-assumption-instruments
+  "Adds engine-backed conservative assets that alignment dropped (no history) back
+  into the engine universe so they reach the solver. Short-history assets are
+  already eligible and need no re-admission."
+  [eligible-universe requested-universe engine-backed-ids]
+  (let [eligible-ids (instrument-id-set eligible-universe)
+        requested-by-id (universe-by-id requested-universe)
+        readmitted (->> engine-backed-ids
+                        (remove eligible-ids)
+                        (keep requested-by-id)
+                        vec)]
+    (into (vec eligible-universe) readmitted)))
+
+(defn- mirror-assumption-caps
+  "Mirrors each engine-backed conservative cap into the per-asset-overrides that the
+  constraint machinery already enforces, taking the tighter of any existing cap."
+  [constraints assumptions engine-backed-ids]
+  (reduce (fn [acc id]
+            (let [cap (get-in assumptions [id :max-weight])]
+              (if (coercion/positive-number? cap)
+                (update-in acc [:per-asset-overrides id]
+                           domain-constraints/merge-max-weight-override cap)
+                acc)))
+          constraints
+          engine-backed-ids))
 
 (defn- current-portfolio-rows
   [current-portfolio]
@@ -389,6 +447,19 @@
                   :stale-after-ms stale-after-ms
                   :funding-periods-per-year funding-periods-per-year})
         eligible-universe (:eligible-instruments history)
+        ;; Conservative history assumptions are folded into the optimization: their
+        ;; assets are re-admitted to the engine universe (no-history) or kept
+        ;; (short-history), their caps mirror into the constraint machinery, and the
+        ;; assumptions ride along for covariance synthesis in engine.context.
+        draft-assumptions (:history-assumptions draft*)
+        assumption-engine-ids (engine-backed-assumption-ids draft-assumptions objective)
+        engine-universe (readmit-assumption-instruments eligible-universe
+                                                       requested-universe
+                                                       assumption-engine-ids)
+        constraints (mirror-assumption-caps constraints
+                                            draft-assumptions
+                                            assumption-engine-ids)
+        history-assumptions* (normalize-history-assumptions draft-assumptions)
         current-universe (current-portfolio-universe current-portfolio
                                                      requested-universe)
         current-history-data (current-history-source history-data
@@ -418,7 +489,7 @@
                               (:warnings history)
                               (:warnings prior)))]
     (cond-> {:scenario-id (:id draft*)
-             :universe eligible-universe
+             :universe engine-universe
              :requested-universe requested-universe
              :current-portfolio-universe current-universe
              :current-portfolio current-portfolio
@@ -432,4 +503,5 @@
              :history history
              :warnings warnings
              :as-of-ms as-of-ms}
+      (seq history-assumptions*) (assoc :history-assumptions history-assumptions*)
       prior (assoc :black-litterman-prior prior))))

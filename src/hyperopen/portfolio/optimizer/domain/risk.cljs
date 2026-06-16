@@ -164,7 +164,7 @@
         matrix
         (range)))
 
-(defn- repair-psd
+(defn repair-psd
   [covariance]
   (let [conditioning (covariance-conditioning covariance)
         min-eigenvalue (:min-eigenvalue conditioning)]
@@ -267,3 +267,78 @@
           (= :diagonal-shrink model-kind)
           (assoc :shrinkage {:kind :diagonal
                              :shrinkage shrinkage}))))))
+
+(defn- positive-number?
+  [value]
+  (and (math/finite-number? value)
+       (pos? value)))
+
+(defn- diagonal-volatility
+  [covariance idx]
+  (let [variance (get-in covariance [idx idx])]
+    (when (and (math/finite-number? variance)
+               (pos? variance))
+      (js/Math.sqrt variance))))
+
+(defn augment-risk-result-with-assumptions
+  "Override or append covariance rows for assets that carry a synthetic annualized
+  volatility and a correlation floor against every other asset (conservative
+  history assumptions). For an asset already present its realized row/column is
+  replaced; for a no-history asset a new row/column is appended. The matrix is
+  re-repaired to stay positive semidefinite.
+
+  `assumptions-by-id` maps instrument-id -> {:volatility v :correlation-floor f}.
+  Entries lacking a positive volatility or a finite floor are ignored."
+  [risk-result assumptions-by-id]
+  (let [assumptions (into {}
+                          (filter (fn [[_ a]]
+                                    (and (positive-number? (:volatility a))
+                                         (math/finite-number? (:correlation-floor a)))))
+                          assumptions-by-id)]
+    (if (empty? assumptions)
+      risk-result
+      (let [base-ids (vec (:instrument-ids risk-result))
+            base-cov (:covariance risk-result)
+            base-id-set (set base-ids)
+            assumption? (set (keys assumptions))
+            new-ids (vec (remove base-id-set (keys assumptions)))
+            ids (into base-ids new-ids)
+            n (count ids)
+            vol-by-id (into {}
+                            (concat
+                             (map-indexed (fn [idx id]
+                                            [id (if (assumption? id)
+                                                  (:volatility (get assumptions id))
+                                                  (or (diagonal-volatility base-cov idx) 0))])
+                                          base-ids)
+                             (map (fn [id]
+                                    [id (:volatility (get assumptions id))])
+                                  new-ids)))
+            floor-of (fn [id]
+                       (when (assumption? id)
+                         (:correlation-floor (get assumptions id))))
+            covariance (mapv (fn [r]
+                               (let [id-r (nth ids r)]
+                                 (mapv (fn [c]
+                                         (let [id-c (nth ids c)]
+                                           (cond
+                                             (= r c)
+                                             (let [v (vol-by-id id-r)]
+                                               (* v v))
+
+                                             (or (assumption? id-r)
+                                                 (assumption? id-c))
+                                             (let [floor (max (or (floor-of id-r) 0)
+                                                              (or (floor-of id-c) 0))]
+                                               (* floor
+                                                  (vol-by-id id-r)
+                                                  (vol-by-id id-c)))
+
+                                             :else
+                                             (or (get-in base-cov [r c]) 0))))
+                                       (range n))))
+                             (range n))
+            {repaired :covariance} (repair-psd covariance)]
+        (assoc risk-result
+               :instrument-ids ids
+               :covariance repaired)))))

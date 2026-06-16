@@ -270,6 +270,7 @@
             [hyperopen.portfolio.optimizer.domain.diagnostics-test]
             [hyperopen.portfolio.optimizer.domain.frontier-overlays-test]
             [hyperopen.portfolio.optimizer.domain.frontier-test]
+            [hyperopen.portfolio.optimizer.domain.history-assumptions-test]
             [hyperopen.portfolio.optimizer.domain.objectives-test]
             [hyperopen.portfolio.optimizer.domain.rebalance-test]
             [hyperopen.portfolio.optimizer.domain.returns-test]
@@ -542,6 +543,7 @@
             [hyperopen.views.portfolio.optimize.result-vault-labels-test]
             [hyperopen.views.portfolio.optimize.results-panel-test]
             [hyperopen.views.portfolio.optimize.scenario-detail-view-test]
+            [hyperopen.views.portfolio.optimize.setup-history-assumptions-test]
             [hyperopen.views.portfolio.optimize.setup-layout-test]
             [hyperopen.views.portfolio.optimize.setup-readiness-panel-test]
             [hyperopen.views.portfolio.optimize.setup-universe-layout-test]
@@ -1005,6 +1007,7 @@
              'hyperopen.portfolio.optimizer.domain.diagnostics-test
              'hyperopen.portfolio.optimizer.domain.frontier-overlays-test
              'hyperopen.portfolio.optimizer.domain.frontier-test
+             'hyperopen.portfolio.optimizer.domain.history-assumptions-test
              'hyperopen.portfolio.optimizer.domain.objectives-test
              'hyperopen.portfolio.optimizer.domain.rebalance-test
              'hyperopen.portfolio.optimizer.domain.returns-test
@@ -1277,6 +1280,7 @@
              'hyperopen.views.portfolio.optimize.result-vault-labels-test
              'hyperopen.views.portfolio.optimize.results-panel-test
              'hyperopen.views.portfolio.optimize.scenario-detail-view-test
+             'hyperopen.views.portfolio.optimize.setup-history-assumptions-test
              'hyperopen.views.portfolio.optimize.setup-layout-test
              'hyperopen.views.portfolio.optimize.setup-readiness-panel-test
              'hyperopen.views.portfolio.optimize.setup-universe-layout-test

@@ -1,6 +1,7 @@
 (ns hyperopen.portfolio.optimizer.defaults
   (:require [hyperopen.portfolio.optimizer.application.black-litterman-editor-model :as bl-editor-model]
-            [hyperopen.portfolio.optimizer.contracts :as contracts]))
+            [hyperopen.portfolio.optimizer.contracts :as contracts]
+            [hyperopen.portfolio.optimizer.domain.history-assumptions :as history-assumptions]))
 
 (defn default-draft
   []
@@ -29,9 +30,15 @@
                            :fallback-slippage-bps 25
                            :fee-mode :taker
                            :manual-capital-usdc nil}
+   :history-assumptions {}
    :metadata {:created-at-ms nil
               :updated-at-ms nil
               :dirty? false}})
+
+(def default-history-assumption
+  "Default per-asset history-assumption draft for the given behavior. Delegates to
+  the pure domain policy so engine, actions, and view models share one source."
+  history-assumptions/default-assumption)
 
 (defn default-run-state
   []

@@ -48,6 +48,26 @@
            (get-in normalized
                    [:diagnostics :custom :weight-sensitivity-by-instrument])))))
 
+(deftest normalize-worker-boundary-stringifies-history-assumptions-and-keywordizes-enums-test
+  (let [new-perp (keyword "perp:NEW")
+        normalized (codec/normalize-worker-boundary
+                    {:history-assumptions
+                     {new-perp {:behavior "conservative"
+                                :relationship "high"
+                                :volatility 0.9
+                                :max-weight 0.03
+                                :correlation-floor 0.75}}})
+        entry (get-in normalized [:history-assumptions "perp:NEW"])]
+    (is (= {"perp:NEW" {:behavior :conservative
+                        :relationship :high
+                        :volatility 0.9
+                        :max-weight 0.03
+                        :correlation-floor 0.75}}
+           (:history-assumptions normalized))
+        "instrument-id key is stringified and :behavior/:relationship values keywordized")
+    (is (= :conservative (:behavior entry)))
+    (is (= :high (:relationship entry)))))
+
 (deftest normalize-worker-boundary-preserves-unrelated-nested-map-keys-test
   (let [btc (keyword "perp:BTC")
         raw-weights {btc 1

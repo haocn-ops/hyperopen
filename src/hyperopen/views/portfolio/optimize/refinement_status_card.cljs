@@ -5,117 +5,120 @@
   progress, and — after a refinement — summarizes whether the selected portfolio changed."
   (:require [hyperopen.views.portfolio.optimize.format :as opt-format]))
 
-(defn- status-dot-class
-  [status]
-  (case status
-    :ok "text-trading-green"
-    :caution "text-warning"
-    "text-trading-muted"))
+(defn- tier-short-label
+  [tier]
+  (case tier
+    :draft "draft"
+    :refined "refined"
+    :maximum "maximum"
+    :partial "partial"
+    "result"))
 
-(defn- quality-status
+(defn- quality-tone
+  "House rule: status tags tint only when they carry signal. Medium quality is the
+  neutral default; High is a positive (green) confirmation, Low a caution (amber)."
   [quality]
   (case quality
-    :high :ok
-    :medium :ok
-    :caution))
+    :high :good
+    :low :warn
+    :neutral))
 
-(defn- stability-status
+(defn- stability-tone
   [stability]
   (case stability
-    :provisional :caution
-    :ok))
+    :stable :good
+    :provisional :warn
+    :neutral))
 
-(defn- chip
-  [data-role status label value]
-  [:span {:class ["optimizer-refinement-chip"
-                  "inline-flex" "items-center" "gap-1.5"
-                  "rounded-full" "border" "border-base-300" "bg-base-200/50"
-                  "px-2.5" "py-1" "text-[0.62rem]" "font-semibold"]
-          :data-role data-role}
-   [:span {:class [(status-dot-class status)]} "●"]
-   [:span {:class ["text-trading-muted"]} label]
-   [:span {:class ["text-trading-text"]} value]])
+(defn- tag
+  "Square, 1px-bordered mono tag chip. Tints (and shows a leading status pip) only when
+  the tone carries signal — amber for caution, green for confirmation; neutral otherwise."
+  [data-role tone label value]
+  [:span {:class ["optimizer-refinement-tag" "inline-flex" "items-center" "gap-1.5"]
+          :data-role data-role
+          :data-tone (name tone)}
+   (when (not= tone :neutral)
+     [:span {:class ["optimizer-refinement-tag-pip"]}])
+   [:span {:class ["optimizer-refinement-tag-label"]} label]
+   [:span {:class ["optimizer-refinement-tag-value"]} value]])
 
 (defn- status-header
   [{:keys [assessment runtime-ms]}]
   (let [tier (:tier assessment)
-        exact? (:exact-selection? assessment)]
+        exact? (:exact-selection? assessment)
+        points (:point-count assessment)
+        quality (:frontier-quality assessment)
+        stability (:selection-stability assessment)]
     [:div {:class ["optimizer-refinement-status"]
            :data-role "portfolio-optimizer-refinement-status"}
-     [:div {:class ["flex" "items-start" "gap-3"]}
-      [:span {:class ["mt-0.5" "text-trading-green" "text-base"]} "✓"]
-      [:div {:class ["min-w-0"]}
-       [:p {:class ["text-[0.65rem]" "font-semibold" "uppercase" "tracking-[0.18em]"
-                    "text-trading-muted"]}
-        "Optimization status"]
-       [:p {:class ["mt-1" "text-sm" "font-semibold" "text-trading-text"]}
-        (opt-format/refinement-tier-ready-label tier)]
-       [:p {:class ["mt-1" "text-xs" "text-trading-muted"]}
-        (if (= :draft tier)
-          "Fast draft based on the current frontier sample. Refine for higher confidence."
-          "Refined over a denser frontier.")
-        (if exact?
-          " Selection is exact for this objective — refinement sharpens the chart."
-          " Selection is sampled from the frontier and may shift when refined.")]]]
-     [:div {:class ["mt-3" "flex" "flex-wrap" "items-center" "gap-2"]}
-      (chip "portfolio-optimizer-refinement-points"
-            :ok
-            "Points"
-            (str (or (:point-count assessment) "—")))
-      (chip "portfolio-optimizer-refinement-runtime"
-            :ok
-            "Runtime"
-            (opt-format/format-duration runtime-ms))
-      (chip "portfolio-optimizer-refinement-quality"
-            (quality-status (:frontier-quality assessment))
-            "Frontier quality"
-            (opt-format/refinement-quality-label (:frontier-quality assessment)))
-      (chip "portfolio-optimizer-refinement-stability"
-            (stability-status (:selection-stability assessment))
-            "Selection stability"
-            (opt-format/refinement-stability-label (:selection-stability assessment)))]]))
+     [:div {:class ["optimizer-refinement-head" "flex" "items-center" "justify-between" "gap-3"]
+            :data-role "portfolio-optimizer-refinement-head"
+            :data-tier (some-> tier name)}
+      [:span {:class ["inline-flex" "items-center" "gap-2" "min-w-0"]}
+       [:span {:class ["optimizer-refinement-head-pip"]}]
+       [:span {:class ["optimizer-refinement-head-label"]} "Optimization status"]]
+      [:span {:class ["optimizer-refinement-head-meta" "font-mono"]}
+       (str (tier-short-label tier) " · " (or points "—") " pts")]]
+     [:p {:class ["optimizer-refinement-title" "mt-3" "text-sm" "font-semibold"
+                  "text-trading-text"]}
+      (opt-format/refinement-tier-ready-label tier)]
+     [:p {:class ["mt-1" "text-xs" "text-trading-muted"]}
+      (str (if (= :draft tier)
+             "Fast draft based on the current frontier sample. Refine for higher confidence"
+             "Refined over a denser frontier")
+           (if exact?
+             " — the selection is exact for this objective, so refinement only sharpens the chart."
+             " — the selection is sampled from the frontier and may shift when refined."))]
+     [:div {:class ["mt-3" "flex" "flex-wrap" "items-center" "gap-1.5"]}
+      (tag "portfolio-optimizer-refinement-points"
+           :neutral "Points" (str (or points "—")))
+      (tag "portfolio-optimizer-refinement-runtime"
+           :neutral "Runtime" (opt-format/format-duration runtime-ms))
+      (tag "portfolio-optimizer-refinement-quality"
+           (quality-tone quality) "Frontier quality"
+           (opt-format/refinement-quality-label quality))
+      (tag "portfolio-optimizer-refinement-stability"
+           (stability-tone stability) "Selection stability"
+           (opt-format/refinement-stability-label stability))]]))
 
 (defn- depth-tile
   [{:keys [key points label hint selected?]}]
   [:button {:type "button"
-            :class (cond-> ["optimizer-refinement-depth-tile"
-                            "flex" "flex-col" "items-start" "gap-0.5"
-                            "rounded-lg" "border" "px-3" "py-2" "text-left"
-                            "transition-colors"]
-                     selected? (conj "border-primary/60" "bg-primary/10" "text-trading-text")
-                     (not selected?) (conj "border-base-300" "bg-base-200/40"
-                                           "text-trading-muted" "hover:text-trading-text"))
+            :class ["optimizer-refinement-depth-tile" "flex" "flex-col" "gap-1" "text-left"]
             :data-role (str "portfolio-optimizer-refinement-depth-" (name key))
             :data-selected (str (boolean selected?))
             :aria-pressed (str (boolean selected?))
             :on {:click [[:actions/set-portfolio-optimizer-refinement-depth key]]}}
-   [:span {:class ["text-[0.72rem]" "font-semibold"]} label]
-   [:span {:class ["text-[0.6rem]" "text-trading-muted"]} hint]
-   [:span {:class ["text-[0.58rem]" "font-mono" "text-trading-muted/70"]}
+   [:span {:class ["flex" "items-center" "gap-2"]}
+    [:span {:class ["optimizer-refinement-depth-check"]}]
+    [:span {:class ["optimizer-refinement-depth-label" "text-[0.72rem]" "font-semibold"]}
+     label]]
+   [:span {:class ["optimizer-refinement-depth-hint" "text-[0.6rem]"]} hint]
+   [:span {:class ["optimizer-refinement-depth-points" "text-[0.58rem]" "font-mono"]}
     (str points " points")]])
 
 (defn- refine-options
   [{:keys [depth-options can-refine?]}]
-  [:div {:class ["optimizer-refinement-options"]
-         :data-role "portfolio-optimizer-refinement-options"}
-   [:p {:class ["text-[0.65rem]" "font-semibold" "uppercase" "tracking-[0.18em]"
-                "text-trading-muted"]}
-    "Refinement options"]
-   (into [:div {:class ["mt-2" "grid" "grid-cols-3" "gap-2"]}]
-         (map depth-tile depth-options))
-   [:button {:type "button"
-             :class ["mt-3" "w-full" "rounded-lg" "border" "border-primary/50"
-                     "bg-primary/15" "px-3" "py-2" "text-[0.72rem]" "font-semibold"
-                     "text-primary" "transition-colors" "hover:bg-primary/25"
-                     "disabled:cursor-not-allowed" "disabled:border-base-300"
-                     "disabled:bg-base-200/40" "disabled:text-trading-muted"]
-             :data-role "portfolio-optimizer-refine-now"
-             :disabled (not can-refine?)
-             :on (when can-refine?
-                   {:click [[:actions/refine-portfolio-optimizer]]})}
-    "Refine now"]
-   [:p {:class ["mt-2" "text-[0.6rem]" "text-trading-muted/70"]}
-    "Your current result stays usable while refinement runs. Selection may change after refinement."]])
+  (let [selected (some #(when (:selected? %) %) depth-options)]
+    [:div {:class ["optimizer-refinement-options"]
+           :data-role "portfolio-optimizer-refinement-options"}
+     [:p {:class ["optimizer-refinement-eyebrow"]}
+      [:span {:class ["optimizer-refinement-eyebrow-label"]} "Refinement options"]
+      [:span {:class ["optimizer-refinement-eyebrow-hint"]}
+       "· denser sweep = higher confidence, longer solve"]]
+     (into [:div {:class ["optimizer-refinement-depth-grid" "mt-2" "grid" "grid-cols-3"]}]
+           (map depth-tile depth-options))
+     [:button {:type "button"
+               :class ["optimizer-primary-action" "optimizer-refinement-refine"
+                       "mt-3" "w-full" "border" "px-3" "py-2" "text-[0.72rem]"
+                       "font-semibold" "disabled:cursor-not-allowed"]
+               :data-role "portfolio-optimizer-refine-now"
+               :disabled (not can-refine?)
+               :on (when can-refine?
+                     {:click [[:actions/refine-portfolio-optimizer]]})}
+      (str "Refine now · " (:label selected) " · " (:points selected) " points")]
+     [:p {:class ["mt-2" "text-[0.6rem]" "text-trading-muted/70"]}
+      "Your current result stays usable while refinement runs. Selection may change after refinement."]]))
 
 (defn- in-flight-view
   [{:keys [progress depth-options]}]
@@ -124,20 +127,24 @@
         selected (some #(when (:selected? %) %) depth-options)]
     [:div {:class ["optimizer-refinement-running"]
            :data-role "portfolio-optimizer-refinement-running"}
-     [:p {:class ["text-[0.65rem]" "font-semibold" "uppercase" "tracking-[0.18em]"
-                  "text-primary"]}
-      "Refining optimization…"]
-     [:p {:class ["mt-1" "text-xs" "text-trading-muted"]}
-      (str "Targeting " (or (:points selected) "—") " frontier points. "
-           "Your current result stays usable.")]
-     [:div {:class ["mt-3" "h-1.5" "w-full" "overflow-hidden" "rounded-full" "bg-base-300"]}
-      [:div {:class ["h-full" "rounded-full" "bg-primary" "transition-all"]
+     [:div {:class ["optimizer-refinement-head" "flex" "items-center" "justify-between" "gap-3"]
+            :data-tier "running"}
+      [:span {:class ["inline-flex" "items-center" "gap-2" "min-w-0"]}
+       [:span {:class ["optimizer-refinement-head-pip"]}]
+       [:span {:class ["optimizer-refinement-head-label"]} "Refining optimization"]]
+      [:span {:class ["optimizer-refinement-head-meta" "font-mono"]}
+       (str "→ " (or (:points selected) "—") " pts")]]
+     [:p {:class ["mt-2" "text-xs" "text-trading-muted"]}
+      "Sweeping a denser frontier. Your current result stays usable until this finishes."]
+     [:div {:class ["optimizer-refinement-progress-track" "mt-3" "h-1.5" "w-full"
+                    "overflow-hidden"]}
+      [:div {:class ["optimizer-refinement-progress-fill" "h-full" "transition-all"]
              :style {:width (str percent "%")}}]]
      [:div {:class ["mt-2" "flex" "items-center" "justify-between" "gap-3"]}
       [:span {:class ["font-mono" "text-[0.62rem]" "text-trading-muted"]}
        (str percent "%" (when active-step (str " · " active-step)))]
       [:button {:type "button"
-                :class ["rounded-md" "border" "border-base-300" "bg-base-200/40"
+                :class ["optimizer-refinement-stop" "rounded-md" "border" "border-base-300"
                         "px-2.5" "py-1" "text-[0.62rem]" "font-semibold" "text-trading-muted"
                         "hover:text-trading-text"]
                 :data-role "portfolio-optimizer-refinement-stop"

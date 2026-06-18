@@ -511,7 +511,277 @@
     background-color: var(--optimizer-surface);
   }
 
-  .portfolio-optimizer .optimizer-refinement-depth-tile[data-selected="true"] {
+  /* Dense pane-head: status pip + uppercase mono label on the left, tier/points meta
+     on the right. Pip is amber for a draft/partial result, green once refined. */
+  .portfolio-optimizer .optimizer-refinement-head-pip {
+    flex: 0 0 auto;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background-color: var(--optimizer-accent);
+  }
+
+  .portfolio-optimizer
+    .optimizer-refinement-head[data-tier="refined"]
+    .optimizer-refinement-head-pip,
+  .portfolio-optimizer
+    .optimizer-refinement-head[data-tier="maximum"]
+    .optimizer-refinement-head-pip {
+    background-color: var(--optimizer-long);
+  }
+
+  .portfolio-optimizer .optimizer-refinement-head-label {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    font-size: 9px;
+    font-weight: 650;
+    letter-spacing: 0.16em;
+    line-height: 1;
+    text-transform: uppercase;
+    color: var(--optimizer-text-2);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .portfolio-optimizer .optimizer-refinement-head-meta {
+    flex: 0 0 auto;
+    font-size: 10px;
+    letter-spacing: 0.02em;
+    color: var(--optimizer-text-3);
+  }
+
+  /* Square, 1px-bordered mono tag chips. Tint (and reveal the leading pip) only when
+     the value carries signal — amber caution, green confirmation; neutral otherwise. */
+  .portfolio-optimizer .optimizer-refinement-tag {
+    border: 1px solid var(--optimizer-border);
+    background-color: var(--optimizer-surface);
+    color: var(--optimizer-text-3);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    font-size: 9px;
+    font-weight: 650;
+    letter-spacing: 0.06em;
+    line-height: 1;
+    padding: 3px 6px;
+    text-transform: uppercase;
+  }
+
+  .portfolio-optimizer .optimizer-refinement-tag-label {
+    color: var(--optimizer-text-3);
+  }
+
+  .portfolio-optimizer .optimizer-refinement-tag-value {
+    color: var(--optimizer-text);
+  }
+
+  .portfolio-optimizer .optimizer-refinement-tag-pip {
+    flex: 0 0 auto;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background-color: var(--optimizer-text-3);
+  }
+
+  .portfolio-optimizer .optimizer-refinement-tag[data-tone="warn"] {
     border-color: var(--optimizer-accent-border);
+    background-color: var(--optimizer-accent-soft);
+  }
+
+  .portfolio-optimizer
+    .optimizer-refinement-tag[data-tone="warn"]
+    .optimizer-refinement-tag-value {
+    color: var(--optimizer-accent);
+  }
+
+  .portfolio-optimizer
+    .optimizer-refinement-tag[data-tone="warn"]
+    .optimizer-refinement-tag-pip {
+    background-color: var(--optimizer-accent);
+  }
+
+  .portfolio-optimizer .optimizer-refinement-tag[data-tone="good"] {
+    border-color: rgb(78 166 116 / 0.45);
+  }
+
+  .portfolio-optimizer
+    .optimizer-refinement-tag[data-tone="good"]
+    .optimizer-refinement-tag-value {
+    color: var(--optimizer-long);
+  }
+
+  .portfolio-optimizer
+    .optimizer-refinement-tag[data-tone="good"]
+    .optimizer-refinement-tag-pip {
+    background-color: var(--optimizer-long);
+  }
+
+  /* Refinement options: divider above, uppercase mono eyebrow + lowercase hint. */
+  .portfolio-optimizer .optimizer-refinement-options {
+    border-top: 1px solid var(--optimizer-border);
+    padding-top: 12px;
+  }
+
+  .portfolio-optimizer .optimizer-refinement-eyebrow {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .portfolio-optimizer .optimizer-refinement-eyebrow-label {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    font-size: 9px;
+    font-weight: 650;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--optimizer-text-2);
+  }
+
+  .portfolio-optimizer .optimizer-refinement-eyebrow-hint {
+    font-size: 10px;
+    letter-spacing: 0.01em;
+    color: var(--optimizer-text-3);
+  }
+
+  /* Tiled mode selector: one hairline frame, tiles share borders (no gutters). */
+  .portfolio-optimizer .optimizer-refinement-depth-grid {
+    border: 1px solid var(--optimizer-border);
+    background-color: var(--optimizer-surface);
+  }
+
+  .portfolio-optimizer .optimizer-refinement-depth-tile {
+    position: relative;
+    min-height: 0;
+    padding: 9px 10px;
+    border: 0;
+    border-radius: 0;
+    background-color: transparent;
+    transition: background-color 120ms ease;
+  }
+
+  .portfolio-optimizer
+    .optimizer-refinement-depth-tile
+    + .optimizer-refinement-depth-tile {
+    border-left: 1px solid var(--optimizer-border);
+  }
+
+  .portfolio-optimizer .optimizer-refinement-depth-tile:not(:disabled):hover {
+    background-color: var(--optimizer-surface-2);
+    border-color: var(--optimizer-border);
+  }
+
+  /* Selected tile: amber inset frame + soft tint (kept on hover). */
+  .portfolio-optimizer .optimizer-refinement-depth-tile[data-selected="true"] {
+    background-color: var(--optimizer-accent-soft);
+    box-shadow: inset 0 0 0 1px var(--optimizer-accent-border);
+  }
+
+  .portfolio-optimizer .optimizer-refinement-depth-tile[data-selected="true"]:hover {
+    background-color: var(--optimizer-accent-soft);
+  }
+
+  .portfolio-optimizer .optimizer-refinement-depth-check {
+    display: grid;
+    place-content: center;
+    flex: 0 0 13px;
+    width: 13px;
+    height: 13px;
+    border: 1px solid var(--optimizer-border-strong);
+    border-radius: 2px;
+    background-color: var(--optimizer-bg);
+  }
+
+  .portfolio-optimizer .optimizer-refinement-depth-check::after {
+    content: "";
+    width: 3px;
+    height: 6px;
+    border-right: 2px solid var(--optimizer-bg);
+    border-bottom: 2px solid var(--optimizer-bg);
+    transform: rotate(45deg) scale(0);
+    transform-origin: center;
+  }
+
+  .portfolio-optimizer
+    .optimizer-refinement-depth-tile[data-selected="true"]
+    .optimizer-refinement-depth-check {
+    border-color: var(--optimizer-accent);
+    background-color: var(--optimizer-accent);
+  }
+
+  .portfolio-optimizer
+    .optimizer-refinement-depth-tile[data-selected="true"]
+    .optimizer-refinement-depth-check::after {
+    transform: rotate(45deg) scale(1);
+  }
+
+  .portfolio-optimizer .optimizer-refinement-depth-label {
+    color: var(--optimizer-text-2);
+  }
+
+  .portfolio-optimizer .optimizer-refinement-depth-hint {
+    color: var(--optimizer-text-3);
+  }
+
+  .portfolio-optimizer .optimizer-refinement-depth-points {
+    color: var(--optimizer-text-3);
+  }
+
+  .portfolio-optimizer
+    .optimizer-refinement-depth-tile[data-selected="true"]
+    .optimizer-refinement-depth-label {
+    color: var(--optimizer-text);
+  }
+
+  .portfolio-optimizer
+    .optimizer-refinement-depth-tile[data-selected="true"]
+    .optimizer-refinement-depth-points {
+    color: var(--optimizer-accent);
+  }
+
+  /* Primary amber CTA: solid fill via .optimizer-primary-action; muted when disabled. */
+  .portfolio-optimizer .optimizer-refinement-refine {
+    letter-spacing: 0.01em;
+  }
+
+  .portfolio-optimizer .optimizer-refinement-refine:disabled {
+    border-color: var(--optimizer-border);
+    background-color: var(--optimizer-surface-2);
+    color: var(--optimizer-text-3);
+    cursor: not-allowed;
+  }
+
+  /* In-flight: determinate amber fill with a shimmer sweep (no spinner, per motion rules). */
+  .portfolio-optimizer .optimizer-refinement-progress-track {
+    border: 1px solid var(--optimizer-border);
+    background-color: var(--optimizer-surface-3);
+    border-radius: 2px;
+  }
+
+  .portfolio-optimizer .optimizer-refinement-progress-fill {
+    background-color: var(--optimizer-accent);
+    background-image: linear-gradient(
+      90deg,
+      rgb(212 181 88 / 0) 0%,
+      rgb(255 244 214 / 0.5) 50%,
+      rgb(212 181 88 / 0) 100%
+    );
+    background-size: 220% 100%;
+    animation: optimizer-refinement-shimmer 1.4s linear infinite;
+    will-change: background-position;
+  }
+
+  @keyframes optimizer-refinement-shimmer {
+    from {
+      background-position: 200% 0;
+    }
+
+    to {
+      background-position: -200% 0;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .portfolio-optimizer .optimizer-refinement-progress-fill {
+      animation: none;
+    }
   }
 }

@@ -8,6 +8,7 @@
    [:trade "Trade" "Order ticket flows and trading-side composites."]
    [:account "Account" "Balances, positions, orders, and history surfaces."]
    [:account.history "History" "Trade, funding, and order history workbench scenes."]
+   [:optimize "Optimize" "Portfolio optimizer result, refinement, and frontier surfaces."]
    [:funding "Funding" "Deposit, transfer, send, and withdraw workflows."]
    [:api "API" "API wallet management surfaces."]
    [:vaults "Vaults" "Vault discovery, detail charts, activity, and transfers."]])

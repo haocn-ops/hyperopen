@@ -207,6 +207,15 @@
                   (not (surface-modules/surface-loading? state :account-surfaces)))
              (conj [:effects/load-surface-module :account-surfaces])
 
+             ;; The account-info panel can list spot instruments, whose readable
+             ;; names only resolve from the full (spot-inclusive) market catalog.
+             ;; Bootstrap loads perps only, so request the full catalog as a
+             ;; demand path here. Deferred on the initial route change (handled by
+             ;; the post-render :idle bucket) to keep it out of the paint window.
+             (and (not defer-account-surfaces?)
+                  (route-refresh/account-info-markets-needed? state normalized-path))
+             (conj [:effects/fetch-asset-selector-markets {:phase :full}])
+
              account-tab-module-effect
              (conj account-tab-module-effect))
            (route-refresh/current-route-refresh-effects state* nil)))))
@@ -237,6 +246,13 @@
             (not (surface-modules/surface-ready? state :account-surfaces))
             (not (surface-modules/surface-loading? state :account-surfaces)))
        (conj [:effects/load-surface-module :account-surfaces])
+
+       ;; Initial-load counterpart to the demand path in `route-change-effects`:
+       ;; pull the full (spot-inclusive) market catalog after first paint so the
+       ;; account-info panel can resolve spot coins (e.g. @230 -> USDH) instead of
+       ;; showing raw provider symbols. Idle-scheduled to stay off the TBT window.
+       (route-refresh/account-info-markets-needed? state normalized-path)
+       (conj [:effects/fetch-asset-selector-markets {:phase :full}])
 
        account-tab-module-effect
        (conj account-tab-module-effect))}))

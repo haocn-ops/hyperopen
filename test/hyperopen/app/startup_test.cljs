@@ -390,7 +390,8 @@
       (is (true? (get-in @store [:trade-ui :desktop-secondary-panels-ready?])))
       ((:load-post-render-route-effects! @captured-init-deps) store))
     (is (= [[store [[:effects/load-trade-chart-module]]]
-            [store [[:effects/load-surface-module :account-surfaces]]]]
+            [store [[:effects/load-surface-module :account-surfaces]
+                    [:effects/fetch-asset-selector-markets {:phase :full}]]]]
            @dispatch-calls))))
 
 (deftest init-loads-trading-indicators-post-render-when-active-indicators-are-restored-test
@@ -433,7 +434,8 @@
       ((:load-post-render-route-effects! @captured-init-deps) store))
     (is (= [[store [[:effects/load-trade-chart-module]
                     [:effects/load-trading-indicators-module]]]
-            [store [[:effects/load-surface-module :account-surfaces]]]]
+            [store [[:effects/load-surface-module :account-surfaces]
+                    [:effects/fetch-asset-selector-markets {:phase :full}]]]]
            @dispatch-calls))))
 
 (deftest init-loads-selected-lazy-account-tab-post-render-on-initial-trade-startup-test
@@ -472,5 +474,6 @@
       ((:load-post-render-route-effects! @captured-init-deps) store))
     (is (= [[store [[:effects/load-trade-chart-module]]]
             [store [[:effects/load-surface-module :account-surfaces]
+                    [:effects/fetch-asset-selector-markets {:phase :full}]
                     [:effects/load-account-tab-module :positions]]]]
            @dispatch-calls))))

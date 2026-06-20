@@ -639,8 +639,8 @@
     (is (contains? strings "· 12%"))
     (is (contains? strings "Maximum return"))
     (is (contains? strings "Use my views"))
-    (is (= ["portfolio-optimizer-objective-menu-option-max-sharpe"
-            "portfolio-optimizer-objective-menu-option-minimum-volatility"
+    (is (= ["portfolio-optimizer-objective-menu-option-minimum-volatility"
+            "portfolio-optimizer-objective-menu-option-max-sharpe"
             "portfolio-optimizer-objective-menu-option-use-my-views"
             "portfolio-optimizer-objective-menu-option-target-volatility"
             "portfolio-optimizer-objective-menu-option-maximum-return"]

@@ -13,11 +13,11 @@
       "portfolio-optimizer-objective-panel"
       (controls/section-heading "02" "Objective" (controls/labelize objective-kind))
       [:div {:class ["mt-3" "grid" "grid-cols-1" "gap-1.5" "sm:grid-cols-2"]}
-       (objective-card "Minimum Variance" "Lowest risk - no return assumption"
+       (objective-card "Minimum Variance" "Lowest risk - no return assumption. Recommended"
                        (= :minimum-variance objective-kind)
                        "portfolio-optimizer-objective-minimum-variance"
                        [:actions/set-portfolio-optimizer-objective-kind :minimum-variance])
-       (objective-card "Maximum Sharpe" "Best risk-adjusted return"
+       (objective-card "Maximum Sharpe" "Best risk-adjusted return, but sensitive to noisy return estimates"
                        (= :max-sharpe objective-kind)
                        "portfolio-optimizer-objective-max-sharpe"
                        [:actions/set-portfolio-optimizer-objective-kind :max-sharpe])

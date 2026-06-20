@@ -108,8 +108,21 @@
     (is (some? claim-button))
     (is (re-find #"Claim Rewards" (hiccup/node-text hero)))))
 
+(defn- expected-local-referral-date
+  "Mirrors the private referrals-view/format-referral-date, which renders the
+   join time in the JS runtime's local timezone. Reconstructing the expected
+   string from the same epoch keeps the assertion timezone-agnostic (the old
+   hard-coded EDT literal failed under UTC on CI)."
+  [time-ms]
+  (let [date (js/Date. time-ms)
+        pad2 (fn [n] (let [s (str n)] (if (= 1 (count s)) (str "0" s) s)))]
+    (str (inc (.getMonth date)) "/" (.getDate date) "/" (.getFullYear date)
+         " - " (pad2 (.getHours date)) ":" (pad2 (.getMinutes date)) ":"
+         (pad2 (.getSeconds date)))))
+
 (deftest referrals-view-renders-api-shaped-referral-row-fields-test
-  (let [view (referrals-view/referrals-view
+  (let [time-joined 1761012412763
+        view (referrals-view/referrals-view
               {:wallet {:address owner-address}
                :referrals {:raw {:referrerState {:stage "ready"
                                                   :data {:code "MYCODE"
@@ -117,7 +130,7 @@
                                                          :referralStates [{:cumVlm "6226785.1799999997"
                                                                            :cumRewardedFeesSinceReferred "4428.91413651"
                                                                            :cumFeesRewardedToReferrer "187.35791924"
-                                                                           :timeJoined 1761012412763
+                                                                           :timeJoined time-joined
                                                                            :user referred-address}]}}}}
                :referrals-ui {:active-tab :referrals
                               :form {:code ""
@@ -125,7 +138,7 @@
         row (hiccup/find-by-data-role view "referrals-row")
         cells (vec (hiccup/node-children row))]
     (is (= "0xabcd…abcd" (hiccup/node-text (nth cells 0))))
-    (is (= "10/20/2025 - 22:06:52" (hiccup/node-text (nth cells 1))))
+    (is (= (expected-local-referral-date time-joined) (hiccup/node-text (nth cells 1))))
     (is (= "$6,226,785.18" (hiccup/node-text (nth cells 2))))
     (is (= "$4,428.91" (hiccup/node-text (nth cells 3))))
     (is (= "$187.36" (hiccup/node-text (nth cells 4))))))

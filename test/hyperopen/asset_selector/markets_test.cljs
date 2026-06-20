@@ -177,6 +177,18 @@
          (expected-twelve-hour-label (.getHours date))
          "?")))
 
+(defn- expected-local-price-range-title
+  [{:keys [underlying expiry-ms]}]
+  (let [date (js/Date. expiry-ms)]
+    (str underlying
+         " price range on "
+         (get expected-local-month-names (.getMonth date))
+         " "
+         (.getDate date)
+         " at "
+         (expected-twelve-hour-label (.getHours date))
+         "?")))
+
 (deftest outcome-encoding-and-description-test
   (is (= 0 (markets/outcome-encoding 0 0)))
   (is (= 1 (markets/outcome-encoding 0 1)))
@@ -252,7 +264,9 @@
         fed (get market-by-key "outcome:104")
         game (get market-by-key "outcome:141")
         finals (get market-by-key "outcome:142")
-        btc-binary (get market-by-key "outcome:159")]
+        btc-binary (get market-by-key "outcome:159")
+        expected-btc-binary-title (expected-local-outcome-title btc-binary)
+        expected-range-title (expected-local-price-range-title range-market)]
     (is (= #{"question:19"
              "question:30"
              "question:32"
@@ -261,8 +275,8 @@
              "outcome:142"
              "outcome:159"}
            (set (map :key outcome-markets))))
-    (is (contains? titles "BTC above 62290 on Jun 6 at 2:00 AM?"))
-    (is (contains? titles "BTC price range on Jun 6 at 2:00 AM?"))
+    (is (contains? titles expected-btc-binary-title))
+    (is (contains? titles expected-range-title))
     (is (contains? titles "May CPI year-over-year"))
     (is (contains? titles "2026 World Cup Champion"))
     (is (contains? titles "June Fed rate change"))
@@ -280,7 +294,7 @@
     (is (= 100001010 (:asset-id cpi)))
 
     (is (= :question (:outcome-kind range-market)))
-    (is (= "BTC price range on Jun 6 at 2:00 AM?" (:title range-market)))
+    (is (= expected-range-title (:title range-market)))
     (is (= "1d" (:period range-market)))
     (is (= 30 (:question-id range-market)))
     (is (= 160 (:fallback-outcome-id range-market)))

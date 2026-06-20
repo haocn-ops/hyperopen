@@ -1,7 +1,7 @@
 ---
 owner: architecture
 status: canonical
-last_reviewed: 2026-03-18
+last_reviewed: 2026-06-19
 review_cycle_days: 90
 source_of_truth: true
 ---

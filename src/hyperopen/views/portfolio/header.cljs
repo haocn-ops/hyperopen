@@ -5,7 +5,10 @@
             [hyperopen.wallet.core :as wallet]))
 
 (def ^:private action-items
-  [{:label "Link Staking"
+  [{:label "Optimize"
+    :data-role "portfolio-action-optimize"
+    :action [:actions/navigate (portfolio-routes/portfolio-optimize-new-path)]}
+   {:label "Link Staking"
     :mobile-label "Staking"
     :data-role "portfolio-action-link-staking"
     :action [:actions/navigate "/staking"]}

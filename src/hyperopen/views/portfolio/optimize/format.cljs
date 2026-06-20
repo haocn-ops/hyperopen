@@ -76,12 +76,16 @@
                              {:maximumFractionDigits maximum-fraction-digits}))
      "N/A")))
 
+(def ^:private friendly-keyword-labels
+  ;; Human copy for reason keywords that would otherwise leak a raw kebab token.
+  {:below-min-notional "Below $10 minimum"})
+
 (defn keyword-label
   ([value]
    (keyword-label value "N/A"))
   ([value fallback]
    (cond
-     (keyword? value) (name value)
+     (keyword? value) (get friendly-keyword-labels value (name value))
      (some? value) (str value)
      :else fallback)))
 

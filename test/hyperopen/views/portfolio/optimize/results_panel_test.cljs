@@ -426,7 +426,7 @@
     (is (= false (node-attr checkbox :checked)))
     (is (= true (node-attr constrained-checkbox :checked)))
     (is (= [[:actions/set-portfolio-optimizer-constrain-frontier
-             :event.target/checked]]
+             [:event.target/checked]]]
            (get-in checkbox [1 :on :change])))
     (is (some #{"Constrain Frontier"} (collect-strings default-view)))
     (is (some #{"3 points"} (collect-strings default-view)))

@@ -536,6 +536,7 @@
             [hyperopen.views.portfolio.optimize.frontier-callout-test]
             [hyperopen.views.portfolio.optimize.frontier-chart-contract-test]
             [hyperopen.views.portfolio.optimize.frontier-chart-model-test]
+            [hyperopen.views.portfolio.optimize.frontier-chart-toolbar-test]
             [hyperopen.views.portfolio.optimize.frontier-overlay-markers-test]
             [hyperopen.views.portfolio.optimize.index-view-test]
             [hyperopen.views.portfolio.optimize.inputs-tab-test]
@@ -543,6 +544,7 @@
             [hyperopen.views.portfolio.optimize.result-vault-labels-test]
             [hyperopen.views.portfolio.optimize.results-panel-test]
             [hyperopen.views.portfolio.optimize.scenario-detail-view-test]
+            [hyperopen.views.portfolio.optimize.setup-actions-test]
             [hyperopen.views.portfolio.optimize.setup-history-assumptions-test]
             [hyperopen.views.portfolio.optimize.setup-layout-test]
             [hyperopen.views.portfolio.optimize.setup-readiness-panel-test]
@@ -1273,6 +1275,7 @@
              'hyperopen.views.portfolio.optimize.frontier-callout-test
              'hyperopen.views.portfolio.optimize.frontier-chart-contract-test
              'hyperopen.views.portfolio.optimize.frontier-chart-model-test
+             'hyperopen.views.portfolio.optimize.frontier-chart-toolbar-test
              'hyperopen.views.portfolio.optimize.frontier-overlay-markers-test
              'hyperopen.views.portfolio.optimize.index-view-test
              'hyperopen.views.portfolio.optimize.inputs-tab-test
@@ -1280,6 +1283,7 @@
              'hyperopen.views.portfolio.optimize.result-vault-labels-test
              'hyperopen.views.portfolio.optimize.results-panel-test
              'hyperopen.views.portfolio.optimize.scenario-detail-view-test
+             'hyperopen.views.portfolio.optimize.setup-actions-test
              'hyperopen.views.portfolio.optimize.setup-history-assumptions-test
              'hyperopen.views.portfolio.optimize.setup-layout-test
              'hyperopen.views.portfolio.optimize.setup-readiness-panel-test

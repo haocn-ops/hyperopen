@@ -23,6 +23,7 @@
 
    :nav/trade {:default "Trade" :degen "Trade (Gamble)"}
    :nav/portfolio {:default "Portfolio" :degen "Portfolio (Hope)"}
+   :nav/optimize {:default "Optimize" :degen "Optimize (Cope)"}
    :nav/funding {:default "Funding" :degen "Funding (Brrr)"}
    :nav/vaults {:default "Vaults" :degen "Vaults (LOL)"}
    :nav/staking {:default "Staking" :degen "Staking (Zzz)"}

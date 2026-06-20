@@ -80,16 +80,18 @@
     (is (= 0 (get-in preview [:summary :gross-trade-notional-usd])))))
 
 (deftest build-rebalance-preview-blocks-quantity-rounded-below-lot-test
+  ;; Notional is $12 (clears the $10 minimum) but the quantity rounds below the
+  ;; lot at szDecimals 4, so this exercises the lot gate specifically.
   (let [preview (rebalance/build-rebalance-preview
-                 {:capital-usd 100
+                 {:capital-usd 12000
                   :rebalance-tolerance 0.0
                   :instrument-ids ["perp:BTC"]
                   :current-weights [0.0]
-                  :target-weights [0.00001]
+                  :target-weights [0.001]
                   :instruments-by-id {"perp:BTC" {:instrument-type :perp
                                                   :coin "BTC"
                                                   :szDecimals 4}}
-                  :prices-by-id {"perp:BTC" 30000}})]
+                  :prices-by-id {"perp:BTC" 200000}})]
     (is (= :blocked (:status preview)))
     (is (= :quantity-below-lot (get-in preview [:rows 0 :reason])))
     (is (= 0 (get-in preview [:rows 0 :quantity])))
@@ -250,3 +252,26 @@
     (is (= :insufficient-visible-depth (:depth-status cost)))
     (is (= :snapshot-depth-limited (:fallback-reason cost)))
     (is (= 5000 (:age-ms cost)))))
+
+(deftest sub-ten-dollar-leg-is-blocked-below-min-notional-test
+  ;; Hyperliquid rejects orders below a $10 notional. A small reweight on a small
+  ;; portfolio must not be offered as a ready row that fails at submit.
+  (let [preview (rebalance/build-rebalance-preview
+                 {:capital-usd 1000
+                  :rebalance-tolerance 0.001
+                  :instrument-ids ["perp:SMALL" "perp:BIG"]
+                  ;; deltas: 0.005 -> $5 (below $10), 0.05 -> $50 (above $10)
+                  :current-weights [0.10 0.0]
+                  :target-weights [0.105 0.05]
+                  :instruments-by-id {"perp:SMALL" {:instrument-type :perp
+                                                    :coin "SMALL"}
+                                      "perp:BIG" {:instrument-type :perp
+                                                  :coin "BIG"}}
+                  :prices-by-id {"perp:SMALL" 50000
+                                 "perp:BIG" 50000}})
+        rows-by-id (into {} (map (juxt :instrument-id identity) (:rows preview)))
+        small (get rows-by-id "perp:SMALL")
+        big (get rows-by-id "perp:BIG")]
+    (is (= :blocked (:status small)))
+    (is (= :below-min-notional (:reason small)))
+    (is (= :ready (:status big)))))

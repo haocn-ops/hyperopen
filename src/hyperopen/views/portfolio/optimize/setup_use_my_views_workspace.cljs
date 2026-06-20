@@ -54,6 +54,7 @@
       (use-my-views-cards/cards draft readiness preview)]
      (setup-actions/model-assumptions-panel)
      (setup-actions/setup-bottom-actions {:draft draft
+                                          :readiness readiness
                                           :running? running?
                                           :run-triggerable? run-triggerable?
                                           :saving-scenario? saving-scenario?

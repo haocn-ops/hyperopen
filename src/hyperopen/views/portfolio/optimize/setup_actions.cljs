@@ -30,13 +30,52 @@
     (= :sample-covariance risk-kind) "sample historical returns"
     :else "stabilized historical returns"))
 
+(defn- run-status-label
+  [reason]
+  (case reason
+    :history-loading "Loading history"
+    :no-eligible-history "No usable history"
+    :incomplete-history "History incomplete"
+    :missing-history-assumptions "Needs assumptions"
+    :missing-black-litterman-views "Add a view"
+    :missing-universe "Add assets to run"
+    "Not ready to run"))
+
+(defn run-status
+  "Pure derivation of the Run button + status-pill state from the run gate and
+  readiness. The pill never reads green \"Ready to run\" while readiness is not
+  runnable; instead it names the blocking reason so the CTA cannot contradict the
+  Readiness panel beside it."
+  [{:keys [run-triggerable? running? readiness asset-count]}]
+  (let [runnable? (if (some? readiness)
+                    (boolean (:runnable? readiness))
+                    true)
+        ready? (boolean (and run-triggerable? runnable?))]
+    (cond
+      running?
+      {:ready? false :tone :busy :label "Optimizing"}
+
+      ready?
+      {:ready? true :tone :ready :label "Ready to run"}
+
+      (zero? (or asset-count 0))
+      {:ready? false :tone :empty :label "Add assets to run"}
+
+      :else
+      {:ready? false :tone :blocked :label (run-status-label (:reason readiness))})))
+
 (defn setup-bottom-actions
-  [{:keys [draft running? run-triggerable? saving-scenario? solved-run?]}]
+  [{:keys [draft readiness running? run-triggerable? saving-scenario? solved-run?]}]
   (let [asset-count (count (:universe draft))
         black-litterman? (= :black-litterman (get-in draft [:return-model :kind]))
         objective-copy (action-objective-label (get-in draft [:objective :kind]))
         model-copy (action-model-label (get-in draft [:return-model :kind])
-                                       (get-in draft [:risk-model :kind]))]
+                                       (get-in draft [:risk-model :kind]))
+        status (run-status {:run-triggerable? run-triggerable?
+                            :running? running?
+                            :readiness readiness
+                            :asset-count asset-count})
+        ready? (:ready? status)]
     [:section {:class ["optimizer-setup-actions"
                        "relative" "z-[180]" "mt-2" "flex" "flex-col" "items-start" "gap-3"
                        "border" "border-base-300" "bg-[#101518]"
@@ -53,6 +92,10 @@
                        "disabled:bg-base-200/30" "disabled:text-trading-muted"
                        "disabled:shadow-none"]
                :data-role "portfolio-optimizer-run-draft"
+               ;; The button stays clickable while a universe is present even when
+               ;; readiness is not runnable: clicking is the intentional
+               ;; "run retries anything still missing" history-load affordance.
+               ;; Honesty lives in the status pill below, not by disabling the CTA.
                :disabled (not run-triggerable?)
                :on {:click [(if black-litterman?
                                [:actions/apply-portfolio-optimizer-objective-menu-selection-and-run]
@@ -71,13 +114,17 @@
                     "sm:ml-auto" "sm:min-w-[220px]" "sm:items-end" "sm:text-right"]}
       [:div {:class ["flex" "items-center" "gap-2" "text-[0.6875rem]" "font-semibold"
                      "whitespace-nowrap" "uppercase" "tracking-[0.14em]"
-                     (if run-triggerable? "text-[#5a5f68]" "text-[#444951]")
+                     (if ready? "text-[#5a5f68]" "text-[#444951]")
                      "sm:justify-end"]
-             :data-role "portfolio-optimizer-setup-bottom-actions-status-meta"}
-       (when run-triggerable?
+             :data-role "portfolio-optimizer-setup-bottom-actions-status-meta"
+             :data-run-status (name (:tone status))}
+       (when ready?
          [:span {:class ["h-2" "w-2" "rounded-full" "bg-success"]
                  :aria-hidden "true"}])
-       [:span (if run-triggerable? "Ready to run" "Add assets to run")]
+       (when (= :blocked (:tone status))
+         [:span {:class ["h-2" "w-2" "rounded-full" "bg-warning"]
+                 :aria-hidden "true"}])
+       [:span (:label status)]
        [:span {:class ["text-trading-muted/50"]} "·"]
        [:span (str asset-count " assets")]]
       [:div {:class ["max-w-full" "text-[0.625rem]" "font-semibold" "normal-case"

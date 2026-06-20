@@ -10,12 +10,15 @@
   (let [view (header/header-actions {})
         actions-row (hiccup/find-by-data-role view "portfolio-actions-row")
         action-buttons (hiccup/find-all-nodes actions-row #(= :button (first %)))
+        optimize (hiccup/find-by-data-role view "portfolio-action-optimize")
         link-staking (hiccup/find-by-data-role view "portfolio-action-link-staking")
         perps-spot (hiccup/find-by-data-role view "portfolio-action-perps-spot")
         withdraw (hiccup/find-by-data-role view "portfolio-action-withdraw")
         deposit (hiccup/find-by-data-role view "portfolio-action-deposit")]
     (is (contains? (set (hiccup/collect-strings view)) "Portfolio"))
-    (is (= 4 (count action-buttons)))
+    (is (= 5 (count action-buttons)))
+    (is (= [[:actions/navigate "/portfolio/optimize/new"]]
+           (get-in optimize [1 :on :click])))
     (is (= [[:actions/navigate "/staking"]]
            (get-in link-staking [1 :on :click])))
     (is (= [[:actions/open-funding-transfer-modal

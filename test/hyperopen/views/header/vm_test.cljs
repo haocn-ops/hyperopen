@@ -17,7 +17,7 @@
         leaderboard-vm (vm/header-vm {:router {:path "/leaderboard"}})
         api-vm (vm/header-vm {:router {:path "/API"}})
         subaccounts-vm (vm/header-vm {:router {:path "/subAccounts"}})]
-    (is (= [:trade :portfolio :funding :vaults :staking :referrals :leaderboard]
+    (is (= [:trade :portfolio :optimize :funding :vaults :staking :referrals :leaderboard]
            (mapv :id (:desktop-nav-items funding-vm))))
     (is (true? (some->> (:desktop-nav-items funding-vm)
                         (some #(when (= :funding (:id %)) (:active? %))))))
@@ -123,17 +123,17 @@
 (deftest header-vm-degen-voice-relabels-nav-test
   (let [degen (vm/header-vm {:ui {:theme "hyperdegen"}})
         plain (vm/header-vm {})]
-    (is (= ["Trade (Gamble)" "Portfolio (Hope)" "Funding (Brrr)" "Vaults (LOL)"
-            "Staking (Zzz)" "Referrals (Spam)" "Leaderboard (Flex)"]
+    (is (= ["Trade (Gamble)" "Portfolio (Hope)" "Optimize (Cope)" "Funding (Brrr)"
+            "Vaults (LOL)" "Staking (Zzz)" "Referrals (Spam)" "Leaderboard (Flex)"]
            (mapv :label (:desktop-nav-items degen))))
-    (is (= ["Trade" "Portfolio" "Funding" "Vaults" "Staking" "Referrals"
+    (is (= ["Trade" "Portfolio" "Optimize" "Funding" "Vaults" "Staking" "Referrals"
             "Leaderboard"]
            (mapv :label (:desktop-nav-items plain))))
     (is (= ["API (Nerds)" "Sub-Accounts (Alts)"]
            (mapv :label (get-in degen [:more-nav :items]))))
     (is (= ["Trade (Gamble)" "Portfolio (Hope)" "Funding (Brrr)" "Vaults (LOL)"]
            (mapv :label (get-in degen [:mobile-nav :primary-items]))))
-    (is (= ["Staking (Zzz)" "Referrals (Spam)" "Leaderboard (Flex)"]
+    (is (= ["Optimize (Cope)" "Staking (Zzz)" "Referrals (Spam)" "Leaderboard (Flex)"]
            (mapv :label (get-in degen [:mobile-nav :secondary-items]))))
     (is (= ["Trade" "Portfolio" "Funding" "Vaults"]
            (mapv :label (get-in plain [:mobile-nav :primary-items]))))))

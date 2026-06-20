@@ -56,6 +56,42 @@
     {:--account-info-tab-indicator-left (format-px left)
      :--account-info-tab-indicator-width (format-px width)}))
 
+(defn- apply-active-tab-indicator!
+  "Pin the sliding indicator to the *actual* rendered active tab by reading its
+   offsetLeft/offsetWidth. account-tab-strip-style gives a close first-paint
+   estimate, but canvas-measuring the label text alone cannot see inline
+   affordances (e.g. the Monte Carlo \"New\" badge), so the estimate drifts left
+   for every tab after such an affordance. Measuring real layout is exact and
+   immune to any future unmeasured affordance or font change. `animate?` false
+   (mount) snaps without a transition; true (tab change) lets the CSS transition
+   slide it. The button's offsetParent is the position:relative strip, so
+   offsetLeft is already relative to the indicator's containing block."
+  [node animate?]
+  (when-let [active (and node (.querySelector node ".account-info-tab-button-active"))]
+    (let [strip-style (.-style node)
+          indicator (.querySelector node ".account-info-tab-indicator")
+          left (.-offsetLeft active)
+          width (.-offsetWidth active)]
+      (when (and indicator (not animate?))
+        (.setProperty (.-style indicator) "transition" "none"))
+      (.setProperty strip-style "--account-info-tab-indicator-left" (str left "px"))
+      (.setProperty strip-style "--account-info-tab-indicator-width" (str width "px"))
+      (when (and indicator (not animate?))
+        ;; Force a synchronous reflow so the un-animated snap to the exact
+        ;; position lands, then hand the transition back to the stylesheet for
+        ;; subsequent tab switches. Gating removeProperty on the offsetWidth read
+        ;; keeps :advanced DCE from dropping the (otherwise unused) reflow.
+        (when (<= 0 (.-offsetWidth indicator))
+          (.removeProperty (.-style indicator) "transition"))))))
+
+(defn- account-tab-indicator-on-render
+  "Replicant lifecycle hook keeping the active-tab indicator on the real tab."
+  [{:keys [:replicant/life-cycle :replicant/node]}]
+  (case life-cycle
+    :replicant.life-cycle/mount (apply-active-tab-indicator! node false)
+    :replicant.life-cycle/update (apply-active-tab-indicator! node true)
+    nil))
+
 (defn- funding-history-header-actions
   []
   [:div {:class ["ml-auto" "flex" "items-center" "justify-end" "gap-2" "px-4" "py-2" "md:min-h-12" "md:py-0"]
@@ -414,6 +450,7 @@
       [:div {:class account-tab-strip-viewport-classes}
        [:div {:class ["account-info-tab-strip"]
               :data-role "account-info-tab-strip"
+              :replicant/on-render account-tab-indicator-on-render
               :style (account-tab-strip-style tabs* counts tab-labels* selected-tab)}
         [:div {:class ["account-info-tab-indicator"]
                :data-role "account-info-tab-indicator"

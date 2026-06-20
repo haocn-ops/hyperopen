@@ -4,6 +4,13 @@
 (def default-fallback-slippage-bps
   25)
 
+(def ^:private min-order-notional-usd
+  ;; Hyperliquid rejects orders below a $10 notional. The same floor is encoded
+  ;; for scale/TWAP suborders in hyperopen.domain.trading.core
+  ;; (scale-min-endpoint-notional / twap-min-suborder-notional); kept local here
+  ;; so the optimizer domain stays decoupled from the scale/TWAP trading domain.
+  10)
+
 (defn- abs-num
   [value]
   (js/Math.abs value))
@@ -238,6 +245,10 @@
     (not (finite-nonzero? delta-notional-usd))
     {:status :blocked
      :reason :zero-delta-notional}
+
+    (< (abs-num delta-notional-usd) min-order-notional-usd)
+    {:status :blocked
+     :reason :below-min-notional}
 
     (not (finite-positive? quantity))
     {:status :blocked

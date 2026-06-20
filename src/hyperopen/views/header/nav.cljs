@@ -2,6 +2,7 @@
   (:require [clojure.string :as str]
             [hyperopen.api-wallets.actions :as api-wallets-actions]
             [hyperopen.funding-comparison.actions :as funding-comparison-actions]
+            [hyperopen.portfolio.routes :as portfolio-routes]
             [hyperopen.referrals.actions :as referrals-actions]
             [hyperopen.router :as router]
             [hyperopen.subaccounts.actions :as subaccounts-actions]))
@@ -26,7 +27,13 @@
     :label "Portfolio"
     :route "/portfolio"
     :placements #{:desktop :mobile-primary}
-    :active-fn #(exact-or-child-route? % "/portfolio")}
+    :active-fn #(and (exact-or-child-route? % "/portfolio")
+                     (not (portfolio-routes/portfolio-optimize-route? %)))}
+   {:id :optimize
+    :label "Optimize"
+    :route (portfolio-routes/portfolio-optimize-index-path)
+    :placements #{:desktop :mobile-secondary}
+    :active-fn portfolio-routes/portfolio-optimize-route?}
    {:id :funding
     :label "Funding"
     :route funding-route

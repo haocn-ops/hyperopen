@@ -49,6 +49,20 @@
              :market-type :spot}]
            (:warnings plan)))))
 
+(deftest build-history-request-plan-defaults-to-three-year-lookback-window-test
+  ;; With no explicit :bars, the plan must request the canonical ~3-year window so
+  ;; sample mean-variance has enough estimation history to beat naive 1/N. Guards
+  ;; against an accidental revert to the old 1-year (365) request.
+  (let [plan (history-loader/build-history-request-plan
+              [{:instrument-id "perp:BTC"
+                :market-type :perp
+                :coin "BTC"}]
+              {})
+        candle (first (:candle-requests plan))]
+    (is (= history-loader/default-bars (get-in candle [:opts :bars])))
+    (is (>= history-loader/default-bars 1095)
+        "default lookback window should be at least ~3 years (1095 daily bars)")))
+
 (deftest build-history-request-plan-fetches-vault-details-without-market-candles-test
   (let [vault-address "0x1111111111111111111111111111111111111111"
         plan (history-loader/build-history-request-plan

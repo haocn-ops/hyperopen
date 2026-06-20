@@ -41,7 +41,7 @@
             :data-role "portfolio-optimizer-constrain-frontier-checkbox"
             :checked (true? constrain-frontier?)
             :on {:change [[:actions/set-portfolio-optimizer-constrain-frontier
-                           :event.target/checked]]}}]
+                           [:event.target/checked]]]}}]
    [:span "Constrain Frontier"]])
 
 (defn toolbar

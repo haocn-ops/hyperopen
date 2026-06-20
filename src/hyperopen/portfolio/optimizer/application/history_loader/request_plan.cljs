@@ -5,7 +5,15 @@
   :1d)
 
 (def default-bars
-  365)
+  "Daily candles requested per asset (~3 years). A long estimation window is what
+  lets sample mean-variance beat naive 1/N weighting - short windows make the
+  estimated covariance/mean too noisy to add value (DeMiguel, Garlappi & Uppal,
+  2009, \"Optimal Versus Naive Diversification\"). Proxy/index-backed series (e.g.
+  perp:xyz:SP500) supply the extended history; the backend serves up to whatever it
+  has for each instrument. Alignment still intersects to the shared return window,
+  so a short-history or TradFi-calendar (weekday-only) asset can cap the usable
+  returns below this. This is the single source of truth for the request window."
+  1095)
 
 (def default-priority
   :high)

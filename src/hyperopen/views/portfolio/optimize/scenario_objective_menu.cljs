@@ -21,12 +21,12 @@
 
 (defn- objective-menu-options
   []
-  [{:key :max-sharpe
-    :title "Maximum Sharpe"
-    :description "Best risk-adjusted return"}
-   {:key :minimum-volatility
+  [{:key :minimum-volatility
     :title "Minimum volatility"
-    :description "Smallest feasible sigma - defensive baseline"}
+    :description "Smallest feasible sigma - defensive baseline. Recommended"}
+   {:key :max-sharpe
+    :title "Maximum Sharpe"
+    :description "Best risk-adjusted return, but sensitive to noisy return estimates"}
    {:key :use-my-views
     :title "Use my views"
     :description "Black-Litterman: combine market reference with beliefs"}

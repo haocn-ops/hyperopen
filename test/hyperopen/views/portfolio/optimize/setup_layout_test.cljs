@@ -161,6 +161,8 @@
                        "Combines market-implied returns with your Black-Litterman views and confidence inputs."]
                       ["portfolio-optimizer-risk-model-diagonal-shrink"
                        "Shrinks the covariance estimate toward a diagonal model to reduce noisy cross-asset correlations."]
+                      ["portfolio-optimizer-risk-model-ledoit-wolf-dense"
+                       "Estimates the optimal shrinkage intensity from your data, raising it automatically as assets grow relative to available history."]
                       ["portfolio-optimizer-risk-model-mixed-frequency"
                        "Keeps dense assets on daily history while aggregating them over sparse asset intervals when needed."]
                       ["portfolio-optimizer-risk-model-sample-covariance"

@@ -51,12 +51,12 @@
 
 (def short-history-min-observations
   "User-facing threshold for \"short history\", in native daily observations (~days).
-  An asset is \"short\" when it has less than ~a year of returns. The optimizer fetches
-  up to 365 daily bars (history-loader.request-plan/default-bars), so a full-year-or-
-  older asset returns ~365 candles while a younger one returns fewer; this bar sits
-  just under 365 to tolerate a few missing daily candles in an otherwise-full year.
-  The engine's own minimum is only 1-2 observations, so this is the meaningful bar.
-  Tune this single constant to taste."
+  An asset is \"short\" when it has less than ~a year of returns, independent of the
+  optimizer's (larger, ~3-year) request window: this flags genuinely thin-history
+  assets, not ones that merely fall short of the full fetch window. The bar sits just
+  under a calendar year (~365) to tolerate a few missing daily candles in an
+  otherwise-full year. The engine's own minimum is only 1-2 observations, so this is
+  the meaningful bar. Tune this single constant to taste."
   360)
 
 (defn resolve-implied-correlation

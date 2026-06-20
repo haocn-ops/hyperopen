@@ -1,6 +1,7 @@
 (ns hyperopen.portfolio.optimizer.infrastructure.history-api-v2-client
   (:require [clojure.string :as str]
             [hyperopen.portfolio.optimizer.application.history-loader.api-v2 :as api-v2]
+            [hyperopen.portfolio.optimizer.application.history-loader.request-plan :as request-plan]
             [hyperopen.portfolio.optimizer.coercion :as coercion]))
 
 (def default-base-url
@@ -152,7 +153,7 @@
 
 (defn- history-body-base
   [{:keys [proxy-policy include-aligned-returns?]} request]
-  {:lookback_days (or (:bars request) 365)
+  {:lookback_days (or (:bars request) request-plan/default-bars)
    :interval (interval-wire (:interval request))
    :proxy_policy (proxy-policy-wire proxy-policy)
    :include_aligned_returns (true? include-aligned-returns?)})

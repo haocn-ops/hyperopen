@@ -1,6 +1,7 @@
 (ns hyperopen.portfolio.optimizer.application.history-workflow
   (:require [hyperopen.portfolio.optimizer.application.current-portfolio :as current-portfolio]
             [hyperopen.portfolio.optimizer.application.history-loader.api-v2 :as history-api-v2]
+            [hyperopen.portfolio.optimizer.application.history-loader.request-plan :as request-plan]
             [hyperopen.portfolio.optimizer.application.history-prefetch :as history-prefetch]
             [hyperopen.portfolio.optimizer.coercion :as coercion]
             [hyperopen.portfolio.optimizer.contracts :as contracts]))
@@ -88,7 +89,7 @@
         request (merge {:universe (get-in state contracts/draft-universe-path)
                         :current-portfolio-universe (current-portfolio-universe state)
                         :interval :1d
-                        :bars 365
+                        :bars request-plan/default-bars
                         :priority :high
                         :now-ms now-ms
                         :funding-window-ms default-funding-window-ms}

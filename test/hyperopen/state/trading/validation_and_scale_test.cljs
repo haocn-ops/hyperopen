@@ -84,10 +84,14 @@
 
 (deftest spot-affordability-skips-unified-portfolio-margin-test
   (let [spot-context (fn [mode]
-                       {:market {:market-type "spot" :mark "1"}
+                       {:active-asset "PURR"
+                        :market {:market-type "spot"
+                                 :coin "PURR/USDC"
+                                 :mark "1"}
                         :account {:mode mode}
                         :spot {:clearinghouse-state
-                               {:balances [{:coin "USDC" :total "10" :hold "0"}]}}})
+                               {:balances [{:coin "USDC" :total "10" :hold "0"}
+                                           {:coin "PURR" :total "5" :hold "0"}]}}})
         buy-over (fn [mode]
                    (domain-validation/validate-order-form
                     (spot-context mode)
@@ -95,7 +99,7 @@
         sell-over (fn [mode]
                     (domain-validation/validate-order-form
                      (spot-context mode)
-                     {:type :market :side :sell :size "5"}))]
+                     {:type :market :side :sell :size "6"}))]
     (testing "classic account caps a spot buy at idle USDC"
       (is (= #{:spot/insufficient-usdc}
              (validation-codes (buy-over :classic)))))
@@ -103,6 +107,11 @@
     (testing "classic account caps a spot sell at held base balance"
       (is (= #{:spot/insufficient-base-balance}
              (validation-codes (sell-over :classic)))))
+
+    (testing "classic account allows selling exactly the held base balance"
+      (is (empty? (domain-validation/validate-order-form
+                   (spot-context :classic)
+                   {:type :market :side :sell :size "5"}))))
 
     (testing "unified (portfolio-margin) account skips the spot affordability cap"
       ;; In PM the exchange auto-borrows USDC against unified collateral, and

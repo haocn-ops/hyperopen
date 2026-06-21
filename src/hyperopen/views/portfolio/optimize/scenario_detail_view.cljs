@@ -36,6 +36,7 @@
            running?
            scenario-save-state
            current-result?
+           result
            refinement]}]
   (let [status (:status active-scenario)
         read-only? (true? (:read-only? active-scenario))
@@ -45,7 +46,8 @@
         saving? (= :saving save-state)
         save-disabled? (or saving?
                            (not current-result?))
-        can-refine? (boolean (:can-refine? refinement))]
+        can-refine? (boolean (:can-refine? refinement))
+        solved? (= :solved (:status result))]
     [:header {:class ["optimizer-scenario-header"
                       "border-b"
                       "border-base-300"
@@ -153,7 +155,24 @@
                  :on {:click [[:actions/run-portfolio-optimizer-from-draft]]}}
         (cond
           running? "Running"
-          :else "Rerun")]]]]))
+          :else "Rerun")]
+       (when solved?
+         [:button {:type "button"
+                   :class ["optimizer-review-rebalance-action"
+                           "rounded-lg"
+                           "border"
+                           "border-primary/50"
+                           "bg-primary/10"
+                           "px-2.5"
+                           "py-1"
+                           "text-[0.65625rem]"
+                           "font-semibold"
+                           "text-primary"
+                           "transition-colors"
+                           "hover:bg-primary/30"]
+                   :data-role "portfolio-optimizer-scenario-review-rebalance"
+                   :on {:click [[:actions/set-portfolio-optimizer-results-tab :rebalance]]}}
+          "Review rebalance"])]]]))
 
 (defn- auto-recompute-stale-scenario!
   [_node]
@@ -365,9 +384,9 @@
           :data-role "portfolio-optimizer-scenario-tabs"}]
    (map (fn [{:keys [key label data-role]}]
           [:button {:type "button"
-                    :class (cond-> ["flex" "items-center" "border-b" "px-4" "text-[0.7rem]" "font-medium"]
+                    :class (cond-> ["flex" "items-center" "border-b" "px-4" "text-[0.7rem]" "font-medium" "transition-colors"]
                              (= key selected-tab) (conj "border-primary" "text-trading-text")
-                             (not= key selected-tab) (conj "border-transparent" "text-trading-muted"))
+                             (not= key selected-tab) (conj "border-transparent" "text-trading-text/60" "hover:text-trading-text"))
                     :data-role data-role
                     :aria-current (when (= key selected-tab) "page")
                     :on {:click [[:actions/set-portfolio-optimizer-results-tab key]]}}
@@ -405,6 +424,27 @@
     "Keeping the previous allocation visible until the new run finishes."]
    (optimization-progress-panel/progress-panel optimization-progress {:show-header? false})])
 
+(defn- review-rebalance-cta
+  "Discoverable bridge from the recommendation read-flow to the rebalance tab.
+  Switches tabs in-place (no navigation) so unsaved run state is preserved; the
+  spectate/read-only gate lives downstream in the execution modal, so this stays
+  enabled in spectate mode (you can still review the rebalance)."
+  []
+  [:button {:type "button"
+            :class ["optimizer-review-rebalance-cta"
+                    "mt-3" "flex" "w-full" "items-center" "justify-between" "gap-3"
+                    "rounded-lg" "border" "border-primary/50" "bg-primary/10"
+                    "px-4" "py-3" "text-left" "text-primary"
+                    "transition-colors" "hover:bg-primary/30"]
+            :data-role "portfolio-optimizer-recommendation-rebalance-cta"
+            :on {:click [[:actions/set-portfolio-optimizer-results-tab :rebalance]]}}
+   [:span {:class ["flex" "flex-col" "gap-0.5"]}
+    [:span {:class ["text-[0.7rem]" "font-semibold"]}
+     "Review rebalance"]
+    [:span {:class ["text-[0.62rem]" "font-medium" "text-trading-muted"]}
+     "See the trades that move you from current to target allocation."]]
+   [:span {:class ["text-sm" "font-semibold"] :aria-hidden "true"} "→"]])
+
 (defn- recommendation-tab
   [{:keys [last-successful-run
            draft
@@ -432,7 +472,8 @@
                     :frontier-overlay-mode frontier-overlay-mode
                     :constrain-frontier? constrain-frontier?
                     :refinement refinement
-                    :include-rebalance? false})))
+                    :include-rebalance? false}))
+       true (conj (review-rebalance-cta)))
 
      :else
      [(empty-tab "portfolio-optimizer-recommendation-empty"

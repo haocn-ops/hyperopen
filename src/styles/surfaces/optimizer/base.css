@@ -68,6 +68,41 @@
     background-color: var(--optimizer-info);
   }
 
+  /* ── Signal-tint leak fix ────────────────────────────────────────
+     DaisyUI emits the bg-/border- *opacity* utilities (e.g. bg-primary/10,
+     border-warning/50) from its own theme vars. The text-primary /
+     text-warning / text-success / text-error remaps above never covered
+     them, so in the default theme these tinted backgrounds and borders
+     pulled the global teal-green primary, yellow warning, and bright
+     green/red signals into this amber/charcoal surface (most visibly the
+     primary-tinted CTAs). Remap the variants the optimizer views actually
+     use to the --optimizer-* signal colors. color-mix keeps these on the
+     existing tokens so no raw color literals are introduced. */
+  .portfolio-optimizer .bg-primary\/10 { background-color: color-mix(in srgb, var(--optimizer-accent) 10%, transparent); }
+  .portfolio-optimizer .bg-primary\/20 { background-color: color-mix(in srgb, var(--optimizer-accent) 20%, transparent); }
+  .portfolio-optimizer .bg-primary\/70 { background-color: color-mix(in srgb, var(--optimizer-accent) 70%, transparent); }
+  .portfolio-optimizer .hover\:bg-primary\/30:hover { background-color: color-mix(in srgb, var(--optimizer-accent) 30%, transparent); }
+  .portfolio-optimizer .border-primary\/40 { border-color: color-mix(in srgb, var(--optimizer-accent) 40%, transparent); }
+  .portfolio-optimizer .border-primary\/50 { border-color: color-mix(in srgb, var(--optimizer-accent) 50%, transparent); }
+  .portfolio-optimizer .border-primary\/60 { border-color: color-mix(in srgb, var(--optimizer-accent) 60%, transparent); }
+  .portfolio-optimizer .border-primary\/70 { border-color: color-mix(in srgb, var(--optimizer-accent) 70%, transparent); }
+
+  .portfolio-optimizer .bg-warning\/5 { background-color: color-mix(in srgb, var(--optimizer-warn) 5%, transparent); }
+  .portfolio-optimizer .bg-warning\/10 { background-color: color-mix(in srgb, var(--optimizer-warn) 10%, transparent); }
+  .portfolio-optimizer .bg-warning\/80 { background-color: color-mix(in srgb, var(--optimizer-warn) 80%, transparent); }
+  .portfolio-optimizer .border-warning\/40 { border-color: color-mix(in srgb, var(--optimizer-warn) 40%, transparent); }
+  .portfolio-optimizer .border-warning\/50 { border-color: color-mix(in srgb, var(--optimizer-warn) 50%, transparent); }
+  .portfolio-optimizer .border-warning\/60 { border-color: color-mix(in srgb, var(--optimizer-warn) 60%, transparent); }
+  .portfolio-optimizer .border-warning\/70 { border-color: color-mix(in srgb, var(--optimizer-warn) 70%, transparent); }
+
+  .portfolio-optimizer .bg-success\/70 { background-color: color-mix(in srgb, var(--optimizer-long) 70%, transparent); }
+  .portfolio-optimizer .border-success\/40 { border-color: color-mix(in srgb, var(--optimizer-long) 40%, transparent); }
+
+  .portfolio-optimizer .bg-error\/10 { background-color: color-mix(in srgb, var(--optimizer-short) 10%, transparent); }
+  .portfolio-optimizer .bg-error\/70 { background-color: color-mix(in srgb, var(--optimizer-short) 70%, transparent); }
+  .portfolio-optimizer .border-error\/40 { border-color: color-mix(in srgb, var(--optimizer-short) 40%, transparent); }
+  .portfolio-optimizer .border-error\/60 { border-color: color-mix(in srgb, var(--optimizer-short) 60%, transparent); }
+
   .portfolio-optimizer :is(.font-mono, .tabular-nums) {
     font-family: "JetBrains Mono", var(--font-mono);
     font-feature-settings: "tnum", "zero";

@@ -64,8 +64,32 @@
       :else
       {:ready? false :tone :blocked :label (run-status-label (:reason readiness))})))
 
+(defn results-tab-nav-actions
+  "Click actions that open the results surface at `tab` from the setup route.
+
+  `navigate` switches to the scenario route and
+  `set-portfolio-optimizer-results-tab` selects the tab. nexus applies both
+  `:effects/save` projections (router path, then the results tab) before the
+  route loaders run, so the results surface opens on the requested tab instead of
+  re-deriving it from the URL."
+  [result-path tab]
+  [[:actions/navigate result-path]
+   [:actions/set-portfolio-optimizer-results-tab tab]])
+
+(defn- result-nav-button
+  [{:keys [result-path tab label data-role accent?]}]
+  [:button {:type "button"
+            :class (into ["border" "px-3" "py-2" "whitespace-nowrap"
+                          "text-[0.6875rem]" "font-semibold" "scroll-mb-12"]
+                         (if accent?
+                           ["border-primary/50" "bg-primary/10" "text-primary"]
+                           ["border-base-300" "bg-base-200/30" "text-trading-text"]))
+            :data-role data-role
+            :on {:click (results-tab-nav-actions result-path tab)}}
+   label])
+
 (defn setup-bottom-actions
-  [{:keys [draft readiness running? run-triggerable? saving-scenario? solved-run?]}]
+  [{:keys [draft readiness running? run-triggerable? saving-scenario? solved-run? result-path]}]
   (let [asset-count (count (:universe draft))
         black-litterman? (= :black-litterman (get-in draft [:return-model :kind]))
         objective-copy (action-objective-label (get-in draft [:objective :kind]))
@@ -110,6 +134,17 @@
                :disabled (or (not solved-run?) saving-scenario?)
                :on {:click [[:actions/open-portfolio-optimizer-scenario-save-modal]]}}
       (if saving-scenario? "Saving" "Save draft")]
+     (when (and solved-run? result-path)
+       (result-nav-button {:result-path result-path
+                           :tab :recommendation
+                           :label "View results"
+                           :data-role "portfolio-optimizer-view-results"}))
+     (when (and solved-run? result-path)
+       (result-nav-button {:result-path result-path
+                           :tab :rebalance
+                           :label "Rebalance preview"
+                           :data-role "portfolio-optimizer-view-rebalance"
+                           :accent? true}))
      [:div {:class ["flex" "max-w-full" "flex-col" "items-start" "gap-1.5" "font-mono"
                     "sm:ml-auto" "sm:min-w-[220px]" "sm:items-end" "sm:text-right"]}
       [:div {:class ["flex" "items-center" "gap-2" "text-[0.6875rem]" "font-semibold"

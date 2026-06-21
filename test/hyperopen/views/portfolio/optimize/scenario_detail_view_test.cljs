@@ -150,6 +150,11 @@
     (is (nil? (get-in (node-by-role view-node
                                      "portfolio-optimizer-scenario-tab-rebalance")
                       [1 :href])))
+    (is (contains? (set (get-in (node-by-role view-node
+                                              "portfolio-optimizer-scenario-tab-rebalance")
+                                [1 :class]))
+                   "text-trading-text/60")
+        "Inactive tabs read as clickable affordances (raised contrast), not disabled chrome.")
     (is (some? (node-by-role view-node "portfolio-optimizer-recommendation-tab")))
     (is (= [[:actions/set-portfolio-optimizer-results-tab :tracking]]
            (click-actions
@@ -161,6 +166,47 @@
     (is (contains? strings "Rebalance preview"))
     (is (contains? strings "Tracking"))
     (is (contains? strings "Inputs"))))
+
+(deftest portfolio-optimizer-scenario-detail-exposes-rebalance-paths-for-solved-result-test
+  ;; Regression: on the scenario-detail Recommendation tab there was no
+  ;; discoverable path to the rebalance preview. A solved result must now expose
+  ;; both a header action and an end-of-read-flow CTA, each switching tabs
+  ;; in-place (no navigation, so unsaved run state is preserved).
+  (let [scenario-id "draft"
+        state (ready-scenario-state scenario-id {:kind :historical-mean})
+        solved-run (solved-run-for-state state)
+        view-node (portfolio-view/portfolio-view
+                   (-> state
+                       (assoc-in [:portfolio :optimizer :run-state :request-signature]
+                                 (:request-signature solved-run))
+                       (assoc-in [:portfolio :optimizer :last-successful-run]
+                                 solved-run)))
+        header-cta (node-by-role view-node "portfolio-optimizer-scenario-review-rebalance")
+        recommendation-cta (node-by-role view-node "portfolio-optimizer-recommendation-rebalance-cta")
+        expected [[:actions/set-portfolio-optimizer-results-tab :rebalance]]
+        strings (set (collect-strings view-node))]
+    (is (some? header-cta)
+        "A solved scenario must expose a header path to the rebalance tab.")
+    (is (some? recommendation-cta)
+        "The recommendation read-flow must end with a discoverable path to the rebalance tab.")
+    (is (= expected (click-actions header-cta)))
+    (is (= expected (click-actions recommendation-cta)))
+    (is (contains? strings "Review rebalance"))
+    ;; The new CTA roles must not collide with reserved roles other tests pin to nil.
+    (is (nil? (node-by-role view-node "portfolio-optimizer-rebalance-preview")))
+    (is (nil? (node-by-role view-node "portfolio-optimizer-recommendation-stale-blocked")))))
+
+(deftest portfolio-optimizer-scenario-detail-hides-rebalance-paths-without-solved-result-test
+  ;; The CTAs are gated on a solved result: with no result the recommendation
+  ;; tab still renders (empty state), but neither rebalance CTA appears.
+  (let [view-node (portfolio-view/portfolio-view
+                   {:router {:path "/portfolio/optimize/scn_no_result"}})]
+    (is (some? (node-by-role view-node "portfolio-optimizer-recommendation-tab"))
+        "Sanity: the recommendation tab still renders so the gate is genuinely exercised.")
+    (is (nil? (node-by-role view-node "portfolio-optimizer-scenario-review-rebalance"))
+        "No solved result ⇒ no header rebalance CTA.")
+    (is (nil? (node-by-role view-node "portfolio-optimizer-recommendation-rebalance-cta"))
+        "No solved result ⇒ no recommendation rebalance CTA.")))
 
 (deftest portfolio-optimizer-scenario-detail-renders-header-kpis-and-provenance-test
   (let [view-node (portfolio-view/portfolio-view

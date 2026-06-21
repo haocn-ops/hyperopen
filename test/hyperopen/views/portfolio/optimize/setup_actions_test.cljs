@@ -95,3 +95,39 @@
     (is (false? (ts/node-attr run-button :disabled)))
     (is (= "ready" (ts/node-attr status-meta :data-run-status)))
     (is (some #{"Ready to run"} (ts/collect-strings status-meta)))))
+
+(deftest setup-bottom-actions-links-to-results-and-rebalance-after-solved-run-test
+  ;; A solved run must expose a direct path from the draft action bar to both the
+  ;; recommendation results and the rebalance preview tab, including the
+  ;; tab-select action so the surface opens on the requested tab.
+  (let [node (setup-actions/setup-bottom-actions
+              {:draft sample-draft
+               :readiness {:runnable? true}
+               :running? false
+               :run-triggerable? true
+               :saving-scenario? false
+               :solved-run? true
+               :result-path "/portfolio/optimize/draft"})
+        view-results (ts/node-by-role node "portfolio-optimizer-view-results")
+        view-rebalance (ts/node-by-role node "portfolio-optimizer-view-rebalance")]
+    (is (some? view-results))
+    (is (some? view-rebalance)
+        "The draft action bar must offer a direct path to the rebalance preview.")
+    (is (= [[:actions/navigate "/portfolio/optimize/draft"]
+            [:actions/set-portfolio-optimizer-results-tab :recommendation]]
+           (ts/click-actions view-results)))
+    (is (= [[:actions/navigate "/portfolio/optimize/draft"]
+            [:actions/set-portfolio-optimizer-results-tab :rebalance]]
+           (ts/click-actions view-rebalance)))))
+
+(deftest setup-bottom-actions-hides-result-links-before-a-solved-run-test
+  (let [node (setup-actions/setup-bottom-actions
+              {:draft sample-draft
+               :readiness {:runnable? true}
+               :running? false
+               :run-triggerable? true
+               :saving-scenario? false
+               :solved-run? false
+               :result-path "/portfolio/optimize/draft"})]
+    (is (nil? (ts/node-by-role node "portfolio-optimizer-view-results")))
+    (is (nil? (ts/node-by-role node "portfolio-optimizer-view-rebalance")))))

@@ -122,6 +122,76 @@
              :coin "MISSING"}]
            (:warnings snapshot)))))
 
+(def ^:private dust-spot-meta
+  {:tokens [{:index 0 :name "USDC"}
+            {:index 1 :name "PURR"}]
+   ;; @113 is the universe entry *name*; its numeric :index is unrelated to 113.
+   :universe [{:name "@113" :index 7 :tokens [1 0]}]})
+
+(deftest current-portfolio-snapshot-resolves-dust-spot-symbol-from-spot-meta-via-token-test
+  ;; A priced spot pair whose catalog market never resolved a token name leaves
+  ;; the base as the bare "@113" reference. spotMeta names it from the balance's
+  ;; own :token index so the label no longer degrades to "@113".
+  (let [snapshot (current-portfolio/current-portfolio-snapshot
+                  {:wallet {:address owner-address}
+                   :router {:path "/portfolio"}
+                   :spot {:meta dust-spot-meta
+                          :clearinghouse-state
+                          {:balances [{:coin "@113" :token 1 :total "10" :hold "0"}]}}
+                   :asset-selector {:market-by-key
+                                    {"spot:@113" {:key "spot:@113"
+                                                  :market-type :spot
+                                                  :coin "@113"
+                                                  :symbol "@113"
+                                                  :base "@113"
+                                                  :mark "0.5"}}}})
+        purr (exposure-by-id snapshot "spot:@113")]
+    (is (= [] (:warnings snapshot)))
+    (is (= "PURR" (:base purr)))
+    (is (= "PURR/USDC" (:symbol purr)))
+    (is (= :spot (:market-type purr)))
+    (is (= "@113" (:coin purr)))))
+
+(deftest current-portfolio-snapshot-resolves-dust-spot-symbol-from-spot-meta-via-coin-test
+  ;; When the balance carries no usable :token, the @<n> coin still maps through
+  ;; its universe entry's base token.
+  (let [snapshot (current-portfolio/current-portfolio-snapshot
+                  {:wallet {:address owner-address}
+                   :router {:path "/portfolio"}
+                   :spot {:meta dust-spot-meta
+                          :clearinghouse-state
+                          {:balances [{:coin "@113" :total "10" :hold "0"}]}}
+                   :asset-selector {:market-by-key
+                                    {"spot:@113" {:key "spot:@113"
+                                                  :market-type :spot
+                                                  :coin "@113"
+                                                  :base "@113"
+                                                  :mark "0.5"}}}})
+        purr (exposure-by-id snapshot "spot:@113")]
+    (is (= "PURR" (:base purr)))
+    (is (= "PURR/USDC" (:symbol purr)))))
+
+(deftest current-portfolio-snapshot-keeps-resolved-market-base-over-spot-meta-test
+  ;; A healthy market base must win; spotMeta is only a fallback for @<n> bases.
+  (let [snapshot (current-portfolio/current-portfolio-snapshot
+                  {:wallet {:address owner-address}
+                   :router {:path "/portfolio"}
+                   :spot {:meta {:tokens [{:index 0 :name "USDC"}
+                                          {:index 1 :name "WRONG"}]
+                                 :universe [{:name "@113" :index 7 :tokens [1 0]}]}
+                          :clearinghouse-state
+                          {:balances [{:coin "@113" :token 1 :total "10" :hold "0"}]}}
+                   :asset-selector {:market-by-key
+                                    {"spot:@113" {:key "spot:@113"
+                                                  :market-type :spot
+                                                  :coin "@113"
+                                                  :symbol "HYPE/USDC"
+                                                  :base "HYPE"
+                                                  :mark "0.5"}}}})
+        hype (exposure-by-id snapshot "spot:@113")]
+    (is (= "HYPE" (:base hype)))
+    (is (= "HYPE/USDC" (:symbol hype)))))
+
 (deftest current-derived-constraints-center-gross-and-net-on-current-book-test
   (let [snapshot {:capital {:nav-usdc 10000
                             :gross-exposure-usdc 16000

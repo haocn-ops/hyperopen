@@ -69,6 +69,60 @@
     (is (pos? (:current-volatility result)))
     (is (not (zero? (:current-expected-return result))))))
 
+(deftest run-optimization-labels-held-only-spot-by-token-symbol-test
+  ;; A dust spot holding ("spot:@113", PURR) is sold to 0 but was never added to
+  ;; the optimization universe. It must still resolve its token symbol — the
+  ;; rebalance preview otherwise renders the raw "@113" pair reference.
+  (let [day-ms 86400000
+        selected-history {"BTC" [{:time-ms 0 :close "100"}
+                                 {:time-ms day-ms :close "101"}
+                                 {:time-ms (* 2 day-ms) :close "102"}]
+                          "ETH" [{:time-ms 0 :close "100"}
+                                 {:time-ms day-ms :close "99"}
+                                 {:time-ms (* 2 day-ms) :close "100"}]}
+        request (request-builder/build-engine-request
+                 {:draft (fixtures/sample-draft
+                          {:id "held-only-spot-label"
+                           :universe [{:instrument-id "perp:BTC"
+                                       :market-type :perp
+                                       :coin "BTC"}
+                                      {:instrument-id "perp:ETH"
+                                       :market-type :perp
+                                       :coin "ETH"}]
+                           :return-model {:kind :historical-mean}
+                           :risk-model {:kind :sample-covariance}
+                           :objective {:kind :minimum-variance}
+                           :constraints {:long-only? true
+                                         :max-asset-weight 1}})
+                  :current-portfolio {:capital {:nav-usdc 10000}
+                                      :exposures [{:instrument-id "spot:@113"
+                                                   :market-type :spot
+                                                   :coin "@113"
+                                                   :base "PURR"
+                                                   :symbol "PURR/USDC"
+                                                   :weight 0.05
+                                                   :signed-notional-usdc 500
+                                                   :abs-notional-usdc 500}]
+                                      :by-instrument {"spot:@113"
+                                                      {:instrument-id "spot:@113"
+                                                       :market-type :spot
+                                                       :coin "@113"
+                                                       :base "PURR"
+                                                       :symbol "PURR/USDC"
+                                                       :weight 0.05}}}
+                  :history-data {:candle-history-by-coin selected-history
+                                 :funding-history-by-coin {}}
+                  :market-cap-by-coin {}
+                  :as-of-ms (* 4 day-ms)})
+        result (engine/run-optimization
+                request
+                {:solve-problem (fn [_problem]
+                                  {:status :solved
+                                   :solver :fixture-solver
+                                   :weights [0.5 0.5]})})]
+    (is (= "PURR" (get-in result [:labels-by-instrument "spot:@113"]))
+        "Held-only spot dust must resolve its token symbol, not the @113 pair id.")))
+
 (deftest run-optimization-scores-current-portfolio-with-black-litterman-views-test
   (let [btc-id "perp:BTC"
         one-year-interval [{:dt-days 365.2425

@@ -2,6 +2,7 @@
   (:require [clojure.string :as str]
             [hyperopen.account.context :as account-context]
             [hyperopen.asset-selector.markets :as markets]
+            [hyperopen.portfolio.optimizer.application.spot-token-labels :as spot-token-labels]
             [hyperopen.portfolio.optimizer.coercion :as coercion]))
 
 (def ^:private non-blank-text coercion/non-blank-text)
@@ -283,11 +284,24 @@
     (contains? market :hip3?)
     (assoc :hip3? (boolean (:hip3? market)))))
 
+(defn- spot-display-fields
+  "Market-derived display fields, with a spotMeta fallback whenever the catalog
+   left the base missing or as a bare @<n> reference (dust/illiquid pairs)."
+  [spot-resolver market coin token]
+  (let [market-fields (market-display-fields market)
+        market-base (non-blank-text (:base market-fields))]
+    (if (and market-base (not (spot-token-labels/at-reference? market-base)))
+      market-fields
+      (merge market-fields
+             (spot-token-labels/display-fields spot-resolver coin token)))))
+
 (defn- build-spot-exposures
   [state]
-  (let [market-by-key (get-in state [:asset-selector :market-by-key])]
+  (let [market-by-key (get-in state [:asset-selector :market-by-key])
+        spot-resolver (spot-token-labels/resolver (get-in state [:spot :meta]))]
     (reduce (fn [{:keys [exposures warnings cash-usdc spot-noncash-usdc] :as acc} balance]
               (let [coin (normalize-coin (:coin balance))
+                    token (:token balance)
                     total (parse-number (:total balance))
                     hold (or (parse-number (:hold balance)) 0)
                     available (when (number? total)
@@ -327,7 +341,10 @@
                                   :abs-notional-usdc (abs-number signed-notional)
                                   :side :long
                                   :source :spot-clearinghouse}
-                                 (market-display-fields market))))))))
+                                 (spot-display-fields spot-resolver
+                                                      market
+                                                      coin
+                                                      token))))))))
             {:exposures []
              :warnings []
              :cash-usdc 0
@@ -356,6 +373,7 @@
   [state]
   [(clearinghouse-state state)
    (spot-balances state)
+   (get-in state [:spot :meta])
    (:perp-dex-clearinghouse state)
    (get-in state [:asset-selector :market-by-key])
    (get-in state [:account :mode])

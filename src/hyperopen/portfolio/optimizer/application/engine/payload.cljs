@@ -93,7 +93,13 @@
 
 (defn- labels-by-instrument
   [request instrument-ids]
-  (instrument-labels/labels-by-instrument (vec (concat (:universe request)
+  ;; Held-only assets (e.g. dust spot sold to 0) live in :current-portfolio-universe
+  ;; but not the selected/requested universe. Include it so their rebalance rows
+  ;; resolve a token symbol instead of falling back to the raw "@113" id. The
+  ;; current-portfolio rows go first so a curated selected-universe label still
+  ;; wins for assets present in both.
+  (instrument-labels/labels-by-instrument (vec (concat (:current-portfolio-universe request)
+                                                       (:universe request)
                                                        (:requested-universe request)))
                                           instrument-ids))
 

@@ -133,3 +133,17 @@
             :market-type :perp}
            (select-keys (:market (get groups-by-asset "SP500"))
                         [:key :coin :symbol :base :dex :market-type])))))
+
+(deftest target-exposure-table-model-shows-spot-token-symbol-not-pair-reference-test
+  ;; Once the spot exposure resolves a token name (label "PURR"), the rebalance
+  ;; grouping renders the symbol instead of the raw "@113" pair reference.
+  (let [result {:instrument-ids ["spot:@113"]
+                :current-weights [0.25]
+                :target-weights [0]
+                :labels-by-instrument {"spot:@113" "PURR"}
+                :rebalance-preview {:capital-usd 10000}}
+        model (rebalance/target-exposure-table-model result)
+        group (first (:groups model))]
+    (is (= ["PURR"] (mapv :asset (:groups model))))
+    (is (= "PURR" (:asset group)))
+    (is (= "spot:@113" (:instrument-id group)))))

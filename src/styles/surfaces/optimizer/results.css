@@ -280,7 +280,10 @@
   }
 
   .portfolio-optimizer .optimizer-kpi-card p:nth-child(2) {
-    color: var(--optimizer-text);
+    /* Inherit --optimizer-text by default (from .portfolio-optimizer) rather
+       than pinning it here, so a value can opt into a signal colour via a
+       utility class (e.g. text-trading-green on Buys / text-trading-red on
+       Sells) without this higher-specificity rule overriding it. */
     font-size: 14px;
     font-weight: 600;
     letter-spacing: -0.02em;
@@ -783,5 +786,98 @@
     .portfolio-optimizer .optimizer-refinement-progress-fill {
       animation: none;
     }
+  }
+
+  /* ── Dense trade table (rebalance preview) ─────────────────────
+     A real tiled data table in the v4 idiom: 1px row separators, a
+     sticky uppercase header, hover-lit rows, and striped group/leg
+     rows — replacing the rounded card-per-row grid. */
+  .portfolio-optimizer .optimizer-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11px;
+  }
+
+  .portfolio-optimizer .optimizer-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    text-align: left;
+    font-weight: 400;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-size: 9.5px;
+    color: var(--optimizer-text-3);
+    padding: 6px 10px;
+    background-color: var(--optimizer-surface);
+    border-bottom: 1px solid var(--optimizer-border);
+    white-space: nowrap;
+  }
+
+  .portfolio-optimizer .optimizer-table :is(th, td).right {
+    text-align: right;
+  }
+
+  .portfolio-optimizer .optimizer-table td {
+    padding: 6px 10px;
+    border-bottom: 1px solid var(--optimizer-border);
+    color: var(--optimizer-text);
+    vertical-align: top;
+  }
+
+  .portfolio-optimizer .optimizer-table tbody tr:hover td {
+    background-color: var(--optimizer-surface-2);
+  }
+
+  .portfolio-optimizer .optimizer-table tr.optimizer-table-group > td {
+    background-color: var(--optimizer-surface-2);
+    font-weight: 600;
+  }
+
+  .portfolio-optimizer .optimizer-table tr.optimizer-table-leg > td {
+    background-color: var(--optimizer-surface);
+    color: var(--optimizer-text-2);
+  }
+
+  .portfolio-optimizer .optimizer-table tr.optimizer-table-blocked > td {
+    color: var(--optimizer-text-3);
+  }
+
+  /* ── Outcome diagnostics list (what this rebalance achieves) ────
+     before → after metric rows for the rebalance side rail, mirroring
+     the v4 .diag block: small uppercase label, large mono value, 1px
+     separators, no card boxing. */
+  .portfolio-optimizer .optimizer-diag {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--optimizer-border);
+  }
+
+  .portfolio-optimizer .optimizer-diag:last-child {
+    border-bottom: none;
+  }
+
+  .portfolio-optimizer .optimizer-diag-label {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    color: var(--optimizer-text-2);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  .portfolio-optimizer .optimizer-diag-value {
+    margin-top: 4px;
+    font-size: 16px;
+    letter-spacing: -0.01em;
+    color: var(--optimizer-text);
+  }
+
+  .portfolio-optimizer .optimizer-diag-sub {
+    /* Colour comes from a utility class in markup (text-trading-muted/70 by
+       default, or a signal colour for improvement/regression deltas) so this
+       rule does not specificity-lock it; see kpi-card value note above. */
+    margin-top: 2px;
+    font-size: 10px;
   }
 }

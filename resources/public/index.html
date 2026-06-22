@@ -167,11 +167,16 @@
           document.body.appendChild(script);
         }
 
+        function safeBuildToken(value) {
+          const token = typeof value === "string" ? value.trim() : "";
+          return token && !token.startsWith("<") && !/\s/.test(token) ? token : "";
+        }
+
         function syncBuildId() {
           return fetch(buildIdUrl, { cache: "no-cache" })
             .then((response) => (response.ok ? response.text() : ""))
             .then((text) => {
-              const buildId = typeof text === "string" ? text.trim() : "";
+              const buildId = safeBuildToken(text);
               if (buildId) {
                 globalThis.HYPEROPEN_BUILD_ID = buildId;
               }
@@ -187,7 +192,7 @@
                 return syncBuildId();
               }
 
-              const sha = typeof build.sha === "string" ? build.sha.trim() : "";
+              const sha = safeBuildToken(build.sha);
               if (!sha) {
                 return syncBuildId();
               }

@@ -291,8 +291,8 @@
            "No rows match the current filters.")])]
 
      (when (seq error)
-       [:div {:class ["rounded-xl" "border" "border-[#7a2836]" "bg-ho-sell-soft-deep" "px-3" "py-2" "text-sm" "text-[#ff9db2"]
-              :data-role "funding-comparison-error"}
+       [:div {:class ["rounded-xl" "border" "border-[#7a2836]" "bg-ho-sell-soft-deep" "px-3" "py-2" "text-sm" "text-[#ff9db2]"]
+               :data-role "funding-comparison-error"}
         error])]))
 
 (defn ^:export route-view

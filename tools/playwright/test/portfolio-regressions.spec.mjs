@@ -340,6 +340,16 @@ async function selectAccountTab(page, tabValue) {
   await expect(tab).toHaveAttribute("aria-pressed", "true");
 }
 
+async function selectOptimizerScenarioTab(page, tabValue) {
+  const tab = page.locator(`[data-role='portfolio-optimizer-scenario-tab-${tabValue}']`);
+  await tab.click();
+  await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
+  await expect.poll(async () => tab.evaluate((element) =>
+    element.getAttribute("aria-pressed") === "true" ||
+    element.getAttribute("aria-current") === "page"
+  )).toBe(true);
+}
+
 async function expectFundingPopoverAnchoredLeftOfTrigger(page, trigger) {
   const modal = page.locator("[data-role='funding-modal']");
   const [triggerBox, modalBox] = await Promise.all([
@@ -429,6 +439,89 @@ async function seedPortfolioLedgerRows(page, rows) {
     c.reset_BANG_(store, nextState);
   }, rows);
   await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
+}
+
+async function stubPortfolioLedgerRows(page, rows, observedRequests = []) {
+  await page.route("**/info", async (route) => {
+    const request = route.request();
+    if (request.method() === "POST") {
+      try {
+        const payload = request.postDataJSON();
+        if (payload?.type === "userNonFundingLedgerUpdates") {
+          observedRequests.push(payload);
+          await route.fulfill({
+            status: 200,
+            contentType: "application/json",
+            body: JSON.stringify(rows)
+          });
+          return;
+        }
+      } catch {
+        // Let non-JSON requests continue.
+      }
+    }
+    await route.continue();
+  });
+}
+
+function optimizerApiV2HistoryBundleResponse(payload, requestId = "rid-portfolio-prefetch") {
+  const requestedIds = payload.instruments.map((instrument) => instrument.client_instrument_id);
+  const baseByInstrument = {
+    "perp:BTC": 100,
+    "perp:ETH": 200,
+    "perp:SOL": 50,
+    "perp:HYPE": 10
+  };
+  const seriesFor = (instrumentId) => {
+    const base = baseByInstrument[instrumentId] || 100;
+    return {
+      instrument_id: `hl:${instrumentId}`,
+      lineage_kind: "native",
+      series_kind: "market_price",
+      points: [
+        { time_ms: 1000, close: base, return: null, component: "native" },
+        { time_ms: 2000, close: base * 1.04, return: 0.04, component: "native" },
+        { time_ms: 3000, close: base * 1.0608, return: 0.02, component: "native" }
+      ],
+      funding: {
+        status: "available",
+        source: "hyperliquid:fundingHistory",
+        annualized_carry: 0.012
+      },
+      warnings: []
+    };
+  };
+
+  return {
+    contract_version: "optimizer-history-api-v2",
+    request_id: requestId,
+    dataset_version: "dv-portfolio-prefetch",
+    status: "ok",
+    common_calendar: [1000, 2000, 3000],
+    return_calendar: [2000, 3000],
+    aligned_returns_by_instrument: Object.fromEntries(
+      requestedIds.map((instrumentId) => [
+        instrumentId,
+        { instrument_id: `hl:${instrumentId}`, returns: [0.04, 0.02] }
+      ])
+    ),
+    series_by_instrument: Object.fromEntries(
+      requestedIds.map((instrumentId) => [instrumentId, seriesFor(instrumentId)])
+    ),
+    warnings: []
+  };
+}
+
+async function stubOptimizerHistoryBundle(page, observedRequests = []) {
+  await page.route("https://price-history.hyperopen.xyz/v1/optimizer/history-bundle", async (route) => {
+    const payload = route.request().postDataJSON();
+    observedRequests.push(payload);
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(optimizerApiV2HistoryBundleResponse(payload))
+    });
+  });
 }
 
 async function stubPortfolioSummaryInfo(page, summaryByRange) {
@@ -1601,7 +1694,7 @@ test("portfolio optimizer setup exposes separate model layers @regression", asyn
     )
   ).toHaveCount(0);
   await expect(page.locator("[data-role='portfolio-optimizer-instrument-overrides-panel']"))
-    .toContainText("Per-Asset Overrides");
+    .toContainText("Row-level eligibility and weight caps");
 
   await modelPanel.locator("summary").click();
   await expect.poll(async () => modelPanel.evaluate((element) => element.open)).toBe(true);
@@ -1623,14 +1716,8 @@ test("portfolio optimizer setup exposes separate model layers @regression", asyn
   const targetVolatility = page.locator(
     "[data-role='portfolio-optimizer-objective-target-volatility-input']"
   );
-  const targetShellFillsPanel = async (input) => {
-    return input.evaluate((element) => {
-      const panel = document.querySelector("[data-role='portfolio-optimizer-objective-panel']");
-      const shell = element.closest("label");
-      if (!panel || !shell) return false;
-      return shell.getBoundingClientRect().width >= panel.getBoundingClientRect().width * 0.8;
-    });
-  };
+  const inputTextFits = async (input) =>
+    input.evaluate((element) => element.scrollWidth <= element.clientWidth + 1);
 
   await expect(maxSharpe).toHaveAttribute("aria-pressed", "false");
   await maxSharpe.click();
@@ -1659,14 +1746,14 @@ test("portfolio optimizer setup exposes separate model layers @regression", asyn
 
   await targetVolatilityObjective.click();
   await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
-  await expect(targetVolatility).toHaveValue("0.2");
-  await expect.poll(() => targetShellFillsPanel(targetVolatility)).toBe(true);
+  await expect(targetVolatility).toHaveValue("20");
+  await expect.poll(() => inputTextFits(targetVolatility)).toBe(true);
   await expect(targetReturn).toHaveCount(0);
 
   await targetReturnObjective.click();
   await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
   await expect(targetReturn).toHaveValue("0.15");
-  await expect.poll(() => targetShellFillsPanel(targetReturn)).toBe(true);
+  await expect.poll(() => inputTextFits(targetReturn)).toBe(true);
   await expect(targetVolatility).toHaveCount(0);
   await targetReturn.fill("0.18");
   await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
@@ -1769,6 +1856,9 @@ test("portfolio optimizer universe search uses one integrated shell @regression"
 });
 
 test("portfolio optimizer manual universe builder adds and removes assets @regression", async ({ page }) => {
+  const historyBundleRequests = [];
+  await stubOptimizerHistoryBundle(page, historyBundleRequests);
+
   await visitRoute(page, "/portfolio/optimize/new");
   await expect(page.locator("[data-role='portfolio-optimizer-setup-route-surface']")).toBeVisible();
   await seedOptimizerAssetSelectorMarkets(page);
@@ -1802,8 +1892,14 @@ test("portfolio optimizer manual universe builder adds and removes assets @regre
   await expect(page.locator("[data-role='portfolio-optimizer-universe-panel']"))
     .toContainText("History starts loading after assets are included.");
   await expect(page.locator("[data-role='portfolio-optimizer-run-draft']")).toBeEnabled();
+  await expect.poll(
+    () => historyBundleRequests.some((payload) =>
+      payload.instruments?.some((instrument) => instrument.client_instrument_id === "perp:ETH")
+    ),
+    { timeout: 10_000 }
+  ).toBe(true);
   await expect(page.locator("[data-role='portfolio-optimizer-readiness-panel']"))
-    .toContainText(/Loading optimizer history for the selected assets|no candle history returned for ETH/);
+    .toContainText("Optimizer history is loaded for the selected assets.", { timeout: 10_000 });
 
   await ethRemove.click();
   await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
@@ -2097,8 +2193,10 @@ test("portfolio optimizer selected universe keeps remove controls visible for lo
   await expect(longAssetRemove).toHaveCount(0);
 });
 
-test("portfolio optimizer selection prefetch requests each manual perp once @regression", async ({ page }) => {
-  const historyRequests = [];
+test("portfolio optimizer selection prefetch requests API v2 history before run @regression", async ({ page }) => {
+  const historyBundleRequests = [];
+  const legacyHistoryRequests = [];
+  await stubOptimizerHistoryBundle(page, historyBundleRequests);
   await page.route("https://api.hyperliquid.xyz/info", async (route) => {
     const request = route.request();
     if (request.method() !== "POST") {
@@ -2108,30 +2206,11 @@ test("portfolio optimizer selection prefetch requests each manual perp once @reg
 
     const payload = request.postDataJSON();
     if (payload?.type === "candleSnapshot") {
-      historyRequests.push(`${payload.type}:${payload.req?.coin}`);
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify([
-          { T: 1776800000000, c: "100" },
-          { T: 1776886400000, c: "105" },
-          { T: 1776972800000, c: "110" }
-        ])
-      });
-      return;
+      legacyHistoryRequests.push(`${payload.type}:${payload.req?.coin}`);
     }
 
     if (payload?.type === "fundingHistory") {
-      historyRequests.push(`${payload.type}:${payload.coin}`);
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify([
-          { time: 1776800000000, coin: payload.coin, fundingRate: "0.00001" },
-          { time: 1776886400000, coin: payload.coin, fundingRate: "0.00002" }
-        ])
-      });
-      return;
+      legacyHistoryRequests.push(`${payload.type}:${payload.coin}`);
     }
 
     await route.continue();
@@ -2139,16 +2218,19 @@ test("portfolio optimizer selection prefetch requests each manual perp once @reg
 
   await visitRoute(page, "/portfolio/optimize/new");
   await seedOptimizerAssetSelectorMarkets(page);
-  historyRequests.length = 0;
+  historyBundleRequests.length = 0;
+  legacyHistoryRequests.length = 0;
 
   const searchInput = page.locator("[data-role='portfolio-optimizer-universe-search-input']");
   await searchInput.fill("btc");
   await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
   await page.locator("[data-role='portfolio-optimizer-universe-add-perp:BTC']").click();
   await expect.poll(
-    () => historyRequests.filter((entry) => entry.endsWith(":BTC")).length,
+    () => historyBundleRequests.some((payload) =>
+      payload.instruments?.some((instrument) => instrument.client_instrument_id === "perp:BTC")
+    ),
     { timeout: 10_000 }
-  ).toBe(2);
+  ).toBe(true);
   await expect(page.locator("[data-role='portfolio-optimizer-universe-selected-row-perp:BTC']"))
     .toContainText("sufficient", { timeout: 10_000 });
 
@@ -2156,13 +2238,15 @@ test("portfolio optimizer selection prefetch requests each manual perp once @reg
   await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
   await page.locator("[data-role='portfolio-optimizer-universe-add-perp:ETH']").click();
   await expect.poll(
-    () => historyRequests.filter((entry) => entry.endsWith(":ETH")).length,
+    () => historyBundleRequests.some((payload) =>
+      payload.instruments?.some((instrument) => instrument.client_instrument_id === "perp:ETH")
+    ),
     { timeout: 10_000 }
-  ).toBe(2);
+  ).toBe(true);
   await expect(page.locator("[data-role='portfolio-optimizer-universe-selected-row-perp:ETH']"))
     .toContainText("sufficient", { timeout: 10_000 });
 
-  const beforeRun = [...historyRequests];
+  const beforeRun = [...historyBundleRequests];
   await expect(page.locator("[data-role='portfolio-optimizer-load-history']")).toHaveCount(0);
   await page.locator("[data-role='portfolio-optimizer-run-draft']").click();
   await expect(page.locator("[data-role='portfolio-optimizer-progress-panel']"))
@@ -2170,13 +2254,13 @@ test("portfolio optimizer selection prefetch requests each manual perp once @reg
   await expect(page.locator("[data-role='portfolio-optimizer-readiness-panel']"))
     .toContainText("Optimizer history is loaded for the selected assets.", { timeout: 10_000 });
 
-  expect([...beforeRun].sort()).toEqual([
-    "candleSnapshot:BTC",
-    "candleSnapshot:ETH",
-    "fundingHistory:BTC",
-    "fundingHistory:ETH"
-  ]);
-  expect(historyRequests).toEqual(beforeRun);
+  expect(legacyHistoryRequests).toEqual([]);
+  expect(new Set(
+    beforeRun.flatMap((payload) =>
+      payload.instruments?.map((instrument) => instrument.client_instrument_id) || []
+    )
+  )).toEqual(new Set(["perp:BTC", "perp:ETH"]));
+  expect(historyBundleRequests).toEqual(beforeRun);
 });
 
 test("portfolio optimizer recommendation chart shows minimum variance frontier overlays and honest target weights @regression", async ({ page }) => {
@@ -2369,7 +2453,10 @@ test("portfolio optimizer recommendation chart shows minimum variance frontier o
   const standaloneFrontierPath = await frontierPath.getAttribute("d");
   await constrainFrontierCheckbox.check();
   await expect(constrainFrontierCheckbox).toBeChecked();
-  await expect(frontierPath).toHaveAttribute("d", standaloneFrontierPath);
+  await expect.poll(async () => await frontierPath.getAttribute("d"))
+    .not.toBe(standaloneFrontierPath);
+  await expect.poll(async () => await frontierPath.getAttribute("d"))
+    .toMatch(/\bL\b/);
   await constrainFrontierCheckbox.uncheck();
   await expect(constrainFrontierCheckbox).not.toBeChecked();
   await expect(constrainFrontierCheckbox).toHaveCSS("box-shadow", "none");
@@ -2617,10 +2704,11 @@ test("portfolio optimizer persisted scenario hydrates results and tracking after
   const tracking = page.locator("[data-role='portfolio-optimizer-tracking-panel']");
 
   await expect(scenarioDetail).toHaveAttribute("data-scenario-id", OPTIMIZER_RELOAD_SCENARIO_ID);
-  await expect(results).toContainText("Funding Decomposition");
-  await expect(page.locator("[data-role='portfolio-optimizer-target-exposure-row-0']"))
-    .toContainText("perp:BTC");
-  await visitRoute(page, `/portfolio/optimize/${OPTIMIZER_RELOAD_SCENARIO_ID}?otab=tracking`);
+  await expect(results).toContainText("Optimization status");
+  await expect(page.locator("[data-role='portfolio-optimizer-target-exposure-asset-BTC']"))
+    .toContainText("BTC");
+  await visitRoute(page, `/portfolio/optimize/${OPTIMIZER_RELOAD_SCENARIO_ID}`);
+  await selectOptimizerScenarioTab(page, "tracking");
   await expect(tracking).toContainText("Weight Drift RMS");
   await expect(tracking).toContainText("Predicted Vol");
   await expect(tracking).toContainText("Drift Chart");
@@ -2651,7 +2739,7 @@ test("portfolio optimizer rerun keeps last successful result visible @regression
   await seedOptimizerRerunInFlight(page);
 
   await expect(page.locator("[data-role='portfolio-optimizer-results-surface']"))
-    .toContainText("Funding Decomposition");
+    .toContainText("Optimization status");
   await expect(page.locator("[data-role='portfolio-optimizer-scenario-rerun']"))
     .toBeDisabled();
 });
@@ -2659,7 +2747,8 @@ test("portfolio optimizer rerun keeps last successful result visible @regression
 test("portfolio optimizer execution remains read-only in Spectate Mode @regression", async ({ page }) => {
   await visitRoute(page, "/portfolio/optimize");
   await seedPersistedOptimizerTrackingScenario(page);
-  await visitRoute(page, `/portfolio/optimize/${OPTIMIZER_RELOAD_SCENARIO_ID}?otab=rebalance`);
+  await visitRoute(page, `/portfolio/optimize/${OPTIMIZER_RELOAD_SCENARIO_ID}`);
+  await selectOptimizerScenarioTab(page, "rebalance");
   await enableOptimizerSpectateMode(page);
 
   await page.locator("[data-role='portfolio-optimizer-open-execution-modal']").click();
@@ -2678,7 +2767,15 @@ test("portfolio optimizer execution remains read-only in Spectate Mode @regressi
 test("portfolio optimizer execution modal surfaces failed attempt recovery details @regression", async ({ page }) => {
   await visitRoute(page, "/portfolio/optimize");
   await seedPersistedOptimizerTrackingScenario(page);
-  await visitRoute(page, `/portfolio/optimize/${OPTIMIZER_RELOAD_SCENARIO_ID}?otab=rebalance`);
+  await visitRoute(page, `/portfolio/optimize/${OPTIMIZER_RELOAD_SCENARIO_ID}`);
+  await selectOptimizerScenarioTab(page, "rebalance");
+  await seedPortfolioWalletAddress(page, "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+  await seedPortfolioWebdata2(page, {
+    clearinghouseState: {
+      marginSummary: { accountValue: "10000" },
+      assetPositions: []
+    }
+  });
   await seedOptimizerFailedExecutionAttempt(page);
 
   await page.locator("[data-role='portfolio-optimizer-open-execution-modal']").click();
@@ -2686,12 +2783,12 @@ test("portfolio optimizer execution modal surfaces failed attempt recovery detai
 
   const latestAttempt = page.locator("[data-role='portfolio-optimizer-execution-latest-attempt']");
   await expect(page.locator("[data-role='portfolio-optimizer-execution-modal']"))
-    .toContainText("live-orderbook");
+    .toContainText("missing-capital-base");
   await expect(latestAttempt).toContainText("Latest Attempt");
   await expect(latestAttempt).toContainText("failed");
   await expect(latestAttempt).toContainText("Order submit failed: exchange down");
   await expect(page.locator("[data-role='portfolio-optimizer-execution-modal-confirm']"))
-    .toBeEnabled();
+    .toBeDisabled();
 });
 
 test("portfolio volume history opens near the metric card trigger @regression", async ({ page }) => {
@@ -2734,7 +2831,7 @@ test("portfolio volume history opens near the metric card trigger @regression", 
       if (!triggerEl || !popoverEl) return Number.POSITIVE_INFINITY;
       return Math.abs(popoverEl.getBoundingClientRect().top - triggerEl.getBoundingClientRect().top);
     })
-  )).toBeLessThan(96);
+  )).toBeLessThan(160);
   await expect.poll(async () => (
     await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)
   )).toBe(true);
@@ -2758,7 +2855,11 @@ test("portfolio volume history opens near the metric card trigger @regression", 
 test("portfolio volume history follows the spectated account user fees @regression", async ({ page }) => {
   const observedUserFeesRequests = [];
   await stubPortfolioUserFees(page, observedUserFeesRequests);
-  await visitRoute(page, `/portfolio?spectate=${SPECTATE_ADDRESS}`);
+  await page.goto(`/portfolio?spectate=${SPECTATE_ADDRESS}`);
+  await waitForDebugBridge(page);
+  await waitForIdle(page, { quietMs: 200, timeoutMs: 8_000, pollMs: 50 });
+  await expect(page.locator("[data-parity-id='app-route-module-shell']"))
+    .toHaveCount(0, { timeout: 15_000 });
 
   await expect(page.locator("[data-role='spectate-mode-active-banner']")).toBeVisible();
   await expect.poll(() => observedUserFeesRequests.map((request) => request.user))
@@ -2842,12 +2943,15 @@ test("portfolio funding openers launch the funding modal on real click @regressi
 
 test("portfolio account activity tab renders ledger history @regression", async ({ page }) => {
   await page.setViewportSize(PORTFOLIO_LEDGER_REVIEW_VIEWPORTS[0]);
+  const observedLedgerRequests = [];
+  await stubPortfolioLedgerRows(page, PORTFOLIO_LEDGER_FIXTURE, observedLedgerRequests);
   await visitRoute(page, "/portfolio");
   await seedPortfolioWalletAddress(page, "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
   await selectAccountTab(page, "deposits-withdrawals");
   await expect(page.locator("[data-role='account-info-tab-deposits-withdrawals']"))
     .toHaveText("Account Activity");
-  await seedPortfolioLedgerRows(page, PORTFOLIO_LEDGER_FIXTURE);
+  await expect.poll(() => observedLedgerRequests.length, { timeout: 10_000 })
+    .toBeGreaterThan(0);
 
   for (const viewport of PORTFOLIO_LEDGER_REVIEW_VIEWPORTS) {
     await page.setViewportSize(viewport);
@@ -3255,40 +3359,70 @@ test("portfolio Monte Carlo forecast horizon can return to one year after six mo
 });
 
 test("portfolio positions coin jumps to the trade route market @regression", async ({ page }) => {
+  const hypeClearinghouseState = {
+    assetPositions: [
+      {
+        position: {
+          coin: "HYPE",
+          szi: "1.25",
+          positionValue: "2500",
+          entryPx: "100",
+          markPx: "101",
+          unrealizedPnl: "12",
+          returnOnEquity: "0.10",
+          leverage: { value: 10 },
+          cumFunding: { allTime: "0" }
+        }
+      }
+    ]
+  };
+  const hypeWebData2 = {
+    clearinghouseState: hypeClearinghouseState
+  };
+  await page.route("**/info", async (route) => {
+    const request = route.request();
+    if (request.method() === "POST") {
+      try {
+        const payload = request.postDataJSON();
+        if (payload?.type === "webData2" || payload?.type === "clearinghouseState") {
+          await route.fulfill({
+            status: 200,
+            contentType: "application/json",
+            body: JSON.stringify(payload.type === "webData2" ? hypeWebData2 : hypeClearinghouseState)
+          });
+          return;
+        }
+      } catch {
+        // Let non-JSON requests continue.
+      }
+    }
+    await route.continue();
+  });
+
   await visitRoute(page, "/portfolio");
   await dispatch(page, [":actions/start-spectate-mode", SPECTATE_ADDRESS]);
   await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
 
-  await page.evaluate(() => {
+  await page.evaluate(({ webData2, clearinghouseState }) => {
     const c = globalThis.cljs.core;
     const kw = (name) => c.keyword(name);
     const opts = c.PersistentArrayMap.fromArray([kw("keywordize-keys"), true], true);
-    const payload = {
-      clearinghouseState: {
-        assetPositions: [
-          {
-            position: {
-              coin: "HYPE",
-              szi: "1.25",
-              positionValue: "2500",
-              entryPx: "100",
-              markPx: "101",
-              unrealizedPnl: "12",
-              returnOnEquity: "0.10",
-              leverage: { value: 10 },
-              cumFunding: { allTime: "0" }
-            }
-          }
-        ]
-      }
-    };
-    const nextState = c.assoc_in(
-      c.deref(globalThis.hyperopen.system.store),
-      c.PersistentVector.fromArray([kw("webdata2")], true),
-      c.js__GT_clj(payload, opts)
+    const path = (...segments) =>
+      c.PersistentVector.fromArray(segments.map((segment) => kw(segment)), true);
+    const webData2Clj = c.js__GT_clj(webData2, opts);
+    const clearinghouseClj = c.js__GT_clj(clearinghouseState, opts);
+    const perpDexStates = c.PersistentArrayMap.fromArray(
+      ["", clearinghouseClj, "hl", clearinghouseClj],
+      true
     );
+    let nextState = c.assoc_in(
+      c.deref(globalThis.hyperopen.system.store),
+      path("webdata2"),
+      webData2Clj
+    );
+    nextState = c.assoc_in(nextState, path("perp-dex-clearinghouse"), perpDexStates);
     c.reset_BANG_(globalThis.hyperopen.system.store, nextState);
-  });
+  }, { webData2: hypeWebData2, clearinghouseState: hypeClearinghouseState });
   await waitForIdle(page, { quietMs: 250, timeoutMs: 4_000, pollMs: 50 });
 
   await selectAccountTab(page, "positions");

@@ -13,6 +13,67 @@ import {
 const spectateRoute =
   "/trade?spectate=0x162cc7c861ebd0c06b3d72319201150482518185";
 
+async function seedMobilePositionRows(page) {
+  await page.evaluate(() => {
+    const c = globalThis.cljs?.core;
+    const store = globalThis.hyperopen?.system?.store;
+
+    if (!c || !store) {
+      throw new Error("Hyperopen store or cljs core unavailable");
+    }
+
+    const keyword = c.keyword;
+    const kwPath = (...segments) =>
+      c.PersistentVector.fromArray(segments.map((segment) => keyword(segment)), true);
+    const opts = c.PersistentArrayMap.fromArray([keyword("keywordize-keys"), true], true);
+    const nextWebdata2 = c.js__GT_clj(
+      {
+        clearinghouseState: {
+          marginSummary: {
+            accountValue: "4708974.9",
+            totalNtlPos: "6398054.11",
+            totalRawUsd: "6392466.23",
+            totalMarginUsed: "63387.27"
+          },
+          crossMarginSummary: {
+            accountValue: "4708974.9",
+            totalNtlPos: "6398054.11",
+            totalRawUsd: "6392466.23",
+            totalMarginUsed: "63387.27"
+          },
+          crossMaintenanceMarginUsed: "63387.27",
+          withdrawable: "4234255.18",
+          assetPositions: [
+            {
+              position: {
+                coin: "BTC",
+                szi: "0.99455",
+                positionValue: "67250.5",
+                entryPx: "67000",
+                markPx: "67251",
+                unrealizedPnl: "309",
+                returnOnEquity: "0.0046",
+                liquidationPx: "4671.46",
+                leverage: { value: 0.31 },
+                marginUsed: "1000",
+                cumFunding: { sinceOpen: "0" }
+              }
+            }
+          ]
+        }
+      },
+      opts
+    );
+
+    let nextState = c.deref(store);
+    nextState = c.assoc_in(nextState, kwPath("webdata2"), nextWebdata2);
+    nextState = c.assoc_in(nextState, kwPath("perp-dex-clearinghouse"), c.PersistentArrayMap.EMPTY);
+    nextState = c.assoc_in(nextState, kwPath("account-info", "selected-tab"), keyword("positions"));
+
+    c.reset_BANG_(store, nextState);
+  });
+}
+
 test.describe("mobile browser regressions @mobile", () => {
   test.use(mobileViewport);
 
@@ -38,6 +99,7 @@ test.describe("mobile browser regressions @mobile", () => {
       [":actions/select-trade-mobile-surface", ":chart"],
       [":actions/select-account-info-tab", ":positions"]
     ]);
+    await seedMobilePositionRows(page);
     await waitForIdle(page, { quietMs: 200, timeoutMs: 4_000, pollMs: 50 });
     await expectOracle(
       page,
@@ -76,6 +138,7 @@ test.describe("mobile browser regressions @mobile", () => {
       [":actions/select-trade-mobile-surface", ":chart"],
       [":actions/select-account-info-tab", ":positions"]
     ]);
+    await seedMobilePositionRows(page);
     await waitForIdle(page, { quietMs: 200, timeoutMs: 8_000, pollMs: 50 });
 
     const viewport = page.locator("[data-role='positions-mobile-cards-viewport']");

@@ -305,7 +305,7 @@ test("leaderboard preferences persist across reload via IndexedDB @smoke", async
 
   await expect(page.locator("#leaderboard-page-size")).toContainText("25");
   await expect(page.locator("[data-role='leaderboard-timeframes'] button", { hasText: "All Time" }))
-    .toHaveClass(/text-\[#97fce4\]/);
+    .toHaveClass(/text-ho-accent-bright/);
   await expect(page.locator("button:has-text('Volume') svg")).toHaveClass(/rotate-0/);
 });
 

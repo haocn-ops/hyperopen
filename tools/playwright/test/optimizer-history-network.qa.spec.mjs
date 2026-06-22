@@ -39,35 +39,76 @@ async function seedMarkets(page) {
   await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
 }
 
-test("portfolio optimizer adding an asset prefetches history before run @regression", async ({ page }) => {
+function apiV2HistoryBundleResponse(payload, requestId = "rid-history-network-prefetch") {
+  const requestedIds = payload.instruments.map((instrument) => instrument.client_instrument_id);
+  const baseByInstrument = {
+    "perp:BTC": 100,
+    "perp:ETH": 200
+  };
+  const seriesFor = (instrumentId) => {
+    const base = baseByInstrument[instrumentId] || 100;
+    return {
+      instrument_id: `hl:${instrumentId}`,
+      lineage_kind: "native",
+      series_kind: "market_price",
+      points: [
+        { time_ms: 1000, close: base, return: null, component: "native" },
+        { time_ms: 2000, close: base * 1.04, return: 0.04, component: "native" },
+        { time_ms: 3000, close: base * 1.0608, return: 0.02, component: "native" }
+      ],
+      funding: {
+        status: "available",
+        source: "hyperliquid:fundingHistory",
+        annualized_carry: 0.012
+      },
+      warnings: []
+    };
+  };
+
+  return {
+    contract_version: "optimizer-history-api-v2",
+    request_id: requestId,
+    dataset_version: "dv-history-network-prefetch",
+    status: "ok",
+    common_calendar: [1000, 2000, 3000],
+    return_calendar: [2000, 3000],
+    aligned_returns_by_instrument: Object.fromEntries(
+      requestedIds.map((instrumentId) => [
+        instrumentId,
+        { instrument_id: `hl:${instrumentId}`, returns: [0.04, 0.02] }
+      ])
+    ),
+    series_by_instrument: Object.fromEntries(
+      requestedIds.map((instrumentId) => [instrumentId, seriesFor(instrumentId)])
+    ),
+    warnings: []
+  };
+}
+
+test("portfolio optimizer adding an asset prefetches API v2 history before run @regression", async ({ page }) => {
   test.setTimeout(90_000);
 
-  const seen = [];
+  const seenHistoryBundles = [];
+  const seenLegacyHistory = [];
+  await page.route("https://price-history.hyperopen.xyz/v1/optimizer/history-bundle", async (route) => {
+    const payload = route.request().postDataJSON();
+    seenHistoryBundles.push(payload);
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(apiV2HistoryBundleResponse(payload))
+    });
+  });
   await page.route("**/info", async (route) => {
     const request = route.request();
     if (request.method() === "POST") {
       try {
         const payload = request.postDataJSON();
         if (payload?.type === "candleSnapshot") {
-          seen.push({ type: payload.type, coin: payload.req?.coin });
-          await route.fulfill({
-            status: 200,
-            contentType: "application/json",
-            body: JSON.stringify([
-              { t: 1000, c: "100" },
-              { t: 2000, c: "110" }
-            ])
-          });
-          return;
+          seenLegacyHistory.push({ type: payload.type, coin: payload.req?.coin });
         }
         if (payload?.type === "fundingHistory") {
-          seen.push({ type: payload.type, coin: payload.coin });
-          await route.fulfill({
-            status: 200,
-            contentType: "application/json",
-            body: JSON.stringify([{ time: 1000, fundingRate: "0.0001" }])
-          });
-          return;
+          seenLegacyHistory.push({ type: payload.type, coin: payload.coin });
         }
       } catch {
         // Let non-JSON requests continue.
@@ -80,19 +121,22 @@ test("portfolio optimizer adding an asset prefetches history before run @regress
   await expect(page.locator("[data-role='portfolio-optimizer-setup-route-surface']"))
     .toBeVisible({ timeout: 60_000 });
   await seedMarkets(page);
-  seen.length = 0;
+  seenHistoryBundles.length = 0;
+  seenLegacyHistory.length = 0;
 
   await page.locator("[data-role='portfolio-optimizer-universe-search-input']").fill("eth");
   await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
   await page.locator("[data-role='portfolio-optimizer-universe-add-perp:ETH']").click();
   await expect.poll(
-    () => seen.filter((entry) => entry.coin === "ETH").length,
+    () => seenHistoryBundles.some((payload) =>
+      payload.instruments?.some((instrument) => instrument.client_instrument_id === "perp:ETH")
+    ),
     { timeout: 10_000 }
-  ).toBe(2);
+  ).toBe(true);
   await expect(page.locator("[data-role='portfolio-optimizer-universe-selected-row-perp:ETH']"))
     .toContainText("sufficient", { timeout: 10_000 });
 
-  const beforeRun = [...seen];
+  const beforeRun = [...seenHistoryBundles];
   await expect(page.locator("[data-role='portfolio-optimizer-load-history']")).toHaveCount(0);
   await page.locator("[data-role='portfolio-optimizer-run-draft']").click();
   await expect(page.locator("[data-role='portfolio-optimizer-progress-panel']"))
@@ -100,9 +144,7 @@ test("portfolio optimizer adding an asset prefetches history before run @regress
   await expect(page.locator("[data-role='portfolio-optimizer-readiness-panel']"))
     .toContainText("Optimizer history is loaded for the selected assets.", { timeout: 10_000 });
 
-  expect([...beforeRun].sort((a, b) => `${a.type}:${a.coin}`.localeCompare(`${b.type}:${b.coin}`))).toEqual([
-    { type: "candleSnapshot", coin: "ETH" },
-    { type: "fundingHistory", coin: "ETH" }
-  ]);
-  expect(seen).toEqual(beforeRun);
+  expect(seenLegacyHistory.filter((entry) => entry.coin === "ETH")).toEqual([]);
+  expect(beforeRun.length).toBeGreaterThan(0);
+  expect(seenHistoryBundles).toEqual(beforeRun);
 });

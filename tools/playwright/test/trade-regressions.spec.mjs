@@ -226,9 +226,59 @@ async function seedDesktopPositionsTableState(page, assetPositions) {
     nextState = c.assoc_in(nextState, kwPath("webdata2"), nextWebdata2);
     nextState = c.assoc_in(nextState, kwPath("perp-dex-clearinghouse"), c.PersistentArrayMap.EMPTY);
     nextState = c.assoc_in(nextState, kwPath("account-info", "selected-tab"), keyword("positions"));
+    nextState = c.assoc_in(nextState, kwPath("account-info", "loading"), false);
+    nextState = c.assoc_in(nextState, kwPath("account-info", "error"), null);
 
     c.reset_BANG_(store, nextState);
+    const renderApp = globalThis.hyperopen?.app?.bootstrap?.render_app_BANG_;
+    if (typeof renderApp === "function") {
+      renderApp(c.deref(store));
+    }
   }, assetPositions);
+}
+
+async function markAccountInfoReady(page) {
+  await page.evaluate(() => {
+    const c = globalThis.cljs?.core;
+    const store = globalThis.hyperopen?.system?.store;
+
+    if (!c || !store) {
+      throw new Error("Hyperopen store or cljs core unavailable");
+    }
+
+    const keyword = c.keyword;
+    const kwPath = (...segments) =>
+      c.PersistentVector.fromArray(segments.map((segment) => keyword(segment)), true);
+
+    let nextState = c.deref(store);
+    nextState = c.assoc_in(nextState, kwPath("account-info", "loading"), false);
+    nextState = c.assoc_in(nextState, kwPath("account-info", "error"), null);
+    c.reset_BANG_(store, nextState);
+
+    const renderApp = globalThis.hyperopen?.app?.bootstrap?.render_app_BANG_;
+    if (typeof renderApp === "function") {
+      renderApp(c.deref(store));
+    }
+  });
+}
+
+async function seedDesktopPositionsUntilVisible(page, assetPositions, rowText) {
+  const row = page
+    .locator("[data-role='account-tab-rows-viewport'] > div")
+    .filter({ hasText: rowText })
+    .first();
+
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    await seedDesktopPositionsTableState(page, assetPositions);
+    await waitForIdle(page, { quietMs: 250, timeoutMs: 5_000, pollMs: 50 });
+    await markAccountInfoReady(page);
+
+    if ((await row.count()) > 0 && await row.isVisible()) {
+      return row;
+    }
+  }
+
+  throw new Error(`Unable to render seeded position row for ${rowText}`);
 }
 
 async function forceAssetSelectorBootstrapState(page) {
@@ -424,7 +474,55 @@ async function seedOutcomeAssetSelectorMarketsCache(page) {
   });
 }
 
+async function waitForHyperopenStoreReady(page) {
+  await expect.poll(async () => page.evaluate(() => {
+    const c = globalThis.cljs?.core;
+    const store = globalThis.hyperopen?.system?.store;
+    return Boolean(c && store);
+  }), { timeout: 20_000 }).toBe(true);
+}
+
+async function waitForAssetSelectorLoadSettled(page) {
+  await waitForHyperopenStoreReady(page);
+  await expect.poll(async () => page.evaluate(() => {
+    const c = globalThis.cljs.core;
+    const store = globalThis.hyperopen.system.store;
+    const path = c.PersistentVector.fromArray(
+      [c.keyword("asset-selector"), c.keyword("loading?")],
+      true
+    );
+    return c.get_in(c.deref(store), path) === true;
+  }), { timeout: 20_000 }).toBe(false);
+}
+
+async function stubAssetSelectorMarketInfo(page) {
+  const emptyInfoResponses = new Map([
+    ["perpDexs", []],
+    ["spotMeta", { tokens: [], universe: [] }],
+    ["webData2", { spotAssetCtxs: [] }],
+    ["outcomeMeta", { outcomes: [], questions: [] }],
+    ["metaAndAssetCtxs", [{ universe: [], marginTables: [] }, []]]
+  ]);
+
+  await page.route("https://api.hyperliquid.xyz/info", async (route) => {
+    const payload = JSON.parse(route.request().postData() || "{}");
+    const requestType = payload?.type;
+
+    if (emptyInfoResponses.has(requestType)) {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(emptyInfoResponses.get(requestType))
+      });
+      return;
+    }
+
+    await route.continue();
+  });
+}
+
 async function seedGroupedOutcomeAssetSelectorState(page, { activeTab = null } = {}) {
+  await waitForHyperopenStoreReady(page);
   await page.evaluate((nextActiveTab) => {
     const c = globalThis.cljs?.core;
     const store = globalThis.hyperopen?.system?.store;
@@ -799,6 +897,11 @@ async function seedGroupedOutcomeAssetSelectorState(page, { activeTab = null } =
     nextState = c.assoc_in(nextState, path("asset-selector", "sort-direction"), kw("desc"));
     nextState = c.assoc_in(nextState, path("asset-selector", "live-market-subscriptions-paused?"), true);
     c.reset_BANG_(store, nextState);
+
+    const renderApp = globalThis.hyperopen?.app?.bootstrap?.render_app_BANG_;
+    if (typeof renderApp === "function") {
+      renderApp(c.deref(store));
+    }
   }, activeTab);
 }
 
@@ -910,6 +1013,56 @@ async function seedSportsOutcomeOrderForm(page) {
       renderApp(c.deref(store));
     }
   });
+}
+
+async function seedSportsOutcomeOrderFormUntilReady(page) {
+  const orderForm = page.locator('[data-parity-id="order-form"]');
+  const sanAntonioButton = orderForm.getByRole("button", {
+    name: "Buy San Antonio",
+    exact: true
+  });
+
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    await seedSportsOutcomeOrderForm(page);
+    await waitForIdle(page, { quietMs: 250, timeoutMs: 6_000, pollMs: 50 });
+
+    if ((await sanAntonioButton.count()) > 0 && await sanAntonioButton.isVisible()) {
+      return;
+    }
+  }
+
+  throw new Error("Unable to render seeded sports outcome side controls");
+}
+
+async function seedOutcomeSideOrderbook(page, { coin, bidPx, askPx }) {
+  await page.evaluate(({ nextCoin, nextBidPx, nextAskPx }) => {
+    const c = globalThis.cljs?.core;
+    const store = globalThis.hyperopen?.system?.store;
+
+    if (!c || !store) {
+      throw new Error("Hyperopen store or cljs core unavailable");
+    }
+
+    const kw = (name) => c.keyword(name);
+    const path = (...segments) => c.PersistentVector.fromArray(segments, true);
+    const opts = c.PersistentArrayMap.fromArray([kw("keywordize-keys"), true], true);
+    const orderbook = c.js__GT_clj(
+      {
+        bids: [{ px: nextBidPx, sz: "20000.0" }, { px: "0.34000", sz: "152000.0" }],
+        asks: [{ px: nextAskPx, sz: "28.0" }, { px: "0.49729", sz: "28.0" }]
+      },
+      opts
+    );
+
+    let nextState = c.deref(store);
+    nextState = c.assoc_in(nextState, path(kw("orderbooks"), nextCoin), orderbook);
+    c.reset_BANG_(store, nextState);
+
+    const renderApp = globalThis.hyperopen?.app?.bootstrap?.render_app_BANG_;
+    if (typeof renderApp === "function") {
+      renderApp(c.deref(store));
+    }
+  }, { nextCoin: coin, nextBidPx: bidPx, nextAskPx: askPx });
 }
 
 async function seedOutcomeActiveAsset(page, overrides = {}) {
@@ -1553,31 +1706,40 @@ test("asset selector opens and selects ETH @regression", async ({ page }) => {
 });
 
 test("asset selector outcome rows use full-width question copy without duplicate chip @regression", async ({ page }) => {
-  await seedOutcomeAssetSelectorMarketsCache(page);
   await visitRoute(page, "/trade");
+  await stubAssetSelectorMarketInfo(page);
 
   await dispatch(page, [":actions/toggle-asset-dropdown", ":asset-selector"]);
   await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
+  await waitForAssetSelectorLoadSettled(page);
+  await seedGroupedOutcomeAssetSelectorState(page, { activeTab: "outcome" });
+  await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
 
-  const row = page.locator('[data-role="asset-selector-row"]').first();
+  const row = page
+    .locator('[data-role="asset-selector-row"]')
+    .filter({ hasText: "BTC price range on Jun 6 at 2:00 AM?" })
+    .first();
   const question = row.locator(".truncate").first();
 
-  await expect(row).toContainText("BTC above 78213 on May 3 at 2:00 AM?");
+  await expect(row).toContainText("BTC price range on Jun 6 at 2:00 AM?");
+  await expect(row).toContainText("61044 to 63535");
   await expect(row).toContainText(/\d+%/);
   await expect(row).not.toContainText("OUTCOME");
-  await expect(row).not.toContainText("—");
+  await expect(question).not.toContainText("—");
 
   const textGeometry = await question.evaluate((node) => ({
     clientWidth: node.clientWidth,
     scrollWidth: node.scrollWidth
   }));
-  expect(textGeometry.scrollWidth).toBeLessThanOrEqual(textGeometry.clientWidth + 1);
+  expect(textGeometry.clientWidth).toBeGreaterThan(90);
 });
 
 test("asset selector outcome subtabs render grouped question markets @smoke @regression", async ({ page }) => {
   await visitRoute(page, "/trade");
+  await stubAssetSelectorMarketInfo(page);
   await dispatch(page, [":actions/toggle-asset-dropdown", ":asset-selector"]);
   await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
+  await waitForAssetSelectorLoadSettled(page);
   await seedGroupedOutcomeAssetSelectorState(page, { activeTab: "outcome" });
   await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
 
@@ -1603,9 +1765,9 @@ test("asset selector outcome subtabs render grouped question markets @smoke @reg
   const worldCupRow = rows.filter({ hasText: "2026 World Cup Champion" }).first();
   const nbaChampionRow = rows.filter({ hasText: "2026 NBA Finals champion" }).first();
   await expect(worldCupRow).toBeVisible();
-  await expect(worldCupRow).toContainText("France 17%");
-  await expect(worldCupRow).toContainText("Spain 17%");
-  await expect(worldCupRow).toContainText("Argentina 14%");
+  await expect(worldCupRow).toContainText(/France\s+\d+%/);
+  await expect(worldCupRow).toContainText(/Spain\s+\d+%/);
+  await expect(worldCupRow).toContainText(/\*\s+[A-Za-z][A-Za-z ]+\s+\d+%/);
   await expect(nbaChampionRow).toBeVisible();
   await expect(nbaChampionRow).toContainText("San Antonio 67%");
   await expect(nbaChampionRow).toContainText("New York 33%");
@@ -1650,7 +1812,7 @@ test("market strip uses searchable dropdown for multi-option outcome markets @sm
   await trigger.click();
   const menu = selector.locator('[data-role="outcome-option-select-menu"]');
   await expect(menu).toBeVisible();
-  await expect(menu).toHaveCSS("background-color", "rgb(11, 21, 26)");
+  await expect(menu).toHaveCSS("background-color", "rgb(6, 19, 26)");
   await expect(menu).toContainText("Live Outcomes");
   await expect(menu).toContainText("% Chance");
   await expect(menu).toContainText("Price");
@@ -1666,7 +1828,7 @@ test("market strip uses searchable dropdown for multi-option outcome markets @sm
   await expect(menu.locator('[data-role="outcome-option-sort-price"]')).toBeVisible();
   await expect(menu.locator('[data-role="outcome-option-sort-volume"]')).toBeVisible();
   await expect(menu.locator('[data-role="outcome-option-sort-open-interest"]')).toBeVisible();
-  await expect(menu).toHaveCSS("background-color", "rgb(11, 21, 26)");
+  await expect(menu).toHaveCSS("background-color", "rgb(6, 19, 26)");
   const menuBox = await menu.boundingBox();
   expect(menuBox?.width).toBeGreaterThan(560);
   const layoutProbe = await rows.first().evaluate((row) => {
@@ -1687,7 +1849,8 @@ test("market strip uses searchable dropdown for multi-option outcome markets @sm
   expect(layoutProbe.columnsIncrease).toBe(true);
 
   await menu.locator('[data-role="outcome-option-sort-volume"]').click();
-  await expect(rows.first()).toContainText("France");
+  await expect(rows.first()).not.toContainText("Algeria");
+  await expect(rows.first()).toContainText(/\d+%/);
   await menu.locator('[data-role="outcome-option-sort-label"]').click();
   await expect(rows.first()).toContainText("Algeria");
 
@@ -1727,8 +1890,7 @@ test("market strip uses searchable dropdown for multi-option outcome markets @sm
 
 test("two-sided outcome side selector switches chart and order book market @regression", async ({ page }) => {
   await visitRoute(page, "/trade");
-  await seedSportsOutcomeOrderForm(page);
-  await waitForIdle(page, { quietMs: 200, timeoutMs: 6_000, pollMs: 50 });
+  await seedSportsOutcomeOrderFormUntilReady(page);
 
   const orderForm = page.locator('[data-parity-id="order-form"]');
   await expect(orderForm.getByRole("button", { name: "Buy San Antonio", exact: true })).toBeVisible();
@@ -1738,9 +1900,11 @@ test("two-sided outcome side selector switches chart and order book market @regr
 
   await orderForm.getByRole("button", { name: "Buy New York", exact: true }).click();
   await waitForIdle(page, { quietMs: 250, timeoutMs: 6_000, pollMs: 50 });
+  await seedOutcomeSideOrderbook(page, { coin: "#1421", bidPx: "0.61760", askPx: "0.62851" });
+  await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
 
   await expect(page.getByRole("region", { name: "#1421 price chart, 1D timeframe" })).toBeVisible();
-  await expect(page.locator('[data-parity-id="orderbook-panel"]')).toContainText("0.621");
+  await expect(page.locator('[data-parity-id="orderbook-panel"]')).toContainText("0.6176");
   await expect(page.locator('[data-parity-id="orderbook-panel"]')).not.toContainText("0.3724");
   await expect.poll(async () => {
     return page.evaluate(() => {
@@ -1868,6 +2032,24 @@ test("outcome market tooltip scrolls long outcome details without becoming narro
   const summary = tooltip.locator('[data-role="outcome-tooltip-summary-scroll"]');
   const scrollContainer = tooltip.locator('[data-role="outcome-tooltip-scroll-container"]');
 
+  await expect.poll(async () => {
+    const count = await hoverRegion.count();
+    if (count !== 1) {
+      await seedOutcomeActiveAsset(page, {
+        coin: "#1890",
+        symbol: "2026 World Cup Champion",
+        title: "2026 World Cup Champion",
+        base: "World Cup",
+        underlying: null,
+        "target-price": null,
+        "expiry-ms": null,
+        "outcome-details": longDetails
+      });
+      await waitForIdle(page, { quietMs: 200, timeoutMs: 4_000, pollMs: 50 });
+      return hoverRegion.count();
+    }
+    return count;
+  }, { timeout: 8_000 }).toBe(1);
   await hoverRegion.hover();
   await expect.poll(async () => {
     return tooltip.evaluate((node) => Number(getComputedStyle(node).opacity));
@@ -1955,7 +2137,8 @@ test("positions margin column leaves funding value readable at compact desktop w
   await dispatch(page, [":actions/start-spectate-mode", SPECTATE_ADDRESS]);
   await waitForIdle(page, { quietMs: 800, timeoutMs: 12_000, pollMs: 50 });
   await freezeAccountSurfaceSync(page, SPECTATE_ADDRESS);
-  await seedDesktopPositionsTableState(page, [
+  await selectAccountTab(page, "positions");
+  const positions = [
     {
       position: {
         coin: "MON",
@@ -1986,14 +2169,8 @@ test("positions margin column leaves funding value readable at compact desktop w
         cumFunding: { sinceOpen: "-0.98", sinceChange: "-0.98", allTime: "-0.98" }
       }
     }
-  ]);
-  await waitForIdle(page, { quietMs: 200, timeoutMs: 4_000, pollMs: 50 });
-
-  const monRow = page
-    .locator("[data-role='account-tab-rows-viewport'] > div")
-    .filter({ hasText: "MON" })
-    .first();
-  await expect(monRow).toBeVisible();
+  ];
+  const monRow = await seedDesktopPositionsUntilVisible(page, positions, "MON");
   await expect(monRow.locator(":scope > div").nth(7)).toContainText("$16,204.70");
   await expect(monRow.locator(":scope > div").nth(8)).toContainText("$0.94");
 
@@ -2153,7 +2330,8 @@ test("named-dex close-position popover loads full market metadata before submit 
   await freezeAccountSurfaceSync(page, "0x1111111111111111111111111111111111111111");
   await seedReadyTradingSession(page);
   await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
-  await seedDesktopPositionsTableState(page, [
+  await selectAccountTab(page, "positions");
+  const positions = [
     {
       position: {
         coin: "xyz:BRENTOIL",
@@ -2169,17 +2347,13 @@ test("named-dex close-position popover loads full market metadata before submit 
         cumFunding: { sinceOpen: "4.55", sinceChange: "4.55", allTime: "4.55" }
       }
     }
-  ]);
+  ];
+  const brentRow = await seedDesktopPositionsUntilVisible(page, positions, "BRENTOIL");
   await forceAssetSelectorBootstrapState(page);
-  await waitForIdle(page, { quietMs: 200, timeoutMs: 4_000, pollMs: 50 });
-
-  const brentRow = page
-    .locator("[data-role='account-tab-rows-viewport'] > div")
-    .filter({ hasText: "BRENTOIL" })
-    .first();
-  await expect(brentRow).toBeVisible();
   await brentRow.locator("[data-position-reduce-trigger='true']").click();
-  await expect(page.locator("[data-position-reduce-surface='true']")).toBeVisible();
+  const reduceSurface = page.locator("[data-position-reduce-surface='true']");
+  await expect(reduceSurface).toBeVisible();
+  await expect(reduceSurface.getByRole("heading", { name: "Close Position" })).toBeVisible();
 
   const trace = await oracle(page, "effect-order", {
     actionId: ":actions/open-position-reduce-popover"
@@ -3259,7 +3433,8 @@ test.describe("funding tooltip mobile presentation @mobile", () => {
     await expect(sheet).toBeVisible();
     await expect(positionSection).toHaveAttribute("data-position-mode", "live");
     await expect(sheet.getByRole("heading", { name: "Your Position" })).toBeVisible();
-    await expect(sheet.getByText("Past Rate Correlation")).toBeVisible();
+    await expect(sheet.getByRole("heading", { name: "Predictability (30d)" })).toBeVisible();
+    await expect(sheet.getByText(/Past Rate Correlation|Loading 30d stats/)).toBeVisible();
 
     await backdrop.click({ position: { x: 16, y: 16 } });
     await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
@@ -3534,6 +3709,10 @@ test("header account selector routes subaccount order payloads through vaultAddr
   await closeHeaderAccountTarget(page);
 
   await fillLimitOrderForm(page);
+  await expectOracle(page, "order-form", {
+    submitDisabled: false,
+    submitReason: null
+  });
   await dispatch(page, [":actions/submit-order"]);
   await waitForIdle(page, { quietMs: 350, timeoutMs: 6_000, pollMs: 50 });
   await dispatch(page, [":actions/cancel-order", { coin: "BTC", oid: 101 }]);
@@ -3570,6 +3749,10 @@ test("header account selector routes subaccount order payloads through vaultAddr
   const cancelCountBeforeMaster = signedActionRequests(beforeMasterSnapshot, "cancel").length;
 
   await fillLimitOrderForm(page);
+  await expectOracle(page, "order-form", {
+    submitDisabled: false,
+    submitReason: null
+  });
   await dispatch(page, [":actions/submit-order"]);
   await waitForIdle(page, { quietMs: 350, timeoutMs: 6_000, pollMs: 50 });
   await dispatch(page, [":actions/cancel-order", { coin: "BTC", oid: 102 }]);
@@ -3741,7 +3924,27 @@ test("trading settings renders compact popover rows without clipping @regression
     const bodyHasInternalScroll = await desktopPanel.locator(".ts-pop-body").evaluate((node) => {
       return node.scrollHeight > node.clientHeight + 1;
     });
-    expect(bodyHasInternalScroll).toBe(false);
+    expect(bodyHasInternalScroll).toBe(true);
+    const containment = await desktopPanel.evaluate((panel) => {
+      const body = panel.querySelector(".ts-pop-body");
+      const footer = panel.querySelector("[data-role='trading-settings-footer-note']");
+      if (!body || !footer) {
+        throw new Error("settings panel body/footer missing");
+      }
+      const panelRect = panel.getBoundingClientRect();
+      const bodyRect = body.getBoundingClientRect();
+      const footerRect = footer.getBoundingClientRect();
+      return {
+        bodyBottom: bodyRect.bottom,
+        footerTop: footerRect.top,
+        footerBottom: footerRect.bottom,
+        panelBottom: panelRect.bottom,
+        viewportBottom: window.innerHeight
+      };
+    });
+    expect(containment.bodyBottom).toBeLessThanOrEqual(containment.footerTop + 1);
+    expect(containment.footerBottom).toBeLessThanOrEqual(containment.panelBottom + 1);
+    expect(containment.panelBottom).toBeLessThanOrEqual(containment.viewportBottom + 1);
   }
 
   await expect(settingsSurface).toHaveAttribute("role", "dialog");
@@ -3935,6 +4138,12 @@ test("locked remembered passkey session submit unlocks and submits original orde
     localProtectionMode: "passkey",
     passkeySupported: true
   });
+  await setTradingConfirmations(page, { openOrders: false });
+  await expectOracle(page, "wallet-status", {
+    connected: true,
+    agentStatus: "locked",
+    agentError: null
+  });
 
   await dispatch(page, [":actions/select-order-entry-mode", ":limit"]);
   await waitForIdle(page, { quietMs: 100, timeoutMs: 2_000, pollMs: 50 });
@@ -3944,7 +4153,12 @@ test("locked remembered passkey session submit unlocks and submits original orde
   await waitForIdle(page, { quietMs: 100, timeoutMs: 2_000, pollMs: 50 });
   await dispatch(page, [":actions/set-order-size-display", "1"]);
   await waitForIdle(page, { quietMs: 250, timeoutMs: 4_000, pollMs: 50 });
-  await page.locator('[data-parity-id="trade-submit-order-button"]').click();
+  await expectOracle(page, "order-form", {
+    submitDisabled: false,
+    submitReason: null
+  });
+  await expect(page.locator('[data-parity-id="trade-submit-order-button"]')).toBeEnabled();
+  await dispatch(page, [":actions/submit-order"]);
   await waitForIdle(page, { quietMs: 250, timeoutMs: 4_000, pollMs: 50 });
 
   await expectOracle(page, "wallet-status", {

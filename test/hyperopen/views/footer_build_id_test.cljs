@@ -91,6 +91,15 @@
         (is (str/includes? (node-text tooltip-node) "dev"))
         (is (str/includes? (node-text tooltip-node) "DEPLOYED"))))))
 
+(deftest footer-ignores-html-fallback-build-id-test
+  (with-global-build-id
+    "<!DOCTYPE html>"
+    (fn []
+      (let [view (footer-view/footer-view (base-state))
+            utility-links (find-node-by-data-role view "footer-utility-links")]
+        (is (some? utility-links))
+        (is (nil? (find-node-by-data-role utility-links "footer-build-id")))))))
+
 (deftest footer-renders-condensed-build-popover-from-build-metadata-test
   (with-global-build
     #js {:sha "f18fbc2a3b00e4e324b39796ffdc1a9cd9cff7e619c"

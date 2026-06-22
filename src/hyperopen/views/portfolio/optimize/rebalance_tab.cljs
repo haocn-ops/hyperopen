@@ -142,7 +142,9 @@
 ;; ── Header (Tier 4) ────────────────────────────────────────────────────
 
 (defn- review-header
-  [ready-count]
+  [summary]
+  (let [reviewable-count (+ (or (:ready-count summary) 0)
+                            (or (:blocked-count summary) 0))]
   [:div {:class ["flex" "flex-wrap" "items-end" "justify-between" "gap-3"
                  "border-b" "border-base-300" "bg-base-100/95" "px-5" "py-3"]
          :data-role "portfolio-optimizer-rebalance-review-header"}
@@ -167,9 +169,9 @@
                       "disabled:cursor-not-allowed" "disabled:border-base-300"
                       "disabled:bg-base-200/40" "disabled:text-trading-muted"]
               :data-role "portfolio-optimizer-open-execution-modal"
-              :disabled (not (pos? (or ready-count 0)))
+              :disabled (not (pos? reviewable-count))
               :on {:click [[:actions/open-portfolio-optimizer-execution-modal]]}}
-     "Stage trades for execution"]]])
+     "Stage trades for execution"]]]))
 
 ;; ── Summary KPI row (Tier 1) ───────────────────────────────────────────
 
@@ -483,7 +485,7 @@
     (if (and (= :solved (:status result)) (map? preview))
       [:section {:class ["border" "border-base-300" "bg-base-100/95"]
                  :data-role "portfolio-optimizer-rebalance-review-surface"}
-       (review-header (:ready-count summary))
+       (review-header summary)
        (summary-kpis preview summary labels-by-instrument)
        [:div {:class ["grid" "grid-cols-1" "xl:grid-cols-[minmax(0,1fr)_380px]"]}
         (trade-table preview labels-by-instrument)

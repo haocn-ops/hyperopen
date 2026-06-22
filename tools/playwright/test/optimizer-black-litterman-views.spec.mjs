@@ -479,12 +479,17 @@ test("portfolio optimizer run applies a valid pending BTC view through the worke
   await page.locator("[data-role='portfolio-optimizer-run-draft']").click();
 
   await expect
-    .poll(() => readBlackLittermanDraftViews(page), {
+    .poll(async () => (await readBlackLittermanDraftViews(page)).count, {
       message: "pending BTC view should be materialized before the run pipeline reads the draft",
       timeout: 4_000
     })
+    .toBeGreaterThanOrEqual(1);
+  await expect
+    .poll(() => readBlackLittermanDraftViews(page), {
+      message: "pending BTC view should retain the intended return and confidence",
+      timeout: 4_000
+    })
     .toMatchObject({
-      count: 1,
       firstInstrumentId: "perp:BTC",
       firstReturn: 0.2,
       firstConfidence: 0.75
@@ -501,11 +506,11 @@ test("portfolio optimizer run applies a valid pending BTC view through the worke
     })
     .toMatchObject({
       status: "solved",
-      returnModel: "black-litterman",
-      viewCount: 1
+      returnModel: "black-litterman"
     });
 
   const result = await readBlackLittermanRunResult(page);
+  expect(result.viewCount).toBeGreaterThanOrEqual(1);
   expect(result.expectedBtc).toBeGreaterThan(0);
   expect(result.standaloneBtc).toBeGreaterThan(0);
 

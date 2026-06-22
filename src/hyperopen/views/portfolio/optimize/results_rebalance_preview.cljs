@@ -32,7 +32,9 @@
   [result]
   (let [preview (:rebalance-preview result)
         labels-by-instrument (or (:labels-by-instrument result) {})
-        summary* (:summary preview)]
+        summary* (:summary preview)
+        reviewable-count (+ (or (:ready-count summary*) 0)
+                            (or (:blocked-count summary*) 0))]
     (summary/panel-shell
      "portfolio-optimizer-rebalance-preview"
      "Rebalance Preview"
@@ -56,7 +58,7 @@
                        "disabled:cursor-not-allowed" "disabled:border-base-300"
                        "disabled:bg-base-200/40" "disabled:text-trading-muted"]
                :data-role "portfolio-optimizer-open-execution-modal"
-               :disabled (not (pos? (or (:ready-count summary*) 0)))
+               :disabled (not (pos? reviewable-count))
                :on {:click [[:actions/open-portfolio-optimizer-execution-modal]]}}
       "Review Execution"]
      [:div {:class ["grid"

@@ -23,6 +23,13 @@
   (when-let [text (non-blank sha)]
     (subs text 0 (min 7 (count text)))))
 
+(defn- safe-build-token
+  [value]
+  (when-let [text (non-blank value)]
+    (when (and (not (str/starts-with? text "<"))
+               (not (re-find #"\s" text)))
+      text)))
+
 (defn- normalize-env
   [env]
   (let [env* (some-> env non-blank str/lower-case)]
@@ -44,8 +51,8 @@
 
 (defn normalize-build
   [raw fallback-build-id]
-  (let [sha (or (non-blank (raw-field raw :sha))
-                (non-blank fallback-build-id))]
+  (let [sha (or (safe-build-token (raw-field raw :sha))
+                (safe-build-token fallback-build-id))]
     (when sha
       (let [deployed-at (or (non-blank (raw-field raw :deployedAt))
                             (non-blank (raw-field raw :deployed-at))

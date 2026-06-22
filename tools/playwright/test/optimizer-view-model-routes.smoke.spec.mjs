@@ -149,7 +149,12 @@ async function seedRetainedDraftScenario(page) {
     state = c.assoc_in(
       state,
       path("portfolio", "optimizer", "scenario-load-state"),
-      map([kw("status"), kw("loading"), kw("scenario-id"), "draft"])
+      map([
+        kw("status"), kw("loaded"),
+        kw("scenario-id"), "draft",
+        kw("started-at-ms"), 1777046099000,
+        kw("completed-at-ms"), 1777046100000
+      ])
     );
     state = c.assoc_in(
       state,
@@ -315,6 +320,62 @@ async function seedTwoAssetDraftScenario(page) {
       state,
       path("portfolio-ui", "optimizer", "results-tab"),
       kw("recommendation")
+    );
+    c.reset_BANG_(store, state);
+  });
+  await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
+}
+
+async function stabilizeSeededOptimizerRun(page) {
+  await page.evaluate(() => {
+    const c = globalThis.cljs.core;
+    const kw = (name) => c.keyword(name);
+    const map = (entries) => c.PersistentArrayMap.fromArray(entries, true);
+    const path = (...segments) =>
+      c.PersistentVector.fromArray(segments.map((segment) => kw(segment)), true);
+    const store = globalThis.hyperopen.system.store;
+    const readiness =
+      globalThis.hyperopen.portfolio.optimizer.application.setup_readiness.build_readiness(
+        c.deref(store)
+      );
+    const request = c.get(readiness, kw("request"));
+
+    if (!request) {
+      return;
+    }
+
+    const signatures = globalThis.hyperopen.portfolio.optimizer.contracts.signatures;
+    const requestSignature = signatures.build_request_signature(request);
+    const inputSignature = signatures.optimizer_input_signature(request);
+    const scenarioId = c.get(request, kw("scenario-id"));
+    let state = c.deref(store);
+
+    state = c.assoc_in(
+      state,
+      path("portfolio", "optimizer", "last-successful-run", "request-signature"),
+      requestSignature
+    );
+    state = c.assoc_in(
+      state,
+      path("portfolio", "optimizer", "run-state"),
+      map([
+        kw("status"), kw("succeeded"),
+        kw("request-signature"), requestSignature
+      ])
+    );
+    state = c.assoc_in(
+      state,
+      path("portfolio", "optimizer", "optimization-progress"),
+      map([kw("status"), kw("idle")])
+    );
+    state = c.assoc_in(
+      state,
+      path("portfolio-ui", "optimizer", "stale-auto-recompute"),
+      map([
+        kw("request-signature"), requestSignature,
+        kw("input-signature"), inputSignature,
+        kw("scenario-id"), scenarioId
+      ])
     );
     c.reset_BANG_(store, state);
   });
@@ -751,11 +812,14 @@ test("portfolio optimizer draft results render namespaced market icons on fronti
       "request-signature": requestSignature
     }),
     seedPatch(optimizerPath("scenario-load-state"), {
-      status: optimizerKeyword("loading"),
-      "scenario-id": "draft"
+      status: optimizerKeyword("loaded"),
+      "scenario-id": "draft",
+      "started-at-ms": 1777046099000,
+      "completed-at-ms": 1777046100000
     }),
     seedPatch(optimizerUiPath("results-tab"), optimizerKeyword("recommendation"))
   ]);
+  await stabilizeSeededOptimizerRun(page);
   await dispatch(page, [
     ":actions/navigate",
     "/portfolio/optimize/draft",

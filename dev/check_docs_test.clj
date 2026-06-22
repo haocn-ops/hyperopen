@@ -131,6 +131,38 @@
       (let [codes (set (map :code (docs/check-repo root (test-config))))]
         (is (contains? codes :stale-doc))))))
 
+(deftest stale-doc-is-advisory-not-blocking
+  (with-temp-repo
+    (fn [root]
+      (baseline-files! root)
+      (write-file! root
+                   "AGENTS.md"
+                   (with-front-matter
+                     ["owner: platform"
+                      "status: canonical"
+                      "last_reviewed: 2025-01-01"
+                      "review_cycle_days: 30"
+                      "source_of_truth: true"]
+                     "# Agents\n\n- [Specs](/hyperopen/docs/product-specs/index.md)\n"))
+      (let [findings (docs/check-repo root (test-config))]
+        ;; Staleness is still surfaced...
+        (is (contains? (set (map :code findings)) :stale-doc))
+        (is (seq (docs/advisory-findings findings)))
+        ;; ...but it never fails the gate.
+        (is (empty? (docs/blocking-errors findings)))))))
+
+(deftest broken-link-is-still-blocking
+  (with-temp-repo
+    (fn [root]
+      (baseline-files! root)
+      (write-file! root
+                   "AGENTS.md"
+                   (with-front-matter default-meta
+                                      "# Agents\n\n- [Specs](/hyperopen/docs/product-specs/index.md)\n- [Broken](/hyperopen/docs/missing.md)\n"))
+      (let [findings (docs/check-repo root (test-config))]
+        (is (seq (docs/blocking-errors findings)))
+        (is (contains? (set (map :code (docs/blocking-errors findings))) :broken-link))))))
+
 (deftest broken-link-is-reported
   (with-temp-repo
     (fn [root]

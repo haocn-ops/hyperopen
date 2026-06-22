@@ -1,3 +1,11 @@
+---
+owner: trading-ui
+status: canonical
+last_reviewed: 2026-06-22
+review_cycle_days: 90
+source_of_truth: true
+---
+
 # Hyperopen Trading UI Policy for Agents
 
 ## Purpose and Scope

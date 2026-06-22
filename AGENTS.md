@@ -50,7 +50,8 @@ Root operating contract for Codex in this repository. Keep the first screen prac
 - Follow `/hyperopen/docs/PLANS.md`, `/hyperopen/docs/WORK_TRACKING.md`, and `/hyperopen/docs/MULTI_AGENT.md`.
 
 ## Validation And Return Contract
-- Required gates when code changes: `npm run check`, `npm test`, `npm run test:websocket`.
+- A fresh worktree has no `node_modules` and `shadow-cljs` is local-only (not on `PATH`), so an unbootstrapped checkout makes every gate fail with an opaque error that is environmental, not a code defect. Before running any gate, run `npm run setup:worktree` (it symlinks `node_modules` from the main checkout, or tells you to run `npm ci`). `npm test`/`npm run check` invoke this guard automatically.
+- Required gates when code changes: `npm run check`, `npm test`, `npm run test:websocket`. Use `npm run gates` to run them all and get a single PASS/FAIL matrix (it does not short-circuit on the first failure).
 - When browser flows or browser-test tooling change, also run the smallest relevant Playwright command first and broaden only after that passes.
 - Always return changed files, commands run, validation results, and remaining risks or blockers.
 

@@ -1,6 +1,7 @@
 (ns hyperopen.registry.runtime
   (:require [nexus.registry :as nxr]
             [hyperopen.schema.runtime-registration-catalog :as runtime-registration-catalog]
+            [hyperopen.runtime.dispatch-errors :as dispatch-errors]
             [hyperopen.runtime.validation :as runtime-validation]))
 
 (defn registered-effect-ids
@@ -40,6 +41,11 @@
 (defn register-system-state!
   []
   (nxr/register-system->state! deref))
+
+(defn register-interceptors!
+  "Register cross-cutting nexus interceptors. Idempotent across dev reload."
+  []
+  (dispatch-errors/install!))
 
 (defn register-placeholders!
   []

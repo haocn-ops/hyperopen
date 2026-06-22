@@ -8,11 +8,14 @@
            register-actions!
            action-handlers
            register-system-state!
-           register-placeholders!]}]
+           register-placeholders!
+           register-interceptors!]}]
   (register-effects! effect-handlers)
   (register-actions! action-handlers)
   (register-system-state!)
-  (register-placeholders!))
+  (register-placeholders!)
+  (when (fn? register-interceptors!)
+    (register-interceptors!)))
 
 (defn install-render-loop!
   [{:keys [store

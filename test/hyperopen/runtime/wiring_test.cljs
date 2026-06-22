@@ -150,6 +150,7 @@
     (is (fn? (:register-actions! deps)))
     (is (fn? (:register-system-state! deps)))
     (is (fn? (:register-placeholders! deps)))
+    (is (fn? (:register-interceptors! deps)))
     (is (identical? action-adapters/navigate
                     (get-in deps [:action-handlers :navigate])))
     (is (identical? effect-adapters/save

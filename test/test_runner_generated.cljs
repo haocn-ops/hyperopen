@@ -326,6 +326,7 @@
             [hyperopen.runtime.bootstrap-test]
             [hyperopen.runtime.collaborators-test]
             [hyperopen.runtime.collaborators.action-maps-test]
+            [hyperopen.runtime.dispatch-errors-test]
             [hyperopen.runtime.effect-adapters.asset-selector-test]
             [hyperopen.runtime.effect-adapters.common-test]
             [hyperopen.runtime.effect-adapters.facade-contract-test]
@@ -1065,6 +1066,7 @@
              'hyperopen.runtime.bootstrap-test
              'hyperopen.runtime.collaborators-test
              'hyperopen.runtime.collaborators.action-maps-test
+             'hyperopen.runtime.dispatch-errors-test
              'hyperopen.runtime.effect-adapters.asset-selector-test
              'hyperopen.runtime.effect-adapters.common-test
              'hyperopen.runtime.effect-adapters.facade-contract-test

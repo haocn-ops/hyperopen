@@ -104,19 +104,41 @@
      :weights weights
      :objective-value (problem-adapter/objective-value problem weights)}))
 
+(defonce ^:private solve-chain
+  ;; The osqp npm package backs every OSQP instance with one shared WASM
+  ;; module and heap. The display-frontier sweep solves its points through
+  ;; js/Promise.all, so without coordination several .setup/.solve/.cleanup
+  ;; cycles race on that one shared heap. That race leaves the module in a
+  ;; state where unrelated later solves throw and silently fall back to
+  ;; quadprog. Serialize every OSQP solve through a single promise chain so
+  ;; only one runs against the shared module at a time.
+  (atom (js/Promise.resolve)))
+
+(defn- run-serialized
+  [work]
+  (let [result (.then @solve-chain work work)]
+    ;; Keep the chain alive whether this solve fulfils or rejects, so one bad
+    ;; solve never blocks the queue.
+    (reset! solve-chain (.then result (fn [_] nil) (fn [_] nil)))
+    result))
+
+(defn- solve-on-shared-module
+  [problem]
+  (let [{adapted-problem :problem decode :decode} (problem-adapter/adapt-problem problem)]
+    (-> (.setup OSQP (options adapted-problem) (settings))
+        (.then (fn [^js solver]
+                 (try
+                   (let [solution (.solve solver)]
+                     (normalize-solution problem solution decode))
+                   (finally
+                     (.cleanup solver)))))
+        (.catch (fn [err]
+                  (fallback/recover-osqp-error problem err quadprog/solve))))))
+
 (defn solve
   [problem]
   (if-let [unsupported (problem-adapter/unsupported-l1-constraints problem)]
     (js/Promise.resolve
      (problem-adapter/unsupported-result :invalid-l1-constraints
                                          {:constraints (vec unsupported)}))
-    (let [{adapted-problem :problem decode :decode} (problem-adapter/adapt-problem problem)]
-      (-> (.setup OSQP (options adapted-problem) (settings))
-          (.then (fn [^js solver]
-                   (try
-                     (let [solution (.solve solver)]
-                       (normalize-solution problem solution decode))
-                     (finally
-                       (.cleanup solver)))))
-          (.catch (fn [err]
-                    (fallback/recover-osqp-error problem err quadprog/solve)))))))
+    (run-serialized (fn [_] (solve-on-shared-module problem)))))

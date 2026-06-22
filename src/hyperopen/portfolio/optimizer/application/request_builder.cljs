@@ -11,7 +11,7 @@
   {:kind :historical-mean})
 
 (def default-risk-model
-  {:kind :diagonal-shrink})
+  {:kind :ledoit-wolf-dense})
 
 (def default-objective
   {:kind :minimum-variance})

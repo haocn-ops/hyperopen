@@ -789,9 +789,9 @@
   }
 
   /* ── Dense trade table (rebalance preview) ─────────────────────
-     A real tiled data table in the v4 idiom: 1px row separators, a
-     sticky uppercase header, hover-lit rows, and striped group/leg
-     rows — replacing the rounded card-per-row grid. */
+     A real tiled data table in the canonical dense idiom: 1px row
+     separators, a sticky uppercase header, hover-lit rows, and striped
+     group/leg rows — replacing the rounded card-per-row grid. */
   .portfolio-optimizer .optimizer-table {
     width: 100%;
     border-collapse: collapse;
@@ -845,8 +845,8 @@
 
   /* ── Outcome diagnostics list (what this rebalance achieves) ────
      before → after metric rows for the rebalance side rail, mirroring
-     the v4 .diag block: small uppercase label, large mono value, 1px
-     separators, no card boxing. */
+     the canonical .diag block: small uppercase label, large mono value,
+     1px separators, no card boxing. */
   .portfolio-optimizer .optimizer-diag {
     padding: 10px 14px;
     border-bottom: 1px solid var(--optimizer-border);

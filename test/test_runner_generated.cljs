@@ -213,6 +213,7 @@
             [hyperopen.portfolio.optimizer.application.black-litterman-editor-model-test]
             [hyperopen.portfolio.optimizer.application.black-litterman-preview-test]
             [hyperopen.portfolio.optimizer.application.current-portfolio-test]
+            [hyperopen.portfolio.optimizer.application.display-frontier-test]
             [hyperopen.portfolio.optimizer.application.engine-blocklist-test]
             [hyperopen.portfolio.optimizer.application.engine-current-portfolio-test]
             [hyperopen.portfolio.optimizer.application.engine-history-window-test]
@@ -952,6 +953,7 @@
              'hyperopen.portfolio.optimizer.application.black-litterman-editor-model-test
              'hyperopen.portfolio.optimizer.application.black-litterman-preview-test
              'hyperopen.portfolio.optimizer.application.current-portfolio-test
+             'hyperopen.portfolio.optimizer.application.display-frontier-test
              'hyperopen.portfolio.optimizer.application.engine-blocklist-test
              'hyperopen.portfolio.optimizer.application.engine-current-portfolio-test
              'hyperopen.portfolio.optimizer.application.engine-history-window-test

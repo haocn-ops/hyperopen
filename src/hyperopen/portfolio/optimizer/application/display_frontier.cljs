@@ -31,18 +31,29 @@
                            instrument-ids)
     :constraints (:constraints request)}))
 
-(defn- unconstrained-frontier-constraints
+(defn reference-frontier-constraints
+  "Feasible set for the reference (\"unconstrained\") display frontier.
+
+  The reference frontier shows the best risk/return the user's chosen universe
+  can reach if their currently held positions were not pinned in place. It
+  preserves the entire opportunity set the optimizer actually works in --
+  per-asset long/short directionality, the gross/leverage budget, the turnover
+  budget, concentration caps, and net-exposure limits -- and relaxes only the
+  held-position locks (the constraint that freezes specific current holdings at
+  their existing weight). Because the reference feasible set is therefore a
+  superset of the fully constrained set, the selected portfolio always lies on
+  or below this frontier instead of floating above it.
+
+  Earlier this helper forced long-only and dropped the per-asset caps (which
+  silently fell back to a 100% cap) plus the gross/turnover budgets. That made
+  a long/short, levered recommendation plot ABOVE the drawn frontier. It also
+  turned every reference sweep into a second signed split-variable solve, which
+  needlessly perturbed the OSQP solver; keeping the opportunity set intact (so
+  the reference aliases the constrained frontier whenever there are no locks)
+  avoids that while still drawing the correct long/short curve."
   [constraints]
   (-> (or constraints {})
-      (dissoc :gross-leverage
-              :max-asset-weight
-              :max-turnover
-              :net-exposure
-              :per-asset-overrides
-              :per-perp-leverage-caps
-              :rebalance-tolerance
-              :held-position-locks)
-      (assoc :long-only? true)))
+      (dissoc :held-position-locks)))
 
 (defn- display-encoded-constraints
   [request instrument-ids constraint-mode]
@@ -50,7 +61,7 @@
                    :unconstrained
                    (assoc request
                           :constraints
-                          (unconstrained-frontier-constraints (:constraints request)))
+                          (reference-frontier-constraints (:constraints request)))
 
                    request)]
     (encoded-constraints request* instrument-ids)))

@@ -336,6 +336,36 @@
      (when subtext
        [:p {:class ["mt-0.5" "text-[0.6rem]" "text-trading-muted/70"]} subtext])]))
 
+(defn- next-step-row
+  "Leads the confidence rail. A solved draft is usable as-is, so this frames the two
+  honest paths forward rather than commanding a refinement: the always-available
+  rebalance (the lone clickable token, an in-place tab switch) and the optional refine
+  (descriptive only — its real trigger is the header action-bar button, and the rail
+  refine control is depth-coupled, so duplicating a one-click refine here would hide
+  that choice). Amber now signals \"clickable\", not \"required\"."
+  [next-step]
+  (let [tail (case next-step
+               :refine-optimization " now, or refine for more density"
+               :refine-further " now, or refine further"
+               ;; :none (maximum density) — refining is genuinely impossible.
+               " now")
+        subtext (if (= :none next-step)
+                  "Frontier is at maximum density — nothing left to refine."
+                  "Draft is solved and usable. Refining only adds frontier density; selection rarely moves.")]
+    [:div {:class ["border-b" "border-base-300" "px-4" "py-3"]
+           :data-role "portfolio-optimizer-result-confidence-next-step"}
+     [:div {:class ["flex" "items-center" "justify-between" "gap-3"]}
+      [:span {:class ["text-[0.62rem]" "font-semibold" "uppercase" "tracking-[0.06em]" "text-trading-muted"]}
+       "From here"]]
+     [:p {:class ["mt-1" "font-mono" "text-sm" "text-trading-muted"]}
+      [:button {:type "button"
+                :class ["optimizer-result-confidence-rebalance"]
+                :data-role "portfolio-optimizer-result-confidence-rebalance"
+                :on {:click [[:actions/set-portfolio-optimizer-results-tab :rebalance]]}}
+       "Rebalance"]
+      tail]
+     [:p {:class ["mt-0.5" "text-[0.6rem]" "text-trading-muted/70"]} subtext]]))
+
 (defn result-confidence-rail
   [refinement]
   (when-let [assessment (:assessment refinement)]
@@ -346,9 +376,7 @@
        [:div {:class ["border-b" "border-base-300" "px-4" "py-3"]}
         [:p {:class ["font-mono" "text-[0.62rem]" "uppercase" "tracking-[0.08em]" "text-trading-muted/70"]}
          "Result confidence"]]
-       (confidence-row {:label "Next step"
-                        :value (opt-format/refinement-next-step-label next-step)
-                        :value-class (when (not= :none next-step) "text-primary")})
+       (next-step-row next-step)
        (confidence-row {:label "Frontier quality"
                         :status (quality-status (:frontier-quality assessment))
                         :value (opt-format/refinement-quality-label (:frontier-quality assessment))

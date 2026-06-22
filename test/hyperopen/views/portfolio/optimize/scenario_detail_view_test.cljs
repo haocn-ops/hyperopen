@@ -183,15 +183,23 @@
                                  solved-run)))
         header-cta (node-by-role view-node "portfolio-optimizer-scenario-review-rebalance")
         recommendation-cta (node-by-role view-node "portfolio-optimizer-recommendation-rebalance-cta")
+        confidence-cta (node-by-role view-node "portfolio-optimizer-result-confidence-rebalance")
         expected [[:actions/set-portfolio-optimizer-results-tab :rebalance]]
         strings (set (collect-strings view-node))]
     (is (some? header-cta)
         "A solved scenario must expose a header path to the rebalance tab.")
     (is (some? recommendation-cta)
         "The recommendation read-flow must end with a discoverable path to the rebalance tab.")
+    (is (some? confidence-cta)
+        "The result-confidence rail must lead with rebalance as a clickable next step, not a refine imperative.")
     (is (= expected (click-actions header-cta)))
     (is (= expected (click-actions recommendation-cta)))
+    (is (= expected (click-actions confidence-cta)))
     (is (contains? strings "Review rebalance"))
+    ;; The rail frames refine as optional rather than required: it is relabelled "From
+    ;; here" (not "Next step") and tells the user the draft is usable as-is.
+    (is (contains? strings "From here"))
+    (is (contains? strings "Draft is solved and usable. Refining only adds frontier density; selection rarely moves."))
     ;; The new CTA roles must not collide with reserved roles other tests pin to nil.
     (is (nil? (node-by-role view-node "portfolio-optimizer-rebalance-preview")))
     (is (nil? (node-by-role view-node "portfolio-optimizer-recommendation-stale-blocked")))))

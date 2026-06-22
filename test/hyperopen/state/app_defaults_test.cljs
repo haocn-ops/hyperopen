@@ -56,7 +56,7 @@
     (is (= :draft (get-in state [:portfolio :optimizer :draft :status])))
     (is (= :historical-mean
            (get-in state [:portfolio :optimizer :draft :return-model :kind])))
-    (is (= :diagonal-shrink
+    (is (= :ledoit-wolf-dense
            (get-in state [:portfolio :optimizer :draft :risk-model :kind])))
     (is (= "" (get-in state [:vaults-ui :search-query])))
     (is (= true (get-in state [:vaults-ui :filter-leading?])))

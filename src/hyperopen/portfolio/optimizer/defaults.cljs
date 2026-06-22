@@ -11,7 +11,7 @@
    :universe []
    :objective {:kind :minimum-variance}
    :return-model {:kind :historical-mean}
-   :risk-model {:kind :diagonal-shrink}
+   :risk-model {:kind :ledoit-wolf-dense}
    :constraints {:long-only? false
                  :include-spot? false
                  :gross-max 2.0

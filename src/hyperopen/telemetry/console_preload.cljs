@@ -1,6 +1,7 @@
 (ns hyperopen.telemetry.console-preload
   (:require [clojure.string :as str]
             [hyperopen.funding.actions :as funding-actions]
+            [hyperopen.runtime.dispatch-errors :as dispatch-errors]
             [hyperopen.runtime.validation :as runtime-validation]
             [nexus.registry :as nxr]
             [hyperopen.platform :as platform]
@@ -426,6 +427,7 @@
   []
   (let [state @app-system/store
         action-traces (runtime-validation/debug-action-effect-traces-snapshot)
+        dispatch-error-entries (dispatch-errors/dispatch-error-log-snapshot)
         events (telemetry/events)
         flight-recording (ws-client/get-flight-recording-redacted)]
     {:captured-at-ms (platform/now-ms)
@@ -437,6 +439,8 @@
      :assetSelector (asset-selector-oracle)
      :orderForm (order-form-oracle)
      :recentActionEffectTraces (take-last-vec 25 action-traces)
+     :dispatchErrorCount (count dispatch-error-entries)
+     :recentDispatchErrors (take-last-vec 25 dispatch-error-entries)
      :websocket {:flightRecordingCount (count flight-recording)
                  :recentFlightRecording (take-last-vec 25 flight-recording)}
      :telemetry {:event-count (count events)
@@ -529,7 +533,10 @@
        :events (fn []
                  (clj->js (telemetry/events)))
        :eventsJson telemetry/events-json
-       :clearEvents telemetry/clear-events!})
+       :clearEvents telemetry/clear-events!
+       :dispatchErrors (fn []
+                         (clj->js (dispatch-errors/dispatch-error-log-snapshot)))
+       :clearDispatchErrors dispatch-errors/clear-dispatch-error-log!})
 
 (when ^boolean goog.DEBUG
   (let [global js/globalThis

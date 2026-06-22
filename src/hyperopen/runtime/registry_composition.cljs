@@ -53,11 +53,13 @@
   [{:keys [register-effects!
            register-actions!
            register-system-state!
-           register-placeholders!]}
+           register-placeholders!
+           register-interceptors!]}
    {:keys [effect-deps action-deps]}]
-  {:register-effects! register-effects!
-   :effect-handlers (runtime-effect-handlers effect-deps)
-   :register-actions! register-actions!
-   :action-handlers (runtime-action-handlers action-deps)
-   :register-system-state! register-system-state!
-   :register-placeholders! register-placeholders!})
+  (cond-> {:register-effects! register-effects!
+           :effect-handlers (runtime-effect-handlers effect-deps)
+           :register-actions! register-actions!
+           :action-handlers (runtime-action-handlers action-deps)
+           :register-system-state! register-system-state!
+           :register-placeholders! register-placeholders!}
+    register-interceptors! (assoc :register-interceptors! register-interceptors!)))

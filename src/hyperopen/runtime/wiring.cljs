@@ -21,6 +21,7 @@
    {:register-effects! runtime-registry/register-effects!
     :register-actions! runtime-registry/register-actions!
     :register-system-state! runtime-registry/register-system-state!
-    :register-placeholders! runtime-registry/register-placeholders!}
+    :register-placeholders! runtime-registry/register-placeholders!
+    :register-interceptors! runtime-registry/register-interceptors!}
    {:effect-deps (runtime-effect-deps runtime)
     :action-deps (runtime-action-deps)})))

@@ -34,10 +34,13 @@
    "docs/PRODUCT_SENSE.md"
    "docs/QUALITY_SCORE.md"
    "docs/RELIABILITY.md"
-   "docs/SECURITY.md"])
+   "docs/SECURITY.md"
+   ;; AGENTS.md MUST-follow contract guide (UI-Specific Docs / Canonical References).
+   "docs/BROWSER_TESTING.md"])
 
 (def default-governed-dirs
-  ["docs/design-docs"
+  ["docs/agent-guides"
+   "docs/design-docs"
    "docs/product-specs"
    "docs/references"])
 
@@ -77,7 +80,14 @@
    "docs/design-docs/index.md"
    "docs/design-docs/agents-section-index.md"
    "docs/product-specs/index.md"
-   "docs/references/index.md"])
+   "docs/references/index.md"
+   ;; MUST-follow contract guides AGENTS.md routes UI/browser work to; keeping
+   ;; them required means a renamed/removed guide breaks the gate instead of
+   ;; silently orphaning the contract.
+   "docs/BROWSER_TESTING.md"
+   "docs/agent-guides/browser-qa.md"
+   "docs/agent-guides/ui-foundations.md"
+   "docs/agent-guides/trading-ui-policy.md"])
 
 (defn utc-today
   []
@@ -453,6 +463,21 @@
          (into stale-bd-errors)
          (into (agents-link-errors root (:agents-required-links config)))))))
 
+(def advisory-codes
+  "Finding codes that are reported but DO NOT fail the gate. Document staleness
+  is a review-hygiene signal, not a correctness defect; keeping it advisory means
+  an unrelated doc clock can never block the compile/test gates that run after
+  `lint:docs` in the (short-circuiting) `npm run check` chain."
+  #{:stale-doc})
+
+(defn blocking-errors
+  [findings]
+  (remove #(advisory-codes (:code %)) findings))
+
+(defn advisory-findings
+  [findings]
+  (filter #(advisory-codes (:code %)) findings))
+
 (defn print-errors!
   [errors]
   (doseq [{:keys [code path message]} errors]
@@ -462,13 +487,19 @@
   [& _args]
   (let [root (.getCanonicalPath (io/file "."))
         config (default-config)
-        errors (check-repo root config)]
-    (if (empty? errors)
+        findings (check-repo root config)
+        advisories (advisory-findings findings)
+        blocking (blocking-errors findings)]
+    (when (seq advisories)
+      (println "Docs advisories (non-blocking):")
+      (print-errors! advisories))
+    (if (empty? blocking)
       (do
         (println "Docs check passed.")
         (System/exit 0))
       (do
-        (print-errors! errors)
+        (println "Docs check failed:")
+        (print-errors! blocking)
         (System/exit 1)))))
 
 (when (= *file* (System/getProperty "babashka.file"))

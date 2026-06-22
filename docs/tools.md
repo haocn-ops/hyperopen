@@ -77,8 +77,12 @@ Use this file as the single starting point for what actions this repo provides t
 
 Development note: Local watch commands that invoke `css:watch` recompile Tailwind to `/hyperopen/resources/public/css/main.css`, but CSS-only edits are not live-swapped into the current browser tab; refresh the page to see them. Shadow's `:after-load` reload path applies to ClojureScript changes, not standalone CSS changes.
 
+Worktree dependency prerequisite (applies to every gate, not just mutation runs):
+- A fresh `git worktree` does not inherit `node_modules/`, and `shadow-cljs` is local-only (resolved via `npx` from `./node_modules/.bin`), so an unbootstrapped checkout makes `npm test`, `npm run test:websocket`, and the compiles inside `npm run check` fail with opaque "command not found" / "Cannot find module" errors that look like code defects but are environmental.
+- Run `npm run setup:worktree` to fix it: it symlinks `node_modules` from the main checkout (resolved via `git rev-parse --git-common-dir`), or prints the exact `npm ci` / `ln -s ../../../node_modules node_modules` remediation when it cannot. `npm test` and `npm run check` invoke this guard automatically via `pretest`/`precheck`.
+
 Nightly mutation dependency and recovery notes:
-- Fresh worktrees may not have `node_modules/` installed even when `package.json` and `package-lock.json` are current. Before starting a long nightly mutation run, run `test -d node_modules/lucide || npm ci` from `/hyperopen`; this restores the locked JavaScript dependency tree without editing dependency manifests.
+- The same prerequisite applies before a long nightly mutation run; `npm run setup:worktree` (or `test -d node_modules/lucide || npm ci` from `/hyperopen`) restores the locked JavaScript dependency tree without editing dependency manifests.
 - If `npm run mutate:nightly` stops with `Nightly mutation coverage build failed.`, reproduce the coverage step directly with `npm run coverage` and read the underlying error. Errors such as `Cannot find module 'lucide/dist/esm/icons/external-link.js'`, `shadow-cljs: command not found`, or missing declared packages mean the local dependency tree is absent or incomplete. Run `npm ci`, then rerun `npm run mutate:nightly`.
 - Do not use `--skip-coverage` after a failed coverage build unless `coverage/lcov.info` already exists and was produced from the current tree. Mutation results are not trustworthy when coverage is red or stale.
 - If coverage completed and the later target sweep was interrupted for an environment reason, rerun `bb tools/mutate_nightly.clj --skip-coverage` to reuse the existing coverage and avoid paying the coverage rebuild again. This reruns the configured target list from the start; it does not resume partway through a target.

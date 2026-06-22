@@ -1,10 +1,47 @@
 import { spawn } from "node:child_process";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
 
+// Run every validation gate WITHOUT short-circuiting, then print a full
+// PASS/FAIL matrix with a copy-pasteable rerun command for each failure.
+//
+// `npm run check` is a single ~29-link `&&` chain that stops at the first
+// failing gate, so an agent fixes one gate, re-pays every earlier gate, and
+// only then discovers the next failure -- serial discovery that wastes turns
+// and loses the thread of which gate to iterate on. This aggregator derives the
+// gate list FROM the `check` script (so it stays in sync automatically), runs
+// each gate to completion regardless of earlier failures, and surfaces all
+// failures at once. Gates must run serially (later segments depend on artifacts
+// from earlier ones, e.g. `compile test` needs `test:runner:generate`).
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const packageJsonPath = join(__dirname, "..", "package.json");
+
+function checkSegments() {
+  try {
+    const pkg = JSON.parse(readFileSync(packageJsonPath, "utf8"));
+    const checkScript = pkg.scripts && pkg.scripts.check;
+    if (typeof checkScript === "string") {
+      return checkScript
+        .split("&&")
+        .map((segment) => segment.trim())
+        .filter((segment) => segment.length > 0);
+    }
+  } catch {
+    // fall through to a safe default
+  }
+  return ["npm run check"];
+}
+
+// Worktree bootstrap runs first so a missing node_modules surfaces at the top
+// (and is auto-linked) instead of failing every compile gate with opaque errors.
 const gates = [
-  { label: "npm run check", cmd: "npm", args: ["run", "check"] },
-  { label: "npm test", cmd: "npm", args: ["test"] },
-  { label: "npm run test:websocket", cmd: "npm", args: ["run", "test:websocket"] }
-];
+  "npm run setup:worktree",
+  ...checkSegments(),
+  "npm test",
+  "npm run test:websocket"
+].map((command) => ({ label: command, command }));
 
 function makeMetrics() {
   return {
@@ -41,12 +78,13 @@ function collectMetrics(metrics, text) {
   }
 }
 
-function runGate({ label, cmd, args }) {
+function runGate({ label, command }) {
   return new Promise((resolve) => {
     const startedAt = Date.now();
-    const child = spawn(cmd, args, {
+    process.stdout.write(`\n──── ${label} ────\n`);
+    const child = spawn(command, {
       stdio: ["inherit", "pipe", "pipe"],
-      shell: process.platform === "win32"
+      shell: true
     });
     let output = "";
 
@@ -69,6 +107,7 @@ function runGate({ label, cmd, args }) {
       collectMetrics(metrics, output);
       resolve({
         label,
+        command,
         ok: false,
         code: null,
         signal: null,
@@ -83,6 +122,7 @@ function runGate({ label, cmd, args }) {
       collectMetrics(metrics, output);
       resolve({
         label,
+        command,
         ok: code === 0,
         code,
         signal,
@@ -103,28 +143,38 @@ function renderStatus(result) {
 
 const results = [];
 
+// Serial, no short-circuit: every gate runs even after an earlier one fails.
 for (const gate of gates) {
-  const result = await runGate(gate);
-  results.push(result);
+  results.push(await runGate(gate));
+}
 
-  if (!result.ok) {
-    break;
+const labelWidth = Math.min(
+  48,
+  gates.reduce((width, gate) => Math.max(width, gate.label.length), 0)
+);
+
+console.log("");
+console.log(`Gate matrix (${results.length} gates):`);
+
+results.forEach((result, index) => {
+  const number = String(index + 1).padStart(2, "0");
+  const status = renderStatus(result);
+  console.log(
+    `  [${number}] ${status.padEnd(20)} ${result.label.padEnd(labelWidth)}  ${formatDuration(result.durationMs)}`
+  );
+});
+
+const failed = results.filter((result) => !result.ok);
+
+if (failed.length > 0) {
+  console.log("");
+  console.log(`Failed gates (${failed.length}) — rerun individually:`);
+  for (const result of failed) {
+    console.log(`  ✗ ${result.label}`);
+    console.log(`      ↳ ${result.command}`);
   }
 }
 
-console.log("");
-console.log("Gate summary:");
-
-for (const gate of gates) {
-  const result = results.find((entry) => entry.label === gate.label);
-  const status = result ? renderStatus(result) : "SKIPPED";
-  const counts = result
-    ? ` tests=${String(result.metrics.tests).padStart(5)} assertions=${String(result.metrics.assertions).padStart(5)} time=${formatDuration(result.durationMs).padStart(6)}`
-    : "";
-  console.log(`  ${gate.label.padEnd(24)} ${status}${counts}`);
-}
-
-const allPassed = results.length === gates.length && results.every((result) => result.ok);
 const totals = results.reduce((acc, result) => {
   acc.tests += result.metrics.tests;
   acc.assertions += result.metrics.assertions;
@@ -134,12 +184,15 @@ const totals = results.reduce((acc, result) => {
 
 console.log("");
 console.log("Totals:");
+console.log(`  gates passed:            ${results.length - failed.length}/${results.length}`);
 console.log(`  tests run:               ${totals.tests}`);
 console.log(`  assertions run:          ${totals.assertions}`);
 console.log(`  total suite time:        ${formatDuration(results.reduce((sum, result) => sum + result.durationMs, 0))}`);
 if (totals.nodeTests > 0) {
   console.log(`  node tests included:     ${totals.nodeTests}`);
 }
+
+const allPassed = failed.length === 0;
 console.log(`Overall: ${allPassed ? "PASS" : "FAIL"}`);
 
 process.exit(allPassed ? 0 : 1);

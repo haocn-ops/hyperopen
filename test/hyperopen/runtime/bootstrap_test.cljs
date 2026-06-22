@@ -7,6 +7,7 @@
         action-calls (atom [])
         system-calls (atom 0)
         placeholder-calls (atom 0)
+        interceptor-calls (atom 0)
         effect-handlers {:save (fn [& _] nil)}
         action-handlers {:navigate (fn [& _] nil)}]
     (runtime-bootstrap/register-runtime!
@@ -19,11 +20,27 @@
       :register-system-state! (fn []
                                 (swap! system-calls inc))
       :register-placeholders! (fn []
-                                (swap! placeholder-calls inc))})
+                                (swap! placeholder-calls inc))
+      :register-interceptors! (fn []
+                                (swap! interceptor-calls inc))})
     (is (= [effect-handlers] @effect-calls))
     (is (= [action-handlers] @action-calls))
     (is (= 1 @system-calls))
-    (is (= 1 @placeholder-calls))))
+    (is (= 1 @placeholder-calls))
+    (is (= 1 @interceptor-calls))))
+
+(deftest register-runtime-tolerates-missing-interceptor-registrar-test
+  ;; Backward compatibility: callers that predate register-interceptors! must
+  ;; still work (the key is optional).
+  (let [system-calls (atom 0)]
+    (runtime-bootstrap/register-runtime!
+     {:register-effects! (fn [_] nil)
+      :effect-handlers {}
+      :register-actions! (fn [_] nil)
+      :action-handlers {}
+      :register-system-state! (fn [] (swap! system-calls inc))
+      :register-placeholders! (fn [] nil)})
+    (is (= 1 @system-calls))))
 
 (deftest install-render-loop-wires-dispatch-and-batches-renders-per-frame-test
   (let [store (atom {:count 0})

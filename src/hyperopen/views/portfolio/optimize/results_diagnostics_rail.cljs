@@ -289,14 +289,15 @@
                                  (opt-format/format-pct (/ (:span sensitivity-top) 2))
                                  ").")
                             "No material sensitivity flags reported.")})
-      (when (seq (:warnings result))
-        [:div {:class ["border-b" "border-base-300" "px-4" "py-3"]
-               :data-role "portfolio-optimizer-result-warnings"}
-         [:p {:class ["text-[0.62rem]" "font-semibold" "uppercase" "tracking-[0.06em]" "text-warning"]}
-          "Warnings"]
-         (into [:div {:class ["mt-2" "space-y-2"]}]
+      (when-let [warnings (seq (:warnings result))]
+        [:details {:class ["border-b" "border-base-300"]
+                   :data-role "portfolio-optimizer-result-warnings"}
+         [:summary {:class ["cursor-pointer" "px-4" "py-3"
+                            "text-[0.62rem]" "font-semibold" "uppercase" "tracking-[0.06em]" "text-warning"]}
+          (str "Warnings · " (count warnings))]
+         (into [:div {:class ["space-y-2" "px-4" "pb-4"]}]
                (map (partial warning-row (:labels-by-instrument result))
-                    (:warnings result)))])
+                    warnings))])
       [:details {:class ["border-b" "border-base-300"]}
        [:summary {:class ["cursor-pointer" "px-4" "py-3" "font-mono" "text-[0.62rem]" "uppercase" "tracking-[0.08em]" "text-trading-muted/70"]}
         "More Diagnostics"]
@@ -345,6 +346,9 @@
        [:div {:class ["border-b" "border-base-300" "px-4" "py-3"]}
         [:p {:class ["font-mono" "text-[0.62rem]" "uppercase" "tracking-[0.08em]" "text-trading-muted/70"]}
          "Result confidence"]]
+       (confidence-row {:label "Next step"
+                        :value (opt-format/refinement-next-step-label next-step)
+                        :value-class (when (not= :none next-step) "text-primary")})
        (confidence-row {:label "Frontier quality"
                         :status (quality-status (:frontier-quality assessment))
                         :value (opt-format/refinement-quality-label (:frontier-quality assessment))
@@ -357,7 +361,4 @@
                                    "Selected portfolio is sampled from the frontier grid.")})
        (confidence-row {:label "Stop reason"
                         :value (opt-format/refinement-stop-reason-label (:stop-reason assessment))
-                        :subtext "Why the current result is where it is."})
-       (confidence-row {:label "Next step"
-                        :value (opt-format/refinement-next-step-label next-step)
-                        :value-class (when (not= :none next-step) "text-primary")})])))
+                        :subtext "Why the current result is where it is."})])))

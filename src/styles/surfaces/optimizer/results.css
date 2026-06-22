@@ -509,6 +509,33 @@
     background-color: var(--optimizer-surface);
   }
 
+  /* The lone inline action in the confidence rail ("From here" next-step row). Amber
+     underlined link — accent color reads as "clickable" here, deliberately quieter than
+     the rounded "Review rebalance" header CTA so it does not compete as a banner. */
+  .portfolio-optimizer .optimizer-result-confidence-rebalance {
+    appearance: none;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    font: inherit;
+    font-weight: 600;
+    color: var(--optimizer-accent);
+    cursor: pointer;
+    text-decoration-line: underline;
+    text-decoration-color: var(--optimizer-accent-border);
+    text-underline-offset: 2px;
+  }
+
+  .portfolio-optimizer .optimizer-result-confidence-rebalance:hover {
+    text-decoration-color: var(--optimizer-accent);
+  }
+
+  .portfolio-optimizer .optimizer-result-confidence-rebalance:focus-visible {
+    outline: 1px solid var(--optimizer-accent-border);
+    outline-offset: 2px;
+  }
+
   .portfolio-optimizer .optimizer-refinement-card {
     border-radius: 0;
     background-color: var(--optimizer-surface);

@@ -177,11 +177,3 @@
     :maximum-density-reached "Maximum density reached"
     :frontier-sweep-incomplete "Frontier sweep incomplete"
     "—"))
-
-(defn refinement-next-step-label
-  [next-step]
-  (case next-step
-    :refine-optimization "Refine optimization"
-    :refine-further "Refine further"
-    :none "At maximum density"
-    "—"))

@@ -250,7 +250,8 @@
                            (:prices-by-id execution-assumptions))
       :cost-contexts-by-id (:cost-contexts-by-id execution-assumptions)
       :leverage-by-id (get-in request [:constraints :perp-leverage])
-      :fee-bps-by-id (:fee-bps-by-id execution-assumptions)})))
+      :fee-bps-by-id (:fee-bps-by-id execution-assumptions)
+      :default-fee-bps (:default-fee-bps execution-assumptions)})))
 
 (defn- solved-payload
   [request

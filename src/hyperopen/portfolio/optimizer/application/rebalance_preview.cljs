@@ -1,10 +1,22 @@
 (ns hyperopen.portfolio.optimizer.application.rebalance-preview
   (:require [hyperopen.portfolio.optimizer.coercion :as coercion]
-            [hyperopen.portfolio.optimizer.domain.rebalance :as rebalance]))
+            [hyperopen.portfolio.optimizer.domain.rebalance :as rebalance]
+            [hyperopen.portfolio.optimizer.ids :as ids]))
 
 (def ^:private finite-number? coercion/finite-number?)
 (def ^:private non-blank-text coercion/non-blank-text)
 (def ^:private parse-number coercion/parse-float-number)
+
+(defn- instrument-id-keyed
+  "Defense-in-depth: rekey an instrument-keyed map through ids/instrument-id-key so
+   any keyword id that slipped past the worker-boundary codec (e.g. :perp:BTC, which
+   stringifies to the literal \":perp:BTC\") can never spawn a phantom instrument-id
+   here. Idempotent on already-stringified keys."
+  [m]
+  (when (map? m)
+    (into {}
+          (map (fn [[k v]] [(ids/instrument-id-key k) v]))
+          m)))
 
 (defn- ordered-distinct
   [values]
@@ -49,7 +61,8 @@
          (vector-weight-map (:current-portfolio-instrument-ids result)
                             (:current-portfolio-weights result))
          (normalized-weight-map
-          (:current-portfolio-weights-by-instrument result))))
+          (instrument-id-keyed
+           (:current-portfolio-weights-by-instrument result)))))
 
 (defn- current-weights-by-id
   [request result]
@@ -120,7 +133,8 @@
    (concat (:instrument-ids result)
            (keys target-by-id)
            (:current-portfolio-instrument-ids result)
-           (keys (:current-portfolio-weights-by-instrument result))
+           (keys (instrument-id-keyed
+                  (:current-portfolio-weights-by-instrument result)))
            (keys current-by-id)
            (keys (get-in request [:current-portfolio :by-instrument]))
            (map :instrument-id (get-in request [:current-portfolio :exposures])))))
@@ -166,7 +180,9 @@
         :leverage-by-id (leverage-by-id request)
         :fee-bps-by-id (get-in request
                                [:execution-assumptions
-                                :fee-bps-by-id])}))))
+                                :fee-bps-by-id])
+        :default-fee-bps (get-in request
+                                 [:execution-assumptions :default-fee-bps])}))))
 
 (defn result-with-rebalance-preview
   [request result]

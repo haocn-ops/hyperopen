@@ -42,6 +42,11 @@
     :expected-returns-by-instrument
     :current-weights-by-instrument
     :target-weights-by-instrument
+    ;; Result-only map (engine/payload.cljs). Without this entry its keys survive
+    ;; the worker boundary as keywords (js->clj :keywordize-keys true) and later
+    ;; stringify to leading-colon ids (":perp:BTC"), spawning phantom blocked
+    ;; "market-metadata-missing" rows in the rebalance preview.
+    :current-portfolio-weights-by-instrument
     :weight-sensitivity-by-instrument
     :pair-metadata
     :labels-by-instrument})

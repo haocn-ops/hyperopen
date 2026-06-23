@@ -188,6 +188,8 @@
       sub])])
 
 (defn- side-totals
+  "Buys/Sells headline reflects only tradeable (non-blocked) rows, so it matches
+   the ready-only Gross trade KPI and is never inflated by blocked rows."
   [labels-by-instrument rows]
   (reduce
    (fn [acc {:keys [side delta-notional-usd instrument-id]}]
@@ -198,7 +200,7 @@
          :sell (-> acc (update :sells + amt) (update :sell-assets conj asset))
          acc)))
    {:buys 0 :sells 0 :buy-assets #{} :sell-assets #{}}
-   rows))
+   (remove #(= :blocked (:status %)) rows)))
 
 (defn- summary-kpis
   [preview summary labels-by-instrument]
@@ -242,7 +244,9 @@
 (defn- row-notes
   [row]
   (case (:status row)
-    :blocked (opt-format/keyword-label (:reason row))
+    :blocked (case (:reason row)
+               :spot-submit-unsupported "spot · manage manually"
+               (opt-format/keyword-label (:reason row)))
     :within-tolerance "within tolerance"
     :ready (->> [(when-let [source (get-in row [:cost :source])]
                    (opt-format/keyword-label source))

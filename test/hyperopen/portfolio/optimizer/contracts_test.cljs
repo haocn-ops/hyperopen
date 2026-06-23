@@ -508,6 +508,7 @@
                     {:type "optimizer-result"
                      :payload {:status "solved"
                                :expected-returns-by-instrument {perp-id 0.12}
+                               :current-portfolio-weights-by-instrument {perp-id 0.5}
                                :diagnostics {:weight-sensitivity-by-instrument
                                              {perp-id {:max-delta 0.01}}}}
                      :return-model {:kind "black-litterman"
@@ -518,6 +519,11 @@
     (is (= :solved (get-in normalized [:payload :status])))
     (is (= {"perp:BTC" 0.12}
            (get-in normalized [:payload :expected-returns-by-instrument])))
+    ;; Regression: this map was missing from instrument-keyed-map-keys, so its
+    ;; keyword keys survived the boundary and spawned phantom ":perp:BTC" rows.
+    (is (= {"perp:BTC" 0.5}
+           (get-in normalized
+                   [:payload :current-portfolio-weights-by-instrument])))
     (is (= {"perp:BTC" {:max-delta 0.01}}
            (get-in normalized
                    [:payload :diagnostics :weight-sensitivity-by-instrument])))

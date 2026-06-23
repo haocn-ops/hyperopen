@@ -152,6 +152,29 @@
     (is (not= vault-id (:label vault-standalone)))
     (is (not= vault-id (:label vault-contribution)))))
 
+(deftest run-optimization-derives-nonzero-fees-from-default-fee-bps-test
+  ;; The worker-built rebalance preview (shown before any snapshot refresh) must
+  ;; charge fees from execution-assumptions :default-fee-bps even when no per-id
+  ;; :fee-bps-by-id is supplied — the reported "Est. fees + slippage is always $0"
+  ;; bug. request_builder derives :default-fee-bps from :fee-mode + the canonical
+  ;; schedule; here we assert the worker preview actually applies it.
+  (let [request (-> base-request
+                    (update :execution-assumptions dissoc :fee-bps-by-id)
+                    (assoc-in [:execution-assumptions :default-fee-bps] 4.5))
+        result (engine/run-optimization
+                request
+                {:solve-problem (fn [_]
+                                  {:status :solved
+                                   :solver :fixture-solver
+                                   :weights [0.5 0.5]
+                                   :iterations 1
+                                   :elapsed-ms 1})})
+        ready (->> (get-in result [:rebalance-preview :rows])
+                   (filter #(= :ready (:status %))))]
+    (is (seq ready))
+    (is (every? #(= 4.5 (get-in % [:cost :fee-bps])) ready))
+    (is (pos? (get-in result [:rebalance-preview :summary :estimated-fees-usd])))))
+
 (deftest run-optimization-uses-latest-history-price-for-rebalance-preview-test
   (let [result (engine/run-optimization
                 (-> base-request

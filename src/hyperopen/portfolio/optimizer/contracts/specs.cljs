@@ -226,6 +226,7 @@
        (every? #(finite-field? value %)
                [:fallback-slippage-bps
                 :slippage-fallback-bps
+                :default-fee-bps
                 :manual-capital-usdc])
        (every? #(map-field? value %)
                [:prices-by-id

@@ -79,6 +79,7 @@
             {:estimated-fill-price (/ notional filled)
              :depth-status :full-visible-depth}
             {:visible-size filled
+             :visible-notional notional
              :depth-status :insufficient-visible-depth}))
         (let [level (first levels*)
               price (level-price level)
@@ -108,6 +109,31 @@
     (when (and (finite-positive? reference-price)
                (finite-positive? fill-price))
       (slippage-bps-from-fill-price side reference-price fill-price))))
+
+(defn- depth-limited-slippage-bps
+  "Conservative slippage for an order whose size exceeds the visible book. Charges
+   the real VWAP slippage on the visible (consumed) portion, plus a penalty on the
+   unfilled remainder that scales with how far the order overruns the book
+   (shortfall multiple = quantity / visible-size). Floored at the flat fallback so
+   it never under-charges relative to the prior flat assumption. We cannot see past
+   the visible book, so the remainder penalty is an explicit assumption rather than
+   a fabricated deep-book fill."
+  [side reference-price quantity {:keys [visible-size visible-notional]} fallback]
+  (if (and (finite-positive? visible-size)
+           (finite-positive? visible-notional)
+           (finite-positive? quantity))
+    (let [visible-vwap (/ visible-notional visible-size)
+          visible-slip (or (slippage-bps-from-fill-price side
+                                                         reference-price
+                                                         visible-vwap)
+                           fallback)
+          depth-ratio (min 1 (/ visible-size quantity))
+          shortfall-mult (max 1 (/ quantity visible-size))
+          remainder-bps (* fallback shortfall-mult)
+          blended (+ (* depth-ratio visible-slip)
+                     (* (- 1 depth-ratio) remainder-bps))]
+      (max fallback blended))
+    fallback))
 
 (defn- finite-nonzero?
   [value]
@@ -188,9 +214,13 @@
 
       (= :insufficient-visible-depth (:depth-status snapshot-fill))
       (merge metadata
-             {:source :fallback-bps
+             {:source :depth-extrapolated
               :estimated-fill-price reference-price
-              :slippage-bps fallback
+              :slippage-bps (depth-limited-slippage-bps side
+                                                        reference-price
+                                                        quantity
+                                                        snapshot-fill
+                                                        fallback)
               :depth-status :insufficient-visible-depth
               :fallback-reason :snapshot-depth-limited})
 
@@ -209,7 +239,9 @@
                                     side
                                     reference-price
                                     quantity)
-        fee-bps (or (get-in opts [:fee-bps-by-id instrument-id]) 0)
+        fee-bps (or (get-in opts [:fee-bps-by-id instrument-id])
+                    (:default-fee-bps opts)
+                    0)
         notional (abs-num delta-notional-usd)]
     (merge context
            {:source source

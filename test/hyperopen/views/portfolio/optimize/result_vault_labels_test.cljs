@@ -114,6 +114,52 @@
     (is (not (str/includes? text vault-id)))
     (is (not (str/includes? text vault-address)))))
 
+(deftest rebalance-tab-buys-sells-exclude-blocked-rows-test
+  ;; A blocked sell (e.g. held spot) must not inflate the Buys/Sells headline; the
+  ;; tradeable buy is the only thing counted, keeping Sells at zero and consistent
+  ;; with the ready-only Gross trade KPI. Held spot also gets a friendlier note.
+  (let [view-node (rebalance-tab/rebalance-tab
+                   {:result
+                    (fixtures/sample-solved-result
+                     {:labels-by-instrument {"perp:BTC" "BTC"
+                                             "spot:PURR" "PURR"}
+                      :rebalance-preview
+                      {:status :partially-blocked
+                       :capital-usd 10000
+                       :summary {:ready-count 1
+                                 :blocked-count 1
+                                 :gross-trade-notional-usd 300
+                                 :estimated-fees-usd 0
+                                 :estimated-slippage-usd 0}
+                       :rows [{:instrument-id "perp:BTC"
+                               :instrument-type :perp
+                               :coin "BTC"
+                               :status :ready
+                               :side :buy
+                               :quantity 3
+                               :price 100
+                               :delta-notional-usd 300
+                               :cost {:source :snapshot
+                                      :estimated-slippage-usd 0
+                                      :slippage-bps 0
+                                      :depth-status :full-visible-depth}}
+                              {:instrument-id "spot:PURR"
+                               :status :blocked
+                               :reason :spot-submit-unsupported
+                               :side :sell
+                               :delta-notional-usd -50000}]}})})
+        buys-text (node-text (node-by-role view-node
+                                           "portfolio-optimizer-rebalance-kpi-buys"))
+        sells-text (node-text (node-by-role view-node
+                                            "portfolio-optimizer-rebalance-kpi-sells"))
+        text (node-text view-node)]
+    (is (str/includes? buys-text "300"))
+    ;; Blocked sell notional is excluded -> Sells is zero, not 50,000.
+    (is (not (str/includes? sells-text "50,000")))
+    (is (str/includes? sells-text "$0"))
+    ;; Held spot renders with a manage-manually note rather than a raw keyword.
+    (is (str/includes? text "spot · manage manually"))))
+
 (deftest rebalance-tab-renders-slippage-source-bps-and-freshness-test
   (let [view-node (rebalance-tab/rebalance-tab
                    {:result

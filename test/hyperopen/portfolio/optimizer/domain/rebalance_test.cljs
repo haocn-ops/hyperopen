@@ -1,5 +1,6 @@
 (ns hyperopen.portfolio.optimizer.domain.rebalance-test
   (:require [cljs.test :refer-macros [deftest is]]
+            [hyperopen.domain.trading.core :as trading-core]
             [hyperopen.portfolio.optimizer.domain.rebalance :as rebalance]))
 
 (defn- near?
@@ -229,7 +230,12 @@
     (is (near? 5 (:estimated-slippage-usd cost)))
     (is (= :full-visible-depth (:depth-status cost)))))
 
-(deftest build-rebalance-preview-falls-back-when-snapshot-depth-is-insufficient-test
+(deftest build-rebalance-preview-extrapolates-when-snapshot-depth-is-insufficient-test
+  ;; Order (qty 3) exceeds the single visible ask level (sz 1). Slippage is the
+  ;; real VWAP on the visible portion blended with a shortfall-scaled penalty on
+  ;; the unfilled remainder, never below the flat fallback. visible-vwap=101 ->
+  ;; visible-slip=100 bps; depth-ratio=1/3; shortfall=3 -> remainder=25*3=75;
+  ;; blended=(1/3*100)+(2/3*75)=83.333 bps; slip-usd=300*83.333/10000=2.5.
   (let [preview (rebalance/build-rebalance-preview
                  {:capital-usd 300
                   :rebalance-tolerance 0.0
@@ -246,12 +252,71 @@
                                                     :age-ms 5000}}})
         cost (get-in preview [:rows 0 :cost])]
     (is (= :ready (get-in preview [:rows 0 :status])))
-    (is (= :fallback-bps (:source cost)))
-    (is (= 25 (:slippage-bps cost)))
-    (is (near? 0.75 (:estimated-slippage-usd cost)))
+    (is (= :depth-extrapolated (:source cost)))
+    (is (near? 83.33333333333333 (:slippage-bps cost)))
+    (is (near? 2.5 (:estimated-slippage-usd cost)))
     (is (= :insufficient-visible-depth (:depth-status cost)))
     (is (= :snapshot-depth-limited (:fallback-reason cost)))
-    (is (= 5000 (:age-ms cost)))))
+    (is (= 5000 (:age-ms cost)))
+    ;; never under-charges relative to the old flat fallback
+    (is (>= (:slippage-bps cost) 25))))
+
+(deftest depth-limited-slippage-grows-with-order-size-test
+  ;; Monotonicity: a larger order that overruns the same visible book by more
+  ;; must be charged strictly more slippage than a smaller over-book order.
+  (let [slip (fn [capital]
+               (-> (rebalance/build-rebalance-preview
+                    {:capital-usd capital
+                     :rebalance-tolerance 0.0
+                     :fallback-slippage-bps 25
+                     :instrument-ids ["perp:BTC"]
+                     :current-weights [0.0]
+                     :target-weights [1.0]
+                     :instruments-by-id {"perp:BTC" {:instrument-type :perp
+                                                     :coin "BTC"}}
+                     :prices-by-id {"perp:BTC" 100}
+                     :cost-contexts-by-id {"perp:BTC"
+                                           {:source :snapshot
+                                            :asks [{:px "101" :sz "1"}]
+                                            :stale? false
+                                            :age-ms 0}}})
+                   (get-in [:rows 0 :cost :slippage-bps])))
+        small (slip 200)
+        medium (slip 300)
+        large (slip 1000)]
+    (is (< small medium))
+    (is (< medium large))))
+
+(deftest taker-rebalance-includes-nonzero-fees-and-per-id-overrides-test
+  ;; A taker rebalance with no per-instrument fee but a schedule-derived
+  ;; :default-fee-bps must charge a non-zero fee (the bug was a permanent $0 fee).
+  ;; The default bps is the canonical taker rate (domain.trading.core/default-fees,
+  ;; percent -> bps); a per-id :fee-bps-by-id entry still wins.
+  (let [taker-bps (* 100 (:taker trading-core/default-fees))
+        base {:capital-usd 300
+              :rebalance-tolerance 0.0
+              :instrument-ids ["perp:BTC"]
+              :current-weights [0.0]
+              :target-weights [1.0]
+              :instruments-by-id {"perp:BTC" {:instrument-type :perp
+                                              :coin "BTC"}}
+              :prices-by-id {"perp:BTC" 100}
+              :cost-contexts-by-id {"perp:BTC" {:source :live-book
+                                                :slippage-bps 4}}}
+        default-cost (-> (rebalance/build-rebalance-preview
+                          (assoc base :default-fee-bps taker-bps))
+                         (get-in [:rows 0 :cost]))
+        override-cost (-> (rebalance/build-rebalance-preview
+                           (assoc base
+                                  :default-fee-bps taker-bps
+                                  :fee-bps-by-id {"perp:BTC" 2}))
+                          (get-in [:rows 0 :cost]))]
+    (is (near? taker-bps (:fee-bps default-cost)))
+    ;; notional 300 * 4.5 bps / 10000 = 0.135, and crucially > 0.
+    (is (pos? (:estimated-fee-usd default-cost)))
+    (is (near? (* 300 (/ taker-bps 10000)) (:estimated-fee-usd default-cost)))
+    (is (= 2 (:fee-bps override-cost)))
+    (is (near? 0.06 (:estimated-fee-usd override-cost)))))
 
 (deftest sub-ten-dollar-leg-is-blocked-below-min-notional-test
   ;; Hyperliquid rejects orders below a $10 notional. A small reweight on a small

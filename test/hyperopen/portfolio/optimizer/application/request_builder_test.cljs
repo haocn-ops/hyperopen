@@ -1,5 +1,6 @@
 (ns hyperopen.portfolio.optimizer.application.request-builder-test
   (:require [cljs.test :refer-macros [deftest is]]
+            [hyperopen.domain.trading.core :as trading-core]
             [hyperopen.portfolio.optimizer.defaults :as defaults]
             [hyperopen.portfolio.optimizer.application.request-builder :as request-builder]))
 
@@ -77,7 +78,21 @@
            (mapv :instrument-id (:universe request))))
     (is (= ["perp:BTC" "spot:PURR"]
            (mapv :instrument-id (get-in request [:history :eligible-instruments]))))
+    ;; Fees are derived from :fee-mode (absent -> taker) + the canonical schedule,
+    ;; so the preview's "Est. fees + slippage" is no longer always $0.
+    (is (near? (* 100 (:taker trading-core/default-fees))
+               (get-in request [:execution-assumptions :default-fee-bps])))
     (is (= [] (:warnings request)))))
+
+(deftest fee-bps-for-mode-resolves-from-canonical-schedule-test
+  (is (near? (* 100 (:taker trading-core/default-fees))
+             (request-builder/fee-bps-for-mode :taker)))
+  (is (near? (* 100 (:maker trading-core/default-fees))
+             (request-builder/fee-bps-for-mode :maker)))
+  ;; Unknown / missing mode falls back to the conservative taker rate.
+  (is (near? (request-builder/fee-bps-for-mode :taker)
+             (request-builder/fee-bps-for-mode nil)))
+  (is (pos? (request-builder/fee-bps-for-mode :taker))))
 
 (deftest build-engine-request-surfaces-excluded-history-rows-and-fallback-prior-test
   (let [request (request-builder/build-engine-request

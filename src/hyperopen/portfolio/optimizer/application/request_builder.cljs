@@ -1,5 +1,6 @@
 (ns hyperopen.portfolio.optimizer.application.request-builder
   (:require [clojure.set :as set]
+            [hyperopen.domain.trading.core :as trading-core]
             [hyperopen.portfolio.optimizer.application.history-loader :as history-loader]
             [hyperopen.portfolio.optimizer.contracts :as contracts]
             [hyperopen.portfolio.optimizer.coercion :as coercion]
@@ -78,14 +79,28 @@
       (contains? constraints* :perp-leverage)
       (assoc :per-perp-leverage-caps (:perp-leverage constraints*)))))
 
+(defn fee-bps-for-mode
+  "Resolve a draft :fee-mode to a flat fee in basis points (1 bps = 0.01%) from the
+   canonical Hyperliquid default fee schedule (hyperopen.domain.trading.core/default-fees,
+   expressed in PERCENT; bps = percent * 100). Taker is the conservative default for a
+   rebalance (orders cross the spread). Spot legs are never auto-submittable in the
+   optimizer (row-status blocks them), so every ready row is a perp and a single
+   perp-derived default is honest for the whole preview."
+  [fee-mode]
+  (let [fees trading-core/default-fees]
+    (* 100 (or (get fees fee-mode) (:taker fees)))))
+
 (defn- normalize-execution-assumptions
   [execution-assumptions]
   (let [assumptions* (or execution-assumptions {})
         fallback-slippage-bps (or (:fallback-slippage-bps assumptions*)
                                   (:slippage-fallback-bps assumptions*))]
-    (cond-> (dissoc assumptions* :slippage-fallback-bps)
-      (some? fallback-slippage-bps)
-      (assoc :fallback-slippage-bps fallback-slippage-bps))))
+    (-> (cond-> (dissoc assumptions* :slippage-fallback-bps)
+          (some? fallback-slippage-bps)
+          (assoc :fallback-slippage-bps fallback-slippage-bps))
+        ;; Derive the fee assumption once, here, so BOTH preview build sites (the
+        ;; worker payload and the frontend refresh) inherit it via execution-assumptions.
+        (assoc :default-fee-bps (fee-bps-for-mode (:fee-mode assumptions*))))))
 
 (defn- normalize-history-assumptions
   "Engine-shaped per-asset assumptions: carry the draft entry through and resolve a

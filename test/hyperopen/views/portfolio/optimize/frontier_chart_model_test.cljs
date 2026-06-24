@@ -62,3 +62,46 @@
            (:current-point model)))
     (is (<= 0.9 (second (:x-domain model))))
     (is (<= 0.5 (second (:y-domain model))))))
+
+;; The Constrain Frontier toggle picks between the constrained and unconstrained
+;; frontier series held under [:frontiers ...]. The browser regression for that
+;; control cannot assert a *difference* on a lock-free scenario, because the
+;; optimizer deliberately aliases :constrained to :unconstrained when there are
+;; no held-position locks (display_frontier.cljs). These unit tests cover the
+;; boolean -> [:frontiers key] -> rendered-points selection directly, on a
+;; result whose constrained and unconstrained frontiers genuinely differ.
+(def ^:private dual-frontier-result
+  {:frontiers {:unconstrained [{:expected-return 0.03 :volatility 0.1}
+                               {:expected-return 0.09 :volatility 0.25}]
+               :constrained [{:expected-return 0.02 :volatility 0.12}
+                             {:expected-return 0.05 :volatility 0.18}
+                             {:expected-return 0.07 :volatility 0.3}]}
+   :frontier [{:expected-return 0.01 :volatility 0.05}]
+   :frontier-overlays {:standalone []
+                       :contribution []}
+   :expected-return 0.09
+   :volatility 0.25})
+
+(deftest frontier-points-selects-unconstrained-when-not-constrained-test
+  (is (= (get-in dual-frontier-result [:frontiers :unconstrained])
+         (chart-model/frontier-points dual-frontier-result false))))
+
+(deftest frontier-points-selects-constrained-when-constrained-test
+  (is (= (get-in dual-frontier-result [:frontiers :constrained])
+         (chart-model/frontier-points dual-frontier-result true))))
+
+(deftest frontier-points-falls-back-to-frontier-without-frontiers-map-test
+  (let [result (dissoc dual-frontier-result :frontiers)]
+    (is (= (:frontier result) (chart-model/frontier-points result true)))
+    (is (= (:frontier result) (chart-model/frontier-points result false)))))
+
+(deftest chart-model-renders-selected-frontier-by-constrain-flag-test
+  (let [unconstrained-model (chart-model/chart-model {} dual-frontier-result :none false)
+        constrained-model (chart-model/chart-model {} dual-frontier-result :none true)]
+    ;; false -> the two-point unconstrained frontier, true -> the three-point
+    ;; constrained frontier (sorted by volatility).
+    (is (= [0.1 0.25] (mapv :volatility (:points unconstrained-model))))
+    (is (= [0.12 0.18 0.3] (mapv :volatility (:points constrained-model))))
+    ;; The toggle genuinely changes the rendered point set and scaled positions.
+    (is (not= (:points unconstrained-model) (:points constrained-model)))
+    (is (not= (:positions unconstrained-model) (:positions constrained-model)))))

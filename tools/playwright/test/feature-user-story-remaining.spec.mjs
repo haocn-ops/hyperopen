@@ -384,6 +384,25 @@ test("api wallet route supports generate, authorize, and remove confirmation @re
 test("funding comparison route filters rows, switches timeframe, and exposes errors @regression", async ({
   page
 }) => {
+  // Stub the live predicted-fundings fetch so the seeded rows below stay
+  // authoritative. With real network access the live fetch resolves after the
+  // seed and overwrites it with the full ~212-coin universe, which made the
+  // row-count assertion environment-dependent. Returning an empty success
+  // (error stays nil, so the "N coins shown" summary still renders) lets the
+  // seed be the single source of funding rows regardless of network.
+  await page.route("https://api.hyperliquid.xyz/info", async (route) => {
+    const payload = route.request().postDataJSON();
+    if (payload?.type === "predictedFundings") {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: "[]"
+      });
+      return;
+    }
+    await route.continue();
+  });
+
   await visitRoute(page, "/funding-comparison");
   await seedFundingComparisonRows(page);
 

@@ -145,7 +145,9 @@
     (is (contains? strings "Manual Add"))
     (is (contains? strings "Asset"))
     (is (contains? strings "Type"))
-    (is (contains? strings "History"))
+    ;; The dedicated History column header was dropped: all-clear rows left it
+    ;; empty, so the by-exception chip now renders inline on the row instead.
+    (is (not (contains? strings "History")))
     (is (contains? strings "Name"))
     (is (not (contains? strings "Liquidity")))
     (is (not (contains? strings "medium")))

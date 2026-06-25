@@ -108,6 +108,7 @@
            market-type
            primary-label
            secondary-label
+           history-status
            history-label
            history-tone
            assumption-badge
@@ -118,7 +119,8 @@
                    "grid" "grid-cols-[18px_minmax(0,1fr)_42px_72px_52px_20px]"
                    "items-center" "gap-2" "border-b" "border-base-300"
                    "px-2" "py-1.5" "last:border-b-0" "hover:bg-base-200/30"]
-           :data-role (str "portfolio-optimizer-universe-selected-row-" instrument-id)}
+           :data-role (str "portfolio-optimizer-universe-selected-row-" instrument-id)
+           :data-history-status (some-> history-status name)}
      [:span {:class ["text-warning"]} "☑"]
      [:span {:class ["min-w-0"]}
       [:span {:class ["block" "truncate" "font-mono" "text-[0.6875rem]" "font-semibold"]}
@@ -127,7 +129,7 @@
        secondary-label]
       (assumption-badge-chip instrument-id assumption-badge assumption-badge-label)]
      [:span {:class ["min-w-0"]} (market-type-tags market-type)]
-     [:span {:class ["min-w-0"]} (tag history-label history-tone)]
+     [:span {:class ["min-w-0"]} (when history-label (tag history-label history-tone))]
      (side-control instrument-id position-side short-selectable?)
      [:span {:class ["text-right"]}
       [:button {:type "button"

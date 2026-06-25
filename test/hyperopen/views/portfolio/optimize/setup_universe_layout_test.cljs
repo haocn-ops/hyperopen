@@ -175,7 +175,11 @@
     (is (contains? loading-strings "loading"))
     (is (contains? missing-strings "missing"))
     (is (contains? insufficient-strings "insufficient"))
-    (is (contains? sufficient-strings "sufficient"))))
+    ;; A :sufficient asset no longer renders the always-on history chip; the
+    ;; column is by-exception. (This two-bar row instead surfaces the depth
+    ;; flag, "Short history", which is the by-exception limited-history signal.)
+    (is (not (contains? sufficient-strings "sufficient")))
+    (is (contains? sufficient-strings "Short history"))))
 
 (deftest setup-selected-universe-row-renders-position-side-controls-test
   (let [spot-instrument {:instrument-id "spot:PURR"

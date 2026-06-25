@@ -34,6 +34,29 @@
    :missing "missing"
    :pending "pending"})
 
+(def ^:private all-clear-history-statuses
+  "Statuses that need no user attention, so the history chip is hidden (the
+  column is shown by-exception). :stale is treated as all-clear: a one-to-two
+  day stale tail is immaterial to the covariance estimate and is dominated by
+  upstream refresh lag, so it is not worth a per-row badge. Genuine coverage
+  problems still surface as :insufficient / :shared-gap / :missing / :rejected."
+  #{:sufficient :stale})
+
+(def ^:private in-progress-history-statuses
+  "Transient load states; shown with a neutral tone rather than a warning."
+  #{:queued :loading :pending})
+
+(defn- history-chip-display
+  "By-exception history chip. Returns nil for all-clear statuses (healthy rows
+  render no chip), a neutral chip for in-progress load states, and an amber
+  warning chip for the genuine coverage problems."
+  [history-status]
+  (when-not (contains? all-clear-history-statuses history-status)
+    {:label (get history-status-labels history-status "pending")
+     :tone (if (contains? in-progress-history-statuses history-status)
+             :muted
+             :warn)}))
+
 (defn- instrument-ids
   [instruments]
   (into #{} (keep :instrument-id) instruments))
@@ -244,7 +267,7 @@
                                                  history-load-state
                                                  history-status-by-id
                                                  instrument)
-         history-label (get history-status-labels history-status "pending")
+         history-chip (history-chip-display history-status)
          primary-label (instrument-primary-label instrument)
          {:keys [name base-label]} (universe-candidates/market-display instrument)
          secondary-label (or (normalized-text (:name instrument))
@@ -263,11 +286,13 @@
               :market-type (:market-type instrument)
               :primary-label primary-label
               :secondary-label secondary-label
-              :history-label history-label
-              :history-tone (if (= :sufficient history-status) :long :warn)
+              :history-status history-status
               :liquidity-label (liquidity-label instrument)
               :position-side (position-side instrument)
               :short-selectable? (short-selectable? instrument)}
+       history-chip
+       (assoc :history-label (:label history-chip)
+              :history-tone (:tone history-chip))
        badge
        (assoc :assumption-badge badge
               :assumption-badge-label (get assumption-badge-labels badge))))))

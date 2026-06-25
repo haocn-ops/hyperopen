@@ -47,17 +47,19 @@
                   :history-load-state {:status :idle}
                   :history-status-by-id {"perp:BTC" :aligned}}))]
     (is (= ["purr"] @calls))
+    ;; An aligned (:sufficient) asset is "all clear" so the history chip is
+    ;; suppressed (by-exception display): no :history-label / :history-tone.
     (is (= [{:instrument-id "perp:BTC"
              :market-type :perp
              :primary-label "BTC"
              :secondary-label "Bitcoin"
-             :history-label "sufficient"
-             :history-tone :long
+             :history-status :sufficient
              :liquidity-label "deep"}]
            (mapv #(select-keys % [:instrument-id
                                   :market-type
                                   :primary-label
                                   :secondary-label
+                                  :history-status
                                   :history-label
                                   :history-tone
                                   :liquidity-label])

@@ -134,7 +134,7 @@ test("portfolio optimizer adding an asset prefetches API v2 history before run @
     { timeout: 10_000 }
   ).toBe(true);
   await expect(page.locator("[data-role='portfolio-optimizer-universe-selected-row-perp:ETH']"))
-    .toContainText("sufficient", { timeout: 10_000 });
+    .toHaveAttribute("data-history-status", "sufficient", { timeout: 10_000 });
 
   const beforeRun = [...seenHistoryBundles];
   await expect(page.locator("[data-role='portfolio-optimizer-load-history']")).toHaveCount(0);

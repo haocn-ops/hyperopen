@@ -136,7 +136,7 @@ test("optimizer history API v2 loads rows without legacy history fanout @regress
   await page.locator("[data-role='portfolio-optimizer-universe-add-perp:ETH']").click();
 
   await expect(page.locator("[data-role='portfolio-optimizer-universe-selected-row-perp:ETH']"))
-    .toContainText("sufficient", { timeout: 10_000 });
+    .toHaveAttribute("data-history-status", "sufficient", { timeout: 10_000 });
   await expect(page.locator("[data-role='portfolio-optimizer-readiness-panel']"))
     .toContainText("approved proxy history", { timeout: 10_000 });
 
@@ -312,16 +312,16 @@ test("optimizer history API v2 uses aligned returns when point rows are sparse @
   await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
   await page.locator("[data-role='portfolio-optimizer-universe-add-perp:BTC']").click();
   await expect(page.locator("[data-role='portfolio-optimizer-universe-selected-row-perp:BTC']"))
-    .toContainText("sufficient", { timeout: 10_000 });
+    .toHaveAttribute("data-history-status", "sufficient", { timeout: 10_000 });
 
   await page.locator("[data-role='portfolio-optimizer-universe-search-input']").fill("eth");
   await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
   await page.locator("[data-role='portfolio-optimizer-universe-add-perp:ETH']").click();
 
   await expect(page.locator("[data-role='portfolio-optimizer-universe-selected-row-perp:BTC']"))
-    .toContainText("sufficient", { timeout: 10_000 });
+    .toHaveAttribute("data-history-status", "sufficient", { timeout: 10_000 });
   await expect(page.locator("[data-role='portfolio-optimizer-universe-selected-row-perp:ETH']"))
-    .toContainText("sufficient", { timeout: 10_000 });
+    .toHaveAttribute("data-history-status", "sufficient", { timeout: 10_000 });
   await expect(page.locator("[data-role='portfolio-optimizer-readiness-panel']"))
     .not.toContainText("candle history", { timeout: 10_000 });
   await expect(page.locator("[data-role='portfolio-optimizer-readiness-panel']"))

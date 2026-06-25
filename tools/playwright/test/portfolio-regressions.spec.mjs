@@ -2051,7 +2051,7 @@ test("portfolio optimizer selected vault rows show shared gap for loaded misalig
 
   await expect(vaultARow).toBeVisible();
   await expect(vaultARow).toContainText("shared gap");
-  await expect(vaultARow).not.toContainText("sufficient");
+  await expect(vaultARow).toHaveAttribute("data-history-status", "shared-gap");
 });
 
 test("portfolio optimizer manual universe vault search sorts by TVL @regression", async ({ page }) => {
@@ -2232,7 +2232,7 @@ test("portfolio optimizer selection prefetch requests API v2 history before run 
     { timeout: 10_000 }
   ).toBe(true);
   await expect(page.locator("[data-role='portfolio-optimizer-universe-selected-row-perp:BTC']"))
-    .toContainText("sufficient", { timeout: 10_000 });
+    .toHaveAttribute("data-history-status", "sufficient", { timeout: 10_000 });
 
   await searchInput.fill("eth");
   await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
@@ -2244,7 +2244,7 @@ test("portfolio optimizer selection prefetch requests API v2 history before run 
     { timeout: 10_000 }
   ).toBe(true);
   await expect(page.locator("[data-role='portfolio-optimizer-universe-selected-row-perp:ETH']"))
-    .toContainText("sufficient", { timeout: 10_000 });
+    .toHaveAttribute("data-history-status", "sufficient", { timeout: 10_000 });
 
   const beforeRun = [...historyBundleRequests];
   await expect(page.locator("[data-role='portfolio-optimizer-load-history']")).toHaveCount(0);
@@ -2351,7 +2351,7 @@ test("portfolio optimizer recommendation chart shows minimum variance frontier o
     await page.locator(`[data-role='portfolio-optimizer-universe-add-perp:${coin.toUpperCase()}']`).click();
     await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
     await expect(page.locator(`[data-role='portfolio-optimizer-universe-selected-row-perp:${coin.toUpperCase()}']`))
-      .toContainText("sufficient", { timeout: 10_000 });
+      .toHaveAttribute("data-history-status", "sufficient", { timeout: 10_000 });
   }
 
   await expect(page.locator("[data-role='portfolio-optimizer-load-history']")).toHaveCount(0);

@@ -145,8 +145,7 @@
            position-side
            short-selectable?]}]
     [:div {:class ["optimizer-universe-row"
-                   "grid" "grid-cols-[18px_minmax(0,1fr)_48px_56px_20px]"
-                   "items-center" "gap-2" "border-b" "border-base-300"
+                   "grid" "items-center" "gap-2" "border-b" "border-base-300"
                    "px-2" "py-1.5" "last:border-b-0" "hover:bg-base-200/30"]
            :data-role (str "portfolio-optimizer-universe-selected-row-" instrument-id)
            :data-history-status (some-> history-status name)}
@@ -171,8 +170,7 @@
 (defn- market-row
   [{:keys [market-key market-type active? label name]} idx]
     [:div {:class ["optimizer-universe-candidate-row"
-                   "grid" "grid-cols-[66px_minmax(0,1fr)_58px_44px]"
-                   "items-center" "gap-2" "border-b" "border-base-300" "cursor-pointer" "px-2"
+                   "grid" "items-center" "gap-2" "border-b" "border-base-300" "cursor-pointer" "px-2"
                    "py-1.5" "last:border-b-0" "hover:bg-base-200/30"]
            :data-role (str "portfolio-optimizer-universe-candidate-row-" market-key)
            :id (str "portfolio-optimizer-universe-candidate-" idx)
@@ -195,8 +193,8 @@
 
 (defn- selected-table-header
   []
-  [:div {:class ["grid" "grid-cols-[18px_minmax(0,1fr)_48px_56px_20px]"
-                 "items-center" "gap-2" "border-b" "border-base-300"
+  [:div {:class ["optimizer-universe-selected-header"
+                 "grid" "items-center" "gap-2" "border-b" "border-base-300"
                  "bg-base-200/40" "px-2" "py-1.5" "font-mono"
                  "text-[0.55rem]" "font-semibold" "uppercase"
                  "tracking-[0.12em]" "text-trading-muted/70"]
@@ -209,8 +207,8 @@
 
 (defn- candidate-table-header
   []
-  [:div {:class ["grid" "grid-cols-[66px_minmax(0,1fr)_58px_44px]"
-                 "items-center" "gap-2" "border-b" "border-base-300"
+  [:div {:class ["optimizer-universe-candidate-header"
+                 "grid" "items-center" "gap-2" "border-b" "border-base-300"
                  "bg-base-200/40" "px-2" "py-1.5" "font-mono"
                  "text-[0.55rem]" "font-semibold" "uppercase"
                  "tracking-[0.12em]" "text-trading-muted/70"]

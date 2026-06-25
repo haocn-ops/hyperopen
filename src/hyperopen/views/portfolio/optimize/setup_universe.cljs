@@ -95,13 +95,42 @@
 (defn- assumption-badge-chip
   [instrument-id badge badge-label]
   (when (and badge (not= :ready badge))
-    [:span {:class ["optimizer-chip" "mt-0.5" "inline-block" "border" "px-1.5"
+    [:span {:class ["optimizer-chip" "border" "px-1.5"
                     "py-[1px]" "font-mono" "text-[0.53125rem]" "font-semibold"
                     "uppercase" "tracking-[0.1em]"]
             :data-optimizer-chip "true"
             :data-tone (if (contains? #{:conservative :using-proxy} badge) "accent" "warn")
             :data-role (str "portfolio-optimizer-universe-assumption-badge-" instrument-id)}
      badge-label]))
+
+(defn- history-row-chip
+  "By-exception history chip rendered inline on the row (no dedicated column).
+  history-label is nil for all-clear rows, so nothing renders; the tone is
+  :muted for transient load states and :warn for genuine coverage problems."
+  [instrument-id history-label history-tone]
+  (when history-label
+    [:span {:class (cond-> ["optimizer-chip" "border" "px-1.5" "py-[1px]" "font-mono"
+                            "text-[0.53125rem]" "font-semibold" "uppercase"
+                            "tracking-[0.12em]"]
+                     (= history-tone :muted) (conj "border-base-300" "text-trading-muted")
+                     (not= history-tone :muted) (conj "border-warning/40" "text-warning"))
+            :data-optimizer-chip "true"
+            :data-tone (name history-tone)
+            :data-role (str "portfolio-optimizer-universe-history-chip-" instrument-id)}
+     history-label]))
+
+(defn- row-flags
+  "By-exception row flags rendered inline under the asset name (there is no
+  dedicated History column). All-clear rows pass history-label = nil and a
+  :ready assumption badge, so nothing renders; only load states, genuine
+  coverage problems, and non-default assumptions surface a chip."
+  [instrument-id history-label history-tone assumption-badge assumption-badge-label]
+  (let [history (history-row-chip instrument-id history-label history-tone)
+        assumption (assumption-badge-chip instrument-id assumption-badge assumption-badge-label)]
+    (when (or history assumption)
+      [:span {:class ["mt-0.5" "flex" "flex-wrap" "items-center" "gap-1"]}
+       history
+       assumption])))
 
 (defn- selected-row
   [{:keys [instrument-id
@@ -116,7 +145,7 @@
            position-side
            short-selectable?]}]
     [:div {:class ["optimizer-universe-row"
-                   "grid" "grid-cols-[18px_minmax(0,1fr)_42px_72px_52px_20px]"
+                   "grid" "grid-cols-[18px_minmax(0,1fr)_42px_52px_20px]"
                    "items-center" "gap-2" "border-b" "border-base-300"
                    "px-2" "py-1.5" "last:border-b-0" "hover:bg-base-200/30"]
            :data-role (str "portfolio-optimizer-universe-selected-row-" instrument-id)
@@ -127,9 +156,8 @@
        primary-label]
       [:span {:class ["block" "truncate" "text-[0.65625rem]" "text-trading-muted"]}
        secondary-label]
-      (assumption-badge-chip instrument-id assumption-badge assumption-badge-label)]
+      (row-flags instrument-id history-label history-tone assumption-badge assumption-badge-label)]
      [:span {:class ["min-w-0"]} (market-type-tags market-type)]
-     [:span {:class ["min-w-0"]} (when history-label (tag history-label history-tone))]
      (side-control instrument-id position-side short-selectable?)
      [:span {:class ["text-right"]}
       [:button {:type "button"
@@ -167,7 +195,7 @@
 
 (defn- selected-table-header
   []
-  [:div {:class ["grid" "grid-cols-[18px_minmax(0,1fr)_42px_72px_52px_20px]"
+  [:div {:class ["grid" "grid-cols-[18px_minmax(0,1fr)_42px_52px_20px]"
                  "items-center" "gap-2" "border-b" "border-base-300"
                  "bg-base-200/40" "px-2" "py-1.5" "font-mono"
                  "text-[0.55rem]" "font-semibold" "uppercase"
@@ -176,7 +204,6 @@
    [:span ""]
    [:span "Asset"]
    [:span "Type"]
-   [:span "History"]
    [:span {:class ["text-right"]} "Side"]
    [:span {:class ["sr-only"]} "Remove"]])
 

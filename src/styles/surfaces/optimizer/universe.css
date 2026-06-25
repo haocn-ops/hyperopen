@@ -75,6 +75,23 @@
     color: var(--optimizer-accent);
   }
 
+  /* Column tracks for the selected/candidate universe tables live in CSS
+     rather than Tailwind `grid-cols-[…]` arbitrary utilities. The arbitrary
+     values carry commas and parentheses (minmax(0, 1fr)); the JIT
+     occasionally drops them from the generated stylesheet on an incremental
+     watch rebuild, which leaves `display: grid` with no template and collapses
+     every cell into a single stacked column. Defining the tracks here keeps
+     header and rows in lockstep and immune to that extraction flakiness. */
+  .portfolio-optimizer .optimizer-universe-selected-header,
+  .portfolio-optimizer .optimizer-universe-row {
+    grid-template-columns: 18px minmax(0, 1fr) 48px 56px 20px;
+  }
+
+  .portfolio-optimizer .optimizer-universe-candidate-header,
+  .portfolio-optimizer .optimizer-universe-candidate-row {
+    grid-template-columns: 66px minmax(0, 1fr) 58px 44px;
+  }
+
   .portfolio-optimizer .optimizer-universe-candidate-row[data-active="true"] {
     background-color: rgb(212 181 88 / 0.05);
   }

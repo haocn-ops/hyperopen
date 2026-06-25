@@ -79,7 +79,7 @@
 
 (defn- side-control
   [instrument-id position-side short-selectable?]
-  [:span {:class ["inline-flex" "items-center" "justify-end"]
+  [:span {:class ["flex" "items-center" "justify-center"]
           :data-role (str "portfolio-optimizer-universe-side-control-"
                           instrument-id)}
    (side-button instrument-id position-side short-selectable? :long)
@@ -145,7 +145,7 @@
            position-side
            short-selectable?]}]
     [:div {:class ["optimizer-universe-row"
-                   "grid" "grid-cols-[18px_minmax(0,1fr)_42px_52px_20px]"
+                   "grid" "grid-cols-[18px_minmax(0,1fr)_48px_56px_20px]"
                    "items-center" "gap-2" "border-b" "border-base-300"
                    "px-2" "py-1.5" "last:border-b-0" "hover:bg-base-200/30"]
            :data-role (str "portfolio-optimizer-universe-selected-row-" instrument-id)
@@ -157,7 +157,7 @@
       [:span {:class ["block" "truncate" "text-[0.65625rem]" "text-trading-muted"]}
        secondary-label]
       (row-flags instrument-id history-label history-tone assumption-badge assumption-badge-label)]
-     [:span {:class ["min-w-0"]} (market-type-tags market-type)]
+     [:span {:class ["flex" "justify-center"]} (market-type-tags market-type)]
      (side-control instrument-id position-side short-selectable?)
      [:span {:class ["text-right"]}
       [:button {:type "button"
@@ -195,7 +195,7 @@
 
 (defn- selected-table-header
   []
-  [:div {:class ["grid" "grid-cols-[18px_minmax(0,1fr)_42px_52px_20px]"
+  [:div {:class ["grid" "grid-cols-[18px_minmax(0,1fr)_48px_56px_20px]"
                  "items-center" "gap-2" "border-b" "border-base-300"
                  "bg-base-200/40" "px-2" "py-1.5" "font-mono"
                  "text-[0.55rem]" "font-semibold" "uppercase"
@@ -203,8 +203,8 @@
          :data-role "portfolio-optimizer-universe-selected-header"}
    [:span ""]
    [:span "Asset"]
-   [:span "Type"]
-   [:span {:class ["text-right"]} "Side"]
+   [:span {:class ["text-center"]} "Type"]
+   [:span {:class ["text-center"]} "Side"]
    [:span {:class ["sr-only"]} "Remove"]])
 
 (defn- candidate-table-header

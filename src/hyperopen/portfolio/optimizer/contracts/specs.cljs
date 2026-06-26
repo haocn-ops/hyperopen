@@ -192,7 +192,8 @@
   (and (map? value)
        (boolean-field? value :long-only?)
        (every? #(finite-field? value %)
-               [:gross-max
+               [:gross-min
+                :gross-max
                 :gross-leverage
                 :net-min
                 :net-max

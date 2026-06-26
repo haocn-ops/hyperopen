@@ -37,7 +37,8 @@
       (:net-exposure constraints))))
 
 (def ^:private draft-only-constraint-keys
-  #{:gross-max
+  #{:gross-min
+    :gross-max
     :net-min
     :net-max
     :asset-overrides
@@ -66,6 +67,9 @@
 
       (contains? constraints* :gross-max)
       (assoc :gross-leverage (:gross-max constraints*))
+
+      (contains? constraints* :gross-min)
+      (assoc :gross-floor (:gross-min constraints*))
 
       (some? net-exposure)
       (assoc :net-exposure net-exposure)

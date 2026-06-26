@@ -101,6 +101,23 @@
      :coefficients expected-returns
      :lower (:target-return objective)}))
 
+(defn- gross-floor-inequality
+  "A gross-leverage FLOOR as a signed-linear inequality in weight space:
+   sum(sign_i * w_i) >= G. Because each asset is single-signed (its bounds keep
+   w_i on one side of zero), sum(sign_i * w_i) equals true gross sum|w_i|, so this
+   is a convex linear lower bound. It rides the generic :inequalities channel
+   (NOT the L1 split-variable :gross-exposure channel, where a >= bound is
+   unenforceable because both split legs could inflate). nil when no floor is set
+   or the universe is not single-signed (see constraints/gross-floor-spec)."
+  [encoded-constraints]
+  (let [floor (:gross-floor encoded-constraints)]
+    (when (and (map? floor)
+               (finite-number? (:min floor))
+               (sequential? (:signs floor)))
+      {:code :gross-floor
+       :coefficients (:signs floor)
+       :lower (:min floor)})))
+
 (defn- l1-constraints
   [encoded-constraints]
   (let [max-gross (get-in encoded-constraints [:gross-exposure :max])
@@ -259,6 +276,8 @@
      :return-tilt (or return-tilt 0)
      :equalities (equality-constraints encoded-constraints n)
      :inequalities (vec (concat (net-inequalities encoded-constraints n)
+                                (when-let [floor (gross-floor-inequality encoded-constraints)]
+                                  [floor])
                                 (when target-return [target-return])))
      :l1-constraints (l1-constraints encoded-constraints)
      :lower-bounds (:lower-bounds encoded-constraints)
@@ -292,6 +311,8 @@
      ;; validation in target selection check closed-form weights unchanged.
      :equalities (equality-constraints encoded-constraints n)
      :inequalities (vec (concat (net-inequalities encoded-constraints n)
+                                (when-let [floor (gross-floor-inequality encoded-constraints)]
+                                  [floor])
                                 (when target-return [target-return])))
      :l1-constraints (l1-constraints encoded-constraints)
      :lower-bounds (unbounded-bound-vector (:lower-bounds encoded-constraints)

@@ -356,8 +356,47 @@
                   :weight weight})))
        vec))
 
+(defn- gross-floor-signs
+  "Per-asset gross sign (+1 long-side, -1 short-side) when every encoded bound
+   pair is single-signed. Returns nil when any asset straddles zero (lower < 0
+   and upper > 0): on a two-sided bound, gross = sum |w_i| is NOT a linear
+   function of the weights, so a gross floor would be non-convex/unsound and must
+   be dropped. Seed-from-current pins every asset's :position-side, so every
+   bound is single-signed and this returns a full sign vector."
+  [lower-bounds upper-bounds]
+  (reduce (fn [signs [lower upper]]
+            (cond
+              (and (number? lower) (>= lower 0)) (conj signs 1)
+              (and (number? upper) (<= upper 0)) (conj signs -1)
+              :else (reduced nil)))
+          []
+          (map vector lower-bounds upper-bounds)))
+
+(defn- gross-floor-spec
+  "Encoded gross floor {:min G :signs [...]} when a finite :gross-floor is
+   requested AND every asset is single-signed; nil otherwise (floor dropped). The
+   signed coefficients turn the floor into the convex linear inequality
+   sum(sign_i * w_i) >= G, which equals true gross only on the fixed-sign region
+   each asset's bounds carve out."
+  [constraints lower-bounds upper-bounds]
+  (let [floor (:gross-floor constraints)]
+    (when (finite-number? floor)
+      (when-let [signs (gross-floor-signs lower-bounds upper-bounds)]
+        {:min floor :signs signs}))))
+
+(defn- gross-capacity
+  "Largest gross the box bounds can physically reach: sum of per-asset
+   max(|lower|, |upper|)."
+  [lower-bounds upper-bounds]
+  (reduce + 0
+          (map (fn [lower upper]
+                 (max (if (number? lower) (js/Math.abs lower) 0)
+                      (if (number? upper) (js/Math.abs upper) 0)))
+               lower-bounds
+               upper-bounds)))
+
 (defn- violations
-  [lower-bounds upper-bounds bounds constraints]
+  [lower-bounds upper-bounds bounds constraints floor-spec]
   (let [target-net* (target-net constraints)
         net-limits (finite-net-limits constraints)
         net-min (:min net-limits)
@@ -413,6 +452,18 @@
             [{:code :locked-gross-above-gross-max
               :locked-gross locked-gross*
               :gross-max gross-max}])
+          (when (and floor-spec
+                     (finite-number? gross-max)
+                     (> (:min floor-spec) gross-max))
+            [{:code :gross-floor-above-gross-max
+              :gross-floor (:min floor-spec)
+              :gross-max gross-max}])
+          (when (and floor-spec
+                     (> (:min floor-spec)
+                        (gross-capacity lower-bounds upper-bounds)))
+            [{:code :gross-floor-exceeds-capacity
+              :gross-floor (:min floor-spec)
+              :gross-capacity (gross-capacity lower-bounds upper-bounds)}])
           (locked-short-violations locked-weights)))))
 
 (defn- apply-runtime-caps
@@ -437,7 +488,8 @@
                      universe)
         lower-bounds (mapv :lower bounds)
         upper-bounds (mapv :upper bounds)
-        violations* (violations lower-bounds upper-bounds bounds constraints)]
+        floor-spec (gross-floor-spec constraints lower-bounds upper-bounds)
+        violations* (violations lower-bounds upper-bounds bounds constraints floor-spec)]
     {:status (if (seq violations*) :infeasible :ok)
      :long-only? (:long-only? constraints)
      :net-target (target-net constraints)
@@ -447,6 +499,7 @@
      :upper-bounds upper-bounds
      :locked-weights (vec (keep :locked bounds))
      :gross-exposure {:max (:gross-leverage constraints)}
+     :gross-floor floor-spec
      :net-exposure (:net-exposure constraints)
      :max-turnover (:max-turnover constraints)
      :rebalance-tolerance (:rebalance-tolerance constraints)

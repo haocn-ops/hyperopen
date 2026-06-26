@@ -62,10 +62,16 @@
   [values]
   (reduce + 0 (map js/Math.abs values)))
 
+(defn- gross-floor-value
+  [signs weights]
+  (reduce + 0 (map * signs weights)))
+
 (defn- l1-violations
   [weights encoded-constraints]
   (let [tol (:constraint-match tolerances)
         gross-max (get-in encoded-constraints [:gross-exposure :max])
+        gross-floor (get-in encoded-constraints [:gross-floor :min])
+        gross-floor-signs (get-in encoded-constraints [:gross-floor :signs])
         max-turnover (:max-turnover encoded-constraints)
         current-weights (:current-weights encoded-constraints)]
     (cond-> []
@@ -75,6 +81,17 @@
       (conj {:code :gross-exposure-violated
              :value (abs-sum weights)
              :limit gross-max})
+
+      ;; A closed-form GMV ignores inequalities, so reject any candidate below the
+      ;; gross floor and let the QP path (which encodes the floor) take over.
+      (and (finite-number? gross-floor)
+           (sequential? gross-floor-signs)
+           (= (count gross-floor-signs) (count weights))
+           (< (gross-floor-value gross-floor-signs weights)
+              (- gross-floor tol)))
+      (conj {:code :gross-floor-violated
+             :value (gross-floor-value gross-floor-signs weights)
+             :limit gross-floor})
 
       (and (finite-number? max-turnover)
            (or (not= (count weights) (count current-weights))
@@ -214,6 +231,7 @@
     :long-only-violated :violates-bounds
     :locked-weights-violated :violates-locked-weights
     :gross-exposure-violated :violates-gross
+    :gross-floor-violated :violates-gross-floor
     :turnover-violated :violates-turnover
     :target-return-floor-violated :violates-target-return
     :non-positive-volatility :violates-sharpe-conditions

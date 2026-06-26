@@ -7,6 +7,8 @@
    :sum-upper-below-net-min #{:net-min :max-asset-weight}
    :sum-lower-above-target #{:held-locks}
    :target-return-above-feasible-maximum #{:target-return}
+   :gross-floor-above-gross-max #{:gross-min :gross-max}
+   :gross-floor-exceeds-capacity #{:gross-min :max-asset-weight}
    :solver-result-gross-exposure-violation #{:gross-max}
    :solver-result-turnover-violation #{:max-turnover}})
 
@@ -17,6 +19,7 @@
 
 (def ^:private control-labels
   {:max-asset-weight "Max Asset Weight"
+   :gross-min "Gross Exposure Min"
    :gross-max "Gross Exposure"
    :held-locks "Held Position Locks"
    :max-turnover "Turnover Cap"
@@ -53,6 +56,26 @@
             (opt-format/format-decimal (:net-min violation))
             ".")
        "Lower Net Exposure Min, add eligible long assets, or raise Max Asset Weight."])
+
+    :gross-floor-above-gross-max
+    (when (and (opt-format/finite-number? (:gross-floor violation))
+               (opt-format/finite-number? (:gross-max violation)))
+      [(str "Gross Exposure Min of "
+            (opt-format/format-decimal (:gross-floor violation))
+            " is above the maximum of "
+            (opt-format/format-decimal (:gross-max violation))
+            ".")
+       "Raise Gross Exposure (max) or lower Gross Exposure Min."])
+
+    :gross-floor-exceeds-capacity
+    (when (and (opt-format/finite-number? (:gross-floor violation))
+               (opt-format/finite-number? (:gross-capacity violation)))
+      [(str "Gross Exposure Min of "
+            (opt-format/format-decimal (:gross-floor violation))
+            " is higher than the "
+            (opt-format/format-decimal (:gross-capacity violation))
+            " the selected assets can reach.")
+       "Lower Gross Exposure Min, add eligible assets, or raise Max Asset Weight."])
     nil))
 
 (defn- violation-messages

@@ -40,7 +40,7 @@
                                                               :szi "10"
                                                               :markPx "100"}}]}}
                :spot {:clearinghouse-state
-                      {:balances [{:coin "USDC" :total "100000" :hold "0"}
+                      {:balances [{:coin "USDC" :total "300000" :hold "0"}
                                   {:coin "PURR" :total "10" :hold "2"}]}}
                :asset-selector {:market-by-key {"spot:PURR/USDC" {:key "spot:PURR/USDC"
                                                                   :market-type :spot
@@ -61,8 +61,12 @@
     (is (true? (:capital-ready? snapshot)))
     (is (true? (:execution-ready? snapshot)))
     (is (= 4 (count (:exposures snapshot))))
-    (is (= 100005 (get-in snapshot [:capital :nav-usdc])))
-    (is (= 100000 (get-in snapshot [:capital :cash-usdc])))
+    ;; Unified account: NAV is the shared spot-wallet collateral (cash 300000 +
+    ;; non-cash spot 5 = 300005), NOT the single main-dex perp accountValue
+    ;; (100000). Exposure spans the main dex AND dex-a, so the denominator must be
+    ;; the whole-account collateral.
+    (is (= 300005 (get-in snapshot [:capital :nav-usdc])))
+    (is (= 300000 (get-in snapshot [:capital :cash-usdc])))
     (is (= 5 (get-in snapshot [:capital :spot-noncash-usdc])))
     (is (= 25000 (:signed-notional-usdc btc)))
     (is (= :long (:side btc)))
@@ -75,10 +79,38 @@
     (is (= "PURR/USDC" (:symbol purr)))
     (is (= "PURR" (:base purr)))
     (is (= "USDC" (:quote purr)))
-    (is (near? (/ 25000 100005) (:weight btc)))
+    (is (near? (/ 25000 300005) (:weight btc)))
     (is (= 32005 (get-in snapshot [:capital :gross-exposure-usdc])))
     (is (= 20005 (get-in snapshot [:capital :net-exposure-usdc])))
     (is (= [] (:warnings snapshot)))))
+
+(deftest current-portfolio-snapshot-classic-keeps-perp-equity-as-nav-test
+  ;; Regression guard for the unified NAV fix: a CLASSIC account must keep using
+  ;; the perp clearinghouse equity (+ non-cash spot) as NAV and must NOT treat the
+  ;; spot USDC cash balance as optimizer collateral. Here perp equity (100000)
+  ;; differs from spot cash (300000); the unified spot-collateral branch must not
+  ;; fire.
+  (let [state {:wallet {:address owner-address}
+               :router {:path "/portfolio"}
+               :account {:mode :classic}
+               :webdata2 {:clearinghouseState
+                          {:marginSummary {:accountValue "100000"
+                                           :totalMarginUsed "0"}
+                           :assetPositions [{:position {:coin "BTC"
+                                                        :szi "0.5"
+                                                        :positionValue "25000"
+                                                        :markPx "50000"
+                                                        :leverage {:type "cross"
+                                                                   :value "10"}}}]}}
+               :spot {:clearinghouse-state
+                      {:balances [{:coin "USDC" :total "300000" :hold "0"}]}}
+               :asset-selector {:market-by-key {}}}
+        snapshot (current-portfolio/current-portfolio-snapshot state)
+        btc (exposure-by-id snapshot "perp:BTC")]
+    (is (= 100000 (get-in snapshot [:capital :nav-usdc])))
+    (is (= 300000 (get-in snapshot [:capital :cash-usdc])))
+    (is (= 0 (get-in snapshot [:capital :spot-noncash-usdc])))
+    (is (near? (/ 25000 100000) (:weight btc)))))
 
 (deftest current-portfolio-snapshot-uses-inspected-account-and-read-only-state-test
   (let [snapshot (current-portfolio/current-portfolio-snapshot
@@ -218,6 +250,9 @@
                      snapshot
                      existing)]
     (is (= false (:long-only? constraints)))
+    ;; gross floor seeded from current gross ratio (16000/10000 = 1.6) so the
+    ;; recommendation preserves leverage instead of delevering.
+    (is (= 1.6 (:gross-min constraints)))
     (is (= 1.6 (:gross-max constraints)))
     (is (= 0.95 (:net-min constraints)))
     (is (= 1.05 (:net-max constraints)))
@@ -248,6 +283,7 @@
                       :net-max 1.0
                       :max-asset-weight 0.5
                       :max-turnover 1.0})]
+    (is (= 0.32 (:gross-min constraints)))
     (is (= 0.33 (:gross-max constraints)))
     (is (= 0.15 (:net-min constraints)))
     (is (= 0.26 (:net-max constraints)))

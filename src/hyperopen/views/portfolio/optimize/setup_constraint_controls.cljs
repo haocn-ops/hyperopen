@@ -9,6 +9,7 @@
   {:long-only? "Restricts target weights to zero or positive values. Turn this off when short or hedged perp exposure is allowed."
    :include-spot? "Allows spot instruments in optimizer recommendations. Leave this off to restrict target legs to perps and vaults."
    :max-asset-weight "Maximum target portfolio weight any single asset can receive. 0.5 means no asset can exceed 50%."
+   :gross-min "Minimum total absolute exposure to hold. Seeded from your current gross leverage so the optimizer preserves leverage instead of delevering. Leave blank to allow full delevering."
    :gross-max "Maximum total absolute exposure across all legs. 1 means long exposure plus short exposure can total up to 100% of capital."
    :net-min "Minimum signed net exposure allowed after optimization. Leave blank when only the maximum net exposure matters."
    :net-max "Maximum signed net exposure allowed after optimization. 1 means the portfolio can be net long up to 100% of capital."
@@ -162,7 +163,10 @@
                       :max-asset-weight (:max-asset-weight constraints)
                       "portfolio-optimizer-constraint-max-asset-weight-input"
                       (contains? highlighted-controls :max-asset-weight))
-      (constraint-row "Gross exposure" "Gross Leverage"
+      (constraint-row "Gross exposure min" :gross-min (:gross-min constraints)
+                      "portfolio-optimizer-constraint-gross-min-input"
+                      (contains? highlighted-controls :gross-min))
+      (constraint-row "Gross exposure max" "Gross Leverage"
                       :gross-max (:gross-max constraints)
                       "portfolio-optimizer-constraint-gross-max-input"
                       (contains? highlighted-controls :gross-max))

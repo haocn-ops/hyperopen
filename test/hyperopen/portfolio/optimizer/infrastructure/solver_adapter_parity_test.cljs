@@ -195,3 +195,37 @@
     (is (= :infeasible (:status plan)))
     (is (= :target-return-above-feasible-maximum (:reason plan)))
     (is (near? 0.17 (get-in plan [:details :max-return])))))
+
+(deftest gross-floor-holds-leverage-instead-of-delevering-test
+  ;; Regression for the "min-vol delevers my book" report: with a gross FLOOR,
+  ;; minimum-variance holds gross at the floor (preserves leverage) instead of
+  ;; collapsing toward the net floor. Verified through both solver paths.
+  (async done
+    (let [base {:universe [{:instrument-id "perp:A" :instrument-type :perp
+                            :position-side :long}
+                           {:instrument-id "perp:B" :instrument-type :perp
+                            :position-side :short}]
+                :constraints {:long-only? false
+                              :gross-leverage 2.0
+                              :net-exposure {:min 0.2 :max 0.3}
+                              :max-asset-weight 1.0}
+                :objective {:kind :minimum-variance}
+                :expected-returns [0.0 0.0]
+                :covariance [[1 0]
+                             [0 1]]}
+          no-floor (first-problem base)
+          with-floor (first-problem (assoc-in base [:constraints :gross-floor] 1.0))
+          no-floor-qp (solver-adapter/solve-with-quadprog no-floor)
+          with-floor-qp (solver-adapter/solve-with-quadprog with-floor)]
+      ;; control: without a floor, min-vol delevers to ~the net floor
+      (is (= :solved (:status no-floor-qp)))
+      (is (near? 0.2 (gross (:weights no-floor-qp))) "no-floor delevers to net floor")
+      ;; with the floor, gross is held at the floor (leverage preserved)
+      (is (= :solved (:status with-floor-qp)))
+      (is (near? 1.0 (gross (:weights with-floor-qp))) "floor preserves gross (quadprog)")
+      ;; same result through OSQP
+      (-> (solver-adapter/solve-with-osqp with-floor)
+          (.then (fn [osqp-res]
+                   (is (= :solved (:status osqp-res)))
+                   (is (near? 1.0 (gross (:weights osqp-res))) "floor preserves gross (OSQP)")
+                   (done)))))))

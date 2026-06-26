@@ -43,6 +43,7 @@
 
 (def numeric-constraint-keys
   #{:max-asset-weight
+    :gross-min
     :gross-max
     :net-min
     :net-max
@@ -51,7 +52,8 @@
     :rebalance-tolerance})
 
 (def clearable-numeric-constraint-keys
-  #{:max-turnover})
+  #{:gross-min
+    :max-turnover})
 
 (def boolean-constraint-keys
   #{:long-only?

@@ -341,3 +341,43 @@
                     (= :max-long-weight (:field %))
                     (= "perp:A" (:instrument-id %)))
               violations))))
+
+(deftest encode-constraints-emits-signed-gross-floor-for-single-signed-universe-test
+  ;; Seed-from-current fixes each asset's side, so every bound is single-signed
+  ;; and a gross floor is a convex signed-linear inequality: long => +1, short => -1.
+  (let [encoded (constraints/encode-constraints
+                 {:universe [{:instrument-id "perp:A" :market-type :perp
+                              :position-side :long}
+                             {:instrument-id "perp:B" :market-type :perp
+                              :position-side :short}]
+                  :constraints {:long-only? false
+                                :gross-floor 1.0
+                                :gross-leverage 3.0
+                                :max-asset-weight 2.0}})]
+    (is (= :ok (:status encoded)))
+    (is (= {:min 1.0 :signs [1 -1]} (:gross-floor encoded)))))
+
+(deftest encode-constraints-drops-gross-floor-for-two-sided-universe-test
+  ;; Without a fixed side a perp bound straddles zero ([-cap, cap]); gross is then
+  ;; not linear in the weights, so the floor must be dropped (nil), not enforced.
+  (let [encoded (constraints/encode-constraints
+                 {:universe [{:instrument-id "perp:A" :market-type :perp}]
+                  :constraints {:long-only? false
+                                :gross-floor 1.0
+                                :gross-leverage 3.0
+                                :max-asset-weight 2.0}})]
+    (is (= [-2.0] (:lower-bounds encoded)))
+    (is (= [2.0] (:upper-bounds encoded)))
+    (is (nil? (:gross-floor encoded)))))
+
+(deftest presolve-reports-gross-floor-above-gross-max-test
+  (let [encoded (constraints/encode-constraints
+                 {:universe [{:instrument-id "perp:A" :market-type :perp
+                              :position-side :long}]
+                  :constraints {:long-only? false
+                                :gross-floor 3.0
+                                :gross-leverage 2.0
+                                :max-asset-weight 5.0}})]
+    (is (= :infeasible (:status encoded)))
+    (is (some #(= :gross-floor-above-gross-max (:code %))
+              (:violations encoded)))))

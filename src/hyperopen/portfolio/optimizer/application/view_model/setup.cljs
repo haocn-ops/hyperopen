@@ -144,7 +144,10 @@
        (summary-row "Objective" (labelize* objective-kind)
                     "Objective remains separate from return model selection.")
        (summary-row "Constraints"
-                    (str "gross <= " (or (:gross-max constraints) "--")
+                    (str "gross "
+                         (if (:gross-min constraints)
+                           (str (:gross-min constraints) ".." (or (:gross-max constraints) "--"))
+                           (str "<= " (or (:gross-max constraints) "--")))
                          " - cap <= " (percent-label* (:max-asset-weight constraints)))
                     "Constraints are enforced before the recommendation is accepted.")
        (summary-row "Horizon" "Annualized"

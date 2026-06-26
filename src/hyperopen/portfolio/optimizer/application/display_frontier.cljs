@@ -68,6 +68,7 @@
 
 (def ^:private frontier-constraint-comparison-keys
   [:gross-exposure
+   :gross-floor
    :locked-weights
    :long-only?
    :lower-bounds

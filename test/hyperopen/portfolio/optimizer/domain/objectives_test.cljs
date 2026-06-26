@@ -376,3 +376,30 @@
                             [0 1]]
                :encoded-constraints encoded})]
     (is (= [] (get-in plan [:problems 0 :l1-constraints])))))
+
+(deftest gross-floor-encodes-as-signed-inequality-not-l1-test
+  (let [encoded (constraints/encode-constraints
+                 {:universe [{:instrument-id "A" :market-type :perp :position-side :long}
+                             {:instrument-id "B" :market-type :perp :position-side :short}]
+                  :constraints {:long-only? false
+                                :gross-floor 1.0
+                                :gross-leverage 3.0
+                                :net-exposure {:min 0.2 :max 0.3}
+                                :max-asset-weight 2.0}})
+        plan (objectives/build-solver-plan
+              {:objective {:kind :minimum-variance}
+               :instrument-ids ["A" "B"]
+               :expected-returns [0.1 0.1]
+               :covariance [[1 0]
+                            [0 1]]
+               :encoded-constraints encoded})
+        inequalities (get-in plan [:problems 0 :inequalities])]
+    (is (= :single-qp (:strategy plan)))
+    ;; the floor rides the generic signed-linear inequality channel ...
+    (is (some #(and (= :gross-floor (:code %))
+                    (= [1 -1] (:coefficients %))
+                    (= 1.0 (:lower %)))
+              inequalities))
+    ;; ... and NOT the L1 split-variable channel (where a >= floor is unenforceable)
+    (is (not-any? #(= :gross-floor (:code %))
+                  (get-in plan [:problems 0 :l1-constraints])))))

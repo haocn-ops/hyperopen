@@ -220,6 +220,7 @@
                                  :market-type :perp
                                  :coin "BTC"}]
                      :constraints {:long-only? false
+                                   :gross-min 0.9
                                    :gross-max 1.3
                                    :net-min -0.2
                                    :net-max 0.8
@@ -247,6 +248,7 @@
                   :as-of-ms 2500})
         constraints (:constraints request)]
     (is (= 1.3 (:gross-leverage constraints)))
+    (is (= 0.9 (:gross-floor constraints)))
     (is (= {:min -0.2 :max 0.8} (:net-exposure constraints)))
     (is (= ["perp:BTC"] (:allowlist constraints)))
     (is (= ["spot:PURR"] (:blocklist constraints)))
@@ -262,6 +264,7 @@
            (:per-perp-leverage-caps constraints)))
     (is (= 0.25 (:max-turnover constraints)))
     (is (not (contains? constraints :gross-max)))
+    (is (not (contains? constraints :gross-min)))
     (is (not (contains? constraints :net-min)))
     (is (not (contains? constraints :asset-overrides)))))
 

@@ -394,8 +394,26 @@
          spot-noncash-usdc :spot-noncash-usdc} (build-spot-exposures state)
         perp-account-value (perp-account-value-usdc state)
         total-margin-used (total-margin-used-usdc state)
-        nav-usdc (if (number? perp-account-value)
+        ;; A unified (portfolio-margin) account backs perps across EVERY dex from a
+        ;; single shared spot-wallet collateral pool, so the main perp
+        ;; clearinghouse's marginSummary.accountValue is just one dex's
+        ;; sub-allocation, not the account's capital. gross/net-exposure below sum
+        ;; positions across all dexes (incl. HIP-3), so dividing by single-dex perp
+        ;; equity overstates leverage (e.g. 25x vs a real 5.9x). The correct
+        ;; denominator is the spot-wallet equity (cash + non-cash spot), which
+        ;; equals the trade page's "Unified Account Value" / portfolio-value.
+        ;; Classic accounts keep perp equity + non-cash spot unchanged.
+        unified-account? (= :unified (get-in state [:account :mode]))
+        unified-collateral-usdc (+ cash-usdc spot-noncash-usdc)
+        nav-usdc (cond
+                   (and unified-account?
+                        (positive-number? unified-collateral-usdc))
+                   unified-collateral-usdc
+
+                   (number? perp-account-value)
                    (+ perp-account-value spot-noncash-usdc)
+
+                   :else
                    (+ cash-usdc spot-noncash-usdc))
         raw-exposures (vec (concat perp-exposures spot-exposures))
         exposures (with-weights nav-usdc raw-exposures)
@@ -475,6 +493,11 @@
                                   current-max-asset-weight)]
         (assoc constraints
                :long-only? false
+               ;; Preserve the book's leverage by default: a gross FLOOR at the
+               ;; current gross ratio (rounded down so it never lands above the
+               ;; ceiled gross-max) keeps minimum-variance from delevering to the
+               ;; net floor. Clearing :gross-min in the UI removes the floor.
+               :gross-min (floor-to-constraint-precision gross-ratio)
                :gross-max gross-max
                :net-min net-min
                :net-max net-max

@@ -185,6 +185,38 @@
                       (is false (str "Unexpected error: " err))
                       (done))))))))
 
+(deftest base-open-orders-refresh-replaces-rendered-open-orders-source-test
+  (async done
+    (let [address "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          stale-order {:coin "SOL"
+                       :oid 44}
+          store (atom {:wallet {:address address}
+                       :orders {:open-orders [{:order stale-order}]
+                                :open-orders-snapshot [{:order stale-order}]}})
+          refresh-open-orders! @#'refresh-runtime/refresh-open-orders-snapshot!
+          service (api-service/make-service
+                   {:info-client-instance
+                    {:request-info! (fn [body _opts]
+                                      (case (get body "type")
+                                        "frontendOpenOrders" (js/Promise.resolve [])
+                                        (js/Promise.resolve nil)))
+                     :get-request-stats (fn [] {})
+                     :reset! (fn [] nil)}
+                    :log-fn (fn [& _] nil)})]
+      (api/install-api-service! service)
+      (-> (refresh-open-orders! store address nil {:priority :high})
+          (.then (fn [_payload]
+                   (is (= []
+                          (get-in @store [:orders :open-orders-snapshot])))
+                   (is (= []
+                          (get-in @store [:orders :open-orders])))
+                   (api/reset-api-service!)
+                   (done)))
+          (.catch (fn [err]
+                    (api/reset-api-service!)
+                    (is false (str "Unexpected error: " err))
+                    (done)))))))
+
 (deftest refresh-snapshot-helpers-apply-errors-and-log-default-failures-test
   (async done
     (let [address "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"

@@ -266,6 +266,7 @@
            refresh-perp-dex-clearinghouse!
            resolve-current-address
            refresh-spot?
+           force-base-open-orders-refresh?
            refresh-dex-open-orders-when-stream-live?
            gate-perp-dex-by-stream?
            skip-perp-dex-when-subscribed-and-ready?
@@ -286,7 +287,8 @@
                               (surface-policy/topic-usable-for-address? state
                                                                         "webData2"
                                                                         address))]
-      (when-not open-orders-live?
+      (when (or force-base-open-orders-refresh?
+                (not open-orders-live?))
         (call-when-fn! refresh-open-orders! store address nil {:priority :high}))
       (when refresh-spot?
         (call-when-fn! refresh-spot-clearinghouse!
@@ -360,6 +362,7 @@
   (run-post-event-refresh!
    (assoc deps
           :refresh-spot? (surface-policy/spot-refresh-surface-active? @store)
+          :force-base-open-orders-refresh? (not (false? (:force-base-open-orders-refresh? deps)))
           :gate-perp-dex-by-stream? true
           :skip-perp-dex-when-subscribed-and-ready? true
           :require-perp-dex-snapshot-ready-when-stream-usable? false

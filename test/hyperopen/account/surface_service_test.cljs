@@ -51,7 +51,7 @@
     (is (nil? @scheduled-callback))
     (is (= [] @fetch-calls))))
 
-(deftest refresh-after-user-fill-respects-stream-and-ready-snapshot-coverage-test
+(deftest refresh-after-user-fill-forces-base-open-orders-and-respects-ready-snapshot-coverage-test
   (async done
     (let [dex "vault"
           refresh-open-orders-calls (atom [])
@@ -102,7 +102,8 @@
                                            (swap! refresh-perp-dex-calls conj [refresh-address refresh-dex opts]))})
       (js/setTimeout
        (fn []
-         (is (= [] @refresh-open-orders-calls))
+         (is (= [[address nil {:priority :high}]]
+                @refresh-open-orders-calls))
          (is (= [] @refresh-default-clearinghouse-calls))
          (is (= [[address {:priority :high
                            :force-refresh? true}]]
@@ -110,6 +111,41 @@
          (is (= [] @refresh-perp-dex-calls))
          (is (= [[address [dex]]]
                 @sync-calls))
+         (done))
+       0))))
+
+(deftest refresh-after-user-fill-refreshes-base-open-orders-when-stream-is-event-driven-test
+  (async done
+    (let [refresh-open-orders-calls (atom [])
+          store (atom
+                 {:wallet {:address address}
+                  :router {:path "/trade"}
+                  :account-info {:selected-tab :open-orders}
+                  :websocket {:health {:transport {:state :connected
+                                                   :freshness :live}
+                                       :streams {["openOrders" nil address nil nil]
+                                                 {:topic "openOrders"
+                                                  :status :n-a
+                                                  :subscribed? true
+                                                  :descriptor {:type "openOrders"
+                                                               :user address}}
+                                                 ["webData2" nil address nil nil]
+                                                 {:topic "webData2"
+                                                  :status :n-a
+                                                  :subscribed? true
+                                                  :descriptor {:type "webData2"
+                                                               :user address}}}}}})]
+      (surface-service/refresh-after-user-fill!
+       {:store store
+        :address address
+        :ensure-perp-dexs! (fn [_store _opts]
+                             (js/Promise.resolve []))
+        :refresh-open-orders! (fn [_store refresh-address refresh-dex opts]
+                                (swap! refresh-open-orders-calls conj [refresh-address refresh-dex opts]))})
+      (js/setTimeout
+       (fn []
+         (is (= [[address nil {:priority :high}]]
+                @refresh-open-orders-calls))
          (done))
        0))))
 

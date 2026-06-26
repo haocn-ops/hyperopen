@@ -37,11 +37,20 @@
                                          (cond-> (merge {:force-refresh? true}
                                                         (or opts {}))
                                            (and dex (not= dex "")) (assoc :dex dex)))
-      (.then (apply-success-and-return-when-address-active
-              store
-              address
-              api-projections/apply-open-orders-success
-              dex))
+      (.then (fn [payload]
+               (when (common/requested-address-active? store address)
+                 (swap! store
+                        (fn [state]
+                          (let [state* (api-projections/apply-open-orders-success
+                                        state
+                                        dex
+                                        payload)]
+                            (if (or (nil? dex) (= "" dex))
+                              (assoc-in state*
+                                        [:orders :open-orders]
+                                        (get-in state* [:orders :open-orders-snapshot]))
+                              state*)))))
+               payload))
       (.catch (apply-error-and-reject-when-address-active
                store
                address
@@ -91,11 +100,12 @@
     :apply-perp-dexs-error api-projections/apply-perp-dexs-error}
    opts))
 
-(defn refresh-account-surfaces-after-user-fill!
-  [store address]
+(defn- refresh-account-surfaces-after-user-event!
+  [store address opts]
   (account-surface-service/refresh-after-user-fill!
    {:store store
     :address address
+    :force-base-open-orders-refresh? (not (false? (:force-base-open-orders-refresh? opts)))
     :ensure-perp-dexs! ensure-perp-dex-metadata!
     :sync-perp-dex-clearinghouse-subscriptions!
     user-subscriptions-runtime/sync-perp-dex-clearinghouse-subscriptions!
@@ -106,14 +116,18 @@
     :resolve-current-address account-context/effective-account-address
     :log-fn telemetry/log!}))
 
+(defn refresh-account-surfaces-after-user-fill!
+  [store address]
+  (refresh-account-surfaces-after-user-event! store address {}))
+
 (defn clear-account-surface-refresh-timeout!
   []
   (when-let [timeout-id (get-in @runtime-state/runtime account-surface-refresh-timeout-path)]
     (platform/clear-timeout! timeout-id)
     (swap! runtime-state/runtime assoc-in account-surface-refresh-timeout-path nil)))
 
-(defn schedule-account-surface-refresh-after-fill!
-  [store]
+(defn- schedule-account-surface-refresh!
+  [store refresh-fn]
   (when-let [address (account-context/effective-account-address @store)]
     (let [address* (common/normalized-address address)]
       (when address*
@@ -128,5 +142,22 @@
                          account-surface-refresh-timeout-path
                          nil)
                   (when (common/requested-address-active? store address*)
-                    (refresh-account-surfaces-after-user-fill! store address*)))
+                    (refresh-fn store address*)))
                 fill-account-surface-refresh-debounce-ms))))))
+
+(defn schedule-account-surface-refresh-after-fill!
+  [store]
+  (schedule-account-surface-refresh!
+   store
+   (fn [store* address*]
+     (refresh-account-surfaces-after-user-fill! store* address*))))
+
+(defn schedule-account-surface-refresh-after-ledger!
+  [store]
+  (schedule-account-surface-refresh!
+   store
+   (fn [store* address*]
+     (refresh-account-surfaces-after-user-event!
+      store*
+      address*
+      {:force-base-open-orders-refresh? false}))))

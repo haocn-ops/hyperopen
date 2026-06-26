@@ -139,7 +139,7 @@
             (swap! store assoc-in [:orders :ledger] rows)
             (do
               (swap! store update-in [:orders :ledger] #(upsert-seq (or % []) rows))
-              (refresh-runtime/schedule-account-surface-refresh-after-fill! store))))))))
+              (refresh-runtime/schedule-account-surface-refresh-after-ledger! store))))))))
 
 (defn user-twap-history-handler
   [store]

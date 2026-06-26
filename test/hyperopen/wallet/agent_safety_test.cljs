@@ -9,6 +9,12 @@
                   :agent {:status :ready
                           :agent-address "0xagent"}}}))
 
+(defn- ready-store-with-mode
+  [mode]
+  (atom (assoc-in @(ready-store)
+                  [:trading-settings :open-order-safety-mode]
+                  mode)))
+
 (deftest install-agent-safety-classifies-volume-gate-and-stops-refresh-test
   (async done
     (let [store (ready-store)
@@ -91,4 +97,113 @@
              (agent-safety/stop-agent-safety! {:runtime runtime
                                                :clear-timeout-fn (fn [_])})
              (done))))
+       0))))
+
+(deftest install-agent-safety-uses-extended-open-order-safety-mode-test
+  (async done
+    (let [store (ready-store-with-mode :extended)
+          runtime (atom {:timeouts {:agent-schedule-cancel-refresh nil}})
+          schedule-calls (atom [])
+          timer-calls (atom [])
+          original-schedule-cancel! trading-api/schedule-cancel!]
+      (set! trading-api/schedule-cancel!
+            (fn [_store address cancel-at-ms & [_options]]
+              (swap! schedule-calls conj [address cancel-at-ms])
+              (js/Promise.resolve {:status "ok"})))
+      (agent-safety/install-agent-safety-watch!
+       {:store store
+        :runtime runtime
+        :ahead-ms 60000
+        :refresh-ms 30000
+        :now-ms-fn (constantly 1000)
+        :set-timeout-fn (fn [callback delay-ms]
+                          (swap! timer-calls conj [callback delay-ms])
+                          :timer-id)})
+      (js/setTimeout
+       (fn []
+         (try
+           (is (= [["0xowner" 14401000]] @schedule-calls))
+           (is (= 1 (count @timer-calls)))
+           (is (= 900000 (second (first @timer-calls))))
+           (finally
+             (set! trading-api/schedule-cancel! original-schedule-cancel!)
+             (agent-safety/stop-agent-safety! {:runtime runtime
+                                               :clear-timeout-fn (fn [_])})
+             (done))))
+       0))))
+
+(deftest install-agent-safety-clears-schedule-cancel-when-open-order-safety-is-off-test
+  (async done
+    (let [store (ready-store-with-mode :off)
+          runtime (atom {:timeouts {:agent-schedule-cancel-refresh nil}})
+          schedule-calls (atom [])
+          timer-calls (atom [])
+          original-schedule-cancel! trading-api/schedule-cancel!]
+      (set! trading-api/schedule-cancel!
+            (fn [_store address cancel-at-ms & [_options]]
+              (swap! schedule-calls conj [address cancel-at-ms])
+              (js/Promise.resolve {:status "ok"})))
+      (agent-safety/install-agent-safety-watch!
+       {:store store
+        :runtime runtime
+        :ahead-ms 60000
+        :refresh-ms 30000
+        :now-ms-fn (constantly 1000)
+        :set-timeout-fn (fn [callback delay-ms]
+                          (swap! timer-calls conj [callback delay-ms])
+                          :timer-id)})
+      (js/setTimeout
+       (fn []
+         (try
+           (is (= [["0xowner" nil]] @schedule-calls))
+           (is (= [] @timer-calls))
+           (finally
+             (set! trading-api/schedule-cancel! original-schedule-cancel!)
+             (agent-safety/stop-agent-safety! {:runtime runtime
+                                               :clear-timeout-fn (fn [_])})
+             (done))))
+       0))))
+
+(deftest install-agent-safety-reacts-to-open-order-safety-mode-change-test
+  (async done
+    (let [store (ready-store)
+          runtime (atom {:timeouts {:agent-schedule-cancel-refresh nil}})
+          schedule-calls (atom [])
+          timer-calls (atom [])
+          original-schedule-cancel! trading-api/schedule-cancel!]
+      (set! trading-api/schedule-cancel!
+            (fn [_store address cancel-at-ms & [_options]]
+              (swap! schedule-calls conj [address cancel-at-ms])
+              (js/Promise.resolve {:status "ok"})))
+      (agent-safety/install-agent-safety-watch!
+       {:store store
+        :runtime runtime
+        :ahead-ms 60000
+        :refresh-ms 30000
+        :now-ms-fn (constantly 1000)
+        :set-timeout-fn (fn [callback delay-ms]
+                          (swap! timer-calls conj [callback delay-ms])
+                          :timer-id)})
+      (js/setTimeout
+       (fn []
+         (try
+           (swap! store assoc-in [:trading-settings :open-order-safety-mode] :off)
+           (js/setTimeout
+            (fn []
+              (try
+                (is (= [["0xowner" 61000]
+                        ["0xowner" nil]]
+                       @schedule-calls))
+                (finally
+                  (set! trading-api/schedule-cancel! original-schedule-cancel!)
+                  (agent-safety/stop-agent-safety! {:runtime runtime
+                                                    :clear-timeout-fn (fn [_])})
+                  (done))))
+            0)
+         (catch :default err
+           (set! trading-api/schedule-cancel! original-schedule-cancel!)
+           (agent-safety/stop-agent-safety! {:runtime runtime
+                                             :clear-timeout-fn (fn [_])})
+           (is false (str "Unexpected error: " err))
+           (done))))
        0))))

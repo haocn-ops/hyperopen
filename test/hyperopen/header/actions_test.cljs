@@ -16,6 +16,7 @@
    'set-confirm-open-orders-enabled (resolve 'hyperopen.header.actions/set-confirm-open-orders-enabled)
    'set-confirm-close-position-enabled (resolve 'hyperopen.header.actions/set-confirm-close-position-enabled)
    'set-confirm-market-orders-enabled (resolve 'hyperopen.header.actions/set-confirm-market-orders-enabled)
+   'set-open-order-safety-mode (resolve 'hyperopen.header.actions/set-open-order-safety-mode)
    'set-sound-on-fill-enabled (resolve 'hyperopen.header.actions/set-sound-on-fill-enabled)})
 
 (defn- resolve-action
@@ -118,153 +119,51 @@
              (request-action state :plain))))))
 
 (deftest header-settings-toggle-actions-persist-bound-local-preferences-test
-  (let [fill-alerts-action (resolve-action 'set-fill-alerts-enabled)
-        animate-action (resolve-action 'set-animate-orderbook-enabled)
-        fill-markers-action (resolve-action 'set-fill-markers-enabled)
-        confirm-open-action (resolve-action 'set-confirm-open-orders-enabled)
-        confirm-close-action (resolve-action 'set-confirm-close-position-enabled)
-        confirm-market-action (resolve-action 'set-confirm-market-orders-enabled)
-        sound-action (resolve-action 'set-sound-on-fill-enabled)
-        base-state {:trading-settings {:fill-alerts-enabled? true
-                                       :animate-orderbook? true
-                                       :show-fill-markers? false
-                                       :confirm-open-orders? true
-                                       :confirm-close-position? true
-                                       :confirm-market-orders? true
-                                       :sound-on-fill? false}}]
-    (is (some? fill-alerts-action))
-    (is (some? animate-action))
-    (is (some? fill-markers-action))
-    (is (some? confirm-open-action))
-    (is (some? confirm-close-action))
-    (is (some? confirm-market-action))
-    (is (some? sound-action))
-    (when fill-alerts-action
-      (is (= [[:effects/save [:trading-settings]
-               {:fill-alerts-enabled? false
-                :animate-orderbook? true
-                :show-fill-markers? false
-                :confirm-open-orders? true
-                :confirm-close-position? true
-                :confirm-market-orders? true
-                :sound-on-fill? false}]
-              [:effects/local-storage-set-json trading-settings/storage-key
-               {:fill-alerts-enabled? false
-                :animate-orderbook? true
-                :show-fill-markers? false
-                :confirm-open-orders? true
-                :confirm-close-position? true
-                :confirm-market-orders? true
-                :sound-on-fill? false}]]
-             (fill-alerts-action base-state false))))
-    (when animate-action
-      (is (= [[:effects/save [:trading-settings]
-               {:fill-alerts-enabled? true
-                :animate-orderbook? false
-                :show-fill-markers? false
-                :confirm-open-orders? true
-                :confirm-close-position? true
-                :confirm-market-orders? true
-                :sound-on-fill? false}]
-              [:effects/local-storage-set-json trading-settings/storage-key
-               {:fill-alerts-enabled? true
-                :animate-orderbook? false
-                :show-fill-markers? false
-                :confirm-open-orders? true
-                :confirm-close-position? true
-                :confirm-market-orders? true
-                :sound-on-fill? false}]]
-             (animate-action base-state false))))
-    (when fill-markers-action
-      (is (= [[:effects/save [:trading-settings]
-               {:fill-alerts-enabled? true
-                :animate-orderbook? true
-                :show-fill-markers? true
-                :confirm-open-orders? true
-                :confirm-close-position? true
-                :confirm-market-orders? true
-                :sound-on-fill? false}]
-              [:effects/local-storage-set-json trading-settings/storage-key
-               {:fill-alerts-enabled? true
-                :animate-orderbook? true
-                :show-fill-markers? true
-                :confirm-open-orders? true
-                :confirm-close-position? true
-                :confirm-market-orders? true
-                :sound-on-fill? false}]]
-             (fill-markers-action base-state true))))
-    (when confirm-open-action
-      (is (= [[:effects/save [:trading-settings]
-               {:fill-alerts-enabled? true
-                :animate-orderbook? true
-                :show-fill-markers? false
-                :confirm-open-orders? false
-                :confirm-close-position? true
-                :confirm-market-orders? true
-                :sound-on-fill? false}]
-              [:effects/local-storage-set-json trading-settings/storage-key
-               {:fill-alerts-enabled? true
-                :animate-orderbook? true
-                :show-fill-markers? false
-                :confirm-open-orders? false
-                :confirm-close-position? true
-                :confirm-market-orders? true
-                :sound-on-fill? false}]]
-             (confirm-open-action base-state false))))
-    (when confirm-close-action
-      (is (= [[:effects/save [:trading-settings]
-               {:fill-alerts-enabled? true
-                :animate-orderbook? true
-                :show-fill-markers? false
-                :confirm-open-orders? true
-                :confirm-close-position? false
-                :confirm-market-orders? true
-                :sound-on-fill? false}]
-              [:effects/local-storage-set-json trading-settings/storage-key
-               {:fill-alerts-enabled? true
-                :animate-orderbook? true
-                :show-fill-markers? false
-                :confirm-open-orders? true
-                :confirm-close-position? false
-                :confirm-market-orders? true
-                :sound-on-fill? false}]]
-             (confirm-close-action base-state false))))
-    (when confirm-market-action
-      (is (= [[:effects/save [:trading-settings]
-               {:fill-alerts-enabled? true
-                :animate-orderbook? true
-                :show-fill-markers? false
-                :confirm-open-orders? true
-                :confirm-close-position? true
-                :confirm-market-orders? false
-                :sound-on-fill? false}]
-              [:effects/local-storage-set-json trading-settings/storage-key
-               {:fill-alerts-enabled? true
-                :animate-orderbook? true
-                :show-fill-markers? false
-                :confirm-open-orders? true
-                :confirm-close-position? true
-                :confirm-market-orders? false
-                :sound-on-fill? false}]]
-             (confirm-market-action base-state false))))
-    (when sound-action
-      (is (= [[:effects/save [:trading-settings]
-               {:fill-alerts-enabled? true
-                :animate-orderbook? true
-                :show-fill-markers? false
-                :confirm-open-orders? true
-                :confirm-close-position? true
-                :confirm-market-orders? true
-                :sound-on-fill? true}]
-              [:effects/local-storage-set-json trading-settings/storage-key
-               {:fill-alerts-enabled? true
-                :animate-orderbook? true
-                :show-fill-markers? false
-                :confirm-open-orders? true
-                :confirm-close-position? true
-                :confirm-market-orders? true
-                :sound-on-fill? true}]]
-             (sound-action base-state true))))))
+  (let [base-settings {:fill-alerts-enabled? true
+                       :animate-orderbook? true
+                       :show-fill-markers? false
+                       :confirm-open-orders? true
+                       :confirm-close-position? true
+                       :confirm-market-orders? true
+                       :sound-on-fill? false
+                       :open-order-safety-mode :strict}
+        base-state {:trading-settings base-settings}
+        expected-effects (fn [settings]
+                           [[:effects/save [:trading-settings] settings]
+                            [:effects/local-storage-set-json
+                             trading-settings/storage-key
+                             settings]])
+        cases [{:sym 'set-fill-alerts-enabled
+                :args [false]
+                :updates {:fill-alerts-enabled? false}}
+               {:sym 'set-animate-orderbook-enabled
+                :args [false]
+                :updates {:animate-orderbook? false}}
+               {:sym 'set-fill-markers-enabled
+                :args [true]
+                :updates {:show-fill-markers? true}}
+               {:sym 'set-confirm-open-orders-enabled
+                :args [false]
+                :updates {:confirm-open-orders? false}}
+               {:sym 'set-confirm-close-position-enabled
+                :args [false]
+                :updates {:confirm-close-position? false}}
+               {:sym 'set-confirm-market-orders-enabled
+                :args [false]
+                :updates {:confirm-market-orders? false}}
+               {:sym 'set-sound-on-fill-enabled
+                :args [true]
+                :updates {:sound-on-fill? true}}
+               {:sym 'set-open-order-safety-mode
+                :args ["extended"]
+                :updates {:open-order-safety-mode :extended}}]]
+    (doseq [{:keys [args sym updates]} cases]
+      (let [action (resolve-action sym)
+            expected-settings (merge base-settings updates)]
+        (is (some? action))
+        (when action
+          (is (= (expected-effects expected-settings)
+                 (apply action base-state args))))))))
 
 (deftest set-ui-theme-saves-persists-and-applies-test
   (is (= [[:effects/save [:ui :theme] "institutional"]

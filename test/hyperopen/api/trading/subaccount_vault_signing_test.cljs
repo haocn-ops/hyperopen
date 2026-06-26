@@ -133,3 +133,18 @@
                                               :expires-after expires-after
                                               :is-mainnet false
                                               :max-nonce-retries 0}))}))))
+
+(deftest clear-schedule-cancel-public-facade-omits-time-and-propagates-vault-options-test
+  (async done
+    (let [action {:type "scheduleCancel"}]
+      (assert-public-agent-action-vault-propagation!
+       done
+       {:expected-action action
+        :invoke! (fn [store owner-address vault-address expires-after]
+                   (trading/schedule-cancel! store
+                                             owner-address
+                                             nil
+                                             {:vault-address vault-address
+                                              :expires-after expires-after
+                                              :is-mainnet false
+                                              :max-nonce-retries 0}))}))))

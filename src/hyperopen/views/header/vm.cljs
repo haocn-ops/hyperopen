@@ -242,6 +242,38 @@
                        :action [[:actions/set-ui-theme id]]})
                     ui-theme/themes)}))
 
+(def ^:private open-order-safety-options
+  [{:value "strict"
+    :label "Strict"
+    :mode :strict
+    :tooltip "Cancels open orders if Hyperopen stops refreshing for about 1 minute."}
+   {:value "extended"
+    :label "4h"
+    :mode :extended
+    :tooltip "Keeps the dead-man switch, but gives this account or vault about 4 hours offline before canceling."}
+   {:value "off"
+    :label "Off"
+    :mode :off
+    :tooltip "Clears Hyperliquid scheduled cancel. GTC orders stay live until filled, manually canceled, or rejected."}])
+
+(defn- open-order-safety-choice-row
+  [state]
+  (let [active-mode (trading-settings/open-order-safety-mode state)]
+    {:id :open-order-safety-mode
+     :kind :choice
+     :data-role "trading-settings-open-order-safety-mode-row"
+     :title "Open order safety"
+     :hint "Account/vault-wide offline cancel behavior."
+     :icon-kind :book
+     :aria-label "Open order safety"
+     :options (mapv (fn [{:keys [label mode tooltip value]}]
+                      {:value value
+                       :label label
+                       :tooltip tooltip
+                       :active? (= mode active-mode)
+                       :action [[:actions/set-open-order-safety-mode value]]})
+                    open-order-safety-options)}))
+
 (defn- settings-vm
   [state]
   (let [confirmation (settings-confirmation-copy
@@ -271,10 +303,10 @@
      :close-actions trading-settings-close-actions
      :footer-note trading-settings-footer-copy
      :sections [(settings-section
-                 :session
-                 "Session"
-                 "Sign-in behavior"
-                 [(settings-row :storage-mode
+                :session
+                "Session"
+                "Sign-in behavior"
+                [(settings-row :storage-mode
                                 "Remember session"
                                 "Stay signed in across browser restarts."
                                 remember-session?
@@ -297,6 +329,11 @@
                                                                       passkey-enabled?
                                                                       agent-status)
                                 :disabled? passkey-disabled?)])
+                (settings-section
+                 :open-orders
+                 "Open orders"
+                 "Exchange safety"
+                 [(open-order-safety-choice-row state)])
                 (settings-section
                  :confirmations
                  "Confirmations"

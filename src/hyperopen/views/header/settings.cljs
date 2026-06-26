@@ -26,11 +26,13 @@
 (s/def :hyperopen.views.header.settings/label string?)
 (s/def :hyperopen.views.header.settings/active? boolean?)
 (s/def :hyperopen.views.header.settings/action some?)
+(s/def :hyperopen.views.header.settings/tooltip string?)
 (s/def :hyperopen.views.header.settings/option
   (s/keys :req-un [:hyperopen.views.header.settings/value
                    :hyperopen.views.header.settings/label
                    :hyperopen.views.header.settings/active?
-                   :hyperopen.views.header.settings/action]))
+                   :hyperopen.views.header.settings/action]
+          :opt-un [:hyperopen.views.header.settings/tooltip]))
 (s/def :hyperopen.views.header.settings/options
   (s/coll-of :hyperopen.views.header.settings/option
              :kind vector?
@@ -97,14 +99,23 @@
    (icons/trading-settings-row-icon icon-kind checked?)])
 
 (defn- choice-option
-  [row-data-role {:keys [action active? label value]}]
-  [:button {:type "button"
-            :class ["ts-choice-option" (when active? "is-active")]
-            :data-role (str row-data-role "-option-" value)
-            :replicant/key (str row-data-role ":" value)
-            :aria-pressed (boolean active?)
-            :on {:click action}}
-   label])
+  [row-data-role {:keys [action active? label tooltip value]}]
+  (let [tooltip-id (str row-data-role "-option-" value "-tooltip")]
+    [:span {:class ["ts-choice-option-wrap"]
+            :replicant/key (str row-data-role ":" value)}
+     [:button {:type "button"
+               :class ["ts-choice-option" (when active? "is-active")]
+               :data-role (str row-data-role "-option-" value)
+               :aria-describedby (when tooltip tooltip-id)
+               :aria-pressed (boolean active?)
+               :on {:click action}}
+      label]
+     (when tooltip
+       [:span {:id tooltip-id
+               :role "tooltip"
+               :class ["ts-choice-tooltip"]
+               :data-role tooltip-id}
+        tooltip])]))
 
 (defn- choice-row
   [{:keys [data-role hint options title] :as row}]

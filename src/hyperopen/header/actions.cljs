@@ -136,6 +136,13 @@
   [state enabled?]
   (persist-trading-settings state {:confirm-market-orders? (boolean enabled?)}))
 
+(defn set-open-order-safety-mode
+  [state mode]
+  (persist-trading-settings
+   state
+   {:open-order-safety-mode
+    (trading-settings/normalize-open-order-safety-mode mode)}))
+
 (defn set-ui-theme
   [state theme-id]
   (let [normalized (ui-theme/normalize-theme-id theme-id)]

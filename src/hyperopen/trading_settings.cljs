@@ -4,6 +4,19 @@
 (def storage-key
   "hyperopen:trading-settings:v1")
 
+(def open-order-safety-modes
+  #{:strict :extended :off})
+
+(defn normalize-open-order-safety-mode
+  [mode]
+  (let [mode* (cond
+                (keyword? mode) mode
+                (string? mode) (keyword mode)
+                :else nil)]
+    (if (contains? open-order-safety-modes mode*)
+      mode*
+      :strict)))
+
 (def default-state
   {:fill-alerts-enabled? true
    :sound-on-fill? false
@@ -11,7 +24,8 @@
    :show-fill-markers? false
    :confirm-open-orders? false
    :confirm-close-position? false
-   :confirm-market-orders? true})
+   :confirm-market-orders? true
+   :open-order-safety-mode :strict})
 
 (defn normalize-state
   [value]
@@ -22,7 +36,9 @@
      :show-fill-markers? (true? (:show-fill-markers? settings))
      :confirm-open-orders? (true? (:confirm-open-orders? settings))
      :confirm-close-position? (true? (:confirm-close-position? settings))
-     :confirm-market-orders? (not (false? (:confirm-market-orders? settings)))}))
+     :confirm-market-orders? (not (false? (:confirm-market-orders? settings)))
+     :open-order-safety-mode (normalize-open-order-safety-mode
+                              (:open-order-safety-mode settings))}))
 
 (defn restore-state
   []
@@ -65,3 +81,7 @@
 (defn confirm-market-orders?
   [state]
   (:confirm-market-orders? (state-settings state)))
+
+(defn open-order-safety-mode
+  [state]
+  (:open-order-safety-mode (state-settings state)))

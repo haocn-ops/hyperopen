@@ -32,9 +32,8 @@
   (->> (tree-seq coll? seq node)
        (filter vector?)
        (keep #(get-in % [1 :data-role]))
-       (filter #(#{"trading-settings-session-section"
-                   "trading-settings-confirmations-section"
-                   "trading-settings-alerts-section"
+       (filter #(#{"trading-settings-session-section" "trading-settings-open-orders-section"
+                   "trading-settings-confirmations-section" "trading-settings-alerts-section"
                    "trading-settings-display-section"} %))
        distinct
        vec))
@@ -168,9 +167,8 @@
     (is (some? session-section))
     (is (some? alerts-section))
     (is (some? display-section))
-    (is (= ["trading-settings-session-section"
-            "trading-settings-confirmations-section"
-            "trading-settings-alerts-section"
+    (is (= ["trading-settings-session-section" "trading-settings-open-orders-section"
+            "trading-settings-confirmations-section" "trading-settings-alerts-section"
             "trading-settings-display-section"]
            (ordered-settings-sections view)))
     (is (= "dialog" (get-in panel [1 :role])))
@@ -198,6 +196,8 @@
     (is (nil? (find-node #(contains? (class-token-set %) "hover:bg-[#20262b]") storage-row)))
     (is (nil? (find-node #(contains? (class-token-set %) "rounded-[9px]") storage-row)))
     (is (contains? all-text "Confirm open orders"))
+    (is (contains? all-text "Open order safety"))
+    (is (contains? all-text "4h"))
     (is (contains? all-text "Confirm close position"))
     (is (contains? all-text "Confirm market orders"))
     (is (contains? all-text "Sound on fill"))

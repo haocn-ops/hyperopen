@@ -2,8 +2,7 @@
   (:require [cljs.spec.alpha :as s]
             [hyperopen.schema.contracts.common :as common]
             [hyperopen.schema.contracts.state :as state]))
-(s/def ::funding-history-filter-path (s/or :path ::common/state-path
-                                          :key keyword?))
+(s/def ::funding-history-filter-path (s/or :path ::common/state-path :key keyword?))
 (s/def ::funding-history-filter-args (s/tuple ::funding-history-filter-path any?))
 (s/def ::add-indicator-args (s/tuple keyword? map?))
 (s/def ::update-indicator-period-args (s/tuple keyword? any?))
@@ -155,6 +154,7 @@
    :actions/set-confirm-open-orders-enabled ::common/boolean-args
    :actions/set-confirm-close-position-enabled ::common/boolean-args
    :actions/set-confirm-market-orders-enabled ::common/boolean-args
+   :actions/set-open-order-safety-mode ::common/keyword-or-string-args
    :actions/set-ui-theme ::set-ui-theme-args
    :actions/reset-degen-life ::common/no-args
    :actions/navigate-mobile-header-menu ::common/path-args

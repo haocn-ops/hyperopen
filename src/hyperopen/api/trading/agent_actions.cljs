@@ -371,6 +371,6 @@
   ([store address cancel-at-ms options]
    (sign-and-post-agent-action! store
                                 address
-                                {:type "scheduleCancel"
-                                 :time cancel-at-ms}
+                                (cond-> {:type "scheduleCancel"}
+                                  (some? cancel-at-ms) (assoc :time cancel-at-ms))
                                 options)))

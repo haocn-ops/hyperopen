@@ -61,17 +61,34 @@
                                                  :confirm-open-orders? true
                                                  :confirm-close-position? false
                                                  :animate-orderbook? true
-                                                 :show-fill-markers? false}})
+                                                 :show-fill-markers? false
+                                                 :open-order-safety-mode :extended}})
         sections (get-in result [:settings :sections])
         session-row (row-by-id sections :session :storage-mode)
+        safety-row (row-by-id sections :open-orders :open-order-safety-mode)
         open-orders-row (row-by-id sections :confirmations :confirm-open-orders)
         close-position-row (row-by-id sections :confirmations :confirm-close-position)
         market-orders-row (row-by-id sections :confirmations :confirm-market-orders)
         sound-row (row-by-id sections :alerts :sound-on-fill)
         fill-markers-row (row-by-id sections :display :fill-markers)]
-    (is (= [:session :confirmations :alerts :display :appearance]
+    (is (= [:session :open-orders :confirmations :alerts :display :appearance]
            (mapv :id sections)))
     (is (= "trading-settings-storage-mode-row" (:data-role session-row)))
+    (is (= "Open order safety" (:title safety-row)))
+    (is (= "Account/vault-wide offline cancel behavior." (:hint safety-row)))
+    (is (= :choice (:kind safety-row)))
+    (is (= ["strict" "extended" "off"]
+           (mapv :value (:options safety-row))))
+    (is (= ["Strict" "4h" "Off"]
+           (mapv :label (:options safety-row))))
+    (is (= ["Cancels open orders if Hyperopen stops refreshing for about 1 minute."
+            "Keeps the dead-man switch, but gives this account or vault about 4 hours offline before canceling."
+            "Clears Hyperliquid scheduled cancel. GTC orders stay live until filled, manually canceled, or rejected."]
+           (mapv :tooltip (:options safety-row))))
+    (is (= [false true false]
+           (mapv :active? (:options safety-row))))
+    (is (= [[:actions/set-open-order-safety-mode "off"]]
+           (-> safety-row :options (nth 2) :action)))
     (is (= "These settings live on this device only."
            (get-in result [:settings :footer-note])))
     (is (not (contains? (:settings result) :keydown-action)))

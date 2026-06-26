@@ -2,7 +2,8 @@
   (:require [hyperopen.account.context :as account-context]
             [hyperopen.api.trading :as trading]
             [hyperopen.order.exchange-errors :as exchange-errors]
-            [hyperopen.platform :as platform]))
+            [hyperopen.platform :as platform]
+            [hyperopen.wallet.agent-safety-policy :as safety-policy]))
 
 (def ^:private agent-safety-watch-key
   ::agent-safety)
@@ -18,8 +19,10 @@
 
 (defn stop-agent-safety!
   [{:keys [runtime]
-    :or {runtime (atom {})}}]
-  (clear-refresh-timeout! runtime platform/clear-timeout!)
+    clear-timeout-fn :clear-timeout-fn
+    :or {clear-timeout-fn platform/clear-timeout!
+         runtime (atom {})}}]
+  (clear-refresh-timeout! runtime clear-timeout-fn)
   true)
 
 (defn- ready-owner-address
@@ -38,7 +41,8 @@
    (get-in state [:wallet :address])
    (get-in state [:wallet :agent :status])
    (get-in state [:wallet :agent :agent-address])
-   (account-context/exchange-vault-address state)])
+   (account-context/exchange-vault-address state)
+   (safety-policy/mode state)])
 
 (defn- response-text
   [resp]
@@ -74,75 +78,77 @@
         (.catch (fn [_] :error)))))
 
 (defn- refresh-allowed?
-  [store disposition]
+  [store disposition policy-fn]
   (and (not= :volume-gated disposition)
-       (ready-owner-address @store)))
+       (ready-owner-address @store)
+       (:enabled? (policy-fn))))
 
 (defn- schedule-next-refresh!
-  [{:keys [ahead-ms now-ms-fn refresh-ms runtime set-timeout-fn store]}]
+  [{:keys [now-ms-fn policy-fn runtime set-timeout-fn store] :as deps}]
   (letfn [(refresh! []
             (swap! runtime assoc-in timer-path nil)
             (if-let [owner-address (ready-owner-address @store)]
-              (-> (submit-schedule-cancel! store
-                                           owner-address
-                                           (+ (now-ms-fn) ahead-ms))
-                  (.then
-                   (fn [disposition]
-                     (when (refresh-allowed? store disposition)
-                       (schedule-next-refresh! {:ahead-ms ahead-ms
-                                                :now-ms-fn now-ms-fn
-                                                :refresh-ms refresh-ms
-                                                :runtime runtime
-                                                :set-timeout-fn set-timeout-fn
-                                                :store store})))))
+              (let [{:keys [ahead-ms enabled?]} (policy-fn)]
+                (if enabled?
+                  (-> (submit-schedule-cancel! store
+                                               owner-address
+                                               (+ (now-ms-fn) ahead-ms))
+                      (.then
+                       (fn [disposition]
+                         (when (refresh-allowed? store disposition policy-fn)
+                           (schedule-next-refresh! deps)))))
+                  (submit-schedule-cancel! store owner-address nil)))
               (swap! runtime assoc-in timer-path nil)))]
-    (let [timer-id (set-timeout-fn refresh! refresh-ms)]
-      (swap! runtime assoc-in timer-path timer-id)
-      timer-id)))
+    (when-let [refresh-ms (:refresh-ms (policy-fn))]
+      (let [timer-id (set-timeout-fn refresh! refresh-ms)]
+        (swap! runtime assoc-in timer-path timer-id)
+        timer-id))))
 
 (defn- ensure-agent-safety!
-  [{:keys [ahead-ms now-ms-fn refresh-ms runtime set-timeout-fn store]}]
-  (clear-refresh-timeout! runtime platform/clear-timeout!)
+  [{:keys [clear-timeout-fn now-ms-fn policy-fn runtime set-timeout-fn store]
+    :as deps}]
+  (clear-refresh-timeout! runtime clear-timeout-fn)
   (when-let [owner-address (ready-owner-address @store)]
-    (-> (submit-schedule-cancel! store
-                                 owner-address
-                                 (+ (now-ms-fn) ahead-ms))
-        (.then
-         (fn [disposition]
-           (when (refresh-allowed? store disposition)
-             (schedule-next-refresh! {:ahead-ms ahead-ms
-                                      :now-ms-fn now-ms-fn
-                                      :refresh-ms refresh-ms
-                                      :runtime runtime
-                                      :set-timeout-fn set-timeout-fn
-                                      :store store})))))))
+    (let [{:keys [ahead-ms enabled?]} (policy-fn)]
+      (if enabled?
+        (-> (submit-schedule-cancel! store
+                                     owner-address
+                                     (+ (now-ms-fn) ahead-ms))
+            (.then
+             (fn [disposition]
+               (when (refresh-allowed? store disposition policy-fn)
+                 (schedule-next-refresh! deps)))))
+        (submit-schedule-cancel! store owner-address nil)))))
 
 (defn install-agent-safety-watch!
   [{:keys [ahead-ms
+           clear-timeout-fn
            now-ms-fn
            refresh-ms
            runtime
            set-timeout-fn
            store]
     :or {ahead-ms 60000
+         clear-timeout-fn platform/clear-timeout!
          now-ms-fn platform/now-ms
          refresh-ms 30000
          runtime (atom {})
          set-timeout-fn platform/set-timeout!}}]
-  (ensure-agent-safety! {:ahead-ms ahead-ms
-                         :now-ms-fn now-ms-fn
-                         :refresh-ms refresh-ms
-                         :runtime runtime
-                         :set-timeout-fn set-timeout-fn
-                         :store store})
-  (remove-watch store agent-safety-watch-key)
-  (add-watch store agent-safety-watch-key
-             (fn [_ _ old-state new-state]
-               (when (not= (safety-fingerprint old-state)
-                           (safety-fingerprint new-state))
-                 (ensure-agent-safety! {:ahead-ms ahead-ms
-                                        :now-ms-fn now-ms-fn
-                                        :refresh-ms refresh-ms
-                                        :runtime runtime
-                                        :set-timeout-fn set-timeout-fn
-                                        :store store})))))
+  (let [policy-fn (fn []
+                    (safety-policy/policy
+                     @store
+                     {:strict-ahead-ms ahead-ms
+                      :strict-refresh-ms refresh-ms}))
+        deps {:clear-timeout-fn clear-timeout-fn
+              :now-ms-fn now-ms-fn
+              :policy-fn policy-fn
+              :runtime runtime
+              :set-timeout-fn set-timeout-fn
+              :store store}]
+    (ensure-agent-safety! deps)
+    (remove-watch store agent-safety-watch-key)
+    (add-watch store agent-safety-watch-key
+               (fn [_ _ old-state new-state]
+                 (when (not= (safety-fingerprint old-state)
+                             (safety-fingerprint new-state))
+                   (ensure-agent-safety! deps))))))

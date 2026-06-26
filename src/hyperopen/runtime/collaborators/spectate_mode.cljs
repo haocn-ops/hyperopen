@@ -23,6 +23,7 @@
    :set-confirm-open-orders-enabled header-actions/set-confirm-open-orders-enabled
    :set-confirm-close-position-enabled header-actions/set-confirm-close-position-enabled
    :set-confirm-market-orders-enabled header-actions/set-confirm-market-orders-enabled
+   :set-open-order-safety-mode header-actions/set-open-order-safety-mode
    :set-ui-theme header-actions/set-ui-theme
    :reset-degen-life header-actions/reset-degen-life
    :navigate-mobile-header-menu header-actions/navigate-mobile-header-menu

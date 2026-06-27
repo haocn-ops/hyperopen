@@ -187,6 +187,13 @@
 	   [:actions/toggle-portfolio-optimizer-execution-row :toggle-portfolio-optimizer-execution-row]
 	   [:actions/set-portfolio-optimizer-execution-row-param :set-portfolio-optimizer-execution-row-param]
 	   [:actions/confirm-portfolio-optimizer-execution :confirm-portfolio-optimizer-execution]
+	   [:actions/resume-portfolio-optimizer-execution :resume-portfolio-optimizer-execution]
+	   [:actions/revert-portfolio-optimizer-execution-filled :revert-portfolio-optimizer-execution-filled]
+	   [:actions/restage-portfolio-optimizer-execution-smaller :restage-portfolio-optimizer-execution-smaller]
+	   [:actions/pause-portfolio-optimizer-execution :pause-portfolio-optimizer-execution]
+	   [:actions/discard-portfolio-optimizer-execution :discard-portfolio-optimizer-execution]
+	   [:actions/open-portfolio-optimizer-execution-in-ticket :open-portfolio-optimizer-execution-in-ticket]
+	   [:actions/set-portfolio-optimizer-execution-order-filter :set-portfolio-optimizer-execution-order-filter]
 	   [:actions/refresh-portfolio-optimizer-tracking :refresh-portfolio-optimizer-tracking]
 	   [:actions/enable-portfolio-optimizer-manual-tracking
 	    :enable-portfolio-optimizer-manual-tracking]

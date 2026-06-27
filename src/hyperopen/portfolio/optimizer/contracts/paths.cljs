@@ -61,6 +61,8 @@
 (def execution-modal-submitting-path (conj execution-modal-path :submitting?))
 (def execution-path (conj optimizer-path :execution))
 (def execution-history-path (conj execution-path :history))
+(def execution-run-attempt-path (conj execution-path :run-attempt))
+(def execution-abort-requested-path (conj execution-path :abort-requested?))
 (def execution-persistence-error-path (conj execution-path :persistence-error))
 (def tracking-path (conj optimizer-path :tracking))
 (def tracking-error-path (conj tracking-path :error))
@@ -157,6 +159,8 @@
    :optimizer/execution-modal-submitting execution-modal-submitting-path
    :optimizer/execution execution-path
    :optimizer/execution-history execution-history-path
+   :optimizer/execution-run-attempt execution-run-attempt-path
+   :optimizer/execution-abort-requested execution-abort-requested-path
    :optimizer/execution-persistence-error execution-persistence-error-path
    :optimizer/tracking tracking-path
    :optimizer/tracking-error tracking-error-path

@@ -120,6 +120,23 @@
     (is (contains? strings "Margin after"))
     (is (contains? strings "spot-submit-unsupported"))))
 
+(deftest execution-tab-slip-is-type-aware-test
+  ;; A market row shows the book-crossing slippage estimate; a limit-overridden row
+  ;; reads "rests" instead of the (misleading) market-impact number.
+  (let [market-view (scenario-view :execution
+                                   {:execution {:status :idle :history []}
+                                    :execution-modal {:open? true :phase :staged :plan staged-plan}})
+        market-row (node-by-role market-view "portfolio-optimizer-execution-order-row-perp-BTC")
+        limit-view (scenario-view :execution
+                                  {:execution {:status :idle :history []}
+                                   :execution-modal {:open? true :phase :staged :plan staged-plan
+                                                     :overrides {"perp:BTC" :limit}}})
+        limit-row (node-by-role limit-view "portfolio-optimizer-execution-order-row-perp-BTC")]
+    (is (str/includes? (node-text market-row) "bp"))
+    (is (not (str/includes? (node-text market-row) "rests")))
+    (is (str/includes? (node-text limit-row) "rests"))
+    (is (not (str/includes? (node-text limit-row) "bp")))))
+
 (deftest execution-tab-armed-renders-enabled-confirm-test
   (let [view-node (scenario-view :execution
                                  {:execution {:status :idle :history []}

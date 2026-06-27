@@ -7,6 +7,7 @@
   type editor (Market/Limit/TWAP/Passive) and the arm/halt affordances are surfaced for
   review but are labelled as not-yet-wired where they don't change real routing."
   (:require [clojure.string :as str]
+            [hyperopen.portfolio.optimizer.application.execution-order-type :as execution-order-type]
             [hyperopen.portfolio.optimizer.application.view-model :as optimizer-view-model]
             [hyperopen.views.portfolio.optimize.format :as opt-format]))
 
@@ -16,6 +17,12 @@
   {:market "Market" :limit "Limit" :twap "TWAP" :passive "Passive"})
 
 (def ^:private order-types [:market :limit :twap :passive])
+
+(defn- resting-type?
+  "Limit and Passive orders rest at a price — they don't cross the book, so the
+  book-crossing slippage estimate doesn't apply to them."
+  [order-type]
+  (contains? #{:limit :passive} order-type))
 
 (defn- abs-num [value] (if (number? value) (js/Math.abs value) 0))
 (defn- finite [value] (opt-format/finite-number? value))
@@ -47,16 +54,6 @@
       (str "$" (opt-format/format-decimal (/ amount 1000) {:maximum-fraction-digits 1}) "k")
       (opt-format/format-usdc amount))))
 
-(defn- recommend-exec-type
-  "Algorithm-recommended order type per row (per the execution design spec)."
-  [{:keys [instrument-type side delta-notional-usd]}]
-  (let [amount (abs-num delta-notional-usd)]
-    (cond
-      (>= amount 70000) :twap
-      (and (= :sell side) (= :spot instrument-type)) :limit
-      (<= amount 22000) :market
-      :else :passive)))
-
 (defn- rec-reason
   [order-type]
   (case order-type
@@ -65,18 +62,9 @@
     :market "small clip — immediacy outweighs impact"
     "medium position — post passively, avoid crossing the spread"))
 
-(defn- effective-type
-  [{:keys [default-order-type overrides]} row]
-  (or (get overrides (:row-id row))
-      (if (= :recommended default-order-type)
-        (recommend-exec-type row)
-        default-order-type)))
-
-(defn- row-params
-  [{:keys [params]} row]
-  (merge {:limit-bps (if (= :buy (:side row)) -2 2)
-          :twap-min (if (>= (abs-num (:delta-notional-usd row)) 70000) 20 10)}
-         (get params (:row-id row))))
+(def ^:private recommend-exec-type execution-order-type/recommend-exec-type)
+(def ^:private effective-type execution-order-type/effective-type)
+(def ^:private row-params execution-order-type/row-params)
 
 (defn- editable?
   [{:keys [phase read-only?]}]
@@ -95,6 +83,7 @@
    :failed "✕"
    :blocked "–"
    :skipped "–"
+   :working "◐"
    :queued "○"
    :staged "○"})
 
@@ -105,6 +94,7 @@
     :failed :failed
     :blocked :blocked
     :skipped :skipped
+    :working :working
     :ready (if (contains? #{:armed :running} phase) :queued :staged)
     :staged))
 
@@ -148,8 +138,28 @@
     :armed "· armed — confirm to send"
     "· staged from rebalance preview"))
 
+(defn- overflow-menu
+  [{:keys [phase]}]
+  [:details {:class ["optimizer-exec-overflow"]
+             :data-role "portfolio-optimizer-execution-overflow"}
+   [:summary {:class ["border" "border-base-300" "px-3" "py-2" "text-sm" "font-medium"
+                      "text-trading-muted" "select-none"]}
+    "⋯"]
+   [:div {:class ["optimizer-exec-overflow-menu" "border" "border-base-300" "bg-base-100" "py-1"]}
+    [:button {:type "button"
+              :class ["block" "w-full" "px-3" "py-1.5" "text-left" "text-xs" "text-trading-text"]
+              :data-role "portfolio-optimizer-execution-open-ticket"
+              :on {:click [[:actions/open-portfolio-optimizer-execution-in-ticket]]}}
+     "Open in trade ticket ↗"]
+    (when-not (= :running phase)
+      [:button {:type "button"
+                :class ["block" "w-full" "px-3" "py-1.5" "text-left" "text-xs" "text-trading-red"]
+                :data-role "portfolio-optimizer-execution-discard"
+                :on {:click [[:actions/discard-portfolio-optimizer-execution]]}}
+       "Abort & discard"])]])
+
 (defn- header
-  [{:keys [phase read-only? disabled-message]}]
+  [{:keys [phase read-only? disabled-message] :as model}]
   [:div {:class ["flex" "flex-wrap" "items-end" "justify-between" "gap-3"
                  "border-b" "border-base-300" "bg-base-100/95" "px-5" "py-3"]
          :data-role "portfolio-optimizer-execution-header"}
@@ -161,6 +171,7 @@
      [:span {:class ["text-xs" "text-trading-muted"]} (subtitle phase)]
      (status-tag phase)]]
    [:div {:class ["flex" "items-center" "gap-2"]}
+    (overflow-menu model)
     (if (= :done phase)
       [:button {:type "button"
                 :class ["border" "border-base-300" "px-3" "py-2" "text-sm" "font-medium" "text-trading-muted"]
@@ -239,7 +250,7 @@
                  :active? (= :twap default-order-type) :read-only? read-only?})]]
    [:p {:class ["border-t" "border-base-300" "bg-base-200/30" "px-5" "py-1.5"
                 "font-mono" "text-[0.6rem]" "text-trading-muted"]}
-    "Live orders submit as Market — Limit / TWAP / Passive preview routing is not yet wired."]])
+    "Recommended routes each order by clip size. Limit / Passive rest as maker orders and may not fully fill; TWAP works over time."]])
 
 (defn- armed-band
   [{:keys [confirm-disabled? disabled-message] :as model} rows]
@@ -255,7 +266,7 @@
        (str "Send " order-count " live order" (when (not= 1 order-count) "s") " to Hyperliquid?")]
       [:p {:class ["mt-0.5" "font-mono" "text-[0.65rem]" "text-trading-muted"]}
        (str (when (seq summary) (str "Order types: " summary ". "))
-            "Live orders submit as Market. This cannot be undone without reverting filled trades.")]]
+            "Each order is sent with its selected type. This cannot be undone without reverting filled trades.")]]
      [:span {:class ["flex-1"]}]
      [:button {:type "button"
                :class ["border" "border-base-300" "px-3" "py-2" "text-sm" "font-medium" "text-trading-muted"]
@@ -275,7 +286,7 @@
 
 (defn- running-band
   [{:keys [summary] :as model} rows]
-  (let [total (count (filter #(contains? #{:ready :submitted :failed} (:status %)) rows))
+  (let [total (count (filter #(contains? #{:ready :working :submitted :failed} (:status %)) rows))
         filled (count (filter #(= :submitted (:status %)) rows))
         pct (if (pos? total) (/ filled total) 0)]
     [:div {:class ["optimizer-exec-band" "is-running" "flex" "items-center" "gap-4"
@@ -292,7 +303,13 @@
              :style {:width (str (* 100 pct) "%")}}
        [:span {:class ["optimizer-exec-progress-shimmer"]}]]]
      [:span {:class ["font-mono" "text-xs" "text-warning"]}
-      (str (js/Math.round (* 100 pct)) "%")]]))
+      (str (js/Math.round (* 100 pct)) "%")]
+     [:button {:type "button"
+               :class ["border" "border-trading-red/60" "px-3" "py-2" "text-sm" "font-medium" "text-trading-red"]
+               :data-role "portfolio-optimizer-execution-pause"
+               :title "Stop releasing new orders. In-flight orders still settle."
+               :on {:click [[:actions/pause-portfolio-optimizer-execution]]}}
+      "Pause / abort"]]))
 
 (defn- done-band
   []
@@ -313,7 +330,9 @@
 (defn- halted-band
   [{:keys [error confirm-disabled?] :as model} rows]
   (let [failed (count (filter #(= :failed (:status %)) rows))
-        filled (count (filter #(= :submitted (:status %)) rows))]
+        filled (count (filter #(= :submitted (:status %)) rows))
+        resume-from (some (fn [[i row]] (when (= :failed (:status row)) (inc i)))
+                          (map-indexed vector rows))]
     [:div {:class ["optimizer-exec-band" "is-halted" "flex" "items-center" "gap-4"
                    "border-b" "border-base-300" "px-5" "py-3"]
            :data-role "portfolio-optimizer-execution-control-band"
@@ -326,18 +345,18 @@
        (or error "One or more orders were rejected. Subsequent orders are never auto-retried.")]]
      [:span {:class ["flex-1"]}]
      [:button {:type "button"
-               :class ["border" "border-base-300" "px-3" "py-2" "text-sm" "font-medium" "text-trading-muted"
-                       "cursor-not-allowed" "opacity-60"]
+               :class ["border" "border-trading-red/60" "px-3" "py-2" "text-sm" "font-medium" "text-trading-red"
+                       "disabled:cursor-not-allowed" "disabled:border-base-300" "disabled:text-trading-muted"]
                :data-role "portfolio-optimizer-execution-revert"
-               :disabled true
-               :title "Revert is not yet wired."}
+               :disabled (zero? filled)
+               :title (when (zero? filled) "No filled orders to revert.")
+               :on (when (pos? filled)
+                     {:click [[:actions/revert-portfolio-optimizer-execution-filled]]})}
       "Revert filled"]
      [:button {:type "button"
-               :class ["border" "border-base-300" "px-3" "py-2" "text-sm" "font-medium" "text-trading-muted"
-                       "cursor-not-allowed" "opacity-60"]
+               :class ["border" "border-base-300" "px-3" "py-2" "text-sm" "font-medium" "text-trading-muted"]
                :data-role "portfolio-optimizer-execution-restage"
-               :disabled true
-               :title "Re-stage is not yet wired."}
+               :on {:click [[:actions/restage-portfolio-optimizer-execution-smaller]]}}
       "Re-stage smaller"]
      [:button {:type "button"
                :class ["optimizer-primary-action" "border" "px-3" "py-2" "text-sm" "font-semibold"
@@ -346,8 +365,8 @@
                :data-role "portfolio-optimizer-execution-resume"
                :disabled (boolean confirm-disabled?)
                :on (when-not confirm-disabled?
-                     {:click [[:actions/confirm-portfolio-optimizer-execution]]})}
-      "Resume"]]))
+                     {:click [[:actions/resume-portfolio-optimizer-execution]]})}
+      (if resume-from (str "Resume from #" resume-from) "Resume")]]))
 
 (defn- control-band
   [{:keys [phase] :as model} rows]
@@ -373,7 +392,7 @@
 
 (defn- kpi-strip
   [{:keys [summary phase] :as model} rows]
-  (let [ready (filter #(= :ready (:status %)) rows)
+  (let [ready (filter #(contains? #{:ready :working} (:status %)) rows)
         submitted (filter #(= :submitted (:status %)) rows)
         failed (filter #(= :failed (:status %)) rows)
         blocked (filter #(= :blocked (:status %)) rows)
@@ -443,6 +462,7 @@
              (str "rejected" (when (:reason row) (str " · " (opt-format/keyword-label (:reason row)))))]
     :blocked [:span {:class ["text-trading-muted"]} (opt-format/keyword-label (:reason row))]
     :skipped [:span {:class ["text-trading-muted"]} "skipped"]
+    :working [:span {:class ["text-warning"]} "sending…"]
     :queued [:span {:class ["text-warning"]} "queued"]
     [:span {:class ["text-trading-muted"]} "staged"]))
 
@@ -476,7 +496,9 @@
          (chip "recommended" :accent))
        [:span {:class ["flex-1"]}]
        [:span {:class ["font-mono" "text-[0.65rem]" "text-trading-muted"]}
-        (str "est. fill " (signed-bps (- est)))]]
+        (if (resting-type? t)
+          "rests — fills at your price or better"
+          (str "est. fill " (signed-bps (- est))))]]
       [:div {:class ["mt-2.5" "flex" "flex-wrap" "items-center" "gap-2" "text-xs" "text-trading-muted"]}
        (case t
          :market
@@ -509,8 +531,18 @@
            (str (max 2 (js/Math.round (/ (:twap-min params) 2))) " slices · even spacing")]]
          [:span "Post-only at the best price — never crosses the spread, re-pegs as the book moves."])]
       [:p {:class ["mt-2" "font-mono" "text-[0.6rem]" "text-trading-muted/70"]}
-       (str "Recommended: " (order-type-labels rec) " — " (rec-reason rec)
-            " · order routing for non-market types is not yet wired.")]]]))
+       (str "Recommended: " (order-type-labels rec) " — " (rec-reason rec))]]]))
+
+(defn- slip-cell
+  "Type-aware slippage display. Resting orders (limit/passive) don't cross the book, so
+  they read \"rests\" rather than the book-crossing market-impact estimate — which would
+  badly overstate their cost. Crossing orders (market/twap) show the impact estimate;
+  non-ready rows show \"—\"."
+  [order-type status slip]
+  (if (and (= :ready status) (resting-type? order-type))
+    [:span {:title "Resting order — pays the spread/offset, not market impact; may not fully fill."}
+     "rests"]
+    (format-bps slip)))
 
 (defn- order-row
   [{:keys [open-row] :as model} index row]
@@ -552,43 +584,78 @@
          [:td {:class ["num" "right" (if buy? "text-trading-green" "text-trading-red")]}
           (str (if buy? "+" "−") (format-knotional notional))]
          [:td {:class ["num" "right" "text-trading-muted"]}
-          (format-bps (get-in row [:cost :slippage-bps]))]
+          (slip-cell t (:status row) (get-in row [:cost :slippage-bps]))]
          [:td {:class ["text-[0.7rem]"]} (state-cell display-state row)]]]
     (if open?
       [row-tr (order-editor-row model row 10)]
       [row-tr])))
 
+(defn- row-visible?
+  [order-filter display-state]
+  (case order-filter
+    :working (contains? #{:queued :working} display-state)
+    :filled (= :filled display-state)
+    true))
+
+(defn- order-filter-toggle
+  [active]
+  (into [:div {:class ["optimizer-exec-toggle" "inline-flex"]
+               :data-role "portfolio-optimizer-execution-order-filter"}]
+        (for [[id label] [[:all "All"] [:working "Working"] [:filled "Filled"]]]
+          [:button {:type "button"
+                    :class (cond-> ["px-2.5" "py-1" "text-[0.65rem]" "font-medium"]
+                             (= active id) (conj "is-on"))
+                    :data-active (str (= active id))
+                    :on {:click [[:actions/set-portfolio-optimizer-execution-order-filter id]]}}
+           label])))
+
 (defn- order-table
-  [{:keys [phase] :as model} rows]
-  [:section {:class ["flex" "flex-col" "min-h-0" "xl:border-r" "border-base-300"]
-             :data-role "portfolio-optimizer-execution-order-list"}
-   [:div {:class ["border-b" "border-base-300" "px-4" "py-3"]}
-    (eyebrow "Order list")
-    [:p {:class ["mt-1" "text-xs" "text-trading-muted"]}
-     (if (editable? model)
-       "Click any order to change its type. Blocked rows stay visible with their reason."
-       "Order types are locked once execution is armed.")]]
-   (if (seq rows)
-     [:div {:class ["overflow-x-auto"]}
-      (into
-       [:table {:class ["optimizer-table" "optimizer-exec-table"]}
-        [:thead
-         [:tr
-          [:th {:class ["w-8"]}]
-          [:th {:class ["w-10"]} "#"]
-          [:th "Asset"]
-          [:th "Side"]
-          [:th "Venue"]
-          [:th "Type"]
-          [:th {:class ["right"]} "Qty"]
-          [:th {:class ["right"]} "Notional"]
-          [:th {:class ["right"]} "Slip"]
-          [:th "State"]]]]
-       (mapcat (fn [index row] (order-row model index row))
-               (range)
-               rows))]
-     [:p {:class ["px-4" "py-4" "text-sm" "text-trading-muted"]}
-      "No orders are staged for this run."])])
+  [{:keys [order-filter] :as model} rows]
+  (let [active-filter (or order-filter :all)
+        any-visible? (some #(row-visible? active-filter (row-display-state model %)) rows)]
+    [:section {:class ["flex" "flex-col" "min-h-0" "xl:border-r" "border-base-300"]
+               :data-role "portfolio-optimizer-execution-order-list"}
+     [:div {:class ["border-b" "border-base-300" "px-4" "py-3"]}
+      [:div {:class ["flex" "flex-wrap" "items-center" "justify-between" "gap-2"]}
+       (eyebrow "Order list")
+       (order-filter-toggle active-filter)]
+      [:p {:class ["mt-1" "text-xs" "text-trading-muted"]}
+       (if (editable? model)
+         "Click any order to change its type. Blocked rows stay visible with their reason."
+         "Order types are locked once execution is armed.")]]
+     (cond
+       (not (seq rows))
+       [:p {:class ["px-4" "py-4" "text-sm" "text-trading-muted"]}
+        "No orders are staged for this run."]
+
+       (not any-visible?)
+       [:p {:class ["px-4" "py-4" "text-sm" "text-trading-muted"]}
+        (str "No " (name active-filter) " orders to show.")]
+
+       :else
+       [:div {:class ["overflow-x-auto"]}
+        (into
+         [:table {:class ["optimizer-table" "optimizer-exec-table"]}
+          [:thead
+           [:tr
+            [:th {:class ["w-8"]}]
+            [:th {:class ["w-10"]} "#"]
+            [:th "Asset"]
+            [:th "Side"]
+            [:th "Venue"]
+            [:th "Type"]
+            [:th {:class ["right"]} "Qty"]
+            [:th {:class ["right"]} "Notional"]
+            [:th {:class ["right"]} "Slip"]
+            [:th "State"]]]]
+         ;; index over the full row set so the # column keeps stable order numbers
+         ;; even when a filter hides rows.
+         (mapcat (fn [index row]
+                   (if (row-visible? active-filter (row-display-state model row))
+                     (order-row model index row)
+                     []))
+                 (range)
+                 rows))])]))
 
 ;; ── Execution-health rail ───────────────────────────────────────────────
 
@@ -607,22 +674,22 @@
   [{:keys [phase]}]
   (let [[title items tone-class] (case phase
                                    :halted ["Halted — your move"
-                                            ["Resume retries the still-ready rows — orders are never auto-retried."
-                                             "Re-stage / Revert are not yet wired."
-                                             "Already-filled orders remain live."]
+                                            ["Resume retries only the failed rows — already-filled orders are never re-sent."
+                                             "Re-stage smaller re-stages the unfilled rows at half size for a fresh arm."
+                                             "Revert filled sends reduce-only orders to unwind the filled trades."]
                                             "text-trading-red"]
                                    :done ["Execution complete"
                                           ["All ready orders were acknowledged by Hyperliquid."
                                            "Tracking has started against the recommendation."]
                                           "text-trading-green"]
                                    :running ["Live — do not close"
-                                             ["Each ready row submits as a market order."
+                                             ["Each ready row is submitted with its selected order type."
                                               "Margin and slippage were checked when the plan was staged."]
                                              "text-trading-muted"]
                                    ["Before you arm"
                                     ["Estimated fills assume top-of-book and recent depth; real fills vary."
                                      "Arming requires a second confirm. No orders are live until then."
-                                     "Limit / TWAP / Passive selections are advisory — live orders submit as Market."]
+                                     "Each order routes by its selected type — Limit / Passive rest as maker orders, TWAP works over time."]
                                     "text-trading-muted"])]
     [:div {:class ["p-3.5" "border-t" "border-base-300"]}
      [:div {:class ["optimizer-note"]
@@ -633,7 +700,7 @@
 
 (defn- health-rail
   [{:keys [summary phase] :as model} rows]
-  (let [ready (filter #(= :ready (:status %)) rows)
+  (let [ready (filter #(contains? #{:ready :working} (:status %)) rows)
         submitted (filter #(= :submitted (:status %)) rows)
         failed (filter #(= :failed (:status %)) rows)
         total (+ (count ready) (count submitted) (count failed))

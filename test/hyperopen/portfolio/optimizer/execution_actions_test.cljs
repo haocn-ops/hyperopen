@@ -28,6 +28,7 @@
              :overrides {}
              :params {}
              :open-row nil
+             :order-filter :all
              :plan {:scenario-id "draft-1"
                     :status :ready
                     :execution-disabled? false
@@ -176,22 +177,64 @@
           {:portfolio {:optimizer {:execution-modal {:open-row "perp:BTC"}}}}
           "perp:BTC")))
   (is (= [[:effects/save [:portfolio :optimizer :execution-modal :params] {"perp:BTC" {:limit-bps -5}}]]
-         (actions/set-portfolio-optimizer-execution-row-param {} "perp:BTC" :limit-bps -5))))
+         (actions/set-portfolio-optimizer-execution-row-param {} "perp:BTC" :limit-bps -5)))
+  (is (= [[:effects/save [:portfolio :optimizer :execution-modal :order-filter] :working]]
+         (actions/set-portfolio-optimizer-execution-order-filter {} :working))))
 
-(deftest confirm-execution-dispatches-execution-effect-test
-  (let [plan {:scenario-id "draft-1"
+(deftest confirm-execution-applies-order-type-selections-and-dispatches-test
+  ;; Confirm must re-resolve each ready row's order type from the LIVE staging
+  ;; selections (overrides + params) and stamp them onto the intent before dispatch,
+  ;; so the submitted order matches what the user picked — not the staged :market.
+  (let [row {:row-id "perp:BTC"
+             :status :ready
+             :side :buy
+             :instrument-type :perp
+             :delta-notional-usd 30000
+             :intent {:kind :perp-order :side :buy :quantity 0.25 :order-type :market}}
+        plan {:scenario-id "draft-1"
               :status :ready
               :execution-disabled? false
               :summary {:ready-count 1}
-              :rows [{:row-id "perp:BTC"
-                      :status :ready
-                      :intent {:kind :perp-order}}]}
-        state {:portfolio {:optimizer {:execution-modal {:open? true
-                                                         :plan plan}}}}]
-    (is (= [[:effects/save [:portfolio :optimizer :execution-modal :submitting?] true]
-            [:effects/save [:portfolio :optimizer :execution-modal :error] nil]
-            [:effects/execute-portfolio-optimizer-plan plan]]
-           (actions/confirm-portfolio-optimizer-execution state)))))
+              :rows [row]}
+        state {:portfolio {:optimizer {:execution-modal
+                                       {:open? true
+                                        :plan plan
+                                        :default-order-type :recommended
+                                        :overrides {"perp:BTC" :limit}
+                                        :params {"perp:BTC" {:limit-bps -5}}}}}}
+        effects (actions/confirm-portfolio-optimizer-execution state)
+        [effect-key dispatched] (nth effects 2)
+        intent (get-in dispatched [:rows 0 :intent])]
+    (is (= [:effects/save [:portfolio :optimizer :execution-modal :submitting?] true]
+           (first effects)))
+    (is (= [:effects/save [:portfolio :optimizer :execution-modal :error] nil]
+           (second effects)))
+    (is (= :effects/execute-portfolio-optimizer-plan effect-key))
+    (is (= :limit (:order-type intent)))
+    (is (= -5 (:limit-bps intent)))
+    (is (= :limit (get-in dispatched [:rows 0 :order-type])))))
+
+(deftest confirm-execution-recommended-default-routes-by-clip-size-test
+  ;; With the default :recommended and no override, a medium perp clip (22k–70k)
+  ;; resolves to :passive (the recommend-exec-type policy).
+  (let [row {:row-id "perp:BTC"
+             :status :ready
+             :side :buy
+             :instrument-type :perp
+             :delta-notional-usd 30000
+             :intent {:kind :perp-order :side :buy :quantity 0.25 :order-type :market}}
+        state {:portfolio {:optimizer {:execution-modal
+                                       {:open? true
+                                        :plan {:scenario-id "draft-1"
+                                               :status :ready
+                                               :execution-disabled? false
+                                               :summary {:ready-count 1}
+                                               :rows [row]}
+                                        :default-order-type :recommended
+                                        :overrides {}
+                                        :params {}}}}}
+        [_ dispatched] (nth (actions/confirm-portfolio-optimizer-execution state) 2)]
+    (is (= :passive (get-in dispatched [:rows 0 :intent :order-type])))))
 
 (deftest confirm-execution-blocks-read-only-plan-test
   (let [state {:portfolio {:optimizer {:execution-modal
@@ -204,3 +247,143 @@
              [:portfolio :optimizer :execution-modal :error]
              "Spectate Mode is read-only."]]
            (actions/confirm-portfolio-optimizer-execution state)))))
+
+(deftest resume-execution-retries-only-failed-rows-test
+  ;; A partial run filled BTC and rejected ETH. Resume must re-arm ONLY ETH and demote
+  ;; the already-filled BTC to :skipped :already-filled so it can never double-submit.
+  (let [plan {:scenario-id "draft-1"
+              :status :partially-blocked
+              :execution-disabled? false
+              :summary {:ready-count 2 :blocked-count 0 :skipped-count 0
+                        :gross-ready-notional-usd 3000
+                        :estimated-fees-usd 1 :estimated-slippage-usd 2 :margin nil}
+              :rows [{:row-id "perp:BTC" :status :ready :delta-notional-usd 1000}
+                     {:row-id "perp:ETH" :status :ready :delta-notional-usd 2000}]}
+        ledger {:rows [{:row-id "perp:BTC" :instrument-id "perp:BTC" :status :submitted
+                        :delta-notional-usd 1000 :intent {:kind :perp-order}
+                        :response {:status "ok"}}
+                       {:row-id "perp:ETH" :instrument-id "perp:ETH" :status :failed
+                        :delta-notional-usd 2000 :intent {:kind :perp-order}
+                        :error {:message "rejected"}}]}
+        state {:portfolio {:optimizer {:execution-modal {:open? true :plan plan}
+                                       :execution {:status :partially-executed
+                                                   :history [ledger]}}}}
+        effects (actions/resume-portfolio-optimizer-execution state)
+        [effect-key resume-plan] (nth effects 2)
+        row-by-id (into {} (map (juxt :row-id identity) (:rows resume-plan)))]
+    (is (= [:effects/save [:portfolio :optimizer :execution-modal :submitting?] true]
+           (first effects)))
+    (is (= [:effects/save [:portfolio :optimizer :execution-modal :error] nil]
+           (second effects)))
+    (is (= :effects/execute-portfolio-optimizer-plan effect-key))
+    ;; filled row demoted, stale response dropped, intent removed so it can't re-request
+    (is (= {:status :skipped :reason :already-filled}
+           (select-keys (row-by-id "perp:BTC") [:status :reason])))
+    (is (nil? (:intent (row-by-id "perp:BTC"))))
+    ;; failed row re-armed, stale error dropped
+    (is (= :ready (:status (row-by-id "perp:ETH"))))
+    (is (nil? (:error (row-by-id "perp:ETH"))))
+    (is (= {:kind :perp-order} (:intent (row-by-id "perp:ETH"))))
+    (is (= 1 (get-in resume-plan [:summary :ready-count])))
+    (is (= 1 (get-in resume-plan [:summary :skipped-count])))
+    (is (= 2000 (get-in resume-plan [:summary :gross-ready-notional-usd])))))
+
+(deftest resume-execution-noops-when-nothing-recoverable-test
+  (let [ledger {:rows [{:row-id "perp:BTC" :status :submitted :delta-notional-usd 1000}]}
+        state {:portfolio {:optimizer {:execution-modal {:plan {:scenario-id "draft-1"
+                                                                :execution-disabled? false
+                                                                :summary {}
+                                                                :rows []}}
+                                       :execution {:history [ledger]}}}}]
+    (is (= [[:effects/save
+             [:portfolio :optimizer :execution-modal :error]
+             "No orders are eligible to resume."]]
+           (actions/resume-portfolio-optimizer-execution state)))))
+
+(deftest revert-execution-builds-reversing-orders-from-filled-ledger-test
+  ;; Only the filled (:submitted) BTC is reverted — opposite side, reduce-only, market.
+  (let [plan {:scenario-id "draft-1" :execution-disabled? false :summary {} :rows []}
+        ledger {:rows [{:row-id "perp:BTC" :instrument-id "perp:BTC" :instrument-type :perp
+                        :status :submitted :side :buy :quantity 0.25 :price 100
+                        :delta-notional-usd 1000}
+                       {:row-id "perp:ETH" :instrument-id "perp:ETH" :instrument-type :perp
+                        :status :failed :side :buy :quantity 0.5 :delta-notional-usd 2000}]}
+        state {:portfolio {:optimizer {:execution-modal {:plan plan}
+                                       :execution {:history [ledger]}}}}
+        effects (actions/revert-portfolio-optimizer-execution-filled state)
+        [effect-key revert-plan] (nth effects 2)
+        row (first (:rows revert-plan))]
+    (is (= [:effects/save [:portfolio :optimizer :execution-modal :submitting?] true]
+           (first effects)))
+    (is (= :effects/execute-portfolio-optimizer-plan effect-key))
+    (is (= :revert (:kind revert-plan)))
+    (is (= 1 (count (:rows revert-plan))))
+    (is (= "perp:BTC" (:row-id row)))
+    (is (= :sell (:side row)))
+    (is (= :ready (:status row)))
+    (is (= true (get-in row [:intent :reduce-only?])))
+    (is (= :market (get-in row [:intent :order-type])))))
+
+(deftest revert-execution-noops-without-filled-rows-test
+  (let [ledger {:rows [{:row-id "perp:ETH" :status :failed :delta-notional-usd 2000}]}
+        state {:portfolio {:optimizer {:execution-modal {:plan {:execution-disabled? false
+                                                                :summary {}
+                                                                :rows []}}
+                                       :execution {:history [ledger]}}}}]
+    (is (= [[:effects/save
+             [:portfolio :optimizer :execution-modal :error]
+             "No filled orders to revert."]]
+           (actions/revert-portfolio-optimizer-execution-filled state)))))
+
+(deftest restage-execution-halves-unfilled-rows-and-returns-to-staged-test
+  (let [plan {:scenario-id "draft-1" :execution-disabled? false
+              :summary {:ready-count 2}
+              :rows [{:row-id "perp:BTC" :status :ready :quantity 0.25 :delta-notional-usd 1000
+                      :intent {:quantity 0.25}}
+                     {:row-id "perp:ETH" :status :ready :quantity 1.0 :delta-notional-usd 2000
+                      :intent {:quantity 1.0}}]}
+        ledger {:rows [{:row-id "perp:BTC" :status :submitted}
+                       {:row-id "perp:ETH" :status :failed}]}
+        state {:portfolio {:optimizer {:execution-modal {:plan plan}
+                                       :execution {:history [ledger]}}}}
+        effects (actions/restage-portfolio-optimizer-execution-smaller state)
+        [_ plan-path restaged] (first effects)
+        eth (first (:rows restaged))]
+    (is (= [:portfolio :optimizer :execution-modal :plan] plan-path))
+    ;; the filled BTC is dropped; only ETH remains, halved
+    (is (= 1 (count (:rows restaged))))
+    (is (= "perp:ETH" (:row-id eth)))
+    (is (= 0.5 (:quantity eth)))
+    (is (= 0.5 (get-in eth [:intent :quantity])))
+    (is (= 1000 (:delta-notional-usd eth)))
+    (is (= 1 (get-in restaged [:summary :ready-count])))
+    ;; surface returns to staged for a fresh arm
+    (is (= [:effects/save [:portfolio :optimizer :execution-modal :phase] :staged]
+           (second effects)))))
+
+(deftest pause-execution-sets-abort-flag-test
+  (is (= [[:effects/save [:portfolio :optimizer :execution :abort-requested?] true]]
+         (actions/pause-portfolio-optimizer-execution {}))))
+
+(deftest discard-execution-clears-plan-and-returns-to-rebalance-test
+  (let [state {:portfolio {:optimizer {:execution-modal {:open? true :submitting? false
+                                                         :plan {:rows []}}}}}
+        effects (actions/discard-portfolio-optimizer-execution state)]
+    (is (= [:portfolio :optimizer :execution-modal] (get-in effects [0 1])))
+    (is (= [:portfolio :optimizer :execution] (get-in effects [1 1])))
+    (is (= [:effects/save [:portfolio-ui :optimizer :results-tab] :rebalance]
+           (nth effects 2)))
+    (is (= [:effects/replace-shareable-route-query] (nth effects 3)))))
+
+(deftest discard-execution-noops-while-submitting-test
+  (is (= [] (actions/discard-portfolio-optimizer-execution
+             {:portfolio {:optimizer {:execution-modal {:submitting? true}}}}))))
+
+(deftest open-in-ticket-navigates-to-first-ready-market-test
+  (let [state {:portfolio {:optimizer {:execution-modal
+                                       {:plan {:rows [{:row-id "perp:ETH" :status :blocked :coin "ETH"}
+                                                      {:row-id "perp:BTC" :status :ready :coin "BTC"}]}}}}}]
+    (is (= [[:actions/navigate "/trade?market=BTC"]]
+           (actions/open-portfolio-optimizer-execution-in-ticket state))))
+  (is (= [] (actions/open-portfolio-optimizer-execution-in-ticket
+             {:portfolio {:optimizer {:execution-modal {:plan {:rows []}}}}}))))

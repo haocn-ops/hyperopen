@@ -266,10 +266,6 @@
     {:status :blocked
      :reason :missing-capital-base}
 
-    (= :spot (:instrument-type instrument))
-    {:status :blocked
-     :reason :spot-submit-unsupported}
-
     (not (finite-positive? price))
     {:status :blocked
      :reason :missing-price}

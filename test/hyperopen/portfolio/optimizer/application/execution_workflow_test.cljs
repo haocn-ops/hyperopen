@@ -34,6 +34,35 @@
                          :status :saved
                          :updated-at-ms 900}}})
 
+(deftest begin-execution-state-seeds-live-run-attempt-test
+  (let [attempt {:scenario-id "scn_submit"
+                 :rows [{:row-id "perp:BTC" :status :ready}
+                        {:row-id "spot:PURR" :status :blocked}]}
+        state (workflow/begin-execution-state attempt 1000)]
+    (is (= :submitting (:status state)))
+    (is (= attempt (:run-attempt state)))
+    (is (= [:ready :blocked] (mapv :status (get-in state [:run-attempt :rows]))))))
+
+(deftest set-run-attempt-row-status-updates-matching-row-test
+  (let [state {:portfolio
+               {:optimizer
+                {:execution
+                 {:run-attempt {:rows [{:row-id "perp:BTC" :status :ready}
+                                       {:row-id "perp:ETH" :status :ready}]}}}}}
+        working (workflow/set-run-attempt-row-status state "perp:BTC" {:status :working})
+        settled (workflow/set-run-attempt-row-status working "perp:BTC"
+                                                     {:status :submitted})]
+    (is (= [:working :ready]
+           (mapv :status (get-in working [:portfolio :optimizer :execution
+                                          :run-attempt :rows]))))
+    (is (= [:submitted :ready]
+           (mapv :status (get-in settled [:portfolio :optimizer :execution
+                                          :run-attempt :rows]))))
+    ;; No live run-attempt -> safe no-op rather than throwing.
+    (is (= {:portfolio {:optimizer {:execution {:run-attempt {:rows []}}}}}
+           (workflow/set-run-attempt-row-status
+            {:portfolio {:optimizer {:execution {}}}} "perp:BTC" {:status :working})))))
+
 (deftest begin-ledger-persistence-plans-scenario-load-test
   (let [result (workflow/begin-ledger-persistence {:state {:portfolio {:optimizer {}}}
                                                   :address address

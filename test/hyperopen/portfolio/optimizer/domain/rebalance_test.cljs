@@ -12,7 +12,7 @@
   (and (= (count expected) (count actual))
        (every? true? (map near? expected actual))))
 
-(deftest build-rebalance-preview-generates-ready-perp-and-blocked-spot-rows-test
+(deftest build-rebalance-preview-generates-ready-perp-and-spot-rows-test
   (let [preview (rebalance/build-rebalance-preview
                  {:capital-usd 10000
                   :rebalance-tolerance 0.005
@@ -30,7 +30,9 @@
                                                     :slippage-bps 4}}
                   :fee-bps-by-id {"perp:BTC" 4.5
                                   "spot:PURR" 7}})]
-    (is (= :partially-blocked (:status preview)))
+    ;; Spot legs are now executable (routed on Hyperliquid like perps), so both rows
+    ;; are ready and the preview status is no longer partially-blocked.
+    (is (= :ready (:status preview)))
     (is (= 2 (count (:rows preview))))
     (let [perp-row (first (:rows preview))
           spot-row (second (:rows preview))]
@@ -43,9 +45,13 @@
       (is (near? 0.6 (get-in perp-row [:cost :estimated-slippage-usd])))
       (is (= 4.5 (get-in perp-row [:cost :fee-bps])))
       (is (near? 0.675 (get-in perp-row [:cost :estimated-fee-usd])))
-      (is (= :blocked (:status spot-row)))
-      (is (= :spot-submit-unsupported (:reason spot-row)))
-      (is (near? -800 (:delta-notional-usd spot-row))))))
+      ;; spot:PURR: target 0.02 vs current 0.10 -> sell $800, qty 400 @ $2, fee 7 bp
+      (is (= :ready (:status spot-row)))
+      (is (= :sell (:side spot-row)))
+      (is (near? -800 (:delta-notional-usd spot-row)))
+      (is (near? 400 (:quantity spot-row)))
+      (is (= 7 (get-in spot-row [:cost :fee-bps])))
+      (is (near? 0.56 (get-in spot-row [:cost :estimated-fee-usd]))))))
 
 (deftest build-rebalance-preview-skips-tolerance-and-blocks-missing-prices-test
   (let [preview (rebalance/build-rebalance-preview
@@ -99,22 +105,28 @@
     (is (= 0 (get-in preview [:summary :ready-count])))))
 
 (deftest build-rebalance-preview-keeps-summary-to-executable-rows-test
+  ;; perp:BTC and spot:PURR are both executable (spot routes on Hyperliquid too);
+  ;; perp:ETH is blocked on a missing price and must be excluded from the summary.
   (let [preview (rebalance/build-rebalance-preview
                  {:capital-usd 10000
                   :rebalance-tolerance 0.0
-                  :instrument-ids ["perp:BTC" "spot:PURR"]
-                  :current-weights [0.0 0.0]
-                  :target-weights [0.1 0.1]
+                  :instrument-ids ["perp:BTC" "spot:PURR" "perp:ETH"]
+                  :current-weights [0.0 0.0 0.0]
+                  :target-weights [0.1 0.1 0.1]
                   :instruments-by-id {"perp:BTC" {:instrument-type :perp
                                                   :coin "BTC"}
                                       "spot:PURR" {:instrument-type :spot
-                                                   :coin "PURR"}}
+                                                   :coin "PURR"}
+                                      "perp:ETH" {:instrument-type :perp
+                                                  :coin "ETH"}}
                   :prices-by-id {"perp:BTC" 10000
                                  "spot:PURR" 1}})]
     (is (= :partially-blocked (:status preview)))
-    (is (= 1 (get-in preview [:summary :ready-count])))
+    (is (= 2 (get-in preview [:summary :ready-count])))
     (is (= 1 (get-in preview [:summary :blocked-count])))
-    (is (= 1000 (get-in preview [:summary :gross-trade-notional-usd])))))
+    (is (= :missing-price (get-in preview [:rows 2 :reason])))
+    ;; gross-trade-notional counts only the two ready rows ($1000 + $1000).
+    (is (= 2000 (get-in preview [:summary :gross-trade-notional-usd])))))
 
 (deftest build-rebalance-preview-derives-live-orderbook-costs-and-margin-impact-test
   (let [preview (rebalance/build-rebalance-preview

@@ -103,6 +103,81 @@
             :grouping "na"}
            (get-in row [:request :action])))))
 
+(deftest build-execution-attempt-routes-selected-order-types-test
+  (let [base (execution/build-execution-plan
+              {:scenario-id "scn_types"
+               :rebalance-preview
+               {:rows [{:instrument-id "perp:BTC"
+                        :instrument-type :perp
+                        :coin "BTC"
+                        :status :ready
+                        :side :buy
+                        :price 100
+                        :quantity 0.25
+                        :delta-notional-usd 25}]}
+               :execution-assumptions {:default-order-type :market}})
+        market-by-key {"perp:BTC" {:coin "BTC"
+                                   :market-type :perp
+                                   :asset-id 0
+                                   :szDecimals 4}}
+        action-for (fn [selections]
+                     (-> base
+                         (execution/apply-order-type-selections selections)
+                         (#(execution/build-execution-attempt
+                            {:plan % :market-by-key market-by-key}))
+                         (get-in [:rows 0 :request :action])))]
+    ;; Limit override -> resting GTC limit, price offset below mark for a buy.
+    (let [action (action-for {:default-order-type :recommended
+                              :overrides {"perp:BTC" :limit}
+                              :params {"perp:BTC" {:limit-bps -5}}})
+          order (first (:orders action))]
+      (is (= "order" (:type action)))
+      (is (= {:tif "Gtc"} (:limit (:t order))))
+      (is (< (js/parseFloat (:p order)) 100)))
+    ;; Passive override -> post-only (ALO) limit that never crosses.
+    (let [action (action-for {:default-order-type :recommended
+                              :overrides {"perp:BTC" :passive}
+                              :params {}})]
+      (is (= {:tif "Alo"} (:limit (:t (first (:orders action)))))))
+    ;; TWAP override -> twapOrder action sliced over the selected minutes.
+    (let [action (action-for {:default-order-type :recommended
+                              :overrides {"perp:BTC" :twap}
+                              :params {"perp:BTC" {:twap-min 20}}})]
+      (is (= "twapOrder" (:type action)))
+      (is (= 20 (get-in action [:twap :m]))))))
+
+(deftest build-execution-attempt-routes-ready-spot-row-test
+  (let [plan (execution/build-execution-plan
+              {:scenario-id "scn_spot"
+               :rebalance-preview
+               {:rows [{:instrument-id "spot:PURR"
+                        :instrument-type :spot
+                        :coin "PURR"
+                        :status :ready
+                        :side :sell
+                        :price 2
+                        :quantity 400
+                        :delta-notional-usd -800}]}
+               :execution-assumptions {:default-order-type :market}})
+        attempt (execution/build-execution-attempt
+                 {:plan plan
+                  :market-by-key {"spot:PURR" {:coin "PURR"
+                                               :market-type :spot
+                                               :asset-id 11035
+                                               :szDecimals 2}}})
+        row (first (:rows attempt))
+        order (first (get-in row [:request :action :orders]))]
+    (is (= :ready (:status attempt)))
+    (is (= :ready (:status row)))
+    (is (= :spot-order (get-in plan [:rows 0 :intent :kind])))
+    (is (= "order" (get-in row [:request :action :type])))
+    ;; spot wire asset-id = 10000 + spot pair index
+    (is (= 11035 (:a order)))
+    ;; sell -> is-buy false
+    (is (= false (:b order)))
+    ;; reduce-only forced false for spot (no position to reduce)
+    (is (= false (:r order)))))
+
 (deftest build-execution-attempt-blocks-ready-row-without-market-metadata-test
   (let [plan (execution/build-execution-plan
               {:scenario-id "scn_missing_market"

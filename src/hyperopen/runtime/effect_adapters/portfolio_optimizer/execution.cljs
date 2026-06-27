@@ -36,39 +36,52 @@
   [submit-order! store target row]
   (if-not (= :ready (:status row))
     (js/Promise.resolve row)
-    (let [request (:request row)
-          pre-actions (->> (:pre-actions request)
-                           (filter map?)
-                           vec)
-          action (:action request)]
-      (if-not (map? action)
-        (js/Promise.resolve
-         (assoc row
-                :status :failed
-                :error {:message "Execution row is missing an order action."}))
-        (let [submit-promise
-              (.then (submit-actions! submit-order! store target pre-actions)
-                     (fn [pre-responses]
-                       (if-let [failed-pre-action (failed-pre-action-response pre-responses)]
-                         (assoc row
-                                :status :failed
-                                :pre-action-responses pre-responses
-                                :error {:message (str "Pre-submit action failed: "
-                                                     (pr-str failed-pre-action))})
-                         (.then (submit-action! submit-order! store target action)
-                                (fn [resp]
-                                  (if (execution/response-ok? resp)
-                                    (assoc row
-                                           :status :submitted
-                                           :response resp)
-                                    (assoc row
-                                           :status :failed
-                                           :response resp
-                                           :error {:message (str "Order submit failed: "
-                                                                 (pr-str resp))})))))))]
-          (.catch submit-promise
-                  (fn [err]
-                    (mark-row-failed row err))))))))
+    (do
+      ;; Mark this row in-flight so the running view animates it as "sending" before
+      ;; the order resolves.
+      (swap! store execution-workflow/set-run-attempt-row-status
+             (:row-id row) {:status :working})
+      (let [request (:request row)
+            pre-actions (->> (:pre-actions request)
+                             (filter map?)
+                             vec)
+            action (:action request)
+            result-promise
+            (if-not (map? action)
+              (js/Promise.resolve
+               (assoc row
+                      :status :failed
+                      :error {:message "Execution row is missing an order action."}))
+              (let [submit-promise
+                    (.then (submit-actions! submit-order! store target pre-actions)
+                           (fn [pre-responses]
+                             (if-let [failed-pre-action (failed-pre-action-response pre-responses)]
+                               (assoc row
+                                      :status :failed
+                                      :pre-action-responses pre-responses
+                                      :error {:message (str "Pre-submit action failed: "
+                                                            (pr-str failed-pre-action))})
+                               (.then (submit-action! submit-order! store target action)
+                                      (fn [resp]
+                                        (if (execution/response-ok? resp)
+                                          (assoc row
+                                                 :status :submitted
+                                                 :response resp)
+                                          (assoc row
+                                                 :status :failed
+                                                 :response resp
+                                                 :error {:message (str "Order submit failed: "
+                                                                       (pr-str resp))})))))))]
+                (.catch submit-promise
+                        (fn [err]
+                          (mark-row-failed row err)))))]
+        ;; Reflect the settled per-row result into the running view as it lands.
+        (.then result-promise
+               (fn [result-row]
+                 (swap! store execution-workflow/set-run-attempt-row-status
+                        (:row-id result-row)
+                        (select-keys result-row [:status :error]))
+                 result-row))))))
 
 (defn- submit-execution-rows!
   [submit-order! store target rows]
@@ -76,9 +89,17 @@
    (fn [promise row]
      (.then promise
             (fn [submitted-rows]
-              (-> (submit-execution-row! submit-order! store target row)
-                  (.then (fn [submitted-row]
-                           (conj submitted-rows submitted-row)))))))
+              (if (and (= :ready (:status row))
+                       (get-in @store contracts/execution-abort-requested-path))
+                ;; Pause/abort requested mid-run: skip remaining ready rows without
+                ;; sending. In-flight orders already settle; nothing new is released.
+                (let [aborted (assoc row :status :skipped :reason :aborted)]
+                  (swap! store execution-workflow/set-run-attempt-row-status
+                         (:row-id aborted) {:status :skipped :reason :aborted})
+                  (js/Promise.resolve (conj submitted-rows aborted)))
+                (-> (submit-execution-row! submit-order! store target row)
+                    (.then (fn [submitted-row]
+                             (conj submitted-rows submitted-row))))))))
    (js/Promise.resolve [])
    rows))
 

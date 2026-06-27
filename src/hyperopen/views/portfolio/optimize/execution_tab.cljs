@@ -554,17 +554,22 @@
     :queued [:span {:class ["text-warning"]} "queued"]
     [:span {:class ["text-trading-muted"]} "staged"]))
 
-(defn- cost-component
-  [label bps usd accent?]
-  [:div {:class ["flex" "flex-col" "leading-tight"]}
-   [:span {:class ["font-mono" "text-[0.55rem]" "uppercase" "tracking-[0.06em]" "text-trading-muted/60"]} label]
-   [:span {:class (cond-> ["font-mono" "text-xs" "tabular-nums"]
-                    accent? (conj "font-semibold" "text-trading-text")
-                    (not accent?) (conj "text-trading-muted"))}
+(defn- cost-stat
+  "One term in the execution-cost equation: a small uppercase label, the bp value (large for
+  glanceability), and the $ underneath. `emphasis` tunes the hierarchy — :input for the
+  spread/impact/fee inputs (muted), :total for the price-cost subtotal (bright), :allin for
+  the boxed accent total."
+  [label bps usd emphasis]
+  [:div {:class ["optimizer-exec-cost-stat"] :data-emphasis (name emphasis)}
+   [:span {:class ["optimizer-exec-cost-stat-label"]} label]
+   [:span {:class ["optimizer-exec-cost-stat-bp"]}
     (if (finite bps) (format-bps bps) "—")]
-   (when (finite usd)
-     [:span {:class ["font-mono" "text-[0.6rem]" "tabular-nums" "text-trading-muted/60"]}
-      (opt-format/format-usdc usd)])])
+   [:span {:class ["optimizer-exec-cost-stat-usd"]}
+    (if (finite usd) (opt-format/format-usdc usd) "—")]])
+
+(defn- cost-op
+  [glyph]
+  [:span {:class ["optimizer-exec-cost-op"]} glyph])
 
 (defn- cost-breakdown
   "Per-row execution-cost components for the row's effective type. Crossing (market/twap):
@@ -590,27 +595,37 @@
      :all-in-bps (+ price-cost-bps fee-bps) :all-in-usd (+ price-cost-usd fee-usd)}))
 
 (defn- cost-breakdown-strip
+  "The right-hand column of the expanded editor: the execution-cost equation laid out across
+  the full width — spread crossing + book impact = price cost, + fees = all-in (each in bp and
+  $). A resting Limit/Passive row pays neither spread nor impact, so those two terms collapse
+  into a single \"rests\" note and the price cost reads ~0."
   [model row]
   (let [{:keys [crossing? spread-bps spread-usd impact-bps impact-usd
                 price-cost-bps price-cost-usd fee-bps fee-usd all-in-bps all-in-usd]}
-        (cost-breakdown model row)
-        sep (fn [s] [:span {:class ["font-mono" "text-trading-muted/40" "self-center" "px-0.5"]} s])]
-    [:div {:class ["mt-3" "border-t" "border-base-300/60" "pt-2.5"]
+        (cost-breakdown model row)]
+    [:div {:class ["optimizer-exec-cost-panel"]
            :data-role "portfolio-optimizer-execution-cost-breakdown"}
-     [:p {:class ["font-mono" "text-[0.55rem]" "uppercase" "tracking-[0.1em]" "text-trading-muted/50" "mb-2"]}
-      "Execution cost breakdown (est.)"]
-     [:div {:class ["flex" "flex-wrap" "items-stretch" "gap-x-1" "gap-y-2"]}
+     [:p {:class ["optimizer-exec-cost-head"]}
+      [:span "Execution cost breakdown (est.)"]
+      [:span {:class ["optimizer-exec-cost-info"]
+              :title (str "Price cost = crossing the spread + walking the book (impact). "
+                          "All-in adds exchange fees. Resting Limit/Passive orders pay "
+                          "neither spread nor impact and earn the lower maker fee.")}
+       "ⓘ"]]
+     [:div {:class ["optimizer-exec-cost-eq"]}
       (if crossing?
-        (list (cost-component "Spread crossing" spread-bps spread-usd false)
-              (sep "+")
-              (cost-component "Book impact" impact-bps impact-usd false))
-        (cost-component "Rests — no spread/impact" nil nil false))
-      (sep "=")
-      (cost-component "Price cost" price-cost-bps price-cost-usd true)
-      (sep "+")
-      (cost-component "Fees" fee-bps fee-usd false)
-      (sep "=")
-      (cost-component "All-in" all-in-bps all-in-usd true)]]))
+        (list (cost-stat "Spread crossing" spread-bps spread-usd :input)
+              (cost-op "+")
+              (cost-stat "Book impact" impact-bps impact-usd :input))
+        [:div {:class ["optimizer-exec-cost-rests"]}
+         [:span {:class ["optimizer-exec-cost-stat-label"]} "Resting order"]
+         [:span {:class ["optimizer-exec-cost-rests-note"]} "No spread or market impact"]])
+      (cost-op "=")
+      (cost-stat "Price cost" price-cost-bps price-cost-usd :total)
+      (cost-op "+")
+      (cost-stat "Fees" fee-bps fee-usd :input)
+      (cost-op "=")
+      (cost-stat "All-in" all-in-bps all-in-usd :allin)]]))
 
 (defn- order-editor-row
   [model row colspan]
@@ -618,60 +633,68 @@
         rec (recommend-exec-type row)
         params (row-params model row)
         buy? (= :buy (:side row))
-        row-id (:row-id row)]
+        row-id (:row-id row)
+        source (cost-source-label row)]
     [:tr {:data-role (str "portfolio-optimizer-execution-order-editor-" (data-role-token (:instrument-id row)))}
      [:td {:colspan colspan :class ["optimizer-exec-order-editor"]}
-      [:div {:class ["flex" "flex-wrap" "items-center" "gap-3"]}
-       [:span {:class ["font-mono" "text-[0.6rem]" "uppercase" "tracking-[0.08em]" "text-trading-muted"]}
-        (str "Order type · " (:instrument-label row))]
-       [:div {:class ["optimizer-exec-toggle" "inline-flex"]}
-        (for [ot order-types]
-          [:button {:type "button"
-                    :class (cond-> ["px-2.5" "py-1" "text-[0.65rem]" "font-medium"]
-                             (= t ot) (conj "is-on"))
-                    :data-active (str (= t ot))
-                    :on {:click [[:actions/set-portfolio-optimizer-execution-row-order-type row-id ot]]}}
-           (order-type-labels ot)])]
-       (if (not= t rec)
-         [:button {:type "button"
-                   :class ["font-mono" "text-[0.65rem]" "text-warning"]
-                   :on {:click [[:actions/set-portfolio-optimizer-execution-row-order-type row-id :recommended]]}}
-          (str "↺ use recommended (" (order-type-labels rec) ")")]
-         (chip "recommended" :accent))]
-      [:div {:class ["mt-2.5" "flex" "flex-wrap" "items-center" "gap-2" "text-xs" "text-trading-muted"]}
-       (case t
-         :market
-         [:span "Crosses the spread immediately — full size as one marketable order."]
-         :limit
-         [:span {:class ["flex" "flex-wrap" "items-center" "gap-2"]}
-          [:span {:class ["font-mono" "text-[0.6rem]" "uppercase" "tracking-[0.06em]" "text-trading-muted/70"]}
-           "Limit price"]
-          (for [[label bp] [["At mid" 0]
-                            [(str (if buy? "−" "+") "2 bp") (if buy? -2 2)]
-                            [(str (if buy? "−" "+") "5 bp") (if buy? -5 5)]]]
+      [:div {:class ["optimizer-exec-editor-grid"]}
+       ;; LEFT — order-type controls + plain-English consequence
+       [:div {:class ["optimizer-exec-editor-controls"]}
+        [:div {:class ["flex" "flex-wrap" "items-center" "gap-3"]}
+         [:span {:class ["font-mono" "text-[0.6rem]" "uppercase" "tracking-[0.08em]" "text-trading-muted"]}
+          (str "Order type · " (:instrument-label row))]
+         [:div {:class ["optimizer-exec-toggle" "inline-flex"]}
+          (for [ot order-types]
             [:button {:type "button"
-                      :class (cond-> ["border" "border-base-300" "px-2" "py-0.5" "text-[0.65rem]"]
-                               (= (:limit-bps params) bp) (conj "optimizer-primary-action" "font-semibold"))
-                      :on {:click [[:actions/set-portfolio-optimizer-execution-row-param row-id :limit-bps bp]]}}
-             label])
-          [:span {:class ["font-mono" "text-trading-muted/70"]}
-           (str "rests " (if buy? "below" "above") " mark · GTC")]]
-         :twap
-         [:span {:class ["flex" "flex-wrap" "items-center" "gap-2"]}
-          [:span {:class ["font-mono" "text-[0.6rem]" "uppercase" "tracking-[0.06em]" "text-trading-muted/70"]}
-           "Duration"]
-          (for [m [5 10 20]]
-            [:button {:type "button"
-                      :class (cond-> ["border" "border-base-300" "px-2" "py-0.5" "text-[0.65rem]"]
-                               (= (:twap-min params) m) (conj "optimizer-primary-action" "font-semibold"))
-                      :on {:click [[:actions/set-portfolio-optimizer-execution-row-param row-id :twap-min m]]}}
-             (str m " min")])
-          [:span {:class ["font-mono" "text-trading-muted/70"]}
-           (str (max 2 (js/Math.round (/ (:twap-min params) 2))) " slices · even spacing")]]
-         [:span "Post-only at the best price — never crosses the spread, re-pegs as the book moves."])]
-      (cost-breakdown-strip model row)
-      [:p {:class ["mt-2" "font-mono" "text-[0.6rem]" "text-trading-muted/70"]}
-       (str "Recommended: " (order-type-labels rec) " — " (rec-reason rec))]]]))
+                      :class (cond-> ["px-2.5" "py-1" "text-[0.65rem]" "font-medium"]
+                               (= t ot) (conj "is-on"))
+                      :data-active (str (= t ot))
+                      :on {:click [[:actions/set-portfolio-optimizer-execution-row-order-type row-id ot]]}}
+             (order-type-labels ot)])]
+         (if (not= t rec)
+           [:button {:type "button"
+                     :class ["font-mono" "text-[0.65rem]" "text-warning"]
+                     :on {:click [[:actions/set-portfolio-optimizer-execution-row-order-type row-id :recommended]]}}
+            (str "↺ use recommended (" (order-type-labels rec) ")")]
+           (chip "recommended" :accent))]
+        [:div {:class ["flex" "flex-wrap" "items-center" "gap-2" "text-xs" "text-trading-muted"]}
+         (case t
+           :market
+           [:span "Crosses the spread immediately — full size as one marketable order."]
+           :limit
+           [:span {:class ["flex" "flex-wrap" "items-center" "gap-2"]}
+            [:span {:class ["font-mono" "text-[0.6rem]" "uppercase" "tracking-[0.06em]" "text-trading-muted/70"]}
+             "Limit price"]
+            (for [[label bp] [["At mid" 0]
+                              [(str (if buy? "−" "+") "2 bp") (if buy? -2 2)]
+                              [(str (if buy? "−" "+") "5 bp") (if buy? -5 5)]]]
+              [:button {:type "button"
+                        :class (cond-> ["border" "border-base-300" "px-2" "py-0.5" "text-[0.65rem]"]
+                                 (= (:limit-bps params) bp) (conj "optimizer-primary-action" "font-semibold"))
+                        :on {:click [[:actions/set-portfolio-optimizer-execution-row-param row-id :limit-bps bp]]}}
+               label])
+            [:span {:class ["font-mono" "text-trading-muted/70"]}
+             (str "rests " (if buy? "below" "above") " mark · GTC")]]
+           :twap
+           [:span {:class ["flex" "flex-wrap" "items-center" "gap-2"]}
+            [:span {:class ["font-mono" "text-[0.6rem]" "uppercase" "tracking-[0.06em]" "text-trading-muted/70"]}
+             "Duration"]
+            (for [m [5 10 20]]
+              [:button {:type "button"
+                        :class (cond-> ["border" "border-base-300" "px-2" "py-0.5" "text-[0.65rem]"]
+                                 (= (:twap-min params) m) (conj "optimizer-primary-action" "font-semibold"))
+                        :on {:click [[:actions/set-portfolio-optimizer-execution-row-param row-id :twap-min m]]}}
+               (str m " min")])
+            [:span {:class ["font-mono" "text-trading-muted/70"]}
+             (str (max 2 (js/Math.round (/ (:twap-min params) 2))) " slices · even spacing")]]
+           [:span "Post-only at the best price — never crosses the spread, re-pegs as the book moves."])]
+        [:p {:class ["font-mono" "text-[0.6rem]" "text-trading-muted/70"]}
+         (str "Recommended: " (order-type-labels rec) " — " (rec-reason rec))]
+        (when source
+          [:p {:class ["font-mono" "text-[0.6rem]" "text-trading-muted/50"]}
+           (str "Cost basis · " source)])]
+       ;; RIGHT — execution-cost equation across the remaining width
+       (cost-breakdown-strip model row)]]]))
 
 (defn- slip-cell
   "Type-aware slippage display. After a fill the realized slippage (vs the same mark the

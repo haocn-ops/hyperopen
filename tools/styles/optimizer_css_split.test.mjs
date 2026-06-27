@@ -32,6 +32,7 @@ const expectedPartials = [
   "results.css",
   "universe.css",
   "frontier.css",
+  "execution.css",
 ];
 
 const expectedEntryImports = expectedPartials.map(

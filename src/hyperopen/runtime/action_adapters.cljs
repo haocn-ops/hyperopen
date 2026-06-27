@@ -327,11 +327,23 @@
 (def duplicate-portfolio-optimizer-scenario-action
   portfolio-optimizer-actions/duplicate-portfolio-optimizer-scenario)
 
-(def open-portfolio-optimizer-execution-modal-action
-  portfolio-optimizer-actions/open-portfolio-optimizer-execution-modal)
+(def open-portfolio-optimizer-execution-action
+  portfolio-optimizer-actions/open-portfolio-optimizer-execution)
 
-(def close-portfolio-optimizer-execution-modal-action
-  portfolio-optimizer-actions/close-portfolio-optimizer-execution-modal)
+(def set-portfolio-optimizer-execution-phase-action
+  portfolio-optimizer-actions/set-portfolio-optimizer-execution-phase)
+
+(def set-portfolio-optimizer-execution-default-order-type-action
+  portfolio-optimizer-actions/set-portfolio-optimizer-execution-default-order-type)
+
+(def set-portfolio-optimizer-execution-row-order-type-action
+  portfolio-optimizer-actions/set-portfolio-optimizer-execution-row-order-type)
+
+(def toggle-portfolio-optimizer-execution-row-action
+  portfolio-optimizer-actions/toggle-portfolio-optimizer-execution-row)
+
+(def set-portfolio-optimizer-execution-row-param-action
+  portfolio-optimizer-actions/set-portfolio-optimizer-execution-row-param)
 
 (def confirm-portfolio-optimizer-execution-action
   portfolio-optimizer-actions/confirm-portfolio-optimizer-execution)

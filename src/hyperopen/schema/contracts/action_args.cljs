@@ -107,6 +107,10 @@
   (s/tuple ::common/non-empty-string))
 (s/def ::portfolio-optimizer-instrument-side-args
   (s/tuple ::common/non-empty-string ::common/keyword-or-string))
+(s/def ::portfolio-optimizer-execution-row-type-args
+  (s/tuple ::common/non-empty-string ::common/keyword-or-string))
+(s/def ::portfolio-optimizer-execution-row-param-args
+  (s/tuple ::common/non-empty-string ::common/keyword-or-string any?))
 (s/def ::portfolio-optimizer-universe-search-keydown-args
   (s/tuple ::common/non-empty-string
            (s/coll-of ::common/non-empty-string :kind vector?)))
@@ -325,8 +329,12 @@
    :actions/load-portfolio-optimizer-route ::common/path-args
    :actions/archive-portfolio-optimizer-scenario ::portfolio-optimizer-scenario-id-args
    :actions/duplicate-portfolio-optimizer-scenario ::portfolio-optimizer-scenario-id-args
-   :actions/open-portfolio-optimizer-execution-modal ::common/no-args
-	   :actions/close-portfolio-optimizer-execution-modal ::common/no-args
+   :actions/open-portfolio-optimizer-execution ::common/no-args
+	   :actions/set-portfolio-optimizer-execution-phase ::common/keyword-or-string-args
+	   :actions/set-portfolio-optimizer-execution-default-order-type ::common/keyword-or-string-args
+	   :actions/set-portfolio-optimizer-execution-row-order-type ::portfolio-optimizer-execution-row-type-args
+	   :actions/toggle-portfolio-optimizer-execution-row ::portfolio-optimizer-instrument-id-args
+	   :actions/set-portfolio-optimizer-execution-row-param ::portfolio-optimizer-execution-row-param-args
 	   :actions/confirm-portfolio-optimizer-execution ::common/no-args
 	   :actions/refresh-portfolio-optimizer-tracking ::common/no-args
 	   :actions/enable-portfolio-optimizer-manual-tracking ::common/no-args

@@ -299,13 +299,33 @@
           {:phase :test})))
   (is (= []
          (contracts/assert-action-args!
-          :actions/open-portfolio-optimizer-execution-modal
+          :actions/open-portfolio-optimizer-execution
           []
           {:phase :test})))
-  (is (= []
+  (is (= [:armed]
          (contracts/assert-action-args!
-          :actions/close-portfolio-optimizer-execution-modal
-          []
+          :actions/set-portfolio-optimizer-execution-phase
+          [:armed]
+          {:phase :test})))
+  (is (= [:twap]
+         (contracts/assert-action-args!
+          :actions/set-portfolio-optimizer-execution-default-order-type
+          [:twap]
+          {:phase :test})))
+  (is (= ["perp:BTC" :limit]
+         (contracts/assert-action-args!
+          :actions/set-portfolio-optimizer-execution-row-order-type
+          ["perp:BTC" :limit]
+          {:phase :test})))
+  (is (= ["perp:BTC"]
+         (contracts/assert-action-args!
+          :actions/toggle-portfolio-optimizer-execution-row
+          ["perp:BTC"]
+          {:phase :test})))
+  (is (= ["perp:BTC" :limit-bps -5]
+         (contracts/assert-action-args!
+          :actions/set-portfolio-optimizer-execution-row-param
+          ["perp:BTC" :limit-bps -5]
           {:phase :test})))
 	  (is (= []
 	         (contracts/assert-action-args!

@@ -57,9 +57,9 @@
                        "text-left" "text-sm" "font-semibold" "text-primary"
                        "disabled:cursor-not-allowed" "disabled:border-base-300"
                        "disabled:bg-base-200/40" "disabled:text-trading-muted"]
-               :data-role "portfolio-optimizer-open-execution-modal"
+               :data-role "portfolio-optimizer-stage-execution"
                :disabled (not (pos? reviewable-count))
-               :on {:click [[:actions/open-portfolio-optimizer-execution-modal]]}}
+               :on {:click [[:actions/open-portfolio-optimizer-execution]]}}
       "Review Execution"]
      [:div {:class ["grid"
                     "grid-cols-[minmax(8rem,1.1fr)_repeat(8,minmax(5rem,0.75fr))]"

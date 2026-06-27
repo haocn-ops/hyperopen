@@ -3,7 +3,7 @@
             [hyperopen.portfolio.optimizer.actions :as actions]
             [hyperopen.portfolio.optimizer.fixtures :as fixtures]))
 
-(deftest execution-modal-actions-save-plan-from-last-successful-run-test
+(deftest open-execution-stages-plan-and-switches-to-execution-tab-test
   (let [state {:portfolio {:optimizer
                            {:draft {:id "draft-1"
                                     :execution-assumptions {:default-order-type :market}}
@@ -17,47 +17,54 @@
                                                 :status :ready
                                                 :side :buy
                                                 :quantity 0.25
-                                                :delta-notional-usd 1000}]}}})}}}]
-    (is (= [[:effects/save
-             [:portfolio :optimizer :execution-modal]
-             {:open? true
-              :plan {:scenario-id "draft-1"
-                     :status :ready
-                     :execution-disabled? false
-                     :disabled-reason nil
-                     :disabled-message nil
-                     :summary {:ready-count 1
-                               :blocked-count 0
-                               :skipped-count 0
-                               :gross-ready-notional-usd 1000
-                               :estimated-fees-usd nil
-                               :estimated-slippage-usd nil
-                               :margin nil}
-                     :rows [{:row-id "perp:BTC"
-                             :instrument-id "perp:BTC"
-                             :instrument-type :perp
-                             :status :ready
-                             :side :buy
-                             :quantity 0.25
-                             :order-type :market
-                             :delta-notional-usd 1000
-                             :cost nil
-                             :intent {:kind :perp-order
-                                      :instrument-id "perp:BTC"
-                                      :side :buy
-                                      :quantity 0.25
-                                      :order-type :market
-                                      :reduce-only? false}}]}}]]
-           (actions/open-portfolio-optimizer-execution-modal state))))
-  (is (= [[:effects/save
-           [:portfolio :optimizer :execution-modal]
-           {:open? false
-            :plan nil
-            :submitting? false
-            :error nil}]]
-         (actions/close-portfolio-optimizer-execution-modal {}))))
+                                                :delta-notional-usd 1000}]}}})}}}
+        effects (actions/open-portfolio-optimizer-execution state)]
+    (is (= [:effects/save [:portfolio :optimizer :execution-modal]
+            {:open? true
+             :submitting? false
+             :error nil
+             :phase :staged
+             :default-order-type :recommended
+             :overrides {}
+             :params {}
+             :open-row nil
+             :plan {:scenario-id "draft-1"
+                    :status :ready
+                    :execution-disabled? false
+                    :disabled-reason nil
+                    :disabled-message nil
+                    :summary {:ready-count 1
+                              :blocked-count 0
+                              :skipped-count 0
+                              :gross-ready-notional-usd 1000
+                              :estimated-fees-usd nil
+                              :estimated-slippage-usd nil
+                              :margin nil}
+                    :rows [{:row-id "perp:BTC"
+                            :instrument-id "perp:BTC"
+                            :instrument-type :perp
+                            :status :ready
+                            :side :buy
+                            :quantity 0.25
+                            :order-type :market
+                            :delta-notional-usd 1000
+                            :cost nil
+                            :intent {:kind :perp-order
+                                     :instrument-id "perp:BTC"
+                                     :side :buy
+                                     :quantity 0.25
+                                     :order-type :market
+                                     :reduce-only? false}}]}}]
+           (first effects)))
+    ;; run-state is reset and the surface switches to the Execution tab.
+    (is (= [:effects/save [:portfolio :optimizer :execution]
+            {:status :idle :attempt nil :history [] :error nil}]
+           (nth effects 1)))
+    (is (= [:effects/save [:portfolio-ui :optimizer :results-tab] :execution]
+           (nth effects 2)))
+    (is (= [:effects/replace-shareable-route-query] (nth effects 3)))))
 
-(deftest execution-modal-action-derives-preview-when-solved-run-lacks-preview-test
+(deftest open-execution-derives-preview-when-solved-run-lacks-preview-test
   (let [state {:asset-selector
                {:market-by-key
                 {"perp:BTC" {:key "perp:BTC"
@@ -127,27 +134,51 @@
                                        :current-weights-by-instrument {"perp:BTC" 0.25
                                                                        "perp:ETH" 0.0}
                                        :diagnostics {:turnover 0.75}}})}}}
-        effects (actions/open-portfolio-optimizer-execution-modal state)
+        effects (actions/open-portfolio-optimizer-execution state)
         plan (get-in effects [0 2 :plan])]
     (is (= :effects/save (get-in effects [0 0])))
-    (is (= [:portfolio :optimizer :execution-modal]
-           (get-in effects [0 1])))
+    (is (= [:portfolio :optimizer :execution-modal] (get-in effects [0 1])))
     (is (= true (get-in effects [0 2 :open?])))
     (is (= :ready (:status plan)))
     (is (= 2 (get-in plan [:summary :ready-count])))
-    (is (= #{"perp:BTC" "perp:ETH"}
-           (set (map :instrument-id (:rows plan)))))
-    (is (= #{:perp-order}
-           (set (map #(get-in % [:intent :kind]) (:rows plan)))))))
+    (is (= #{"perp:BTC" "perp:ETH"} (set (map :instrument-id (:rows plan)))))
+    (is (= #{:perp-order} (set (map #(get-in % [:intent :kind]) (:rows plan)))))))
 
-(deftest open-execution-modal-requires-solved-run-test
-  (is (= []
-         (actions/open-portfolio-optimizer-execution-modal
-          {:portfolio {:optimizer {:last-successful-run
-                                    (fixtures/sample-last-successful-run
-                                     {:result {:status :infeasible}})}}}))))
+(deftest open-execution-without-solved-run-still-switches-tab-with-nil-plan-test
+  (let [effects (actions/open-portfolio-optimizer-execution
+                 {:portfolio {:optimizer {:last-successful-run
+                                          (fixtures/sample-last-successful-run
+                                           {:result {:status :infeasible}})}}})]
+    (is (nil? (get-in effects [0 2 :plan])))
+    (is (= [:effects/save [:portfolio-ui :optimizer :results-tab] :execution]
+           (nth effects 2)))))
 
-(deftest confirm-execution-modal-dispatches-execution-effect-test
+(deftest execution-staging-mutators-update-interaction-state-test
+  (is (= [[:effects/save [:portfolio :optimizer :execution-modal :phase] :armed]
+          [:effects/save [:portfolio :optimizer :execution-modal :error] nil]]
+         (actions/set-portfolio-optimizer-execution-phase {} :armed)))
+  (is (= [[:effects/save [:portfolio :optimizer :execution-modal :phase] :staged]
+          [:effects/save [:portfolio :optimizer :execution-modal :error] nil]]
+         (actions/set-portfolio-optimizer-execution-phase {} :staged)))
+  (is (= [[:effects/save [:portfolio :optimizer :execution-modal :default-order-type] :twap]]
+         (actions/set-portfolio-optimizer-execution-default-order-type {} :twap)))
+  (is (= [[:effects/save [:portfolio :optimizer :execution-modal :overrides] {"perp:BTC" :limit}]]
+         (actions/set-portfolio-optimizer-execution-row-order-type {} "perp:BTC" :limit)))
+  ;; the :recommended sentinel clears an existing override
+  (is (= [[:effects/save [:portfolio :optimizer :execution-modal :overrides] {}]]
+         (actions/set-portfolio-optimizer-execution-row-order-type
+          {:portfolio {:optimizer {:execution-modal {:overrides {"perp:BTC" :limit}}}}}
+          "perp:BTC" :recommended)))
+  (is (= [[:effects/save [:portfolio :optimizer :execution-modal :open-row] "perp:BTC"]]
+         (actions/toggle-portfolio-optimizer-execution-row {} "perp:BTC")))
+  (is (= [[:effects/save [:portfolio :optimizer :execution-modal :open-row] nil]]
+         (actions/toggle-portfolio-optimizer-execution-row
+          {:portfolio {:optimizer {:execution-modal {:open-row "perp:BTC"}}}}
+          "perp:BTC")))
+  (is (= [[:effects/save [:portfolio :optimizer :execution-modal :params] {"perp:BTC" {:limit-bps -5}}]]
+         (actions/set-portfolio-optimizer-execution-row-param {} "perp:BTC" :limit-bps -5))))
+
+(deftest confirm-execution-dispatches-execution-effect-test
   (let [plan {:scenario-id "draft-1"
               :status :ready
               :execution-disabled? false
@@ -162,7 +193,7 @@
             [:effects/execute-portfolio-optimizer-plan plan]]
            (actions/confirm-portfolio-optimizer-execution state)))))
 
-(deftest confirm-execution-modal-blocks-read-only-plan-test
+(deftest confirm-execution-blocks-read-only-plan-test
   (let [state {:portfolio {:optimizer {:execution-modal
                                        {:open? true
                                         :plan {:scenario-id "draft-1"

@@ -163,11 +163,23 @@
 (def confirm-portfolio-optimizer-scenario-save
   run/confirm-portfolio-optimizer-scenario-save)
 
-(def open-portfolio-optimizer-execution-modal
-  execution/open-portfolio-optimizer-execution-modal)
+(def open-portfolio-optimizer-execution
+  execution/open-portfolio-optimizer-execution)
 
-(def close-portfolio-optimizer-execution-modal
-  execution/close-portfolio-optimizer-execution-modal)
+(def set-portfolio-optimizer-execution-phase
+  execution/set-portfolio-optimizer-execution-phase)
+
+(def set-portfolio-optimizer-execution-default-order-type
+  execution/set-portfolio-optimizer-execution-default-order-type)
+
+(def set-portfolio-optimizer-execution-row-order-type
+  execution/set-portfolio-optimizer-execution-row-order-type)
+
+(def toggle-portfolio-optimizer-execution-row
+  execution/toggle-portfolio-optimizer-execution-row)
+
+(def set-portfolio-optimizer-execution-row-param
+  execution/set-portfolio-optimizer-execution-row-param)
 
 (def confirm-portfolio-optimizer-execution
   execution/confirm-portfolio-optimizer-execution)

@@ -17,6 +17,13 @@
     --optimizer-short: #c25b5b;
     --optimizer-warn: #d49a3a;
     --optimizer-info: #6b8db5;
+    /* Pin DaisyUI base surfaces to the optimizer charcoal so every bg-base-100/200/300
+       (and opacity variant, which all resolve to oklch(var(--b1|2|3)/a)) stays
+       theme-independent — the design surface is near-black, not the active theme's
+       tinted base. OKLCH equivalents of --optimizer-surface / -2 / -3. */
+    --b1: 18.5877% 0.006899 258.369891;
+    --b2: 20.7611% 0.009203 255.618180;
+    --b3: 22.9793% 0.010692 260.683815;
     background-color: var(--optimizer-bg);
     color: var(--optimizer-text);
     font-family: "Inter Variable", var(--font-ui-system);
@@ -209,6 +216,16 @@
   .portfolio-optimizer .optimizer-chip[data-tone="warn"] {
     border-color: rgb(212 154 58 / 0.45);
     color: var(--optimizer-warn, #d49a3a);
+  }
+
+  .portfolio-optimizer .optimizer-chip[data-tone="short"] {
+    border-color: rgb(194 91 91 / 0.4);
+    color: var(--optimizer-short);
+  }
+
+  .portfolio-optimizer .optimizer-chip[data-tone="live"] {
+    border-color: rgb(78 166 116 / 0.4);
+    color: var(--optimizer-long);
   }
 
   .portfolio-optimizer .optimizer-note {

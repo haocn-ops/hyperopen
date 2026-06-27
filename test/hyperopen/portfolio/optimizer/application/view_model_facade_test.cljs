@@ -39,6 +39,8 @@
            (view-model/tracking-model state)))
     (is (= (view-model-execution/execution-modal-model state)
            (view-model/execution-modal-model state)))
+    (is (= (view-model-execution/execution-tab-model state)
+           (view-model/execution-tab-model state)))
     (is (= (view-model-scenario/inputs-audit-model state)
            (view-model/inputs-audit-model state)))))
 

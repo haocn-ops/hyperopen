@@ -141,7 +141,13 @@
   {:open? false
    :plan nil
    :submitting? false
-   :error nil})
+   :error nil
+   ;; v4 execution-tab staging interaction state (cosmetic + pre-submit phase).
+   :phase :staged
+   :default-order-type :recommended
+   :overrides {}
+   :params {}
+   :open-row nil})
 
 (defn default-execution-state
   []

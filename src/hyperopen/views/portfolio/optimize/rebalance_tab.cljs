@@ -168,9 +168,9 @@
               :class ["optimizer-primary-action" "border" "px-3" "py-2" "text-sm" "font-semibold"
                       "disabled:cursor-not-allowed" "disabled:border-base-300"
                       "disabled:bg-base-200/40" "disabled:text-trading-muted"]
-              :data-role "portfolio-optimizer-open-execution-modal"
+              :data-role "portfolio-optimizer-stage-execution"
               :disabled (not (pos? reviewable-count))
-              :on {:click [[:actions/open-portfolio-optimizer-execution-modal]]}}
+              :on {:click [[:actions/open-portfolio-optimizer-execution]]}}
      "Stage trades for execution"]]]))
 
 ;; ── Summary KPI row (Tier 1) ───────────────────────────────────────────

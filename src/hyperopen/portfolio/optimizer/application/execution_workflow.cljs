@@ -14,10 +14,27 @@
   [attempt started-at-ms]
   {:status :submitting
    :attempt attempt
+   ;; Live, per-row in-flight copy the running view reads. Ready rows render as
+   ;; "queued" and flip to :working then :submitted/:failed as each order lands. The
+   ;; terminal apply-execution-ledger rebuilds execution-path without it (auto-clear).
+   :run-attempt attempt
    :started-at-ms started-at-ms
    :completed-at-ms nil
    :history []
    :error nil})
+
+(defn set-run-attempt-row-status
+  "Updates one in-flight run-attempt row (by :row-id) with new status fields, so the
+  running view animates orders as they are submitted. No-op when there is no live
+  run-attempt (e.g. the no-wallet branch never seeds one)."
+  [state row-id status-update]
+  (update-in state (conj contracts/execution-run-attempt-path :rows)
+             (fn [rows]
+               (mapv (fn [row]
+                       (if (= row-id (:row-id row))
+                         (merge row status-update)
+                         row))
+                     (or rows [])))))
 
 (defn execution-ledger
   [attempt started-at-ms completed-at-ms rows]

@@ -80,6 +80,57 @@
                      (done)))
             (.catch (async-support/unexpected-error done)))))))
 
+(defn- near?
+  [expected actual]
+  (and (number? actual)
+       (< (js/Math.abs (- expected actual)) 0.0000001)))
+
+(deftest execute-portfolio-optimizer-plan-effect-records-realized-slippage-from-fill-test
+  ;; A filled order response carries an avgPx; the effect parses it and stamps realized
+  ;; slippage measured against the row's :price (the same reference the estimate used).
+  ;; buy @ ref 100, fill 101 -> 100 bp; notional 25 -> $0.25.
+  (async done
+    (let [address "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          ticks (atom [1000 1100])
+          store (atom {:wallet {:address address :agent {:status :ready}}
+                       :asset-selector {:market-by-key
+                                        {"perp:BTC" {:coin "BTC"
+                                                     :market-type :perp
+                                                     :asset-id 0
+                                                     :szDecimals 4}}}
+                       :portfolio {:optimizer
+                                   {:active-scenario {:loaded-id "scn_submit"
+                                                      :status :saved}
+                                    :execution-modal {:open? true
+                                                      :submitting? true
+                                                      :plan ready-plan}}}})]
+      (with-redefs [portfolio-optimizer-adapters/*now-ms*
+                    (fn []
+                      (let [t (first @ticks)]
+                        (swap! ticks rest)
+                        t))
+                    portfolio-optimizer-adapters/*submit-order!*
+                    (fn [_store _address _action]
+                      (js/Promise.resolve
+                       {:status "ok"
+                        :response {:data {:statuses [{:filled {:oid 7
+                                                               :totalSz "0.25"
+                                                               :avgPx "101"}}]}}}))
+                    portfolio-optimizer-adapters/*dispatch!*
+                    (fn [_ _ _] nil)]
+        (-> (portfolio-optimizer-adapters/execute-portfolio-optimizer-plan-effect
+             nil
+             store
+             ready-plan)
+            (.then (fn [ledger]
+                     (let [realized (get-in ledger [:rows 0 :realized])]
+                       (is (= :submitted (get-in ledger [:rows 0 :status])))
+                       (is (near? 101 (:avg-px realized)))
+                       (is (near? 100 (:slippage-bps realized)))
+                       (is (near? 0.25 (:slippage-usd realized))))
+                     (done)))
+            (.catch (async-support/unexpected-error done)))))))
+
 (deftest execute-portfolio-optimizer-plan-effect-routes-selected-subaccount-test
   (async done
     (let [submitted (atom [])

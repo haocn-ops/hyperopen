@@ -81,6 +81,8 @@
 (def execution-modal-submitting-path paths/execution-modal-submitting-path)
 (def execution-path paths/execution-path)
 (def execution-history-path paths/execution-history-path)
+(def execution-run-attempt-path paths/execution-run-attempt-path)
+(def execution-abort-requested-path paths/execution-abort-requested-path)
 (def execution-persistence-error-path paths/execution-persistence-error-path)
 (def tracking-path paths/tracking-path)
 (def tracking-error-path paths/tracking-error-path)

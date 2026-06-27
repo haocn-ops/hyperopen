@@ -450,6 +450,29 @@
     ;; unresolved spot dust still degrades to the bare reference (never crashes)
     (is (= "@999" (:instrument-label (nth rows 2))))))
 
+(deftest execution-tab-model-shows-live-run-attempt-rows-while-submitting-test
+  (let [state {:portfolio
+               {:optimizer
+                {:execution
+                 {:status :submitting
+                  :run-attempt {:rows [{:row-id "perp:BTC" :instrument-id "perp:BTC"
+                                        :status :submitted :side :buy :delta-notional-usd 100}
+                                       {:row-id "perp:ETH" :instrument-id "perp:ETH"
+                                        :status :working :side :buy :delta-notional-usd 50}]}}
+                 :execution-modal
+                 {:open? true
+                  :submitting? true
+                  :phase :armed
+                  :plan {:summary {:ready-count 2}
+                         :rows [{:row-id "perp:BTC" :instrument-id "perp:BTC"
+                                 :status :ready :side :buy :delta-notional-usd 100}
+                                {:row-id "perp:ETH" :instrument-id "perp:ETH"
+                                 :status :ready :side :buy :delta-notional-usd 50}]}}}}}
+        model (view-model/execution-tab-model state)]
+    (is (= :running (:phase model)))
+    ;; display rows are the live in-flight run-attempt, not the static staged plan
+    (is (= [:submitted :working] (mapv :status (:rows model))))))
+
 (deftest inputs-audit-model-projects-draft-scenario-and-readable-input-labels-test
   (let [vault-id (str "vault:" vault-address)
         model (view-model/inputs-audit-model

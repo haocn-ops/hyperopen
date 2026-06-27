@@ -12,7 +12,7 @@
   (and (= (count expected) (count actual))
        (every? true? (map near? expected actual))))
 
-(deftest build-rebalance-preview-generates-ready-perp-and-blocked-spot-rows-test
+(deftest build-rebalance-preview-generates-ready-perp-and-spot-rows-test
   (let [preview (rebalance/build-rebalance-preview
                  {:capital-usd 10000
                   :rebalance-tolerance 0.005
@@ -30,7 +30,9 @@
                                                     :slippage-bps 4}}
                   :fee-bps-by-id {"perp:BTC" 4.5
                                   "spot:PURR" 7}})]
-    (is (= :partially-blocked (:status preview)))
+    ;; Spot legs are now executable (routed on Hyperliquid like perps), so both rows
+    ;; are ready and the preview status is no longer partially-blocked.
+    (is (= :ready (:status preview)))
     (is (= 2 (count (:rows preview))))
     (let [perp-row (first (:rows preview))
           spot-row (second (:rows preview))]
@@ -43,9 +45,13 @@
       (is (near? 0.6 (get-in perp-row [:cost :estimated-slippage-usd])))
       (is (= 4.5 (get-in perp-row [:cost :fee-bps])))
       (is (near? 0.675 (get-in perp-row [:cost :estimated-fee-usd])))
-      (is (= :blocked (:status spot-row)))
-      (is (= :spot-submit-unsupported (:reason spot-row)))
-      (is (near? -800 (:delta-notional-usd spot-row))))))
+      ;; spot:PURR: target 0.02 vs current 0.10 -> sell $800, qty 400 @ $2, fee 7 bp
+      (is (= :ready (:status spot-row)))
+      (is (= :sell (:side spot-row)))
+      (is (near? -800 (:delta-notional-usd spot-row)))
+      (is (near? 400 (:quantity spot-row)))
+      (is (= 7 (get-in spot-row [:cost :fee-bps])))
+      (is (near? 0.56 (get-in spot-row [:cost :estimated-fee-usd]))))))
 
 (deftest build-rebalance-preview-skips-tolerance-and-blocks-missing-prices-test
   (let [preview (rebalance/build-rebalance-preview
@@ -99,22 +105,28 @@
     (is (= 0 (get-in preview [:summary :ready-count])))))
 
 (deftest build-rebalance-preview-keeps-summary-to-executable-rows-test
+  ;; perp:BTC and spot:PURR are both executable (spot routes on Hyperliquid too);
+  ;; perp:ETH is blocked on a missing price and must be excluded from the summary.
   (let [preview (rebalance/build-rebalance-preview
                  {:capital-usd 10000
                   :rebalance-tolerance 0.0
-                  :instrument-ids ["perp:BTC" "spot:PURR"]
-                  :current-weights [0.0 0.0]
-                  :target-weights [0.1 0.1]
+                  :instrument-ids ["perp:BTC" "spot:PURR" "perp:ETH"]
+                  :current-weights [0.0 0.0 0.0]
+                  :target-weights [0.1 0.1 0.1]
                   :instruments-by-id {"perp:BTC" {:instrument-type :perp
                                                   :coin "BTC"}
                                       "spot:PURR" {:instrument-type :spot
-                                                   :coin "PURR"}}
+                                                   :coin "PURR"}
+                                      "perp:ETH" {:instrument-type :perp
+                                                  :coin "ETH"}}
                   :prices-by-id {"perp:BTC" 10000
                                  "spot:PURR" 1}})]
     (is (= :partially-blocked (:status preview)))
-    (is (= 1 (get-in preview [:summary :ready-count])))
+    (is (= 2 (get-in preview [:summary :ready-count])))
     (is (= 1 (get-in preview [:summary :blocked-count])))
-    (is (= 1000 (get-in preview [:summary :gross-trade-notional-usd])))))
+    (is (= :missing-price (get-in preview [:rows 2 :reason])))
+    ;; gross-trade-notional counts only the two ready rows ($1000 + $1000).
+    (is (= 2000 (get-in preview [:summary :gross-trade-notional-usd])))))
 
 (deftest build-rebalance-preview-derives-live-orderbook-costs-and-margin-impact-test
   (let [preview (rebalance/build-rebalance-preview
@@ -340,3 +352,149 @@
     (is (= :blocked (:status small)))
     (is (= :below-min-notional (:reason small)))
     (is (= :ready (:status big)))))
+
+;; ── 0-bp cost-model guard (M7) ─────────────────────────────────────────────
+
+(deftest implausibly-favorable-buy-snapshot-fill-is-flagged-untrusted-not-zero-test
+  ;; A stale/coin-mismatched snapshot whose ask sits far BELOW the reference implies a
+  ;; non-physical "free" buy fill; the favorable delta would clamp to 0 bp and read as
+  ;; zero cost. The guard refuses that, reporting the configured flat fallback against the
+  ;; reference under an explicit untrusted source.
+  (let [preview (rebalance/build-rebalance-preview
+                 {:capital-usd 300
+                  :rebalance-tolerance 0.0
+                  :fallback-slippage-bps 30
+                  :instrument-ids ["perp:BTC"]
+                  :current-weights [0.0]
+                  :target-weights [1.0]
+                  :instruments-by-id {"perp:BTC" {:instrument-type :perp :coin "BTC"}}
+                  :prices-by-id {"perp:BTC" 100}
+                  :cost-contexts-by-id {"perp:BTC" {:source :snapshot
+                                                    :asks [{:px "90" :sz "10"}]
+                                                    :stale? false
+                                                    :age-ms 1000}}})
+        cost (get-in preview [:rows 0 :cost])]
+    (is (= :ready (get-in preview [:rows 0 :status])))
+    (is (= :untrusted-snapshot-fill (:source cost)))
+    (is (= :implausible-favorable-fill (:fallback-reason cost)))
+    (is (near? 30 (:slippage-bps cost)))           ;; the configured fallback, not 25
+    (is (near? 100 (:estimated-fill-price cost)))   ;; the reference, not the bogus 90
+    (is (near? 0.9 (:estimated-slippage-usd cost)))));; 300 * 30/10000
+
+(deftest implausibly-favorable-sell-snapshot-fill-is-flagged-untrusted-test
+  (let [preview (rebalance/build-rebalance-preview
+                 {:capital-usd 300
+                  :rebalance-tolerance 0.0
+                  :fallback-slippage-bps 25
+                  :instrument-ids ["perp:BTC"]
+                  :current-weights [1.0]
+                  :target-weights [0.0]
+                  :instruments-by-id {"perp:BTC" {:instrument-type :perp :coin "BTC"}}
+                  :prices-by-id {"perp:BTC" 100}
+                  :cost-contexts-by-id {"perp:BTC" {:source :snapshot
+                                                    :bids [{:px "115" :sz "10"}]
+                                                    :stale? false
+                                                    :age-ms 1000}}})
+        cost (get-in preview [:rows 0 :cost])]
+    (is (= :sell (get-in preview [:rows 0 :side])))
+    (is (= :untrusted-snapshot-fill (:source cost)))
+    (is (near? 25 (:slippage-bps cost)))
+    (is (near? 100 (:estimated-fill-price cost)))))
+
+(deftest small-favorable-snapshot-fill-still-floors-to-zero-test
+  ;; Genuine sub-threshold improvement (a buy filling just below the reference) is real
+  ;; and still clamps to 0 bp — the guard only fires beyond the 50 bp band.
+  (let [preview (rebalance/build-rebalance-preview
+                 {:capital-usd 300
+                  :rebalance-tolerance 0.0
+                  :fallback-slippage-bps 25
+                  :instrument-ids ["perp:BTC"]
+                  :current-weights [0.0]
+                  :target-weights [1.0]
+                  :instruments-by-id {"perp:BTC" {:instrument-type :perp :coin "BTC"}}
+                  :prices-by-id {"perp:BTC" 100}
+                  :cost-contexts-by-id {"perp:BTC" {:source :snapshot
+                                                    :asks [{:px "99.9" :sz "10"}]
+                                                    :stale? false
+                                                    :age-ms 1000}}})
+        cost (get-in preview [:rows 0 :cost])]
+    (is (= :snapshot (:source cost)))
+    (is (near? 99.9 (:estimated-fill-price cost)))
+    (is (near? 0 (:slippage-bps cost)))))
+
+(deftest build-rebalance-preview-exposes-maker-fee-for-resting-orders-test
+  ;; The cost carries both the taker fee (estimated-fee-usd) and the maker fee, so the
+  ;; execution tab can show the lower fee when a row is routed as a resting (maker) order.
+  (let [preview (rebalance/build-rebalance-preview
+                 {:capital-usd 10000
+                  :rebalance-tolerance 0.0
+                  :instrument-ids ["perp:BTC"]
+                  :current-weights [0.0]
+                  :target-weights [0.1]
+                  :instruments-by-id {"perp:BTC" {:instrument-type :perp :coin "BTC"}}
+                  :prices-by-id {"perp:BTC" 100}
+                  :fee-bps-by-id {"perp:BTC" 4.5}
+                  :maker-fee-bps 1.5})
+        cost (get-in preview [:rows 0 :cost])]
+    ;; notional 1000: taker 4.5 bp -> $0.45, maker 1.5 bp -> $0.15
+    (is (near? 0.45 (:estimated-fee-usd cost)))
+    (is (= 1.5 (:maker-fee-bps cost)))
+    (is (near? 0.15 (:maker-fee-usd cost)))))
+
+;; ── price-cost decomposition (spread + impact) ─────────────────────────────
+
+(deftest build-rebalance-preview-decomposes-price-cost-into-spread-and-impact-test
+  ;; :slippage-bps (price cost) already bundles crossing the spread + walking the book. With
+  ;; asks [101,102] vs mark 100 for a 3-unit buy, the touch (101) is the spread crossing
+  ;; (100 bp) and the residual to the VWAP (101.667) is the book impact (66.67 bp); the two
+  ;; sum back to the total price cost.
+  (let [preview (rebalance/build-rebalance-preview
+                 {:capital-usd 300
+                  :rebalance-tolerance 0.0
+                  :fallback-slippage-bps 25
+                  :instrument-ids ["perp:BTC"]
+                  :current-weights [0.0]
+                  :target-weights [1.0]
+                  :instruments-by-id {"perp:BTC" {:instrument-type :perp :coin "BTC"}}
+                  :prices-by-id {"perp:BTC" 100}
+                  :cost-contexts-by-id {"perp:BTC" {:source :snapshot
+                                                    :asks [{:px "101" :sz "1"}
+                                                           {:px "102" :sz "2"}]
+                                                    :stale? false
+                                                    :age-ms 0}}})
+        cost (get-in preview [:rows 0 :cost])]
+    (is (near? 166.66666666666669 (:slippage-bps cost)))   ; total price cost, unchanged
+    (is (near? 100 (:spread-bps cost)))
+    (is (near? 66.66666666666669 (:impact-bps cost)))
+    (is (near? (:slippage-bps cost) (+ (:spread-bps cost) (:impact-bps cost))))
+    ;; notional 300: spread 300*100/10000 = 3, impact 300*66.667/10000 = 2 (sum = total 5)
+    (is (near? 3 (:spread-usd cost)))
+    (is (near? 2 (:impact-usd cost)))))
+
+(deftest top-of-book-price-cost-is-all-spread-no-impact-test
+  ;; A fill that only reaches the touch (best ask) has spread crossing but no book impact.
+  (let [preview (rebalance/build-rebalance-preview
+                 {:capital-usd 10000
+                  :rebalance-tolerance 0.0
+                  :instrument-ids ["perp:BTC"]
+                  :current-weights [0.0]
+                  :target-weights [0.2]
+                  :instruments-by-id {"perp:BTC" {:instrument-type :perp :coin "BTC"}}
+                  :prices-by-id {"perp:BTC" 100}
+                  :cost-contexts-by-id {"perp:BTC" {:source :live-orderbook
+                                                    :best-bid {:px-num 99}
+                                                    :best-ask {:px-num 101}}}})
+        cost (get-in preview [:rows 0 :cost])]
+    (is (near? 100 (:slippage-bps cost)))
+    (is (near? 100 (:spread-bps cost)))
+    (is (near? 0 (:impact-bps cost)))))
+
+;; ── realized slippage helper ───────────────────────────────────────────────
+
+(deftest realized-slippage-bps-matches-estimate-convention-test
+  ;; buy filling 1% above the reference -> 100 bp; a favorable fill floors to 0 like the
+  ;; estimate so realized and estimated are directly comparable.
+  (is (near? 100 (rebalance/realized-slippage-bps :buy 100 101)))
+  (is (near? 100 (rebalance/realized-slippage-bps :sell 100 99)))
+  (is (near? 0 (rebalance/realized-slippage-bps :buy 100 99)))
+  (is (nil? (rebalance/realized-slippage-bps :buy 100 nil))))

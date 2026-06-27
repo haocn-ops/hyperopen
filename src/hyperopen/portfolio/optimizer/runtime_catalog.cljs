@@ -152,6 +152,20 @@
     actions/set-portfolio-optimizer-execution-row-param
     :confirm-portfolio-optimizer-execution
     actions/confirm-portfolio-optimizer-execution
+    :resume-portfolio-optimizer-execution
+    actions/resume-portfolio-optimizer-execution
+    :revert-portfolio-optimizer-execution-filled
+    actions/revert-portfolio-optimizer-execution-filled
+    :restage-portfolio-optimizer-execution-smaller
+    actions/restage-portfolio-optimizer-execution-smaller
+    :pause-portfolio-optimizer-execution
+    actions/pause-portfolio-optimizer-execution
+    :discard-portfolio-optimizer-execution
+    actions/discard-portfolio-optimizer-execution
+    :open-portfolio-optimizer-execution-in-ticket
+    actions/open-portfolio-optimizer-execution-in-ticket
+    :set-portfolio-optimizer-execution-order-filter
+    actions/set-portfolio-optimizer-execution-order-filter
     :refresh-portfolio-optimizer-tracking
     actions/refresh-portfolio-optimizer-tracking
     :enable-portfolio-optimizer-manual-tracking

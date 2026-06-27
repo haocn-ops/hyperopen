@@ -1,7 +1,13 @@
 (ns hyperopen.portfolio.optimizer.application.rebalance-preview
-  (:require [hyperopen.portfolio.optimizer.coercion :as coercion]
+  (:require [hyperopen.domain.trading.core :as trading-core]
+            [hyperopen.portfolio.optimizer.coercion :as coercion]
             [hyperopen.portfolio.optimizer.domain.rebalance :as rebalance]
             [hyperopen.portfolio.optimizer.ids :as ids]))
+
+(def ^:private maker-fee-bps
+  ;; Canonical Hyperliquid maker fee (percent -> bps), used to show the lower fee a resting
+  ;; (limit/passive) execution order would pay. The taker fee comes from the draft :fee-mode.
+  (* 100 (:maker trading-core/default-fees)))
 
 (def ^:private finite-number? coercion/finite-number?)
 (def ^:private non-blank-text coercion/non-blank-text)
@@ -182,7 +188,8 @@
                                [:execution-assumptions
                                 :fee-bps-by-id])
         :default-fee-bps (get-in request
-                                 [:execution-assumptions :default-fee-bps])}))))
+                                 [:execution-assumptions :default-fee-bps])
+        :maker-fee-bps maker-fee-bps}))))
 
 (defn result-with-rebalance-preview
   [request result]

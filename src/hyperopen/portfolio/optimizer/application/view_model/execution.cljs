@@ -119,15 +119,26 @@
         latest-attempt (enrich-execution-attempt
                         resolve-label
                         (latest-record (get-in state contracts/execution-history-path)))
+        run-attempt (enrich-execution-attempt
+                     resolve-label
+                     (get-in state contracts/execution-run-attempt-path))
         submitting? (boolean (:submitting? modal))
         status (run-status state)
         terminal? (boolean (terminal-run-statuses status))
         ui-phase (or (:phase modal) :staged)
         phase (derive-phase {:submitting? submitting? :ui-phase ui-phase :status status})
         plan-rows (enrich-instrument-rows resolve-label (:rows plan))
-        display-rows (if (and terminal? (seq (:rows latest-attempt)))
+        ;; During a run, show the live in-flight rows (queued -> working ->
+        ;; submitted/failed); after a run, the latest ledger attempt; otherwise the
+        ;; static staged plan.
+        display-rows (cond
+                       (and submitting? (seq (:rows run-attempt)))
+                       (:rows run-attempt)
+
+                       (and terminal? (seq (:rows latest-attempt)))
                        (:rows latest-attempt)
-                       plan-rows)
+
+                       :else plan-rows)
         ready? (pos? (or (:ready-count summary) 0))
         execution-disabled? (boolean (:execution-disabled? plan))
         confirm-disabled? (or submitting?
@@ -145,6 +156,7 @@
      :overrides (or (:overrides modal) {})
      :params (or (:params modal) {})
      :open-row (:open-row modal)
+     :order-filter (or (:order-filter modal) :all)
      :submitting? submitting?
      :error (:error modal)
      :ready? ready?

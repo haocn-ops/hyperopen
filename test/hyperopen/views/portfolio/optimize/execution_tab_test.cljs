@@ -120,6 +120,71 @@
     (is (contains? strings "Margin after"))
     (is (contains? strings "spot-submit-unsupported"))))
 
+(deftest execution-tab-slip-is-type-aware-test
+  ;; A market row shows the book-crossing slippage estimate; a limit-overridden row
+  ;; reads "rests" instead of the (misleading) market-impact number.
+  (let [market-view (scenario-view :execution
+                                   {:execution {:status :idle :history []}
+                                    :execution-modal {:open? true :phase :staged :plan staged-plan}})
+        market-row (node-by-role market-view "portfolio-optimizer-execution-order-row-perp-BTC")
+        limit-view (scenario-view :execution
+                                  {:execution {:status :idle :history []}
+                                   :execution-modal {:open? true :phase :staged :plan staged-plan
+                                                     :overrides {"perp:BTC" :limit}}})
+        limit-row (node-by-role limit-view "portfolio-optimizer-execution-order-row-perp-BTC")]
+    (is (str/includes? (node-text market-row) "bp"))
+    (is (not (str/includes? (node-text market-row) "rests")))
+    (is (str/includes? (node-text limit-row) "rests"))
+    (is (not (str/includes? (node-text limit-row) "bp")))))
+
+(deftest execution-tab-cost-kpis-react-to-order-type-test
+  ;; A market (crossing) row contributes its price cost (spread + impact) + taker fee, which
+  ;; rolls into the all-in KPI; overriding it to limit (resting/maker) drops the price cost to
+  ;; $0 and switches to the maker fee — recomputed live, no re-staging.
+  (let [plan (assoc-in staged-plan [:rows 0 :cost]
+                       {:source :snapshot :slippage-bps 5.0
+                        :estimated-slippage-usd 12.0
+                        :estimated-fee-usd 6.0
+                        :maker-fee-usd 2.0})
+        view (fn [overrides]
+               (scenario-view :execution
+                              {:execution {:status :idle :history []}
+                               :execution-modal (cond-> {:open? true :phase :staged :plan plan}
+                                                  overrides (assoc :overrides overrides))}))
+        kpi (fn [v role] (node-text (node-by-role v (str "portfolio-optimizer-execution-kpi-" role))))
+        market (view nil)
+        limit (view {"perp:BTC" :limit})]
+    ;; market: price cost $12, taker fee $6, all-in $18
+    (is (str/includes? (kpi market "price-cost") "12"))
+    (is (str/includes? (kpi market "fees") "6"))
+    (is (str/includes? (kpi market "all-in") "18"))
+    ;; limit override: rests -> price cost $0, maker fee $2, all-in $2
+    (is (str/includes? (kpi limit "price-cost") "$0"))
+    (is (not (str/includes? (kpi limit "price-cost") "12")))
+    (is (str/includes? (kpi limit "fees") "2"))
+    (is (str/includes? (kpi limit "all-in") "2"))
+    (is (not (str/includes? (kpi limit "all-in") "18")))))
+
+(deftest execution-tab-row-expansion-shows-cost-breakdown-test
+  ;; Expanding a market row reveals the execution-cost breakdown: spread crossing + book
+  ;; impact = price cost, + fees = all-in. all-in = price cost $0.68 + fees $0.23 = $0.91.
+  (let [plan (assoc-in staged-plan [:rows 0 :cost]
+                       {:source :snapshot :slippage-bps 25 :estimated-slippage-usd 0.68
+                        :spread-bps 18 :spread-usd 0.49 :impact-bps 7 :impact-usd 0.19
+                        :fee-bps 4 :estimated-fee-usd 0.23 :maker-fee-bps 1.5 :maker-fee-usd 0.08})
+        view-node (scenario-view :execution
+                                 {:execution {:status :idle :history []}
+                                  :execution-modal {:open? true :phase :staged :plan plan
+                                                    :open-row "perp:BTC"}})
+        breakdown (node-by-role view-node "portfolio-optimizer-execution-cost-breakdown")
+        text (node-text breakdown)]
+    (is (some? breakdown))
+    (is (str/includes? text "Spread crossing"))
+    (is (str/includes? text "Book impact"))
+    (is (str/includes? text "Price cost"))
+    (is (str/includes? text "All-in"))
+    (is (str/includes? text "0.91"))))
+
 (deftest execution-tab-armed-renders-enabled-confirm-test
   (let [view-node (scenario-view :execution
                                  {:execution {:status :idle :history []}

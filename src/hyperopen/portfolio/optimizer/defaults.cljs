@@ -147,7 +147,8 @@
    :default-order-type :recommended
    :overrides {}
    :params {}
-   :open-row nil})
+   :open-row nil
+   :order-filter :all})
 
 (defn default-execution-state
   []

@@ -4,6 +4,13 @@
 (def default-fallback-slippage-bps
   25)
 
+(def ^:private max-favorable-fill-deviation
+  ;; A marketable taker fill cannot beat the reference price by a wide margin. When an
+  ;; orderbook snapshot implies one (a stale or coin-mismatched book), the favorable
+  ;; delta would clamp to a deceptive 0 bp via (max 0 ...); instead we treat the estimate
+  ;; as untrusted and fall back. 0.005 = 50 bps.
+  0.005)
+
 (def ^:private min-order-notional-usd
   ;; Hyperliquid rejects orders below a $10 notional. The same floor is encoded
   ;; for scale/TWAP suborders in hyperopen.domain.trading.core
@@ -63,6 +70,37 @@
                  :sell (- reference-price fill-price)
                  0))
           reference-price))))
+
+(defn realized-slippage-bps
+  "Public: realized fill slippage in bps versus the reference price the estimate used.
+   Reuses the estimate's convention (favorable fills floor at 0) so a realized figure is
+   directly comparable to the row's estimated :slippage-bps."
+  [side reference-price fill-price]
+  (slippage-bps-from-fill-price side reference-price fill-price))
+
+(defn- implausible-favorable-fill?
+  "True when a candidate book fill is favorable beyond the trust band -- a buy filling
+   below the reference, or a sell filling above it, by more than max-favorable-fill-deviation.
+   Such a fill is non-physical for a marketable taker and signals a stale/mismatched book,
+   so the favorable clamp to 0 bp would be deceptive."
+  [side reference-price fill-price]
+  (and (finite-positive? reference-price)
+       (finite-positive? fill-price)
+       (let [favorable (case side
+                         :buy (- reference-price fill-price)
+                         :sell (- fill-price reference-price)
+                         0)]
+         (> (/ favorable reference-price) max-favorable-fill-deviation))))
+
+(defn- untrusted-fill-cost
+  "Cost map for a snapshot whose implied fill is implausibly favorable: report the
+   configured flat fallback against the reference price rather than a deceptive 0 bp."
+  [metadata reference-price fallback]
+  (merge metadata
+         {:source :untrusted-snapshot-fill
+          :estimated-fill-price reference-price
+          :slippage-bps fallback
+          :fallback-reason :implausible-favorable-fill}))
 
 (defn- visible-depth-fill
   [levels quantity]
@@ -182,6 +220,27 @@
   [context]
   (select-keys context [:age-ms :stale? :observed-at-ms :loaded-at-ms :received-at-ms]))
 
+(defn- side-touch-price
+  "Best (touch) price on the fill side of a snapshot/orderbook context: the first ask level
+   for a buy, the first bid level for a sell, falling back to best-ask/best-bid."
+  [context side]
+  (or (level-price (first (snapshot-side-levels context side)))
+      (orderbook-fill-price context side)))
+
+(defn- cost-split
+  "Decompose a total price cost (bps) into spread crossing (the touch vs the reference mark)
+   and book impact (the residual of walking past the touch). Both floor at 0 and spread is
+   capped at the total, so spread + impact = total. Returns nil when there is no real touch
+   to split against (flat fallback / no book)."
+  [side reference-price total-bps touch-price]
+  (when (and (finite-number? total-bps)
+             (finite-positive? touch-price))
+    (let [spread (min (or (slippage-bps-from-fill-price side reference-price touch-price) 0)
+                      total-bps)
+          impact (max 0 (- total-bps spread))]
+      {:spread-bps spread
+       :impact-bps impact})))
+
 (defn- cost-context
   [opts instrument-id side reference-price quantity]
   (let [fallback (or (:fallback-slippage-bps opts)
@@ -203,19 +262,23 @@
 
       (= :full-visible-depth (:depth-status snapshot-fill))
       (let [estimated-fill-price (:estimated-fill-price snapshot-fill)]
-        (merge metadata
-               {:source source
-                :estimated-fill-price estimated-fill-price
-                :slippage-bps (or (slippage-bps-from-fill-price side
-                                                                 reference-price
-                                                                 estimated-fill-price)
-                                  fallback)
-                :depth-status :full-visible-depth}))
+        (if (implausible-favorable-fill? side reference-price estimated-fill-price)
+          (untrusted-fill-cost metadata reference-price fallback)
+          (merge metadata
+                 {:source source
+                  :estimated-fill-price estimated-fill-price
+                  :touch-price (side-touch-price context side)
+                  :slippage-bps (or (slippage-bps-from-fill-price side
+                                                                   reference-price
+                                                                   estimated-fill-price)
+                                    fallback)
+                  :depth-status :full-visible-depth})))
 
       (= :insufficient-visible-depth (:depth-status snapshot-fill))
       (merge metadata
              {:source :depth-extrapolated
               :estimated-fill-price reference-price
+              :touch-price (side-touch-price context side)
               :slippage-bps (depth-limited-slippage-bps side
                                                         reference-price
                                                         quantity
@@ -224,16 +287,20 @@
               :depth-status :insufficient-visible-depth
               :fallback-reason :snapshot-depth-limited})
 
+      (implausible-favorable-fill? side reference-price fill-price)
+      (untrusted-fill-cost metadata reference-price fallback)
+
       :else
       (merge metadata
              {:source source
               :estimated-fill-price (or fill-price reference-price)
+              :touch-price fill-price
               :slippage-bps (or (orderbook-slippage-bps context side reference-price)
                                 fallback)}))))
 
 (defn- cost-estimate
   [opts instrument-id side reference-price delta-notional-usd quantity]
-  (let [{:keys [source slippage-bps estimated-fill-price]
+  (let [{:keys [source slippage-bps estimated-fill-price touch-price]
          :as context} (cost-context opts
                                     instrument-id
                                     side
@@ -242,15 +309,28 @@
         fee-bps (or (get-in opts [:fee-bps-by-id instrument-id])
                     (:default-fee-bps opts)
                     0)
-        notional (abs-num delta-notional-usd)]
-    (merge context
-           {:source source
-            :estimated-fill-price estimated-fill-price
-            :notional-usd notional
-            :slippage-bps slippage-bps
-            :estimated-slippage-usd (* notional (/ slippage-bps 10000))
-            :fee-bps fee-bps
-            :estimated-fee-usd (* notional (/ fee-bps 10000))})))
+        ;; Maker fee for the same notional: a resting (limit/passive) order fills as a
+        ;; maker, so the Execution tab can show the lower fee when a row is routed that way.
+        maker-fee-bps (or (:maker-fee-bps opts) 0)
+        notional (abs-num delta-notional-usd)
+        ;; Price cost (:slippage-bps) already bundles crossing the spread and walking the
+        ;; book, so split it at the touch: spread = touch vs mark, impact = the residual.
+        ;; nil when there is no real book to split against (flat fallback / prebaked).
+        {:keys [spread-bps impact-bps]} (cost-split side reference-price slippage-bps touch-price)]
+    (cond-> (merge context
+                   {:source source
+                    :estimated-fill-price estimated-fill-price
+                    :notional-usd notional
+                    :slippage-bps slippage-bps
+                    :estimated-slippage-usd (* notional (/ slippage-bps 10000))
+                    :fee-bps fee-bps
+                    :estimated-fee-usd (* notional (/ fee-bps 10000))
+                    :maker-fee-bps maker-fee-bps
+                    :maker-fee-usd (* notional (/ maker-fee-bps 10000))})
+      (some? spread-bps) (assoc :spread-bps spread-bps
+                                :impact-bps impact-bps
+                                :spread-usd (* notional (/ spread-bps 10000))
+                                :impact-usd (* notional (/ impact-bps 10000))))))
 
 (defn- row-status
   [{:keys [rebalance-tolerance]} instrument price capital-usd delta-weight delta-notional-usd quantity]
@@ -265,10 +345,6 @@
     (not (finite-positive? capital-usd))
     {:status :blocked
      :reason :missing-capital-base}
-
-    (= :spot (:instrument-type instrument))
-    {:status :blocked
-     :reason :spot-submit-unsupported}
 
     (not (finite-positive? price))
     {:status :blocked
@@ -381,9 +457,10 @@
                    instrument-ids
                    current-weights
                    target-weights)
-        ready-rows (filter #(= :ready (:status %)) rows)]
+        ready-rows (filter #(= :ready (:status %)) rows)
+        capital-usd (:capital-usd opts)]
     {:status (preview-status rows)
-     :capital-usd (:capital-usd opts)
+     :capital-usd capital-usd
      :rows rows
      :summary {:ready-count (count (filter #(= :ready (:status %)) rows))
                :blocked-count (count (filter #(= :blocked (:status %)) rows))

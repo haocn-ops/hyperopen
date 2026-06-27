@@ -348,6 +348,27 @@
 (def confirm-portfolio-optimizer-execution-action
   portfolio-optimizer-actions/confirm-portfolio-optimizer-execution)
 
+(def resume-portfolio-optimizer-execution-action
+  portfolio-optimizer-actions/resume-portfolio-optimizer-execution)
+
+(def revert-portfolio-optimizer-execution-filled-action
+  portfolio-optimizer-actions/revert-portfolio-optimizer-execution-filled)
+
+(def restage-portfolio-optimizer-execution-smaller-action
+  portfolio-optimizer-actions/restage-portfolio-optimizer-execution-smaller)
+
+(def pause-portfolio-optimizer-execution-action
+  portfolio-optimizer-actions/pause-portfolio-optimizer-execution)
+
+(def discard-portfolio-optimizer-execution-action
+  portfolio-optimizer-actions/discard-portfolio-optimizer-execution)
+
+(def open-portfolio-optimizer-execution-in-ticket-action
+  portfolio-optimizer-actions/open-portfolio-optimizer-execution-in-ticket)
+
+(def set-portfolio-optimizer-execution-order-filter-action
+  portfolio-optimizer-actions/set-portfolio-optimizer-execution-order-filter)
+
 (def refresh-portfolio-optimizer-tracking-action
   portfolio-optimizer-actions/refresh-portfolio-optimizer-tracking)
 

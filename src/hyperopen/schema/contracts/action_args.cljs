@@ -336,6 +336,13 @@
 	   :actions/toggle-portfolio-optimizer-execution-row ::portfolio-optimizer-instrument-id-args
 	   :actions/set-portfolio-optimizer-execution-row-param ::portfolio-optimizer-execution-row-param-args
 	   :actions/confirm-portfolio-optimizer-execution ::common/no-args
+	   :actions/resume-portfolio-optimizer-execution ::common/no-args
+	   :actions/revert-portfolio-optimizer-execution-filled ::common/no-args
+	   :actions/restage-portfolio-optimizer-execution-smaller ::common/no-args
+	   :actions/pause-portfolio-optimizer-execution ::common/no-args
+	   :actions/discard-portfolio-optimizer-execution ::common/no-args
+	   :actions/open-portfolio-optimizer-execution-in-ticket ::common/no-args
+	   :actions/set-portfolio-optimizer-execution-order-filter ::common/keyword-or-string-args
 	   :actions/refresh-portfolio-optimizer-tracking ::common/no-args
 	   :actions/enable-portfolio-optimizer-manual-tracking ::common/no-args
 	   :actions/auto-recompute-stale-portfolio-optimizer-scenario ::common/no-args

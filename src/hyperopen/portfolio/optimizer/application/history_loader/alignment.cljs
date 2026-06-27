@@ -9,7 +9,12 @@
   2)
 
 (def default-funding-periods-per-year
-  1095)
+  ;; Hyperliquid charges funding HOURLY (paid every hour at 1/8 of the 8h formula rate),
+  ;; and :average-rate is the mean of per-1h :funding-rate-raw rows, so the correct
+  ;; annualization is 24*365 = 8760. (The prior 1095 = 365*3 wrongly assumed an 8h raw
+  ;; rate and understated annualized funding ~8x.) Matches utils/formatting.cljs
+  ;; annualized-funding-rate (*24*365) and the execution Fund-8h basis (rate*8).
+  8760)
 
 (def ^:private common-vault-window-preference
   [:one-year :six-month :three-month :month :week :day :all-time])

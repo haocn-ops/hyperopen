@@ -132,6 +132,26 @@
                     :dedupe-key [:portfolio-optimizer :funding "ETH" (- 2000000 86400000) 2000000]}}]
            (:funding-requests plan)))))
 
+(deftest funding-carry-annualizes-hourly-by-default-test
+  ;; Hyperliquid funds HOURLY, so the default annualization is 8760 (24*365), not 1095.
+  ;; With no explicit funding-periods-per-year, average-rate 0.0015 -> 0.0015*8760 = 13.14.
+  (is (= 8760 history-loader/default-funding-periods-per-year))
+  (let [aligned (history-loader/align-history-inputs
+                 {:universe [{:instrument-id "perp:BTC"
+                              :market-type :perp
+                              :coin "BTC"}]
+                  :candle-history-by-coin {"BTC" [{:time 1000 :close "100"}
+                                                  {:time 2000 :close "110"}
+                                                  {:time 3000 :close "121"}]}
+                  :funding-history-by-coin {"BTC" [{:time-ms 1000 :funding-rate-raw "0.001"}
+                                                   {:time-ms 2000 :fundingRate 0.002}]}
+                  :as-of-ms 4000
+                  :stale-after-ms 5000})]
+    (is (fixtures/near? 0.0015
+                        (get-in aligned [:funding-by-instrument "perp:BTC" :average-rate])))
+    (is (fixtures/near? 13.14
+                        (get-in aligned [:funding-by-instrument "perp:BTC" :annualized-carry])))))
+
 (deftest align-history-inputs-aligns-common-calendar-and-exposes-funding-carry-test
   (let [aligned (history-loader/align-history-inputs
                  {:universe [{:instrument-id "perp:BTC"

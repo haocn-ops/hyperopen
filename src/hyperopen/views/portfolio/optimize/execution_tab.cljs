@@ -40,12 +40,6 @@
     (str (opt-format/format-decimal value {:maximum-fraction-digits 1}) " bp")
     "—"))
 
-(defn- signed-bps
-  [value]
-  (if (finite value)
-    (str (when (pos? value) "+") (opt-format/format-decimal value {:maximum-fraction-digits 1}) " bp")
-    "—"))
-
 (defn- format-knotional
   "Compact $Nk notional for the dense order list."
   [value]
@@ -379,12 +373,76 @@
 
 ;; ── KPI strip ───────────────────────────────────────────────────────────
 
+(defn- crossing-type?
+  "Market and TWAP orders cross the book — they pay market-impact slippage and the taker
+  fee. Limit and Passive rest as maker orders: no market impact, the lower maker fee."
+  [order-type]
+  (not (resting-type? order-type)))
+
+(defn- type-aware-costs
+  "Recomputes price cost (spread + book impact) + fees from each row's LIVE effective order
+  type so the KPI strip and health rail react to type changes without re-staging. Crossing
+  (market/twap) rows keep their spread + impact + taker fee; resting (limit/passive) rows
+  contribute no spread/impact and the maker fee. Returns the totals, the spread/impact split,
+  the maker/taker split, and the crossing-row price-cost bps samples for the average."
+  [model rows]
+  (reduce
+   (fn [acc row]
+     (let [crossing? (crossing-type? (effective-type model row))
+           cost (:cost row)
+           slip-bps (:slippage-bps cost)
+           slip-usd (if crossing? (or (:estimated-slippage-usd cost) 0) 0)
+           has-split? (some? (:spread-usd cost))
+           spread-usd (if (and crossing? has-split?) (:spread-usd cost) 0)
+           ;; Attribute an un-splittable crossing cost (flat fallback / no book) entirely to
+           ;; impact so spread + impact always reconciles to the price-cost total.
+           impact-usd (cond (not crossing?) 0
+                            has-split? (or (:impact-usd cost) 0)
+                            :else slip-usd)]
+       (cond-> acc
+         true (update :slippage-usd + slip-usd)
+         true (update :spread-usd + spread-usd)
+         true (update :impact-usd + impact-usd)
+         true (update :fees-usd + (if crossing?
+                                    (or (:estimated-fee-usd cost) 0)
+                                    (or (:maker-fee-usd cost) 0)))
+         true (update (if crossing? :taker-count :maker-count) inc)
+         (and crossing? (finite slip-bps)) (update :slip-bps conj (abs-num slip-bps)))))
+   {:slippage-usd 0 :spread-usd 0 :impact-usd 0 :fees-usd 0
+    :taker-count 0 :maker-count 0 :slip-bps []}
+   rows))
+
+(defn- fee-mix-label
+  [{:keys [taker-count maker-count]}]
+  (cond
+    (and (pos? taker-count) (pos? maker-count)) (str taker-count " taker · " maker-count " maker")
+    (pos? maker-count) "maker · resting rows"
+    :else "taker · ready rows"))
+
+(defn- price-cost-split-text
+  "\"spread $X + impact $Y\" for the crossing rows, or nil when nothing crosses the book."
+  [{:keys [spread-usd impact-usd taker-count]}]
+  (when (pos? taker-count)
+    (str "spread " (opt-format/format-usdc spread-usd)
+         " + impact " (opt-format/format-usdc impact-usd))))
+
+(defn- price-cost-sub
+  [costs avg-bps]
+  (cond
+    (price-cost-split-text costs)
+    (str (price-cost-split-text costs)
+         (when avg-bps (str " · " (format-bps avg-bps) " avg")))
+    (pos? (+ (:taker-count costs) (:maker-count costs))) "resting — no market impact"
+    :else "no ready rows"))
+
 (defn- kpi
-  [{:keys [data-role label value value-class sub]}]
+  [{:keys [data-role label value value-class sub info]}]
   [:div {:class ["optimizer-kpi-card" "border-r" "border-base-300" "px-3" "py-2.5" "last:border-r-0"]
          :data-role data-role}
-   [:p {:class ["font-mono" "text-[0.6rem]" "uppercase" "tracking-[0.08em]" "text-trading-muted/70"]}
-    label]
+   [:p {:class ["font-mono" "text-[0.6rem]" "uppercase" "tracking-[0.08em]" "text-trading-muted/70"]
+        :title info}
+    label
+    (when info [:span {:class ["ml-1" "cursor-help" "text-trading-muted/50"]} "ⓘ"])]
    [:p {:class ["mt-1" "font-mono" "text-sm" "font-semibold" "tabular-nums" (or value-class "text-trading-text")]}
     value]
    (when (seq sub)
@@ -402,15 +460,31 @@
         staged-notional (or (:gross-ready-notional-usd summary)
                             (reduce + 0 (map #(abs-num (:delta-notional-usd %))
                                              (concat ready submitted failed))))
-        sampled (filter #(get-in % [:cost :slippage-bps]) (concat ready submitted))
-        avg-bps (when (seq sampled)
-                  (/ (reduce + 0 (map #(abs-num (get-in % [:cost :slippage-bps])) sampled))
-                     (count sampled)))
+        ;; Slippage + fees recomputed from each row's LIVE effective order type, so the KPIs
+        ;; update as the user toggles types (resting => no impact + maker fee, crossing =>
+        ;; impact + taker fee) without re-staging. Covers ready/working (pre-run) and
+        ;; submitted (post-run) rows so the fee total survives a run.
+        costs (type-aware-costs model (concat ready submitted))
+        slip-bps-samples (:slip-bps costs)
+        avg-bps (when (seq slip-bps-samples)
+                  (/ (reduce + 0 slip-bps-samples) (count slip-bps-samples)))
+        ;; Realized slippage is recoverable only post-run, off filled rows (the effect
+        ;; stamps :realized; resting/unfilled rows have none). Never relabel the estimate.
+        post-run? (contains? #{:done :halted} phase)
+        realized-rows (filter #(get-in % [:realized :slippage-bps]) submitted)
+        realized-bps (when (seq realized-rows)
+                       (/ (reduce + 0 (map #(get-in % [:realized :slippage-bps]) realized-rows))
+                          (count realized-rows)))
+        realized-usd (reduce + 0 (keep #(get-in % [:realized :slippage-usd]) submitted))
+        show-realized? (and post-run? (seq realized-rows))
+        ;; Price cost = spread + impact (realized fill cost post-run); all-in = price cost + fees.
+        price-cost-usd (if show-realized? realized-usd (:slippage-usd costs))
+        all-in-usd (+ price-cost-usd (:fees-usd costs))
         margin (:margin summary)
         margin-warn? (and (:warning margin) (not= :none (:warning margin)))
         orders-value (if (= :done phase) (str filled " / " total) (str filled " / " total))]
     [:section {:class ["optimizer-rebalance-kpis" "grid" "grid-cols-2" "border-b" "border-base-300"
-                       "bg-base-100/95" "sm:grid-cols-3" "lg:grid-cols-5"]
+                       "bg-base-100/95" "sm:grid-cols-3" "lg:grid-cols-6"]
                :data-role "portfolio-optimizer-execution-kpis"}
      (kpi {:data-role "portfolio-optimizer-execution-kpi-orders"
            :label "Orders filled"
@@ -425,10 +499,6 @@
            :label "Notional executed"
            :value (format-knotional filled-notional)
            :sub (str "of " (format-knotional staged-notional) " staged")})
-     (kpi {:data-role "portfolio-optimizer-execution-kpi-slippage"
-           :label "Est. slippage"
-           :value (opt-format/format-usdc (or (:estimated-slippage-usd summary) 0))
-           :sub (if avg-bps (str "≈ " (format-bps avg-bps) " avg") "no ready rows")})
      (kpi {:data-role "portfolio-optimizer-execution-kpi-margin"
            :label "Margin after"
            :value (opt-format/format-pct (:after-utilization margin))
@@ -436,10 +506,28 @@
            :sub (if margin-warn?
                   (opt-format/keyword-label (:warning margin))
                   "post-rebalance maint.")})
+     (if show-realized?
+       (kpi {:data-role "portfolio-optimizer-execution-kpi-price-cost"
+             :label "Realized price cost"
+             :info "What you actually paid versus the mark the estimate used."
+             :value (opt-format/format-usdc realized-usd)
+             :sub (str "≈ " (format-bps realized-bps) " avg · est "
+                       (if avg-bps (format-bps avg-bps) "—"))})
+       (kpi {:data-role "portfolio-optimizer-execution-kpi-price-cost"
+             :label "Est. price cost"
+             :info "Price paid to execute = crossing the spread + walking the book (impact). Resting Limit/Passive orders pay neither."
+             :value (opt-format/format-usdc (:slippage-usd costs))
+             :sub (price-cost-sub costs avg-bps)}))
      (kpi {:data-role "portfolio-optimizer-execution-kpi-fees"
            :label "Est. fees"
-           :value (opt-format/format-usdc (or (:estimated-fees-usd summary) 0))
-           :sub "taker · ready rows"})]))
+           :info "Exchange fees: taker for crossing orders, the lower maker fee for resting ones."
+           :value (opt-format/format-usdc (:fees-usd costs))
+           :sub (fee-mix-label costs)})
+     (kpi {:data-role "portfolio-optimizer-execution-kpi-all-in"
+           :label (if show-realized? "Realized all-in" "Est. all-in cost")
+           :info "Total cost to execute = price cost + fees."
+           :value (opt-format/format-usdc all-in-usd)
+           :sub "price cost + fees"})]))
 
 ;; ── order table ─────────────────────────────────────────────────────────
 
@@ -466,13 +554,69 @@
     :queued [:span {:class ["text-warning"]} "queued"]
     [:span {:class ["text-trading-muted"]} "staged"]))
 
+(defn- cost-component
+  [label bps usd accent?]
+  [:div {:class ["flex" "flex-col" "leading-tight"]}
+   [:span {:class ["font-mono" "text-[0.55rem]" "uppercase" "tracking-[0.06em]" "text-trading-muted/60"]} label]
+   [:span {:class (cond-> ["font-mono" "text-xs" "tabular-nums"]
+                    accent? (conj "font-semibold" "text-trading-text")
+                    (not accent?) (conj "text-trading-muted"))}
+    (if (finite bps) (format-bps bps) "—")]
+   (when (finite usd)
+     [:span {:class ["font-mono" "text-[0.6rem]" "tabular-nums" "text-trading-muted/60"]}
+      (opt-format/format-usdc usd)])])
+
+(defn- cost-breakdown
+  "Per-row execution-cost components for the row's effective type. Crossing (market/twap):
+  spread crossing + book impact = price cost, + taker fee = all-in. Resting (limit/passive):
+  no spread/impact (rests), + maker fee = all-in. A crossing row whose book can't be split
+  (flat fallback) attributes its whole price cost to impact so the parts reconcile."
+  [model row]
+  (let [t (effective-type model row)
+        crossing? (crossing-type? t)
+        cost (:cost row)
+        has-split? (some? (:spread-usd cost))
+        price-cost-usd (if crossing? (or (:estimated-slippage-usd cost) 0) 0)
+        price-cost-bps (if crossing? (or (:slippage-bps cost) 0) 0)
+        fee-usd (if crossing? (or (:estimated-fee-usd cost) 0) (or (:maker-fee-usd cost) 0))
+        fee-bps (if crossing? (or (:fee-bps cost) 0) (or (:maker-fee-bps cost) 0))]
+    {:crossing? crossing?
+     :spread-bps (if (and crossing? has-split?) (:spread-bps cost) 0)
+     :spread-usd (if (and crossing? has-split?) (:spread-usd cost) 0)
+     :impact-bps (cond (not crossing?) 0 has-split? (or (:impact-bps cost) 0) :else price-cost-bps)
+     :impact-usd (cond (not crossing?) 0 has-split? (or (:impact-usd cost) 0) :else price-cost-usd)
+     :price-cost-bps price-cost-bps :price-cost-usd price-cost-usd
+     :fee-bps fee-bps :fee-usd fee-usd
+     :all-in-bps (+ price-cost-bps fee-bps) :all-in-usd (+ price-cost-usd fee-usd)}))
+
+(defn- cost-breakdown-strip
+  [model row]
+  (let [{:keys [crossing? spread-bps spread-usd impact-bps impact-usd
+                price-cost-bps price-cost-usd fee-bps fee-usd all-in-bps all-in-usd]}
+        (cost-breakdown model row)
+        sep (fn [s] [:span {:class ["font-mono" "text-trading-muted/40" "self-center" "px-0.5"]} s])]
+    [:div {:class ["mt-3" "border-t" "border-base-300/60" "pt-2.5"]
+           :data-role "portfolio-optimizer-execution-cost-breakdown"}
+     [:p {:class ["font-mono" "text-[0.55rem]" "uppercase" "tracking-[0.1em]" "text-trading-muted/50" "mb-2"]}
+      "Execution cost breakdown (est.)"]
+     [:div {:class ["flex" "flex-wrap" "items-stretch" "gap-x-1" "gap-y-2"]}
+      (if crossing?
+        (list (cost-component "Spread crossing" spread-bps spread-usd false)
+              (sep "+")
+              (cost-component "Book impact" impact-bps impact-usd false))
+        (cost-component "Rests — no spread/impact" nil nil false))
+      (sep "=")
+      (cost-component "Price cost" price-cost-bps price-cost-usd true)
+      (sep "+")
+      (cost-component "Fees" fee-bps fee-usd false)
+      (sep "=")
+      (cost-component "All-in" all-in-bps all-in-usd true)]]))
+
 (defn- order-editor-row
   [model row colspan]
   (let [t (effective-type model row)
         rec (recommend-exec-type row)
         params (row-params model row)
-        slip (abs-num (get-in row [:cost :slippage-bps]))
-        est (case t :market slip :twap (* slip 0.6) (* slip 0.4))
         buy? (= :buy (:side row))
         row-id (:row-id row)]
     [:tr {:data-role (str "portfolio-optimizer-execution-order-editor-" (data-role-token (:instrument-id row)))}
@@ -493,12 +637,7 @@
                    :class ["font-mono" "text-[0.65rem]" "text-warning"]
                    :on {:click [[:actions/set-portfolio-optimizer-execution-row-order-type row-id :recommended]]}}
           (str "↺ use recommended (" (order-type-labels rec) ")")]
-         (chip "recommended" :accent))
-       [:span {:class ["flex-1"]}]
-       [:span {:class ["font-mono" "text-[0.65rem]" "text-trading-muted"]}
-        (if (resting-type? t)
-          "rests — fills at your price or better"
-          (str "est. fill " (signed-bps (- est))))]]
+         (chip "recommended" :accent))]
       [:div {:class ["mt-2.5" "flex" "flex-wrap" "items-center" "gap-2" "text-xs" "text-trading-muted"]}
        (case t
          :market
@@ -530,19 +669,25 @@
           [:span {:class ["font-mono" "text-trading-muted/70"]}
            (str (max 2 (js/Math.round (/ (:twap-min params) 2))) " slices · even spacing")]]
          [:span "Post-only at the best price — never crosses the spread, re-pegs as the book moves."])]
+      (cost-breakdown-strip model row)
       [:p {:class ["mt-2" "font-mono" "text-[0.6rem]" "text-trading-muted/70"]}
        (str "Recommended: " (order-type-labels rec) " — " (rec-reason rec))]]]))
 
 (defn- slip-cell
-  "Type-aware slippage display. Resting orders (limit/passive) don't cross the book, so
-  they read \"rests\" rather than the book-crossing market-impact estimate — which would
-  badly overstate their cost. Crossing orders (market/twap) show the impact estimate;
-  non-ready rows show \"—\"."
-  [order-type status slip]
-  (if (and (= :ready status) (resting-type? order-type))
+  "Type-aware slippage display. After a fill the realized slippage (vs the same mark the
+  estimate used) takes over. Pre-fill: resting orders (limit/passive) read \"rests\" rather
+  than the book-crossing market-impact estimate — which would badly overstate their cost;
+  crossing orders (market/twap) show the impact estimate; non-ready rows show \"—\"."
+  [order-type status est-slip realized-slip]
+  (cond
+    (finite realized-slip)
+    [:span {:title "Realized fill vs the mark the estimate used."} (format-bps realized-slip)]
+
+    (and (= :ready status) (resting-type? order-type))
     [:span {:title "Resting order — pays the spread/offset, not market impact; may not fully fill."}
      "rests"]
-    (format-bps slip)))
+
+    :else (format-bps est-slip)))
 
 (defn- order-row
   [{:keys [open-row] :as model} index row]
@@ -584,7 +729,7 @@
          [:td {:class ["num" "right" (if buy? "text-trading-green" "text-trading-red")]}
           (str (if buy? "+" "−") (format-knotional notional))]
          [:td {:class ["num" "right" "text-trading-muted"]}
-          (slip-cell t (:status row) (get-in row [:cost :slippage-bps]))]
+          (slip-cell t (:status row) (get-in row [:cost :slippage-bps]) (get-in row [:realized :slippage-bps]))]
          [:td {:class ["text-[0.7rem]"]} (state-cell display-state row)]]]
     (if open?
       [row-tr (order-editor-row model row 10)]
@@ -646,7 +791,7 @@
             [:th "Type"]
             [:th {:class ["right"]} "Qty"]
             [:th {:class ["right"]} "Notional"]
-            [:th {:class ["right"]} "Slip"]
+            [:th {:class ["right"]} "Cost"]
             [:th "State"]]]]
          ;; index over the full row set so the # column keeps stable order numbers
          ;; even when a filter hides rows.
@@ -708,7 +853,8 @@
         pct (if (pos? total) (/ filled total) 0)
         margin (:margin summary)
         margin-warn? (and (:warning margin) (not= :none (:warning margin)))
-        sampled (filter #(get-in % [:cost :slippage-bps]) (concat ready submitted))
+        ;; Same live, type-aware recompute as the KPI strip so the rail agrees with it.
+        costs (type-aware-costs model (concat ready submitted))
         sources (->> (concat ready submitted)
                      (keep #(get-in % [:cost :source]))
                      frequencies
@@ -734,12 +880,16 @@
              "post-rebalance maintenance margin")
            (if margin-warn? "breach" "ok")
            (if margin-warn? "text-trading-red" nil))
-     (diag "Estimated slippage"
-           (opt-format/format-usdc (or (:estimated-slippage-usd summary) 0))
-           (or sources "no ready rows sampled"))
-     (diag "Estimated fees"
-           (opt-format/format-usdc (or (:estimated-fees-usd summary) 0))
-           "taker fees on ready notional")
+     (diag "Est. price cost"
+           (opt-format/format-usdc (:slippage-usd costs))
+           (or (not-empty (str/join " · " (remove nil? [(price-cost-split-text costs) sources])))
+               "no ready rows sampled"))
+     (diag "Est. fees"
+           (opt-format/format-usdc (:fees-usd costs))
+           (str (fee-mix-label costs) " on ready notional"))
+     (diag "Est. all-in cost"
+           (opt-format/format-usdc (+ (:slippage-usd costs) (:fees-usd costs)))
+           "price cost + fees")
      (health-note model)]))
 
 ;; ── latest attempt (retry context) ──────────────────────────────────────

@@ -20,19 +20,27 @@
   [{:row-id "perp:BTC" :instrument-id "perp:BTC" :instrument-type :perp :side :sell
     :quantity 8.0 :order-type :market :delta-notional-usd -174720 :status :ready
     :cost {:source :snapshot :age-ms 3000 :depth-status :full-visible-depth
-           :slippage-bps 5.2 :estimated-slippage-usd 91 :estimated-fee-usd 52}}
+           :slippage-bps 5.2 :estimated-slippage-usd 91
+           :spread-bps 3.5 :spread-usd 61 :impact-bps 1.7 :impact-usd 30
+           :fee-bps 4.5 :estimated-fee-usd 52 :maker-fee-bps 1.5 :maker-fee-usd 17}}
    {:row-id "spot:SOL" :instrument-id "spot:SOL" :instrument-type :spot :side :buy
     :quantity 410.0 :order-type :market :delta-notional-usd 78395 :status :ready
     :cost {:source :snapshot :age-ms 1000 :depth-status :full-visible-depth
-           :slippage-bps 4.1 :estimated-slippage-usd 32 :estimated-fee-usd 23}}
+           :slippage-bps 4.1 :estimated-slippage-usd 32
+           :spread-bps 2.6 :spread-usd 20 :impact-bps 1.5 :impact-usd 12
+           :fee-bps 4.5 :estimated-fee-usd 23 :maker-fee-bps 1.5 :maker-fee-usd 8}}
    {:row-id "perp:ETH" :instrument-id "perp:ETH" :instrument-type :perp :side :buy
     :quantity 21.5 :order-type :market :delta-notional-usd 76452 :status :ready
     :cost {:source :orderbook :age-ms 500 :depth-status :insufficient-visible-depth
-           :slippage-bps 9.1 :estimated-slippage-usd 70 :estimated-fee-usd 30}}
+           :slippage-bps 9.1 :estimated-slippage-usd 70
+           :spread-bps 3.0 :spread-usd 23 :impact-bps 6.1 :impact-usd 47
+           :fee-bps 4.5 :estimated-fee-usd 30 :maker-fee-bps 1.5 :maker-fee-usd 10}}
    {:row-id "perp:HYPE" :instrument-id "perp:HYPE" :instrument-type :perp :side :buy
     :quantity 35.0 :order-type :market :delta-notional-usd 21871 :status :ready
     :cost {:source :snapshot :age-ms 2000 :depth-status :full-visible-depth
-           :slippage-bps 6.0 :estimated-slippage-usd 13 :estimated-fee-usd 11}}
+           :slippage-bps 6.0 :estimated-slippage-usd 13
+           :spread-bps 3.5 :spread-usd 8 :impact-bps 2.5 :impact-usd 5
+           :fee-bps 4.5 :estimated-fee-usd 11 :maker-fee-bps 1.5 :maker-fee-usd 4}}
    {:row-id "perp:ARB" :instrument-id "perp:ARB" :instrument-type :perp :side :buy
     :quantity 4.2 :order-type :market :delta-notional-usd 8 :status :blocked
     :reason :below-min-notional}])
@@ -81,8 +89,12 @@
 
 (portfolio/defscene staged
   []
+  ;; ETH is overridden to a resting Limit order to show the type-aware cost KPIs: its row
+  ;; reads "rests" (no spread/impact) and the Est. price cost / all-in totals drop accordingly.
+  ;; Expand any row to see the spread + impact = price cost + fees = all-in breakdown.
   (shell (execution-tab/execution-tab
-          (state (modal {}) {:status :idle :history []}))))
+          (state (modal {:overrides {"perp:ETH" :limit} :open-row "perp:BTC"})
+                 {:status :idle :history []}))))
 
 (portfolio/defscene armed
   []
@@ -96,7 +108,16 @@
 
 (portfolio/defscene done
   []
-  (let [rows (mapv #(assoc % :status :submitted) ready-rows)]
+  ;; Submitted rows carry :realized (parsed from the fill response) so the Slip column and
+  ;; the slippage KPI show realized-vs-estimate rather than the pre-run estimate.
+  (let [realized {"perp:BTC" 4.8 "spot:SOL" 3.6 "perp:ETH" 11.2 "perp:HYPE" 5.5}
+        rows (mapv (fn [row]
+                     (let [bps (realized (:row-id row))]
+                       (cond-> (assoc row :status :submitted)
+                         bps (assoc :realized {:slippage-bps bps
+                                               :slippage-usd (* (js/Math.abs (:delta-notional-usd row))
+                                                                (/ bps 10000))}))))
+                   ready-rows)]
     (shell (execution-tab/execution-tab
             (state (modal {}) {:status :executed :history [(ledger :executed rows)]})))))
 

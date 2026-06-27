@@ -190,6 +190,54 @@ Everything downstream is already spot-capable: `coin-for-row` strips `spot:` →
 
 ---
 
+## M7 — 0-bp cost-model guard (honesty fix from live review)
+
+**Problem (verified live + adversarially).** `slippage-bps-from-fill-price` (`domain/rebalance.cljs:55-65`) wraps the directional price delta in `(max 0 …)`. A stale or coin-mismatched orderbook **snapshot** can imply a fill *better* than the reference (a buy below mark, a sell above mark). The favorable delta goes negative, `(max 0 …)` clamps it to exactly **0**, and the cost map reports `0 bp` with a real-looking `:source` (`:snapshot` / `:live-orderbook`). During live review the synthetic `xyz:` testnet markets did exactly this (est-fill prices wildly off mark — COPPER 6.24 vs 39.55 — clamping to a deceptive `0 bp`). The clamp is correct for genuine sub-spread price improvement but indistinguishable from garbage data. This fires on two `cost-context` branches (`rebalance.cljs`): the `:full-visible-depth` VWAP branch and the `:else` top-of-book branch. The `:insufficient-visible-depth` branch is unaffected (it never calls the single-fill function).
+
+**Implementation.**
+- Add `max-favorable-fill-deviation` (0.005 = 50 bps). A *marketable taker* fill cannot beat the reference by a wide margin; beyond the band the snapshot is untrusted.
+- Add pure `implausible-favorable-fill? [side reference-price fill-price]` (favorable amount / reference > the band) and `untrusted-fill-cost [metadata reference-price fallback]` → `{:source :untrusted-snapshot-fill :estimated-fill-price reference-price :slippage-bps fallback :fallback-reason :implausible-favorable-fill}` (never the bogus fill; `fallback` = the configured `:fallback-slippage-bps`, default 25).
+- Guard both single-fill branches: when the candidate fill (snapshot VWAP, else `orderbook-fill-price`) is implausibly favorable, short-circuit to `untrusted-fill-cost` instead of letting `(max 0 …)` produce a deceptive 0. Genuine sub-50 bp improvement still floors to 0 as today.
+
+**Blast radius.** `cost-context` is shared by the Rebalance preview tab and the Execution tab; both gain the honest fallback. No new `:source` consumer breaks (`cost-source-label` already renders any `:source`/`:fallback-reason` via `keyword-label`). Existing snapshot tests use *unfavorable* books (asks above / bids below ref) so they are unchanged.
+
+**Tests.** New (in `domain/rebalance_test.cljs`): favorable buy book → `:untrusted-snapshot-fill` + configured fallback + reference-as-fill; favorable sell book → same; sub-threshold improvement still floors to 0.
+**Effort:** S.
+
+---
+
+## M8 — Funding (Fund 8h + projection) and realized slippage (deferred M6 slice)
+
+### M8a — per-row Fund 8h + portfolio funding-8h projection
+
+**Data source (verified).** Aligned per-instrument funding lives at `[:history :funding-by-instrument <instrument-id>]` inside `(:request readiness)` — the *same* request `build-derived-preview` already reads `[:history :price-series-by-instrument]` from (`rebalance_preview.cljs:104`). Each entry: `{:average-rate <raw per-1h fraction> :annualized-carry … :source :market-funding-history|:missing-market-funding-history|:not-applicable}`.
+
+**Two existing-code hazards (do NOT copy).**
+1. **Unit mismatch:** the raw HL `fundingRate` is **per-1h** (`utils/formatting.cljs:323-325` annualizes ×24×365), but the optimizer's `:annualized-carry` multiplies by `funding-periods-per-year` = **1095** (an 8h-period assumption) — ~8× understated. So source `:average-rate` (per-1h) directly and multiply by an explicit 8h window; never reuse `:annualized-carry`.
+2. **Sign bug:** `domain/returns.cljs:149-158` *adds* `:annualized-carry` to a long's expected return (treats positive funding as income). HL convention is the **opposite** — positive funding ⇒ **longs pay** (`active_asset/funding_policy.cljs:178-187`). The execution funding cost must use the funding-policy sign, not the returns.cljs sign. (returns.cljs sign flagged as suspect — out of scope here; see Decision Log / spawned follow-up.)
+
+**Implementation (pure, domain-first).**
+- `rebalance.cljs`: new opt `:funding-by-id`; `funding-8h-bps` = `-1 × sign(target-weight) × average-rate × 8 × 10000`, gated on `:perp` + `:source :market-funding-history` + finite non-zero target (else nil → honest dash). Per-row `:funding-8h-bps`; summary `:funding-8h-proj-usd` = `Σ |target-weight·capital| × bps/10000` over all rows (the resulting **book**, including held within-tolerance positions).
+- `rebalance_preview.cljs`: thread `:funding-by-id` = merge of `[:current-portfolio-history :funding-by-instrument]` then `[:history :funding-by-instrument]` (target wins).
+- `application/execution.cljs`: `execution-row` copies `:funding-8h-bps` onto plan rows (so it rides into the ledger); `build-execution-plan` summary reads `:funding-8h-proj-usd` from the preview.
+- `execution_tab.cljs`: "Fund 8h" column (signed bps, green earns / red pays / dash unknown; colspan 10→11), a 6th "Funding 8h" KPI (`lg:grid-cols-5`→`lg:grid-cols-6`; core utility, no safelist needed), and a funding health diag.
+
+### M8b — realized slippage (post-run, measured vs the estimate's reference)
+
+**Shape (verified against the repo's own fixture `submit_failures_test.cljs:98-101`).** A filled status entry is `{:filled {:avgPx "<str>" :totalSz "<str>"}}` at `[:response :data :statuses 0 :filled :avgPx]` (singular `[:response :data :status]` fallback). Each optimizer row submits exactly **one** order, so the index is always 0. A post-only order that only rests is `{:resting {:oid …}}` (no `:filled`) → realized is **pending**, not 0. Each row already carries `:price` (the mark) and `:cost` — and `:price` is the very reference the estimate used (`domain/rebalance.cljs:308-316`), so realized must be measured against `:price` for an apples-to-apples comparison.
+
+**Implementation.**
+- `rebalance.cljs`: expose `realized-slippage-bps` (public wrapper over the same convention the estimate uses — favorable floors to 0).
+- `effect_adapters/portfolio_optimizer/execution.cljs` `submit-execution-row!` success branch: parse `avgPx` (string → number), compute `realized {:avg-px :slippage-bps :slippage-usd}` vs `(:price row)`, and stamp it on the row **before** it settles into the ledger (recovery builders dissoc `:response`, so the parse must happen here, not later).
+- `execution_tab.cljs`: the per-row Slip cell prefers realized when present (title distinguishes it); the slippage KPI goes phase-aware — "Est. slippage" pre-run, "Realized slippage" (avg + vs-est) post-run. No view-model change (realized flows ledger → latest-attempt → display rows).
+
+**Honesty.** Never label an estimate "realized"; resting/unfilled rows stay pending; favorable realized fills floor to 0 like the estimate (signed realized is a future refinement).
+
+**Tests.** `rebalance_test` (funding sign + projection + source gate; realized fn); `application/execution_test` (funding rides into plan rows + summary); effect-adapter test (filled `avgPx` → `:realized` on the ledger row; existing `{:statuses ["success"]}` mocks stay green — a non-map status yields nil realized); view test (Fund 8h column + Funding KPI render).
+**Effort:** M (a + b together).
+
+---
+
 ## Cross-cutting honesty & policy constraints (from the designer narrative)
 
 These are hard rules the implementation must respect (DESIGN.md / notes.jsx / states.jsx / wireframes.jsx):
@@ -220,6 +268,8 @@ Acceptance per milestone:
 - [x] M4 — Resume no longer re-submits filled rows (P0 fixed) and re-enters the phase machine correctly; Revert filled and Re-stage smaller are wired with ledger/audit handling; action tests added.
 - [x] M5 — Open in ticket + Abort & discard (overflow menu), Pause/abort (running), and Resume-from-#N shipped; Copy JSON + Export CSV deferred (each needs a new global clipboard/download effect).
 - [x] M6 (filter) — All/Working/Filled filter shipped (stable order numbers under filtering). Fund 8h column + funding projection + realized slippage deferred (data plumbing / live fill-response verification — see Decision Log + Progress).
+- [x] M7 — 0-bp cost-model guard: an implausibly-favorable snapshot fill reports the configured fallback bps under `:source :untrusted-snapshot-fill` (with `:fallback-reason :implausible-favorable-fill`, reference-as-fill), instead of a deceptive 0; genuine sub-band improvement still floors to 0; domain tests added; rebalance-preview + execution tabs both inherit the honest fallback.
+- [x] M8 — Funding (per-row Fund 8h + portfolio funding-8h projection, per-1h `:average-rate`×8, HL sign = long pays on positive) and realized slippage (`[:filled :avgPx]` parsed in the effect, measured vs the estimate's `:price` reference, pending on resting); KPI/column/diag wired; honesty preserved (estimate never labelled realized); the `returns.cljs` additive-carry sign flagged as suspect (out of scope, spawned as a follow-up task).
 - [ ] Final — Playwright browser-QA pass + user review + testnet verification of live spot (M2) and TWAP/limit (M1), then move this plan to `docs/exec-plans/completed/`.
 
 ## Progress
@@ -233,8 +283,12 @@ Acceptance per milestone:
 - [x] (2026-06-26) M5 — header overflow + run controls: overflow `<details>` menu (Open in trade ticket / Abort & discard), running-phase Pause/abort (abort flag + submit-loop checkpoint, now feasible post-M3), "Resume from #N" label.
 - [x] (2026-06-26) M6 (partial) — order-list All/Working/Filled filter (now meaningful post-M3); stable order-number indexing under filtering.
 - [x] (2026-06-27) Slip-column honesty fix (from live review): the SLIP column was showing the book-crossing market-impact estimate for ALL order types, badly overstating resting orders (a SOPH limit read 1088.8 bp). Now type-aware via `slip-cell` — Limit/Passive read "rests", Market/TWAP show the impact estimate; the per-order editor's est-fill is consistent ("rests — fills at your price or better"). View test added.
+- [x] (2026-06-27) Dynamic type-aware Est. slippage + Est. fees (from live review): the KPI strip + health rail now recompute slippage and fees from each row's LIVE effective order type instead of reading the static plan summary — toggling a row Market→Limit/Passive drops its market-impact slippage to 0 and switches it from the taker fee to the maker fee, with no re-stage. The domain `cost-estimate` now also carries `:maker-fee-usd`/`:maker-fee-bps` (canonical HL maker rate threaded via `rebalance_preview`); the view's `type-aware-costs` helper picks taker/maker + impact/zero per `effective-type` and feeds both KPIs (the slippage KPI stays realized post-run). Fees sub shows the maker/taker split. Domain + view tests added; workbench-verified (ETH→Limit: slippage 206→136, fees 116→96 "3 taker · 1 maker"). Budget `execution_tab.cljs` 870→910.
 - [ ] Follow-up (from live review): 0 bp on staged Market rows is misleading. `slippage-bps-from-fill-price` clamps *favorable* fills to 0 (`(max 0 …)`); when a market's slippage snapshot is stale/mismatched (live store had only `xyz:STRC` subscribed, and synthetic `xyz:` markets showed est-fill prices wildly off mark — COPPER 6.24 vs 39.55, EIGEN 0.2329 vs 0.2098), the implausible "favorable" fill clamps to a deceptive 0 bp. Guard: when the snapshot fill is implausibly far from the reference (esp. favorable beyond a threshold), treat the estimate as untrusted (fall back to fallback-bps / a stale marker) instead of reporting 0. Cost-model change in `domain/rebalance.cljs` (affects rebalance preview too) — likely partly environmental (stale testnet books), so confirm against a live account first.
-- [ ] M6 (deferred) — Fund 8h column + funding-8h projection, and realized slippage from `[:filled :avgPx]`. Both need new data plumbing (funding-by-coin threading; live HL fill-response capture to verify the parse shape + sign/reference conventions). Deferred deliberately: shipping an unverified funding sign or an estimate mislabelled "realized" would violate the project's honesty mandate. Tracked here as the next slice.
+- [x] (2026-06-27) M7 — 0-bp cost-model guard landed: `cost-context` flags an implausibly-favorable snapshot/top-of-book fill (favorable beyond 50 bps) as `:source :untrusted-snapshot-fill` + `:fallback-reason :implausible-favorable-fill` against the reference price, reporting the configured flat fallback instead of a deceptive clamped 0; genuine sub-band improvement still floors to 0. Three domain tests (favorable buy/sell + sub-threshold). Verified the existing snapshot tests (unfavorable books) are unchanged.
+- [x] (2026-06-27) M8a — funding landed: domain `funding-8h-bps` (per-1h `:average-rate` × 8h, signed by target direction per the HL convention long-pays-on-positive), threaded via `:funding-by-id` from the request's aligned `:history`/`:current-portfolio-history`; per-row `:funding-8h-bps` + summary `:funding-8h-proj-usd` (resulting book); Fund 8h column + 6th Funding KPI (`lg:grid-cols-6`) + funding health diag. **Did not reuse `returns.cljs`** (unit + sign hazards documented in the Decision Log).
+- [x] (2026-06-27) M8b — realized slippage landed: pure `execution/realized-fill` parses `[:statuses 0 :filled :avgPx]` (singular fallback; resting → pending) and is stamped on the ledger row in the effect's success branch, measured vs `(:price row)` (the estimate's reference); the Slip column prefers realized post-fill and the slippage KPI flips to "Realized slippage (avg · est)". Effect-adapter test (filled avgPx → `:realized`) + domain `realized-slippage-bps` test.
+- [x] (2026-06-27) Workbench visual QA (non-Playwright): static-served `resources/public` and eyeballed the `staged` + `done` execution scenes — Fund 8h column (correct signs/colors: short earns green, longs pay red, spot/blocked dash), the 6-KPI strip lays out cleanly under `lg:grid-cols-6`, and the `done` scene shows the realized-slippage takeover ($209.74 ≈ 6.3 bp avg · est 6.1 bp). Scenes enriched with funding/realized demo data so this stays reviewable.
 - [x] (2026-06-26) All gates green after each milestone: final `npm run gates` 33/33 — 5544 tests, 30079 assertions, 0 failures.
 - [ ] Browser-QA: live Playwright pass on the execution tab (staged → armed → running → done | halted, plus the new overflow/filter/recovery affordances) on a worktree dev server. Not yet run (view-render unit tests pass; AGENTS.md routes committed browser coverage to Playwright).
 - [ ] User review + testnet verification of live spot (M2) and TWAP/limit (M1) routing before production use; then move this plan to `docs/exec-plans/completed/`.
@@ -272,6 +326,16 @@ Acceptance per milestone:
   Rationale: both require data that isn't safely available here — the funding-8h projection needs funding-by-coin threaded through `staged-plan` plus a correct period-fraction and pay/receive sign convention (easy to get wrong → misleading), and realized slippage needs the live Hyperliquid fill response shape (`[:filled :avgPx]`) verified against a real capture, measured against the SAME reference the estimate used. The project's honesty mandate makes shipping an unverified sign or an estimate mislabelled "realized" worse than deferring. The All/Working/Filled filter (the self-contained, M3-enabled M6 item) shipped.
   Date/Author: 2026-06-26 / Geronimo.
 
+- Decision (M7): guard the FAVORABLE direction only (a taker can't fill better than the touch by a wide margin), with a 50 bp band; an implausibly-favorable snapshot reports the configured flat fallback under a distinct `:untrusted-snapshot-fill` source rather than the deceptive clamped 0.
+  Rationale: under-reporting (0 bp) is the deceptive failure; over-reporting on the unfavorable side (a genuinely wide spread / thin book) is real cost and must NOT be capped — the depth-limited path already over-charges honestly. Symmetric capping would hide real slippage.
+  Date/Author: 2026-06-27 / Geronimo.
+- Decision (M8a): compute funding from the per-1h `:average-rate` × an explicit 8h window, NOT from `:annualized-carry`; sign per the funding-policy convention (positive funding ⇒ longs pay), NOT the optimizer's `returns.cljs` additive carry.
+  Rationale: two verified hazards in existing code — (1) `:annualized-carry` multiplies the per-1h rate by `funding-periods-per-year` = 1095 (an 8h-period assumption), understating funding ~8×; (2) `domain/returns.cljs:149-158` ADDS carry to a long's expected return, i.e. treats positive funding as income to a long — the opposite of the HL convention. The execution funding cost must be honest, so it bypasses both. The `returns.cljs` sign is flagged as suspect and spawned as a separate follow-up task (out of scope here — changing expected-return decomposition would move solver outputs and needs its own verification).
+  Date/Author: 2026-06-27 / Geronimo.
+- Decision (M8b): realized slippage is parsed in the effect and stamped on the ledger row immediately (before any resume/revert/restage rebuild dissocs `:response`); measured against the SAME `(:price row)` reference the estimate used; favorable realized fills floor to 0 like the estimate (signed realized is a deferred refinement); resting/unfilled rows stay pending, never 0.
+  Rationale: comparability (realized vs estimate must share a reference + convention) and honesty (an estimate is never relabelled "realized"; a post-only rest is not a 0-slippage fill). The parse shape is verified against the repo's own fixture (`submit_failures_test.cljs`), but a LIVE Hyperliquid fill-response capture on testnet remains the final confirmation before production use.
+  Date/Author: 2026-06-27 / Geronimo.
+
 ## Outcomes & Retrospective
 
 Landed 2026-06-26 (branch `feature/friendly-kirch-b26798`). M0–M5 fully, M6 partially (filter), behind green gates after each milestone (final `npm run gates` 33/33: 5544 tests / 30079 assertions / 0 failures).
@@ -287,4 +351,12 @@ Files changed:
 
 What changed in real behaviour: the default `Recommended` now actually routes per clip (TWAP/limit/passive/market) instead of everything-as-Market; spot legs execute; the running bar animates per fill; Resume no longer re-sends filled orders; Revert/Re-stage/Pause/Abort/Open-in-ticket work; the order list filters.
 
-Deferred (next slice): M6 funding column/projection + realized slippage — see Decision Log. Browser-QA Playwright pass and testnet verification of live spot/TWAP remain open before this moves to `completed/`.
+M7 (0-bp guard) + M8 (funding Fund-8h column/projection + realized slippage) landed 2026-06-27 behind a green gate matrix (33/33: 5553 tests / 30114 assertions / 0 failures), with workbench visual QA of the staged + done scenes. Files added/changed in this slice:
+- `domain/rebalance.cljs` — `implausible-favorable-fill?` + `untrusted-fill-cost` guard, `funding-8h-bps` + `:funding-by-id` + summary `:funding-8h-proj-usd`, public `realized-slippage-bps`.
+- `application/rebalance_preview.cljs` — `:funding-by-id` threaded from the request's aligned histories.
+- `application/execution.cljs` — `execution-row` copies `:funding-8h-bps`, plan summary carries `:funding-8h-proj-usd`, pure `realized-fill` (+ `response-statuses` factored out of `response-ok?`).
+- `runtime/effect_adapters/portfolio_optimizer/execution.cljs` — stamps `:realized` on the row in the success branch.
+- `views/portfolio/optimize/execution_tab.cljs` — Fund 8h column (colspan 10→11), 6th Funding KPI (`lg:grid-cols-6`), phase-aware slippage KPI (realized post-run), realized-aware slip cell, funding health diag, `format-funding-usd`/`funding-cell` helpers.
+- Tests: `domain/rebalance_test` (guard + funding + realized fn), `application/execution_test` (funding flow-through), `runtime/.../portfolio_optimizer_execution_test` (realized from fill), `views/.../execution_tab_test` (Fund 8h column + Funding KPI), `execution_actions_test` (summary key). Budget: `execution_tab.cljs` 810→870. Workbench `execution_scenes.cljs` enriched with funding/realized demo data.
+
+Still open before this whole plan moves to `completed/`: a committed Playwright browser-QA pass; testnet verification of live spot (M2), TWAP/limit (M1), and the realized-fill parse against a real Hyperliquid response (M8b); and the spawned `returns.cljs` funding-sign follow-up.

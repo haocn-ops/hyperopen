@@ -13,7 +13,11 @@
 (def ^:private day-ms
   (* 24 60 60 1000))
 
-(deftest historical-mean-annualizes-return-series-and-adds-funding-carry-test
+(deftest historical-mean-annualizes-return-series-and-subtracts-funding-carry-test
+  ;; HL convention: positive funding => longs PAY. The expected-return vector is the
+  ;; per-unit LONG return, so a positive :annualized-carry (raw HL sign) is a COST and is
+  ;; SUBTRACTED: return 0.2 − carry 0.12 = 0.08, and :funding-component is the long's carry
+  ;; contribution (−0.12). A short earns it via its negative weight.
   (let [result (returns/estimate-expected-returns
                 {:return-model {:kind :historical-mean}
                  :periods-per-year 10
@@ -24,12 +28,24 @@
                                                    "spot:PURR" {:source :not-applicable}}}})]
     (is (= :historical-mean (:model result)))
     (is (= ["perp:BTC" "spot:PURR"] (:instrument-ids result)))
-    (is (near? 0.32 (get-in result [:expected-returns-by-instrument "perp:BTC"])))
+    (is (near? 0.08 (get-in result [:expected-returns-by-instrument "perp:BTC"])))
     (is (near? 0.1 (get-in result [:expected-returns-by-instrument "spot:PURR"])))
     (is (= {:return-component 0.2
-            :funding-component 0.12
+            :funding-component -0.12
             :funding-source :market-funding-history}
            (get-in result [:decomposition-by-instrument "perp:BTC"])))))
+
+(deftest negative-funding-carry-is-income-to-a-long-test
+  ;; Negative funding (shorts pay longs) is INCOME to a long: it raises the long's
+  ;; expected return. return 0.2 − (−0.12) = 0.32.
+  (let [result (returns/estimate-expected-returns
+                {:return-model {:kind :historical-mean}
+                 :periods-per-year 10
+                 :history {:return-series-by-instrument {"perp:BTC" [0.01 0.03]}
+                           :funding-by-instrument {"perp:BTC" {:annualized-carry -0.12
+                                                               :source :market-funding-history}}}})]
+    (is (near? 0.32 (get-in result [:expected-returns-by-instrument "perp:BTC"])))
+    (is (near? 0.12 (get-in result [:decomposition-by-instrument "perp:BTC" :funding-component])))))
 
 (deftest ew-mean-weights-recent-observations-more-heavily-test
   (let [result (returns/estimate-expected-returns

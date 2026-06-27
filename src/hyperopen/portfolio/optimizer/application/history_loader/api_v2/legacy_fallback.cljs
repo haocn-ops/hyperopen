@@ -4,7 +4,8 @@
             [hyperopen.portfolio.optimizer.application.history-loader.normalization :as normalization]))
 
 (def default-funding-periods-per-year
-  1095)
+  ;; Hourly HL funding => 24*365 = 8760 (see history-loader.alignment for the rationale).
+  8760)
 
 (def ^:private fallback-lineage-kinds
   #{:missing})

@@ -64,9 +64,11 @@
                                (.then (submit-action! submit-order! store target action)
                                       (fn [resp]
                                         (if (execution/response-ok? resp)
-                                          (assoc row
-                                                 :status :submitted
-                                                 :response resp)
+                                          (let [realized (execution/realized-fill row resp)]
+                                            (cond-> (assoc row
+                                                           :status :submitted
+                                                           :response resp)
+                                              (some? realized) (assoc :realized realized)))
                                           (assoc row
                                                  :status :failed
                                                  :response resp

@@ -3,7 +3,8 @@
             [hyperopen.api.gateway.orders.commands :as order-commands]
             [hyperopen.asset-selector.markets :as markets]
             [hyperopen.portfolio.optimizer.application.execution-order-type :as execution-order-type]
-            [hyperopen.portfolio.optimizer.coercion :as coercion]))
+            [hyperopen.portfolio.optimizer.coercion :as coercion]
+            [hyperopen.portfolio.optimizer.domain.rebalance :as rebalance]))
 
 (def ^:private finite-positive? coercion/positive-number?)
 
@@ -274,19 +275,39 @@
                            :skipped-count skipped-count)
            :rows rows)))
 
+(defn- response-statuses
+  "Per-order status entries from an order response. Each optimizer row submits exactly one
+   order, so the singular [:response :data :status] is the legacy fallback for the vector."
+  [resp]
+  (let [statuses (get-in resp [:response :data :statuses])
+        status (get-in resp [:response :data :status])]
+    (cond
+      (sequential? statuses) statuses
+      (some? status) [status]
+      :else [])))
+
 (defn response-ok?
   [resp]
-  (let [top-level-ok? (= "ok" (:status resp))
-        statuses (let [statuses (get-in resp [:response :data :statuses])
-                       status (get-in resp [:response :data :status])]
-                   (cond
-                     (sequential? statuses) statuses
-                     (some? status) [status]
-                     :else []))]
-    (and top-level-ok?
-         (not-any? #(and (map? %)
-                         (contains? % :error))
-                   statuses))))
+  (and (= "ok" (:status resp))
+       (not-any? #(and (map? %)
+                       (contains? % :error))
+                 (response-statuses resp))))
+
+(defn realized-fill
+  "Realized average fill + slippage from a settled order response, measured against
+   (:price row) -- the same reference the slippage ESTIMATE used. One order is submitted
+   per row, so the single status entry is at index 0. A post-only order that only rests has
+   no :filled entry, so realized stays pending (nil) rather than reading as 0. Returns nil
+   when no average fill price is available."
+  [row resp]
+  (let [avg-px (some-> (get-in (first (response-statuses resp)) [:filled :avgPx])
+                       coercion/parse-float-number)]
+    (when (coercion/positive-number? avg-px)
+      (let [bps (rebalance/realized-slippage-bps (:side row) (:price row) avg-px)]
+        (cond-> {:avg-px avg-px}
+          (some? bps) (assoc :slippage-bps bps
+                             :slippage-usd (* (js/Math.abs (or (:delta-notional-usd row) 0))
+                                              (/ bps 10000))))))))
 
 (defn final-ledger-status
   [rows]

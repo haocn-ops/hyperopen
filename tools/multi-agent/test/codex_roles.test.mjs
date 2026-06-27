@@ -3,7 +3,10 @@ import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { loadRoleConfig, validateProjectConfig } from "../src/codex_roles.mjs";
+
+const realRepoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
 
 async function makeTempRepo({ configToml, files }) {
   const repoRoot = await fs.mkdtemp(path.join(os.tmpdir(), "hyperopen-codex-roles-"));
@@ -183,4 +186,39 @@ developer_instructions = "Review architecture."
     }
   });
   await assert.rejects(() => validateProjectConfig(repoRoot), /expected \.codex\/agents\/architect-review\.toml to declare name = "architect_review"/);
+});
+
+test("checked-in worker prompt requires local-pattern discovery and diff accountability", async () => {
+  const roleConfig = await loadRoleConfig(realRepoRoot, "worker");
+  assert.match(roleConfig.developer_instructions, /read (the )?target file/i);
+  assert.match(roleConfig.developer_instructions, /nearest tests/i);
+  assert.match(roleConfig.developer_instructions, /similar local implementation/i);
+  assert.match(roleConfig.developer_instructions, /existing helpers/i);
+  assert.match(roleConfig.developer_instructions, /new (package|dependency)/i);
+  assert.match(roleConfig.developer_instructions, /every changed line/i);
+  assert.match(roleConfig.developer_instructions, /approved (test )?contract/i);
+});
+
+test("checked-in reviewer prompt flags generic LLM coding failure modes", async () => {
+  const roleConfig = await loadRoleConfig(realRepoRoot, "reviewer");
+  assert.match(roleConfig.developer_instructions, /unearned abstractions/i);
+  assert.match(roleConfig.developer_instructions, /single-use generic/i);
+  assert.match(roleConfig.developer_instructions, /speculative configurability/i);
+  assert.match(roleConfig.developer_instructions, /unexplained (package|dependency)/i);
+  assert.match(roleConfig.developer_instructions, /style drift/i);
+  assert.match(roleConfig.developer_instructions, /symptom-only/i);
+});
+
+test("checked-in debugger prompt diagnoses and hands production implementation to worker", async () => {
+  const debuggerToml = await fs.readFile(
+    path.join(realRepoRoot, ".codex", "agents", "debugger.toml"),
+    "utf8"
+  );
+  assert.doesNotMatch(debuggerToml, /implement targeted fix/i);
+  assert.doesNotMatch(debuggerToml, /specific code fix/i);
+  assert.match(debuggerToml, /diagnosis/i);
+  assert.match(debuggerToml, /reproduction/i);
+  assert.match(debuggerToml, /(suspected|likely) fix surface/i);
+  assert.match(debuggerToml, /verification plan/i);
+  assert.match(debuggerToml, /hand .*worker/i);
 });

@@ -114,6 +114,10 @@
   [state]
   (execution/execution-modal-model state))
 
+(defn execution-tab-model
+  [state]
+  (execution/execution-tab-model state))
+
 (defn inputs-audit-model
   [state]
   (scenario/inputs-audit-model state))

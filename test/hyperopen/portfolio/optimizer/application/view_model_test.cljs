@@ -425,6 +425,31 @@
     (is (= "Order submission wiring is not enabled in this slice."
            (:disabled-message disabled-model)))))
 
+(deftest execution-tab-model-resolves-perp-and-spot-display-labels-test
+  (let [state {:spot {:meta {:tokens [{:index 189 :name "PURR"}]
+                             :universe [{:name "@189" :tokens [189]}]}}
+               :portfolio
+               {:optimizer
+                {:execution {:status :idle :history []}
+                 :execution-modal
+                 {:open? true
+                  :phase :staged
+                  :plan {:status :partially-blocked
+                         :summary {:ready-count 2 :blocked-count 1}
+                         :rows [{:row-id "perp:xyz:xyz:SILVER" :instrument-id "perp:xyz:xyz:SILVER"
+                                 :status :ready :side :sell :delta-notional-usd -100}
+                                {:row-id "spot:@189" :instrument-id "spot:@189"
+                                 :status :ready :side :buy :delta-notional-usd 100}
+                                {:row-id "spot:@999" :instrument-id "spot:@999"
+                                 :status :blocked :reason :below-min-notional :delta-notional-usd 1}]}}}}}
+        rows (:rows (view-model/execution-tab-model state))]
+    ;; HIP-3 perp id collapses to its trailing coin segment
+    (is (= "SILVER" (:instrument-label (nth rows 0))))
+    ;; spot dust @N reference resolves through spotMeta to the human token
+    (is (= "PURR" (:instrument-label (nth rows 1))))
+    ;; unresolved spot dust still degrades to the bare reference (never crashes)
+    (is (= "@999" (:instrument-label (nth rows 2))))))
+
 (deftest inputs-audit-model-projects-draft-scenario-and-readable-input-labels-test
   (let [vault-id (str "vault:" vault-address)
         model (view-model/inputs-audit-model

@@ -1281,11 +1281,47 @@ async function seedOptimizerFailedExecutionAttempt(page) {
       kw("history"), vector([ledger]),
       kw("error"), map([kw("message"), "Execution failed before any rows submitted."])
     ]);
+    // The v4 execution surface is a tab driven by the staged plan + run-state, so seed
+    // the staged plan and switch the results tab to Execution (the live halted flow keeps
+    // the plan; re-opening via the CTA would re-stage and clear the failed history).
+    const planRow = map([
+      kw("row-id"), "perp:BTC",
+      kw("instrument-id"), "perp:BTC",
+      kw("instrument-type"), kw("perp"),
+      kw("status"), kw("ready"),
+      kw("side"), kw("buy"),
+      kw("quantity"), 0.25,
+      kw("order-type"), kw("market"),
+      kw("delta-notional-usd"), 500,
+      kw("cost"), map([kw("source"), kw("snapshot"), kw("slippage-bps"), 5])
+    ]);
+    const plan = map([
+      kw("status"), kw("ready"),
+      kw("execution-disabled?"), false,
+      kw("summary"), map([
+        kw("ready-count"), 1,
+        kw("blocked-count"), 0,
+        kw("skipped-count"), 0,
+        kw("gross-ready-notional-usd"), 500,
+        kw("estimated-fees-usd"), 5,
+        kw("estimated-slippage-usd"), 3,
+        kw("margin"), map([kw("after-utilization"), 0.42, kw("warning"), kw("none")])
+      ]),
+      kw("rows"), vector([planRow])
+    ]);
+    const modal = map([
+      kw("open?"), true,
+      kw("phase"), kw("staged"),
+      kw("submitting?"), false,
+      kw("error"), "Execution halted before all rows submitted.",
+      kw("plan"), plan
+    ]);
     const store = globalThis.hyperopen.system.store;
-    c.reset_BANG_(
-      store,
-      c.assoc_in(c.deref(store), path("portfolio", "optimizer", "execution"), execution)
-    );
+    let next = c.deref(store);
+    next = c.assoc_in(next, path("portfolio", "optimizer", "execution"), execution);
+    next = c.assoc_in(next, path("portfolio", "optimizer", "execution-modal"), modal);
+    next = c.assoc_in(next, path("portfolio-ui", "optimizer", "results-tab"), kw("execution"));
+    c.reset_BANG_(store, next);
   });
   await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
 }
@@ -2771,24 +2807,22 @@ test("portfolio optimizer execution remains read-only in Spectate Mode @regressi
   await selectOptimizerScenarioTab(page, "rebalance");
   await enableOptimizerSpectateMode(page);
 
-  await page.locator("[data-role='portfolio-optimizer-open-execution-modal']").click();
+  await page.locator("[data-role='portfolio-optimizer-stage-execution']").click();
   await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
 
-  const modal = page.locator("[data-role='portfolio-optimizer-execution-modal']");
-  await expect(modal).toContainText("Cost Source");
-  await expect(modal).toContainText("Margin After");
-  await expect(modal).toContainText(
+  const tab = page.locator("[data-role='portfolio-optimizer-execution-tab']");
+  await expect(tab).toContainText("Margin after");
+  await expect(tab).toContainText(
     "Spectate Mode is read-only. Stop Spectate Mode to place trades or move funds."
   );
-  await expect(page.locator("[data-role='portfolio-optimizer-execution-modal-confirm']"))
+  await expect(page.locator("[data-role='portfolio-optimizer-execution-arm']"))
     .toBeDisabled();
 });
 
-test("portfolio optimizer execution modal surfaces failed attempt recovery details @regression", async ({ page }) => {
+test("portfolio optimizer execution surfaces failed attempt recovery details @regression", async ({ page }) => {
   await visitRoute(page, "/portfolio/optimize");
   await seedPersistedOptimizerTrackingScenario(page);
   await visitRoute(page, `/portfolio/optimize/${OPTIMIZER_RELOAD_SCENARIO_ID}`);
-  await selectOptimizerScenarioTab(page, "rebalance");
   await seedPortfolioWalletAddress(page, "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
   await seedPortfolioWebdata2(page, {
     clearinghouseState: {
@@ -2796,19 +2830,17 @@ test("portfolio optimizer execution modal surfaces failed attempt recovery detai
       assetPositions: []
     }
   });
+  // seeds the staged plan + failed run-state + switches to the Execution tab in-place
   await seedOptimizerFailedExecutionAttempt(page);
 
-  await page.locator("[data-role='portfolio-optimizer-open-execution-modal']").click();
-  await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
+  const band = page.locator("[data-role='portfolio-optimizer-execution-control-band']");
+  await expect(band).toHaveAttribute("data-phase", "halted");
 
   const latestAttempt = page.locator("[data-role='portfolio-optimizer-execution-latest-attempt']");
-  await expect(page.locator("[data-role='portfolio-optimizer-execution-modal']"))
-    .toContainText("missing-capital-base");
-  await expect(latestAttempt).toContainText("Latest Attempt");
+  await expect(latestAttempt).toContainText("Latest attempt");
   await expect(latestAttempt).toContainText("failed");
   await expect(latestAttempt).toContainText("Order submit failed: exchange down");
-  await expect(page.locator("[data-role='portfolio-optimizer-execution-modal-confirm']"))
-    .toBeDisabled();
+  await expect(page.locator("[data-role='portfolio-optimizer-execution-resume']")).toBeVisible();
 });
 
 test("portfolio volume history opens near the metric card trigger @regression", async ({ page }) => {

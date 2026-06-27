@@ -146,7 +146,7 @@ source_of_truth: true
   `hyperopen.views.portfolio.optimize.scenario-detail-view-test`,
   `hyperopen.views.portfolio.optimize.results-panel-test`,
   `hyperopen.views.portfolio.optimize.frontier-chart-contract-test`,
-  `hyperopen.views.portfolio.optimize.execution-modal-test`,
+  `hyperopen.views.portfolio.optimize.execution-tab-test`,
   `hyperopen.views.portfolio.optimize.tracking-panel-test`
 - Browser validation for route or interaction work:
   follow `/hyperopen/docs/BROWSER_TESTING.md` and run the smallest relevant

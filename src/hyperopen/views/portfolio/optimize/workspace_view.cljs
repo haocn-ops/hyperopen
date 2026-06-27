@@ -1,6 +1,5 @@
 (ns hyperopen.views.portfolio.optimize.workspace-view
   (:require [hyperopen.portfolio.optimizer.application.view-model :as optimizer-view-model]
-            [hyperopen.views.portfolio.optimize.execution-modal :as execution-modal]
             [hyperopen.views.portfolio.optimize.infeasible-panel :as infeasible-panel]
             [hyperopen.views.portfolio.optimize.setup-context :as setup-context]
             [hyperopen.views.portfolio.optimize.setup-header :as setup-header]
@@ -68,5 +67,4 @@
                                    :history-load-state history-load-state
                                    :last-successful-run last-successful-run
                                    :current-result? current-result?
-                                   :result-path result-path})]
-     (execution-modal/execution-modal state)]))
+                                   :result-path result-path})]]))

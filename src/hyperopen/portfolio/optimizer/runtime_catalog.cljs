@@ -138,10 +138,18 @@
     actions/archive-portfolio-optimizer-scenario
     :duplicate-portfolio-optimizer-scenario
     actions/duplicate-portfolio-optimizer-scenario
-    :open-portfolio-optimizer-execution-modal
-    actions/open-portfolio-optimizer-execution-modal
-    :close-portfolio-optimizer-execution-modal
-    actions/close-portfolio-optimizer-execution-modal
+    :open-portfolio-optimizer-execution
+    actions/open-portfolio-optimizer-execution
+    :set-portfolio-optimizer-execution-phase
+    actions/set-portfolio-optimizer-execution-phase
+    :set-portfolio-optimizer-execution-default-order-type
+    actions/set-portfolio-optimizer-execution-default-order-type
+    :set-portfolio-optimizer-execution-row-order-type
+    actions/set-portfolio-optimizer-execution-row-order-type
+    :toggle-portfolio-optimizer-execution-row
+    actions/toggle-portfolio-optimizer-execution-row
+    :set-portfolio-optimizer-execution-row-param
+    actions/set-portfolio-optimizer-execution-row-param
     :confirm-portfolio-optimizer-execution
     actions/confirm-portfolio-optimizer-execution
     :refresh-portfolio-optimizer-tracking

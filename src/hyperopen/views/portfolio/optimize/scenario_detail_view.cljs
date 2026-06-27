@@ -2,7 +2,7 @@
   (:require [hyperopen.portfolio.optimizer.application.view-model :as optimizer-view-model]
             [hyperopen.portfolio.routes :as portfolio-routes]
             [hyperopen.system :as app-system]
-            [hyperopen.views.portfolio.optimize.execution-modal :as execution-modal]
+            [hyperopen.views.portfolio.optimize.execution-tab :as execution-tab]
             [hyperopen.views.portfolio.optimize.format :as opt-format]
             [hyperopen.views.portfolio.optimize.inputs-tab :as inputs-tab-view]
             [hyperopen.views.portfolio.optimize.optimization-progress-panel :as optimization-progress-panel]
@@ -16,6 +16,10 @@
 (def ^:private tabs
   [{:key :recommendation :label "Recommendation" :data-role "portfolio-optimizer-scenario-tab-recommendation"}
    {:key :rebalance :label "Rebalance preview" :data-role "portfolio-optimizer-scenario-tab-rebalance"}
+   {:key :execution :label "Execution" :data-role "portfolio-optimizer-scenario-tab-execution"
+    ;; Entering Execution rebuilds the plan snapshot, so route the tab click through
+    ;; the open action rather than the bare set-tab.
+    :on [[:actions/open-portfolio-optimizer-execution]]}
    {:key :tracking :label "Tracking" :data-role "portfolio-optimizer-scenario-tab-tracking"}
    {:key :inputs :label "Inputs" :data-role "portfolio-optimizer-scenario-tab-inputs"}])
 
@@ -382,14 +386,14 @@
    [:nav {:class ["optimizer-scenario-tabs"
                   "flex" "h-8" "items-stretch" "border-b" "border-base-300" "bg-base-100/95" "pl-4"]
           :data-role "portfolio-optimizer-scenario-tabs"}]
-   (map (fn [{:keys [key label data-role]}]
+   (map (fn [{:keys [key label data-role on]}]
           [:button {:type "button"
                     :class (cond-> ["flex" "items-center" "border-b" "px-4" "text-[0.7rem]" "font-medium" "transition-colors"]
                              (= key selected-tab) (conj "border-primary" "text-trading-text")
                              (not= key selected-tab) (conj "border-transparent" "text-trading-text/60" "hover:text-trading-text"))
                     :data-role data-role
                     :aria-current (when (= key selected-tab) "page")
-                    :on {:click [[:actions/set-portfolio-optimizer-results-tab key]]}}
+                    :on {:click (or on [[:actions/set-portfolio-optimizer-results-tab key]])}}
            label])
         tabs)))
 
@@ -495,6 +499,9 @@
   [{:keys [state selected-tab] :as model}]
   (case selected-tab
     :rebalance (rebalance-tab model)
+    :execution [:section {:class ["space-y-4"]
+                          :data-role "portfolio-optimizer-execution-tab-shell"}
+                (execution-tab/execution-tab state)]
     :tracking [:section {:class ["space-y-4"]
                          :data-role "portfolio-optimizer-tracking-tab"}
                (tracking-panel/tracking-panel state)]
@@ -528,5 +535,4 @@
      (stale-banner (and stale? (not running?)))
      (if loading?
        (scenario-loading-state scenario-id)
-       (tab-body model))
-     (execution-modal/execution-modal state)]))
+       (tab-body model))]))

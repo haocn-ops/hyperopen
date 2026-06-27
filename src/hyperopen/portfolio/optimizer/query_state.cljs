@@ -36,7 +36,7 @@
   #{:setup :results :rebalance :tracking :diagnostics})
 
 (def ^:private results-tab-values
-  #{:recommendation :rebalance :tracking :inputs})
+  #{:recommendation :rebalance :execution :tracking :inputs})
 
 (def ^:private results-tab-aliases
   {:allocation :recommendation

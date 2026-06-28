@@ -575,21 +575,23 @@
   "Per-row execution-cost components for the row's effective type. Crossing (market/twap):
   spread crossing + book impact = price cost, + taker fee = all-in. Resting (limit/passive):
   no spread/impact (rests), + maker fee = all-in. A crossing row whose book can't be split
-  (flat fallback) attributes its whole price cost to impact so the parts reconcile."
+  (untrusted snapshot / flat fallback / prebaked) is `splittable?`=false: spread/impact are
+  unknown (nil, not a deceptive 0), and the strip collapses them into a single honest note."
   [model row]
   (let [t (effective-type model row)
         crossing? (crossing-type? t)
         cost (:cost row)
-        has-split? (some? (:spread-usd cost))
+        splittable? (and crossing? (some? (:spread-usd cost)))
         price-cost-usd (if crossing? (or (:estimated-slippage-usd cost) 0) 0)
         price-cost-bps (if crossing? (or (:slippage-bps cost) 0) 0)
         fee-usd (if crossing? (or (:estimated-fee-usd cost) 0) (or (:maker-fee-usd cost) 0))
         fee-bps (if crossing? (or (:fee-bps cost) 0) (or (:maker-fee-bps cost) 0))]
     {:crossing? crossing?
-     :spread-bps (if (and crossing? has-split?) (:spread-bps cost) 0)
-     :spread-usd (if (and crossing? has-split?) (:spread-usd cost) 0)
-     :impact-bps (cond (not crossing?) 0 has-split? (or (:impact-bps cost) 0) :else price-cost-bps)
-     :impact-usd (cond (not crossing?) 0 has-split? (or (:impact-usd cost) 0) :else price-cost-usd)
+     :splittable? splittable?
+     :spread-bps (when splittable? (:spread-bps cost))
+     :spread-usd (when splittable? (:spread-usd cost))
+     :impact-bps (when splittable? (:impact-bps cost))
+     :impact-usd (when splittable? (:impact-usd cost))
      :price-cost-bps price-cost-bps :price-cost-usd price-cost-usd
      :fee-bps fee-bps :fee-usd fee-usd
      :all-in-bps (+ price-cost-bps fee-bps) :all-in-usd (+ price-cost-usd fee-usd)}))
@@ -600,7 +602,7 @@
   $). A resting Limit/Passive row pays neither spread nor impact, so those two terms collapse
   into a single \"rests\" note and the price cost reads ~0."
   [model row]
-  (let [{:keys [crossing? spread-bps spread-usd impact-bps impact-usd
+  (let [{:keys [crossing? splittable? spread-bps spread-usd impact-bps impact-usd
                 price-cost-bps price-cost-usd fee-bps fee-usd all-in-bps all-in-usd]}
         (cost-breakdown model row)]
     [:div {:class ["optimizer-exec-cost-panel"]
@@ -613,10 +615,24 @@
                           "neither spread nor impact and earn the lower maker fee.")}
        "ⓘ"]]
      [:div {:class ["optimizer-exec-cost-eq"]}
-      (if crossing?
+      (cond
+        ;; A crossing row with a real book: show the spread vs impact split.
+        splittable?
         (list (cost-stat "Spread crossing" spread-bps spread-usd :input)
               (cost-op "+")
               (cost-stat "Book impact" impact-bps impact-usd :input))
+
+        ;; A crossing row whose book can't be split (untrusted snapshot / flat fallback):
+        ;; the spread is unknown — say so honestly instead of rendering a deceptive 0 bp.
+        crossing?
+        [:div {:class ["optimizer-exec-cost-rests"]
+               :data-role "portfolio-optimizer-execution-cost-unsplit"}
+         [:span {:class ["optimizer-exec-cost-stat-label"]} "Spread + impact"]
+         [:span {:class ["optimizer-exec-cost-rests-note"]}
+          "Not separable — flat estimate (no live book)"]]
+
+        ;; A resting Limit/Passive row pays neither.
+        :else
         [:div {:class ["optimizer-exec-cost-rests"]}
          [:span {:class ["optimizer-exec-cost-stat-label"]} "Resting order"]
          [:span {:class ["optimizer-exec-cost-rests-note"]} "No spread or market impact"]])

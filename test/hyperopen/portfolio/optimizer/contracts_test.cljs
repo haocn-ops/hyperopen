@@ -126,6 +126,19 @@
                   (contracts/optimizer-input-signature
                    (assoc sample-request :objective {:kind :minimum-variance}))))))))
 
+(deftest execution-prices-by-id-excluded-from-input-signature-test
+  (testing "native marks seeded into :prices-by-id are preview-only and don't churn the signature"
+    (let [base (assoc sample-request
+                      :execution-assumptions {:fallback-slippage-bps 25})
+          marks-a (assoc-in base [:execution-assumptions :prices-by-id] {"perp:BTC" 95.0})
+          marks-b (assoc-in base [:execution-assumptions :prices-by-id] {"perp:BTC" 96.5})]
+      ;; adding live marks must not change the signature (else a mark tick triggers re-solves)
+      (is (= (contracts/optimizer-input-signature base)
+             (contracts/optimizer-input-signature marks-a)))
+      ;; and a different mark value must still hash identically
+      (is (= (contracts/optimizer-input-signature marks-a)
+             (contracts/optimizer-input-signature marks-b))))))
+
 (deftest draft-and-record-migrations-stamp-current-versions-test
   (testing "drafts"
     (let [draft (contracts/migrate-draft sample-draft)]

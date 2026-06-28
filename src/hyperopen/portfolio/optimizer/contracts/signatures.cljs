@@ -17,8 +17,12 @@
 
 (defn- stable-execution-assumptions
   [execution-assumptions]
+  ;; :cost-contexts-by-id (live book snapshots) and :prices-by-id (live native marks seeded for
+  ;; the rebalance preview) are preview-only inputs — the solver consumes neither — so they must
+  ;; not enter the input-signature, or a live book/mark tick would churn it and trigger false
+  ;; staleness and re-solve storms.
   (when (map? execution-assumptions)
-    (dissoc execution-assumptions :cost-contexts-by-id)))
+    (dissoc execution-assumptions :cost-contexts-by-id :prices-by-id)))
 
 (defn- stable-history
   [history]

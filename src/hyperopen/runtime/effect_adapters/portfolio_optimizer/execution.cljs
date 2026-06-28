@@ -32,6 +32,31 @@
   [responses]
   (some #(when-not (execution/response-ok? %) %) responses))
 
+(def ^:private post-only-reprice-attempts
+  ;; A post-only order can be rejected for crossing if the book moved between when its price was
+  ;; computed and when it landed. Each retry reprices to the live touch from the rejection's own
+  ;; bbo; a couple of retries absorb a fast-moving thin book without looping forever.
+  2)
+
+(defn- submit-with-reprice!
+  "Submits one order action. If Hyperliquid rejects a post-only order because it would have
+  immediately matched, reprices it to rest at the live touch carried in the rejection bbo and
+  resubmits (up to `attempts-left` times). Any other outcome (ok, or a non-cross error) resolves
+  as-is. This makes a passive order self-correct to the current book instead of hard-failing when
+  the book moved since the plan was built."
+  [submit-order! store target action attempts-left]
+  (-> (submit-action! submit-order! store target action)
+      (.then (fn [resp]
+               (if (and (pos? attempts-left)
+                        (not (execution/response-ok? resp)))
+                 (if-let [bbo (execution/post-only-cross-bbo resp)]
+                   (if-let [action* (execution/reprice-post-only-action action bbo)]
+                     (submit-with-reprice! submit-order! store target action*
+                                           (dec attempts-left))
+                     (js/Promise.resolve resp))
+                   (js/Promise.resolve resp))
+                 (js/Promise.resolve resp))))))
+
 (defn- submit-execution-row!
   [submit-order! store target row]
   (if-not (= :ready (:status row))
@@ -61,7 +86,8 @@
                                       :pre-action-responses pre-responses
                                       :error {:message (str "Pre-submit action failed: "
                                                             (pr-str failed-pre-action))})
-                               (.then (submit-action! submit-order! store target action)
+                               (.then (submit-with-reprice! submit-order! store target action
+                                                            post-only-reprice-attempts)
                                       (fn [resp]
                                         (if (execution/response-ok? resp)
                                           ;; Classify the accepted order: a crossing order

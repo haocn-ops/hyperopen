@@ -4,6 +4,7 @@
             [hyperopen.asset-selector.markets :as markets]
             [hyperopen.domain.trading :as trading-domain]
             [hyperopen.portfolio.optimizer.application.execution-order-type :as execution-order-type]
+            [hyperopen.portfolio.optimizer.application.orderbook-loader :as orderbook-loader]
             [hyperopen.portfolio.optimizer.coercion :as coercion]
             [hyperopen.portfolio.optimizer.domain.rebalance :as rebalance]))
 
@@ -192,13 +193,35 @@
   (when (finite-positive? mark)
     (* mark (+ 1 (/ (or bps 0) 10000.0)))))
 
+(defn- passive-price
+  "Post-only (ALO) limit price that is guaranteed to REST rather than cross. Hyperliquid
+  rejects a post-only order that would immediately match (\"Post only order would have
+  immediately matched\"), and the mark-relative offset is unreliable for thin HIP-3 perps
+  whose native mark sits outside the live BBO -- a 2bp nudge below a mark that is already above
+  the best ask still crosses. When the live touch is known (and the book is not crossed), rest
+  at the near touch of the order's OWN maker side: a buy joins the best bid, a sell joins the
+  best ask -- neither can immediately match. Falls back to the mark-relative offset only when
+  the book/touch is unavailable (no worse than the prior behavior)."
+  [side mark best-bid best-ask limit-bps]
+  (let [touch (case side
+                :buy best-bid
+                :sell best-ask
+                nil)]
+    (if (and (finite-positive? best-bid)
+             (finite-positive? best-ask)
+             (< best-bid best-ask)
+             (finite-positive? touch))
+      touch
+      (offset-price mark limit-bps))))
+
 (defn- order-form-for-row
   "Translates a ready row's resolved :intent into the order-gateway form. The four UI
   types map onto the gateway as: :market -> marketable IOC at mark; :limit -> resting
-  GTC at mark +/- limit-bps; :passive -> post-only (ALO) limit that never crosses;
-  :twap -> twapOrder over twap-min minutes. Any unmapped type falls back to :market so
-  it can never leak to build-order-request and become a stray resting GTC limit."
-  [row]
+  GTC at mark +/- limit-bps; :passive -> post-only (ALO) limit priced to rest at the live
+  book's own-side touch (so it never crosses); :twap -> twapOrder over twap-min minutes. Any
+  unmapped type falls back to :market so it can never leak to build-order-request and become a
+  stray resting GTC limit. `bbo` carries the live {:best-bid :best-ask} for the passive price."
+  [row bbo]
   (let [intent (:intent row)
         order-type (or (:order-type intent) :market)
         mark (:price row)
@@ -214,7 +237,9 @@
       :passive (assoc base
                       :type :limit
                       :post-only true
-                      :price (offset-price mark (:limit-bps intent)))
+                      :price (passive-price (:side intent) mark
+                                            (:best-bid bbo) (:best-ask bbo)
+                                            (:limit-bps intent)))
       :twap (assoc base
                    :type :twap
                    :twap {:minutes (max 5 (or (:twap-min intent) 10))
@@ -248,11 +273,14 @@
       {:blocked-reason :missing-price}
 
       :else
-      (let [command-context {:active-asset coin
+      (let [book (get orderbooks coin)
+            bbo {:best-bid (orderbook-loader/best-bid-price book)
+                 :best-ask (orderbook-loader/best-ask-price book)}
+            command-context {:active-asset coin
                              :asset-idx asset-idx
                              :market market
-                             :orderbook (get orderbooks coin)}
-            form (order-form-for-row row)
+                             :orderbook book}
+            form (order-form-for-row row bbo)
             size-text (wire-size-string market (:size form))]
         (if-not (non-blank-text size-text)
           {:blocked-reason :quantity-below-lot}
@@ -314,6 +342,39 @@
   [resp status-key]
   (some #(and (map? %) (contains? % status-key))
         (response-statuses resp)))
+
+(def ^:private post-only-cross-bbo-re
+  ;; Hyperliquid embeds the live touch in the post-only rejection message, e.g.
+  ;; "Post only order would have immediately matched, bbo was 0.004815@0.004818. asset=197".
+  #"would have immediately matched.*?bbo was\s+([0-9]+(?:\.[0-9]+)?)@([0-9]+(?:\.[0-9]+)?)")
+
+(defn post-only-cross-bbo
+  "When `resp` is a Hyperliquid post-only (ALO) rejection for crossing, returns the live touch
+   {:bid <string> :ask <string>} parsed from its 'bbo was <bid>@<ask>' message; nil otherwise.
+   The strings are canonical exchange prices, usable verbatim as a wire `:p`."
+  [resp]
+  (let [error (some-> (first (response-statuses resp)) :error str)
+        match (when (non-blank-text error)
+                (re-find post-only-cross-bbo-re error))]
+    (when match
+      {:bid (nth match 1)
+       :ask (nth match 2)})))
+
+(defn reprice-post-only-action
+  "Reprices a rejected single-order post-only action to REST at the live touch from the
+   rejection bbo -- a buy joins the bid, a sell joins the ask -- so a resubmit no longer crosses.
+   The book can move between price computation and submission, so the freshest source of the
+   touch is the rejection itself. Returns the repriced action, or nil when it is not a single
+   repriceable post-only order. The bbo strings are canonical exchange prices, used verbatim."
+  [action {:keys [bid ask]}]
+  (let [orders (:orders action)
+        order (first orders)
+        post-only? (= "Alo" (get-in order [:t :limit :tif]))
+        rest-price (if (:b order) bid ask)]
+    (when (and (= 1 (count orders))
+               post-only?
+               (non-blank-text rest-price))
+      (assoc-in action [:orders 0 :p] rest-price))))
 
 (defn settled-row-status
   "Terminal row status for an OK order response (callers gate on `response-ok?` first).

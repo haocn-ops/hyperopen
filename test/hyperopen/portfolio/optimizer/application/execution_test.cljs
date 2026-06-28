@@ -207,6 +207,92 @@
       (is (= "twapOrder" (:type action)))
       (is (= 20 (get-in action [:twap :m]))))))
 
+(deftest build-execution-attempt-passive-rests-at-book-touch-not-crossing-test
+  ;; Hyperliquid rejects a post-only (ALO) order that would immediately match. The native mark
+  ;; can sit OUTSIDE the live BBO for thin HIP-3 perps, so the mark-relative offset crosses and
+  ;; the order fails ("Post only order would have immediately matched"). A passive order must
+  ;; instead rest at the near touch of its own maker side: a buy joins the best bid, a sell joins
+  ;; the best ask -- neither can cross.
+  (let [market-by-key {"perp:THIN" {:coin "THIN" :market-type :perp :asset-id 7 :szDecimals 0}}
+        ;; mark 0.004782 is ABOVE the best ask 0.004781 -> a 2bp nudge below mark still crosses.
+        book {"THIN" {:render {:best-bid {:px "0.004777"}
+                               :best-ask {:px "0.004781"}}
+                      :timestamp 0}}
+        order-for (fn [side]
+                    (-> (execution/build-execution-plan
+                         {:scenario-id "scn_thin"
+                          :rebalance-preview
+                          {:rows [{:instrument-id "perp:THIN" :instrument-type :perp :coin "THIN"
+                                   :status :ready :side side :price 0.004782
+                                   :quantity 5000
+                                   :delta-notional-usd (if (= side :buy) 24 -24)}]}
+                          :execution-assumptions {:default-order-type :passive}})
+                        (#(execution/build-execution-attempt
+                           {:plan % :market-by-key market-by-key :orderbooks book}))
+                        (get-in [:rows 0 :request :action :orders 0])))
+        buy (order-for :buy)
+        sell (order-for :sell)]
+    ;; post-only routing preserved
+    (is (= {:tif "Alo"} (:limit (:t buy))))
+    ;; buy rests AT the best bid (below the ask -> cannot immediately match)
+    (is (= 0.004777 (js/parseFloat (:p buy))))
+    ;; sell rests AT the best ask (above the bid -> cannot immediately match)
+    (is (= 0.004781 (js/parseFloat (:p sell))))
+    ;; both land strictly inside the no-cross band
+    (is (< (js/parseFloat (:p buy)) 0.004781))
+    (is (> (js/parseFloat (:p sell)) 0.004777))))
+
+(deftest build-execution-attempt-passive-falls-back-to-mark-offset-without-book-test
+  ;; With no live book (no touch known), passive keeps the mark-relative offset that rests away
+  ;; from the mark (buy below, sell above via the -2/+2 bps default) -- no worse than before.
+  (let [market-by-key {"perp:BTC" {:coin "BTC" :market-type :perp :asset-id 0 :szDecimals 4}}
+        order-for (fn [side]
+                    (-> (execution/build-execution-plan
+                         {:scenario-id "scn_nobook"
+                          :rebalance-preview
+                          {:rows [{:instrument-id "perp:BTC" :instrument-type :perp :coin "BTC"
+                                   :status :ready :side side :price 100
+                                   :quantity 0.25
+                                   :delta-notional-usd (if (= side :buy) 25 -25)}]}
+                          :execution-assumptions {:default-order-type :market}})
+                        (execution/apply-order-type-selections
+                         {:default-order-type :recommended
+                          :overrides {"perp:BTC" :passive}
+                          :params {}})
+                        (#(execution/build-execution-attempt
+                           {:plan % :market-by-key market-by-key}))
+                        (get-in [:rows 0 :request :action :orders 0])))
+        buy (order-for :buy)
+        sell (order-for :sell)]
+    (is (= {:tif "Alo"} (:limit (:t buy))))
+    ;; mark = 100: buy rests below, sell rests above
+    (is (< (js/parseFloat (:p buy)) 100))
+    (is (> (js/parseFloat (:p sell)) 100))))
+
+(deftest build-execution-attempt-passive-falls-back-when-book-crossed-test
+  ;; A crossed/locked book (best-bid >= best-ask, e.g. a stale snapshot) is not a safe source of
+  ;; a resting touch, so passive must fall back to the mark-relative offset rather than place at a
+  ;; touch that could itself cross.
+  (let [market-by-key {"perp:BTC" {:coin "BTC" :market-type :perp :asset-id 0 :szDecimals 4}}
+        crossed {"BTC" {:render {:best-bid {:px "101"} :best-ask {:px "100"}} :timestamp 0}}
+        buy (-> (execution/build-execution-plan
+                 {:scenario-id "scn_crossed"
+                  :rebalance-preview
+                  {:rows [{:instrument-id "perp:BTC" :instrument-type :perp :coin "BTC"
+                           :status :ready :side :buy :price 100 :quantity 0.25
+                           :delta-notional-usd 25}]}
+                  :execution-assumptions {:default-order-type :market}})
+                (execution/apply-order-type-selections
+                 {:default-order-type :recommended
+                  :overrides {"perp:BTC" :passive}
+                  :params {}})
+                (#(execution/build-execution-attempt
+                   {:plan % :market-by-key market-by-key :orderbooks crossed}))
+                (get-in [:rows 0 :request :action :orders 0]))]
+    (is (= {:tif "Alo"} (:limit (:t buy))))
+    ;; NOT the crossed best-bid (101); falls back to the mark offset (< mark 100)
+    (is (< (js/parseFloat (:p buy)) 100))))
+
 (deftest build-execution-attempt-routes-ready-spot-row-test
   (let [plan (execution/build-execution-plan
               {:scenario-id "scn_spot"
@@ -325,6 +411,37 @@
          (execution/settled-row-status
           {:status "ok" :response {:data {:statuses ["success"]}}}))
       "legacy/empty OK shape -> :submitted (immediate-cross behavior preserved)"))
+
+(deftest post-only-cross-bbo-parses-live-touch-from-rejection-test
+  ;; Hyperliquid rejects a crossing post-only order but embeds the LIVE touch in the message, so
+  ;; the order can be repriced to the current book even when the snapshot it was built from moved.
+  (is (= {:bid "0.004815" :ask "0.004818"}
+         (execution/post-only-cross-bbo
+          {:status "ok"
+           :response {:type "order"
+                      :data {:statuses [{:error "Post only order would have immediately matched, bbo was 0.004815@0.004818. asset=197"}]}}})))
+  ;; an unrelated rejection is not a post-only cross
+  (is (nil? (execution/post-only-cross-bbo
+             {:status "ok" :response {:data {:statuses [{:error "Insufficient margin"}]}}})))
+  ;; an accepted order is not a cross
+  (is (nil? (execution/post-only-cross-bbo
+             {:status "ok" :response {:data {:statuses [{:resting {:oid 1}}]}}}))))
+
+(deftest reprice-post-only-action-rests-at-rejection-touch-test
+  ;; A buy reprices to the live bid (rests below the ask); a sell to the live ask (rests above the
+  ;; bid). The bbo strings are canonical exchange prices, used verbatim. Non-post-only is left.
+  (let [action (fn [is-buy]
+                 {:type "order" :grouping "na"
+                  :orders [{:a 197 :b is-buy :p "0.004822" :s "3000" :r false
+                            :t {:limit {:tif "Alo"}}}]})
+        bbo {:bid "0.004815" :ask "0.004818"}]
+    (is (= "0.004815"
+           (get-in (execution/reprice-post-only-action (action true) bbo) [:orders 0 :p])))
+    (is (= "0.004818"
+           (get-in (execution/reprice-post-only-action (action false) bbo) [:orders 0 :p])))
+    ;; a non-post-only (Gtc) order is left alone -- a crossing limit just fills, it never errors
+    (is (nil? (execution/reprice-post-only-action
+               (assoc-in (action true) [:orders 0 :t] {:limit {:tif "Gtc"}}) bbo)))))
 
 (deftest final-ledger-status-distinguishes-resting-from-filled-test
   ;; A passive limit order that only rests on the book (HL :resting, no :filled) is accepted but

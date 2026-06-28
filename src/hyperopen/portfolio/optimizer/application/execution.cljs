@@ -427,17 +427,19 @@
         ;; Orders the exchange accepted — filled outright or resting (open) on the book.
         accepted-count (+ filled-count resting-count)]
     (cond
-      ;; Something went live, but a rejection/block also occurred ⇒ a partial run the trader
-      ;; must act on (resume / revert / re-stage).
-      (and (pos? accepted-count)
-           (or (pos? failed-count) (pos? blocked-count))) :partially-executed
+      ;; A genuine exchange REJECTION (:failed) alongside live orders ⇒ a partial run the trader
+      ;; must act on (resume / revert / re-stage). Blocked rows are pre-execution EXCLUSIONS
+      ;; (below the $10 minimum, missing market metadata, sub-lot) — they were never sent, so
+      ;; they are not failures and must NOT halt a run on their own. A run whose only non-sent
+      ;; rows are blocked, with every sendable order live and nothing rejected, succeeded.
+      (and (pos? failed-count) (pos? accepted-count)) :partially-executed
       (pos? failed-count) :failed
-      (pos? blocked-count) :blocked
-      ;; Every accepted order crossed and filled outright ⇒ fully executed.
+      ;; No rejection: every order that was actually sendable filled outright ⇒ fully executed.
       (and (pos? filled-count) (zero? resting-count)) :executed
-      ;; At least one order is live, and not all accepted orders filled ⇒ orders resting on
-      ;; the book (open, not a fill). This is terminal but distinct from :executed.
+      ;; No rejection, at least one order live (resting/open on the book) ⇒ orders resting.
       (pos? accepted-count) :resting
+      ;; Nothing was sendable (all rows blocked/excluded) and nothing failed.
+      (pos? blocked-count) :blocked
       :else :no-op)))
 
 (defn- recoverable-row

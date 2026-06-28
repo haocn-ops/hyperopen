@@ -311,7 +311,10 @@
                      (done)))
             (.catch (async-support/unexpected-error done)))))))
 
-(deftest execute-portfolio-optimizer-plan-effect-records-partial-when-blocked-rows-remain-test
+(deftest execute-portfolio-optimizer-plan-effect-executes-when-only-blocked-rows-remain-test
+  ;; A blocked row is a pre-execution EXCLUSION (below the $10 minimum / unsupported), not an
+  ;; exchange rejection. A run whose sendable order filled and whose only non-sent rows are
+  ;; blocked is :executed, NOT a halted :executed.
   (async done
     (let [address "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
           plan (assoc ready-plan
@@ -346,10 +349,10 @@
              store
              plan)
             (.then (fn [ledger]
-                     (is (= :partially-executed (:status ledger)))
+                     (is (= :executed (:status ledger)))
                      (is (= :submitted (get-in ledger [:rows 0 :status])))
                      (is (= :blocked (get-in ledger [:rows 1 :status])))
-	                     (is (= :partially-executed
+	                     (is (= :executed
 	                            (get-in @store [:portfolio :optimizer :execution :status])))
 	                     (done)))
 	            (.catch (async-support/unexpected-error done)))))))

@@ -463,6 +463,28 @@
          (execution/final-ledger-status [{:status :failed} {:status :failed}]))
       "pure failures unchanged"))
 
+(deftest final-ledger-status-blocked-rows-do-not-halt-a-successful-run-test
+  ;; Blocked rows are pre-execution EXCLUSIONS (below the $10 minimum / un-buildable), NOT
+  ;; exchange rejections -- they were never sent -- so they must never turn a successful run into
+  ;; a halted :partially-executed. (Reported live: 2 orders rested + 18 below-min blocked rows
+  ;; rendered the whole run as "Execution halted -- one or more orders were rejected".)
+  (is (= :resting
+         (execution/final-ledger-status
+          (into [{:status :resting} {:status :resting}]
+                (repeat 18 {:status :blocked}))))
+      "all sendable orders resting + only blocked exclusions -> :resting, not halted")
+  (is (= :executed
+         (execution/final-ledger-status
+          [{:status :submitted} {:status :blocked} {:status :blocked}]))
+      "sendable order filled + blocked exclusions -> :executed, not partial")
+  (is (= :partially-executed
+         (execution/final-ledger-status
+          [{:status :submitted} {:status :failed} {:status :blocked}]))
+      "a genuine exchange rejection DOES still halt as a partial run")
+  (is (= :blocked
+         (execution/final-ledger-status [{:status :blocked} {:status :blocked}]))
+      "nothing sendable and nothing failed -> :blocked"))
+
 (deftest build-resume-plan-skips-resting-rows-test
   ;; Resume retries the failed rows; an order already resting (live, open) on the book must
   ;; never be re-submitted, so it is demoted to :skipped just like an already-filled row.

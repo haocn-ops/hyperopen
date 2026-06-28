@@ -333,20 +333,26 @@
       "Pause / abort"]]))
 
 (defn- done-band
-  []
-  [:div {:class ["optimizer-exec-band" "is-done" "flex" "items-center" "gap-4"
-                 "border-b" "border-base-300" "px-5" "py-3"]
-         :data-role "portfolio-optimizer-execution-control-band"
-         :data-phase "done"}
-   (chip "complete" :long)
-   [:p {:class ["text-[0.8125rem]" "font-medium" "text-trading-text"]}
-    "Execution complete — all orders acknowledged."]
-   [:span {:class ["flex-1"]}]
-   [:button {:type "button"
-             :class ["optimizer-primary-action" "border" "px-3" "py-2" "text-sm" "font-semibold"]
-             :data-role "portfolio-optimizer-execution-view-tracking"
-             :on {:click [[:actions/set-portfolio-optimizer-results-tab :tracking]]}}
-    "View tracking →"]])
+  [rows]
+  (let [{:keys [filled blocked]} (fill-counts rows)]
+    [:div {:class ["optimizer-exec-band" "is-done" "flex" "items-center" "gap-4"
+                   "border-b" "border-base-300" "px-5" "py-3"]
+           :data-role "portfolio-optimizer-execution-control-band"
+           :data-phase "done"}
+     (chip "complete" :long)
+     [:p {:class ["text-[0.8125rem]" "font-medium" "text-trading-text"]}
+      (str "Execution complete — "
+           (if (pos? filled)
+             (str filled " order" (when (not= 1 filled) "s") " acknowledged")
+             "orders acknowledged")
+           (when (pos? blocked)
+             (str " · " blocked " below minimum (not sent)")))]
+     [:span {:class ["flex-1"]}]
+     [:button {:type "button"
+               :class ["optimizer-primary-action" "border" "px-3" "py-2" "text-sm" "font-semibold"]
+               :data-role "portfolio-optimizer-execution-view-tracking"
+               :on {:click [[:actions/set-portfolio-optimizer-results-tab :tracking]]}}
+      "View tracking →"]]))
 
 (defn- halted-band
   [{:keys [error confirm-disabled?] :as model} rows]
@@ -392,7 +398,7 @@
 
 (defn- resting-band
   [_model rows]
-  (let [{:keys [filled resting]} (fill-counts rows)]
+  (let [{:keys [filled resting blocked]} (fill-counts rows)]
     [:div {:class ["optimizer-exec-band" "is-done" "flex" "items-center" "gap-4"
                    "border-b" "border-base-300" "px-5" "py-3"]
            :data-role "portfolio-optimizer-execution-control-band"
@@ -402,7 +408,9 @@
       [:p {:class ["text-[0.8125rem]" "font-medium" "text-trading-text"]}
        (str resting " order" (when (not= 1 resting) "s") " resting on the book"
             (when (pos? filled)
-              (str " · " filled " filled outright")))]
+              (str " · " filled " filled outright"))
+            (when (pos? blocked)
+              (str " · " blocked " below minimum (not sent)")))]
       [:p {:class ["mt-0.5" "font-mono" "text-[0.65rem]" "text-trading-muted"]}
        "Open limit orders are live on Hyperliquid — they fill as the market reaches your price. Manage or cancel them from the trade ticket."]]
      [:span {:class ["flex-1"]}]]))
@@ -412,7 +420,7 @@
   (case phase
     :armed (armed-band model rows)
     :running (running-band model rows)
-    :done (done-band)
+    :done (done-band rows)
     :resting (resting-band model rows)
     :halted (halted-band model rows)
     (staged-band model rows)))

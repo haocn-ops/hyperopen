@@ -1,7 +1,17 @@
 (ns hyperopen.portfolio.optimizer.execution-actions-test
   (:require [cljs.test :refer-macros [deftest is]]
             [hyperopen.portfolio.optimizer.actions :as actions]
-            [hyperopen.portfolio.optimizer.fixtures :as fixtures]))
+            [hyperopen.portfolio.optimizer.fixtures :as fixtures]
+            [hyperopen.schema.contracts :as contracts]))
+
+(defn- emitted-effects-valid?
+  "Runs the emitted effects through the real action-emission contract — every emitted item
+  must be a registered `effects/*` effect with conforming args. This guards against an action
+  returning a raw `[:actions/...]` chain (which throws at runtime dispatch, not in a plain
+  return-value assertion)."
+  [action-id effects]
+  (= effects (contracts/assert-emitted-effects!
+              effects {:phase :action-emission :action-id action-id})))
 
 (deftest open-execution-stages-plan-and-switches-to-execution-tab-test
   (let [state {:portfolio {:optimizer
@@ -196,7 +206,8 @@
               :execution-disabled? false
               :summary {:ready-count 1}
               :rows [row]}
-        state {:portfolio {:optimizer {:execution-modal
+        state {:wallet {:agent {:status :ready}}
+               :portfolio {:optimizer {:execution-modal
                                        {:open? true
                                         :plan plan
                                         :default-order-type :recommended
@@ -223,7 +234,8 @@
              :instrument-type :perp
              :delta-notional-usd 30000
              :intent {:kind :perp-order :side :buy :quantity 0.25 :order-type :market}}
-        state {:portfolio {:optimizer {:execution-modal
+        state {:wallet {:agent {:status :ready}}
+               :portfolio {:optimizer {:execution-modal
                                        {:open? true
                                         :plan {:scenario-id "draft-1"
                                                :status :ready
@@ -235,6 +247,71 @@
                                         :params {}}}}}
         [_ dispatched] (nth (actions/confirm-portfolio-optimizer-execution state) 2)]
     (is (= :passive (get-in dispatched [:rows 0 :intent :order-type])))))
+
+(defn- locked-state
+  [agent-status]
+  (let [row {:row-id "perp:BTC"
+             :status :ready
+             :side :buy
+             :instrument-type :perp
+             :delta-notional-usd 30000
+             :intent {:kind :perp-order :side :buy :quantity 0.25 :order-type :market}}]
+    {:wallet {:agent {:status agent-status}}
+     :portfolio {:optimizer {:execution-modal
+                             {:open? true
+                              :plan {:scenario-id "draft-1"
+                                     :status :ready
+                                     :execution-disabled? false
+                                     :summary {:ready-count 1}
+                                     :rows [row]}
+                              :default-order-type :market
+                              :overrides {}
+                              :params {}}}}}))
+
+(deftest confirm-execution-locked-agent-prompts-unlock-and-replays-confirm-test
+  ;; A locked agent must behave like normal order entry: prompt the passkey unlock and
+  ;; replay the confirm on success, instead of dispatching the submit (which would dead-end
+  ;; with a per-row "Trading is locked" rejection). An action can only emit effects/*, so it
+  ;; runs the :effects/unlock-agent-trading EFFECT directly (not an :actions/* chain, which
+  ;; would throw the effect-id schema at runtime dispatch).
+  (let [effects (actions/confirm-portfolio-optimizer-execution (locked-state :locked))
+        effect-keys (map first effects)]
+    ;; the emitted effects must pass the real action-emission contract (regression guard:
+    ;; an :actions/* emission throws here)
+    (is (emitted-effects-valid? :actions/confirm-portfolio-optimizer-execution effects))
+    (is (some #{:effects/unlock-agent-trading} effect-keys))
+    ;; never dispatches the submit while locked
+    (is (not (some #{:effects/execute-portfolio-optimizer-plan} effect-keys)))
+    ;; flips the agent to :unlocking so a second confirm-click can't double-prompt
+    (is (some #{[:effects/save-many [[[:wallet :agent :status] :unlocking]
+                                     [[:wallet :agent :error] nil]]]}
+              effects))
+    (let [unlock (first (filter #(= :effects/unlock-agent-trading (first %)) effects))]
+      (is (= {:after-success-actions [[:actions/confirm-portfolio-optimizer-execution]]}
+             (second unlock))))))
+
+(deftest confirm-execution-unlocking-agent-waits-without-submitting-test
+  (let [effects (actions/confirm-portfolio-optimizer-execution (locked-state :unlocking))
+        effect-keys (map first effects)]
+    (is (emitted-effects-valid? :actions/confirm-portfolio-optimizer-execution effects))
+    (is (not (some #{:effects/execute-portfolio-optimizer-plan} effect-keys)))
+    (is (some #{:effects/save} effect-keys))))
+
+(deftest confirm-execution-not-ready-agent-opens-enable-recovery-test
+  ;; Trading never enabled (the DEFAULT :not-ready status) must open the enable-trading
+  ;; recovery modal — like manual order entry — instead of submitting orders that would each
+  ;; dead-end on "Enable trading first".
+  (let [effects (actions/confirm-portfolio-optimizer-execution (locked-state :not-ready))
+        effect-keys (map first effects)]
+    (is (emitted-effects-valid? :actions/confirm-portfolio-optimizer-execution effects))
+    (is (not (some #{:effects/execute-portfolio-optimizer-plan} effect-keys)))
+    (is (some #{[:effects/save [:wallet :agent :recovery-modal-open?] true]} effects))))
+
+(deftest confirm-execution-ready-agent-still-submits-test
+  ;; Only a :ready agent submits.
+  (let [effects (actions/confirm-portfolio-optimizer-execution (locked-state :ready))]
+    (is (emitted-effects-valid? :actions/confirm-portfolio-optimizer-execution effects))
+    (is (some #{:effects/execute-portfolio-optimizer-plan} (map first effects)))))
 
 (deftest confirm-execution-blocks-read-only-plan-test
   (let [state {:portfolio {:optimizer {:execution-modal

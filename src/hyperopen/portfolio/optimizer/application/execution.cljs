@@ -2,6 +2,7 @@
   (:require [clojure.string :as str]
             [hyperopen.api.gateway.orders.commands :as order-commands]
             [hyperopen.asset-selector.markets :as markets]
+            [hyperopen.domain.trading :as trading-domain]
             [hyperopen.portfolio.optimizer.application.execution-order-type :as execution-order-type]
             [hyperopen.portfolio.optimizer.coercion :as coercion]
             [hyperopen.portfolio.optimizer.domain.rebalance :as rebalance]))
@@ -220,6 +221,17 @@
                           :randomize true})
       (assoc base :type :market :price mark))))
 
+(defn- wire-size-string
+  "Floors the order quantity to the catalog market's szDecimals and formats it as a clean
+  wire decimal string (mirrors the manual order form's base-size-string). The optimizer
+  derives quantity = |notional| / price as a raw float, so without this the wire :s carries
+  14-17 sig figs (e.g. SILVER szDecimals 2 -> \"1.089665624397716\"); Hyperliquid deserializes
+  :s into a precision-bounded decimal and rejects an over-precise size with \"Failed to
+  deserialize the JSON body into the target type\". Returns nil when the size floors below one
+  lot (non-positive)."
+  [market size]
+  (trading-domain/base-size-string {:market market} (coercion/parse-float-number size)))
+
 (defn- order-request-for-row
   [{:keys [market-by-key orderbooks]} row]
   (let [market (row-market market-by-key row)
@@ -240,11 +252,16 @@
                              :asset-idx asset-idx
                              :market market
                              :orderbook (get orderbooks coin)}
-            request (order-commands/build-order-request command-context
-                                                        (order-form-for-row row))]
-        (if (map? request)
-          {:request request}
-          {:blocked-reason :request-unavailable})))))
+            form (order-form-for-row row)
+            size-text (wire-size-string market (:size form))]
+        (if-not (non-blank-text size-text)
+          {:blocked-reason :quantity-below-lot}
+          (let [request (order-commands/build-order-request
+                         command-context
+                         (assoc form :size size-text))]
+            (if (map? request)
+              {:request request}
+              {:blocked-reason :request-unavailable})))))))
 
 (defn- attempt-row
   [opts row]

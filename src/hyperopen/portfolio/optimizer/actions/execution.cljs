@@ -104,7 +104,8 @@
                 {:default-order-type (:default-order-type modal)
                  :overrides (:overrides modal)
                  :params (:params modal)}))
-        ready-count (get-in plan [:summary :ready-count])]
+        ready-count (get-in plan [:summary :ready-count])
+        agent-status (get-in state [:wallet :agent :status])]
     (cond
       (not (map? plan))
       []
@@ -122,6 +123,38 @@
       [[:effects/save
         contracts/execution-modal-error-path
         "No executable rows are ready."]]
+
+      ;; Trading must be ready before any order is sent — mirror manual order entry
+      ;; (order/effects.cljs api-submit-order), which routes every non-ready agent status
+      ;; instead of submitting. Without this the orders dispatch and each row dead-ends on a
+      ;; "Trading is locked" / "Enable trading first" rejection with no recovery affordance.
+      ;;
+      ;; A locked agent prompts the passkey unlock and replays confirm on success. An action
+      ;; can only EMIT effects (`effects/*`) — it cannot return `[:actions/...]` (that fails
+      ;; the effect-id schema). So inline what :actions/unlock-agent-trading itself emits:
+      ;; flip the agent status to :unlocking (so a second confirm-click can't double-prompt
+      ;; the passkey) and run the unlock effect with confirm queued as the replay.
+      (= :locked agent-status)
+      [[:effects/save contracts/execution-modal-error-path nil]
+       [:effects/save-many [[[:wallet :agent :status] :unlocking]
+                            [[:wallet :agent :error] nil]]]
+       [:effects/unlock-agent-trading
+        {:after-success-actions [[:actions/confirm-portfolio-optimizer-execution]]}]]
+
+      ;; Unlock already in flight (awaiting passkey): hold without submitting.
+      (= :unlocking agent-status)
+      [[:effects/save
+        contracts/execution-modal-error-path
+        "Awaiting passkey before executing."]]
+
+      ;; Trading not enabled yet (the default :not-ready, plus :approving / :error): open the
+      ;; enable-trading recovery modal — the same prompt manual order entry shows — instead of
+      ;; submitting orders that would each be rejected with "Enable trading first".
+      (not= :ready agent-status)
+      [[:effects/save [:wallet :agent :recovery-modal-open?] true]
+       [:effects/save
+        contracts/execution-modal-error-path
+        "Enable trading before executing."]]
 
       :else
       [[:effects/save contracts/execution-modal-submitting-path true]

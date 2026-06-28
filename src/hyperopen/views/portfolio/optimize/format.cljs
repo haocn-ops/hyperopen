@@ -78,7 +78,11 @@
 
 (def ^:private friendly-keyword-labels
   ;; Human copy for reason keywords that would otherwise leak a raw kebab token.
-  {:below-min-notional "Below $10 minimum"})
+  {:below-min-notional "Below $10 minimum"
+   ;; The order quantity rounds down to zero at the asset's lot precision (szDecimals),
+   ;; so there is no placeable size — e.g. a 0.7-unit target on a whole-lot (szDecimals 0)
+   ;; market.
+   :quantity-below-lot "Below one lot"})
 
 (defn keyword-label
   ([value]

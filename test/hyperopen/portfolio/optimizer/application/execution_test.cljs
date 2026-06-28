@@ -103,6 +103,67 @@
             :grouping "na"}
            (get-in row [:request :action])))))
 
+(deftest build-execution-attempt-floors-wire-size-to-sz-decimals-test
+  ;; The optimizer derives quantity = |notional| / price as a raw float, so the wire :s
+  ;; would otherwise carry 14-17 sig figs (e.g. SOPH szDecimals 0 -> "7968.855385980289").
+  ;; Hyperliquid deserializes :s into a precision-bounded decimal and rejects over-precise
+  ;; sizes ("Failed to deserialize the JSON body into the target type"). The size must be
+  ;; floored to the catalog szDecimals, exactly like the manual order path.
+  (let [attempt-for (fn [coin sz-decimals quantity]
+                      (let [plan (execution/build-execution-plan
+                                  {:scenario-id "scn_sz"
+                                   :rebalance-preview
+                                   {:rows [{:instrument-id (str "perp:" coin)
+                                            :instrument-type :perp
+                                            :coin coin
+                                            :status :ready
+                                            :side :sell
+                                            :price 0.005
+                                            :quantity quantity
+                                            :delta-notional-usd -40}]}
+                                   :execution-assumptions {:default-order-type :market}})]
+                        (execution/build-execution-attempt
+                         {:plan plan
+                          :market-by-key {(str "perp:" coin)
+                                          {:coin coin
+                                           :market-type :perp
+                                           :asset-id 197
+                                           :szDecimals sz-decimals}}})))
+        wire-size (fn [attempt]
+                    (get-in (first (:rows attempt))
+                            [:request :action :orders 0 :s]))]
+    ;; szDecimals 0 -> integer size, no fractional part
+    (is (= "7968" (wire-size (attempt-for "SOPH" 0 7968.855385980289))))
+    ;; szDecimals 2 -> at most 2 decimals (floored)
+    (is (= "1.08" (wire-size (attempt-for "SILVER" 2 1.089665624397716))))
+    ;; szDecimals 3 -> at most 3 decimals (floored)
+    (is (= "0.574" (wire-size (attempt-for "BABA" 3 0.57497234024216))))))
+
+(deftest build-execution-attempt-blocks-row-when-size-floors-below-one-lot-test
+  ;; A quantity smaller than one lot for the asset (szDecimals 0, quantity < 1) floors to
+  ;; zero, which is not a placeable order; the row is blocked rather than sent as ":s 0".
+  (let [plan (execution/build-execution-plan
+              {:scenario-id "scn_dust"
+               :rebalance-preview
+               {:rows [{:instrument-id "perp:SOPH"
+                        :instrument-type :perp
+                        :coin "SOPH"
+                        :status :ready
+                        :side :sell
+                        :price 0.005
+                        :quantity 0.7
+                        :delta-notional-usd -0.0035}]}
+               :execution-assumptions {:default-order-type :market}})
+        attempt (execution/build-execution-attempt
+                 {:plan plan
+                  :market-by-key {"perp:SOPH" {:coin "SOPH"
+                                               :market-type :perp
+                                               :asset-id 197
+                                               :szDecimals 0}}})
+        row (first (:rows attempt))]
+    (is (= :blocked (:status row)))
+    (is (nil? (get-in row [:request :action])))))
+
 (deftest build-execution-attempt-routes-selected-order-types-test
   (let [base (execution/build-execution-plan
               {:scenario-id "scn_types"

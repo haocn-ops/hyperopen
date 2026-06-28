@@ -151,6 +151,38 @@
            (get-in readiness
                    [:request :execution-assumptions :cost-contexts-by-id "perp:ETH" :fallback-bps])))))
 
+(deftest build-readiness-injects-native-marks-as-execution-prices-test
+  ;; A HIP-3 perp prices its returns off an equity proxy, so the last history close is the
+  ;; proxy level (here 112), not the native perp mark. build-readiness must seed the execution
+  ;; reference price from the live market catalog ([:asset-selector :market-by-key]), so the
+  ;; rebalance preview sizes and costs against the native mark (95), not the proxy. The "spot:BTC"
+  ;; decoy shares the coin "BTC" with a different price: resolution is per market-type (by the
+  ;; instrument's own catalog key), so the perp must NOT pick up the spot price.
+  (let [readiness (setup-readiness/build-readiness
+                   (optimizer-state
+                    {:asset-selector
+                     {:market-by-key
+                      {"perp:BTC" {:coin "BTC" :markRaw "95.0" :mark 95}
+                       "spot:BTC" {:coin "BTC" :markRaw "1.0" :mark 1}}}
+                     :portfolio
+                     {:optimizer
+                      {:history-data
+                       {:candle-history-by-coin
+                        {"BTC" [{:time 1000 :close "100"}
+                                {:time 2000 :close "112"}]
+                         "ETH" [{:time 1000 :close "2000"}
+                                {:time 2000 :close "2200"}]}
+                        :funding-history-by-coin {}}}}}))]
+    (is (= :ready (:status readiness)))
+    ;; native perp mark (95) is seeded as the execution price, keyed by instrument-id — NOT the
+    ;; same-coin spot decoy price (1.0)
+    (is (= 95.0
+           (get-in readiness
+                   [:request :execution-assumptions :prices-by-id "perp:BTC"])))
+    ;; ETH has no catalog mark -> no native price injected (preview falls back to history close)
+    (is (nil? (get-in readiness
+                      [:request :execution-assumptions :prices-by-id "perp:ETH"])))))
+
 (deftest build-readiness-blocks-empty-black-litterman-views-test
   (let [readiness (setup-readiness/build-readiness
                    (optimizer-state

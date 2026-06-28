@@ -185,6 +185,31 @@
     (is (str/includes? text "All-in"))
     (is (str/includes? text "0.91"))))
 
+(deftest execution-tab-row-expansion-unsplittable-cost-shows-not-separable-note-test
+  ;; When the cost model can't separate spread from impact (e.g. :untrusted-snapshot-fill, a
+  ;; stale/mismatched book), the row carries a flat slippage with NO :spread-usd. The breakdown
+  ;; must say so honestly rather than render a misleading "Spread crossing 0 bp" — the spread
+  ;; term collapses into a "not separable" note while price cost / all-in still reconcile.
+  (let [plan (assoc-in staged-plan [:rows 0 :cost]
+                       {:source :untrusted-snapshot-fill :slippage-bps 25
+                        :estimated-slippage-usd 0.19
+                        :fee-bps 4.5 :estimated-fee-usd 0.03
+                        :maker-fee-bps 1.5 :maker-fee-usd 0.01})
+        view-node (scenario-view :execution
+                                 {:execution {:status :idle :history []}
+                                  :execution-modal {:open? true :phase :staged :plan plan
+                                                    :open-row "perp:BTC"}})
+        breakdown (node-by-role view-node "portfolio-optimizer-execution-cost-breakdown")
+        text (node-text breakdown)]
+    (is (some? breakdown))
+    ;; no fabricated spread-crossing stat (which previously read "0 bp")
+    (is (not (str/includes? text "Spread crossing")))
+    ;; an honest note explains the missing split
+    (is (str/includes? text "separable"))
+    ;; the price cost / all-in equation still renders
+    (is (str/includes? text "Price cost"))
+    (is (str/includes? text "All-in"))))
+
 (deftest execution-tab-armed-renders-enabled-confirm-test
   (let [view-node (scenario-view :execution
                                  {:execution {:status :idle :history []}
@@ -261,3 +286,31 @@
     (is (str/includes? text "Alpha Yield"))
     (is (not (str/includes? text vault-id)))
     (is (not (str/includes? text vault-address)))))
+
+(deftest execution-tab-resting-renders-open-state-not-filled-test
+  ;; A completed run of passive orders that only REST on the book must render each order's state
+  ;; as "open" (never "filled"), drive the resting control band, and report 0 filled with the
+  ;; resting count surfaced — the exact bug: a resting (open) order was mislabeled "filled".
+  (let [view-node (scenario-view :execution
+                                 {:execution {:status :resting
+                                              :history [{:attempt-id "exec_2000"
+                                                         :status :resting
+                                                         :rows [{:instrument-id "perp:BTC"
+                                                                 :status :resting
+                                                                 :side :buy
+                                                                 :delta-notional-usd 1000}]}]}
+                                  :execution-modal {:open? true :phase :staged
+                                                    :plan staged-plan}})
+        strings (set (collect-strings view-node))
+        band (node-by-role view-node "portfolio-optimizer-execution-control-band")
+        orders-kpi (node-by-role view-node "portfolio-optimizer-execution-kpi-orders")]
+    (is (= "resting" (get-in band [1 :data-phase]))
+        "a resting run drives the resting control band, not done/halted")
+    (is (contains? strings "open")
+        "the resting order renders its state as \"open\"")
+    (is (not (contains? strings "filled"))
+        "no order-state cell claims \"filled\" when nothing filled")
+    (is (str/includes? (node-text orders-kpi) "0 / 1")
+        "Orders filled reports 0 of 1 — the resting order is not counted as filled")
+    (is (str/includes? (node-text orders-kpi) "resting on book")
+        "the resting order is surfaced in the orders KPI")))

@@ -38,6 +38,23 @@
   (or (get-in book [:render :best-ask])
       (first (:asks book))))
 
+(defn- level-price
+  "Numeric price of an order-book level, tolerant of the several level shapes (normalized
+  `:px-num`, raw `:px`/`:price`/`:p`)."
+  [level]
+  (some coercion/parse-float-number
+        [(:px-num level) (:px level) (:price level) (:p level)]))
+
+(defn best-bid-price
+  "Numeric best-bid (top maker bid) price from a loaded order book, or nil when unavailable."
+  [book]
+  (some-> (best-bid book) level-price))
+
+(defn best-ask-price
+  "Numeric best-ask (top maker ask) price from a loaded order book, or nil when unavailable."
+  [book]
+  (some-> (best-ask book) level-price))
+
 (defn- book-age-ms
   [book now-ms]
   (when (and (number? now-ms)

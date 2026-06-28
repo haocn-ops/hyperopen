@@ -151,6 +151,47 @@
               [:execution-assumptions :cost-contexts-by-id]
               (merge existing-contexts generated-contexts))))
 
+(defn- native-mark-price
+  "Live native mark for a market-catalog entry, preferring the precise :markRaw string over the
+   display-rounded :mark. Returns nil when neither is a positive number."
+  [entry]
+  (let [px (or (coercion/parse-float-number (:markRaw entry))
+               (coercion/parse-float-number (:mark entry)))]
+    (when (coercion/positive-number? px) px)))
+
+(defn- native-marks-by-id
+  "Map of optimizer instrument-id -> live native mark, resolved from the global market catalog
+   ([:asset-selector :market-by-key]). A HIP-3 perp prices its RETURNS off an equity proxy
+   (e.g. xyz:BABA -> the Tiingo Alibaba ADR), so its last history close is the proxy level
+   (~112) and not the native perp mark (~95); seeding the execution price from the native mark
+   keeps the rebalance preview's order sizing and cost estimate honest. Each instrument is
+   resolved by its OWN catalog key — its instrument-id, falling back to a market-type-qualified
+   coin key (\"<market-type>:<coin>\") for doubled-prefix ids like \"perp:xyz:xyz:SILVER\" whose
+   id does not equal the catalog key \"perp:xyz:SILVER\". Resolving per market-type means a spot
+   and a perp sharing a base token never collide onto one another's price."
+  [state universe]
+  (let [market-by-key (get-in state [:asset-selector :market-by-key])]
+    (into {}
+          (keep (fn [{:keys [instrument-id coin market-type]}]
+                  (when-let [entry (or (get market-by-key instrument-id)
+                                       (when (and market-type (non-blank-text coin))
+                                         (get market-by-key
+                                              (str (name market-type) ":" coin))))]
+                    (when-let [px (native-mark-price entry)]
+                      [instrument-id px]))))
+          universe)))
+
+(defn- with-native-marks
+  "Seed [:execution-assumptions :prices-by-id] with live native marks for the eligible universe
+   so the rebalance preview prices execution against the native mark rather than an equity-proxy
+   daily close. Any explicit price already present wins, and the solver is unaffected (only the
+   preview reads :prices-by-id)."
+  [state request]
+  (let [marks (native-marks-by-id state (:universe request))]
+    (cond-> request
+      (seq marks)
+      (update-in [:execution-assumptions :prices-by-id] #(merge marks %)))))
+
 (defn- instrument-ids
   [instruments]
   (set (keep :instrument-id instruments)))
@@ -470,7 +511,8 @@
        :runnable? false
        :request nil
        :warnings []}
-      (let [request (with-cost-contexts state (build-request state draft))
+      (let [request (with-native-marks state
+                      (with-cost-contexts state (build-request state draft)))
             risk-blocking-warnings (risk/missing-native-risk-history-warnings
                                     {:risk-model (:risk-model request)
                                      :history (:history request)})

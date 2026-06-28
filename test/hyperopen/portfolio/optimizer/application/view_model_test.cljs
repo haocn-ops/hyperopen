@@ -473,6 +473,32 @@
     ;; display rows are the live in-flight run-attempt, not the static staged plan
     (is (= [:submitted :working] (mapv :status (:rows model))))))
 
+(deftest execution-tab-model-projects-resting-phase-for-orders-on-the-book-test
+  ;; A completed run of passive orders that only rest on the book is terminal but NOT a fill:
+  ;; the phase is :resting (not :done / not :staged) and the table shows the ledger attempt's
+  ;; :resting rows rather than the static staged plan.
+  (let [state {:portfolio
+               {:optimizer
+                {:execution
+                 {:status :resting
+                  :history [{:status :resting
+                             :rows [{:row-id "perp:BTC" :instrument-id "perp:BTC"
+                                     :status :resting :side :buy :delta-notional-usd 100}
+                                    {:row-id "perp:ETH" :instrument-id "perp:ETH"
+                                     :status :resting :side :buy :delta-notional-usd 50}]}]}
+                 :execution-modal
+                 {:open? true
+                  :phase :armed
+                  :plan {:summary {:ready-count 2}
+                         :rows [{:row-id "perp:BTC" :instrument-id "perp:BTC"
+                                 :status :ready :side :buy :delta-notional-usd 100}
+                                {:row-id "perp:ETH" :instrument-id "perp:ETH"
+                                 :status :ready :side :buy :delta-notional-usd 50}]}}}}}
+        model (view-model/execution-tab-model state)]
+    (is (= :resting (:phase model)))
+    (is (true? (:terminal? model)))
+    (is (= [:resting :resting] (mapv :status (:rows model))))))
+
 (deftest inputs-audit-model-projects-draft-scenario-and-readable-input-labels-test
   (let [vault-id (str "vault:" vault-address)
         model (view-model/inputs-audit-model

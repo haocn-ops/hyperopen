@@ -88,7 +88,7 @@
                            "Order submission wiring is not enabled in this slice.")}))
 
 (def ^:private terminal-run-statuses
-  #{:executed :partially-executed :failed :blocked})
+  #{:executed :resting :partially-executed :failed :blocked})
 
 (defn- run-status
   [state]
@@ -101,6 +101,8 @@
   (cond
     submitting? :running
     (= :executed status) :done
+    ;; Orders accepted and live (open) on the book, none rejected — terminal, but not a fill.
+    (= :resting status) :resting
     (terminal-run-statuses status) :halted
     (= :armed ui-phase) :armed
     :else :staged))

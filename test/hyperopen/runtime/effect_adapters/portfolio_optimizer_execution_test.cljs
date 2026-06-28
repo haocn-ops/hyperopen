@@ -131,6 +131,131 @@
                      (done)))
             (.catch (async-support/unexpected-error done)))))))
 
+(def passive-ready-plan
+  {:scenario-id "scn_passive"
+   :status :ready
+   :execution-disabled? false
+   :summary {:ready-count 1 :blocked-count 0}
+   :rows [{:row-id "perp:THIN"
+           :instrument-id "perp:THIN"
+           :instrument-type :perp
+           :coin "THIN"
+           :status :ready
+           :side :buy
+           :price 0.004822
+           :quantity 3000
+           :delta-notional-usd 14.5
+           :intent {:kind :perp-order
+                    :instrument-id "perp:THIN"
+                    :side :buy
+                    :quantity 3000
+                    :order-type :passive
+                    :limit-bps -2
+                    :reduce-only? false}}]})
+
+(deftest execute-portfolio-optimizer-plan-effect-reprices-crossed-post-only-and-rests-test
+  ;; A passive (post-only) order can be rejected for crossing when the book moves between the plan
+  ;; snapshot and submission. The effect must reprice to the live touch carried in the rejection
+  ;; bbo and resubmit, so the order rests instead of hard-failing.
+  (async done
+    (let [submitted (atom [])
+          address "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          ticks (atom [1000 1100])
+          store (atom {:wallet {:address address :agent {:status :ready}}
+                       :asset-selector {:market-by-key
+                                        {"perp:THIN" {:coin "THIN"
+                                                      :market-type :perp
+                                                      :asset-id 197
+                                                      :szDecimals 0}}}
+                       :portfolio {:optimizer
+                                   {:active-scenario {:loaded-id "scn_passive"
+                                                      :status :saved}
+                                    :execution-modal {:open? true
+                                                      :submitting? true
+                                                      :plan passive-ready-plan}}}})]
+      (with-redefs [portfolio-optimizer-adapters/*now-ms*
+                    (fn []
+                      (let [t (first @ticks)]
+                        (swap! ticks rest)
+                        t))
+                    portfolio-optimizer-adapters/*submit-order!*
+                    (fn [_store _address action]
+                      (swap! submitted conj action)
+                      (js/Promise.resolve
+                       (if (= 1 (count @submitted))
+                         ;; first attempt crosses -> Hyperliquid rejects, reporting the live bbo
+                         {:status "ok"
+                          :response {:type "order"
+                                     :data {:statuses [{:error "Post only order would have immediately matched, bbo was 0.004815@0.004818. asset=197"}]}}}
+                         ;; repriced resubmit rests on the book
+                         {:status "ok"
+                          :response {:data {:statuses [{:resting {:oid 42}}]}}})))
+                    portfolio-optimizer-adapters/*dispatch!*
+                    (fn [_ _ _] nil)]
+        (-> (portfolio-optimizer-adapters/execute-portfolio-optimizer-plan-effect
+             nil
+             store
+             passive-ready-plan)
+            (.then (fn [ledger]
+                     ;; retried exactly once; the resubmit was repriced to the rejection's bid
+                     (is (= 2 (count @submitted)))
+                     (is (= "0.004815" (get-in (second @submitted) [:orders 0 :p])))
+                     ;; the repriced order rests (open), not failed
+                     (is (= :resting (get-in ledger [:rows 0 :status])))
+                     (is (= :resting (:status ledger)))
+                     (done)))
+            (.catch (async-support/unexpected-error done)))))))
+
+(deftest execute-portfolio-optimizer-plan-effect-marks-resting-order-not-filled-test
+  ;; A passive limit order that does not cross returns HL :resting (no :filled). The effect must
+  ;; record the row as :resting (open on the book) and the ledger as :resting — NOT :submitted /
+  ;; :executed — while still refreshing user data so the new open order surfaces.
+  (async done
+    (let [dispatches (atom [])
+          address "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          ticks (atom [1000 1100])
+          store (atom {:wallet {:address address :agent {:status :ready}}
+                       :asset-selector {:market-by-key
+                                        {"perp:BTC" {:coin "BTC"
+                                                     :market-type :perp
+                                                     :asset-id 0
+                                                     :szDecimals 4}}}
+                       :portfolio {:optimizer
+                                   {:active-scenario {:loaded-id "scn_submit"
+                                                      :status :saved}
+                                    :execution-modal {:open? true
+                                                      :submitting? true
+                                                      :plan ready-plan}}}})]
+      (with-redefs [portfolio-optimizer-adapters/*now-ms*
+                    (fn []
+                      (let [t (first @ticks)]
+                        (swap! ticks rest)
+                        t))
+                    portfolio-optimizer-adapters/*submit-order!*
+                    (fn [_store _address _action]
+                      (js/Promise.resolve
+                       {:status "ok"
+                        :response {:data {:statuses [{:resting {:oid 7}}]}}}))
+                    portfolio-optimizer-adapters/*dispatch!*
+                    (fn [runtime-store ctx effects]
+                      (swap! dispatches conj [runtime-store ctx effects]))]
+        (-> (portfolio-optimizer-adapters/execute-portfolio-optimizer-plan-effect
+             nil
+             store
+             ready-plan)
+            (.then (fn [ledger]
+                     (is (= :resting (get-in ledger [:rows 0 :status])))
+                     (is (nil? (get-in ledger [:rows 0 :realized])))
+                     (is (= :resting (:status ledger)))
+                     (is (= :resting
+                            (get-in @store [:portfolio :optimizer :execution :status])))
+                     ;; a resting placement still pulls user data so the open order shows up
+                     (is (= [[store nil [[:actions/load-user-data address]
+                                         [:actions/refresh-order-history]]]]
+                            @dispatches))
+                     (done)))
+            (.catch (async-support/unexpected-error done)))))))
+
 (deftest execute-portfolio-optimizer-plan-effect-routes-selected-subaccount-test
   (async done
     (let [submitted (atom [])
@@ -186,7 +311,10 @@
                      (done)))
             (.catch (async-support/unexpected-error done)))))))
 
-(deftest execute-portfolio-optimizer-plan-effect-records-partial-when-blocked-rows-remain-test
+(deftest execute-portfolio-optimizer-plan-effect-executes-when-only-blocked-rows-remain-test
+  ;; A blocked row is a pre-execution EXCLUSION (below the $10 minimum / unsupported), not an
+  ;; exchange rejection. A run whose sendable order filled and whose only non-sent rows are
+  ;; blocked is :executed, NOT a halted :executed.
   (async done
     (let [address "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
           plan (assoc ready-plan
@@ -221,10 +349,10 @@
              store
              plan)
             (.then (fn [ledger]
-                     (is (= :partially-executed (:status ledger)))
+                     (is (= :executed (:status ledger)))
                      (is (= :submitted (get-in ledger [:rows 0 :status])))
                      (is (= :blocked (get-in ledger [:rows 1 :status])))
-	                     (is (= :partially-executed
+	                     (is (= :executed
 	                            (get-in @store [:portfolio :optimizer :execution :status])))
 	                     (done)))
 	            (.catch (async-support/unexpected-error done)))))))

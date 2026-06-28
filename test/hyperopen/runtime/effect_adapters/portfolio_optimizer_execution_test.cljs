@@ -131,6 +131,56 @@
                      (done)))
             (.catch (async-support/unexpected-error done)))))))
 
+(deftest execute-portfolio-optimizer-plan-effect-marks-resting-order-not-filled-test
+  ;; A passive limit order that does not cross returns HL :resting (no :filled). The effect must
+  ;; record the row as :resting (open on the book) and the ledger as :resting — NOT :submitted /
+  ;; :executed — while still refreshing user data so the new open order surfaces.
+  (async done
+    (let [dispatches (atom [])
+          address "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          ticks (atom [1000 1100])
+          store (atom {:wallet {:address address :agent {:status :ready}}
+                       :asset-selector {:market-by-key
+                                        {"perp:BTC" {:coin "BTC"
+                                                     :market-type :perp
+                                                     :asset-id 0
+                                                     :szDecimals 4}}}
+                       :portfolio {:optimizer
+                                   {:active-scenario {:loaded-id "scn_submit"
+                                                      :status :saved}
+                                    :execution-modal {:open? true
+                                                      :submitting? true
+                                                      :plan ready-plan}}}})]
+      (with-redefs [portfolio-optimizer-adapters/*now-ms*
+                    (fn []
+                      (let [t (first @ticks)]
+                        (swap! ticks rest)
+                        t))
+                    portfolio-optimizer-adapters/*submit-order!*
+                    (fn [_store _address _action]
+                      (js/Promise.resolve
+                       {:status "ok"
+                        :response {:data {:statuses [{:resting {:oid 7}}]}}}))
+                    portfolio-optimizer-adapters/*dispatch!*
+                    (fn [runtime-store ctx effects]
+                      (swap! dispatches conj [runtime-store ctx effects]))]
+        (-> (portfolio-optimizer-adapters/execute-portfolio-optimizer-plan-effect
+             nil
+             store
+             ready-plan)
+            (.then (fn [ledger]
+                     (is (= :resting (get-in ledger [:rows 0 :status])))
+                     (is (nil? (get-in ledger [:rows 0 :realized])))
+                     (is (= :resting (:status ledger)))
+                     (is (= :resting
+                            (get-in @store [:portfolio :optimizer :execution :status])))
+                     ;; a resting placement still pulls user data so the open order shows up
+                     (is (= [[store nil [[:actions/load-user-data address]
+                                         [:actions/refresh-order-history]]]]
+                            @dispatches))
+                     (done)))
+            (.catch (async-support/unexpected-error done)))))))
+
 (deftest execute-portfolio-optimizer-plan-effect-routes-selected-subaccount-test
   (async done
     (let [submitted (atom [])

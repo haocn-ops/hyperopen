@@ -64,9 +64,13 @@
                                (.then (submit-action! submit-order! store target action)
                                       (fn [resp]
                                         (if (execution/response-ok? resp)
-                                          (let [realized (execution/realized-fill row resp)]
+                                          ;; Classify the accepted order: a crossing order
+                                          ;; fills (:submitted); a passive/post-only one that
+                                          ;; does not cross rests open on the book (:resting).
+                                          (let [status (execution/settled-row-status resp)
+                                                realized (execution/realized-fill row resp)]
                                             (cond-> (assoc row
-                                                           :status :submitted
+                                                           :status status
                                                            :response resp)
                                               (some? realized) (assoc :realized realized)))
                                           (assoc row
@@ -107,8 +111,10 @@
 
 (defn- refresh-after-execution!
   [dispatch! store address ledger]
+  ;; A filled (:submitted) order changes positions; a resting one adds an open order. Either
+  ;; way, pull fresh user data so the new state surfaces in the account panels.
   (when (and address
-             (some #(= :submitted (:status %)) (:rows ledger)))
+             (some #(contains? #{:submitted :resting} (:status %)) (:rows ledger)))
     (dispatch! store nil [[:actions/load-user-data address]
                           [:actions/refresh-order-history]])))
 

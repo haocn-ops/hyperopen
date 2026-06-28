@@ -310,6 +310,26 @@
                        (contains? % :error))
                  (response-statuses resp))))
 
+(defn- status-entry-has?
+  [resp status-key]
+  (some #(and (map? %) (contains? % status-key))
+        (response-statuses resp)))
+
+(defn settled-row-status
+  "Terminal row status for an OK order response (callers gate on `response-ok?` first).
+
+   Hyperliquid reports per-order outcomes in [:response :data :statuses]: a `:filled` entry
+   means the order crossed and (fully or partially) executed; a `:resting` entry means it was
+   accepted and is sitting on the book as an open order, NOT filled. A passive/post-only limit
+   order that does not cross returns `:resting` only — so it must read as resting, never as a
+   fill. An OK response with neither entry (legacy/empty status shape, e.g. the string
+   \"success\") falls back to :submitted so immediate-cross orders keep their prior behavior."
+  [resp]
+  (cond
+    (status-entry-has? resp :filled) :submitted
+    (status-entry-has? resp :resting) :resting
+    :else :submitted))
+
 (defn realized-fill
   "Realized average fill + slippage from a settled order response, measured against
    (:price row) -- the same reference the slippage ESTIMATE used. One order is submitted
@@ -317,34 +337,54 @@
    no :filled entry, so realized stays pending (nil) rather than reading as 0. Returns nil
    when no average fill price is available."
   [row resp]
-  (let [avg-px (some-> (get-in (first (response-statuses resp)) [:filled :avgPx])
-                       coercion/parse-float-number)]
+  (let [status-entry (first (response-statuses resp))
+        avg-px (some-> (get-in status-entry [:filled :avgPx])
+                       coercion/parse-float-number)
+        filled-qty (some-> (get-in status-entry [:filled :totalSz])
+                           coercion/parse-float-number)]
     (when (coercion/positive-number? avg-px)
-      (let [bps (rebalance/realized-slippage-bps (:side row) (:price row) avg-px)]
+      (let [bps (rebalance/realized-slippage-bps (:side row) (:price row) avg-px)
+            ;; Realized $ slippage scales with the quantity ACTUALLY filled (a partial fill costs
+            ;; slippage only on totalSz, the remainder resting): bps × filled notional at the
+            ;; REFERENCE price (totalSz × :price) -- not avgPx, which `bps` already prices in.
+            ;; Fall back to the full intended notional when totalSz is absent (legacy shape).
+            ref-px (:price row)
+            filled-notional (if (and (coercion/positive-number? filled-qty)
+                                     (coercion/positive-number? ref-px))
+                              (* filled-qty ref-px)
+                              (js/Math.abs (or (:delta-notional-usd row) 0)))]
         (cond-> {:avg-px avg-px}
           (some? bps) (assoc :slippage-bps bps
-                             :slippage-usd (* (js/Math.abs (or (:delta-notional-usd row) 0))
-                                              (/ bps 10000))))))))
+                             :slippage-usd (* filled-notional (/ bps 10000))))))))
 
 (defn final-ledger-status
   [rows]
-  (let [submitted-count (count (filter #(= :submitted (:status %)) rows))
+  (let [filled-count (count (filter #(= :submitted (:status %)) rows))
+        resting-count (count (filter #(= :resting (:status %)) rows))
         failed-count (count (filter #(= :failed (:status %)) rows))
-        blocked-count (count (filter #(= :blocked (:status %)) rows))]
+        blocked-count (count (filter #(= :blocked (:status %)) rows))
+        ;; Orders the exchange accepted — filled outright or resting (open) on the book.
+        accepted-count (+ filled-count resting-count)]
     (cond
-      (and (pos? submitted-count)
-           (zero? failed-count)
-           (zero? blocked-count)) :executed
-      (pos? submitted-count) :partially-executed
+      ;; Something went live, but a rejection/block also occurred ⇒ a partial run the trader
+      ;; must act on (resume / revert / re-stage).
+      (and (pos? accepted-count)
+           (or (pos? failed-count) (pos? blocked-count))) :partially-executed
       (pos? failed-count) :failed
       (pos? blocked-count) :blocked
+      ;; Every accepted order crossed and filled outright ⇒ fully executed.
+      (and (pos? filled-count) (zero? resting-count)) :executed
+      ;; At least one order is live, and not all accepted orders filled ⇒ orders resting on
+      ;; the book (open, not a fill). This is terminal but distinct from :executed.
+      (pos? accepted-count) :resting
       :else :no-op)))
 
 (defn- recoverable-row
   "Maps one ledger-attempt row into a fresh row for a Resume attempt. Failed rows are
   reset to :ready (dropping the stale request/response so a fresh request is built),
-  already-submitted rows become :skipped :already-filled so they can NEVER be
-  re-submitted, and everything else passes through unchanged."
+  already-submitted rows become :skipped :already-filled and already-resting rows become
+  :skipped :already-resting — both already live on the exchange, so they can NEVER be
+  re-submitted — and everything else passes through unchanged."
   [row]
   (case (:status row)
     :failed (-> row
@@ -353,6 +393,9 @@
     :submitted (-> row
                    (assoc :status :skipped :reason :already-filled)
                    (dissoc :intent :request :response :error :pre-action-responses))
+    :resting (-> row
+                 (assoc :status :skipped :reason :already-resting)
+                 (dissoc :intent :request :response :error :pre-action-responses))
     row))
 
 (defn build-resume-plan
@@ -431,17 +474,18 @@
     row))
 
 (defn build-restaged-plan
-  "Rebuilds the staged plan at a smaller clip: rows already filled in the latest ledger
-  are dropped, and each remaining ready row's quantity + notional are scaled by `factor`
+  "Rebuilds the staged plan at a smaller clip: rows already live in the latest ledger —
+  filled OR resting on the book — are dropped (re-staging one would duplicate a working
+  order), and each remaining ready row's quantity + notional are scaled by `factor`
   (e.g. 0.5). Summary counts are recomputed; the result replaces the modal plan and the
   surface returns to :staged for re-review."
   [plan ledger factor]
-  (let [filled-ids (->> (:rows ledger)
-                        (filter #(= :submitted (:status %)))
-                        (map :row-id)
-                        set)
+  (let [live-ids (->> (:rows ledger)
+                      (filter #(contains? #{:submitted :resting} (:status %)))
+                      (map :row-id)
+                      set)
         rows (->> (:rows plan)
-                  (remove #(contains? filled-ids (:row-id %)))
+                  (remove #(contains? live-ids (:row-id %)))
                   (mapv #(scale-row factor %)))
         ready-rows (filter #(= :ready (:status %)) rows)
         blocked-rows (filter #(= :blocked (:status %)) rows)

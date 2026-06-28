@@ -82,7 +82,11 @@
    ;; The order quantity rounds down to zero at the asset's lot precision (szDecimals),
    ;; so there is no placeable size — e.g. a 0.7-unit target on a whole-lot (szDecimals 0)
    ;; market.
-   :quantity-below-lot "Below one lot"})
+   :quantity-below-lot "Below one lot"
+   ;; A Resume skips orders already filled or already resting (open) on the book so it can
+   ;; never duplicate a live order.
+   :already-filled "Already filled"
+   :already-resting "Already resting"})
 
 (defn keyword-label
   ([value]

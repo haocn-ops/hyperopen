@@ -280,3 +280,118 @@
     (is (= 0 (get-in zero-quantity [:summary :ready-count])))
     (is (= :blocked (:status no-side)))
     (is (= :zero-delta-notional (get-in no-side [:rows 0 :reason])))))
+
+(defn- near?
+  [expected actual]
+  (and (number? actual)
+       (< (js/Math.abs (- expected actual)) 0.0000001)))
+
+(deftest realized-fill-scales-slippage-usd-to-filled-quantity-test
+  ;; Realized $ slippage must scale with the quantity ACTUALLY filled. On a partial fill
+  ;; (totalSz < order size, remainder resting under the same oid), only the filled portion
+  ;; incurs slippage cost — using the full intended notional overstates it. bps is a per-unit
+  ;; price comparison and is unaffected by the filled quantity.
+  (let [row {:side :buy :price 100 :quantity 1.0 :delta-notional-usd 100}
+        partial (execution/realized-fill
+                 row
+                 {:status "ok"
+                  :response {:data {:statuses [{:filled {:oid 1 :totalSz "0.5" :avgPx "101"}}]}}})
+        full (execution/realized-fill
+              row
+              {:status "ok"
+               :response {:data {:statuses [{:filled {:oid 1 :totalSz "1.0" :avgPx "101"}}]}}})]
+    ;; buy @ ref 100, fill 101 -> +100 bp regardless of how much filled
+    (is (near? 100 (:slippage-bps partial)))
+    (is (near? 100 (:slippage-bps full)))
+    ;; 0.5 filled @ ref 100 = $50 filled notional -> $0.50 slippage (NOT $1.00 on the full size)
+    (is (near? 0.5 (:slippage-usd partial)))
+    ;; a full fill of the same row still costs the full $1.00
+    (is (near? 1.0 (:slippage-usd full)))))
+
+(deftest settled-row-status-classifies-resting-vs-filled-test
+  ;; HL reports per-order outcomes in [:response :data :statuses]. A :filled entry => the order
+  ;; crossed (:submitted); a :resting entry (no fill) => it sits open on the book (:resting); an
+  ;; OK response with neither (legacy "success" shape) keeps the :submitted fallback.
+  (is (= :submitted
+         (execution/settled-row-status
+          {:status "ok"
+           :response {:data {:statuses [{:filled {:oid 1 :avgPx "10" :totalSz "1"}}]}}}))
+      "a filled entry -> :submitted")
+  (is (= :resting
+         (execution/settled-row-status
+          {:status "ok" :response {:data {:statuses [{:resting {:oid 2}}]}}}))
+      "a resting (open) entry, no fill -> :resting")
+  (is (= :submitted
+         (execution/settled-row-status
+          {:status "ok" :response {:data {:statuses ["success"]}}}))
+      "legacy/empty OK shape -> :submitted (immediate-cross behavior preserved)"))
+
+(deftest final-ledger-status-distinguishes-resting-from-filled-test
+  ;; A passive limit order that only rests on the book (HL :resting, no :filled) is accepted but
+  ;; NOT a fill. A run of resting orders must be :resting, never :executed — otherwise the tab
+  ;; reports "all filled" when nothing filled.
+  (is (= :resting
+         (execution/final-ledger-status [{:status :resting} {:status :resting}]))
+      "all orders resting on the book -> :resting (never :executed)")
+  (is (= :resting
+         (execution/final-ledger-status [{:status :submitted} {:status :resting}]))
+      "some filled, some still resting -> :resting (not fully executed)")
+  (is (= :executed
+         (execution/final-ledger-status [{:status :submitted} {:status :submitted}]))
+      "every accepted order filled outright -> :executed (unchanged)")
+  (is (= :partially-executed
+         (execution/final-ledger-status [{:status :resting} {:status :failed}]))
+      "a live resting order alongside a rejection -> partial run (halted)")
+  (is (= :failed
+         (execution/final-ledger-status [{:status :failed} {:status :failed}]))
+      "pure failures unchanged"))
+
+(deftest build-resume-plan-skips-resting-rows-test
+  ;; Resume retries the failed rows; an order already resting (live, open) on the book must
+  ;; never be re-submitted, so it is demoted to :skipped just like an already-filled row.
+  (let [plan {:summary {} :rows []}
+        ledger {:rows [{:row-id "perp:BTC" :status :resting :side :buy
+                        :quantity 1 :delta-notional-usd 10}
+                       {:row-id "perp:ETH" :status :failed :side :buy
+                        :quantity 2 :delta-notional-usd 20}]}
+        resumed (execution/build-resume-plan plan ledger)
+        by-id (into {} (map (juxt :row-id identity) (:rows resumed)))]
+    (is (= :skipped (get-in by-id ["perp:BTC" :status]))
+        "resting row is demoted to :skipped, never re-submitted")
+    (is (= :ready (get-in by-id ["perp:ETH" :status]))
+        "the failed row is re-armed for retry")
+    (is (= 1 (get-in resumed [:summary :ready-count]))
+        "only the failed row counts toward the resume")))
+
+(deftest build-restaged-plan-drops-resting-rows-test
+  ;; Re-stage smaller drops orders already live on the exchange (filled OR resting) so a
+  ;; re-stage can never duplicate a working order; only still-unsent rows are re-staged.
+  (let [plan {:summary {}
+              :rows [{:row-id "perp:BTC" :status :ready :quantity 4
+                      :delta-notional-usd 40 :intent {:quantity 4}}
+                     {:row-id "perp:ETH" :status :ready :quantity 2
+                      :delta-notional-usd 20 :intent {:quantity 2}}]}
+        ledger {:rows [{:row-id "perp:BTC" :status :resting}
+                       {:row-id "perp:ETH" :status :failed}]}
+        restaged (execution/build-restaged-plan plan ledger 0.5)
+        ids (set (map :row-id (:rows restaged)))]
+    (is (not (contains? ids "perp:BTC"))
+        "resting (live) row is dropped, not re-staged")
+    (is (contains? ids "perp:ETH")
+        "the unfilled/failed row is re-staged")
+    (is (= 1 (count (:rows restaged))))))
+
+(deftest build-revert-plan-excludes-resting-rows-test
+  ;; Revert unwinds FILLED legs with reversing reduce-only orders. A resting (open, unfilled)
+  ;; order holds no position to unwind, so it must be excluded from the revert plan — only
+  ;; filled rows are reversed.
+  (let [plan {:summary {} :rows []}
+        ledger {:rows [{:row-id "perp:BTC" :status :submitted :side :buy :instrument-type :perp
+                        :instrument-id "perp:BTC" :price 100 :quantity 1 :delta-notional-usd 100}
+                       {:row-id "perp:ETH" :status :resting :side :buy :instrument-type :perp
+                        :instrument-id "perp:ETH" :price 50 :quantity 2 :delta-notional-usd 100}]}
+        revert (execution/build-revert-plan plan ledger)
+        ids (set (map :row-id (:rows revert)))]
+    (is (contains? ids "perp:BTC") "the filled leg is reversed")
+    (is (not (contains? ids "perp:ETH")) "the resting (unfilled) leg is NOT reversed")
+    (is (= 1 (count (:rows revert))))))

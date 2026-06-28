@@ -74,6 +74,7 @@
 
 (def ^:private state-glyph
   {:filled "✓"
+   :resting "○"
    :failed "✕"
    :blocked "–"
    :skipped "–"
@@ -85,6 +86,8 @@
   [{:keys [phase]} row]
   (case (:status row)
     :submitted :filled
+    ;; Accepted and live on the book, but NOT filled — an open order.
+    :resting :resting
     :failed :failed
     :blocked :blocked
     :skipped :skipped
@@ -95,6 +98,24 @@
 (defn- side-tone
   [side]
   (case side :buy :long :sell :short :muted))
+
+(defn- fill-counts
+  "Status breakdown of the displayed order rows so every summary surface agrees and a resting
+  (open) order is never reported as filled. :total is the run denominator — queued/working +
+  accepted (filled or resting) + failed — i.e. every row that belongs to the run."
+  [rows]
+  (let [by (frequencies (map :status rows))
+        filled (get by :submitted 0)
+        resting (get by :resting 0)
+        failed (get by :failed 0)
+        blocked (get by :blocked 0)
+        ready (+ (get by :ready 0) (get by :working 0))]
+    {:filled filled
+     :resting resting
+     :failed failed
+     :blocked blocked
+     :ready ready
+     :total (+ ready filled resting failed)}))
 
 ;; ── shared bits ─────────────────────────────────────────────────────────
 
@@ -115,6 +136,7 @@
   [phase]
   (let [[label tone] (case phase
                        :done ["complete" :long]
+                       :resting ["resting" :info]
                        :halted ["halted" :short]
                        :running ["executing" :live]
                        :armed ["armed" :warn]
@@ -127,6 +149,7 @@
   [phase]
   (case phase
     :done "· all orders filled"
+    :resting "· orders resting on the book"
     :halted "· halted — partial fills sent"
     :running "· sending live orders"
     :armed "· armed — confirm to send"
@@ -280,9 +303,11 @@
 
 (defn- running-band
   [{:keys [summary] :as model} rows]
-  (let [total (count (filter #(contains? #{:ready :working :submitted :failed} (:status %)) rows))
-        filled (count (filter #(= :submitted (:status %)) rows))
-        pct (if (pos? total) (/ filled total) 0)]
+  (let [{:keys [filled resting total]} (fill-counts rows)
+        ;; Progress tracks orders the exchange has accepted (filled or resting), not just fills,
+        ;; so the bar advances as passive orders land on the book.
+        accepted (+ filled resting)
+        pct (if (pos? total) (/ accepted total) 0)]
     [:div {:class ["optimizer-exec-band" "is-running" "flex" "items-center" "gap-4"
                    "border-b" "border-base-300" "px-5" "py-3"]
            :data-role "portfolio-optimizer-execution-control-band"
@@ -291,7 +316,9 @@
      [:div {:class ["shrink-0"]}
       [:p {:class ["text-[0.8125rem]" "text-trading-text"]} "Submitting live orders"]
       [:p {:class ["mt-0.5" "font-mono" "text-[0.65rem]" "text-trading-muted"]}
-       (str filled " / " total " filled")]]
+       (str filled " filled"
+            (when (pos? resting) (str " · " resting " resting"))
+            " / " total)]]
      [:div {:class ["optimizer-exec-progress" "flex-1" "max-w-[520px]"]}
       [:div {:class ["optimizer-exec-progress-fill"]
              :style {:width (str (* 100 pct) "%")}}
@@ -323,8 +350,7 @@
 
 (defn- halted-band
   [{:keys [error confirm-disabled?] :as model} rows]
-  (let [failed (count (filter #(= :failed (:status %)) rows))
-        filled (count (filter #(= :submitted (:status %)) rows))
+  (let [{:keys [filled resting failed]} (fill-counts rows)
         resume-from (some (fn [[i row]] (when (= :failed (:status row)) (inc i)))
                           (map-indexed vector rows))]
     [:div {:class ["optimizer-exec-band" "is-halted" "flex" "items-center" "gap-4"
@@ -334,7 +360,9 @@
      (chip "halted" :short)
      [:div {:class ["min-w-0"]}
       [:p {:class ["text-[0.8125rem]" "font-medium" "text-trading-text"]}
-       (str "Execution halted — " filled " filled · " failed " failed")]
+       (str "Execution halted — " filled " filled · "
+            (when (pos? resting) (str resting " resting · "))
+            failed " failed")]
       [:p {:class ["mt-0.5" "font-mono" "text-[0.65rem]" "text-trading-muted"]}
        (or error "One or more orders were rejected. Subsequent orders are never auto-retried.")]]
      [:span {:class ["flex-1"]}]
@@ -362,12 +390,30 @@
                      {:click [[:actions/resume-portfolio-optimizer-execution]]})}
       (if resume-from (str "Resume from #" resume-from) "Resume")]]))
 
+(defn- resting-band
+  [_model rows]
+  (let [{:keys [filled resting]} (fill-counts rows)]
+    [:div {:class ["optimizer-exec-band" "is-done" "flex" "items-center" "gap-4"
+                   "border-b" "border-base-300" "px-5" "py-3"]
+           :data-role "portfolio-optimizer-execution-control-band"
+           :data-phase "resting"}
+     (chip "resting" :info)
+     [:div {:class ["min-w-0"]}
+      [:p {:class ["text-[0.8125rem]" "font-medium" "text-trading-text"]}
+       (str resting " order" (when (not= 1 resting) "s") " resting on the book"
+            (when (pos? filled)
+              (str " · " filled " filled outright")))]
+      [:p {:class ["mt-0.5" "font-mono" "text-[0.65rem]" "text-trading-muted"]}
+       "Open limit orders are live on Hyperliquid — they fill as the market reaches your price. Manage or cancel them from the trade ticket."]]
+     [:span {:class ["flex-1"]}]]))
+
 (defn- control-band
   [{:keys [phase] :as model} rows]
   (case phase
     :armed (armed-band model rows)
     :running (running-band model rows)
     :done (done-band)
+    :resting (resting-band model rows)
     :halted (halted-band model rows)
     (staged-band model rows)))
 
@@ -452,25 +498,28 @@
   [{:keys [summary phase] :as model} rows]
   (let [ready (filter #(contains? #{:ready :working} (:status %)) rows)
         submitted (filter #(= :submitted (:status %)) rows)
+        resting (filter #(= :resting (:status %)) rows)
         failed (filter #(= :failed (:status %)) rows)
         blocked (filter #(= :blocked (:status %)) rows)
-        total (+ (count ready) (count submitted) (count failed))
+        total (+ (count ready) (count submitted) (count resting) (count failed))
         filled (count submitted)
+        resting-count (count resting)
+        ;; "Executed" notional is filled-only — a resting (open) order has not executed.
         filled-notional (reduce + 0 (map #(abs-num (:delta-notional-usd %)) submitted))
         staged-notional (or (:gross-ready-notional-usd summary)
                             (reduce + 0 (map #(abs-num (:delta-notional-usd %))
-                                             (concat ready submitted failed))))
+                                             (concat ready submitted resting failed))))
         ;; Slippage + fees recomputed from each row's LIVE effective order type, so the KPIs
         ;; update as the user toggles types (resting => no impact + maker fee, crossing =>
-        ;; impact + taker fee) without re-staging. Covers ready/working (pre-run) and
-        ;; submitted (post-run) rows so the fee total survives a run.
-        costs (type-aware-costs model (concat ready submitted))
+        ;; impact + taker fee) without re-staging. Covers ready/working (pre-run) and accepted
+        ;; (submitted + resting, post-run) rows so the fee total survives a run.
+        costs (type-aware-costs model (concat ready submitted resting))
         slip-bps-samples (:slip-bps costs)
         avg-bps (when (seq slip-bps-samples)
                   (/ (reduce + 0 slip-bps-samples) (count slip-bps-samples)))
         ;; Realized slippage is recoverable only post-run, off filled rows (the effect
         ;; stamps :realized; resting/unfilled rows have none). Never relabel the estimate.
-        post-run? (contains? #{:done :halted} phase)
+        post-run? (contains? #{:done :resting :halted} phase)
         realized-rows (filter #(get-in % [:realized :slippage-bps]) submitted)
         realized-bps (when (seq realized-rows)
                        (/ (reduce + 0 (map #(get-in % [:realized :slippage-bps]) realized-rows))
@@ -482,7 +531,7 @@
         all-in-usd (+ price-cost-usd (:fees-usd costs))
         margin (:margin summary)
         margin-warn? (and (:warning margin) (not= :none (:warning margin)))
-        orders-value (if (= :done phase) (str filled " / " total) (str filled " / " total))]
+        orders-value (str filled " / " total)]
     [:section {:class ["optimizer-rebalance-kpis" "grid" "grid-cols-2" "border-b" "border-base-300"
                        "bg-base-100/95" "sm:grid-cols-3" "lg:grid-cols-6"]
                :data-role "portfolio-optimizer-execution-kpis"}
@@ -491,8 +540,10 @@
            :value orders-value
            :value-class (cond (= :halted phase) "text-trading-red"
                               (= :done phase) "text-trading-green"
+                              (= :resting phase) "text-info"
                               :else "text-trading-text")
            :sub (cond (pos? (count blocked)) (str (count blocked) " blocked")
+                      (pos? resting-count) (str resting-count " resting on book")
                       (= :done phase) "all venues acked"
                       :else "awaiting release")})
      (kpi {:data-role "portfolio-optimizer-execution-kpi-notional"
@@ -546,6 +597,7 @@
   [display-state row]
   (case display-state
     :filled [:span {:class ["text-trading-green"]} "filled"]
+    :resting [:span {:class ["text-info"]} "open"]
     :failed [:span {:class ["text-trading-red"]}
              (str "rejected" (when (:reason row) (str " · " (opt-format/keyword-label (:reason row)))))]
     :blocked [:span {:class ["text-trading-muted"]} (opt-format/keyword-label (:reason row))]
@@ -777,7 +829,8 @@
 (defn- row-visible?
   [order-filter display-state]
   (case order-filter
-    :working (contains? #{:queued :working} display-state)
+    ;; A resting order is a live, working order on the book — surface it under "Working".
+    :working (contains? #{:queued :working :resting} display-state)
     :filled (= :filled display-state)
     true))
 
@@ -866,6 +919,10 @@
                                           ["All ready orders were acknowledged by Hyperliquid."
                                            "Tracking has started against the recommendation."]
                                           "text-trading-green"]
+                                   :resting ["Orders resting on the book"
+                                             ["Your passive limit orders are live on Hyperliquid and fill as the market reaches your price — they are not filled yet."
+                                              "Nothing else is sent automatically. Manage or cancel them from the trade ticket; Re-stage isn't needed."]
+                                             "text-info"]
                                    :running ["Live — do not close"
                                              ["Each ready row is submitted with its selected order type."
                                               "Margin and slippage were checked when the plan was staged."]
@@ -886,15 +943,18 @@
   [{:keys [summary phase] :as model} rows]
   (let [ready (filter #(contains? #{:ready :working} (:status %)) rows)
         submitted (filter #(= :submitted (:status %)) rows)
+        resting (filter #(= :resting (:status %)) rows)
         failed (filter #(= :failed (:status %)) rows)
-        total (+ (count ready) (count submitted) (count failed))
+        total (+ (count ready) (count submitted) (count resting) (count failed))
         filled (count submitted)
+        ;; Fill progress tracks fills only — a resting order has not filled, so the bar stays
+        ;; honest (it does not advance for orders merely accepted onto the book).
         pct (if (pos? total) (/ filled total) 0)
         margin (:margin summary)
         margin-warn? (and (:warning margin) (not= :none (:warning margin)))
         ;; Same live, type-aware recompute as the KPI strip so the rail agrees with it.
-        costs (type-aware-costs model (concat ready submitted))
-        sources (->> (concat ready submitted)
+        costs (type-aware-costs model (concat ready submitted resting))
+        sources (->> (concat ready submitted resting)
                      (keep #(get-in % [:cost :source]))
                      frequencies
                      (map (fn [[s n]] (str n " " (opt-format/keyword-label s))))
@@ -910,8 +970,8 @@
                   :data-phase (name phase)}
             [:div {:class ["optimizer-exec-progress-fill"]
                    :style {:width (str (* 100 pct) "%")}}]]
-           (case phase :done "complete" :halted "halted" :running "live" "staged")
-           (case phase :halted "text-trading-red" :running "text-warning" nil))
+           (case phase :done "complete" :resting "resting" :halted "halted" :running "live" "staged")
+           (case phase :halted "text-trading-red" :running "text-warning" :resting "text-info" nil))
      (diag "Cross-margin after"
            (opt-format/format-pct (:after-utilization margin))
            (if margin-warn?
@@ -935,7 +995,7 @@
 
 (defn- latest-attempt-panel
   [{:keys [latest-attempt phase]}]
-  (when (and (contains? #{:halted :done} phase) (seq (:rows latest-attempt)))
+  (when (and (contains? #{:halted :done :resting} phase) (seq (:rows latest-attempt)))
     [:section {:class ["border-t" "border-base-300" "bg-base-200/20" "px-4" "py-4"]
                :data-role "portfolio-optimizer-execution-latest-attempt"}
      [:div {:class ["flex" "items-start" "justify-between" "gap-3"]}
@@ -946,6 +1006,7 @@
       (chip (opt-format/keyword-label (:status latest-attempt))
             (case (:status latest-attempt)
               :executed :long
+              :resting :info
               (:failed :partially-executed) :short
               :muted))]
      (into

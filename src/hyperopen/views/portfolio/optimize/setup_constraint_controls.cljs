@@ -41,12 +41,25 @@
     "?"]
    (constraint-tooltip tooltip-id help-copy)])
 
+(defn- constraint-echo
+  "Persistent interpreted-value echo so the unit isn't hidden in the `?` hover tooltip
+  (the audit found constraint units lived only there). 0.5 -> \"max 50% per asset\"."
+  [unit value]
+  (when (and unit (number? value))
+    (case unit
+      :weight (str "max " (js/Math.round (* 100 value)) "% per asset")
+      :mult (str (.toFixed value 2) "× capital")
+      :pts (str (.toFixed (* 100 value) 1) " pp band")
+      :usd (str "$" value " min trade")
+      nil)))
+
 (defn- constraint-row
-  ([label constraint-key value role highlighted?]
-   (constraint-row label nil constraint-key value role highlighted?))
-  ([label hidden-label constraint-key value role highlighted?]
+  ([label constraint-key value role highlighted? unit]
+   (constraint-row label nil constraint-key value role highlighted? unit))
+  ([label hidden-label constraint-key value role highlighted? unit]
    (let [tooltip-id (str role "-tooltip")
-         help-copy (get constraint-help constraint-key)]
+         help-copy (get constraint-help constraint-key)
+         echo (constraint-echo unit value)]
      [:label {:class (cond-> ["group" "relative" "grid" "grid-cols-[minmax(0,1fr)_92px]" "items-center"
                               "gap-2" "border" "border-base-300" "bg-base-200/20"
                               "px-2" "py-1.5"]
@@ -59,7 +72,12 @@
          [:span {:class ["sr-only"]} hidden-label])
        [:span {:class ["ml-2" "font-mono" "text-[0.59375rem]" "uppercase"
                        "tracking-[0.08em]" "text-trading-muted"]}
-        "edit"]]
+        "edit"]
+       (when echo
+         [:span {:class ["mt-0.5" "block" "font-mono" "text-[0.5625rem]"
+                         "normal-case" "tracking-normal" "text-trading-muted/70"]
+                 :data-role (str role "-echo")}
+          echo])]
       [:input {:type "text"
                :inputmode "decimal"
                :class controls/input-class
@@ -68,9 +86,13 @@
                :aria-invalid (when highlighted? "true")
                :aria-describedby (when help-copy tooltip-id)
                :value (str value)
-               :on {:input [[:actions/set-portfolio-optimizer-constraint
-                             constraint-key
-                             [:event.target/value]]]}}]])))
+               ;; Commit on blur/Enter, not per keystroke: the handler parses the value with
+               ;; js/Number and writes it back into this controlled :value, so on :input a typed
+               ;; "0." snaps to "0" and a decimal can never be entered. :change keeps the raw
+               ;; text in the DOM until blur, then reconciles to the interpreted value.
+               :on {:change [[:actions/set-portfolio-optimizer-constraint
+                              constraint-key
+                              [:event.target/value]]]}}]])))
 
 (defn- turnover-cap-row
   [constraints highlighted?]
@@ -106,9 +128,10 @@
                       :aria-describedby tooltip-id
                       :value (if enabled? (str (:max-turnover constraints)) "")
                       :disabled (not enabled?)}
-               enabled? (assoc :on {:input [[:actions/set-portfolio-optimizer-constraint
-                                             :max-turnover
-                                             [:event.target/value]]]}))]]]))
+               ;; Commit on blur/Enter (see constraint-row) so a typed decimal isn't rewritten.
+               enabled? (assoc :on {:change [[:actions/set-portfolio-optimizer-constraint
+                                              :max-turnover
+                                              [:event.target/value]]]}))]]]))
 
 (defn- long-only-row
   [constraints]
@@ -165,24 +188,31 @@
       (constraint-row "Per-asset cap" "Max Asset Weight"
                       :max-asset-weight (:max-asset-weight constraints)
                       "portfolio-optimizer-constraint-max-asset-weight-input"
-                      (contains? highlighted-controls :max-asset-weight))
+                      (contains? highlighted-controls :max-asset-weight)
+                      :weight)
       (constraint-row "Gross exposure min" :gross-min (:gross-min constraints)
                       "portfolio-optimizer-constraint-gross-min-input"
-                      (contains? highlighted-controls :gross-min))
+                      (contains? highlighted-controls :gross-min)
+                      :mult)
       (constraint-row "Gross exposure max" "Gross Leverage"
                       :gross-max (:gross-max constraints)
                       "portfolio-optimizer-constraint-gross-max-input"
-                      (contains? highlighted-controls :gross-max))
+                      (contains? highlighted-controls :gross-max)
+                      :mult)
       (constraint-row "Net exposure min" :net-min (:net-min constraints)
                       "portfolio-optimizer-constraint-net-min-input"
-                      (contains? highlighted-controls :net-min))
+                      (contains? highlighted-controls :net-min)
+                      :mult)
       (constraint-row "Net exposure max" :net-max (:net-max constraints)
                       "portfolio-optimizer-constraint-net-max-input"
-                      (contains? highlighted-controls :net-max))
+                      (contains? highlighted-controls :net-max)
+                      :mult)
       (constraint-row "Dust threshold" :dust-usdc (:dust-usdc constraints)
-                      "portfolio-optimizer-constraint-dust-usdc-input" false)
+                      "portfolio-optimizer-constraint-dust-usdc-input" false
+                      :usd)
       (turnover-cap-row constraints
                         (contains? highlighted-controls :max-turnover))
       (constraint-row "Rebalance tolerance" "Rebalance Tolerance"
                       :rebalance-tolerance (:rebalance-tolerance constraints)
-                      "portfolio-optimizer-constraint-rebalance-tolerance-input" false)])))
+                      "portfolio-optimizer-constraint-rebalance-tolerance-input" false
+                      :pts)])))

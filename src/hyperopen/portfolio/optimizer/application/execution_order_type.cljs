@@ -38,3 +38,25 @@
   (merge {:limit-bps (if (= :buy (:side row)) -2 2)
           :twap-min (if (>= (abs-num (:delta-notional-usd row)) 70000) 20 10)}
          (get params (:row-id row))))
+
+(defn recommended-routed-cost-usd
+  "Total estimated execution cost of the ready rows under the Execution tab's default
+  'recommended' routing (the same per-clip policy recommend-exec-type applies). Lets the
+  rebalance preview show the cost the user actually pays at the execution default, not only
+  the all-market upper bound that the domain summary aggregates. Crossing rows (market/twap)
+  keep their taker fee + book-crossing slippage; resting rows (limit/passive) pay only the
+  maker fee and no market impact — matching execution-tab type-aware-costs at default routing."
+  [rows]
+  (reduce
+   (fn [total row]
+     (if (= :ready (:status row))
+       (let [cost (:cost row)
+             resting? (contains? #{:limit :passive} (recommend-exec-type row))]
+         (+ total
+            (if resting?
+              (or (:maker-fee-usd cost) 0)
+              (+ (or (:estimated-slippage-usd cost) 0)
+                 (or (:estimated-fee-usd cost) 0)))))
+       total))
+   0
+   rows))

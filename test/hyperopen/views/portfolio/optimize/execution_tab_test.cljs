@@ -120,6 +120,35 @@
     (is (contains? strings "Margin after"))
     (is (contains? strings "spot-submit-unsupported"))))
 
+(deftest execution-tab-orders-largest-first-exact-notional-test
+  ;; The pre-commit table leads with the largest-notional order so the riskiest line is never
+  ;; buried in a long list, and each row shows its exact dollar notional (not $Nk-rounded) so
+  ;; the same order reads identically in the rebalance preview and here.
+  (let [plan {:status :ready :execution-disabled? false
+              :summary {:ready-count 2 :blocked-count 0
+                        :gross-ready-notional-usd 2300
+                        :margin {:after-utilization 0.3 :warning :none}}
+              :rows [{:row-id "perp:SMALL" :instrument-id "perp:SMALL" :instrument-type :perp
+                      :status :ready :side :buy :quantity 1 :order-type :market
+                      :delta-notional-usd 300
+                      :cost {:source :snapshot :slippage-bps 5 :estimated-slippage-usd 1}}
+                     {:row-id "perp:BIG" :instrument-id "perp:BIG" :instrument-type :perp
+                      :status :ready :side :sell :quantity 1 :order-type :market
+                      :delta-notional-usd -2345
+                      :cost {:source :snapshot :slippage-bps 5 :estimated-slippage-usd 1}}]}
+        view-node (scenario-view :execution
+                                 {:execution {:status :idle :history []}
+                                  :execution-modal {:open? true :phase :staged :plan plan}})
+        order-list (node-by-role view-node "portfolio-optimizer-execution-order-list")
+        big-row (node-by-role view-node "portfolio-optimizer-execution-order-row-perp-BIG")
+        strs (vec (collect-strings order-list))
+        idx (fn [s] (first (keep-indexed (fn [i x] (when (= x s) i)) strs)))]
+    ;; exact dollar notional, not "$2.3k"
+    (is (str/includes? (node-text big-row) "$2,345"))
+    (is (not (str/includes? (node-text big-row) "$2.3k")))
+    ;; the bigger order (sorted first) appears before the smaller one in the table
+    (is (< (idx "BIG") (idx "SMALL")))))
+
 (deftest execution-tab-slip-is-type-aware-test
   ;; A market row shows the book-crossing slippage estimate; a limit-overridden row
   ;; reads "rests" instead of the (misleading) market-impact number.
@@ -218,6 +247,52 @@
     (is (some? confirm))
     (is (= false (boolean (get-in confirm [1 :disabled]))))
     (is (= [[:actions/confirm-portfolio-optimizer-execution]] (click-actions confirm)))))
+
+(deftest execution-tab-armed-restates-money-figures-test
+  ;; The commit moment must restate how much money moves (buys/sells/gross/margin-after),
+  ;; not just the order count, and the commit button must carry the reserved danger style.
+  (let [plan (assoc staged-plan :summary {:ready-count 1 :blocked-count 1
+                                          :gross-ready-notional-usd 1000
+                                          :margin {:after-utilization 0.42 :warning :none}})
+        view-node (scenario-view :execution
+                                 {:execution {:status :idle :history []}
+                                  :execution-modal {:open? true :phase :armed :plan plan}})
+        figures (node-by-role view-node "portfolio-optimizer-execution-armed-figures")
+        confirm (node-by-role view-node "portfolio-optimizer-execution-confirm")
+        ftext (node-text figures)]
+    (is (some? figures))
+    (is (str/includes? ftext "buys"))
+    (is (str/includes? ftext "sells"))
+    (is (str/includes? ftext "gross"))
+    (is (str/includes? ftext "margin after"))
+    ;; the irreversible commit no longer reuses the amber primary look of safe actions
+    (is (str/includes? (str/join " " (get-in confirm [1 :class])) "optimizer-exec-commit"))))
+
+(deftest execution-tab-running-abort-acknowledges-test
+  ;; Clicking Pause flips an :abort-requested? flag the submit loop reads; the running band
+  ;; must acknowledge it immediately (text + a disabled control), not look inert.
+  (let [view-node (scenario-view :execution
+                                 {:execution {:status :submitting :history [] :abort-requested? true}
+                                  :execution-modal {:open? true :phase :armed :submitting? true
+                                                    :plan staged-plan}})
+        band (node-by-role view-node "portfolio-optimizer-execution-control-band")
+        pause (node-by-role view-node "portfolio-optimizer-execution-pause")]
+    (is (= "running" (get-in band [1 :data-phase])))
+    (is (str/includes? (node-text band) "Stopping"))
+    (is (= true (boolean (get-in pause [1 :disabled]))))
+    (is (nil? (get-in pause [1 :on])))))
+
+(deftest execution-tab-discard-requires-confirmation-test
+  ;; "Abort & discard" must not wipe the staged plan in one click: it sits behind a nested
+  ;; confirm disclosure, and only the inner button fires the discard action.
+  (let [view-node (scenario-view :execution
+                                 {:execution {:status :idle :history []}
+                                  :execution-modal {:open? true :phase :staged :plan staged-plan}})
+        confirm-wrap (node-by-role view-node "portfolio-optimizer-execution-discard-confirm")
+        discard (node-by-role view-node "portfolio-optimizer-execution-discard")]
+    (is (some? confirm-wrap) "discard is wrapped in a confirm disclosure")
+    (is (some? discard))
+    (is (= [[:actions/discard-portfolio-optimizer-execution]] (click-actions discard)))))
 
 (deftest execution-tab-running-hides-confirm-and-shows-progress-test
   (let [view-node (scenario-view :execution

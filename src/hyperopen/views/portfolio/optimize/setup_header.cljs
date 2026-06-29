@@ -40,14 +40,7 @@
              :data-role "portfolio-optimizer-draft-state"}
       (if (get-in draft [:metadata :dirty?])
         "Draft has unsaved changes"
-        "Draft clean")]]
-    [:div {:class ["flex" "shrink-0" "items-center" "gap-2"]}
-     [:button {:type "button"
-               :class ["border" "border-base-300" "bg-base-200/20" "px-2.5" "py-1"
-                       "font-mono" "text-[0.65625rem]" "font-semibold" "text-trading-muted"]
-               :aria-label "More setup actions"
-               :data-role "portfolio-optimizer-setup-overflow"}
-      "..."]]]])
+        "Draft clean")]]]])
 
 (defn- preset-card
   [draft preset title subtitle kicker]

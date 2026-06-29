@@ -1,5 +1,6 @@
 (ns hyperopen.views.portfolio.optimize.rebalance-tab
   (:require [clojure.string :as str]
+            [hyperopen.portfolio.optimizer.application.execution-order-type :as execution-order-type]
             [hyperopen.portfolio.optimizer.ids :as ids]
             [hyperopen.views.portfolio.optimize.format :as opt-format]))
 
@@ -210,6 +211,9 @@
         slip (or (:estimated-slippage-usd summary) 0)
         gross (or (:gross-trade-notional-usd summary) 0)
         total-cost (+ fees slip)
+        ;; Headline = all-market (taker) upper bound; rec-cost = the cheaper cost at Execution's
+        ;; default "recommended" routing, shown so the two money screens don't silently disagree.
+        rec-cost (execution-order-type/recommended-routed-cost-usd rows)
         ready (or (:ready-count summary) 0)
         blocked (or (:blocked-count summary) 0)]
     [:section {:class ["optimizer-rebalance-kpis" "grid" "grid-cols-2" "border-b" "border-base-300"
@@ -226,9 +230,10 @@
                  :value-class "text-trading-red"
                  :sub (str (count sell-assets) " assets")})
      (kpi-block {:data-role "portfolio-optimizer-rebalance-kpi-cost"
-                 :label "Est. fees + slippage"
+                 :label "Est. fees + slip · market"
                  :value (opt-format/format-usdc total-cost)
-                 :sub (slippage-summary-detail preview)})
+                 :sub (str (slippage-summary-detail preview)
+                           " · ≈ " (opt-format/format-usdc rec-cost) " smart-routed")})
      (kpi-block {:data-role "portfolio-optimizer-rebalance-kpi-gross"
                  :label "Gross trade"
                  :value (opt-format/format-usdc gross)

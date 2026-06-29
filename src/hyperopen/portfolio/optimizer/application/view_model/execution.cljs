@@ -48,6 +48,17 @@
           (assoc row :instrument-label (resolve-label (:instrument-id row))))
         (or rows [])))
 
+(defn- order-numbered-and-sorted
+  "Stamp each display row with its 1-based ledger order number (the submission order) then
+  sort the list by absolute notional, largest first — so the riskiest trade always leads the
+  pre-commit order table while the displayed `#` stays tied to ledger order (the reference
+  used by Resume / audit). Ties keep ledger order."
+  [rows]
+  (->> rows
+       (map-indexed (fn [i row] (assoc row :order-no (inc i))))
+       (sort-by (fn [row] [(- (js/Math.abs (or (:delta-notional-usd row) 0))) (:order-no row)]))
+       vec))
+
 (defn- latest-record
   [records]
   (last (vec records)))
@@ -133,23 +144,38 @@
         ;; During a run, show the live in-flight rows (queued -> working ->
         ;; submitted/failed); after a run, the latest ledger attempt; otherwise the
         ;; static staged plan.
-        display-rows (cond
-                       (and submitting? (seq (:rows run-attempt)))
-                       (:rows run-attempt)
+        display-rows (order-numbered-and-sorted
+                      (cond
+                        (and submitting? (seq (:rows run-attempt)))
+                        (:rows run-attempt)
 
-                       (and terminal? (seq (:rows latest-attempt)))
-                       (:rows latest-attempt)
+                        (and terminal? (seq (:rows latest-attempt)))
+                        (:rows latest-attempt)
 
-                       :else plan-rows)
+                        :else plan-rows))
         ready? (pos? (or (:ready-count summary) 0))
         execution-disabled? (boolean (:execution-disabled? plan))
         confirm-disabled? (or submitting?
                               execution-disabled?
-                              (not ready?))]
+                              (not ready?))
+        ;; Side-split notional of the rows that will actually send (status :ready), so the
+        ;; armed/confirm band can restate "how much money moves" — buys vs sells — alongside
+        ;; the order count. Derived from the staged plan rows (pre-run).
+        ready-rows (filter #(= :ready (:status %)) plan-rows)
+        side-notional (fn [side]
+                        (->> ready-rows
+                             (filter #(= side (:side %)))
+                             (map #(js/Math.abs (or (:delta-notional-usd %) 0)))
+                             (reduce + 0)))]
     {:plan (assoc plan :rows plan-rows)
      :summary summary
      :rows display-rows
      :phase phase
+     ;; The live-run pause/abort flag the submit loop checks; surfaced so the running band can
+     ;; acknowledge the request instead of leaving the button looking inert.
+     :abort-requested? (boolean (get-in state (conj contracts/execution-path :abort-requested?)))
+     :ready-buys-usd (side-notional :buy)
+     :ready-sells-usd (side-notional :sell)
      :run-status status
      :terminal? terminal?
      :latest-attempt latest-attempt

@@ -74,6 +74,9 @@
                      (is (= false
                             (get-in @store
                                     [:portfolio :optimizer :execution-modal :submitting?])))
+                     ;; A finished run announces its outcome via the global aria-live toast.
+                     (is (= :success (get-in @store [:ui :toasts 0 :kind])))
+                     (is (= "Execution complete" (get-in @store [:ui :toasts 0 :headline])))
                      (is (= [[store nil [[:actions/load-user-data address]
                                           [:actions/refresh-order-history]]]]
                             @dispatches))

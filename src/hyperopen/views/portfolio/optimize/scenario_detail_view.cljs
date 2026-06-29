@@ -96,18 +96,6 @@
          (opt-format/keyword-label status)]]]
       [:div {:class ["flex" "flex-wrap" "items-center" "gap-2"]}
        [:button {:type "button"
-                 :class ["border"
-                         "border-base-300"
-                         "bg-base-200/30"
-                         "px-2"
-                         "py-1"
-                         "font-mono"
-                         "text-[0.65625rem]"
-                         "font-semibold"
-                         "text-trading-muted"]
-                 :aria-label "More scenario actions"}
-        "..."]
-       [:button {:type "button"
                  :class ["optimizer-refine-action"
                          "rounded-lg"
                          "border"

@@ -308,6 +308,27 @@
     .portfolio-optimizer .optimizer-exec-pulse { animation: none; }
   }
 
+  /* nested discard confirmation inside the overflow menu (pure-markup <details>) */
+  .portfolio-optimizer .optimizer-exec-overflow-confirm > summary { list-style: none; }
+  .portfolio-optimizer .optimizer-exec-overflow-confirm > summary::-webkit-details-marker { display: none; }
+  .portfolio-optimizer .optimizer-exec-overflow-confirm > summary::marker { content: ""; }
+  .portfolio-optimizer .optimizer-exec-overflow-confirm[open] > summary {
+    background: color-mix(in srgb, var(--optimizer-short) 12%, transparent);
+  }
+
+  /* live-commit button — reserved danger styling so the irreversible "Confirm & send"
+     never shares the amber primary look of safe actions (Arm / Resume / View tracking). */
+  .portfolio-optimizer .optimizer-exec-commit {
+    background: var(--optimizer-short);
+    border-color: var(--optimizer-short);
+    color: var(--optimizer-text);
+    border-radius: 2px;
+  }
+  .portfolio-optimizer .optimizer-exec-commit:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--optimizer-short) 84%, white);
+    border-color: color-mix(in srgb, var(--optimizer-short) 84%, white);
+  }
+
   /* diagnostics-rail status pill + rail scroll */
   .portfolio-optimizer .optimizer-diag-status { font-weight: 500; color: var(--optimizer-long); }
   .portfolio-optimizer .optimizer-exec-rail { min-height: 0; }

@@ -84,37 +84,37 @@
     (is (= [[:actions/set-portfolio-optimizer-constraint
              :max-asset-weight
              [:event.target/value]]]
-           (input-actions
+           (change-actions
             (node-by-role view-node
                           "portfolio-optimizer-constraint-max-asset-weight-input"))))
     (is (= [[:actions/set-portfolio-optimizer-constraint
              :gross-max
              [:event.target/value]]]
-           (input-actions
+           (change-actions
             (node-by-role view-node
                           "portfolio-optimizer-constraint-gross-max-input"))))
     (is (= [[:actions/set-portfolio-optimizer-constraint
              :net-min
              [:event.target/value]]]
-           (input-actions
+           (change-actions
             (node-by-role view-node
                           "portfolio-optimizer-constraint-net-min-input"))))
     (is (= [[:actions/set-portfolio-optimizer-constraint
              :net-max
              [:event.target/value]]]
-           (input-actions
+           (change-actions
             (node-by-role view-node
                           "portfolio-optimizer-constraint-net-max-input"))))
     (is (= [[:actions/set-portfolio-optimizer-constraint
              :dust-usdc
              [:event.target/value]]]
-           (input-actions
+           (change-actions
             (node-by-role view-node
                           "portfolio-optimizer-constraint-dust-usdc-input"))))
     (is (= [[:actions/set-portfolio-optimizer-constraint
              :max-turnover
              [:event.target/value]]]
-           (input-actions
+           (change-actions
             (node-by-role view-node
                           "portfolio-optimizer-constraint-max-turnover-input"))))
     (is (= "true"
@@ -128,7 +128,7 @@
     (is (= [[:actions/set-portfolio-optimizer-constraint
              :rebalance-tolerance
              [:event.target/value]]]
-           (input-actions
+           (change-actions
             (node-by-role view-node
                           "portfolio-optimizer-constraint-rebalance-tolerance-input"))))
     (is (= [[:actions/set-portfolio-optimizer-objective-kind :max-sharpe]]
@@ -182,8 +182,12 @@
   (let [return-role "portfolio-optimizer-objective-target-return-input"
         volatility-role "portfolio-optimizer-objective-target-volatility-input"
         view-for #(portfolio-optimizer-setup-view {:kind % :target-return 0.18 :target-volatility 0.25})
-        action-for #(input-actions (node-by-role (view-for %1) %2))]
-    (is (= [[:actions/set-portfolio-optimizer-objective-parameter :target-return [:event.target/value]]] (action-for :target-return return-role)))
+        action-for #(change-actions (node-by-role (view-for %1) %2))]
+    ;; Target Return is now percent-entry (commits on change like Target σ) and routes through
+    ;; the percent handler that divides by 100, so a typed 15 means 15% — not 1500%.
+    (is (= [[:actions/set-portfolio-optimizer-objective-parameter-percent :target-return [:event.target/value]]] (action-for :target-return return-role)))
+    ;; the field echoes the interpreted percent (0.18 -> "18"), not the raw fraction "0.18"
+    (is (= "18" (get-in (node-by-role (view-for :target-return) return-role) [1 :value])))
     (is (= [[:actions/set-portfolio-optimizer-objective-parameter-percent :target-volatility [:event.target/value]]]
            (change-actions (node-by-role (view-for :target-volatility) volatility-role)))
         "sigma text input commits on change so the dial clamp cannot rewrite mid-typing")

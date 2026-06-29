@@ -35,10 +35,17 @@
            :target-volatility
            (target-sigma/objective-parameter-block draft sigma-bounds)
            :target-return
-           (controls/number-input "Target Return"
-                                  (or (get-in draft [:objective :target-return]) 0.15) "portfolio-optimizer-objective-target-return-input"
-                                  [:actions/set-portfolio-optimizer-objective-parameter :target-return [:event.target/value]]
-                                  (contains? highlighted-controls :target-return)))])))))
+           ;; Percent-entry to match Target σ and Black-Litterman: the user types 15 to mean
+           ;; 15% (the percent handler divides by 100), instead of the old fraction-entry where
+           ;; 0.15 meant 15% and a typed "15" silently requested a 1500% return.
+           (controls/percent-input "Target Return"
+                                   (controls/decimal->percent-text
+                                    (or (get-in draft [:objective :target-return]) 0.15))
+                                   "portfolio-optimizer-objective-target-return-input"
+                                   [:actions/set-portfolio-optimizer-objective-parameter-percent
+                                    :target-return [:event.target/value]]
+                                   (contains? highlighted-controls :target-return)
+                                   "Type a percent — 15 = 15%"))])))))
 
 (defn- objective-card
   [title subtitle selected? role action]

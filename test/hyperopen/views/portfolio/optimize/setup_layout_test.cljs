@@ -2,7 +2,7 @@
   (:require [cljs.test :refer-macros [deftest is]]
             [clojure.string :as str]
             [hyperopen.views.portfolio-view :as portfolio-view]
-            [hyperopen.views.portfolio.optimize.setup-layout-fixtures :refer [node-children find-first-node collect-strings node-by-role child-roles node-text click-actions input-actions keydown-actions day-start-ms summary-from-points class-token-set count-nodes btc-instrument eth-instrument black-litterman-ready-readiness black-litterman-ready-draft black-litterman-empty-readiness black-litterman-empty-draft candle-rows]]))
+            [hyperopen.views.portfolio.optimize.setup-layout-fixtures :refer [node-children find-first-node collect-strings node-by-role child-roles node-text click-actions input-actions change-actions keydown-actions day-start-ms summary-from-points class-token-set count-nodes btc-instrument eth-instrument black-litterman-ready-readiness black-litterman-ready-draft black-litterman-empty-readiness black-litterman-empty-draft candle-rows]]))
 
 (deftest setup-new-route-uses-canonical-grid-instead-of-old-left-rail-test
   (let [view-node (portfolio-view/portfolio-view
@@ -157,7 +157,7 @@
     (is (= [[:actions/set-portfolio-optimizer-constraint
              :gross-max
              [:event.target/value]]]
-           (input-actions
+           (change-actions
             (node-by-role view-node
                           "portfolio-optimizer-constraint-gross-max-input"))))))
 
@@ -315,4 +315,9 @@
     ;; Constraints are pre-filled from default-draft and never gate Run, so the
     ;; section is labelled "defaults applied", not the old false "mandatory".
     (is (contains? strings "defaults applied"))
+    ;; Each numeric constraint echoes its interpreted unit persistently (not only in the
+    ;; hover tooltip): 0.25 -> "max 25% per asset", 3 -> "3.00× capital", 0.03 -> "3.0 pp band".
+    (is (contains? strings "max 25% per asset"))
+    (is (contains? strings "3.00× capital"))
+    (is (contains? strings "3.0 pp band"))
     (is (not (contains? strings "mandatory")))))

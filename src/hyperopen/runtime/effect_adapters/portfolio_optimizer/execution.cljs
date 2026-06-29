@@ -1,8 +1,36 @@
 (ns hyperopen.runtime.effect-adapters.portfolio-optimizer.execution
   (:require [hyperopen.account.context :as account-context]
+            [hyperopen.order.feedback-runtime :as feedback-runtime]
             [hyperopen.portfolio.optimizer.application.execution :as execution]
             [hyperopen.portfolio.optimizer.application.execution-workflow :as execution-workflow]
             [hyperopen.portfolio.optimizer.contracts :as contracts]))
+
+(defn- execution-outcome-toast
+  "Plain-language summary toast for a finished run, so success/failure is announced (the toast
+  region is aria-live) and stays visible for a user who tab-switched mid-run — most importantly
+  for resting/limit orders, where no fill event ever fires. Returns [kind message] or nil."
+  [ledger]
+  (let [by (frequencies (map :status (:rows ledger)))
+        filled (get by :submitted 0)
+        resting (get by :resting 0)
+        failed (get by :failed 0)
+        blocked (get by :blocked 0)
+        blocked-note (when (pos? blocked) (str " · " blocked " below minimum"))]
+    (cond
+      (pos? failed)
+      [:error {:headline "Execution halted"
+               :subline (str filled " filled · " resting " resting · " failed
+                             " failed — review and resume from the Execution tab.")}]
+      (pos? resting)
+      [:info {:headline "Orders resting on the book"
+              :subline (str resting " resting"
+                            (when (pos? filled) (str " · " filled " filled"))
+                            blocked-note " — they fill as the market reaches your price.")}]
+      (pos? filled)
+      [:success {:headline "Execution complete"
+                 :subline (str filled " order" (when (not= 1 filled) "s")
+                               " filled on Hyperliquid" blocked-note ".")}]
+      :else nil)))
 
 (defn- mark-row-failed
   [row err]
@@ -323,6 +351,10 @@
                                    completed-at-ms
                                    rows)]
                        (swap! store execution-workflow/apply-execution-ledger ledger)
+                       ;; Announce the outcome (success/resting/halted) via the global aria-live
+                       ;; toast region so it reaches screen readers and anyone who tab-switched.
+                       (when-let [[kind message] (execution-outcome-toast ledger)]
+                         (feedback-runtime/set-order-feedback-toast! store kind message))
                        (refresh-after-execution! dispatch! store account-address ledger)
                        (persist-execution-ledger! persistence-env
                                                   store

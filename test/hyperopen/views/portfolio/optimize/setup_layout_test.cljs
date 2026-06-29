@@ -20,7 +20,7 @@
     (is (nil? (node-by-role view-node "portfolio-optimizer-left-rail")))
     (is (contains? strings "Portfolio Optimizer"))
     (is (contains? strings "Start with"))
-    (is (contains? strings "From holdings"))
+    (is (contains? strings "Load my holdings"))
     (is (contains? strings "Custom"))
     (is (not (contains? strings "Index")))
     (is (contains? strings "What this scenario will solve for"))
@@ -41,22 +41,25 @@
                              (str/starts-with? (node-text %) "Custom")))
         strings (set (collect-strings source-toggle))]
     (is (some? source-toggle))
-    (is (contains? strings "From holdings"))
+    (is (contains? strings "Load my holdings"))
     (is (contains? strings "Custom"))
     (is (not (contains? strings "Index")))))
 
-(deftest setup-empty-universe-offers-prominent-load-holdings-cta-test
-  ;; When the universe is empty (e.g. account data wasn't ready in time for the
-  ;; auto-seed on a cold load), the dominant affordance is a one-click "Load my
-  ;; holdings" firing the same from-holdings action, so the user reaches a real
-  ;; portfolio without hand-searching every asset.
+(deftest setup-universe-load-holdings-is-single-affordance-test
+  ;; "Load my holdings" lives in ONE place — the universe source strip button
+  ;; (portfolio-optimizer-universe-use-current), relabelled from "From holdings".
+  ;; The old duplicate prominent empty-state button (…-universe-load-holdings) was
+  ;; removed; the empty state points at the strip button instead.
   (let [view-node (portfolio-view/portfolio-view
                    {:router {:path "/portfolio/optimize/new"}
                     :wallet {:address "0x1111111111111111111111111111111111111111"}})
-        load-holdings (node-by-role view-node "portfolio-optimizer-universe-load-holdings")]
-    (is (some? load-holdings))
+        load-strip (node-by-role view-node "portfolio-optimizer-universe-use-current")]
+    (is (some? load-strip))
     (is (= [[:actions/set-portfolio-optimizer-universe-from-current]]
-           (click-actions load-holdings)))))
+           (click-actions load-strip)))
+    (is (str/includes? (node-text load-strip) "Load my holdings"))
+    ;; the duplicate empty-state button is gone
+    (is (nil? (node-by-role view-node "portfolio-optimizer-universe-load-holdings")))))
 
 (deftest setup-control-rail-orders-objective-before-return-risk-model-test
   (let [view-node (portfolio-view/portfolio-view

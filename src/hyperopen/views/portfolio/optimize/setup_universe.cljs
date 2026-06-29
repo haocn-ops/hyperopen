@@ -230,22 +230,15 @@
      (into [:div {:class ["text-xs"]}]
            (cons (selected-table-header)
                  (map selected-row selected-rows)))
-     ;; Prominent one-click fallback: when the universe is empty (e.g. account
-     ;; data wasn't ready in time for the auto-seed on a cold load), the dominant
-     ;; affordance is "Load my holdings" — the same action the From-holdings strip
-     ;; fires — so a user reaches a real portfolio in one click instead of
-     ;; hand-searching every asset. No-ops gracefully if there are no holdings.
-     [:div {:class ["flex" "flex-col" "items-start" "gap-2" "px-2" "py-3"]}
+     ;; Empty universe (e.g. account data wasn't ready for the auto-seed on a cold
+     ;; load): point at the single "Load my holdings" control in the strip above —
+     ;; the same set-…-universe-from-current action — rather than duplicating it with
+     ;; a second prominent button here.
+     [:div {:class ["flex" "flex-col" "items-start" "gap-1" "px-2" "py-3"]}
       [:p {:class ["text-xs" "text-trading-muted"]}
        "No assets selected yet."]
-      [:button {:type "button"
-                :class ["optimizer-primary-action" "border" "border-warning/70" "bg-warning/80"
-                        "px-4" "py-2" "text-[0.6875rem]" "font-semibold" "text-base-100"]
-                :data-role "portfolio-optimizer-universe-load-holdings"
-                :on {:click [[:actions/set-portfolio-optimizer-universe-from-current]]}}
-       "Load my holdings"]
       [:p {:class ["text-[0.65625rem]" "text-trading-muted/80"]}
-       "or search above to build a custom set"]])])
+       "Use “Load my holdings” above to import your portfolio, or search to build a custom set."]])])
 
 (defn universe-section
   ([state draft]
@@ -276,12 +269,15 @@
                     "tracking-[0.04em]" "text-trading-muted"]}
       [:span {:class ["border-r" "border-warning/60" "bg-warning/10" "px-2" "py-2" "text-warning"]}
        "Custom"]
+      ;; Single "Load my holdings" affordance: this segment fires the same
+      ;; set-…-universe-from-current action the old empty-state button did, so that
+      ;; duplicate button was removed (see selected-table).
       [:button {:type "button"
                 :class ["px-2" "py-2" "uppercase" "hover:text-warning"]
                 :data-role "portfolio-optimizer-universe-use-current"
                 :on {:click [[:actions/set-portfolio-optimizer-universe-from-current]]}}
-       "From holdings"
-       [:span {:class ["sr-only"]} "Use Current Holdings"]]]
+       "Load my holdings"
+       [:span {:class ["sr-only"]} "Load my current holdings into the universe"]]]
      [:div {:class ["sr-only"]} "Manual Add"]
      [:div {:class ["mt-3" "relative"]}
       [:div {:class ["optimizer-universe-search-shell"

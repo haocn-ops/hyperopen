@@ -32,14 +32,11 @@
                         :missing :volatility
                         :message "NEW needs an expected annual volatility."}])
         card (ts/node-by-role node "portfolio-optimizer-history-assumption-card-perp:NEW")
-        proxy-mode-button (ts/node-by-role node "portfolio-optimizer-history-assumption-mode-perp:NEW-proxy")
         volatility-input (ts/node-by-role node "portfolio-optimizer-history-assumption-volatility-perp:NEW")
         cap-input (ts/node-by-role node "portfolio-optimizer-history-assumption-max-weight-perp:NEW")
         clear-button (ts/node-by-role node "portfolio-optimizer-history-assumption-clear-perp:NEW")]
     (is (some? (ts/node-by-role node "portfolio-optimizer-history-assumptions-section")))
     (is (some? card))
-    (is (= [:actions/set-portfolio-optimizer-history-assumption-mode "perp:NEW" :proxy]
-           (first (ts/click-actions proxy-mode-button))))
     (is (= [:actions/set-portfolio-optimizer-history-assumption-expected-volatility
             "perp:NEW" [:event.target/value]]
            (first (ts/input-actions volatility-input))))
@@ -52,28 +49,27 @@
               (ts/collect-strings card))
         "Field-level errors are surfaced on the card.")))
 
-(deftest history-assumptions-section-renders-proxy-controls-test
-  (let [node (section {:behavior :proxy
-                       :expected-return 0.25
-                       :volatility 0.9
-                       :proxy-instrument-id "perp:BTC"
-                       :relationship :medium
-                       :max-weight 0.05}
-                      [{:code :history-assumption-proxy-not-applied
-                        :instrument-id "perp:NEW"
-                        :message "NEW's proxy assumption is saved but isn't applied to the risk model yet, so it is excluded from this optimization."}])
-        proxy-select (ts/node-by-role node "portfolio-optimizer-history-assumption-proxy-perp:NEW")
-        relationship-high (ts/node-by-role node "portfolio-optimizer-history-assumption-relationship-perp:NEW-high")]
-    (is (some? proxy-select))
-    (is (= [:actions/set-portfolio-optimizer-history-assumption-proxy-instrument
-            "perp:NEW" [:event.target/value]]
-           (first (ts/change-actions proxy-select))))
-    (is (= [:actions/set-portfolio-optimizer-history-assumption-proxy-relationship
-            "perp:NEW" :high]
-           (first (ts/click-actions relationship-high))))
-    (is (some #(re-find #"saved but isn't applied" %)
-              (ts/collect-strings node))
-        "Proxy mode shows the honest not-yet-applied note.")))
+(deftest history-assumptions-section-unconfigured-asset-offers-conservative-enable-test
+  ;; A thin-history asset with no entry yet shows a single opt-in "Use a
+  ;; conservative assumption" affordance - there is no proxy mode to pick - and
+  ;; stays excluded until the user opts in.
+  (let [node (setup-history-assumptions/history-assumptions-section
+              {:state {}
+               :draft {:universe [btc new-perp]
+                       :objective {:kind :minimum-variance}
+                       :history-assumptions {}}
+               :readiness {:request {:requested-universe [btc new-perp]
+                                     :universe [btc]
+                                     :objective {:kind :minimum-variance}}
+                           :blocking-warnings []}
+               :history-load-state {:status :succeeded
+                                    :request-signature {:universe [btc new-perp]}}})
+        enable (ts/node-by-role node "portfolio-optimizer-history-assumption-enable-perp:NEW")]
+    (is (some? enable))
+    (is (= [:actions/set-portfolio-optimizer-history-assumption-mode "perp:NEW" :conservative]
+           (first (ts/click-actions enable))))
+    (is (nil? (ts/node-by-role node "portfolio-optimizer-history-assumption-mode-perp:NEW-proxy"))
+        "There is no proxy mode picker.")))
 
 (deftest history-assumptions-section-absent-when-no-cards-test
   (let [node (setup-history-assumptions/history-assumptions-section

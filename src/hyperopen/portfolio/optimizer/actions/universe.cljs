@@ -7,8 +7,10 @@
             [hyperopen.portfolio.optimizer.application.universe-candidates :as universe-candidates]
             [hyperopen.portfolio.optimizer.black-litterman-actions.views :as black-litterman-views]
             [hyperopen.portfolio.optimizer.contracts :as contracts]
+            [hyperopen.portfolio.optimizer.defaults :as optimizer-defaults]
             [hyperopen.portfolio.optimizer.ids :as ids]
-            [hyperopen.portfolio.optimizer.universe-keyboard :as universe-keyboard]))
+            [hyperopen.portfolio.optimizer.universe-keyboard :as universe-keyboard]
+            [hyperopen.portfolio.routes :as portfolio-routes]))
 
 (defn set-portfolio-optimizer-universe-search-query
   [_state query]
@@ -427,4 +429,33 @@
         (with-prefetch-effect
           (common/save-draft-path-values path-values)
           prefetch-plan))
+      [])))
+
+(defn auto-preseed-portfolio-optimizer-universe-from-current
+  "Auto-seed the optimizer universe from the user's current holdings when they
+  enter a fresh /optimize/new draft, so a returning user reaches a result without
+  hand-searching and adding each asset. Reuses
+  `set-portfolio-optimizer-universe-from-current` verbatim (universe +
+  holdings-derived constraints + history prefetch).
+
+  Fires only on the :optimize-new route and only while the draft is UNTOUCHED
+  (absent, or still exactly default-draft), so it never clobbers a universe the
+  user has built or deliberately cleared. The underlying seed no-ops when the
+  holdings snapshot has not loaded yet, so the route-load naturally re-attempts
+  until account + market data are ready; a cold direct page-load where data is not
+  yet present (and no further route event fires) is covered by the prominent
+  \"Load my holdings\" empty-state CTA in setup-universe."
+  [state path]
+  (let [route (portfolio-routes/parse-portfolio-route path)
+        draft (get-in state contracts/draft-path)]
+    (if (and (= :optimize-new (:kind route))
+             (or (nil? draft)
+                 (= draft optimizer-defaults/default-draft)))
+      ;; Materialize default-draft for the computation so the holdings-derived
+      ;; constraints have a base to derive from (a fresh draft holds no
+      ;; constraints in state yet). Only the universe + derived constraints are
+      ;; actually persisted by the underlying save.
+      (set-portfolio-optimizer-universe-from-current
+       (cond-> state
+         (nil? draft) (assoc-in contracts/draft-path optimizer-defaults/default-draft)))
       [])))

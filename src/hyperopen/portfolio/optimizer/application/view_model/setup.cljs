@@ -1,6 +1,5 @@
 (ns hyperopen.portfolio.optimizer.application.view-model.setup
   (:require [clojure.string :as str]
-            [hyperopen.portfolio.optimizer.application.instrument-labels :as instrument-labels]
             [hyperopen.portfolio.optimizer.application.setup-readiness :as setup-readiness]
             [hyperopen.portfolio.optimizer.application.view-model.universe :as universe]
             [hyperopen.portfolio.optimizer.coercion :as coercion]
@@ -160,25 +159,16 @@
 ;; missing/short on history or that the user has already started configuring.
 
 (def ^:private mode-options
-  [{:value :conservative :label "Use conservative assumption"}
-   {:value :proxy :label "Use proxy behavior"}])
-
-(def ^:private relationship-options
-  [{:value :low :label "Low"}
-   {:value :medium :label "Medium"}
-   {:value :high :label "High"}])
+  [{:value :conservative :label "Use a conservative assumption"}])
 
 (def ^:private mode-labels
-  {:conservative "Use conservative assumption"
-   :proxy "Use proxy behavior"})
+  {:conservative "Conservative assumption"})
 
 (def ^:private assumption-action-ids
   {:set-mode :actions/set-portfolio-optimizer-history-assumption-mode
    :set-expected-return :actions/set-portfolio-optimizer-history-assumption-expected-return
    :set-expected-volatility :actions/set-portfolio-optimizer-history-assumption-expected-volatility
    :set-max-weight-cap :actions/set-portfolio-optimizer-history-assumption-max-weight-cap
-   :set-proxy-instrument :actions/set-portfolio-optimizer-history-assumption-proxy-instrument
-   :set-proxy-relationship :actions/set-portfolio-optimizer-history-assumption-proxy-relationship
    :clear :actions/clear-portfolio-optimizer-history-assumption})
 
 (def ^:private card-needing-adequacy
@@ -194,81 +184,47 @@
    ;; editable percent text (decimal 0.25 -> "25"); the action parses it back.
    :input-text (when (some? value) (coercion/decimal->percent-text value))})
 
-(defn- proxy-options
-  [universe history-status-by-id instrument-id]
-  (let [usable (->> universe
-                    (keep :instrument-id)
-                    (filter (fn [id]
-                              (and (not= id instrument-id)
-                                   (= :aligned (get history-status-by-id id)))))
-                    vec)
-        labels (instrument-labels/labels-by-instrument universe usable)]
-    (mapv (fn [id]
-            {:value id
-             :label (get labels id id)})
-          usable)))
-
 (defn- card-status
-  [entry complete? proxy?]
+  [entry complete?]
   (cond
     (nil? (:behavior entry)) :needs-assumptions
-    (and complete? proxy?) :proxy-not-applied
     complete? :complete
     :else :incomplete))
 
 (def ^:private card-status-labels
-  {:needs-assumptions "Needs assumptions"
+  {:needs-assumptions "Excluded - needs assumption"
    :incomplete "Needs assumptions"
-   :complete "Conservative"
-   :proxy-not-applied "Using proxy"})
+   :complete "Conservative"})
 
 (defn- card-summary
-  [entry percent-label* proxy-label]
+  [entry percent-label*]
   (let [vol (some-> (:volatility entry) percent-label*)
         cap (some-> (:max-weight entry) percent-label*)]
-    (case (:behavior entry)
-      :conservative (str "conservative" (when vol (str " - " vol " vol"))
-                         (when cap (str " - " cap " cap")))
-      :proxy (str "using " (or proxy-label "proxy") " proxy"
-                  (when (:relationship entry)
-                    (str " - " (name (:relationship entry)) " relationship"))
-                  (when vol (str " - " vol " vol"))
-                  (when cap (str " - " cap " cap")))
-      nil)))
+    (when (= :conservative (:behavior entry))
+      (str "conservative" (when vol (str " - " vol " vol"))
+           (when cap (str " - " cap " cap"))))))
 
 (defn- history-assumption-card
-  [{:keys [instrument label entry complete? errors note percent-label* universe
-           history-status-by-id]}]
+  [{:keys [instrument label entry complete? errors note percent-label*]}]
   (let [id (:instrument-id instrument)
         behavior (:behavior entry)
-        proxy? (= :proxy behavior)
-        status (card-status entry complete? proxy?)
-        proxy-id (:proxy-instrument-id entry)
-        proxy-label (when proxy-id
-                      (get (instrument-labels/labels-by-instrument universe [proxy-id])
-                           proxy-id proxy-id))]
-    (cond-> {:instrument-id id
-             :label label
-             :role (str "portfolio-optimizer-history-assumption-card-" id)
-             :status status
-             :status-label (get card-status-labels status "Needs assumptions")
-             :mode behavior
-             :mode-label (get mode-labels behavior)
-             :mode-options mode-options
-             :expected-return (percent-field percent-label* (:expected-return entry))
-             :volatility (percent-field percent-label* (:volatility entry))
-             :max-weight (percent-field percent-label* (:max-weight entry))
-             :errors (vec errors)
-             :note note
-             :engine-applied? (and complete? (not proxy?))
-             :summary (when complete? (card-summary entry percent-label* proxy-label))
-             :actions assumption-action-ids}
-      proxy?
-      (assoc :proxy {:selected-id proxy-id
-                     :label proxy-label
-                     :options (proxy-options universe history-status-by-id id)}
-             :relationship {:value (:relationship entry)
-                            :options relationship-options}))))
+        status (card-status entry complete?)]
+    {:instrument-id id
+     :label label
+     :role (str "portfolio-optimizer-history-assumption-card-" id)
+     :status status
+     :status-label (get card-status-labels status "Needs assumptions")
+     :mode behavior
+     :mode-label (get mode-labels behavior)
+     :mode-options mode-options
+     :expected-return (percent-field percent-label* (:expected-return entry))
+     :volatility (percent-field percent-label* (:volatility entry))
+     :max-weight (percent-field percent-label* (:max-weight entry))
+     :errors (vec errors)
+     :note note
+     :engine-applied? (boolean complete?)
+     :summary (when complete? (card-summary entry percent-label*))
+     :actions assumption-action-ids}))
 
 (defn history-assumption-cards
   ([state draft readiness history-load-state]
@@ -305,26 +261,15 @@
                                 (let [complete? (and entry
                                                      (history-assumptions/assumption-complete?
                                                       entry return-required?))
-                                      id-warnings (get warnings-by-id id)
-                                      errors (->> id-warnings
-                                                  (remove #(= :history-assumption-proxy-not-applied
-                                                              (:code %)))
-                                                  (keep :message))
-                                      note (some (fn [warning]
-                                                   (when (= :history-assumption-proxy-not-applied
-                                                            (:code warning))
-                                                     (:message warning)))
-                                                 id-warnings)]
+                                      errors (keep :message (get warnings-by-id id))]
                                   (history-assumption-card
                                    {:instrument instrument
                                     :label (universe/instrument-primary-label instrument)
                                     :entry entry
                                     :complete? complete?
                                     :errors errors
-                                    :note note
-                                    :percent-label* percent-label*
-                                    :universe universe
-                                    :history-status-by-id history-status-by-id}))))))
+                                    :note nil
+                                    :percent-label* percent-label*}))))))
                     vec)]
      {:cards cards
       :applicable? (boolean (seq cards))})))

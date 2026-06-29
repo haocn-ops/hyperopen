@@ -346,7 +346,7 @@
       (is (false?
            (get-in @store [:portfolio :optimizer :draft :metadata :dirty?]))))))
 
-(deftest worker-result-on-new-route-dispatches-navigation-to-draft-results-test
+(deftest worker-result-on-new-route-reveals-in-place-without-navigating-test
   (let [dispatches (atom [])
         store (atom {:router {:path "/portfolio/optimize/new"}
                      :portfolio {:optimizer {:draft {:metadata {:dirty? true}}
@@ -362,11 +362,11 @@
                                         :type "optimizer-result"
                                         :payload {:status :solved}}
                                        {:computed-at-ms 200})
-    (is (= [[store nil [[:actions/navigate "/portfolio/optimize/draft"]]]
-            [store
+    (is (= [[store
              nil
              [[:effects/refresh-portfolio-optimizer-rebalance-slippage-snapshots]]]]
-           @dispatches))))
+           @dispatches)
+        "A run on /optimize/new no longer dispatches a navigation; the result reveals in-place.")))
 
 (deftest normalized-worker-result-with-string-status-updates-successful-run-test
   (let [store (atom {:portfolio {:optimizer {:run-state {:status :running

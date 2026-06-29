@@ -91,12 +91,6 @@
 (def set-portfolio-optimizer-history-assumption-max-weight-cap
   draft/set-portfolio-optimizer-history-assumption-max-weight-cap)
 
-(def set-portfolio-optimizer-history-assumption-proxy-instrument
-  draft/set-portfolio-optimizer-history-assumption-proxy-instrument)
-
-(def set-portfolio-optimizer-history-assumption-proxy-relationship
-  draft/set-portfolio-optimizer-history-assumption-proxy-relationship)
-
 (def clear-portfolio-optimizer-history-assumption
   draft/clear-portfolio-optimizer-history-assumption)
 
@@ -135,6 +129,9 @@
 
 (def set-portfolio-optimizer-universe-from-current
   universe/set-portfolio-optimizer-universe-from-current)
+
+(def auto-preseed-portfolio-optimizer-universe-from-current
+  universe/auto-preseed-portfolio-optimizer-universe-from-current)
 
 (def load-portfolio-optimizer-history-from-draft
   run/load-portfolio-optimizer-history-from-draft)

@@ -16,7 +16,7 @@
         risk-kind (get-in draft [:risk-model :kind])]
     (controls/disclosure-panel
      "portfolio-optimizer-return-risk-panel"
-     (controls/disclosure-heading "03" "Return / Risk Model" (controls/labelize return-kind))
+     (controls/disclosure-heading "Return / Risk Model" (controls/labelize return-kind))
      [:div {:class ["mt-3" "space-y-3"] :data-role "portfolio-optimizer-setup-model-grid"}
       [:div {:class ["optimizer-model-panel"]
              :data-role "portfolio-optimizer-return-model-panel"}

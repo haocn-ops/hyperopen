@@ -107,20 +107,12 @@
         (assoc :default-fee-bps (fee-bps-for-mode (:fee-mode assumptions*))))))
 
 (defn- normalize-history-assumptions
-  "Engine-shaped per-asset assumptions: carry the draft entry through and resolve a
-  proxy relationship strength to its implied correlation. Decimals already; the
-  engine only consumes conservative entries today (see domain.history-assumptions)."
+  "Engine-shaped per-asset assumptions: the conservative draft entries are carried
+  through unchanged (the engine only consumes conservative entries; see
+  domain.history-assumptions)."
   [assumptions]
   (when (seq assumptions)
-    (reduce-kv (fn [acc id entry]
-                 (assoc acc id
-                        (cond-> entry
-                          (history-assumptions/proxy? entry)
-                          (assoc :implied-correlation
-                                 (history-assumptions/resolve-implied-correlation
-                                  (:relationship entry))))))
-               {}
-               assumptions)))
+    assumptions))
 
 (def ^:private finite-number? coercion/finite-number?)
 

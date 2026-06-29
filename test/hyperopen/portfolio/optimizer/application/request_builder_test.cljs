@@ -305,13 +305,7 @@
                                       :expected-return nil
                                       :volatility 0.9
                                       :max-weight 0.03
-                                      :correlation-floor 0.75}
-                          "perp:PXY" {:behavior :proxy
-                                      :expected-return 0.25
-                                      :volatility 0.8
-                                      :proxy-instrument-id "perp:BTC"
-                                      :relationship :medium
-                                      :max-weight 0.05}})
+                                      :correlation-floor 0.75}})
                   (assoc-in [:constraints :asset-overrides]
                             {"perp:NEW" {:max-weight 0.5}}))
         request (request-builder/build-engine-request
@@ -327,14 +321,10 @@
         constraints (:constraints request)]
     (is (contains? universe-ids "perp:NEW")
         "A complete conservative assumption re-admits the no-history asset to the engine universe.")
-    (is (not (contains? universe-ids "perp:PXY"))
-        "A proxy assumption is collected but not yet engine-backed, so its asset stays dropped.")
     (is (= 0.03 (get-in constraints [:per-asset-overrides "perp:NEW" :max-weight]))
         "The conservative cap min-merges into the existing per-asset override (0.5 vs 0.03 -> 0.03).")
     (is (= 0.9 (get-in request [:history-assumptions "perp:NEW" :volatility])))
-    (is (= 0.75 (get-in request [:history-assumptions "perp:NEW" :correlation-floor])))
-    (is (= 0.65 (get-in request [:history-assumptions "perp:PXY" :implied-correlation]))
-        "A proxy relationship resolves to its implied correlation on the request.")))
+    (is (= 0.75 (get-in request [:history-assumptions "perp:NEW" :correlation-floor])))))
 
 (deftest build-engine-request-treats-empty-allowlist-as-unbounded-test
   (let [draft (assoc (defaults/default-draft)

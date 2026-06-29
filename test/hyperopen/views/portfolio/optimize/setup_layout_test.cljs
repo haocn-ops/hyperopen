@@ -18,7 +18,7 @@
     (is (some? (node-by-role view-node "portfolio-optimizer-assumptions-rail")))
     (is (nil? (node-by-role view-node "portfolio-optimizer-trust-freshness-panel")))
     (is (nil? (node-by-role view-node "portfolio-optimizer-left-rail")))
-    (is (contains? strings "Optimizer · portfolio / optimize / new"))
+    (is (contains? strings "Portfolio Optimizer"))
     (is (contains? strings "Start with"))
     (is (contains? strings "From holdings"))
     (is (contains? strings "Custom"))
@@ -45,6 +45,19 @@
     (is (contains? strings "Custom"))
     (is (not (contains? strings "Index")))))
 
+(deftest setup-empty-universe-offers-prominent-load-holdings-cta-test
+  ;; When the universe is empty (e.g. account data wasn't ready in time for the
+  ;; auto-seed on a cold load), the dominant affordance is a one-click "Load my
+  ;; holdings" firing the same from-holdings action, so the user reaches a real
+  ;; portfolio without hand-searching every asset.
+  (let [view-node (portfolio-view/portfolio-view
+                   {:router {:path "/portfolio/optimize/new"}
+                    :wallet {:address "0x1111111111111111111111111111111111111111"}})
+        load-holdings (node-by-role view-node "portfolio-optimizer-universe-load-holdings")]
+    (is (some? load-holdings))
+    (is (= [[:actions/set-portfolio-optimizer-universe-from-current]]
+           (click-actions load-holdings)))))
+
 (deftest setup-control-rail-orders-objective-before-return-risk-model-test
   (let [view-node (portfolio-view/portfolio-view
                    {:router {:path "/portfolio/optimize/new"}
@@ -63,10 +76,16 @@
             "portfolio-optimizer-constraints-panel"
             "portfolio-optimizer-advanced-overrides-shell"]
            (child-roles control-rail)))
+    ;; The leading section numbers (01..05) are gone: the panels read as a
+    ;; sovereign workbench, not a required wizard sequence. Titles remain.
     (is (str/includes? (node-text (node-by-role view-node "portfolio-optimizer-objective-panel"))
-                       "02Objective"))
+                       "Objective"))
+    (is (not (str/includes? (node-text (node-by-role view-node "portfolio-optimizer-objective-panel"))
+                            "02Objective")))
     (is (str/includes? (node-text (node-by-role view-node "portfolio-optimizer-return-risk-panel"))
-                       "03Return / Risk Model"))))
+                       "Return / Risk Model"))
+    (is (not (str/includes? (node-text (node-by-role view-node "portfolio-optimizer-return-risk-panel"))
+                            "03Return / Risk Model")))))
 
 (deftest setup-return-risk-and-constraints-panels-are-collapsed-disclosures-test
   (let [view-node (portfolio-view/portfolio-view
@@ -292,4 +311,8 @@
     (is (contains? strings
                    "Small rebalance trades below this USDC notional are ignored so the output avoids noisy dust orders."))
     (is (contains? strings
-                   "Minimum target-vs-current weight difference before a rebalance row is considered actionable. 0.03 means 3 percentage points."))))
+                   "Minimum target-vs-current weight difference before a rebalance row is considered actionable. 0.03 means 3 percentage points."))
+    ;; Constraints are pre-filled from default-draft and never gate Run, so the
+    ;; section is labelled "defaults applied", not the old false "mandatory".
+    (is (contains? strings "defaults applied"))
+    (is (not (contains? strings "mandatory")))))

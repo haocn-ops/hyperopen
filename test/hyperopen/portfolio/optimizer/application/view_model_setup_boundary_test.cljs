@@ -240,8 +240,7 @@
     (is (= :conservative (:mode card)))
     (is (= :incomplete (:status card)))
     (is (= "Needs assumptions" (:status-label card)))
-    (is (= [{:value :conservative :label "Use conservative assumption"}
-            {:value :proxy :label "Use proxy behavior"}]
+    (is (= [{:value :conservative :label "Use a conservative assumption"}]
            (:mode-options card)))
     (is (= "3%" (get-in card [:max-weight :percent-label])))
     (is (nil? (get-in card [:volatility :value])))
@@ -251,37 +250,6 @@
            (get-in card [:actions :set-mode])))
     (is (= :actions/clear-portfolio-optimizer-history-assumption
            (get-in card [:actions :clear])))))
-
-(deftest history-assumption-cards-projects-proxy-options-test
-  (let [draft {:universe [btc-instrument new-perp-instrument]
-               :objective {:kind :minimum-variance}
-               :history-assumptions
-               {"perp:NEW" {:behavior :proxy
-                            :expected-return 0.25
-                            :volatility 0.9
-                            :proxy-instrument-id "perp:BTC"
-                            :relationship :medium
-                            :max-weight 0.05}}}
-        readiness {:request {:requested-universe [btc-instrument new-perp-instrument]
-                             :universe [btc-instrument]
-                             :objective {:kind :minimum-variance}}
-                   :blocking-warnings [{:code :history-assumption-proxy-not-applied
-                                        :instrument-id "perp:NEW"
-                                        :message "NEW's proxy assumption is saved but isn't applied to the risk model yet, so it is excluded from this optimization."}]}
-        model (view-model/history-assumption-cards
-               {} draft readiness loaded-state-with-new
-               {:percent-label (fn [value] (str (js/Math.round (* 100 value)) "%"))})
-        card (first (:cards model))]
-    (is (= :proxy (:mode card)))
-    (is (= :proxy-not-applied (:status card)))
-    (is (= "Using proxy" (:status-label card)))
-    (is (= "perp:BTC" (get-in card [:proxy :selected-id])))
-    (is (= [{:value "perp:BTC" :label "BTC"}]
-           (get-in card [:proxy :options]))
-        "Proxy options are the other selected instruments that have usable history.")
-    (is (= :medium (get-in card [:relationship :value])))
-    (is (= [] (:errors card)))
-    (is (str/includes? (:note card) "saved but isn't applied"))))
 
 (deftest history-assumption-cards-hidden-while-history-still-loading-test
   ;; Regression: before history loads, readiness reports every asset as :missing

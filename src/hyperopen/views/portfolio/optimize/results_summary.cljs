@@ -41,6 +41,41 @@
        [:p {:class ["mt-2" "text-sm" "text-trading-muted"]}
         "These allocation weights come from the last successful run. The app is refreshing them automatically; save and execute unlock when the refreshed run completes."]]]]))
 
+(defn verdict-headline
+  "One plain-language sentence at the top of the recommendation tab stating what the
+  recommended portfolio does to the user's risk and return, with the trade count —
+  so the user reads the answer instead of reconstructing it from five KPI cards and
+  a frontier chart. Targets are framed as estimates; deltas are signed (the rest of
+  the UI uses the same convention: lower volatility and higher return are good).
+  Falls back to non-delta phrasing when there is no current baseline.
+
+  `deltas` is the map produced by scenario-detail-view's `recommendation-deltas`."
+  [{:keys [target-vol vol-delta target-return return-delta trade-count]}]
+  (let [vol-clause (if (opt-format/finite-number? vol-delta)
+                     (str "estimated volatility " (opt-format/format-pct target-vol)
+                          " (" (opt-format/format-pct-delta vol-delta) " vs current)")
+                     (str "an estimated " (opt-format/format-pct target-vol) " volatility"))
+        return-clause (if (opt-format/finite-number? return-delta)
+                        (str "expected return " (opt-format/format-pct target-return)
+                             " (" (opt-format/format-pct-delta return-delta) " vs current)")
+                        (str "an estimated " (opt-format/format-pct target-return) " expected return"))
+        body (str "Targets " vol-clause " and " return-clause ".")
+        trades-clause (cond
+                        (not (opt-format/finite-number? trade-count)) nil
+                        (zero? trade-count) "No trades needed — you're already at target."
+                        (= 1 trade-count) "1 trade gets you there."
+                        :else (str trade-count " trades get you there."))]
+    [:section {:class ["optimizer-results-panel" "optimizer-recommendation-verdict"
+                       "rounded-xl" "border" "border-base-300" "bg-base-100/95" "p-4"]
+               :data-role "portfolio-optimizer-recommendation-verdict"}
+     [:p {:class ["text-[0.65rem]" "font-semibold" "uppercase" "tracking-[0.24em]" "text-trading-muted"]}
+      "Recommendation"]
+     [:p {:class ["mt-2" "text-sm" "font-medium" "text-trading-text"]} body]
+     (when trades-clause
+       [:p {:class ["mt-1" "text-[0.75rem]" "text-trading-muted"]
+            :data-role "portfolio-optimizer-recommendation-verdict-trades"}
+        trades-clause])]))
+
 (defn- history-lookback-label
   [result]
   (let [summary (:history-summary result)

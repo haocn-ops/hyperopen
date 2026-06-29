@@ -11,7 +11,7 @@
    (let [objective-kind (get-in draft [:objective :kind])]
      (controls/panel
       "portfolio-optimizer-objective-panel"
-      (controls/section-heading "02" "Objective" (controls/labelize objective-kind))
+      (controls/section-heading "Objective" (controls/labelize objective-kind))
       [:div {:class ["mt-3" "grid" "grid-cols-1" "gap-1.5" "sm:grid-cols-2"]}
        (objective-card "Minimum Variance" "Lowest risk - no return assumption. Recommended"
                        (= :minimum-variance objective-kind)

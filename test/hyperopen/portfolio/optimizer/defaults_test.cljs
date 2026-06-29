@@ -32,22 +32,19 @@
     (is (contains? draft :history-assumptions))
     (is (= {} (:history-assumptions draft)))))
 
-(deftest default-history-assumption-seeds-mode-specific-fields-test
-  (let [proxy (defaults/default-history-assumption :proxy)
-        conservative (defaults/default-history-assumption :conservative)]
-    (is (= {:behavior :proxy
-            :expected-return nil
-            :volatility nil
-            :proxy-instrument-id nil
-            :relationship :medium
-            :max-weight 0.05}
-           proxy))
+(deftest default-history-assumption-seeds-editable-conservative-anchors-test
+  (let [conservative (defaults/default-history-assumption :conservative)]
+    ;; Conservative is the only behavior, and its volatility/return anchors are
+    ;; pre-seeded (editable) so the user can accept or revise them rather than
+    ;; starting from blank.
     (is (= {:behavior :conservative
-            :expected-return nil
-            :volatility nil
+            :expected-return 0.0
+            :volatility 0.8
             :max-weight 0.03
             :correlation-floor 0.75}
            conservative))
+    (is (nil? (defaults/default-history-assumption :proxy))
+        "The removed :proxy behavior has no default.")
     (is (nil? (defaults/default-history-assumption :unknown)))))
 
 (deftest default-optimizer-state-preserves-run-and-scenario-contract-test

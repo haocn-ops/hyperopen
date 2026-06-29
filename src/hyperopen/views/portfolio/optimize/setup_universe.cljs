@@ -230,8 +230,22 @@
      (into [:div {:class ["text-xs"]}]
            (cons (selected-table-header)
                  (map selected-row selected-rows)))
-     [:p {:class ["px-2" "py-3" "text-xs" "text-trading-muted"]}
-      "No instruments selected yet."])])
+     ;; Prominent one-click fallback: when the universe is empty (e.g. account
+     ;; data wasn't ready in time for the auto-seed on a cold load), the dominant
+     ;; affordance is "Load my holdings" — the same action the From-holdings strip
+     ;; fires — so a user reaches a real portfolio in one click instead of
+     ;; hand-searching every asset. No-ops gracefully if there are no holdings.
+     [:div {:class ["flex" "flex-col" "items-start" "gap-2" "px-2" "py-3"]}
+      [:p {:class ["text-xs" "text-trading-muted"]}
+       "No assets selected yet."]
+      [:button {:type "button"
+                :class ["optimizer-primary-action" "border" "border-warning/70" "bg-warning/80"
+                        "px-4" "py-2" "text-[0.6875rem]" "font-semibold" "text-base-100"]
+                :data-role "portfolio-optimizer-universe-load-holdings"
+                :on {:click [[:actions/set-portfolio-optimizer-universe-from-current]]}}
+       "Load my holdings"]
+      [:p {:class ["text-[0.65625rem]" "text-trading-muted/80"]}
+       "or search above to build a custom set"]])])
 
 (defn universe-section
   ([state draft]
@@ -253,9 +267,7 @@
                :data-role "portfolio-optimizer-universe-panel"}
      [:div {:class ["flex" "items-center" "justify-between" "gap-3" "border-b"
                     "border-base-300" "pb-2"]}
-      [:p {:class section-title-class}
-       [:span {:class ["mr-2" "font-mono" "text-trading-muted/70"]} "01"]
-       "Universe"]
+      [:p {:class section-title-class} "Universe"]
       [:span {:class ["font-mono" "text-[0.65625rem]" "uppercase" "tracking-[0.08em]"
                       "text-trading-muted/70"]}
        (str (count universe) " included")]]

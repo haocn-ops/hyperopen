@@ -15,7 +15,6 @@
     :objective-kind
     :order-type
     :reason
-    :relationship
     :side
     :source
     :status

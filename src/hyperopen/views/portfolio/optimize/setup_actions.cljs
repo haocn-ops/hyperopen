@@ -124,7 +124,7 @@
                :on {:click [(if black-litterman?
                                [:actions/apply-portfolio-optimizer-objective-menu-selection-and-run]
                                [:actions/run-portfolio-optimizer-from-draft])]}}
-      (if running? "Running Optimization" "Run optimization")]
+      (if running? "Running Optimization" "Run on safe defaults")]
      [:button {:type "button"
                :class ["border" "border-base-300" "bg-base-200/30" "px-3" "py-2"
                        "whitespace-nowrap" "text-[0.6875rem]" "font-semibold" "text-trading-text"

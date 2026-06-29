@@ -53,20 +53,17 @@
         normalized (codec/normalize-worker-boundary
                     {:history-assumptions
                      {new-perp {:behavior "conservative"
-                                :relationship "high"
                                 :volatility 0.9
                                 :max-weight 0.03
                                 :correlation-floor 0.75}}})
         entry (get-in normalized [:history-assumptions "perp:NEW"])]
     (is (= {"perp:NEW" {:behavior :conservative
-                        :relationship :high
                         :volatility 0.9
                         :max-weight 0.03
                         :correlation-floor 0.75}}
            (:history-assumptions normalized))
-        "instrument-id key is stringified and :behavior/:relationship values keywordized")
-    (is (= :conservative (:behavior entry)))
-    (is (= :high (:relationship entry)))))
+        "instrument-id key is stringified and the :behavior value keywordized")
+    (is (= :conservative (:behavior entry)))))
 
 (deftest normalize-worker-boundary-preserves-unrelated-nested-map-keys-test
   (let [btc (keyword "perp:BTC")

@@ -72,6 +72,109 @@
                                  :summary {:ready-count 1 :blocked-count 0}
                                  :rows []}}}))
 
+(defn- solved-run-with-baseline
+  "A solved run carrying a current baseline (so vol/return deltas are non-nil) and a
+  configurable rebalance trade count, for exercising the recommendation verdict and
+  the rebalance CTA hierarchy."
+  [state {:keys [current-vol target-vol current-return target-return ready-count]}]
+  (fixtures/sample-last-successful-run
+   {:computed-at-ms 2600
+    :request-signature (request-signature-for-state state)
+    :result {:status :solved
+             :as-of-ms 2600
+             :instrument-ids ["perp:BTC"]
+             :target-weights [1.0]
+             :current-weights [0.0]
+             :target-weights-by-instrument {"perp:BTC" 1.0}
+             :current-weights-by-instrument {"perp:BTC" 0.0}
+             :expected-returns-by-instrument {"perp:BTC" target-return}
+             :current-expected-return current-return
+             :expected-return target-return
+             :current-volatility current-vol
+             :volatility target-vol
+             :current-performance {:in-sample-sharpe 0.8}
+             :performance {:in-sample-sharpe 1.0 :shrunk-sharpe 0.5}
+             :history-summary {:return-observations 2 :stale? false}
+             :return-model :historical-mean
+             :risk-model :sample-covariance
+             :diagnostics {:turnover 1.0 :gross-exposure 1.0 :net-exposure 1.0}
+             :rebalance-preview {:status :ready
+                                 :capital-usd 1000
+                                 :summary {:ready-count ready-count :blocked-count 0}
+                                 :rows []}}}))
+
+(defn- solved-baseline-view
+  [opts]
+  (let [scenario-id "draft"
+        state (ready-scenario-state scenario-id {:kind :historical-mean})
+        solved-run (solved-run-with-baseline state opts)]
+    (portfolio-view/portfolio-view
+     (-> state
+         (assoc-in [:portfolio :optimizer :run-state :request-signature]
+                   (:request-signature solved-run))
+         (assoc-in [:portfolio :optimizer :last-successful-run]
+                   solved-run)))))
+
+(deftest portfolio-optimizer-recommendation-leads-with-plain-language-verdict-test
+  (let [view-node (solved-baseline-view {:current-vol 0.30 :target-vol 0.24
+                                         :current-return 0.08 :target-return 0.10
+                                         :ready-count 3})
+        recommendation-tab (node-by-role view-node "portfolio-optimizer-recommendation-tab")
+        verdict (node-by-role view-node "portfolio-optimizer-recommendation-verdict")
+        verdict-text (str/join " " (collect-strings verdict))]
+    (is (some? verdict) "The recommendation tab leads with a plain-language verdict.")
+    ;; The verdict is the FIRST child of the recommendation tab, ahead of the
+    ;; results/frontier diagnostics (which still render below).
+    (is (= "portfolio-optimizer-recommendation-verdict"
+           (get-in (nth recommendation-tab 2) [1 :data-role])))
+    (is (some? (node-by-role view-node "portfolio-optimizer-results-surface")))
+    ;; Signed deltas, framed as estimates; volatility down and expected return up.
+    (is (str/includes? verdict-text "estimated volatility 24.00%"))
+    (is (str/includes? verdict-text "-6.00 pts vs current"))
+    (is (str/includes? verdict-text "+2.00 pts vs current"))
+    (is (str/includes? verdict-text "3 trades get you there"))))
+
+(deftest portfolio-optimizer-provenance-strip-drops-invariant-horizon-field-test
+  (let [view-node (solved-baseline-view {:current-vol 0.30 :target-vol 0.24
+                                         :current-return 0.08 :target-return 0.10
+                                         :ready-count 1})
+        provenance (node-by-role view-node "portfolio-optimizer-provenance-strip")
+        strings (set (collect-strings provenance))]
+    (is (not (contains? strings "Horizon")))
+    (is (not (contains? strings "Annualized")))))
+
+(deftest portfolio-optimizer-review-rebalance-is-the-single-primary-cta-test
+  (let [view-node (solved-baseline-view {:current-vol 0.30 :target-vol 0.24
+                                         :current-return 0.08 :target-return 0.10
+                                         :ready-count 3})
+        review (node-by-role view-node "portfolio-optimizer-scenario-review-rebalance")
+        rerun (node-by-role view-node "portfolio-optimizer-scenario-rerun")
+        review-classes (set (node-attr review :class))
+        rerun-classes (set (node-attr rerun :class))]
+    ;; Review rebalance reads as THE single primary action (amber solid); Rerun is
+    ;; demoted to neutral; Save and Refine remain present.
+    (is (contains? review-classes "bg-warning/80"))
+    (is (contains? rerun-classes "bg-base-200/40"))
+    (is (not (contains? rerun-classes "bg-primary/10")))
+    (is (some? (node-by-role view-node "portfolio-optimizer-scenario-save")))
+    (is (some? (node-by-role view-node "portfolio-optimizer-scenario-refine")))
+    (is (= [[:actions/set-portfolio-optimizer-results-tab :rebalance]]
+           (click-actions review)))))
+
+(deftest portfolio-optimizer-zero-trade-result-mutes-rebalance-affordances-test
+  (let [view-node (solved-baseline-view {:current-vol 0.24 :target-vol 0.24
+                                         :current-return 0.10 :target-return 0.10
+                                         :ready-count 0})
+        verdict-text (str/join " " (collect-strings
+                                    (node-by-role view-node "portfolio-optimizer-recommendation-verdict")))
+        review (node-by-role view-node "portfolio-optimizer-scenario-review-rebalance")
+        cta-text (str/join " " (collect-strings
+                                (node-by-role view-node "portfolio-optimizer-recommendation-rebalance-cta")))]
+    (is (str/includes? verdict-text "No trades needed"))
+    (is (some #{"Already at target"} (collect-strings review)))
+    (is (contains? (set (node-attr review :class)) "text-trading-muted"))
+    (is (str/includes? cta-text "Already at target"))))
+
 (defn- scenario-kpi-delta-classes
   ([current-return target-return current-vol target-vol]
    (scenario-kpi-delta-classes current-return target-return current-vol target-vol 0.7 1.2))

@@ -507,29 +507,21 @@
                                    :history-assumptions assumptions
                                    :metadata {:dirty? false}}}}})
 
-(deftest set-history-assumption-mode-seeds-mode-defaults-test
+(deftest set-history-assumption-mode-seeds-conservative-anchors-test
   (is (= [[:effects/save-many
            [[history-assumptions-path
              {"perp:NEW" {:behavior :conservative
-                          :expected-return nil
-                          :volatility nil
+                          :expected-return 0.0
+                          :volatility 0.8
                           :max-weight 0.03
                           :correlation-floor 0.75}}]
             [dirty-path true]]]]
          (actions/set-portfolio-optimizer-history-assumption-mode
           (ha-state {}) "perp:NEW" :conservative))
-      "Choosing a mode on a fresh asset seeds that mode's defaults and saves the whole map.")
-  (is (= [[:effects/save-many
-           [[history-assumptions-path
-             {"perp:NEW" {:behavior :proxy
-                          :expected-return nil
-                          :volatility nil
-                          :proxy-instrument-id nil
-                          :relationship :medium
-                          :max-weight 0.05}}]
-            [dirty-path true]]]]
-         (actions/set-portfolio-optimizer-history-assumption-mode
-          (ha-state {}) "perp:NEW" :proxy)))
+      "Choosing the conservative behavior on a fresh asset seeds editable anchors and saves the whole map.")
+  (is (= [] (actions/set-portfolio-optimizer-history-assumption-mode
+             (ha-state {}) "perp:NEW" :proxy))
+      "The removed :proxy behavior is a no-op.")
   (is (= [] (actions/set-portfolio-optimizer-history-assumption-mode
              (ha-state {}) "perp:NEW" :bogus))
       "An unknown mode is a no-op.")
@@ -537,27 +529,15 @@
              (ha-state {}) " " :conservative))
       "A blank instrument-id is a no-op."))
 
-(deftest set-history-assumption-mode-switch-preserves-return-and-volatility-test
+(deftest set-history-assumption-mode-reselect-is-a-no-op-test
   (let [filled (ha-state {"perp:NEW" {:behavior :conservative
                                       :expected-return 0.25
                                       :volatility 0.9
                                       :max-weight 0.03
                                       :correlation-floor 0.75}})]
-    (is (= [[:effects/save-many
-             [[history-assumptions-path
-               {"perp:NEW" {:behavior :proxy
-                            :expected-return 0.25
-                            :volatility 0.9
-                            :proxy-instrument-id nil
-                            :relationship :medium
-                            :max-weight 0.05}}]
-              [dirty-path true]]]]
-           (actions/set-portfolio-optimizer-history-assumption-mode
-            filled "perp:NEW" :proxy))
-        "Switching modes preserves expected return/volatility and reseeds mode-specific fields.")
     (is (= [] (actions/set-portfolio-optimizer-history-assumption-mode
                filled "perp:NEW" :conservative))
-        "Re-selecting the current mode is a no-op so user input is never discarded.")))
+        "Re-selecting the current (only) mode is a no-op so user input is never discarded.")))
 
 (deftest set-history-assumption-fields-parse-percent-on-existing-entry-test
   (let [conservative (ha-state {"perp:NEW" {:behavior :conservative
@@ -590,35 +570,12 @@
     (is (= [] (actions/set-portfolio-optimizer-history-assumption-expected-return
                conservative "perp:NEW" "")))))
 
-(deftest set-history-assumption-proxy-fields-test
-  (let [proxy (ha-state {"perp:NEW" {:behavior :proxy
-                                     :expected-return 0.25
-                                     :volatility 0.9
-                                     :proxy-instrument-id nil
-                                     :relationship :medium
-                                     :max-weight 0.05}})]
-    (is (= "perp:BTC"
-           (get-in (actions/set-portfolio-optimizer-history-assumption-proxy-instrument
-                    proxy "perp:NEW" "perp:BTC")
-                   [0 1 0 1 "perp:NEW" :proxy-instrument-id])))
-    (is (= [] (actions/set-portfolio-optimizer-history-assumption-proxy-instrument
-               proxy "perp:NEW" "perp:NEW"))
-        "A proxy cannot be the asset itself.")
-    (is (= :high
-           (get-in (actions/set-portfolio-optimizer-history-assumption-proxy-relationship
-                    proxy "perp:NEW" :high)
-                   [0 1 0 1 "perp:NEW" :relationship])))
-    (is (= [] (actions/set-portfolio-optimizer-history-assumption-proxy-relationship
-               proxy "perp:NEW" :extreme))
-        "An unknown relationship strength is a no-op.")))
-
 (deftest clear-history-assumption-removes-entry-test
-  (let [proxy (ha-state {"perp:NEW" {:behavior :proxy
+  (let [proxy (ha-state {"perp:NEW" {:behavior :conservative
                                      :expected-return 0.25
                                      :volatility 0.9
-                                     :proxy-instrument-id "perp:BTC"
-                                     :relationship :medium
-                                     :max-weight 0.05}
+                                     :max-weight 0.05
+                                     :correlation-floor 0.75}
                          "perp:OTHER" {:behavior :conservative
                                        :expected-return nil
                                        :volatility 0.5

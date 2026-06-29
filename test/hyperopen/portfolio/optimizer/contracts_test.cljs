@@ -3,6 +3,7 @@
             [clojure.spec.alpha :as s]
             [hyperopen.portfolio.optimizer.contract-fixtures :as contract-fixtures]
             [hyperopen.portfolio.optimizer.contracts :as contracts]
+            [hyperopen.portfolio.optimizer.contracts.migrations :as migrations]
             [hyperopen.portfolio.optimizer.fixtures :as optimizer-fixtures]))
 
 (def sample-request
@@ -332,13 +333,6 @@
                              :volatility 0.9
                              :max-weight 0.03
                              :correlation-floor 0.75}}]
-               ["proxy entry"
-                {"perp:NEW" {:behavior :proxy
-                             :expected-return 0.25
-                             :volatility 0.9
-                             :proxy-instrument-id "perp:BTC"
-                             :relationship :medium
-                             :max-weight 0.05}}]
                ["blank return/vol still structurally valid (readiness enforces completeness)"
                 {"perp:NEW" {:behavior :conservative
                              :expected-return nil
@@ -350,6 +344,41 @@
           (str label ": "
                (s/explain-str ::contracts/draft
                               (assoc draft :history-assumptions assumptions)))))))
+
+(deftest history-assumptions-draft-contract-rejects-removed-proxy-behavior-test
+  ;; The :proxy history-assumption behavior was removed; the draft spec is now
+  ;; conservative-only. Legacy persisted proxy drafts are converted to conservative
+  ;; by contracts.migrations on load before validation runs.
+  (let [draft (contract-fixtures/valid-draft)
+        proxy-assumptions {"perp:NEW" {:behavior :proxy
+                                       :expected-return 0.25
+                                       :volatility 0.9
+                                       :proxy-instrument-id "perp:BTC"
+                                       :relationship :medium
+                                       :max-weight 0.05}}]
+    (is (not (s/valid? ::contracts/draft
+                       (assoc draft :history-assumptions proxy-assumptions))))))
+
+(deftest migrate-draft-converts-legacy-proxy-assumptions-to-conservative-test
+  (let [draft (assoc (contract-fixtures/valid-draft)
+                     :history-assumptions
+                     {"perp:NEW" {:behavior :proxy
+                                  :expected-return 0.25
+                                  :volatility 0.9
+                                  :proxy-instrument-id "perp:BTC"
+                                  :relationship :medium
+                                  :max-weight 0.05}})
+        migrated (migrations/migrate-draft draft)
+        entry (get-in migrated [:history-assumptions "perp:NEW"])]
+    (is (= :conservative (:behavior entry))
+        "A legacy proxy entry is converted to conservative.")
+    (is (= 0.9 (:volatility entry)) "The user's volatility is preserved.")
+    (is (= 0.25 (:expected-return entry)) "The user's expected return is preserved.")
+    (is (= 0.75 (:correlation-floor entry)) "The conservative correlation floor is seeded.")
+    (is (nil? (:proxy-instrument-id entry)) "Proxy-only fields are dropped.")
+    (is (nil? (:relationship entry)))
+    (is (s/valid? ::contracts/draft migrated)
+        "The migrated draft passes the conservative-only spec.")))
 
 (deftest black-litterman-view-contract-accepts-supported-shapes-test
   (let [valid-views [["absolute instrument view"

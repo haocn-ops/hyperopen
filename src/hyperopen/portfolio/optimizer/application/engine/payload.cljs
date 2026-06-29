@@ -293,9 +293,17 @@
                                    :weights current-weights*
                                    :expected-returns expected-returns
                                    :risk-result risk-result})
-        current-portfolio-metrics* (or (current-portfolio-metrics
-                                        current-portfolio-analysis)
-                                       selected-current-metrics)
+        ;; Plot the Current marker on the SAME basis as the frontier/Target: the selected
+        ;; universe's weights + the selected risk-result covariance. The held-book
+        ;; current-portfolio-analysis covers a DIFFERENT, larger instrument set (the full
+        ;; account — e.g. spot dust positions outside the optimization universe) with its OWN
+        ;; covariance, which placed Current at a wildly different volatility from Target (~6x)
+        ;; even for a tiny rebalance — an apples-to-oranges comparison. Falling back to the
+        ;; held-book metrics only when there is no selected-universe current allocation keeps a
+        ;; marker in the edge case where the current book doesn't overlap the chosen universe.
+        current-portfolio-metrics* (or selected-current-metrics
+                                       (current-portfolio-metrics
+                                        current-portfolio-analysis))
         current-portfolio-instrument-ids (or (:instrument-ids
                                               current-portfolio-metrics*)
                                              instrument-ids)

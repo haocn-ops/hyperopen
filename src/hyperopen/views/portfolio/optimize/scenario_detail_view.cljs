@@ -8,6 +8,7 @@
             [hyperopen.views.portfolio.optimize.optimization-progress-panel :as optimization-progress-panel]
             [hyperopen.views.portfolio.optimize.rebalance-tab :as rebalance-tab-view]
             [hyperopen.views.portfolio.optimize.results-panel :as results-panel]
+            [hyperopen.views.portfolio.optimize.results-summary :as results-summary]
             [hyperopen.views.portfolio.optimize.scenario-objective-menu :as objective-menu]
             [hyperopen.views.portfolio.optimize.target-sigma :as target-sigma]
             [hyperopen.views.portfolio.optimize.tracking-panel :as tracking-panel]
@@ -22,6 +23,8 @@
     :on [[:actions/open-portfolio-optimizer-execution]]}
    {:key :tracking :label "Tracking" :data-role "portfolio-optimizer-scenario-tab-tracking"}
    {:key :inputs :label "Inputs" :data-role "portfolio-optimizer-scenario-tab-inputs"}])
+
+(declare recommendation-deltas)
 
 (defn- copy-scenario-link!
   [scenario-id]
@@ -51,7 +54,11 @@
         save-disabled? (or saving?
                            (not current-result?))
         can-refine? (boolean (:can-refine? refinement))
-        solved? (= :solved (:status result))]
+        solved? (= :solved (:status result))
+        trade-count (:trade-count (recommendation-deltas result))
+        no-trades? (and solved?
+                        (opt-format/finite-number? trade-count)
+                        (zero? trade-count))]
     [:header {:class ["optimizer-scenario-header"
                       "border-b"
                       "border-base-300"
@@ -140,16 +147,17 @@
                  :on (when-not save-disabled?
                        {:click [[:actions/open-portfolio-optimizer-scenario-save-modal]]})}
         (if saving? "Saving" "Save scenario")]
+       ;; Rerun demoted to neutral so a single action reads as primary.
        [:button {:type "button"
                  :class ["rounded-lg"
                          "border"
-                         "border-primary/50"
-                         "bg-primary/10"
+                         "border-base-300"
+                         "bg-base-200/40"
                          "px-2.5"
                          "py-1"
                          "text-[0.65625rem]"
                          "font-semibold"
-                         "text-primary"
+                         "text-trading-text"
                          "disabled:cursor-not-allowed"
                          "disabled:border-base-300"
                          "disabled:bg-base-200/40"
@@ -160,23 +168,21 @@
         (cond
           running? "Running"
           :else "Rerun")]
+       ;; Review rebalance is the single visually-primary action (amber solid,
+       ;; matching the app's primary-action convention). Muted + relabelled when
+       ;; the target already matches the current book.
        (when solved?
          [:button {:type "button"
-                   :class ["optimizer-review-rebalance-action"
-                           "rounded-lg"
-                           "border"
-                           "border-primary/50"
-                           "bg-primary/10"
-                           "px-2.5"
-                           "py-1"
-                           "text-[0.65625rem]"
-                           "font-semibold"
-                           "text-primary"
-                           "transition-colors"
-                           "hover:bg-primary/30"]
+                   :class (into ["optimizer-review-rebalance-action"
+                                 "optimizer-primary-action"
+                                 "rounded-lg" "border" "px-2.5" "py-1"
+                                 "text-[0.65625rem]" "font-semibold" "transition-colors"]
+                                (if no-trades?
+                                  ["border-base-300" "bg-base-200/40" "text-trading-muted"]
+                                  ["border-warning/70" "bg-warning/80" "text-base-100" "hover:bg-warning"]))
                    :data-role "portfolio-optimizer-scenario-review-rebalance"
                    :on {:click [[:actions/set-portfolio-optimizer-results-tab :rebalance]]}}
-          "Review rebalance"])]]]))
+          (if no-trades? "Already at target" "Review rebalance")])]]]))
 
 (defn- auto-recompute-stale-scenario!
   [_node]
@@ -230,20 +236,38 @@
          (opt-format/format-decimal value))
     "N/A"))
 
+(defn recommendation-deltas
+  "Single source of the current→target volatility/return deltas and the trade
+  count, so the recommendation headline and the KPI strip never disagree.
+  Volatility down is good and expected return up is good; deltas are nil when there
+  is no current baseline, and `trade-count` is nil when no rebalance preview exists."
+  [result]
+  (let [current-return (:current-expected-return result)
+        current-vol (:current-volatility result)
+        target-return (:expected-return result)
+        target-vol (:volatility result)
+        summary (:summary (:rebalance-preview result))]
+    {:current-return current-return
+     :current-vol current-vol
+     :target-return target-return
+     :target-vol target-vol
+     :return-delta (when (opt-format/finite-number? current-return)
+                     (- (or target-return 0) current-return))
+     :vol-delta (when (opt-format/finite-number? current-vol)
+                  (- (or target-vol 0) current-vol))
+     :trade-count (when summary
+                    (+ (or (:ready-count summary) 0)
+                       (or (:blocked-count summary) 0)))
+     :rebalance-status (:status (:rebalance-preview result))}))
+
 (defn- kpi-strip
   [result*]
-  (let [preview (:rebalance-preview result*)
+  (let [{:keys [current-return current-vol target-return target-vol
+                return-delta vol-delta]} (recommendation-deltas result*)
+        preview (:rebalance-preview result*)
         performance (:performance result*)
         current-performance (:current-performance result*)
         diagnostics (:diagnostics result*)
-        current-return (:current-expected-return result*)
-        current-vol (:current-volatility result*)
-        target-return (:expected-return result*)
-        target-vol (:volatility result*)
-        return-delta (when (opt-format/finite-number? current-return)
-                       (- (or target-return 0) current-return))
-        vol-delta (when (opt-format/finite-number? current-vol)
-                    (- (or target-vol 0) current-vol))
         current-sharpe (sharpe-from current-performance
                                     current-return
                                     current-vol)
@@ -354,7 +378,8 @@
                   (field "Risk"
                          (opt-format/display-label (or (:risk-model result*)
                                                        (get-in draft [:risk-model :kind]))))
-                  (field "Horizon" "Annualized")
+                  ;; "Horizon: Annualized" was a hard-coded invariant carrying zero
+                  ;; information — dropped to reduce provenance-strip noise.
                   (field "Funding"
                          (if (seq (:return-decomposition-by-instrument result*))
                            "Included"
@@ -432,26 +457,33 @@
   "Discoverable bridge from the recommendation read-flow to the rebalance tab.
   Switches tabs in-place (no navigation) so unsaved run state is preserved; the
   spectate/read-only gate lives downstream in the execution modal, so this stays
-  enabled in spectate mode (you can still review the rebalance)."
-  []
-  [:button {:type "button"
-            :class ["optimizer-review-rebalance-cta"
-                    "mt-3" "flex" "w-full" "items-center" "justify-between" "gap-3"
-                    "rounded-lg" "border" "border-primary/50" "bg-primary/10"
-                    "px-4" "py-3" "text-left" "text-primary"
-                    "transition-colors" "hover:bg-primary/30"]
-            :data-role "portfolio-optimizer-recommendation-rebalance-cta"
-            :on {:click [[:actions/set-portfolio-optimizer-results-tab :rebalance]]}}
-   [:span {:class ["flex" "flex-col" "gap-0.5"]}
-    [:span {:class ["text-[0.7rem]" "font-semibold"]}
-     "Review rebalance"]
-    [:span {:class ["text-[0.62rem]" "font-medium" "text-trading-muted"]}
-     "See the trades that move you from current to target allocation."]]
-   [:span {:class ["text-sm" "font-semibold"] :aria-hidden "true"} "→"]])
+  enabled in spectate mode (you can still review the rebalance). When the target
+  matches the current book (zero trades) it mutes and relabels so it doesn't invite
+  a no-op."
+  [trade-count]
+  (let [no-trades? (and (opt-format/finite-number? trade-count) (zero? trade-count))]
+    [:button {:type "button"
+              :class (into ["optimizer-review-rebalance-cta"
+                            "mt-3" "flex" "w-full" "items-center" "justify-between" "gap-3"
+                            "rounded-lg" "border" "px-4" "py-3" "text-left" "transition-colors"]
+                           (if no-trades?
+                             ["border-base-300" "bg-base-200/30" "text-trading-muted"]
+                             ["border-primary/50" "bg-primary/10" "text-primary" "hover:bg-primary/30"]))
+              :data-role "portfolio-optimizer-recommendation-rebalance-cta"
+              :on {:click [[:actions/set-portfolio-optimizer-results-tab :rebalance]]}}
+     [:span {:class ["flex" "flex-col" "gap-0.5"]}
+      [:span {:class ["text-[0.7rem]" "font-semibold"]}
+       (if no-trades? "Already at target" "Review rebalance")]
+      [:span {:class ["text-[0.62rem]" "font-medium" "text-trading-muted"]}
+       (if no-trades?
+         "Your current allocation already matches the target — no trades needed."
+         "See the trades that move you from current to target allocation.")]]
+     [:span {:class ["text-sm" "font-semibold"] :aria-hidden "true"} "→"]]))
 
 (defn- recommendation-tab
   [{:keys [last-successful-run
            draft
+           result
            stale?
            running?
            optimization-progress
@@ -465,19 +497,22 @@
               :data-role "portfolio-optimizer-recommendation-tab"}]
    (cond
      (solved-result? model)
-     (cond-> []
-       running? (conj (recompute-banner optimization-progress))
-       true (conj (results-panel/results-panel
-                   last-successful-run
-                   draft
-                   {:state state
-                    :readiness readiness
-                    :stale? (and stale? (not running?))
-                    :frontier-overlay-mode frontier-overlay-mode
-                    :constrain-frontier? constrain-frontier?
-                    :refinement refinement
-                    :include-rebalance? false}))
-       true (conj (review-rebalance-cta)))
+     (let [deltas (recommendation-deltas result)]
+       (cond-> []
+         ;; Lead with the plain-language verdict, before the analyst diagnostics.
+         true (conj (results-summary/verdict-headline deltas))
+         running? (conj (recompute-banner optimization-progress))
+         true (conj (results-panel/results-panel
+                     last-successful-run
+                     draft
+                     {:state state
+                      :readiness readiness
+                      :stale? (and stale? (not running?))
+                      :frontier-overlay-mode frontier-overlay-mode
+                      :constrain-frontier? constrain-frontier?
+                      :refinement refinement
+                      :include-rebalance? false}))
+         true (conj (review-rebalance-cta (:trade-count deltas)))))
 
      :else
      [(empty-tab "portfolio-optimizer-recommendation-empty"

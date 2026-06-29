@@ -77,10 +77,7 @@
   #{:taker :maker})
 
 (def history-assumption-behaviors
-  #{:proxy :conservative})
-
-(def history-assumption-relationships
-  #{:low :medium :high})
+  #{:conservative})
 
 (defn- absent-or-allowed?
   [allowed value]
@@ -241,15 +238,12 @@
        (finite-field? value :expected-return)
        (finite-field? value :volatility)
        (finite-field? value :max-weight)
-       ;; Mode-discriminating fields are always seeded by defaults, so they must
-       ;; be present and valid; expected-return / volatility stay nil-allowed
-       ;; (blank until the user fills them, completeness enforced by readiness).
-       (case (:behavior value)
-         :proxy (and (optional? non-blank-string? (:proxy-instrument-id value))
-                     (allowed-keyword? history-assumption-relationships
-                                       (:relationship value)))
-         :conservative (coercion/finite-number? (:correlation-floor value))
-         false)))
+       ;; Conservative is the only behavior; correlation-floor is always seeded by
+       ;; defaults. expected-return / volatility stay nil-allowed (blank until the
+       ;; user fills them, completeness enforced by readiness). Legacy :proxy entries
+       ;; are converted to :conservative on load (see contracts.migrations).
+       (= :conservative (:behavior value))
+       (coercion/finite-number? (:correlation-floor value))))
 
 (defn- history-assumptions?
   [value]

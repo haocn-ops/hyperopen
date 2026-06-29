@@ -548,24 +548,6 @@
   (update-history-assumption-field state instrument-id :max-weight
                                    (coercion/parse-percent-text value)))
 
-(defn set-portfolio-optimizer-history-assumption-proxy-instrument
-  [state instrument-id proxy-instrument-id]
-  (let [instrument-id* (common/non-blank-text instrument-id)
-        proxy* (common/non-blank-text proxy-instrument-id)]
-    ;; a proxy must be a different instrument.
-    (if (and instrument-id*
-             proxy*
-             (not= instrument-id* proxy*))
-      (update-history-assumption-field state instrument-id :proxy-instrument-id proxy*)
-      [])))
-
-(defn set-portfolio-optimizer-history-assumption-proxy-relationship
-  [state instrument-id relationship]
-  (let [relationship* (common/normalize-keyword-like relationship)]
-    (if (contains? history-assumptions/relationships relationship*)
-      (update-history-assumption-field state instrument-id :relationship relationship*)
-      [])))
-
 (defn clear-portfolio-optimizer-history-assumption
   [state instrument-id]
   (let [instrument-id* (common/non-blank-text instrument-id)

@@ -28,7 +28,6 @@
    (controls/disclosure-panel
     "portfolio-optimizer-advanced-overrides-shell"
     (controls/disclosure-heading
-     "05"
      "Advanced Overrides"
      (instrument-overrides-panel/overrides-trailing-label draft))
     (instrument-overrides-panel/instrument-overrides-panel draft))])

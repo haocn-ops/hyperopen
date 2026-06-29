@@ -5,8 +5,9 @@
             [hyperopen.views.portfolio.optimize.setup-controls :as controls]))
 
 (def ^:private intro-copy
-  (str "Return and volatility are not enough. HyperOpen also needs to know how this "
-       "asset moves relative to the rest of the portfolio."))
+  (str "This asset doesn't have enough history for a data-driven risk estimate. "
+       "Apply a conservative assumption - a high volatility with no diversification "
+       "credit, pre-filled and editable - or leave it excluded from this run."))
 
 (defn- percent-input
   [{:keys [label field role action]}]
@@ -21,76 +22,42 @@
              :on {:input [action]}}]
     [:span {:class ["font-mono" "text-[0.6875rem]" "text-trading-muted"]} "%"]]])
 
-(defn- mode-selector
+(defn- enable-conservative-button
+  "Single opt-in affordance for a not-yet-configured asset: there is only one
+  history-assumption behavior (conservative), so this seeds an editable conservative
+  entry rather than asking the user to pick a mode. Until clicked, the asset stays
+  excluded (the card shows the exclusion note)."
   [card]
   (let [id (:instrument-id card)]
-    (into [:div {:class ["mt-3" "grid" "grid-cols-2" "border" "border-base-300"]
-                 :data-role (str "portfolio-optimizer-history-assumption-mode-" id)}]
-          (map (fn [{:keys [value label]}]
-                 (controls/segmented-button
-                  label
-                  (= value (:mode card))
-                  (str "portfolio-optimizer-history-assumption-mode-" id "-" (name value))
-                  [(get-in card [:actions :set-mode]) id value]))
-               (:mode-options card)))))
-
-(defn- relationship-selector
-  [card]
-  (let [id (:instrument-id card)
-        selected (get-in card [:relationship :value])]
-    [:div {:class ["mt-2"]}
-     [:p {:class controls/eyebrow-class} "Relationship strength"]
-     (into [:div {:class ["mt-1" "grid" "grid-cols-3" "border" "border-base-300"]
-                  :data-role (str "portfolio-optimizer-history-assumption-relationship-" id)}]
-           (map (fn [{:keys [value label]}]
-                  (controls/segmented-button
-                   label
-                   (= value selected)
-                   (str "portfolio-optimizer-history-assumption-relationship-" id "-" (name value))
-                   [(get-in card [:actions :set-proxy-relationship]) id value]))
-                (get-in card [:relationship :options])))]))
-
-(defn- proxy-selector
-  [card]
-  (let [id (:instrument-id card)]
-    [:label {:class ["block" "mt-2" "border" "border-base-300" "bg-base-200/20" "p-2"]}
-     [:span {:class controls/eyebrow-class} "Proxy asset"]
-     (into [:select {:class (conj controls/input-class "mt-2")
-                     :data-role (str "portfolio-optimizer-history-assumption-proxy-" id)
-                     :value (or (get-in card [:proxy :selected-id]) "")
-                     :on {:change [[(get-in card [:actions :set-proxy-instrument])
-                                    id
-                                    [:event.target/value]]]}}
-            [:option {:value ""} "Select a proxy asset"]]
-           (map (fn [{:keys [value label]}]
-                  [:option {:value value} label])
-                (get-in card [:proxy :options])))]))
+    [:button {:type "button"
+              :class ["optimizer-primary-action" "mt-3" "w-full" "border" "border-warning/70"
+                      "bg-warning/80" "px-3" "py-2" "text-[0.6875rem]" "font-semibold" "text-base-100"]
+              :data-role (str "portfolio-optimizer-history-assumption-enable-" id)
+              :on {:click [[(get-in card [:actions :set-mode]) id :conservative]]}}
+     "Use a conservative assumption"]))
 
 (defn- card-fields
   [card]
-  (let [id (:instrument-id card)
-        proxy? (= :proxy (:mode card))]
-    (cond-> [:div {:class ["space-y-2"]}
-             (percent-input
-              {:label "Expected annual return"
-               :field (:expected-return card)
-               :role (str "portfolio-optimizer-history-assumption-return-" id)
-               :action [(get-in card [:actions :set-expected-return]) id
-                        [:event.target/value]]})
-             (percent-input
-              {:label "Expected annual volatility"
-               :field (:volatility card)
-               :role (str "portfolio-optimizer-history-assumption-volatility-" id)
-               :action [(get-in card [:actions :set-expected-volatility]) id
-                        [:event.target/value]]})]
-      proxy? (conj (proxy-selector card))
-      proxy? (conj (relationship-selector card))
-      :always (conj (percent-input
-                     {:label "Max weight cap"
-                      :field (:max-weight card)
-                      :role (str "portfolio-optimizer-history-assumption-max-weight-" id)
-                      :action [(get-in card [:actions :set-max-weight-cap]) id
-                               [:event.target/value]]})))))
+  (let [id (:instrument-id card)]
+    [:div {:class ["space-y-2"]}
+     (percent-input
+      {:label "Expected annual return"
+       :field (:expected-return card)
+       :role (str "portfolio-optimizer-history-assumption-return-" id)
+       :action [(get-in card [:actions :set-expected-return]) id
+                [:event.target/value]]})
+     (percent-input
+      {:label "Expected annual volatility"
+       :field (:volatility card)
+       :role (str "portfolio-optimizer-history-assumption-volatility-" id)
+       :action [(get-in card [:actions :set-expected-volatility]) id
+                [:event.target/value]]})
+     (percent-input
+      {:label "Max weight cap"
+       :field (:max-weight card)
+       :role (str "portfolio-optimizer-history-assumption-max-weight-" id)
+       :action [(get-in card [:actions :set-max-weight-cap]) id
+                [:event.target/value]]})]))
 
 (defn- card-errors
   [card]
@@ -112,16 +79,17 @@
        [:p {:class ["mt-1" "font-mono" "text-[0.6rem]" "uppercase" "tracking-[0.08em]"
                     "text-trading-muted/70"]}
         (:status-label card)]]
-      [:button {:type "button"
-                :class ["text-[0.6rem]" "uppercase" "tracking-[0.08em]"
-                        "text-trading-muted" "hover:text-warning"]
-                :data-role (str "portfolio-optimizer-history-assumption-clear-" id)
-                :on {:click [[(get-in card [:actions :clear]) id]]}}
-       "Clear"]]
+      (when (:mode card)
+        [:button {:type "button"
+                  :class ["text-[0.6rem]" "uppercase" "tracking-[0.08em]"
+                          "text-trading-muted" "hover:text-warning"]
+                  :data-role (str "portfolio-optimizer-history-assumption-clear-" id)
+                  :on {:click [[(get-in card [:actions :clear]) id]]}}
+         "Clear"])]
      [:p {:class ["text-[0.65rem]" "leading-[1.5]" "text-trading-muted"]} intro-copy]
-     (mode-selector card)
-     (when (:mode card)
-       (card-fields card))
+     (if (:mode card)
+       (card-fields card)
+       (enable-conservative-button card))
      (when (:note card)
        [:p {:class ["border" "border-warning/40" "bg-warning/10" "p-2"
                     "text-[0.65rem]" "text-warning"]

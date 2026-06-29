@@ -38,20 +38,23 @@
         children))
 
 (defn section-heading
-  [idx title trailing]
+  ;; No leading section number: the optimizer setup is a sovereign workbench, not
+  ;; an ordered wizard. Numbering the panels 01..05 falsely implied a required
+  ;; sequence; the only real gate to Run is "add >=1 asset" (see workspace
+  ;; run-triggerable?). The optional `trailing` eyebrow still carries at-a-glance
+  ;; state (chosen objective/model, "optional", "N active").
+  [title trailing]
   [:div {:class ["flex" "items-center" "justify-between" "gap-3" "border-b" "border-base-300" "pb-2"]}
-   [:p {:class section-title-class}
-    [:span {:class ["mr-2" "font-mono" "text-trading-muted/70"]} idx]
-    title]
+   [:p {:class section-title-class} title]
    (when trailing
      [:span {:class ["font-mono" "text-[0.65625rem]" "uppercase" "tracking-[0.08em]"
                       "text-trading-muted/70"]}
       trailing])])
 
 (defn disclosure-heading
-  [idx title trailing]
+  [title trailing]
   [:summary {:class ["cursor-pointer" "select-none" "focus:outline-none" "focus:text-warning"]}
-   (section-heading idx title trailing)])
+   (section-heading title trailing)])
 
 (defn segmented-button
   ([label selected? role action]

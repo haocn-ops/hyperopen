@@ -551,40 +551,6 @@
     (is (= :volatility (:missing warning)))
     (is (= "ETH needs an expected annual volatility." (:message warning)))))
 
-(deftest readiness-blocks-complete-proxy-as-not-applied-test
-  (let [readiness (setup-readiness/build-readiness
-                   (assumptions-state {:behavior :proxy
-                                       :expected-return 0.2
-                                       :volatility 0.9
-                                       :proxy-instrument-id "perp:BTC"
-                                       :relationship :medium
-                                       :max-weight 0.05}
-                                      {:kind :minimum-variance}))
-        warning (first (filter #(= "perp:ETH" (:instrument-id %))
-                               (:blocking-warnings readiness)))]
-    (is (= :missing-history-assumptions (:reason readiness)))
-    (is (= false (:runnable? readiness)))
-    (is (= :history-assumption-proxy-not-applied (:code warning)))
-    (is (= "ETH's proxy assumption is saved but isn't applied to the risk model yet, so it is excluded from this optimization."
-           (:message warning)))))
-
-(deftest readiness-blocks-proxy-without-proxy-instrument-test
-  (let [readiness (setup-readiness/build-readiness
-                   (assumptions-state {:behavior :proxy
-                                       :expected-return 0.2
-                                       :volatility 0.9
-                                       :proxy-instrument-id nil
-                                       :relationship :medium
-                                       :max-weight 0.05}
-                                      {:kind :minimum-variance}))
-        warning (first (filter #(= "perp:ETH" (:instrument-id %))
-                               (:blocking-warnings readiness)))]
-    (is (= :missing-history-assumptions (:reason readiness)))
-    (is (= :history-assumption-incomplete (:code warning)))
-    (is (= :proxy-instrument (:missing warning)))
-    (is (= "ETH is set to proxy behavior but no proxy asset is selected."
-           (:message warning)))))
-
 (deftest readiness-requires-expected-return-only-for-return-seeking-objectives-test
   (let [conservative {:behavior :conservative
                       :expected-return nil

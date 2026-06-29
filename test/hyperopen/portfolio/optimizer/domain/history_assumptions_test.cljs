@@ -36,21 +36,6 @@
       (is (not (history-assumptions/conservative-assumption-complete?
                 (assoc full :behavior :proxy) false))))))
 
-(deftest proxy-assumption-complete-test
-  (let [full {:behavior :proxy
-              :expected-return 0.25
-              :volatility 0.9
-              :proxy-instrument-id "perp:BTC"
-              :relationship :medium
-              :max-weight 0.05}]
-    (is (history-assumptions/proxy-assumption-complete? full true))
-    (is (not (history-assumptions/proxy-assumption-complete?
-              (assoc full :proxy-instrument-id nil) true)))
-    (is (not (history-assumptions/proxy-assumption-complete?
-              (dissoc full :relationship) true)))
-    (is (not (history-assumptions/proxy-assumption-complete?
-              (assoc full :expected-return nil) true)))))
-
 (deftest conservative-engine-inputs-extracts-universe-assets-test
   (let [request {:universe [{:instrument-id "perp:BTC"} {:instrument-id "perp:NEW"}]
                  :history-assumptions

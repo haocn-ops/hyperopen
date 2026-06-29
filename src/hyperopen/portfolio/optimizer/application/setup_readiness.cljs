@@ -27,13 +27,11 @@
     :proxy-validation-failed
     :validation-failed
     :history-assumption-required
-    :history-assumption-incomplete
-    :history-assumption-proxy-not-applied})
+    :history-assumption-incomplete})
 
 (def ^:private history-assumption-warning-codes
   #{:history-assumption-required
-    :history-assumption-incomplete
-    :history-assumption-proxy-not-applied})
+    :history-assumption-incomplete})
 
 (def ^:private missing-history-warning-codes
   #{:missing-history-coin
@@ -311,7 +309,7 @@
       (str label ": source refresh failed; cached optimizer history may be stale.")
 
       :history-assumption-required
-      (str label " needs a history assumption. Choose proxy behavior or conservative assumption.")
+      (str label " needs a history assumption. Add a conservative assumption, or remove the asset.")
 
       :history-assumption-incomplete
       (str label
@@ -319,12 +317,7 @@
              :volatility " needs an expected annual volatility."
              :expected-return " needs an expected annual return for this objective."
              :max-weight " needs a max weight cap."
-             :proxy-instrument " is set to proxy behavior but no proxy asset is selected."
-             :relationship " needs a relationship strength."
              " needs more history-assumption details."))
-
-      :history-assumption-proxy-not-applied
-      (str label "'s proxy assumption is saved but isn't applied to the risk model yet, so it is excluded from this optimization.")
 
       (or (some-> (:code warning) name)
           "Optimizer warning."))))
@@ -347,33 +340,15 @@
     (not (positive-number? (:max-weight entry)))
     :max-weight
 
-    (and (history-assumptions/proxy? entry)
-         (not (non-blank-text (:proxy-instrument-id entry))))
-    :proxy-instrument
-
-    (and (history-assumptions/proxy? entry)
-         (not (contains? history-assumptions/relationships (:relationship entry))))
-    :relationship
-
     :else nil))
 
 (defn- history-assumption-warning
   [entry return-required? instrument-id]
-  (cond
-    ;; A complete proxy assumption is collected but not yet folded into the
-    ;; covariance model, so the run must say so rather than silently exclude it.
-    (and (history-assumptions/proxy? entry)
-         (history-assumptions/proxy-assumption-complete? entry return-required?))
-    {:code :history-assumption-proxy-not-applied
-     :instrument-id instrument-id
-     :behavior :proxy}
-
-    ;; A mode is chosen but required fields are still missing.
-    :else
-    {:code :history-assumption-incomplete
-     :instrument-id instrument-id
-     :behavior (:behavior entry)
-     :missing (first-missing-assumption-field entry return-required?)}))
+  ;; A conservative assumption is chosen but required fields are still missing.
+  {:code :history-assumption-incomplete
+   :instrument-id instrument-id
+   :behavior (:behavior entry)
+   :missing (first-missing-assumption-field entry return-required?)})
 
 (defn- history-assumption-warnings
   "Honest guidance for dropped assets the user has started configuring. Assets with

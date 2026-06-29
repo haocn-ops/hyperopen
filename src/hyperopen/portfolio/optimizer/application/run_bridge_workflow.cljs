@@ -1,7 +1,6 @@
 (ns hyperopen.portfolio.optimizer.application.run-bridge-workflow
   (:require [hyperopen.portfolio.optimizer.application.progress :as progress]
-            [hyperopen.portfolio.optimizer.contracts :as contracts]
-            [hyperopen.portfolio.routes :as portfolio-routes]))
+            [hyperopen.portfolio.optimizer.contracts :as contracts]))
 
 (defn- run-state
   [state]
@@ -147,28 +146,16 @@
                   (failed-run-state (run-state state) computed-at-ms payload))
         (update-progress id progress/fail-progress computed-at-ms payload))))
 
-(defn- new-optimizer-route?
-  [state]
-  (= (:kind (portfolio-routes/parse-portfolio-route
-             (get-in state [:router :path])))
-     :optimize-new))
-
-(defn- result-path
-  [state]
-  (portfolio-routes/portfolio-optimize-scenario-path
-   (or (get-in state contracts/active-scenario-loaded-id-path)
-       "draft")))
-
 (defn- success-commands
-  [state state*]
-  (cond-> []
-    (new-optimizer-route? state)
-    (conj {:command/type :optimizer.workflow/navigate
-           :path (result-path state*)})
-
-    true
-    (conj {:command/type
-           :optimizer.workflow/refresh-portfolio-optimizer-rebalance-slippage-snapshots})))
+  [_state _state*]
+  ;; Phase 1 of the single-workspace collapse: a run on /optimize/new no longer
+  ;; force-navigates to the results page. The result reveals in-place in the
+  ;; workspace (context rail + KPI strip + the "View results" actions), so the user
+  ;; keeps their inputs in view instead of being teleported to a separate page.
+  ;; (Saved-{id} reruns already never navigated; the first save still promotes the
+  ;; draft to its own URL through the save flow.)
+  [{:command/type
+    :optimizer.workflow/refresh-portfolio-optimizer-rebalance-slippage-snapshots}])
 
 (defn handle-worker-message
   [{:keys [state message computed-at-ms]}]

@@ -155,7 +155,10 @@
   (let [constraints (:constraints draft)]
     (controls/disclosure-panel
      "portfolio-optimizer-constraints-panel"
-     (controls/disclosure-heading "04" "Constraints" "mandatory")
+     ;; "defaults applied", not "mandatory": every constraint is pre-filled from
+     ;; default-draft and none gate Run. The old "mandatory" label scared users
+     ;; into opening an 8-input panel they never need to touch.
+     (controls/disclosure-heading "Constraints" "defaults applied")
      [:div {:class ["mt-3" "grid" "grid-cols-1" "gap-2"]}
       (long-only-row constraints)
       (include-spot-row constraints)

@@ -25,7 +25,7 @@
             :data-role "portfolio-optimizer-setup-header"}
    [:div {:class ["flex" "items-center" "justify-between" "gap-4"]}
     [:div {:class ["min-w-0"]}
-     [:p {:class eyebrow-class} "Optimizer · portfolio / optimize / new"]
+     [:p {:class eyebrow-class} "Portfolio Optimizer"]
      [:div {:class ["mt-1" "flex" "flex-wrap" "items-center" "gap-2"]}
       [:h1 {:class ["text-lg" "font-medium" "tracking-[-0.01em]" "text-trading-text"]}
        (route-title route)]

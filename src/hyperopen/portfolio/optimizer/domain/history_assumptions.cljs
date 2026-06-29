@@ -3,17 +3,20 @@
 
   Some selected optimizer assets have little or no return history. The engine
   cannot estimate covariance for them from realized series, so it drops them and
-  the run is blocked. History assumptions let the user supply a stand-in risk
+  the run is blocked. A history assumption lets the user supply a stand-in risk
   treatment for such an asset:
 
     :conservative - no diversification credit. Use the user's volatility and a
                     correlation floor against the rest of the universe, capped to
                     a small max weight. This mode is engine-backed (see
-                    `augment-risk-model`).
+                    `augment-risk-model`). It is the ONLY history-assumption
+                    behavior; the fields are pre-seeded with editable anchors so the
+                    user can accept or revise them rather than starting from blank.
 
-    :proxy        - treat the asset like another asset at a chosen relationship
-                    strength. Collected and persisted, but NOT yet folded into the
-                    covariance model; readiness reports it as not-yet-applied.
+  (A former :proxy mode - map the asset to a related asset at a chosen relationship
+  strength - was removed: it was collected and persisted but the engine never folded
+  it into the covariance model, so it was pure wasted effort. Legacy persisted proxy
+  entries are migrated to conservative on load; see contracts.migrations.)
 
   This namespace is the ONE source of truth for the numeric presets so the engine,
   request-builder, readiness, defaults, and view models never disagree. All
@@ -21,33 +24,28 @@
   (:require [hyperopen.portfolio.optimizer.coercion :as coercion]))
 
 (def behaviors
-  "Supported history-assumption behaviors."
-  #{:proxy :conservative})
-
-(def relationships
-  "Proxy relationship-strength presets (user-facing copy says \"relationship\";
-  the implied correlation is derived, never shown as a raw number in the simple
-  UI)."
-  #{:low :medium :high})
-
-(def relationship-correlations
-  "Maps a proxy relationship strength to its implied correlation."
-  {:low 0.35
-   :medium 0.65
-   :high 0.85})
+  "Supported history-assumption behaviors. Conservative is the only behavior."
+  #{:conservative})
 
 (def conservative-correlation-floor
   "Correlation a conservative-mode asset is assumed to have against every other
   asset in the universe (no diversification credit)."
   0.75)
 
-(def default-proxy-max-weight
-  "Default max-weight cap for a proxy-mode assumption (5%)."
-  0.05)
-
 (def default-conservative-max-weight
   "Default max-weight cap for a conservative-mode assumption (3%)."
   0.03)
+
+(def default-conservative-volatility
+  "Pre-seeded, editable annual-volatility anchor for a no/short-history asset (80%).
+  Deliberately high: with no realized history the asset is treated as risky until the
+  user revises it."
+  0.8)
+
+(def default-conservative-return
+  "Pre-seeded, editable annual expected-return anchor for a no/short-history asset
+  (0% - no return edge assumed)."
+  0.0)
 
 (def short-history-min-observations
   "User-facing threshold for \"short history\", in native daily observations (~days).
@@ -59,34 +57,23 @@
   the meaningful bar. Tune this single constant to taste."
   360)
 
-(defn resolve-implied-correlation
-  "Implied correlation for a proxy relationship strength, or nil if unknown."
-  [relationship]
-  (get relationship-correlations relationship))
-
 (defn default-max-weight
   "Default max-weight cap for the given behavior."
   [behavior]
   (case behavior
-    :proxy default-proxy-max-weight
     :conservative default-conservative-max-weight
     nil))
 
 (defn default-assumption
-  "Default per-asset history-assumption draft for the given behavior. Mode-specific
-  fields are seeded; expected return/volatility are left blank for the user to fill.
+  "Default per-asset history-assumption draft for the given behavior. All fields are
+  pre-seeded with editable anchors (a conservative volatility and a 0% expected
+  return) so the user can accept or revise them rather than starting from blank.
   Returns nil for an unknown behavior."
   [behavior]
   (case behavior
-    :proxy {:behavior :proxy
-            :expected-return nil
-            :volatility nil
-            :proxy-instrument-id nil
-            :relationship :medium
-            :max-weight default-proxy-max-weight}
     :conservative {:behavior :conservative
-                   :expected-return nil
-                   :volatility nil
+                   :expected-return default-conservative-return
+                   :volatility default-conservative-volatility
                    :max-weight default-conservative-max-weight
                    :correlation-floor conservative-correlation-floor}
     nil))
@@ -108,12 +95,8 @@
   [entry]
   (= :conservative (:behavior entry)))
 
-(defn proxy?
-  [entry]
-  (= :proxy (:behavior entry)))
-
 (defn engine-backed?
-  "Only conservative assumptions are folded into the covariance model in V1."
+  "Only conservative assumptions are folded into the covariance model."
   [entry]
   (conservative? entry))
 
@@ -136,22 +119,10 @@
        (valid-cap? entry)
        (valid-return? entry return-required?)))
 
-(defn proxy-assumption-complete?
-  "True when a proxy entry has every required field. (Proxy is collected but not yet
-  folded into the covariance model in V1.)"
-  [entry return-required?]
-  (and (proxy? entry)
-       (coercion/positive-number? (:volatility entry))
-       (coercion/non-blank-text (:proxy-instrument-id entry))
-       (contains? relationships (:relationship entry))
-       (valid-cap? entry)
-       (valid-return? entry return-required?)))
-
 (defn assumption-complete?
   [entry return-required?]
-  (case (:behavior entry)
-    :conservative (conservative-assumption-complete? entry return-required?)
-    :proxy (proxy-assumption-complete? entry return-required?)
+  (if (conservative? entry)
+    (conservative-assumption-complete? entry return-required?)
     false))
 
 ;; --- Engine inputs (conservative covariance synthesis) ----------------------

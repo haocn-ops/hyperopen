@@ -86,10 +86,6 @@
     actions/set-portfolio-optimizer-history-assumption-expected-volatility
     :set-portfolio-optimizer-history-assumption-max-weight-cap
     actions/set-portfolio-optimizer-history-assumption-max-weight-cap
-    :set-portfolio-optimizer-history-assumption-proxy-instrument
-    actions/set-portfolio-optimizer-history-assumption-proxy-instrument
-    :set-portfolio-optimizer-history-assumption-proxy-relationship
-    actions/set-portfolio-optimizer-history-assumption-proxy-relationship
     :clear-portfolio-optimizer-history-assumption
     actions/clear-portfolio-optimizer-history-assumption
     :set-portfolio-optimizer-universe-search-query

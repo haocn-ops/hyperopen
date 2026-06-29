@@ -112,7 +112,10 @@
     (is (false?
          (get-in result [:state :portfolio :optimizer :draft :metadata :dirty?])))))
 
-(deftest handle-worker-message-navigates-new-route-to-current-draft-result-test
+(deftest handle-worker-message-on-new-route-reveals-result-in-place-without-navigating-test
+  ;; Single-workspace Phase 1: a run on /optimize/new reveals the result in-place
+  ;; rather than force-navigating to the results page, so the user keeps their
+  ;; inputs in view. The only post-run command is the slippage-snapshot refresh.
   (let [state {:router {:path "/portfolio/optimize/new"}
                :portfolio {:optimizer {:draft {:metadata {:dirty? true}}
                                         :optimization-progress
@@ -131,8 +134,7 @@
                            :type "optimizer-result"
                            :payload {:status :solved}}
                  :computed-at-ms 400})]
-    (is (= [{:command/type :optimizer.workflow/navigate
-             :path "/portfolio/optimize/draft"}
-            {:command/type
+    (is (= [{:command/type
              :optimizer.workflow/refresh-portfolio-optimizer-rebalance-slippage-snapshots}]
-           (:commands result)))))
+           (:commands result))
+        "No navigate command — the result reveals in-place on the workspace.")))

@@ -245,11 +245,6 @@
          (history-assumptions/conservative-assumption-complete? entry return-required?))
     :conservative
 
-    (and entry
-         (history-assumptions/proxy? entry)
-         (history-assumptions/proxy-assumption-complete? entry return-required?))
-    :using-proxy
-
     (some? (:behavior entry))
     :needs-assumptions
 

@@ -332,7 +332,10 @@
                    "overflow-hidden" "border" "border-base-300" "p-3"
                    "shadow-[0_12px_32px_rgba(0,0,0,0.45)]"
                    "md:absolute" "md:inset-auto" "md:right-0" "md:top-[calc(100%+4px)]"
-                   "md:w-[380px]" "md:max-h-[320px]"]
+                   ;; Cap the dropdown shorter than the row it anchors to so it stays
+                   ;; within the viewport even when content above (e.g. the
+                   ;; recommendation verdict) pushes the anchor row lower on the page.
+                   "md:w-[380px]" "md:max-h-[224px]"]
            :data-role "portfolio-optimizer-draft-add-asset-popover"}
      [:div {:class ["flex" "items-start" "justify-between" "gap-3"]}
       [:div

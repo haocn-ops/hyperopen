@@ -297,8 +297,6 @@
    :actions/set-portfolio-optimizer-history-assumption-expected-return ::portfolio-optimizer-instrument-value-args
    :actions/set-portfolio-optimizer-history-assumption-expected-volatility ::portfolio-optimizer-instrument-value-args
    :actions/set-portfolio-optimizer-history-assumption-max-weight-cap ::portfolio-optimizer-instrument-value-args
-   :actions/set-portfolio-optimizer-history-assumption-proxy-instrument ::portfolio-optimizer-instrument-value-args
-   :actions/set-portfolio-optimizer-history-assumption-proxy-relationship ::portfolio-optimizer-instrument-value-args
    :actions/clear-portfolio-optimizer-history-assumption ::portfolio-optimizer-instrument-id-args
    :actions/set-portfolio-optimizer-universe-search-query ::common/single-input-args
    :actions/set-portfolio-optimizer-draft-add-asset-open ::common/boolean-args

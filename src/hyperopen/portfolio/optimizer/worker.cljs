@@ -6,6 +6,20 @@
 (def ^:dynamic run-optimization-async
   engine/run-optimization-async)
 
+(def ^:private worker-solver-env-key
+  "HYPEROPEN_OPTIMIZER_WORKER_SOLVER")
+
+(defn- env-value
+  [key]
+  (when (exists? js/process)
+    (some-> js/process .-env (aget key))))
+
+(defn- worker-solver
+  []
+  (case (env-value worker-solver-env-key)
+    "quadprog" solver-adapter/solve-with-quadprog
+    solver-adapter/solve-with-osqp))
+
 (defn- post-message!
   [id type payload]
   (.postMessage js/self #js {:id id
@@ -22,7 +36,7 @@
   ([id request]
   (run-optimization-async
    (normalize-worker-request request)
-   {:solve-problem solver-adapter/solve-with-osqp
+   {:solve-problem (worker-solver)
     :on-progress (fn [payload]
                    (when id
                      (post-message! id "optimizer-progress" payload)))})))

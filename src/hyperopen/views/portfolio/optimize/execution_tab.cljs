@@ -1,9 +1,10 @@
 (ns hyperopen.views.portfolio.optimize.execution-tab
-  "Execution surface — the step after \"Stage trades for execution\". A dense,
-  phase-aware order list (staged → armed → running → done | halted | resting) with a
-  per-order type editor and an Execution-health diagnostics rail.
+  "Execution surface — where a solved rebalance is staged for review and commit. The
+  standalone Rebalance preview tab was retired; \"Rebalance\" CTAs open this tab directly.
+  A dense, phase-aware order list (staged → armed → running → done | halted | resting) with
+  a Buys/Sells flow summary, a per-order type editor and an Execution-health diagnostics rail.
 
-  This namespace holds the header, phase control bands, the 6-KPI strip, the health rail,
+  This namespace holds the header, phase control bands, the KPI strip, the health rail,
   and the latest-attempt panel. The order table + per-order editor live in the sibling
   namespace hyperopen.views.portfolio.optimize.execution-order-table; pure presentation
   helpers shared by both live in hyperopen.views.portfolio.optimize.execution-shared.
@@ -15,6 +16,34 @@
             [hyperopen.views.portfolio.optimize.execution-order-table :as order-table]
             [hyperopen.views.portfolio.optimize.execution-shared :as shared]
             [hyperopen.views.portfolio.optimize.format :as opt-format]))
+
+;; ── Buys/Sells flow (ported from the retired Rebalance preview) ───────────
+
+(defn- instrument-group-key
+  "Collapses multi-leg instruments under one asset name (e.g. a perp + spot leg of the
+  same asset count once), mirroring the retired rebalance preview so the Buys/Sells
+  asset counts agree with what the rebalance produced."
+  [labels-by-instrument instrument-id]
+  (let [value (or (get labels-by-instrument instrument-id)
+                  (str instrument-id))
+        unprefixed (last (str/split value #":"))
+        base (first (str/split unprefixed #"[/-]"))]
+    (if (seq base) base value)))
+
+(defn- side-totals
+  "Buys/Sells dollar flow across the tradeable (non-blocked) rows, so the headline
+  matches the ready-only staged notional and is never inflated by blocked rows."
+  [labels-by-instrument rows]
+  (reduce
+   (fn [acc {:keys [side delta-notional-usd instrument-id]}]
+     (let [amt (shared/abs-num delta-notional-usd)
+           asset (instrument-group-key labels-by-instrument instrument-id)]
+       (case side
+         :buy (-> acc (update :buys + amt) (update :buy-assets conj asset))
+         :sell (-> acc (update :sells + amt) (update :sell-assets conj asset))
+         acc)))
+   {:buys 0 :sells 0 :buy-assets #{} :sell-assets #{}}
+   (remove #(= :blocked (:status %)) rows)))
 
 ;; ── counts ──────────────────────────────────────────────────────────────
 
@@ -57,7 +86,7 @@
     :halted "· halted — partial fills sent"
     :running "· sending live orders"
     :armed "· armed — confirm to send"
-    "· staged from rebalance preview"))
+    "· staged from the rebalance"))
 
 (defn- overflow-menu
   [{:keys [phase]}]
@@ -111,8 +140,8 @@
       [:button {:type "button"
                 :class ["border" "border-base-300" "px-3" "py-2" "text-sm" "font-medium" "text-trading-muted"]
                 :data-role "portfolio-optimizer-execution-back"
-                :on {:click [[:actions/set-portfolio-optimizer-results-tab :rebalance]]}}
-       "Back to preview"])
+                :on {:click [[:actions/set-portfolio-optimizer-results-tab :recommendation]]}}
+       "Back to recommendation"])
     (when (= :staged phase)
       [:button {:type "button"
                 :class ["optimizer-primary-action" "border" "px-3" "py-2" "text-sm" "font-semibold"
@@ -456,8 +485,9 @@
      [:p {:class ["mt-0.5" "font-mono" "text-[0.65rem]" "tabular-nums" "text-trading-muted"]} sub])])
 
 (defn- kpi-strip
-  [{:keys [summary phase] :as model} rows]
-  (let [ready (filter #(contains? #{:ready :working} (:status %)) rows)
+  [{:keys [summary phase labels-by-instrument] :as model} rows]
+  (let [{:keys [buys sells buy-assets sell-assets]} (side-totals labels-by-instrument rows)
+        ready (filter #(contains? #{:ready :working} (:status %)) rows)
         submitted (filter #(= :submitted (:status %)) rows)
         resting (filter #(= :resting (:status %)) rows)
         failed (filter #(= :failed (:status %)) rows)
@@ -494,7 +524,7 @@
         margin-warn? (and (:warning margin) (not= :none (:warning margin)))
         orders-value (str filled " / " total)]
     [:section {:class ["optimizer-rebalance-kpis" "grid" "grid-cols-2" "border-b" "border-base-300"
-                       "bg-base-100/95" "sm:grid-cols-3" "lg:grid-cols-6"]
+                       "bg-base-100/95" "sm:grid-cols-4" "lg:grid-cols-4"]
                :data-role "portfolio-optimizer-execution-kpis"}
      (kpi {:data-role "portfolio-optimizer-execution-kpi-orders"
            :label "Orders filled"
@@ -511,6 +541,18 @@
            :label "Notional executed"
            :value (shared/format-knotional filled-notional)
            :sub (str "of " (shared/format-knotional staged-notional) " staged")})
+     ;; Buys/Sells directional flow, ported from the retired Rebalance preview so the
+     ;; at-a-glance in/out magnitude survives the one-click Rebalance → Execution flow.
+     (kpi {:data-role "portfolio-optimizer-execution-kpi-buys"
+           :label "Buys"
+           :value (str "+" (opt-format/format-usdc buys))
+           :value-class "text-trading-green"
+           :sub (str (count buy-assets) " assets")})
+     (kpi {:data-role "portfolio-optimizer-execution-kpi-sells"
+           :label "Sells"
+           :value (str "−" (opt-format/format-usdc sells))
+           :value-class "text-trading-red"
+           :sub (str (count sell-assets) " assets")})
      (kpi {:data-role "portfolio-optimizer-execution-kpi-margin"
            :label "Margin after"
            :value (opt-format/format-pct (:after-utilization margin))
@@ -695,4 +737,4 @@
               :data-role "portfolio-optimizer-execution-empty"}
         (shared/eyebrow "Execution")
         [:p {:class ["mt-2" "text-sm" "text-trading-muted"]}
-         "Stage a rebalance to review and commit trades. Run or load a scenario, then open the Rebalance preview and choose “Stage trades for execution.”"]])]))
+         "Run or load a scenario to stage its rebalance here for review and execution."]])]))

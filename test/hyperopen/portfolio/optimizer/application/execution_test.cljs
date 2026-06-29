@@ -1,7 +1,6 @@
 (ns hyperopen.portfolio.optimizer.application.execution-test
   (:require [cljs.test :refer-macros [deftest is]]
-            [hyperopen.portfolio.optimizer.application.execution :as execution]
-            [hyperopen.portfolio.optimizer.application.execution-order-type :as execution-order-type]))
+            [hyperopen.portfolio.optimizer.application.execution :as execution]))
 
 (def sample-preview
   {:status :partially-blocked
@@ -535,18 +534,3 @@
     (is (contains? ids "perp:BTC") "the filled leg is reversed")
     (is (not (contains? ids "perp:ETH")) "the resting (unfilled) leg is NOT reversed")
     (is (= 1 (count (:rows revert))))))
-
-(deftest recommended-routed-cost-matches-default-routing-test
-  ;; The rebalance "smart-routed" estimate must equal what Execution charges at its default
-  ;; routing: small clips cross (taker fee + slippage), large clips TWAP-cross, medium clips
-  ;; rest as passive maker orders (maker fee only, no slippage); blocked rows never count.
-  (let [c (fn [s f m] {:estimated-slippage-usd s :estimated-fee-usd f :maker-fee-usd m})
-        rows [{:row-id "S" :instrument-type :perp :side :buy :status :ready
-               :delta-notional-usd 1000 :cost (c 4 1 0.4)}      ; market: 4 + 1 = 5
-              {:row-id "B" :instrument-type :perp :side :buy :status :ready
-               :delta-notional-usd 80000 :cost (c 50 20 8)}     ; twap (crosses): 50 + 20 = 70
-              {:row-id "M" :instrument-type :perp :side :buy :status :ready
-               :delta-notional-usd 40000 :cost (c 30 12 3)}     ; passive (rests): maker 3
-              {:row-id "X" :instrument-type :perp :side :sell :status :blocked
-               :delta-notional-usd 5000 :cost (c 99 99 99)}]]   ; blocked: ignored
-    (is (= 78 (execution-order-type/recommended-routed-cost-usd rows)))))

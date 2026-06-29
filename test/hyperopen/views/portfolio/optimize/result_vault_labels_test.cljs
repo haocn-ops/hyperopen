@@ -2,8 +2,13 @@
   (:require [cljs.test :refer-macros [deftest is]]
             [clojure.string :as str]
             [hyperopen.portfolio.optimizer.fixtures :as fixtures]
-            [hyperopen.views.portfolio.optimize.rebalance-tab :as rebalance-tab]
             [hyperopen.views.portfolio.optimize.results-panel :as results-panel]))
+
+;; The standalone Rebalance preview tab (views.portfolio.optimize.rebalance-tab) was
+;; retired — its rebalance is now staged straight into Execution. The rebalance-tab
+;; vault-label / buys-sells / slippage-source coverage moved to execution-tab-test
+;; (which renders the same data through the execution surface). What remains here is the
+;; results-panel target-exposure vault-label coverage.
 
 (defn- node-children
   [node]
@@ -103,93 +108,3 @@
     (is (some? diamond))
     (is (not (str/includes? text vault-id)))
     (is (not (str/includes? text vault-address)))))
-
-(deftest rebalance-tab-renders-vault-result-labels-by-name-test
-  (let [vault-address "0x4dec0a851849056e259128464ef28ce78afa27f6"
-        vault-id (str "vault:" vault-address)
-        view-node (rebalance-tab/rebalance-tab
-                   {:result (solved-result vault-id "Growi Vault")})
-        text (node-text view-node)]
-    (is (str/includes? text "Growi Vault"))
-    (is (not (str/includes? text vault-id)))
-    (is (not (str/includes? text vault-address)))))
-
-(deftest rebalance-tab-buys-sells-exclude-blocked-rows-test
-  ;; A blocked sell (e.g. held spot) must not inflate the Buys/Sells headline; the
-  ;; tradeable buy is the only thing counted, keeping Sells at zero and consistent
-  ;; with the ready-only Gross trade KPI. Held spot also gets a friendlier note.
-  (let [view-node (rebalance-tab/rebalance-tab
-                   {:result
-                    (fixtures/sample-solved-result
-                     {:labels-by-instrument {"perp:BTC" "BTC"
-                                             "spot:PURR" "PURR"}
-                      :rebalance-preview
-                      {:status :partially-blocked
-                       :capital-usd 10000
-                       :summary {:ready-count 1
-                                 :blocked-count 1
-                                 :gross-trade-notional-usd 300
-                                 :estimated-fees-usd 0
-                                 :estimated-slippage-usd 0}
-                       :rows [{:instrument-id "perp:BTC"
-                               :instrument-type :perp
-                               :coin "BTC"
-                               :status :ready
-                               :side :buy
-                               :quantity 3
-                               :price 100
-                               :delta-notional-usd 300
-                               :cost {:source :snapshot
-                                      :estimated-slippage-usd 0
-                                      :slippage-bps 0
-                                      :depth-status :full-visible-depth}}
-                              {:instrument-id "spot:PURR"
-                               :status :blocked
-                               :reason :spot-submit-unsupported
-                               :side :sell
-                               :delta-notional-usd -50000}]}})})
-        buys-text (node-text (node-by-role view-node
-                                           "portfolio-optimizer-rebalance-kpi-buys"))
-        sells-text (node-text (node-by-role view-node
-                                            "portfolio-optimizer-rebalance-kpi-sells"))
-        text (node-text view-node)]
-    (is (str/includes? buys-text "300"))
-    ;; Blocked sell notional is excluded -> Sells is zero, not 50,000.
-    (is (not (str/includes? sells-text "50,000")))
-    (is (str/includes? sells-text "$0"))
-    ;; Held spot renders with a manage-manually note rather than a raw keyword.
-    (is (str/includes? text "spot · manage manually"))))
-
-(deftest rebalance-tab-renders-slippage-source-bps-and-freshness-test
-  (let [view-node (rebalance-tab/rebalance-tab
-                   {:result
-                    (fixtures/sample-solved-result
-                     {:labels-by-instrument {"perp:BTC" "BTC"}
-                      :rebalance-preview
-                      {:status :ready
-                       :capital-usd 300
-                       :summary {:ready-count 1
-                                 :blocked-count 0
-                                 :gross-trade-notional-usd 300
-                                 :estimated-fees-usd 0
-                                 :estimated-slippage-usd 5}
-                       :rows [{:instrument-id "perp:BTC"
-                               :instrument-type :perp
-                               :coin "BTC"
-                               :status :ready
-                               :side :buy
-                               :quantity 3
-                               :price 100
-                               :delta-notional-usd 300
-                               :cost {:source :snapshot
-                                      :estimated-slippage-usd 5
-                                      :slippage-bps 166.66666666666669
-                                      :age-ms 1000
-                                      :depth-status :full-visible-depth}}]}})})
-        text (node-text view-node)]
-    (is (str/includes? text "snapshot"))
-    (is (str/includes? text "1 snapshot"))
-    (is (str/includes? text "max age 1s old"))
-    (is (str/includes? text "166.67 bps"))
-    (is (str/includes? text "1s old"))
-    (is (str/includes? text "full depth"))))

@@ -6,7 +6,6 @@
             [hyperopen.views.portfolio.optimize.format :as opt-format]
             [hyperopen.views.portfolio.optimize.inputs-tab :as inputs-tab-view]
             [hyperopen.views.portfolio.optimize.optimization-progress-panel :as optimization-progress-panel]
-            [hyperopen.views.portfolio.optimize.rebalance-tab :as rebalance-tab-view]
             [hyperopen.views.portfolio.optimize.results-panel :as results-panel]
             [hyperopen.views.portfolio.optimize.results-summary :as results-summary]
             [hyperopen.views.portfolio.optimize.scenario-objective-menu :as objective-menu]
@@ -16,10 +15,10 @@
 
 (def ^:private tabs
   [{:key :recommendation :label "Recommendation" :data-role "portfolio-optimizer-scenario-tab-recommendation"}
-   {:key :rebalance :label "Rebalance preview" :data-role "portfolio-optimizer-scenario-tab-rebalance"}
    {:key :execution :label "Execution" :data-role "portfolio-optimizer-scenario-tab-execution"
-    ;; Entering Execution rebuilds the plan snapshot, so route the tab click through
-    ;; the open action rather than the bare set-tab.
+    ;; Entering Execution rebuilds the plan snapshot from the latest rebalance, so route
+    ;; the tab click through the open action rather than the bare set-tab. There is no
+    ;; separate Rebalance preview tab — the rebalance is staged straight into Execution.
     :on [[:actions/open-portfolio-optimizer-execution]]}
    {:key :tracking :label "Tracking" :data-role "portfolio-optimizer-scenario-tab-tracking"}
    {:key :inputs :label "Inputs" :data-role "portfolio-optimizer-scenario-tab-inputs"}])
@@ -156,9 +155,11 @@
         (cond
           running? "Running"
           :else "Rerun")]
-       ;; Review rebalance is the single visually-primary action (amber solid,
-       ;; matching the app's primary-action convention). Muted + relabelled when
-       ;; the target already matches the current book.
+       ;; Review & execute is the single visually-primary action (amber solid,
+       ;; matching the app's primary-action convention). It stages the rebalance
+       ;; straight into the Execution tab (review and commit), skipping the retired
+       ;; standalone preview. Muted + relabelled when the target already matches the
+       ;; current book.
        (when solved?
          [:button {:type "button"
                    :class (into ["optimizer-review-rebalance-action"
@@ -169,8 +170,8 @@
                                   ["border-base-300" "bg-base-200/40" "text-trading-muted"]
                                   ["border-warning/70" "bg-warning/80" "text-base-100" "hover:bg-warning"]))
                    :data-role "portfolio-optimizer-scenario-review-rebalance"
-                   :on {:click [[:actions/set-portfolio-optimizer-results-tab :rebalance]]}}
-          (if no-trades? "Already at target" "Review rebalance")])]]]))
+                   :on {:click [[:actions/open-portfolio-optimizer-execution]]}}
+          (if no-trades? "Already at target" "Review & execute")])]]]))
 
 (defn- auto-recompute-stale-scenario!
   [_node]
@@ -442,12 +443,12 @@
    (optimization-progress-panel/progress-panel optimization-progress {:show-header? false})])
 
 (defn- review-rebalance-cta
-  "Discoverable bridge from the recommendation read-flow to the rebalance tab.
-  Switches tabs in-place (no navigation) so unsaved run state is preserved; the
-  spectate/read-only gate lives downstream in the execution modal, so this stays
-  enabled in spectate mode (you can still review the rebalance). When the target
-  matches the current book (zero trades) it mutes and relabels so it doesn't invite
-  a no-op."
+  "Discoverable bridge from the recommendation read-flow straight into Execution.
+  Stages the rebalance into the Execution tab in-place (no separate preview step) so
+  unsaved run state is preserved; the spectate/read-only gate lives downstream in the
+  execution surface, so this stays enabled in spectate mode (you can still review the
+  staged trades). When the target matches the current book (zero trades) it mutes and
+  relabels so it doesn't invite a no-op."
   [trade-count]
   (let [no-trades? (and (opt-format/finite-number? trade-count) (zero? trade-count))]
     [:button {:type "button"
@@ -458,14 +459,14 @@
                              ["border-base-300" "bg-base-200/30" "text-trading-muted"]
                              ["border-primary/50" "bg-primary/10" "text-primary" "hover:bg-primary/30"]))
               :data-role "portfolio-optimizer-recommendation-rebalance-cta"
-              :on {:click [[:actions/set-portfolio-optimizer-results-tab :rebalance]]}}
+              :on {:click [[:actions/open-portfolio-optimizer-execution]]}}
      [:span {:class ["flex" "flex-col" "gap-0.5"]}
       [:span {:class ["text-[0.7rem]" "font-semibold"]}
-       (if no-trades? "Already at target" "Review rebalance")]
+       (if no-trades? "Already at target" "Review & execute")]
       [:span {:class ["text-[0.62rem]" "font-medium" "text-trading-muted"]}
        (if no-trades?
          "Your current allocation already matches the target — no trades needed."
-         "See the trades that move you from current to target allocation.")]]
+         "Review and execute the trades that move you from current to target allocation.")]]
      [:span {:class ["text-sm" "font-semibold"] :aria-hidden "true"} "→"]]))
 
 (defn- recommendation-tab
@@ -507,21 +508,9 @@
                  "Recommendation"
                  "Run or load this scenario to review target allocation, frontier, diagnostics, and rebalance context.")])))
 
-(defn- rebalance-tab
-  [{:keys [last-successful-run] :as model}]
-  [:section {:class ["space-y-4"]
-             :data-role "portfolio-optimizer-rebalance-tab"}
-   (if (solved-result? model)
-     (rebalance-tab-view/rebalance-tab
-      last-successful-run)
-     (empty-tab "portfolio-optimizer-rebalance-empty"
-                "Rebalance Preview"
-                "A rebalance preview is available after a successful optimization run."))])
-
 (defn- tab-body
   [{:keys [state selected-tab] :as model}]
   (case selected-tab
-    :rebalance (rebalance-tab model)
     :execution [:section {:class ["space-y-4"]
                           :data-role "portfolio-optimizer-execution-tab-shell"}
                 (execution-tab/execution-tab state)]

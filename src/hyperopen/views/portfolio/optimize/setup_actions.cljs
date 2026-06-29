@@ -77,7 +77,9 @@
    [:actions/set-portfolio-optimizer-results-tab tab]])
 
 (defn- result-nav-button
-  [{:keys [result-path tab label data-role accent?]}]
+  "Opens the results surface from the setup route. By default it navigates and selects
+  `tab`; pass `actions` to override the click vector (e.g. navigate + stage execution)."
+  [{:keys [result-path tab label data-role accent? actions]}]
   [:button {:type "button"
             :class (into ["border" "px-3" "py-2" "whitespace-nowrap"
                           "text-[0.6875rem]" "font-semibold" "scroll-mb-12"]
@@ -85,7 +87,7 @@
                            ["border-primary/50" "bg-primary/10" "text-primary"]
                            ["border-base-300" "bg-base-200/30" "text-trading-text"]))
             :data-role data-role
-            :on {:click (results-tab-nav-actions result-path tab)}}
+            :on {:click (or actions (results-tab-nav-actions result-path tab))}}
    label])
 
 (defn setup-bottom-actions
@@ -141,10 +143,11 @@
                            :data-role "portfolio-optimizer-view-results"}))
      (when (and solved-run? result-path)
        (result-nav-button {:result-path result-path
-                           :tab :rebalance
-                           :label "Rebalance preview"
+                           :label "Review & execute"
                            :data-role "portfolio-optimizer-view-rebalance"
-                           :accent? true}))
+                           :accent? true
+                           :actions [[:actions/navigate result-path]
+                                     [:actions/open-portfolio-optimizer-execution]]}))
      [:div {:class ["flex" "max-w-full" "flex-col" "items-start" "gap-1.5" "font-mono"
                     "sm:ml-auto" "sm:min-w-[220px]" "sm:items-end" "sm:text-right"]}
       [:div {:class ["flex" "items-center" "gap-2" "text-[0.6875rem]" "font-semibold"

@@ -87,7 +87,7 @@
    :summary {:ready-count 1 :blocked-count 1 :skipped-count 0
              :gross-ready-notional-usd 1000
              :estimated-fees-usd 10 :estimated-slippage-usd 5
-             :margin {:after-utilization 0.42 :warning :none}}
+             :margin {:after-utilization 0.42 :after-gross-leverage 1.85 :before-gross-leverage 1.79 :free-margin-usd 8600 :capital-usd 10000 :warning :none}}
    :rows [{:row-id "perp:BTC" :instrument-id "perp:BTC" :instrument-type :perp
            :status :ready :side :buy :quantity 0.25 :order-type :market
            :delta-notional-usd 1000
@@ -103,7 +103,7 @@
   (let [plan {:status :partially-blocked :execution-disabled? false
               :summary {:ready-count 1 :blocked-count 1
                         :gross-ready-notional-usd 300
-                        :margin {:after-utilization 0.42 :warning :none}}
+                        :margin {:after-utilization 0.42 :after-gross-leverage 1.85 :before-gross-leverage 1.79 :free-margin-usd 8600 :capital-usd 10000 :warning :none}}
               :rows [{:row-id "perp:BTC" :instrument-id "perp:BTC" :instrument-type :perp
                       :status :ready :side :buy :quantity 3 :delta-notional-usd 300
                       :cost {:source :snapshot :slippage-bps 0 :estimated-slippage-usd 0}}
@@ -133,7 +133,7 @@
     (is (= [[:actions/set-portfolio-optimizer-execution-phase :armed]] (click-actions arm)))
     ;; cost-source + margin honesty signals + blocked reason are surfaced
     (is (some #(str/includes? % "snapshot") strings))
-    (is (contains? strings "Margin after"))
+    (is (contains? strings "Account leverage after"))
     (is (contains? strings "spot-submit-unsupported"))))
 
 (deftest execution-tab-orders-largest-first-exact-notional-test
@@ -143,7 +143,7 @@
   (let [plan {:status :ready :execution-disabled? false
               :summary {:ready-count 2 :blocked-count 0
                         :gross-ready-notional-usd 2300
-                        :margin {:after-utilization 0.3 :warning :none}}
+                        :margin {:after-utilization 0.3 :after-gross-leverage 1.85 :before-gross-leverage 1.79 :free-margin-usd 8600 :capital-usd 10000 :warning :none}}
               :rows [{:row-id "perp:SMALL" :instrument-id "perp:SMALL" :instrument-type :perp
                       :status :ready :side :buy :quantity 1 :order-type :market
                       :delta-notional-usd 300
@@ -265,11 +265,11 @@
     (is (= [[:actions/confirm-portfolio-optimizer-execution]] (click-actions confirm)))))
 
 (deftest execution-tab-armed-restates-money-figures-test
-  ;; The commit moment must restate how much money moves (buys/sells/gross/margin-after),
+  ;; The commit moment must restate how much money moves (buys/sells/gross/leverage),
   ;; not just the order count, and the commit button must carry the reserved danger style.
   (let [plan (assoc staged-plan :summary {:ready-count 1 :blocked-count 1
                                           :gross-ready-notional-usd 1000
-                                          :margin {:after-utilization 0.42 :warning :none}})
+                                          :margin {:after-utilization 0.42 :after-gross-leverage 1.85 :before-gross-leverage 1.79 :free-margin-usd 8600 :capital-usd 10000 :warning :none}})
         view-node (scenario-view :execution
                                  {:execution {:status :idle :history []}
                                   :execution-modal {:open? true :phase :armed :plan plan}})
@@ -280,7 +280,8 @@
     (is (str/includes? ftext "buys"))
     (is (str/includes? ftext "sells"))
     (is (str/includes? ftext "gross"))
-    (is (str/includes? ftext "margin after"))
+    (is (str/includes? ftext "leverage"))
+    (is (str/includes? ftext "1.85x"))
     ;; the irreversible commit no longer reuses the amber primary look of safe actions
     (is (str/includes? (str/join " " (get-in confirm [1 :class])) "optimizer-exec-commit"))))
 
@@ -367,7 +368,7 @@
                                   {:open? true :phase :staged
                                    :plan {:status :partially-blocked
                                           :summary {:ready-count 0 :blocked-count 1
-                                                    :margin {:after-utilization 0.1 :warning :none}}
+                                                    :margin {:after-utilization 0.1 :after-gross-leverage 1.85 :before-gross-leverage 1.79 :free-margin-usd 8600 :capital-usd 10000 :warning :none}}
                                           :rows [{:row-id vault-id :instrument-id vault-id
                                                   :status :blocked :side :sell
                                                   :reason :vault-submit-unsupported

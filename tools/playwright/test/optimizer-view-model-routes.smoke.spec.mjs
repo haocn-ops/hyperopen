@@ -452,24 +452,25 @@ test("portfolio optimizer setup and retained draft detail routes render through 
   await expect(page.locator("[data-role='portfolio-optimizer-recommendation-stale-blocked']"))
     .toHaveCount(0);
 
-  const navigationEntriesBeforeRebalanceClick = await page.evaluate(() =>
+  const navigationEntriesBeforeExecutionClick = await page.evaluate(() =>
     performance.getEntriesByType("navigation").length
   );
 
-  await page.locator("[data-role='portfolio-optimizer-scenario-tab-rebalance']").click();
+  // The standalone Rebalance preview tab was retired — the rebalance is staged straight
+  // into Execution. Entering Execution must switch the tab in place (no full navigation)
+  // and render the execution surface from the view model.
+  await page.locator("[data-role='portfolio-optimizer-scenario-tab-execution']").click();
 
-  const rebalanceRoute = await page.evaluate(() => ({
+  const executionRoute = await page.evaluate(() => ({
     pathname: window.location.pathname,
     selectedTab: new URL(window.location.href).searchParams.get("otab")
   }));
-  expect(rebalanceRoute).toEqual({
+  expect(executionRoute).toEqual({
     pathname: "/portfolio/optimize/draft",
-    selectedTab: "rebalance"
+    selectedTab: "execution"
   });
-  await expect(page.locator("[data-role='portfolio-optimizer-rebalance-review-surface']"))
+  await expect(page.locator("[data-role='portfolio-optimizer-execution-tab-shell']"))
     .toBeVisible();
-  await expect(page.locator("[data-role='portfolio-optimizer-rebalance-empty']"))
-    .toHaveCount(0);
   await expect.poll(async () => {
     const result = await readOptimizerState(page, [
       "portfolio",
@@ -480,10 +481,10 @@ test("portfolio optimizer setup and retained draft detail routes render through 
     return result?.status;
   }).toBe("solved");
 
-  const navigationEntriesAfterRebalanceClick = await page.evaluate(() =>
+  const navigationEntriesAfterExecutionClick = await page.evaluate(() =>
     performance.getEntriesByType("navigation").length
   );
-  expect(navigationEntriesAfterRebalanceClick).toBe(navigationEntriesBeforeRebalanceClick);
+  expect(navigationEntriesAfterExecutionClick).toBe(navigationEntriesBeforeExecutionClick);
 });
 
 test("portfolio optimizer setup explains rejected solver output @smoke @regression", async ({ page }) => {

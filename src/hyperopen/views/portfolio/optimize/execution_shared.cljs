@@ -47,6 +47,50 @@
 (def effective-type execution-order-type/effective-type)
 (def row-params execution-order-type/row-params)
 
+;; ── commit-moment margin / leverage copy ──────────────────────────────────
+;; The execution figure is account leverage (gross notional ÷ equity, the same
+;; metric the account-equity panels show as "Cross/Unified Account Leverage"),
+;; not a maintenance-margin ratio. The :warning still rides margin utilization
+;; (margin used ÷ equity) so a thin-headroom commit is flagged red.
+
+(defn margin-warn?
+  [margin]
+  (boolean (and (:warning margin) (not= :none (:warning margin)))))
+
+(defn format-compact-usd
+  "Compact $ with M/k suffixes for headroom figures (e.g. $4.62M, $8.6k, $940)."
+  [value]
+  (let [amount (abs-num value)]
+    (cond
+      (>= amount 1e6) (str "$" (opt-format/format-decimal (/ amount 1e6) {:maximum-fraction-digits 2}) "M")
+      (>= amount 1000) (str "$" (opt-format/format-decimal (/ amount 1000) {:maximum-fraction-digits 1}) "k")
+      :else (opt-format/format-usdc amount {:maximum-fraction-digits 0}))))
+
+(defn leverage-after-label
+  "Projected account leverage multiple after the rebalance, e.g. \"1.85x\"."
+  [margin]
+  (opt-format/format-multiple (:after-gross-leverage margin)))
+
+(defn leverage-headroom-sub
+  "Sub-line under the leverage figure: prior leverage + free-margin headroom, or a
+  thin-headroom caution when margin utilization is in warning range. `full?` appends
+  the equity base (for the wider health rail)."
+  ([margin] (leverage-headroom-sub margin false))
+  ([margin full?]
+   (if (margin-warn? margin)
+     "thin margin headroom — review before arming"
+     (let [before (:before-gross-leverage margin)
+           free (:free-margin-usd margin)
+           equity (:capital-usd margin)
+           was (when (finite before) (str "was " (opt-format/format-multiple before)))
+           head (when (finite free)
+                  (str (format-compact-usd free) " free"
+                       (when (and full? (finite equity))
+                         (str " of " (format-compact-usd equity) " equity"))))]
+       (cond
+         (and was head) (str was " · " head)
+         :else (or was head ""))))))
+
 ;; ── shared bits ─────────────────────────────────────────────────────────
 
 (defn eyebrow

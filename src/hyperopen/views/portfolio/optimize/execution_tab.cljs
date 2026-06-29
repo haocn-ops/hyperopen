@@ -218,8 +218,9 @@
         type-summary (order-summary-line model rows)
         gross (:gross-ready-notional-usd summary)
         margin (:margin summary)
-        after-util (:after-utilization margin)
-        margin-warn? (and (:warning margin) (not= :none (:warning margin)))]
+        after-lev (:after-gross-leverage margin)
+        before-lev (:before-gross-leverage margin)
+        margin-warn? (shared/margin-warn? margin)]
     [:div {:class ["optimizer-exec-band" "is-armed" "flex" "items-center" "gap-4"
                    "border-b" "border-base-300" "px-5" "py-3"]
            :data-role "portfolio-optimizer-execution-control-band"
@@ -237,8 +238,10 @@
        (str "+" (opt-format/format-usdc ready-buys-usd) " buys · "
             "−" (opt-format/format-usdc ready-sells-usd) " sells"
             (when (shared/finite gross) (str " · gross " (opt-format/format-usdc gross)))
-            (when (shared/finite after-util)
-              (str " · margin after " (opt-format/format-pct after-util))))]
+            (when (shared/finite after-lev)
+              (str " · leverage " (opt-format/format-multiple after-lev)
+                   (when (shared/finite before-lev)
+                     (str " (was " (opt-format/format-multiple before-lev) ")")))))]
       ;; Irreversibility caveat raised above the ~10px legibility floor — it is the single most
       ;; consequential sentence on the screen and must not be the smallest text on it.
       [:p {:class (cond-> ["mt-0.5" "font-mono" "text-[0.72rem]" "text-trading-muted"]
@@ -521,7 +524,7 @@
         price-cost-usd (if show-realized? realized-usd (:slippage-usd costs))
         all-in-usd (+ price-cost-usd (:fees-usd costs))
         margin (:margin summary)
-        margin-warn? (and (:warning margin) (not= :none (:warning margin)))
+        margin-warn? (shared/margin-warn? margin)
         orders-value (str filled " / " total)]
     [:section {:class ["optimizer-rebalance-kpis" "grid" "grid-cols-2" "border-b" "border-base-300"
                        "bg-base-100/95" "sm:grid-cols-4" "lg:grid-cols-4"]
@@ -554,12 +557,11 @@
            :value-class "text-trading-red"
            :sub (str (count sell-assets) " assets")})
      (kpi {:data-role "portfolio-optimizer-execution-kpi-margin"
-           :label "Margin after"
-           :value (opt-format/format-pct (:after-utilization margin))
+           :label "Account leverage after"
+           :info "Projected gross notional ÷ equity after the rebalance — the same leverage metric the account panels show. Red if margin headroom runs thin."
+           :value (shared/leverage-after-label margin)
            :value-class (if margin-warn? "text-trading-red" "text-trading-text")
-           :sub (if margin-warn?
-                  (opt-format/keyword-label (:warning margin))
-                  "post-rebalance maint.")})
+           :sub (shared/leverage-headroom-sub margin)})
      (if show-realized?
        (kpi {:data-role "portfolio-optimizer-execution-kpi-price-cost"
              :label "Realized price cost"
@@ -640,7 +642,7 @@
         ;; honest (it does not advance for orders merely accepted onto the book).
         pct (if (pos? total) (/ filled total) 0)
         margin (:margin summary)
-        margin-warn? (and (:warning margin) (not= :none (:warning margin)))
+        margin-warn? (shared/margin-warn? margin)
         ;; Same live, type-aware recompute as the KPI strip so the rail agrees with it.
         costs (type-aware-costs model (concat ready submitted resting))
         sources (->> (concat ready submitted resting)
@@ -666,11 +668,9 @@
                    :style {:width (str (* 100 pct) "%")}}]]
            (case phase :done "complete" :resting "resting" :halted "halted" :running "live" "staged")
            (case phase :halted "text-trading-red" :running "text-warning" :resting "text-info" nil))
-     (diag "Cross-margin after"
-           (opt-format/format-pct (:after-utilization margin))
-           (if margin-warn?
-             "review margin headroom before arming"
-             "post-rebalance maintenance margin")
+     (diag "Account leverage after"
+           (shared/leverage-after-label margin)
+           (shared/leverage-headroom-sub margin true)
            (if margin-warn? "breach" "ok")
            (if margin-warn? "text-trading-red" nil))
      (diag "Est. price cost"

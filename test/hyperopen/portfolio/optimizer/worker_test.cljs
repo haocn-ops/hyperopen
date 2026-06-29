@@ -1,5 +1,6 @@
 (ns hyperopen.portfolio.optimizer.worker-test
   (:require [cljs.test :refer-macros [async deftest is]]
+            [hyperopen.portfolio.optimizer.infrastructure.solver-adapter :as solver-adapter]
             [hyperopen.portfolio.optimizer.worker :as worker]))
 
 (defn- now-ms
@@ -86,6 +87,23 @@
           (js/Promise.resolve [])
           requests))
 
+(defn- with-env-var
+  [key value f]
+  (let [env (some-> js/process .-env)
+        previous (when env (aget env key))
+        had-key? (and env (.hasOwnProperty env key))]
+    (try
+      (when env
+        (if (nil? value)
+          (js-delete env key)
+          (aset env key value)))
+      (f)
+      (finally
+        (when env
+          (if had-key?
+            (aset env key previous)
+            (js-delete env key)))))))
+
 (deftest optimizer-result-payload-runs-engine-with-worker-solver-test
   (async done
     (let [captured (atom nil)
@@ -107,6 +125,25 @@
             (.catch (fn [err]
                       (is false (str "worker payload failed: " err))
                       (done))))))))
+
+(deftest optimizer-result-payload-can-use-coverage-safe-worker-solver-test
+  (async done
+    (with-env-var
+      "HYPEROPEN_OPTIMIZER_WORKER_SOLVER" "quadprog"
+      (fn []
+        (let [captured (atom nil)]
+          (with-redefs [worker/run-optimization-async
+                        (fn [_request opts]
+                          (reset! captured (:solve-problem opts))
+                          (js/Promise.resolve {:status :solved}))]
+            (-> (worker/optimizer-result-payload {:scenario-id "coverage"})
+                (.then (fn [_]
+                         (is (identical? solver-adapter/solve-with-quadprog
+                                         @captured))
+                         (done)))
+                (.catch (fn [err]
+                          (is false (str "coverage-safe worker solver failed: " err))
+                          (done))))))))))
 
 (deftest optimizer-result-payload-normalizes-worker-decoded-instrument-key-maps-test
   (async done

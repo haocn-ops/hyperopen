@@ -90,8 +90,8 @@
                                "px-3" "py-2" "text-center" "text-[0.6875rem]" "font-medium" "text-primary"]
                        :data-role "portfolio-optimizer-rebalance-link"
                        :on {:click [[:actions/navigate result-path*]
-                                    [:actions/set-portfolio-optimizer-results-tab :rebalance]]}}
-              "Rebalance preview"]]))
+                                    [:actions/open-portfolio-optimizer-execution]]}}
+              "Review & execute"]]))
         (when read-only-message
           [:p {:class ["mt-3" "border" "border-warning/40" "bg-warning/10" "p-2"
                        "text-[0.6875rem]" "text-warning"]}

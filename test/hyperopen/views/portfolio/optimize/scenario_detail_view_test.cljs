@@ -151,14 +151,16 @@
         rerun (node-by-role view-node "portfolio-optimizer-scenario-rerun")
         review-classes (set (node-attr review :class))
         rerun-classes (set (node-attr rerun :class))]
-    ;; Review rebalance reads as THE single primary action (amber solid); Rerun is
+    ;; Review & execute reads as THE single primary action (amber solid); Rerun is
     ;; demoted to neutral; Save and Refine remain present.
     (is (contains? review-classes "bg-warning/80"))
     (is (contains? rerun-classes "bg-base-200/40"))
     (is (not (contains? rerun-classes "bg-primary/10")))
     (is (some? (node-by-role view-node "portfolio-optimizer-scenario-save")))
     (is (some? (node-by-role view-node "portfolio-optimizer-scenario-refine")))
-    (is (= [[:actions/set-portfolio-optimizer-results-tab :rebalance]]
+    ;; The standalone Rebalance preview tab was retired, so the primary CTA stages
+    ;; straight into Execution.
+    (is (= [[:actions/open-portfolio-optimizer-execution]]
            (click-actions review)))))
 
 (deftest portfolio-optimizer-zero-trade-result-mutes-rebalance-affordances-test
@@ -243,18 +245,21 @@
     (is (some? (node-by-role view-node "portfolio-optimizer-provenance-strip")))
     (is (some? (node-by-role view-node "portfolio-optimizer-scenario-tabs")))
     (is (some? (node-by-role view-node "portfolio-optimizer-scenario-tab-recommendation")))
-    (is (some? (node-by-role view-node "portfolio-optimizer-scenario-tab-rebalance")))
+    ;; The standalone Rebalance preview tab was retired — it must no longer appear in
+    ;; the tab bar; the Execution tab is its replacement entry point.
+    (is (nil? (node-by-role view-node "portfolio-optimizer-scenario-tab-rebalance")))
+    (is (some? (node-by-role view-node "portfolio-optimizer-scenario-tab-execution")))
     (is (some? (node-by-role view-node "portfolio-optimizer-scenario-tab-tracking")))
     (is (some? (node-by-role view-node "portfolio-optimizer-scenario-tab-inputs")))
     (is (= :button
            (first (node-by-role view-node
-                                "portfolio-optimizer-scenario-tab-rebalance")))
+                                "portfolio-optimizer-scenario-tab-tracking")))
         "Switching tabs must not perform browser navigation that loses unsaved run state.")
     (is (nil? (get-in (node-by-role view-node
-                                     "portfolio-optimizer-scenario-tab-rebalance")
+                                     "portfolio-optimizer-scenario-tab-tracking")
                       [1 :href])))
     (is (contains? (set (get-in (node-by-role view-node
-                                              "portfolio-optimizer-scenario-tab-rebalance")
+                                              "portfolio-optimizer-scenario-tab-tracking")
                                 [1 :class]))
                    "text-trading-text/60")
         "Inactive tabs read as clickable affordances (raised contrast), not disabled chrome.")
@@ -262,11 +267,17 @@
     (is (= [[:actions/set-portfolio-optimizer-results-tab :tracking]]
            (click-actions
             (node-by-role view-node "portfolio-optimizer-scenario-tab-tracking"))))
+    ;; Entering Execution rebuilds the staged plan, so its tab routes through the open
+    ;; action rather than a bare set-tab.
+    (is (= [[:actions/open-portfolio-optimizer-execution]]
+           (click-actions
+            (node-by-role view-node "portfolio-optimizer-scenario-tab-execution"))))
     (is (nil? (node-by-role view-node "portfolio-optimizer-setup-surface")))
     (is (nil? (node-by-role view-node "portfolio-optimizer-workspace")))
     (is (contains? strings "Scenario scn_01"))
     (is (contains? strings "Recommendation"))
-    (is (contains? strings "Rebalance preview"))
+    (is (not (contains? strings "Rebalance preview")))
+    (is (contains? strings "Execution"))
     (is (contains? strings "Tracking"))
     (is (contains? strings "Inputs"))))
 
@@ -287,18 +298,20 @@
         header-cta (node-by-role view-node "portfolio-optimizer-scenario-review-rebalance")
         recommendation-cta (node-by-role view-node "portfolio-optimizer-recommendation-rebalance-cta")
         confidence-cta (node-by-role view-node "portfolio-optimizer-result-confidence-rebalance")
-        expected [[:actions/set-portfolio-optimizer-results-tab :rebalance]]
+        ;; The standalone Rebalance preview tab was retired, so every rebalance CTA
+        ;; stages straight into Execution (in-place, no navigation).
+        expected [[:actions/open-portfolio-optimizer-execution]]
         strings (set (collect-strings view-node))]
     (is (some? header-cta)
-        "A solved scenario must expose a header path to the rebalance tab.")
+        "A solved scenario must expose a header path to stage the rebalance.")
     (is (some? recommendation-cta)
-        "The recommendation read-flow must end with a discoverable path to the rebalance tab.")
+        "The recommendation read-flow must end with a discoverable path to stage the rebalance.")
     (is (some? confidence-cta)
         "The result-confidence rail must lead with rebalance as a clickable next step, not a refine imperative.")
     (is (= expected (click-actions header-cta)))
     (is (= expected (click-actions recommendation-cta)))
     (is (= expected (click-actions confidence-cta)))
-    (is (contains? strings "Review rebalance"))
+    (is (contains? strings "Review & execute"))
     ;; The rail frames refine as optional rather than required: it is relabelled "From
     ;; here" (not "Next step") and tells the user the draft is usable as-is.
     (is (contains? strings "From here"))

@@ -113,8 +113,8 @@
 
 (deftest setup-bottom-actions-links-to-results-and-rebalance-after-solved-run-test
   ;; A solved run must expose a direct path from the draft action bar to both the
-  ;; recommendation results and the rebalance preview tab, including the
-  ;; tab-select action so the surface opens on the requested tab.
+  ;; recommendation results and the rebalance trades. The standalone Rebalance preview
+  ;; tab was retired, so the rebalance link now stages straight into Execution.
   (let [node (setup-actions/setup-bottom-actions
               {:draft sample-draft
                :readiness {:runnable? true}
@@ -127,12 +127,12 @@
         view-rebalance (ts/node-by-role node "portfolio-optimizer-view-rebalance")]
     (is (some? view-results))
     (is (some? view-rebalance)
-        "The draft action bar must offer a direct path to the rebalance preview.")
+        "The draft action bar must offer a direct path to stage the rebalance.")
     (is (= [[:actions/navigate "/portfolio/optimize/draft"]
             [:actions/set-portfolio-optimizer-results-tab :recommendation]]
            (ts/click-actions view-results)))
     (is (= [[:actions/navigate "/portfolio/optimize/draft"]
-            [:actions/set-portfolio-optimizer-results-tab :rebalance]]
+            [:actions/open-portfolio-optimizer-execution]]
            (ts/click-actions view-rebalance)))))
 
 (deftest setup-bottom-actions-hides-result-links-before-a-solved-run-test

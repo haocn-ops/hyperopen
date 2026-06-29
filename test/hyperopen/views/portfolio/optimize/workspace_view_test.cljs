@@ -172,8 +172,9 @@
            (click-actions results-link)))))
 
 (deftest portfolio-optimizer-workspace-exposes-rebalance-path-after-clean-run-test
-  ;; Regression: the draft page offered no path to the rebalance preview. Both
-  ;; the status rail and the action bar must now link directly to it.
+  ;; Regression: the draft page offered no path to the rebalance trades. Both the
+  ;; status rail and the action bar must now link directly to them. The standalone
+  ;; Rebalance preview tab was retired, so both stage straight into Execution.
   (let [state (ready-workspace-state {:kind :historical-mean})
         view-node (portfolio-view/portfolio-view
                    (assoc-in state
@@ -182,11 +183,11 @@
         rail-rebalance (node-by-role view-node "portfolio-optimizer-rebalance-link")
         action-rebalance (node-by-role view-node "portfolio-optimizer-view-rebalance")
         expected [[:actions/navigate "/portfolio/optimize/draft"]
-                  [:actions/set-portfolio-optimizer-results-tab :rebalance]]]
+                  [:actions/open-portfolio-optimizer-execution]]]
     (is (some? rail-rebalance)
-        "The setup status rail must offer a direct path to the rebalance preview.")
+        "The setup status rail must offer a direct path to stage the rebalance.")
     (is (some? action-rebalance)
-        "The setup action bar must offer a direct path to the rebalance preview.")
+        "The setup action bar must offer a direct path to stage the rebalance.")
     (is (= expected (click-actions rail-rebalance)))
     (is (= expected (click-actions action-rebalance)))))
 

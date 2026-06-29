@@ -1,9 +1,21 @@
 (ns hyperopen.views.portfolio.optimize.unsaved-draft-route-test
   (:require [cljs.test :refer-macros [deftest is]]
             [hyperopen.portfolio.optimizer.actions.common :as action-common]
+            [hyperopen.portfolio.optimizer.actions.execution :as execution-actions]
             [hyperopen.portfolio.optimizer.application.setup-readiness :as setup-readiness]
             [hyperopen.portfolio.optimizer.fixtures :as fixtures]
             [hyperopen.views.portfolio-view :as portfolio-view]))
+
+(defn- apply-saves
+  "Applies the :effects/save effects from an action's return to `state`, so a test can
+  exercise the real staging action and then render the resulting surface."
+  [state effects]
+  (reduce (fn [st effect]
+            (if (= :effects/save (first effect))
+              (assoc-in st (second effect) (nth effect 2))
+              st))
+          state
+          effects))
 
 (defn- node-children
   [node]
@@ -113,9 +125,13 @@
     (is (some? (node-by-role view-node
                              "portfolio-optimizer-target-exposure-row-0")))))
 
-(deftest unsaved-draft-rebalance-route-derives-preview-from-active-target-test
+(deftest unsaved-draft-execution-stages-preview-from-active-target-test
+  ;; Regression: for an unsaved draft (no saved scenario), staging the rebalance must
+  ;; DERIVE the preview from the active target rather than dead-ending. The standalone
+  ;; Rebalance preview tab was retired, so this now flows through the open-execution
+  ;; action into the Execution surface — the derived rows must appear as order rows.
   (let [base-state {:router {:path "/portfolio/optimize/draft"}
-                    :portfolio-ui {:optimizer {:results-tab :rebalance}}
+                    :portfolio-ui {:optimizer {:results-tab :execution}}
                     :asset-selector
                     {:market-by-key
                      {"perp:BTC" {:key "perp:BTC"
@@ -188,21 +204,21 @@
                        :labels-by-instrument {"perp:BTC" "BTC"
                                               "perp:ETH" "ETH"})
                 :rebalance-preview)
-        view-node (portfolio-view/portfolio-view
-                   (with-current-minimal-solved-run base-state result))
+        seeded-state (with-current-minimal-solved-run base-state result)
+        ;; Exercise the real staging action: it derives the plan from the active target
+        ;; and saves it onto the execution surface, exactly as a "Rebalance" CTA would.
+        staged-state (apply-saves seeded-state
+                                  (execution-actions/open-portfolio-optimizer-execution
+                                   seeded-state))
+        view-node (portfolio-view/portfolio-view staged-state)
         strings (set (collect-strings view-node))]
+    (is (some? (node-by-role view-node "portfolio-optimizer-execution-tab")))
     (is (some? (node-by-role view-node
-                             "portfolio-optimizer-rebalance-review-surface")))
+                             "portfolio-optimizer-execution-order-row-perp-BTC")))
     (is (some? (node-by-role view-node
-                             "portfolio-optimizer-rebalance-summary-kpis")))
-    (is (some? (node-by-role view-node
-                             "portfolio-optimizer-rebalance-preview")))
-    (is (some? (node-by-role view-node
-                             "portfolio-optimizer-rebalance-row-perp-BTC")))
-    (is (some? (node-by-role view-node
-                             "portfolio-optimizer-rebalance-row-perp-ETH")))
+                             "portfolio-optimizer-execution-order-row-perp-ETH")))
     (is (not (contains? strings
-                        "A rebalance preview is available after a successful optimization run.")))))
+                        "Run or load a scenario to stage its rebalance here for review and execution.")))))
 
 (deftest unsaved-draft-results-route-uses-draft-vault-name-when-result-label-is-missing-or-raw-test
   (let [vault-address "0x1e37a337ed460039d1b15bd3bc489de789768d5e"

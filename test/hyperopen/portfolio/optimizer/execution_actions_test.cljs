@@ -442,13 +442,15 @@
   (is (= [[:effects/save [:portfolio :optimizer :execution :abort-requested?] true]]
          (actions/pause-portfolio-optimizer-execution {}))))
 
-(deftest discard-execution-clears-plan-and-returns-to-rebalance-test
+(deftest discard-execution-clears-plan-and-returns-to-recommendation-test
   (let [state {:portfolio {:optimizer {:execution-modal {:open? true :submitting? false
                                                          :plan {:rows []}}}}}
         effects (actions/discard-portfolio-optimizer-execution state)]
     (is (= [:portfolio :optimizer :execution-modal] (get-in effects [0 1])))
     (is (= [:portfolio :optimizer :execution] (get-in effects [1 1])))
-    (is (= [:effects/save [:portfolio-ui :optimizer :results-tab] :rebalance]
+    ;; The standalone Rebalance preview tab was retired, so discarding returns to the
+    ;; Recommendation tab rather than a dead :rebalance value.
+    (is (= [:effects/save [:portfolio-ui :optimizer :results-tab] :recommendation]
            (nth effects 2)))
     (is (= [:effects/replace-shareable-route-query] (nth effects 3)))))
 

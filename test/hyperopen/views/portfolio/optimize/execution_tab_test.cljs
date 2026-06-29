@@ -96,13 +96,29 @@
            :status :blocked :side :sell :reason :spot-submit-unsupported
            :delta-notional-usd -500}]})
 
-(deftest rebalance-tab-stage-cta-opens-execution-test
-  (let [view-node (scenario-view :rebalance {})
-        cta (node-by-role view-node "portfolio-optimizer-stage-execution")]
-    (is (some? (node-by-role view-node "portfolio-optimizer-scenario-tab-execution")))
-    (is (some? cta))
-    (is (= false (get-in cta [1 :disabled])))
-    (is (= [[:actions/open-portfolio-optimizer-execution]] (click-actions cta)))))
+(deftest execution-tab-staged-buys-sells-exclude-blocked-rows-test
+  ;; Buys/Sells (ported from the retired Rebalance preview) reflect only tradeable
+  ;; (non-blocked) rows, so a blocked sell never inflates the Sells headline — keeping
+  ;; the dollar-flow consistent with the ready-only staged notional.
+  (let [plan {:status :partially-blocked :execution-disabled? false
+              :summary {:ready-count 1 :blocked-count 1
+                        :gross-ready-notional-usd 300
+                        :margin {:after-utilization 0.42 :warning :none}}
+              :rows [{:row-id "perp:BTC" :instrument-id "perp:BTC" :instrument-type :perp
+                      :status :ready :side :buy :quantity 3 :delta-notional-usd 300
+                      :cost {:source :snapshot :slippage-bps 0 :estimated-slippage-usd 0}}
+                     {:row-id "spot:PURR" :instrument-id "spot:PURR" :instrument-type :spot
+                      :status :blocked :side :sell :reason :spot-submit-unsupported
+                      :delta-notional-usd -50000}]}
+        view-node (scenario-view :execution
+                                 {:execution {:status :idle :history []}
+                                  :execution-modal {:open? true :phase :staged :plan plan}})
+        buys (node-text (node-by-role view-node "portfolio-optimizer-execution-kpi-buys"))
+        sells (node-text (node-by-role view-node "portfolio-optimizer-execution-kpi-sells"))]
+    (is (str/includes? buys "300"))
+    ;; Blocked sell notional is excluded -> Sells is zero, not 50,000.
+    (is (not (str/includes? sells "50,000")))
+    (is (str/includes? sells "$0"))))
 
 (deftest execution-tab-staged-renders-plan-and-arm-action-test
   (let [view-node (scenario-view :execution

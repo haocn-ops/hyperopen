@@ -36,12 +36,15 @@
   #{:setup :results :rebalance :tracking :diagnostics})
 
 (def ^:private results-tab-values
-  #{:recommendation :rebalance :execution :tracking :inputs})
+  #{:recommendation :execution :tracking :inputs})
 
 (def ^:private results-tab-aliases
   {:allocation :recommendation
    :frontier :recommendation
-   :diagnostics :recommendation})
+   :diagnostics :recommendation
+   ;; The standalone Rebalance preview tab was retired — the rebalance now stages
+   ;; straight into Execution, so old ?otab=rebalance deep-links land there.
+   :rebalance :execution})
 
 (def ^:private diagnostics-tab-values
   #{:conditioning :constraints :sensitivity :data :returns})

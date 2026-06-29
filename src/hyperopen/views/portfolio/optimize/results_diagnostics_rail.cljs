@@ -339,10 +339,11 @@
 (defn- next-step-row
   "Leads the confidence rail. A solved draft is usable as-is, so this frames the two
   honest paths forward rather than commanding a refinement: the always-available
-  rebalance (the lone clickable token, an in-place tab switch) and the optional refine
-  (descriptive only — its real trigger is the header action-bar button, and the rail
-  refine control is depth-coupled, so duplicating a one-click refine here would hide
-  that choice). Amber now signals \"clickable\", not \"required\"."
+  rebalance (the lone clickable token, which stages straight into the Execution tab)
+  and the optional refine (descriptive only — its real trigger is the header
+  action-bar button, and the rail refine control is depth-coupled, so duplicating a
+  one-click refine here would hide that choice). Amber now signals \"clickable\", not
+  \"required\"."
   [next-step]
   (let [tail (case next-step
                :refine-optimization " now, or refine for more density"
@@ -361,7 +362,7 @@
       [:button {:type "button"
                 :class ["optimizer-result-confidence-rebalance"]
                 :data-role "portfolio-optimizer-result-confidence-rebalance"
-                :on {:click [[:actions/set-portfolio-optimizer-results-tab :rebalance]]}}
+                :on {:click [[:actions/open-portfolio-optimizer-execution]]}}
        "Rebalance"]
       tail]
      [:p {:class ["mt-0.5" "text-[0.6rem]" "text-trading-muted/70"]} subtext]]))

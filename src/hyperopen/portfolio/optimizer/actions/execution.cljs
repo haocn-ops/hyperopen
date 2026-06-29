@@ -267,8 +267,9 @@
   [[:effects/save contracts/execution-abort-requested-path true]])
 
 (defn discard-portfolio-optimizer-execution
-  "Abort & discard: clears the staged plan and run state and returns to the Rebalance
-  preview. No-op while a run is in flight (mirrors confirm's submitting guard)."
+  "Abort & discard: clears the staged plan and run state and returns to the
+  Recommendation tab. No-op while a run is in flight (mirrors confirm's submitting
+  guard)."
   [state]
   (if (:submitting? (get-in state contracts/execution-modal-path))
     []
@@ -276,7 +277,7 @@
       (optimizer-defaults/default-execution-modal-state)]
      [:effects/save contracts/execution-path
       (optimizer-defaults/default-execution-state)]
-     [:effects/save contracts/ui-results-tab-path :rebalance]
+     [:effects/save contracts/ui-results-tab-path :recommendation]
      [:effects/replace-shareable-route-query]]))
 
 (defn open-portfolio-optimizer-execution-in-ticket

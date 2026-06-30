@@ -171,6 +171,10 @@
                                           [:current-portfolio
                                            :capital
                                            :total-margin-used-usdc])
+        :current-gross-exposure-usdc (get-in request
+                                             [:current-portfolio
+                                              :capital
+                                              :gross-exposure-usdc])
         :rebalance-tolerance (get-in request [:constraints :rebalance-tolerance])
         :fallback-slippage-bps (get-in request
                                        [:execution-assumptions

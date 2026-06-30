@@ -2,7 +2,7 @@
   (:require [cljs.test :refer-macros [deftest is]]
             [clojure.string :as str]
             [hyperopen.views.portfolio-view :as portfolio-view]
-            [hyperopen.views.portfolio.optimize.setup-layout-fixtures :refer [node-children find-first-node collect-strings node-by-role child-roles node-text click-actions input-actions keydown-actions day-start-ms summary-from-points class-token-set count-nodes btc-instrument eth-instrument black-litterman-ready-readiness black-litterman-ready-draft black-litterman-empty-readiness black-litterman-empty-draft candle-rows]]))
+            [hyperopen.views.portfolio.optimize.setup-layout-fixtures :refer [node-children find-first-node collect-strings node-by-role child-roles node-text click-actions input-actions change-actions keydown-actions day-start-ms summary-from-points class-token-set count-nodes btc-instrument eth-instrument black-litterman-ready-readiness black-litterman-ready-draft black-litterman-empty-readiness black-litterman-empty-draft candle-rows]]))
 
 (deftest setup-new-route-uses-canonical-grid-instead-of-old-left-rail-test
   (let [view-node (portfolio-view/portfolio-view
@@ -20,7 +20,7 @@
     (is (nil? (node-by-role view-node "portfolio-optimizer-left-rail")))
     (is (contains? strings "Portfolio Optimizer"))
     (is (contains? strings "Start with"))
-    (is (contains? strings "From holdings"))
+    (is (contains? strings "Load my holdings"))
     (is (contains? strings "Custom"))
     (is (not (contains? strings "Index")))
     (is (contains? strings "What this scenario will solve for"))
@@ -41,22 +41,25 @@
                              (str/starts-with? (node-text %) "Custom")))
         strings (set (collect-strings source-toggle))]
     (is (some? source-toggle))
-    (is (contains? strings "From holdings"))
+    (is (contains? strings "Load my holdings"))
     (is (contains? strings "Custom"))
     (is (not (contains? strings "Index")))))
 
-(deftest setup-empty-universe-offers-prominent-load-holdings-cta-test
-  ;; When the universe is empty (e.g. account data wasn't ready in time for the
-  ;; auto-seed on a cold load), the dominant affordance is a one-click "Load my
-  ;; holdings" firing the same from-holdings action, so the user reaches a real
-  ;; portfolio without hand-searching every asset.
+(deftest setup-universe-load-holdings-is-single-affordance-test
+  ;; "Load my holdings" lives in ONE place — the universe source strip button
+  ;; (portfolio-optimizer-universe-use-current), relabelled from "From holdings".
+  ;; The old duplicate prominent empty-state button (…-universe-load-holdings) was
+  ;; removed; the empty state points at the strip button instead.
   (let [view-node (portfolio-view/portfolio-view
                    {:router {:path "/portfolio/optimize/new"}
                     :wallet {:address "0x1111111111111111111111111111111111111111"}})
-        load-holdings (node-by-role view-node "portfolio-optimizer-universe-load-holdings")]
-    (is (some? load-holdings))
+        load-strip (node-by-role view-node "portfolio-optimizer-universe-use-current")]
+    (is (some? load-strip))
     (is (= [[:actions/set-portfolio-optimizer-universe-from-current]]
-           (click-actions load-holdings)))))
+           (click-actions load-strip)))
+    (is (str/includes? (node-text load-strip) "Load my holdings"))
+    ;; the duplicate empty-state button is gone
+    (is (nil? (node-by-role view-node "portfolio-optimizer-universe-load-holdings")))))
 
 (deftest setup-control-rail-orders-objective-before-return-risk-model-test
   (let [view-node (portfolio-view/portfolio-view
@@ -157,7 +160,7 @@
     (is (= [[:actions/set-portfolio-optimizer-constraint
              :gross-max
              [:event.target/value]]]
-           (input-actions
+           (change-actions
             (node-by-role view-node
                           "portfolio-optimizer-constraint-gross-max-input"))))))
 
@@ -315,4 +318,9 @@
     ;; Constraints are pre-filled from default-draft and never gate Run, so the
     ;; section is labelled "defaults applied", not the old false "mandatory".
     (is (contains? strings "defaults applied"))
+    ;; Each numeric constraint echoes its interpreted unit persistently (not only in the
+    ;; hover tooltip): 0.25 -> "max 25% per asset", 3 -> "3.00× capital", 0.03 -> "3.0 pp band".
+    (is (contains? strings "max 25% per asset"))
+    (is (contains? strings "3.00× capital"))
+    (is (contains? strings "3.0 pp band"))
     (is (not (contains? strings "mandatory")))))

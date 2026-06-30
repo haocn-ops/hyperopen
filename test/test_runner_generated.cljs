@@ -260,6 +260,7 @@
             [hyperopen.portfolio.optimizer.application.view-model-results-test]
             [hyperopen.portfolio.optimizer.application.view-model-setup-boundary-test]
             [hyperopen.portfolio.optimizer.application.view-model-test]
+            [hyperopen.portfolio.optimizer.application.view-model.execution-reconcile-test]
             [hyperopen.portfolio.optimizer.black-litterman-actions-test]
             [hyperopen.portfolio.optimizer.black-litterman-view-edits-test]
             [hyperopen.portfolio.optimizer.coercion-test]
@@ -1003,6 +1004,7 @@
              'hyperopen.portfolio.optimizer.application.view-model-results-test
              'hyperopen.portfolio.optimizer.application.view-model-setup-boundary-test
              'hyperopen.portfolio.optimizer.application.view-model-test
+             'hyperopen.portfolio.optimizer.application.view-model.execution-reconcile-test
              'hyperopen.portfolio.optimizer.black-litterman-actions-test
              'hyperopen.portfolio.optimizer.black-litterman-view-edits-test
              'hyperopen.portfolio.optimizer.coercion-test

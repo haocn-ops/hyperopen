@@ -38,13 +38,14 @@
            (node-attr purr-icon :src)))
     (is (some? (node-by-role view-node "portfolio-optimizer-result-warnings")))
     (is (some? (node-by-role view-node "portfolio-optimizer-diagnostics-panel")))
-    (is (some? (node-by-role view-node "portfolio-optimizer-rebalance-preview")))
+    ;; The standalone Rebalance preview card was retired — the rebalance stages straight
+    ;; into Execution — so the results workspace no longer renders it.
+    (is (nil? (node-by-role view-node "portfolio-optimizer-rebalance-preview")))
     (is (contains? strings "Allocation"))
     (is (contains? strings "How much to trust this"))
     (is (contains? strings "0.37x"))
     (is (contains? strings "0.33x"))
-    (is (contains? strings "low-invested-exposure"))
-    (is (contains? strings "partially-blocked"))))
+    (is (contains? strings "low-invested-exposure"))))
 
 (deftest results-panel-renders-history-window-limiter-in-trust-rail-test
   (let [result (-> solved-result

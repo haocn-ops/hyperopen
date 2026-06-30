@@ -69,8 +69,16 @@
              :quantity 0.25
              :delta-notional-usd 1000}]}}))
 
+(def ^:private current-run-signature
+  ;; A run-state whose signature matches the retained run marks the solve as *current* (via
+  ;; run-identity/completed-run?), so the staged plan is not flagged stale. This mirrors the
+  ;; real app, where a staged execution plan always comes from an up-to-date solved run.
+  {:scenario-id "scn_01" :input-signature "sig-current"})
+
 (defn- scenario-view
-  "Renders the optimizer scenario surface at the given results-tab + optimizer state."
+  "Renders the optimizer scenario surface at the given results-tab + optimizer state. The run is
+  current by default (matching run-state/last-run signature); override :draft with a dirty
+  metadata map to exercise the stale path."
   [results-tab optimizer]
   (portfolio-view/portfolio-view
    {:router {:path "/portfolio/optimize/scn_01"}
@@ -78,7 +86,10 @@
     :portfolio {:optimizer
                 (merge {:active-scenario {:loaded-id "scn_01" :status :computed}
                         :draft {:id "scn_01"}
-                        :last-successful-run {:result solved-result}}
+                        :run-state {:status :succeeded
+                                    :request-signature current-run-signature}
+                        :last-successful-run {:result solved-result
+                                              :request-signature current-run-signature}}
                        optimizer)}}))
 
 (def ^:private staged-plan
@@ -87,7 +98,7 @@
    :summary {:ready-count 1 :blocked-count 1 :skipped-count 0
              :gross-ready-notional-usd 1000
              :estimated-fees-usd 10 :estimated-slippage-usd 5
-             :margin {:after-utilization 0.42 :warning :none}}
+             :margin {:after-utilization 0.42 :after-gross-leverage 1.85 :before-gross-leverage 1.79 :free-margin-usd 8600 :capital-usd 10000 :warning :none}}
    :rows [{:row-id "perp:BTC" :instrument-id "perp:BTC" :instrument-type :perp
            :status :ready :side :buy :quantity 0.25 :order-type :market
            :delta-notional-usd 1000
@@ -103,7 +114,7 @@
   (let [plan {:status :partially-blocked :execution-disabled? false
               :summary {:ready-count 1 :blocked-count 1
                         :gross-ready-notional-usd 300
-                        :margin {:after-utilization 0.42 :warning :none}}
+                        :margin {:after-utilization 0.42 :after-gross-leverage 1.85 :before-gross-leverage 1.79 :free-margin-usd 8600 :capital-usd 10000 :warning :none}}
               :rows [{:row-id "perp:BTC" :instrument-id "perp:BTC" :instrument-type :perp
                       :status :ready :side :buy :quantity 3 :delta-notional-usd 300
                       :cost {:source :snapshot :slippage-bps 0 :estimated-slippage-usd 0}}
@@ -133,8 +144,53 @@
     (is (= [[:actions/set-portfolio-optimizer-execution-phase :armed]] (click-actions arm)))
     ;; cost-source + margin honesty signals + blocked reason are surfaced
     (is (some #(str/includes? % "snapshot") strings))
-    (is (contains? strings "Margin after"))
+    (is (contains? strings "Account leverage after"))
     (is (contains? strings "spot-submit-unsupported"))))
+
+(deftest execution-tab-stale-recommendation-disables-arm-test
+  ;; Inputs edited since the solve (dirty draft) => the staged plan is stale. The Arm button is
+  ;; disabled (no click action) and a re-run notice is shown, so a stale recommendation can't be
+  ;; armed into live orders from the surface.
+  (let [view-node (scenario-view :execution
+                                 {:draft {:id "scn_01" :metadata {:dirty? true}}
+                                  :execution {:status :idle :history []}
+                                  :execution-modal {:open? true :phase :staged :plan staged-plan}})
+        arm (node-by-role view-node "portfolio-optimizer-execution-arm")
+        stale-notice (node-by-role view-node "portfolio-optimizer-execution-stale")]
+    (is (some? arm))
+    (is (true? (get-in arm [1 :disabled])))
+    (is (nil? (click-actions arm)))
+    (is (some? stale-notice))
+    (is (str/includes? (node-text stale-notice) "re-run"))))
+
+(deftest execution-tab-orders-largest-first-exact-notional-test
+  ;; The pre-commit table leads with the largest-notional order so the riskiest line is never
+  ;; buried in a long list, and each row shows its exact dollar notional (not $Nk-rounded) so
+  ;; the same order reads identically in the rebalance preview and here.
+  (let [plan {:status :ready :execution-disabled? false
+              :summary {:ready-count 2 :blocked-count 0
+                        :gross-ready-notional-usd 2300
+                        :margin {:after-utilization 0.3 :after-gross-leverage 1.85 :before-gross-leverage 1.79 :free-margin-usd 8600 :capital-usd 10000 :warning :none}}
+              :rows [{:row-id "perp:SMALL" :instrument-id "perp:SMALL" :instrument-type :perp
+                      :status :ready :side :buy :quantity 1 :order-type :market
+                      :delta-notional-usd 300
+                      :cost {:source :snapshot :slippage-bps 5 :estimated-slippage-usd 1}}
+                     {:row-id "perp:BIG" :instrument-id "perp:BIG" :instrument-type :perp
+                      :status :ready :side :sell :quantity 1 :order-type :market
+                      :delta-notional-usd -2345
+                      :cost {:source :snapshot :slippage-bps 5 :estimated-slippage-usd 1}}]}
+        view-node (scenario-view :execution
+                                 {:execution {:status :idle :history []}
+                                  :execution-modal {:open? true :phase :staged :plan plan}})
+        order-list (node-by-role view-node "portfolio-optimizer-execution-order-list")
+        big-row (node-by-role view-node "portfolio-optimizer-execution-order-row-perp-BIG")
+        strs (vec (collect-strings order-list))
+        idx (fn [s] (first (keep-indexed (fn [i x] (when (= x s) i)) strs)))]
+    ;; exact dollar notional, not "$2.3k"
+    (is (str/includes? (node-text big-row) "$2,345"))
+    (is (not (str/includes? (node-text big-row) "$2.3k")))
+    ;; the bigger order (sorted first) appears before the smaller one in the table
+    (is (< (idx "BIG") (idx "SMALL")))))
 
 (deftest execution-tab-slip-is-type-aware-test
   ;; A market row shows the book-crossing slippage estimate; a limit-overridden row
@@ -235,6 +291,53 @@
     (is (= false (boolean (get-in confirm [1 :disabled]))))
     (is (= [[:actions/confirm-portfolio-optimizer-execution]] (click-actions confirm)))))
 
+(deftest execution-tab-armed-restates-money-figures-test
+  ;; The commit moment must restate how much money moves (buys/sells/gross/leverage),
+  ;; not just the order count, and the commit button must carry the reserved danger style.
+  (let [plan (assoc staged-plan :summary {:ready-count 1 :blocked-count 1
+                                          :gross-ready-notional-usd 1000
+                                          :margin {:after-utilization 0.42 :after-gross-leverage 1.85 :before-gross-leverage 1.79 :free-margin-usd 8600 :capital-usd 10000 :warning :none}})
+        view-node (scenario-view :execution
+                                 {:execution {:status :idle :history []}
+                                  :execution-modal {:open? true :phase :armed :plan plan}})
+        figures (node-by-role view-node "portfolio-optimizer-execution-armed-figures")
+        confirm (node-by-role view-node "portfolio-optimizer-execution-confirm")
+        ftext (node-text figures)]
+    (is (some? figures))
+    (is (str/includes? ftext "buys"))
+    (is (str/includes? ftext "sells"))
+    (is (str/includes? ftext "gross"))
+    (is (str/includes? ftext "leverage"))
+    (is (str/includes? ftext "1.85x"))
+    ;; the irreversible commit no longer reuses the amber primary look of safe actions
+    (is (str/includes? (str/join " " (get-in confirm [1 :class])) "optimizer-exec-commit"))))
+
+(deftest execution-tab-running-abort-acknowledges-test
+  ;; Clicking Pause flips an :abort-requested? flag the submit loop reads; the running band
+  ;; must acknowledge it immediately (text + a disabled control), not look inert.
+  (let [view-node (scenario-view :execution
+                                 {:execution {:status :submitting :history [] :abort-requested? true}
+                                  :execution-modal {:open? true :phase :armed :submitting? true
+                                                    :plan staged-plan}})
+        band (node-by-role view-node "portfolio-optimizer-execution-control-band")
+        pause (node-by-role view-node "portfolio-optimizer-execution-pause")]
+    (is (= "running" (get-in band [1 :data-phase])))
+    (is (str/includes? (node-text band) "Stopping"))
+    (is (= true (boolean (get-in pause [1 :disabled]))))
+    (is (nil? (get-in pause [1 :on])))))
+
+(deftest execution-tab-discard-requires-confirmation-test
+  ;; "Abort & discard" must not wipe the staged plan in one click: it sits behind a nested
+  ;; confirm disclosure, and only the inner button fires the discard action.
+  (let [view-node (scenario-view :execution
+                                 {:execution {:status :idle :history []}
+                                  :execution-modal {:open? true :phase :staged :plan staged-plan}})
+        confirm-wrap (node-by-role view-node "portfolio-optimizer-execution-discard-confirm")
+        discard (node-by-role view-node "portfolio-optimizer-execution-discard")]
+    (is (some? confirm-wrap) "discard is wrapped in a confirm disclosure")
+    (is (some? discard))
+    (is (= [[:actions/discard-portfolio-optimizer-execution]] (click-actions discard)))))
+
 (deftest execution-tab-running-hides-confirm-and-shows-progress-test
   (let [view-node (scenario-view :execution
                                  {:execution {:status :submitting :history []}
@@ -254,7 +357,7 @@
                                                                  :status :failed
                                                                  :side :buy
                                                                  :delta-notional-usd 1000
-                                                                 :error {:message "Order submit failed: exchange down"}}]}]}
+                                                                 :error {:message "Order must have minimum value of $10. asset=110023"}}]}]}
                                   :execution-modal {:open? true :phase :staged
                                                     :error "Execution halted before all rows submitted."
                                                     :plan staged-plan}})
@@ -263,7 +366,8 @@
     (is (= "halted" (get-in (node-by-role view-node "portfolio-optimizer-execution-control-band")
                             [1 :data-phase])))
     (is (contains? strings "Latest attempt"))
-    (is (contains? strings "Order submit failed: exchange down"))
+    ;; The Detail column shows the deciphered exchange error, not a raw response map.
+    (is (contains? strings "Order must have minimum value of $10. asset=110023"))
     (is (some? (node-by-role view-node "portfolio-optimizer-execution-resume")))))
 
 (deftest execution-tab-read-only-disables-arm-and-shows-message-test
@@ -292,7 +396,7 @@
                                   {:open? true :phase :staged
                                    :plan {:status :partially-blocked
                                           :summary {:ready-count 0 :blocked-count 1
-                                                    :margin {:after-utilization 0.1 :warning :none}}
+                                                    :margin {:after-utilization 0.1 :after-gross-leverage 1.85 :before-gross-leverage 1.79 :free-margin-usd 8600 :capital-usd 10000 :warning :none}}
                                           :rows [{:row-id vault-id :instrument-id vault-id
                                                   :status :blocked :side :sell
                                                   :reason :vault-submit-unsupported

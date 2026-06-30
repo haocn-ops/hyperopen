@@ -49,26 +49,34 @@
    [:span {:class ["font-semibold" "text-trading-muted"]} "Notional"]])
 
 (defn- drift-chart
-  [rows]
-  [:section {:class ["mt-4" "rounded-lg" "border" "border-base-300" "bg-base-200/30" "p-3"]
-             :data-role "portfolio-optimizer-drift-chart"}
-   [:p {:class ["text-[0.65rem]" "font-semibold" "uppercase" "tracking-[0.18em]" "text-trading-muted"]}
-    "Drift Chart"]
-   (into
-    [:div {:class ["mt-3" "space-y-2"]}]
-    (map (fn [row]
-           (let [drift (:weight-drift row)
-                 width (if (opt-format/finite-number? drift)
-                         (min 100 (* 1000 (js/Math.abs drift)))
-                         0)]
-             [:div {:class ["grid" "grid-cols-[8rem_minmax(0,1fr)_4rem]" "items-center" "gap-2" "text-xs"]}
-              [:span {:class ["truncate" "font-semibold"]}
-               (:instrument-label row)]
-              [:div {:class ["h-2" "overflow-hidden" "rounded-full" "bg-base-300"]}
-               [:div {:class ["h-full" "rounded-full" "bg-primary/70"]
-                      :style {:width (str width "%")}}]]
-              [:span {:class ["text-right" "tabular-nums"]} (opt-format/format-pct drift)]]))
-         rows))])
+  [rows max-drift]
+  ;; Scale every bar to the run's largest absolute drift so the chart is comparative. The old
+  ;; fixed 1000x scale saturated any drift >= 10% to a full bar, so 10% / 18% / 35% all read
+  ;; identically. The exact % stays labelled beside each bar, and the header states the scale.
+  (let [scale (max (if (opt-format/finite-number? max-drift) (js/Math.abs max-drift) 0)
+                   0.0001)]
+    [:section {:class ["mt-4" "rounded-lg" "border" "border-base-300" "bg-base-200/30" "p-3"]
+               :data-role "portfolio-optimizer-drift-chart"}
+     [:div {:class ["flex" "items-baseline" "justify-between" "gap-2"]}
+      [:p {:class ["text-[0.65rem]" "font-semibold" "uppercase" "tracking-[0.18em]" "text-trading-muted"]}
+       "Drift Chart"]
+      [:span {:class ["font-mono" "text-[0.6rem]" "tabular-nums" "text-trading-muted/70"]}
+       (str "full bar = " (opt-format/format-pct scale))]]
+     (into
+      [:div {:class ["mt-3" "space-y-2"]}]
+      (map (fn [row]
+             (let [drift (:weight-drift row)
+                   width (if (opt-format/finite-number? drift)
+                           (min 100 (* 100 (/ (js/Math.abs drift) scale)))
+                           0)]
+               [:div {:class ["grid" "grid-cols-[8rem_minmax(0,1fr)_4rem]" "items-center" "gap-2" "text-xs"]}
+                [:span {:class ["truncate" "font-semibold"]}
+                 (:instrument-label row)]
+                [:div {:class ["h-2" "overflow-hidden" "rounded-full" "bg-base-300"]}
+                 [:div {:class ["h-full" "rounded-full" "bg-primary/70"]
+                        :style {:width (str width "%")}}]]
+                [:span {:class ["text-right" "tabular-nums"]} (opt-format/format-pct drift)]]))
+           rows))]))
 
 (defn- tracking-path
   [snapshots]
@@ -173,7 +181,7 @@
           [:p {:class ["mt-4" "rounded-lg" "border" "border-base-300" "bg-base-200/40" "p-3" "text-sm" "text-trading-muted"]}
            "No tracking snapshots yet. Refresh tracking after execution to measure weight drift."])]
        (when latest-snapshot
-         (concat [(drift-chart latest-rows)
+         (concat [(drift-chart latest-rows (:max-abs-weight-drift latest-snapshot))
                   (tracking-path (:snapshots tracking-record))
                   (tracking-header-row)]
                  (map-indexed tracking-row latest-rows)))))))

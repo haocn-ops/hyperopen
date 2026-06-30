@@ -48,7 +48,12 @@
 (def ^:private summary
   {:ready-count 4 :blocked-count 1 :skipped-count 0
    :gross-ready-notional-usd 351438 :estimated-fees-usd 116 :estimated-slippage-usd 206
-   :margin {:after-utilization 0.42 :after-used-usd 482000 :warning :none}})
+   ;; Account leverage (gross notional / equity) + free-margin headroom — the commit-moment
+   ;; figure shown on the armed band, KPI strip, and health rail.
+   :margin {:after-utilization 0.42 :after-used-usd 482000
+            :capital-usd 1200000 :free-margin-usd 718000
+            :before-gross-leverage 1.58 :after-gross-leverage 1.64
+            :warning :none}})
 
 (defn- plan
   ([] (plan nil))

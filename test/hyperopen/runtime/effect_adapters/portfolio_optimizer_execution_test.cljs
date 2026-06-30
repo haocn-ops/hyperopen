@@ -74,9 +74,51 @@
                      (is (= false
                             (get-in @store
                                     [:portfolio :optimizer :execution-modal :submitting?])))
+                     ;; A finished run announces its outcome via the global aria-live toast.
+                     (is (= :success (get-in @store [:ui :toasts 0 :kind])))
+                     (is (= "Execution complete" (get-in @store [:ui :toasts 0 :headline])))
                      (is (= [[store nil [[:actions/load-user-data address]
                                           [:actions/refresh-order-history]]]]
                             @dispatches))
+                     (done)))
+            (.catch (async-support/unexpected-error done)))))))
+
+(deftest execute-portfolio-optimizer-plan-effect-records-deciphered-rejection-error-test
+  ;; A hard exchange rejection (e.g. below the $10 minimum) must land on the row as the human
+  ;; error string for the Detail column — never the raw response map.
+  (async done
+    (let [address "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          ticks (atom [1000 1100])
+          store (atom {:wallet {:address address :agent {:status :ready}}
+                       :asset-selector {:market-by-key
+                                        {"perp:BTC" {:coin "BTC"
+                                                     :market-type :perp
+                                                     :asset-id 0
+                                                     :szDecimals 4}}}
+                       :portfolio {:optimizer
+                                   {:active-scenario {:loaded-id "scn_submit" :status :saved}
+                                    :execution-modal {:open? true
+                                                      :submitting? true
+                                                      :plan ready-plan}}}})]
+      (with-redefs [portfolio-optimizer-adapters/*now-ms*
+                    (fn [] (let [t (first @ticks)] (swap! ticks rest) t))
+                    portfolio-optimizer-adapters/*submit-order!*
+                    (fn [_store _address _action]
+                      (js/Promise.resolve
+                       {:status "ok"
+                        :response {:type "order"
+                                   :data {:statuses [{:error "Order must have minimum value of $10. asset=110023"}]}}}))
+                    portfolio-optimizer-adapters/*dispatch!* (fn [_ _ _] nil)]
+        (-> (portfolio-optimizer-adapters/execute-portfolio-optimizer-plan-effect
+             nil store ready-plan)
+            (.then (fn [ledger]
+                     (let [row (get-in ledger [:rows 0])]
+                       (is (= :failed (:status row)))
+                       ;; the Detail message is the deciphered exchange error, not a pr-str'd map
+                       (is (= "Order must have minimum value of $10. asset=110023"
+                              (get-in row [:error :message])))
+                       ;; the full response is still retained on the row for audit
+                       (is (map? (:response row))))
                      (done)))
             (.catch (async-support/unexpected-error done)))))))
 

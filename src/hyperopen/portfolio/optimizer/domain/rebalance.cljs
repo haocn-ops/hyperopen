@@ -410,6 +410,8 @@
   [opts row]
   (or (let [value (get-in opts [:leverage-by-id (:instrument-id row)])]
         (when (finite-positive? value) value))
+      ;; No explicit cap: charge at the account's real average leverage, not 1x.
+      (:default-leverage opts)
       1))
 
 (defn- margin-impact-usd
@@ -434,20 +436,41 @@
          (> after-utilization 0.8)) :high-utilization
     :else nil))
 
+(defn- account-effective-leverage
+  ;; Account average leverage; nil for an all-spot / no-position book (caller → 1x).
+  [gross-usd margin-used-usd]
+  (when (and (finite-positive? gross-usd) (finite-positive? margin-used-usd))
+    (/ gross-usd margin-used-usd)))
+
+(defn- gross-leverage
+  [gross-usd capital-usd]
+  (when (finite-positive? capital-usd)
+    (/ (or gross-usd 0) capital-usd)))
+
+(defn- ready-gross-delta-usd ;; Δgross from the ready (will-trade) rows.
+  [capital-usd ready-rows]
+  (reduce + 0 (map (fn [{:keys [current-weight target-weight]}]
+                     (* capital-usd (- (abs-num target-weight) (abs-num current-weight))))
+                   ready-rows)))
+
 (defn- margin-summary
-  [opts ready-rows]
+  [opts ready-rows current-gross-usd]
   (let [capital-usd (:capital-usd opts)
         current-used (or (:current-margin-used-usdc opts) 0)
         impact (reduce + 0 (map #(margin-impact-usd opts %) ready-rows))
         after-used (+ current-used impact)
-        before-utilization (utilization current-used capital-usd)
+        after-gross-usd (+ (or current-gross-usd 0)
+                           (ready-gross-delta-usd capital-usd ready-rows))
         after-utilization (utilization after-used capital-usd)]
     {:capital-usd capital-usd
      :current-used-usd current-used
      :estimated-impact-usd impact
      :after-used-usd after-used
-     :before-utilization before-utilization
+     :free-margin-usd (- capital-usd after-used)
+     :before-utilization (utilization current-used capital-usd)
      :after-utilization after-utilization
+     :before-gross-leverage (gross-leverage current-gross-usd capital-usd)
+     :after-gross-leverage (gross-leverage after-gross-usd capital-usd)
      :warning (margin-warning after-utilization)}))
 
 (defn build-rebalance-preview
@@ -458,7 +481,13 @@
                    current-weights
                    target-weights)
         ready-rows (filter #(= :ready (:status %)) rows)
-        capital-usd (:capital-usd opts)]
+        capital-usd (:capital-usd opts)
+        ;; Account-wide current gross when supplied; else the universe rows' own gross.
+        current-gross-usd (or (:current-gross-exposure-usdc opts)
+                              (reduce + 0 (map #(* capital-usd (abs-num (:current-weight %))) rows)))
+        opts (assoc opts :default-leverage
+                    (account-effective-leverage current-gross-usd
+                                                (:current-margin-used-usdc opts)))]
     {:status (preview-status rows)
      :capital-usd capital-usd
      :rows rows
@@ -468,4 +497,4 @@
                :gross-trade-notional-usd (reduce + 0 (map #(abs-num (:delta-notional-usd %)) ready-rows))
                :estimated-fees-usd (reduce + 0 (map #(or (get-in % [:cost :estimated-fee-usd]) 0) ready-rows))
                :estimated-slippage-usd (reduce + 0 (map #(or (get-in % [:cost :estimated-slippage-usd]) 0) ready-rows))
-               :margin (margin-summary opts ready-rows)}}))
+               :margin (margin-summary opts ready-rows current-gross-usd)}}))

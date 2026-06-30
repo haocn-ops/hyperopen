@@ -312,7 +312,8 @@
     (is (some? (node-by-role view-node "portfolio-optimizer-target-exposure-group-PURR")))
     (is (some? (node-by-role view-node "portfolio-optimizer-result-warnings")))
     (is (some? (node-by-role view-node "portfolio-optimizer-diagnostics-panel")))
-    (is (some? (node-by-role view-node "portfolio-optimizer-rebalance-preview")))
+    ;; Retired card: the rebalance stages straight into Execution, no preview panel here.
+    (is (nil? (node-by-role view-node "portfolio-optimizer-rebalance-preview")))
     (is (= "true"
            (get-in (node-by-role view-node
                                  "portfolio-optimizer-target-exposure-row-0")
@@ -343,10 +344,7 @@
     (is (contains? strings "Contribution"))
     (is (contains? strings "watch"))
     (is (not (contains? strings "Funding Decomposition")))
-    (is (contains? strings "low-invested-exposure"))
-    (is (contains? strings "partially-blocked"))
-    (is (contains? strings "spot-submit-unsupported"))
-    (is (contains? strings "perp:BTC"))))
+    (is (contains? strings "low-invested-exposure"))))
 
 (deftest results-panel-renders-current-marker-for-current-portfolio-outside-selected-universe-test
   (let [outside-result (-> solved-result

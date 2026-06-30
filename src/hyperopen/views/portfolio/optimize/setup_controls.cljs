@@ -113,4 +113,41 @@
             :data-infeasible (when highlighted? "true")
             :aria-invalid (when highlighted? "true")
             :value (str value)
-            :on {:input [action]}}]])
+            ;; Commit on blur/Enter, not per keystroke: an eager parse rewrites the
+            ;; controlled :value mid-typing (e.g. "0." collapses to "0"), so a decimal
+            ;; can never be entered. See setup-constraint-controls + target-sigma.
+            :on {:change [action]}}]])
+
+(defn decimal->percent-text
+  "Render a stored fraction as a clean percent string for a percent-entry input
+  (0.15 -> \"15\", 0.155 -> \"15.5\"), so the field echoes the interpreted value the
+  user is meant to type rather than the raw fraction."
+  [value]
+  (if (number? value)
+    (let [pct (/ (js/Math.round (* value 10000)) 100)]
+      (if (== pct (js/Math.round pct))
+        (str (js/Math.round pct))
+        (str pct)))
+    ""))
+
+(defn percent-input
+  "Percent-entry numeric input: the user types a percent (15 = 15%); it commits on
+  blur/Enter (:change, never per keystroke — an eager parse rewrites a controlled input
+  mid-typing), shows a literal % suffix, and echoes the interpreted value via `value-text`.
+  `action` must dispatch a percent-aware handler that divides the typed number by 100."
+  [label value-text role action highlighted? hint]
+  [:label {:class (cond-> ["block" "border" "border-base-300" "bg-base-200/20" "p-2"]
+                    highlighted? (conj "border-warning/70" "bg-warning/10"))}
+   [:span {:class eyebrow-class} label]
+   [:span {:class ["mt-2" "flex" "items-center" "gap-1"]}
+    [:input {:type "text"
+             :inputmode "decimal"
+             :class input-class
+             :data-role role
+             :data-infeasible (when highlighted? "true")
+             :aria-invalid (when highlighted? "true")
+             :value (str value-text)
+             :on {:change [action]}}]
+    [:span {:class ["font-mono" "text-[0.6875rem]" "text-trading-muted"]} "%"]]
+   (when hint
+     [:span {:class ["mt-1" "block" "font-mono" "text-[0.5625rem]" "text-trading-muted/70"]} hint])])

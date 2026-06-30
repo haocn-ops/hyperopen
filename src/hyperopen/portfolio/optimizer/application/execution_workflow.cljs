@@ -1,14 +1,36 @@
 (ns hyperopen.portfolio.optimizer.application.execution-workflow
-  (:require [hyperopen.portfolio.optimizer.application.execution :as execution]
+  (:require [clojure.string :as str]
+            [hyperopen.portfolio.optimizer.application.execution :as execution]
             [hyperopen.portfolio.optimizer.application.scenario-records :as scenario-records]
             [hyperopen.portfolio.optimizer.application.scenario-workflow :as scenario-workflow]
             [hyperopen.portfolio.optimizer.contracts :as contracts]))
 
+(defn- non-blank
+  [value]
+  (when (string? value)
+    (let [text (str/trim value)]
+      (when (seq text) text))))
+
+(defn order-error-message
+  "Human-readable error from a rejected order response or a thrown error, for the execution
+   ledger Detail column — never a pr-str'd map. Hyperliquid carries the per-order rejection
+   reason at [:response :data :statuses 0 :error] (the same shape an accepted order uses for
+   :resting/:filled), so prefer that; then a top-level :error/:message, then a plain string
+   :response, an exception message, or a bare string. Falls back to a generic line so a
+   structured value never leaks to the UI."
+  [value]
+  (or (when (map? value)
+        (or (non-blank (:error (first (execution/response-statuses value))))
+            (non-blank (:error value))
+            (non-blank (:message value))
+            (non-blank (:response value))))
+      (non-blank (some-> value .-message))
+      (non-blank value)
+      "The exchange rejected this order."))
+
 (defn error-message
   [err]
-  (or (when (map? err) (:message err))
-      (some-> err .-message)
-      (str err)))
+  (order-error-message err))
 
 (defn begin-execution-state
   [attempt started-at-ms]

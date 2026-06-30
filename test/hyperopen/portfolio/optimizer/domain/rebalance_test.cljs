@@ -151,14 +151,50 @@
     (is (near? 100 (get-in preview [:rows 0 :cost :slippage-bps])))
     (is (near? 20 (get-in preview [:rows 0 :cost :estimated-slippage-usd])))
     (is (near? 1 (get-in preview [:rows 0 :cost :estimated-fee-usd])))
+    ;; Explicit per-instrument leverage (5x) still drives the margin impact (2000/5 = 400);
+    ;; the new keys add the account-leverage projection + free-margin headroom. No
+    ;; :current-gross-exposure-usdc here, so before-gross falls back to the row's own
+    ;; current gross (0 — the position is opened from flat), after-gross is the Δ (0.2x).
     (is (= {:capital-usd 10000
             :current-used-usd 1000
             :estimated-impact-usd 400
             :after-used-usd 1400
+            :free-margin-usd 8600
             :before-utilization 0.1
             :after-utilization 0.14
+            :before-gross-leverage 0
+            :after-gross-leverage 0.2
             :warning nil}
            (get-in preview [:summary :margin])))))
+
+(deftest build-rebalance-preview-projects-account-leverage-and-effective-margin-impact-test
+  ;; The commit-moment figure is account leverage (gross notional / equity), projected
+  ;; with the ready trade applied; and with no explicit per-instrument leverage cap, the
+  ;; margin impact must charge at the account's REAL effective leverage (gross/margin-used),
+  ;; not the misleading 1x (full-collateral) default.
+  (let [preview (rebalance/build-rebalance-preview
+                 {:capital-usd 10000
+                  ;; Account-wide current book: 2.0x gross leverage, running at 5x effective
+                  ;; (20000 gross / 4000 margin used).
+                  :current-gross-exposure-usdc 20000
+                  :current-margin-used-usdc 4000
+                  :rebalance-tolerance 0.0
+                  :fallback-slippage-bps 25
+                  :instrument-ids ["perp:BTC"]
+                  :current-weights [0.0]
+                  :target-weights [0.3]
+                  :instruments-by-id {"perp:BTC" {:instrument-type :perp :coin "BTC"}}
+                  :prices-by-id {"perp:BTC" 100}
+                  :fee-bps-by-id {"perp:BTC" 5}}) ;; NB: no :leverage-by-id -> effective fallback
+        margin (get-in preview [:summary :margin])]
+    (is (= :ready (:status preview)))
+    ;; Impact = 3000 notional / 5x effective = 600 (the old 1x default would charge 3000).
+    (is (= 600 (:estimated-impact-usd margin)))
+    (is (= 4600 (:after-used-usd margin)))
+    (is (= 5400 (:free-margin-usd margin)))
+    ;; Leverage projection: 2.0x before, +0.3x from the opened position -> 2.3x after.
+    (is (near? 2.0 (:before-gross-leverage margin)))
+    (is (near? 2.3 (:after-gross-leverage margin)))))
 
 (deftest build-rebalance-preview-uses-signed-deltas-across-zero-test
   (let [preview (rebalance/build-rebalance-preview

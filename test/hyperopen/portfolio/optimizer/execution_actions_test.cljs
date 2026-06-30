@@ -1,6 +1,7 @@
 (ns hyperopen.portfolio.optimizer.execution-actions-test
   (:require [cljs.test :refer-macros [deftest is]]
             [hyperopen.portfolio.optimizer.actions :as actions]
+            [hyperopen.portfolio.optimizer.actions.execution :as exec-actions]
             [hyperopen.portfolio.optimizer.fixtures :as fixtures]
             [hyperopen.schema.contracts :as contracts]))
 
@@ -13,13 +14,26 @@
   (= effects (contracts/assert-emitted-effects!
               effects {:phase :action-emission :action-id action-id})))
 
+(def ^:private current-run-signature
+  ;; A run-state whose signature matches the retained run marks the solve as *current* (via
+  ;; run-identity/completed-run?), so the staged plan is not flagged stale at the entry. Real
+  ;; staging always comes from an up-to-date solved run; the minimal draft fixtures here have no
+  ;; universe, so without this they would yield a nil readiness signature and read as stale.
+  {:scenario-id "draft-1" :input-signature "sig-current"})
+
+(defn- current-run-state
+  []
+  {:status :succeeded :request-signature current-run-signature})
+
 (deftest open-execution-stages-plan-and-switches-to-execution-tab-test
   (let [state {:portfolio {:optimizer
                            {:draft {:id "draft-1"
                                     :execution-assumptions {:default-order-type :market}}
+                            :run-state (current-run-state)
                             :last-successful-run
                             (fixtures/sample-last-successful-run
-                             {:result {:rebalance-preview
+                             {:request-signature current-run-signature
+                              :result {:rebalance-preview
                                        {:summary {:estimated-fees-usd nil
                                                   :estimated-slippage-usd nil}
                                         :rows [{:instrument-id "perp:BTC"
@@ -164,6 +178,33 @@
     (is (= [:effects/save [:portfolio-ui :optimizer :results-tab] :execution]
            (nth effects 2)))))
 
+(deftest open-execution-stages-disabled-plan-when-recommendation-stale-test
+  ;; The entry gates on currency, not just solved?: a stale recommendation (dirty draft) stages a
+  ;; plan flagged execution-disabled :stale-recommendation. The rows are still staged (the trader
+  ;; sees what WOULD trade), but the plan can't be armed/committed until the optimizer is re-run.
+  (let [state {:portfolio {:optimizer
+                           {:draft {:id "draft-1"
+                                    :metadata {:dirty? true}
+                                    :execution-assumptions {:default-order-type :market}}
+                            :last-successful-run
+                            (fixtures/sample-last-successful-run
+                             {:result {:rebalance-preview
+                                       {:summary {:estimated-fees-usd nil
+                                                  :estimated-slippage-usd nil}
+                                        :rows [{:instrument-id "perp:BTC"
+                                                :instrument-type :perp
+                                                :status :ready
+                                                :side :buy
+                                                :quantity 0.25
+                                                :delta-notional-usd 1000}]}}})}}}
+        plan (get-in (actions/open-portfolio-optimizer-execution state) [0 2 :plan])]
+    (is (true? (:execution-disabled? plan)))
+    (is (= :stale-recommendation (:disabled-reason plan)))
+    (is (= exec-actions/stale-recommendation-message (:disabled-message plan)))
+    ;; rows still present for context; the ready row is not silently dropped
+    (is (= 1 (count (:rows plan))))
+    (is (= "perp:BTC" (:instrument-id (first (:rows plan)))))))
+
 (deftest execution-staging-mutators-update-interaction-state-test
   (is (= [[:effects/save [:portfolio :optimizer :execution-modal :phase] :armed]
           [:effects/save [:portfolio :optimizer :execution-modal :error] nil]]
@@ -267,6 +308,51 @@
                               :default-order-type :market
                               :overrides {}
                               :params {}}}}}))
+
+(defn- stale-execution-state
+  "A solved run whose draft was edited since the solve (dirty), so the staged plan is stale.
+  agent :ready proves the block is staleness, not trading-readiness."
+  []
+  (-> (locked-state :ready)
+      (assoc-in [:portfolio :optimizer :draft] {:id "draft-1" :metadata {:dirty? true}})
+      (assoc-in [:portfolio :optimizer :last-successful-run]
+                (fixtures/sample-last-successful-run {}))))
+
+(defn- current-execution-state
+  "A just-completed solved run: clean draft + a run-state whose signature matches the retained
+  run, so `stale-run?` is false and the gate must let it through."
+  []
+  (let [signature {:scenario-id "draft-1" :input-signature "sig-current"}]
+    (-> (locked-state :ready)
+        (assoc-in [:portfolio :optimizer :draft] {:id "draft-1" :metadata {:dirty? false}})
+        (assoc-in [:portfolio :optimizer :run-state]
+                  {:status :succeeded :request-signature signature})
+        (assoc-in [:portfolio :optimizer :last-successful-run]
+                  (fixtures/sample-last-successful-run {:request-signature signature})))))
+
+(deftest confirm-execution-blocks-stale-recommendation-test
+  ;; Inputs edited since the solve => the staged plan is stale. Confirm must refuse to send
+  ;; (no execute, no agent-unlock) even with a ready agent, and emit the re-run prompt.
+  (let [effects (actions/confirm-portfolio-optimizer-execution (stale-execution-state))]
+    (is (emitted-effects-valid? :actions/confirm-portfolio-optimizer-execution effects))
+    (is (= [[:effects/save [:portfolio :optimizer :execution-modal :error]
+             exec-actions/stale-recommendation-message]]
+           effects))
+    (is (not (some #{:effects/execute-portfolio-optimizer-plan} (map first effects))))))
+
+(deftest arm-execution-blocked-when-stale-test
+  ;; Arming a stale plan is refused: the surface stays :staged with the re-run prompt, so the
+  ;; live-commit button is never reachable from a stale recommendation.
+  (is (= [[:effects/save [:portfolio :optimizer :execution-modal :phase] :staged]
+          [:effects/save [:portfolio :optimizer :execution-modal :error]
+           exec-actions/stale-recommendation-message]]
+         (actions/set-portfolio-optimizer-execution-phase (stale-execution-state) :armed))))
+
+(deftest confirm-execution-current-solved-run-still-submits-test
+  ;; A just-completed solved run is NOT stale, so a ready agent must still submit — guards the
+  ;; gate against blocking a valid, current recommendation.
+  (let [effects (actions/confirm-portfolio-optimizer-execution (current-execution-state))]
+    (is (some #{:effects/execute-portfolio-optimizer-plan} (map first effects)))))
 
 (deftest confirm-execution-locked-agent-prompts-unlock-and-replays-confirm-test
   ;; A locked agent must behave like normal order entry: prompt the passkey unlock and

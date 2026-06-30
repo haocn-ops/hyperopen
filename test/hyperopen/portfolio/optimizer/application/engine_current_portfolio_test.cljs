@@ -69,6 +69,68 @@
     (is (pos? (:current-volatility result)))
     (is (not (zero? (:current-expected-return result))))))
 
+(deftest run-optimization-current-marker-uses-selected-basis-when-overlapping-test
+  ;; Regression: the Current frontier marker must be plotted on the SAME basis as the
+  ;; Target/frontier — the selected universe's weights + risk-result covariance — not the
+  ;; held-book current-portfolio-analysis, which spans a larger instrument set (here a
+  ;; high-vol holding HYPE that's OUTSIDE the universe) with its own covariance. Mixing
+  ;; bases placed Current at ~6x the Target volatility even for a tiny rebalance.
+  (let [day-ms 86400000
+        ;; Calm selected-universe history -> low frontier/Target covariance.
+        selected-history {"BTC" [{:time-ms 0 :close "100"}
+                                 {:time-ms day-ms :close "100.5"}
+                                 {:time-ms (* 2 day-ms) :close "101"}]
+                          "ETH" [{:time-ms 0 :close "100"}
+                                 {:time-ms day-ms :close "100.4"}
+                                 {:time-ms (* 2 day-ms) :close "100.8"}]}
+        ;; Wild outside holding -> if the held book leaks into the marker, vol explodes.
+        hype-history [{:time-ms 0 :close "100"}
+                      {:time-ms day-ms :close "160"}
+                      {:time-ms (* 2 day-ms) :close "70"}]
+        request (request-builder/build-engine-request
+                 {:draft (fixtures/sample-draft
+                          {:id "overlap-current"
+                           :universe [{:instrument-id "perp:BTC" :market-type :perp :coin "BTC"}
+                                      {:instrument-id "perp:ETH" :market-type :perp :coin "ETH"}]
+                           :return-model {:kind :historical-mean}
+                           :risk-model {:kind :sample-covariance}
+                           :objective {:kind :minimum-variance}
+                           :constraints {:long-only? true :max-asset-weight 1}})
+                  ;; Current book overlaps the universe (BTC, ETH) AND holds an outside HYPE.
+                  :current-portfolio {:capital {:nav-usdc 10000}
+                                      :exposures [{:instrument-id "perp:BTC" :market-type :perp :coin "BTC"
+                                                   :weight 0.3 :signed-notional-usdc 3000 :abs-notional-usdc 3000}
+                                                  {:instrument-id "perp:ETH" :market-type :perp :coin "ETH"
+                                                   :weight 0.2 :signed-notional-usdc 2000 :abs-notional-usdc 2000}
+                                                  {:instrument-id "perp:HYPE" :market-type :perp :coin "HYPE"
+                                                   :weight 0.25 :signed-notional-usdc 2500 :abs-notional-usdc 2500}]
+                                      :by-instrument {"perp:BTC" {:instrument-id "perp:BTC" :market-type :perp :coin "BTC" :weight 0.3}
+                                                      "perp:ETH" {:instrument-id "perp:ETH" :market-type :perp :coin "ETH" :weight 0.2}
+                                                      "perp:HYPE" {:instrument-id "perp:HYPE" :market-type :perp :coin "HYPE" :weight 0.25}}}
+                  :history-data {:candle-history-by-coin selected-history
+                                 :funding-history-by-coin {}
+                                 :current-portfolio-history-data
+                                 {:candle-history-by-coin {"BTC" (get selected-history "BTC")
+                                                           "ETH" (get selected-history "ETH")
+                                                           "HYPE" hype-history}
+                                  :funding-history-by-coin {}}}
+                  :market-cap-by-coin {}
+                  :as-of-ms (* 4 day-ms)})
+        result (engine/run-optimization
+                request
+                {:solve-problem (fn [_problem]
+                                  {:status :solved :solver :fixture-solver :weights [0.5 0.5]})})
+        marker (:current-portfolio-weights-by-instrument result)]
+    ;; The marker is on the SELECTED basis: only BTC/ETH, the outside HYPE is excluded.
+    (is (= #{"perp:BTC" "perp:ETH"} (set (keys marker)))
+        "Current marker uses the selected universe, not the held-book superset.")
+    (is (not (contains? marker "perp:HYPE")))
+    ;; Same covariance basis as Target -> Current vol is the same order as Target vol,
+    ;; not ~6x inflated by the high-vol outside holding.
+    (is (pos? (:current-volatility result)))
+    (is (< (:current-volatility result) (* 3 (:volatility result)))
+        "Current vol must share the frontier's covariance basis, not the wild held-book one.")))
+
 (deftest run-optimization-labels-held-only-spot-by-token-symbol-test
   ;; A dust spot holding ("spot:@113", PURR) is sold to 0 but was never added to
   ;; the optimization universe. It must still resolve its token symbol — the

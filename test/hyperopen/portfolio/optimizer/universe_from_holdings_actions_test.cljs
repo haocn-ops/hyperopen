@@ -170,7 +170,7 @@
 
 (deftest auto-preseed-no-ops-when-holdings-not-loaded-test
   ;; Cold load before the account snapshot is present -> graceful no-op (the
-  ;; prominent "Load my holdings" empty state covers this), draft left untouched
+  ;; "Load my holdings" strip button covers this), draft left untouched
   ;; so a later route event re-attempts.
   (let [state {:portfolio {:optimizer {:draft nil}}}]
     (is (= [] (actions/auto-preseed-portfolio-optimizer-universe-from-current

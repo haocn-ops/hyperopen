@@ -49,6 +49,10 @@
   [node]
   (get-in node [1 :on :input]))
 
+(defn change-actions
+  [node]
+  (get-in node [1 :on :change]))
+
 (defn keydown-actions
   [node]
   (get-in node [1 :on :keydown]))

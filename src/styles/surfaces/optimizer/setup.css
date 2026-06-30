@@ -361,4 +361,29 @@
     background-color: var(--optimizer-accent-soft);
     color: var(--optimizer-text);
   }
+
+  .portfolio-optimizer .optimizer-exposure-map__preview {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.4rem;
+  }
+
+  .portfolio-optimizer .optimizer-exposure-map__preview-value {
+    font-family: var(--font-mono, monospace);
+    font-size: 0.5625rem;
+    color: var(--optimizer-text-2);
+  }
+
+  .portfolio-optimizer .optimizer-exposure-map__preview-verdict {
+    font-family: var(--font-mono, monospace);
+    font-size: 0.5625rem;
+    color: var(--optimizer-warn);
+  }
+
+  .portfolio-optimizer
+    .optimizer-exposure-map__preview[data-on-policy="true"]
+    .optimizer-exposure-map__preview-verdict {
+    color: var(--optimizer-long);
+  }
 }

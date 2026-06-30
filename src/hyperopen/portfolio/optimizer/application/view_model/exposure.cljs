@@ -18,6 +18,28 @@
       {:gross (/ gross nav)
        :net (/ net nav)})))
 
+(defn- within?
+  [v lo hi]
+  (and (number? v)
+       (or (not (number? lo)) (>= v lo))
+       (or (not (number? hi)) (<= v hi))))
+
+(defn exposure-preview
+  "Honest pre-run preview: compares the CURRENT portfolio exposure to the target band and reports
+  whether it is already on policy. It deliberately does NOT estimate a trade count — that needs a
+  solve, and the setup panel is shown while constraints are being edited (which makes any prior
+  run stale), so a number here would mislead. The exact trades appear in Results after Run."
+  [{:keys [current-exposure constraints]}]
+  (when current-exposure
+    (let [{:keys [gross net]} current-exposure
+          {:keys [gross-min gross-max net-min net-max]} constraints
+          gross-ok? (within? gross gross-min gross-max)
+          net-ok? (within? net net-min net-max)]
+      {:current-exposure current-exposure
+       :gross-ok? gross-ok?
+       :net-ok? net-ok?
+       :on-policy? (and gross-ok? net-ok?)})))
+
 (defn- gross-highlighted?
   [highlighted-controls]
   (boolean (some highlighted-controls [:gross-min :gross-max])))
@@ -53,6 +75,8 @@
             :gross-floored? (some? gross-min)
             :net-min net-min
             :net-max net-max}
+     :preview (exposure-preview {:current-exposure current-exposure
+                                 :constraints constraints*})
      :active-preset active
      :presets (mapv (fn [k]
                       {:key k

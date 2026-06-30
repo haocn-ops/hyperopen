@@ -121,6 +121,23 @@
            :data-role (str role "-value")}
     (str "± " (fmt-mult value))]])
 
+(defn- preview-block
+  [{:keys [current-exposure on-policy? gross-ok? net-ok?]}]
+  (when current-exposure
+    [:p {:class ["optimizer-exposure-map__preview"]
+         :data-role "portfolio-optimizer-exposure-preview"
+         :data-on-policy (str (boolean on-policy?))}
+     [:span {:class controls/eyebrow-class} "Now"]
+     [:span {:class ["optimizer-exposure-map__preview-value"]}
+      (str (fmt-mult (:gross current-exposure)) " gross · "
+           (fmt-mult (:net current-exposure)) " net")]
+     [:span {:class ["optimizer-exposure-map__preview-verdict"]}
+      (cond
+        on-policy? "on policy — no rebalance needed"
+        (and (not gross-ok?) (not net-ok?)) "off policy — gross & net out of range"
+        (not gross-ok?) "off policy — gross out of range"
+        :else "off policy — net out of range")]]))
+
 (defn- preset-chip
   [{:keys [key label active?]}]
   [:button {:type "button"
@@ -133,7 +150,7 @@
 (defn exposure-map
   "Render the Positioning control from the exposure-map view-model."
   [model]
-  (let [{:keys [gross-band net-band max-band echo presets current-exposure]} model]
+  (let [{:keys [gross-band net-band max-band echo presets preview]} model]
     [:div {:class ["optimizer-exposure-map"]
            :data-role "portfolio-optimizer-exposure-map"}
      (axis-frame (exposure-pad model))
@@ -148,11 +165,8 @@
           :data-role "portfolio-optimizer-exposure-echo"}
       [:span {:class controls/eyebrow-class} "Sent to solver"]
       [:span {:class ["optimizer-exposure-map__echo-value"]}
-       (str (gross-echo echo) " · " (net-echo echo))]
-      (when current-exposure
-        [:span {:class ["optimizer-exposure-map__echo-current"]}
-         (str "now " (fmt-mult (:gross current-exposure)) " gross · "
-              (fmt-mult (:net current-exposure)) " net")])]
+       (str (gross-echo echo) " · " (net-echo echo))]]
+     (preview-block preview)
      (into [:div {:class ["optimizer-exposure-map__presets"]
                   :data-role "portfolio-optimizer-exposure-presets"}]
            (map preset-chip presets))]))

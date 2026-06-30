@@ -74,7 +74,9 @@ Local scratch refs (non-authoritative):
   compiles clean. Surprise: existing view tests + Playwright key on the original constraint
   `data-role`s, so each canonical control appears exactly once (no duplication), with the raw
   gross/net min/max in the Advanced drawer.
-- [ ] M4 — Named presets and live pre-run preview.
+- [x] (2026-06-30) M4 — Named presets (wired in M2/M3: chips apply + active-preset detection)
+  and an honest live preview (current exposure + on-policy verdict; no stale/fabricated trade
+  count — see Decision Log). `npm test` green (+3 view-model tests); styles pass.
 - [ ] M5 — Profile memory persistence (remember last-used per wallet + universe).
 - [ ] M6 — Workbench scene, Playwright spec, and full validation gates.
 
@@ -137,6 +139,15 @@ Local scratch refs (non-authoritative):
   current draft exists; otherwise it says "Run to preview estimated trades."
   Rationale: Running a real solve on every constraint tweak is expensive and out of scope; a
   fabricated estimate would violate the trading-UI honesty policy.
+  Date/Author: 2026-06-30 / Claude.
+
+- Decision (M4 refinement): The preview shows current exposure + an on-policy verdict, and does
+  NOT show a trade count at all (not even from the last run).
+  Rationale: The setup panel is shown WHILE constraints are edited, which makes the draft dirty
+  and any prior run stale relative to the displayed policy; a trade count there would almost
+  always be stale, i.e. misleading. The honest, always-available pre-run signal is "is the
+  current portfolio already within the target band?" The exact trades remain in Results after
+  Run. This keeps the promise of a live preview without a fabricated or stale number.
   Date/Author: 2026-06-30 / Claude.
 
 ## Outcomes & Retrospective

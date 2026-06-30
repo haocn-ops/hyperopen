@@ -62,8 +62,18 @@ Local scratch refs (non-authoritative):
   green (4917 tests / 27006 assertions, 0 failures). Surprise: the system-default constraints
   (gross 2.0, net 1.0/1.0, cap 0.5) ARE exactly the Balanced preset, so `active-preset` returns
   `:balanced` for a fresh draft — corrected the test to assert that.
-- [ ] M2 — Exposure actions, pointer placeholders, and all contract surfaces + tests.
-- [ ] M3 — 2D exposure-map view, panel restructure, view-model, and CSS.
+- [x] (2026-06-30) M2 — Exposure actions (`actions/exposure.cljs`), `:event/clientY` +
+  `:event/pointer-buttons` placeholders, and all contract surfaces (facade, runtime catalog,
+  registration rows, action_args specs + ceiling bump). `npm test` green; drift gate green.
+  Note: handlers write the WHOLE constraints map (so a zero gross band can DISSOC `:gross-min`).
+- [x] (2026-06-30) M3 — 2D exposure-map view (`setup_exposure_map.cljs`), exposure view-model
+  (`view_model/exposure.cljs`), panel restructured into Positioning / Risk guards / Rebalance /
+  Advanced groups (`setup_constraint_controls.cljs`), current-exposure threaded through
+  `control-rail`, CSS block + range reset. `npm test`, `lint:hiccup`, `lint:theme-colors`,
+  `lint:input-parsing`, `lint:namespace-boundaries`, `test:styles` pass; `portfolio` build
+  compiles clean. Surprise: existing view tests + Playwright key on the original constraint
+  `data-role`s, so each canonical control appears exactly once (no duplication), with the raw
+  gross/net min/max in the Advanced drawer.
 - [ ] M4 — Named presets and live pre-run preview.
 - [ ] M5 — Profile memory persistence (remember last-used per wallet + universe).
 - [ ] M6 — Workbench scene, Playwright spec, and full validation gates.

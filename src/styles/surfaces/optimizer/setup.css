@@ -191,4 +191,174 @@
   .portfolio-optimizer .optimizer-include-spot-control {
     justify-self: end;
   }
+
+  /* --- Exposure map (the 2D Positioning control) ------------------------------- */
+
+  .portfolio-optimizer .optimizer-constraint-group + .optimizer-constraint-group {
+    border-top: 1px solid var(--optimizer-border);
+    padding-top: 0.75rem;
+  }
+
+  .portfolio-optimizer .optimizer-exposure-map {
+    display: flex;
+    flex-direction: column;
+    gap: 0.625rem;
+  }
+
+  /* The pad sits in a square frame with axis labels on each edge. */
+  .portfolio-optimizer .optimizer-exposure-map__frame {
+    position: relative;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    grid-template-rows: auto 1fr auto;
+    align-items: center;
+    gap: 0.25rem 0.4rem;
+  }
+
+  .portfolio-optimizer .optimizer-exposure-map__pad {
+    grid-column: 2;
+    grid-row: 2;
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    border: 1px solid var(--optimizer-border-strong);
+    background-color: var(--optimizer-bg);
+    cursor: crosshair;
+    touch-action: none;
+  }
+
+  .portfolio-optimizer .optimizer-exposure-map__pad[data-gross-infeasible="true"],
+  .portfolio-optimizer .optimizer-exposure-map__pad[data-net-infeasible="true"] {
+    border-color: var(--optimizer-warn);
+  }
+
+  .portfolio-optimizer
+    :is(.optimizer-exposure-map__axis-y-top, .optimizer-exposure-map__axis-y-bot,
+        .optimizer-exposure-map__axis-x-left, .optimizer-exposure-map__axis-x-right) {
+    font-family: var(--font-mono, monospace);
+    font-size: 0.5rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--optimizer-text-3);
+    white-space: nowrap;
+  }
+
+  .portfolio-optimizer .optimizer-exposure-map__axis-y-top {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .portfolio-optimizer .optimizer-exposure-map__axis-y-bot {
+    grid-column: 1;
+    grid-row: 3;
+  }
+
+  .portfolio-optimizer .optimizer-exposure-map__axis-x-left {
+    grid-column: 2;
+    grid-row: 3;
+    justify-self: start;
+  }
+
+  .portfolio-optimizer .optimizer-exposure-map__axis-x-right {
+    grid-column: 2;
+    grid-row: 3;
+    justify-self: end;
+  }
+
+  /* SVG primitives reference tokens via class so no raw colors live in the view. */
+  .portfolio-optimizer .optimizer-exposure-map__surface {
+    fill: var(--optimizer-surface);
+  }
+
+  .portfolio-optimizer .optimizer-exposure-map__grid {
+    stroke: var(--optimizer-border);
+    stroke-width: 0.5;
+  }
+
+  .portfolio-optimizer .optimizer-exposure-map__band {
+    fill: color-mix(in srgb, var(--optimizer-accent) 18%, transparent);
+    stroke: color-mix(in srgb, var(--optimizer-accent) 55%, transparent);
+    stroke-width: 0.75;
+  }
+
+  .portfolio-optimizer .optimizer-exposure-map__range {
+    stroke: var(--optimizer-accent);
+    stroke-width: 1;
+  }
+
+  .portfolio-optimizer .optimizer-exposure-map__handle {
+    fill: var(--optimizer-accent);
+    stroke: var(--optimizer-bg);
+    stroke-width: 1;
+  }
+
+  .portfolio-optimizer .optimizer-exposure-map__current {
+    fill: none;
+    stroke: var(--optimizer-text-2);
+    stroke-width: 1;
+    stroke-dasharray: 1.5 1.5;
+  }
+
+  .portfolio-optimizer .optimizer-exposure-map__bands {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+  }
+
+  .portfolio-optimizer .optimizer-exposure-map__band-row {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+  }
+
+  .portfolio-optimizer .optimizer-exposure-map__band-value {
+    font-family: var(--font-mono, monospace);
+    font-size: 0.5625rem;
+    color: var(--optimizer-text-2);
+  }
+
+  .portfolio-optimizer .optimizer-exposure-map__echo {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.4rem;
+    border: 1px solid var(--optimizer-border);
+    background-color: var(--optimizer-surface-2);
+    padding: 0.35rem 0.5rem;
+  }
+
+  .portfolio-optimizer .optimizer-exposure-map__echo-value {
+    font-family: var(--font-mono, monospace);
+    font-size: 0.625rem;
+    color: var(--optimizer-text);
+  }
+
+  .portfolio-optimizer .optimizer-exposure-map__echo-current {
+    font-family: var(--font-mono, monospace);
+    font-size: 0.5625rem;
+    color: var(--optimizer-text-3);
+  }
+
+  .portfolio-optimizer .optimizer-exposure-map__presets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+  }
+
+  .portfolio-optimizer .optimizer-exposure-map__preset {
+    border: 1px solid var(--optimizer-border);
+    background-color: transparent;
+    padding: 0.2rem 0.5rem;
+    font-family: var(--font-mono, monospace);
+    font-size: 0.5625rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--optimizer-text-2);
+    cursor: pointer;
+  }
+
+  .portfolio-optimizer .optimizer-exposure-map__preset[aria-pressed="true"] {
+    border-color: var(--optimizer-accent-border);
+    background-color: var(--optimizer-accent-soft);
+    color: var(--optimizer-text);
+  }
 }

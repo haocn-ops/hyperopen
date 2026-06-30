@@ -1,5 +1,8 @@
 (ns hyperopen.views.portfolio.optimize.setup-constraint-controls
-  (:require [hyperopen.views.portfolio.optimize.setup-controls :as controls]
+  (:require [hyperopen.portfolio.optimizer.application.view-model.exposure :as exposure-vm]
+            [hyperopen.portfolio.optimizer.domain.exposure-policy :as exposure-policy]
+            [hyperopen.views.portfolio.optimize.setup-controls :as controls]
+            [hyperopen.views.portfolio.optimize.setup-exposure-map :as exposure-map]
             [hyperopen.views.ui.toggle :as toggle]))
 
 (def ^:private default-turnover-cap
@@ -173,46 +176,88 @@
                                    :include-spot?
                                    (not enabled?)]]})]]))
 
+(defn- group-block
+  "A labelled sub-group inside the Constraints panel. `eyebrow` is the small uppercase label,
+  `hint` an optional plain-English caption, `body` the controls."
+  [eyebrow hint body]
+  [:div {:class ["optimizer-constraint-group"]}
+   [:div {:class ["flex" "items-baseline" "justify-between" "gap-2"]}
+    [:span {:class controls/eyebrow-class} eyebrow]
+    (when hint
+      [:span {:class ["font-mono" "text-[0.5625rem]" "normal-case"
+                      "tracking-normal" "text-trading-muted/70"]}
+       hint])]
+   [:div {:class ["mt-2"]} body]])
+
+(defn- advanced-drawer
+  "The raw gross/net min/max fields the exposure pad abstracts, kept for experts. Editing any raw
+  field writes the canonical key directly, which flips the active preset to Custom (the
+  exposure-map derives the preset from the values). Lives behind a nested disclosure so the
+  common path never sees it. Each field keeps its original data-role and appears exactly once in
+  the panel — these are the only place gross-min/gross-max/net-min/net-max are editable."
+  [constraints highlighted-controls]
+  (controls/disclosure-panel
+   "portfolio-optimizer-constraints-advanced"
+   (controls/disclosure-heading "Advanced solver constraints" "raw min/max")
+   [:div {:class ["mt-3" "grid" "grid-cols-1" "gap-2"]}
+    (constraint-row "Gross exposure min" :gross-min (:gross-min constraints)
+                    "portfolio-optimizer-constraint-gross-min-input"
+                    (contains? highlighted-controls :gross-min)
+                    :mult)
+    (constraint-row "Gross exposure max" "Gross Leverage"
+                    :gross-max (:gross-max constraints)
+                    "portfolio-optimizer-constraint-gross-max-input"
+                    (contains? highlighted-controls :gross-max)
+                    :mult)
+    (constraint-row "Net exposure min" :net-min (:net-min constraints)
+                    "portfolio-optimizer-constraint-net-min-input"
+                    (contains? highlighted-controls :net-min)
+                    :mult)
+    (constraint-row "Net exposure max" :net-max (:net-max constraints)
+                    "portfolio-optimizer-constraint-net-max-input"
+                    (contains? highlighted-controls :net-max)
+                    :mult)]))
+
 (defn constraints-section
-  [draft highlighted-controls]
-  (let [constraints (:constraints draft)]
-    (controls/disclosure-panel
-     "portfolio-optimizer-constraints-panel"
-     ;; "defaults applied", not "mandatory": every constraint is pre-filled from
-     ;; default-draft and none gate Run. The old "mandatory" label scared users
-     ;; into opening an 8-input panel they never need to touch.
-     (controls/disclosure-heading "Constraints" "defaults applied")
-     [:div {:class ["mt-3" "grid" "grid-cols-1" "gap-2"]}
-      (long-only-row constraints)
-      (include-spot-row constraints)
-      (constraint-row "Per-asset cap" "Max Asset Weight"
-                      :max-asset-weight (:max-asset-weight constraints)
-                      "portfolio-optimizer-constraint-max-asset-weight-input"
-                      (contains? highlighted-controls :max-asset-weight)
-                      :weight)
-      (constraint-row "Gross exposure min" :gross-min (:gross-min constraints)
-                      "portfolio-optimizer-constraint-gross-min-input"
-                      (contains? highlighted-controls :gross-min)
-                      :mult)
-      (constraint-row "Gross exposure max" "Gross Leverage"
-                      :gross-max (:gross-max constraints)
-                      "portfolio-optimizer-constraint-gross-max-input"
-                      (contains? highlighted-controls :gross-max)
-                      :mult)
-      (constraint-row "Net exposure min" :net-min (:net-min constraints)
-                      "portfolio-optimizer-constraint-net-min-input"
-                      (contains? highlighted-controls :net-min)
-                      :mult)
-      (constraint-row "Net exposure max" :net-max (:net-max constraints)
-                      "portfolio-optimizer-constraint-net-max-input"
-                      (contains? highlighted-controls :net-max)
-                      :mult)
-      (constraint-row "Dust threshold" :dust-usdc (:dust-usdc constraints)
-                      "portfolio-optimizer-constraint-dust-usdc-input" false
-                      :usd)
-      (turnover-cap-row constraints
-                        (contains? highlighted-controls :max-turnover))
-      (constraint-row "Rebalance tolerance" "Rebalance Tolerance"
-                      :rebalance-tolerance (:rebalance-tolerance constraints)
-                      "portfolio-optimizer-constraint-rebalance-tolerance-input" false
-                      :pts)])))
+  ([draft highlighted-controls]
+   (constraints-section draft highlighted-controls nil))
+  ([draft highlighted-controls current-exposure]
+   (let [constraints (:constraints draft)
+         exposure-model (exposure-vm/exposure-map-model
+                         {:constraints constraints
+                          :current-exposure current-exposure
+                          :highlighted-controls highlighted-controls})
+         active-label (get exposure-policy/preset-labels
+                           (:active-preset exposure-model) "Custom")]
+     (controls/disclosure-panel
+      "portfolio-optimizer-constraints-panel"
+      ;; The trailing eyebrow now reflects the active positioning preset (Balanced / Custom / …)
+      ;; instead of the old "defaults applied": the panel leads with one draggable control, not
+      ;; an eight-input form, so the at-a-glance state worth showing is the chosen policy.
+      (controls/disclosure-heading "Constraints" active-label)
+      [:div {:class ["mt-3" "space-y-4"]}
+       (group-block "Positioning" "gross leverage + net bias"
+                    (exposure-map/exposure-map exposure-model))
+       ;; Risk guards / Rebalance behavior keep each canonical control exactly once (original
+       ;; data-roles), just grouped by what the trader is deciding rather than listed flat.
+       (group-block "Risk guards" nil
+                    [:div {:class ["grid" "grid-cols-1" "gap-2"]}
+                     (constraint-row "Per-asset cap" "Max Asset Weight"
+                                     :max-asset-weight (:max-asset-weight constraints)
+                                     "portfolio-optimizer-constraint-max-asset-weight-input"
+                                     (contains? highlighted-controls :max-asset-weight)
+                                     :weight)
+                     (long-only-row constraints)
+                     (include-spot-row constraints)])
+       (group-block "Rebalance behavior" "fewer trades ↔ tighter tracking"
+                    [:div {:class ["grid" "grid-cols-1" "gap-2"]}
+                     (constraint-row "Rebalance tolerance" "Rebalance Tolerance"
+                                     :rebalance-tolerance (:rebalance-tolerance constraints)
+                                     "portfolio-optimizer-constraint-rebalance-tolerance-input" false
+                                     :pts)
+                     (turnover-cap-row constraints
+                                       (contains? highlighted-controls :max-turnover))
+                     (constraint-row "Dust threshold" :dust-usdc (:dust-usdc constraints)
+                                     "portfolio-optimizer-constraint-dust-usdc-input" false
+                                     :usd)])
+       (advanced-drawer constraints highlighted-controls)]))))

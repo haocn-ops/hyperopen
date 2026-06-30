@@ -161,7 +161,9 @@
      reads as a border wall around the track, and the accent fill already
      signals the control's state. */
   .portfolio-optimizer input.optimizer-target-sigma-slider,
-  .portfolio-optimizer input.optimizer-target-sigma-slider:focus {
+  .portfolio-optimizer input.optimizer-target-sigma-slider:focus,
+  .portfolio-optimizer input.optimizer-exposure-band,
+  .portfolio-optimizer input.optimizer-exposure-band:focus {
     background-color: transparent;
     border-color: transparent;
     box-shadow: none;

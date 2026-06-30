@@ -315,9 +315,15 @@
                    "Small rebalance trades below this USDC notional are ignored so the output avoids noisy dust orders."))
     (is (contains? strings
                    "Minimum target-vs-current weight difference before a rebalance row is considered actionable. 0.03 means 3 percentage points."))
-    ;; Constraints are pre-filled from default-draft and never gate Run, so the
-    ;; section is labelled "defaults applied", not the old false "mandatory".
-    (is (contains? strings "defaults applied"))
+    ;; The panel leads with the 2D exposure-map Positioning control; its trailing eyebrow now
+    ;; reflects the active positioning preset (here :custom) instead of the old "defaults
+    ;; applied", and the controls are grouped by what the trader decides.
+    (is (contains? strings "Custom"))
+    (is (contains? strings "Positioning"))
+    (is (contains? strings "Risk guards"))
+    (is (contains? strings "Rebalance behavior"))
+    (is (contains? strings "Sent to solver"))
+    (is (contains? strings "Advanced solver constraints"))
     ;; Each numeric constraint echoes its interpreted unit persistently (not only in the
     ;; hover tooltip): 0.25 -> "max 25% per asset", 3 -> "3.00× capital", 0.03 -> "3.0 pp band".
     (is (contains? strings "max 25% per asset"))

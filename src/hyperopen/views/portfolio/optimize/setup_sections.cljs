@@ -1,5 +1,7 @@
 (ns hyperopen.views.portfolio.optimize.setup-sections
-  (:require [hyperopen.portfolio.optimizer.application.view-model :as optimizer-view-model]
+  (:require [hyperopen.portfolio.optimizer.application.current-portfolio :as current-portfolio]
+            [hyperopen.portfolio.optimizer.application.view-model :as optimizer-view-model]
+            [hyperopen.portfolio.optimizer.application.view-model.exposure :as exposure-vm]
             [hyperopen.portfolio.optimizer.contracts :as optimizer-contracts]
             [hyperopen.views.portfolio.optimize.instrument-overrides-panel :as instrument-overrides-panel]
             [hyperopen.views.portfolio.optimize.setup-constraint-controls :as constraint-controls]
@@ -24,7 +26,10 @@
     (target-sigma/frontier-sigma-bounds
      (get-in state optimizer-contracts/last-successful-run-result-path)))
    (model-controls/model-section draft)
-   (constraint-controls/constraints-section draft highlighted-controls)
+   (constraint-controls/constraints-section
+    draft highlighted-controls
+    (exposure-vm/snapshot->current-exposure
+     (current-portfolio/current-portfolio-snapshot state)))
    (controls/disclosure-panel
     "portfolio-optimizer-advanced-overrides-shell"
     (controls/disclosure-heading

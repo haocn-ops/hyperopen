@@ -86,7 +86,13 @@ Local scratch refs (non-authoritative):
   `npm test` green (4933 tests; +pure/action/async-effect tests); all structural lints +
   `portfolio` build clean. Note: save is gated on `mutations-allowed?` (no persist in spectate)
   and a valid wallet address.
-- [ ] M6 — Workbench scene, Playwright spec, and full validation gates.
+- [x] (2026-06-30) M6 — Verification. Added the workbench scene
+  (`portfolio/.../scenes/optimize/exposure_scenes.cljs`, 6 scenes) and the Playwright spec
+  (`tools/playwright/test/optimizer-exposure-map.spec.mjs`, 4 tests — render, preset round-trip
+  through the real runtime, band-slider, advanced drawer; all pass). `npm run gates` reports
+  34/34 PASS (5638 tests, 30418 assertions). Browser-verified the live component in the UI
+  workbench: the pad, band sliders, "Sent to solver" echo (gross 1.91×–1.92× · net 1.31×–1.42×,
+  the original screenshot's values), on-policy verdict, presets, and Memory row all render.
 
 ## Surprises & Discoveries
 
@@ -160,10 +166,29 @@ Local scratch refs (non-authoritative):
 
 ## Outcomes & Retrospective
 
-To be completed at milestone boundaries. Track whether the change reduced or increased overall
-complexity. Expectation: net UI complexity for the common path drops sharply (one drag vs.
-eight fields); internal complexity rises modestly (one pure namespace, one new actions
-namespace, one persistence triple), all additive and behind the existing constraint model.
+Completed 2026-06-30. All six milestones landed; `npm run gates` is 34/34 PASS (full `check` +
+`npm test` 5638 tests + `test:websocket`), the 4-test Playwright spec passes against the live
+app, and the component was browser-verified in the UI workbench.
+
+What a user gains: the Constraints panel now leads with one draggable 2D exposure map (gross
+leverage on Y, net bias on X) whose shaded box is the exact min/max band sent to the solver,
+plus band sliders, four presets, an honest on-policy preview, and per-wallet/per-universe
+memory (Save as default / Use saved / Reset) — replacing the eight numeric fields the trader had
+to re-edit every visit. The raw fields remain in an Advanced drawer for experts, and the exact
+solver constraints are always shown.
+
+Complexity: net UI complexity for the common path dropped sharply (one drag + presets vs. an
+eight-input form). Internal complexity rose modestly and additively — two pure namespaces
+(`exposure-policy`, `constraint-profiles`), one view-model, one view, one actions namespace, and
+one IndexedDB persistence triple — all sitting on top of the unchanged canonical min/max
+constraint model, so the solver, specs, and request builder were not touched. The honest design
+choices (zero gross band ⇒ no floor; preview shows on-policy status, not a stale trade count)
+keep the "simple on top, exact underneath" contract.
+
+Deferred / future: auto-remembering the last-used policy on every successful run (today memory
+is explicit via Save as default + auto-apply on load); pad keyboard-nudge of the target point
+(today keyboard users use the band sliders, presets, and Advanced raw fields); and validating
+preset values against live solver feasibility on more universes.
 
 ## Context and Orientation
 

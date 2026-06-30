@@ -1,0 +1,229 @@
+(ns hyperopen.portfolio.optimizer.domain.exposure-policy
+  "Pure conversion between the canonical flat constraint model (gross-min/gross-max,
+  net-min/net-max) and the trader-facing 'exposure policy' representation used by the 2D
+  exposure map (gross/net TARGET plus a symmetric BAND). This namespace owns every number in
+  the redesigned Positioning control so the view, the action handlers, and the tests share one
+  source of truth.
+
+  Why target/band instead of min/max: a trader thinks 'keep me around this leverage and this
+  directional bias', not 'edit a lower and an upper bound'. Target+band is purely a view
+  representation; it always round-trips back to the canonical keys before the request builder
+  renames them for the solver, so nothing here changes solver behavior.
+
+  Honest nil-floor semantics: `gross-min` is absent by default (no leverage floor). A zero gross
+  band therefore means 'cap leverage at the target, no floor' and DISSOCs `:gross-min`; a
+  positive gross band means 'keep leverage within +/- of the target' and writes a floor. The
+  request builder keys gross-floor on `(contains? constraints :gross-min)`, so callers must write
+  the WHOLE constraints map this namespace returns (it dissocs the key) rather than assoc'ing a
+  nil value, which would wrongly register a nil floor.")
+
+;; --- Axis scales (display domain for the pad) --------------------------------------------
+;;
+;; The pad plots gross on Y (0 at the bottom, `gross-axis-max` at the top) and net on X
+;; (-`net-axis-extent` at the left, +`net-axis-extent` at the right). Targets snap to
+;; `target-snap` for clean values. Advanced raw fields may exceed these bounds; the pad simply
+;; clamps the plotted marker.
+
+(def gross-axis-max 3.0)
+(def net-axis-extent 2.0)
+(def target-snap 0.05)
+(def band-eps 1e-6)
+(def max-band 0.5)
+
+(def preset-keys [:conservative :balanced :high-gross :long-bias])
+
+;; --- Small numeric helpers ----------------------------------------------------------------
+
+(defn- finite-number?
+  [x]
+  (and (number? x) (js/isFinite x)))
+
+(defn- round4
+  [x]
+  (when (finite-number? x)
+    (/ (js/Math.round (* x 10000)) 10000)))
+
+(defn- clamp
+  [x lo hi]
+  (max lo (min hi x)))
+
+(defn- snap
+  [x]
+  (* target-snap (js/Math.round (/ x target-snap))))
+
+(defn- approx=
+  [a b]
+  (and (finite-number? a) (finite-number? b)
+       (< (js/Math.abs (- a b)) 1e-4)))
+
+;; --- Forward: canonical constraints -> exposure policy ------------------------------------
+
+(defn constraints->policy
+  "Derive {:gross-target :gross-band :net-target :net-band} from the canonical constraint map.
+  Net defaults to both bounds present; gross-min is nilable (nil ⇒ ceiling-only ⇒ band 0,
+  target = gross-max)."
+  [constraints]
+  (let [gmax (when (finite-number? (:gross-max constraints)) (:gross-max constraints))
+        gmin (when (finite-number? (:gross-min constraints)) (:gross-min constraints))
+        nmin (when (finite-number? (:net-min constraints)) (:net-min constraints))
+        nmax (when (finite-number? (:net-max constraints)) (:net-max constraints))
+        net-target (cond
+                     (and nmin nmax) (/ (+ nmin nmax) 2)
+                     nmax nmax
+                     nmin nmin
+                     :else 0.0)
+        net-band (if (and nmin nmax) (/ (- nmax nmin) 2) 0.0)
+        gross-target (cond
+                       (and gmin gmax) (/ (+ gmin gmax) 2)
+                       gmax gmax
+                       gmin gmin
+                       :else 0.0)
+        gross-band (if (and gmin gmax) (/ (- gmax gmin) 2) 0.0)]
+    {:gross-target (round4 gross-target)
+     :gross-band (round4 (max 0.0 gross-band))
+     :net-target (round4 net-target)
+     :net-band (round4 (max 0.0 net-band))}))
+
+;; --- Reverse: exposure policy -> canonical constraints ------------------------------------
+
+(defn policy->constraints
+  "Return `constraints` with gross/net bounds recomputed from `policy`. Writes gross-max,
+  net-min, net-max always; writes gross-min only when the gross band is positive, otherwise
+  DISSOCs it to preserve the no-floor default. Returns a full constraints map so callers persist
+  it whole."
+  [constraints {:keys [gross-target gross-band net-target net-band]}]
+  (let [gt (max 0.0 (or gross-target 0.0))
+        gb (max 0.0 (or gross-band 0.0))
+        nt (or net-target 0.0)
+        nb (max 0.0 (or net-band 0.0))]
+    (cond-> (assoc constraints
+                   :gross-max (round4 (+ gt gb))
+                   :net-min (round4 (- nt nb))
+                   :net-max (round4 (+ nt nb)))
+      (> gb band-eps) (assoc :gross-min (round4 (max 0.0 (- gt gb))))
+      (<= gb band-eps) (dissoc :gross-min))))
+
+;; --- Pure transforms applied by the action handlers --------------------------------------
+
+(defn apply-point
+  "Move the target point to `{:gross-target :net-target}` while preserving both bands."
+  [constraints {:keys [gross-target net-target]}]
+  (let [{:keys [gross-band net-band]} (constraints->policy constraints)]
+    (policy->constraints constraints
+                         {:gross-target gross-target
+                          :gross-band gross-band
+                          :net-target net-target
+                          :net-band net-band})))
+
+(defn apply-band
+  "Set the `axis` (:gross | :net) band to `value`, clamped to [0, max-band], preserving targets."
+  [constraints axis value]
+  (let [policy (constraints->policy constraints)
+        v (clamp (max 0.0 (or value 0.0)) 0.0 max-band)
+        policy' (case axis
+                  :gross (assoc policy :gross-band v)
+                  :net (assoc policy :net-band v)
+                  policy)]
+    (policy->constraints constraints policy')))
+
+;; --- Named presets ------------------------------------------------------------------------
+;;
+;; Each preset is a partial constraint map merged over the current constraints. All presets are
+;; ceiling-only on gross (no floor), so applying one dissocs :gross-min. Values are starting
+;; points a trader can then nudge; see the ExecPlan Decision Log for the rationale.
+
+(def presets
+  {:conservative {:gross-max 1.0 :net-min 0.0 :net-max 0.0 :max-asset-weight 0.25}
+   :balanced     {:gross-max 2.0 :net-min 1.0 :net-max 1.0 :max-asset-weight 0.5}
+   :high-gross   {:gross-max 3.0 :net-min 1.0 :net-max 1.0 :max-asset-weight 0.5}
+   :long-bias    {:gross-max 2.0 :net-min 1.25 :net-max 1.75 :max-asset-weight 0.5}})
+
+(def preset-labels
+  {:conservative "Conservative"
+   :balanced "Balanced"
+   :high-gross "High Gross"
+   :long-bias "Long Bias"
+   :custom "Custom"})
+
+(defn apply-preset
+  "Merge the named preset over `constraints`, clearing any gross floor (presets are ceiling-only)."
+  [constraints preset-key]
+  (if-let [partial (get presets preset-key)]
+    (dissoc (merge constraints partial) :gross-min)
+    constraints))
+
+(defn active-preset
+  "Return the preset key whose gross/net/cap values match `constraints` (with no gross floor),
+  else :custom."
+  [constraints]
+  (or (some (fn [k]
+              (let [{:keys [gross-max net-min net-max max-asset-weight]} (get presets k)]
+                (when (and (nil? (:gross-min constraints))
+                           (approx= (:gross-max constraints) gross-max)
+                           (approx= (:net-min constraints) net-min)
+                           (approx= (:net-max constraints) net-max)
+                           (approx= (:max-asset-weight constraints) max-asset-weight))
+                  k)))
+            preset-keys)
+      :custom))
+
+;; --- Pad pointer math (pure; receives plain numbers, never the DOM) ----------------------
+
+(defn point->targets
+  "Convert a pad pointer event to snapped gross/net targets, or nil when this is not an active
+  drag (no pressed button) or the pad bounds are degenerate. `bounds` is the pad's bounding
+  rect {:left :top :width :height} resolved by the :event.currentTarget/bounds placeholder."
+  [{:keys [client-x client-y bounds buttons]}]
+  (let [{:keys [left top width height]} bounds
+        pressed? (and (number? buttons) (pos? buttons))]
+    (when (and pressed?
+               (finite-number? client-x) (finite-number? client-y)
+               (finite-number? left) (finite-number? top)
+               (finite-number? width) (finite-number? height)
+               (pos? width) (pos? height))
+      (let [fx (clamp (/ (- client-x left) width) 0.0 1.0)
+            fy (clamp (/ (- client-y top) height) 0.0 1.0)
+            net-target (snap (+ (- net-axis-extent) (* fx (* 2 net-axis-extent))))
+            gross-target (snap (* gross-axis-max (- 1.0 fy)))
+            ;; Gross is total absolute exposure, so it can never be below the absolute net
+            ;; target; clamp to keep the box physically meaningful.
+            gross-target* (max gross-target (js/Math.abs net-target))]
+        {:gross-target (round4 gross-target*)
+         :net-target (round4 net-target)}))))
+
+;; --- Plotting helpers for the view (0..1 fractions; y grows downward like SVG) ------------
+
+(defn- net->fraction
+  [net]
+  (clamp (/ (+ net net-axis-extent) (* 2 net-axis-extent)) 0.0 1.0))
+
+(defn- gross->fraction
+  [gross]
+  (clamp (- 1.0 (/ gross gross-axis-max)) 0.0 1.0))
+
+(defn target-marker
+  "Fractional {:x :y} (0..1) position of the policy target point on the pad."
+  [{:keys [gross-target net-target]}]
+  {:x (net->fraction (or net-target 0.0))
+   :y (gross->fraction (or gross-target 0.0))})
+
+(defn band-rect
+  "Fractional {:x :y :w :h} (0..1) rectangle of the allowed exposure region (the band box)."
+  [{:keys [gross-target gross-band net-target net-band]}]
+  (let [gt (or gross-target 0.0)
+        gb (max 0.0 (or gross-band 0.0))
+        nt (or net-target 0.0)
+        nb (max 0.0 (or net-band 0.0))
+        x0 (net->fraction (- nt nb))
+        x1 (net->fraction (+ nt nb))
+        y-top (gross->fraction (+ gt gb))
+        y-bot (gross->fraction (- gt gb))]
+    {:x x0 :y y-top :w (max 0.0 (- x1 x0)) :h (max 0.0 (- y-bot y-top))}))
+
+(defn current-exposure-marker
+  "Fractional {:x :y} position of the current portfolio's {:gross :net} exposure, or nil when
+  either value is missing."
+  [{:keys [gross net]}]
+  (when (and (finite-number? gross) (finite-number? net))
+    {:x (net->fraction net)
+     :y (gross->fraction gross)}))

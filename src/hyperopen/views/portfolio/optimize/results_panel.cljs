@@ -3,7 +3,6 @@
             [hyperopen.views.portfolio.optimize.frontier-chart :as frontier-chart]
             [hyperopen.views.portfolio.optimize.refinement-status-card :as refinement-card]
             [hyperopen.views.portfolio.optimize.results-diagnostics-rail :as diagnostics-rail]
-            [hyperopen.views.portfolio.optimize.results-rebalance-preview :as rebalance-preview]
             [hyperopen.views.portfolio.optimize.results-summary :as summary]
             [hyperopen.views.portfolio.optimize.scenario-objective-menu :as objective-menu]
             [hyperopen.views.portfolio.optimize.target-exposure-table :as target-exposure-table]))
@@ -28,12 +27,11 @@
    (results-panel last-successful-run nil))
   ([last-successful-run draft]
    (results-panel last-successful-run draft nil))
-  ([last-successful-run draft {:keys [state stale? include-rebalance? frontier-overlay-mode
+  ([last-successful-run draft {:keys [state stale? frontier-overlay-mode
                                       readiness
                                       constrain-frontier?
                                       refinement]
-                               :or {include-rebalance? true
-                                    frontier-overlay-mode :standalone}}]
+                               :or {frontier-overlay-mode :standalone}}]
    (let [result (results-model/enrich-result-labels (:result last-successful-run) draft)]
      (when (= :solved (:status result))
        [:section {:class ["optimizer-results-surface" "space-y-0" "leading-4"]
@@ -62,6 +60,4 @@
                 :data-role "portfolio-optimizer-results-right-panel"}
           (active-views-editor state draft result readiness)
           (diagnostics-rail/result-confidence-rail refinement)
-          (diagnostics-rail/trust-diagnostics-rail result)]]
-        (when include-rebalance?
-          (rebalance-preview/rebalance-preview result))]))))
+          (diagnostics-rail/trust-diagnostics-rail result)]]]))))

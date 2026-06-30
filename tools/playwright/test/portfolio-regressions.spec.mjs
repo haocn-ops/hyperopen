@@ -2804,14 +2804,15 @@ test("portfolio optimizer execution remains read-only in Spectate Mode @regressi
   await visitRoute(page, "/portfolio/optimize");
   await seedPersistedOptimizerTrackingScenario(page);
   await visitRoute(page, `/portfolio/optimize/${OPTIMIZER_RELOAD_SCENARIO_ID}`);
-  await selectOptimizerScenarioTab(page, "rebalance");
+  // The standalone Rebalance preview tab/card was retired — the rebalance stages straight
+  // into Execution. Reach Execution directly; the plan is rebuilt on tab entry, so spectate
+  // must be enabled first for the read-only message to bake into it.
   await enableOptimizerSpectateMode(page);
-
-  await page.locator("[data-role='portfolio-optimizer-stage-execution']").click();
+  await selectOptimizerScenarioTab(page, "execution");
   await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
 
   const tab = page.locator("[data-role='portfolio-optimizer-execution-tab']");
-  await expect(tab).toContainText("Margin after");
+  await expect(tab).toContainText("Account leverage after");
   await expect(tab).toContainText(
     "Spectate Mode is read-only. Stop Spectate Mode to place trades or move funds."
   );

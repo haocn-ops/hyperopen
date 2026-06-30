@@ -499,8 +499,7 @@
                       :stale? (and stale? (not running?))
                       :frontier-overlay-mode frontier-overlay-mode
                       :constrain-frontier? constrain-frontier?
-                      :refinement refinement
-                      :include-rebalance? false}))
+                      :refinement refinement}))
          true (conj (review-rebalance-cta (:trade-count deltas)))))
 
      :else

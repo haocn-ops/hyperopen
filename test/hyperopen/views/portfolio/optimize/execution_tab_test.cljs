@@ -357,7 +357,7 @@
                                                                  :status :failed
                                                                  :side :buy
                                                                  :delta-notional-usd 1000
-                                                                 :error {:message "Order submit failed: exchange down"}}]}]}
+                                                                 :error {:message "Order must have minimum value of $10. asset=110023"}}]}]}
                                   :execution-modal {:open? true :phase :staged
                                                     :error "Execution halted before all rows submitted."
                                                     :plan staged-plan}})
@@ -366,7 +366,8 @@
     (is (= "halted" (get-in (node-by-role view-node "portfolio-optimizer-execution-control-band")
                             [1 :data-phase])))
     (is (contains? strings "Latest attempt"))
-    (is (contains? strings "Order submit failed: exchange down"))
+    ;; The Detail column shows the deciphered exchange error, not a raw response map.
+    (is (contains? strings "Order must have minimum value of $10. asset=110023"))
     (is (some? (node-by-role view-node "portfolio-optimizer-execution-resume")))))
 
 (deftest execution-tab-read-only-disables-arm-and-shows-message-test

@@ -322,7 +322,7 @@
                            :skipped-count skipped-count)
            :rows rows)))
 
-(defn- response-statuses
+(defn response-statuses
   "Per-order status entries from an order response. Each optimizer row submits exactly one
    order, so the singular [:response :data :status] is the legacy fallback for the vector."
   [resp]

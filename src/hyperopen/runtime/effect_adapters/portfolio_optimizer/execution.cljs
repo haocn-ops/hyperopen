@@ -112,8 +112,8 @@
                                (assoc row
                                       :status :failed
                                       :pre-action-responses pre-responses
-                                      :error {:message (str "Pre-submit action failed: "
-                                                            (pr-str failed-pre-action))})
+                                      :error {:message (execution-workflow/order-error-message
+                                                        failed-pre-action)})
                                (.then (submit-with-reprice! submit-order! store target action
                                                             post-only-reprice-attempts)
                                       (fn [resp]
@@ -130,8 +130,8 @@
                                           (assoc row
                                                  :status :failed
                                                  :response resp
-                                                 :error {:message (str "Order submit failed: "
-                                                                       (pr-str resp))})))))))]
+                                                 :error {:message (execution-workflow/order-error-message
+                                                                   resp)})))))))]
                 (.catch submit-promise
                         (fn [err]
                           (mark-row-failed row err)))))]

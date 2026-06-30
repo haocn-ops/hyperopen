@@ -356,4 +356,6 @@
 	   :effects/execute-portfolio-optimizer-plan ::portfolio-optimizer-execution-plan-args
 	   :effects/refresh-portfolio-optimizer-tracking ::common/no-args
 	   :effects/refresh-portfolio-optimizer-rebalance-slippage-snapshots ::common/no-args
-	   :effects/enable-portfolio-optimizer-manual-tracking ::common/no-args})
+	   :effects/enable-portfolio-optimizer-manual-tracking ::common/no-args
+	   :effects/save-portfolio-optimizer-constraint-default ::common/no-args
+	   :effects/load-portfolio-optimizer-constraint-profiles ::common/no-args})

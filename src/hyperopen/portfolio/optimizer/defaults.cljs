@@ -182,6 +182,7 @@
    :scenario-index {:ordered-ids []
                     :by-id {}}
    :last-successful-run nil
+   :constraint-profiles {}
    :history-data {:candle-history-by-coin {}
                   :funding-history-by-coin {}
                   :vault-details-by-address {}

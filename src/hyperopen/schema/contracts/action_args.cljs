@@ -281,6 +281,8 @@
    :actions/set-portfolio-optimizer-exposure-band ::portfolio-optimizer-key-value-args
    :actions/apply-portfolio-optimizer-exposure-preset ::portfolio-optimizer-model-kind-args
    :actions/reset-portfolio-optimizer-constraints-to-system ::common/no-args
+   :actions/save-portfolio-optimizer-constraint-default ::common/no-args
+   :actions/apply-portfolio-optimizer-constraint-default ::common/no-args
    :actions/set-portfolio-optimizer-objective-parameter ::portfolio-optimizer-key-value-args
    :actions/set-portfolio-optimizer-objective-parameter-percent ::portfolio-optimizer-key-value-args
    :actions/set-portfolio-optimizer-target-sigma-draft ::common/single-input-args

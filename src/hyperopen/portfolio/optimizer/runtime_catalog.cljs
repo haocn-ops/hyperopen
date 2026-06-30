@@ -46,6 +46,10 @@
     actions/apply-portfolio-optimizer-exposure-preset
     :reset-portfolio-optimizer-constraints-to-system
     actions/reset-portfolio-optimizer-constraints-to-system
+    :save-portfolio-optimizer-constraint-default
+    actions/save-portfolio-optimizer-constraint-default
+    :apply-portfolio-optimizer-constraint-default
+    actions/apply-portfolio-optimizer-constraint-default
     :set-portfolio-optimizer-objective-parameter
     actions/set-portfolio-optimizer-objective-parameter
     :set-portfolio-optimizer-objective-parameter-percent
@@ -223,4 +227,8 @@
       :refresh-portfolio-optimizer-rebalance-slippage-snapshots
       effect-adapters/refresh-portfolio-optimizer-rebalance-slippage-snapshots-effect
       :enable-portfolio-optimizer-manual-tracking
-      effect-adapters/enable-portfolio-optimizer-manual-tracking-effect}}))
+      effect-adapters/enable-portfolio-optimizer-manual-tracking-effect
+      :save-portfolio-optimizer-constraint-default
+      effect-adapters/save-portfolio-optimizer-constraint-default-effect
+      :load-portfolio-optimizer-constraint-profiles
+      effect-adapters/load-portfolio-optimizer-constraint-profiles-effect}}))

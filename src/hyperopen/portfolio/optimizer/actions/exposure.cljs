@@ -10,6 +10,7 @@
   (:gross-min/:gross-max/:net-min/:net-max/:max-asset-weight), so the request builder and specs
   are unchanged."
   (:require [hyperopen.portfolio.optimizer.actions.common :as common]
+            [hyperopen.portfolio.optimizer.application.constraint-profiles :as profiles]
             [hyperopen.portfolio.optimizer.contracts :as contracts]
             [hyperopen.portfolio.optimizer.defaults :as defaults]
             [hyperopen.portfolio.optimizer.domain.exposure-policy :as policy]))
@@ -58,3 +59,21 @@
   "Replace the draft constraints with the system defaults."
   [_state]
   (write-constraints (:constraints (defaults/default-draft))))
+
+;; --- Remembered profiles (per wallet + universe) -----------------------------------------
+
+(defn save-portfolio-optimizer-constraint-default
+  "Remember the current constraints as the default for this wallet + universe. The effect reads
+  the draft, stamps the time, updates state, and persists — so the action stays pure."
+  [_state]
+  [[:effects/save-portfolio-optimizer-constraint-default]])
+
+(defn apply-portfolio-optimizer-constraint-default
+  "Apply the remembered default for the current universe to the draft, if one exists."
+  [state]
+  (let [profile-map (get-in state contracts/constraint-profiles-path)
+        universe-key (profiles/universe-key (get-in state contracts/draft-universe-path))
+        remembered (profiles/remembered-constraints profile-map universe-key)]
+    (if remembered
+      (write-constraints remembered)
+      [])))

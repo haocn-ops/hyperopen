@@ -221,12 +221,13 @@
 (defn constraints-section
   ([draft highlighted-controls]
    (constraints-section draft highlighted-controls nil))
-  ([draft highlighted-controls current-exposure]
+  ([draft highlighted-controls {:keys [current-exposure has-saved-default?]}]
    (let [constraints (:constraints draft)
          exposure-model (exposure-vm/exposure-map-model
                          {:constraints constraints
                           :current-exposure current-exposure
-                          :highlighted-controls highlighted-controls})
+                          :highlighted-controls highlighted-controls
+                          :has-saved-default? has-saved-default?})
          active-label (get exposure-policy/preset-labels
                            (:active-preset exposure-model) "Custom")]
      (controls/disclosure-panel

@@ -393,18 +393,21 @@
 
 (deftest load-portfolio-optimizer-route-emits-scenario-read-effects-test
   (is (= [[:effects/load-portfolio-optimizer-scenario-index]
-          [:effects/load-portfolio-optimizer-history-discovery]]
+          [:effects/load-portfolio-optimizer-history-discovery]
+          [:effects/load-portfolio-optimizer-constraint-profiles]]
          (actions/load-portfolio-optimizer-route
           {:asset-selector {:phase :full}
            :vaults {:merged-index-rows [{:vault-address "0xloaded"}]}}
           "/portfolio/optimize")))
   (is (= [[:effects/load-portfolio-optimizer-scenario "scn_01"]
-          [:effects/load-portfolio-optimizer-history-discovery]]
+          [:effects/load-portfolio-optimizer-history-discovery]
+          [:effects/load-portfolio-optimizer-constraint-profiles]]
          (actions/load-portfolio-optimizer-route
           {:asset-selector {:phase :full}
            :vaults {:merged-index-rows [{:vault-address "0xloaded"}]}}
           "/portfolio/optimize/scn_01")))
-  (is (= [[:effects/load-portfolio-optimizer-history-discovery]]
+  (is (= [[:effects/load-portfolio-optimizer-history-discovery]
+          [:effects/load-portfolio-optimizer-constraint-profiles]]
          (actions/load-portfolio-optimizer-route
           {:asset-selector {:phase :full}
            :vaults {:merged-index-rows [{:vault-address "0xloaded"}]}}
@@ -417,14 +420,16 @@
 (deftest load-portfolio-optimizer-route-fetches-vault-metadata-for-universe-search-test
   (is (= [[:effects/load-portfolio-optimizer-history-discovery]
           [:effects/api-fetch-vault-index-with-cache]
-          [:effects/api-fetch-vault-summaries]]
+          [:effects/api-fetch-vault-summaries]
+          [:effects/load-portfolio-optimizer-constraint-profiles]]
          (actions/load-portfolio-optimizer-route
           {:asset-selector {:phase :full}}
           "/portfolio/optimize/new")))
   (is (= [[:effects/load-portfolio-optimizer-scenario-index]
           [:effects/load-portfolio-optimizer-history-discovery]
           [:effects/api-fetch-vault-index-with-cache]
-          [:effects/api-fetch-vault-summaries]]
+          [:effects/api-fetch-vault-summaries]
+          [:effects/load-portfolio-optimizer-constraint-profiles]]
          (actions/load-portfolio-optimizer-route
           {:asset-selector {:phase :full}
            :vaults {}}
@@ -432,12 +437,14 @@
   (is (= [[:effects/load-portfolio-optimizer-scenario "scn_01"]
           [:effects/load-portfolio-optimizer-history-discovery]
           [:effects/api-fetch-vault-index-with-cache]
-          [:effects/api-fetch-vault-summaries]]
+          [:effects/api-fetch-vault-summaries]
+          [:effects/load-portfolio-optimizer-constraint-profiles]]
          (actions/load-portfolio-optimizer-route
           {:asset-selector {:phase :full}
            :vaults {}}
           "/portfolio/optimize/scn_01")))
-  (is (= [[:effects/load-portfolio-optimizer-history-discovery]]
+  (is (= [[:effects/load-portfolio-optimizer-history-discovery]
+          [:effects/load-portfolio-optimizer-constraint-profiles]]
          (actions/load-portfolio-optimizer-route
           {:asset-selector {:phase :full}
            :vaults {:merged-index-rows [{:vault-address "0xloaded"}]}}
@@ -445,7 +452,8 @@
 
 (deftest load-portfolio-optimizer-route-refreshes-cache-only-selector-markets-test
   (is (= [[:effects/load-portfolio-optimizer-history-discovery]
-          [:effects/fetch-asset-selector-markets {:phase :full}]]
+          [:effects/fetch-asset-selector-markets {:phase :full}]
+          [:effects/load-portfolio-optimizer-constraint-profiles]]
          (actions/load-portfolio-optimizer-route
           {:asset-selector {:cache-hydrated? true
                             :phase :bootstrap

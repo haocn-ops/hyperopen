@@ -1,8 +1,10 @@
 (ns hyperopen.runtime.effect-adapters.portfolio-optimizer
   (:require [nexus.registry :as nxr]
+            [hyperopen.account.context :as account-context]
             [hyperopen.api.default :as api]
             [hyperopen.api.trading :as trading-api]
             [hyperopen.config :as app-config]
+            [hyperopen.portfolio.optimizer.application.constraint-profiles :as constraint-profiles]
             [hyperopen.portfolio.optimizer.application.rebalance-snapshot :as rebalance-snapshot]
             [hyperopen.portfolio.optimizer.application.history-loader.api-v2 :as history-api-v2]
             [hyperopen.portfolio.optimizer.contracts :as contracts]
@@ -39,6 +41,8 @@
 (def ^:dynamic *save-scenario-index!* persistence/save-scenario-index!)
 (def ^:dynamic *load-tracking!* persistence/load-tracking!)
 (def ^:dynamic *save-tracking!* persistence/save-tracking!)
+(def ^:dynamic *load-constraint-profiles!* persistence/load-constraint-profiles!)
+(def ^:dynamic *save-constraint-profiles!* persistence/save-constraint-profiles!)
 (def ^:dynamic *next-scenario-id* (fn [now-ms] (str "scn_" now-ms)))
 (def ^:dynamic *now-ms* #(.now js/Date))
 (def ^:dynamic *submit-order!* trading-api/submit-order!)
@@ -335,6 +339,50 @@
                          (get-in @store contracts/history-discovery-path)
                          err
                          (now-ms-fn))))))))))
+
+(defn save-portfolio-optimizer-constraint-default-effect
+  "Persist the current draft constraints as the remembered default for this wallet + universe.
+  A no-op (resolves false) when the account is read-only/spectated or there is no universe yet."
+  [_ store]
+  (let [state @store
+        address (account-context/effective-account-address state)]
+    (if-not (and address (account-context/mutations-allowed? state))
+      (js/Promise.resolve false)
+      (let [universe-key (constraint-profiles/universe-key
+                          (get-in state contracts/draft-universe-path))]
+        (if-not universe-key
+          (js/Promise.resolve false)
+          (let [record (constraint-profiles/profile-record
+                        (get-in state contracts/draft-constraints-path)
+                        universe-key
+                        (*now-ms*))
+                profile-map (constraint-profiles/put-profile
+                             (get-in state contracts/constraint-profiles-path)
+                             record)]
+            (swap! store assoc-in contracts/constraint-profiles-path profile-map)
+            (-> (*save-constraint-profiles!* address profile-map)
+                (.catch (fn [_err] false)))))))))
+
+(defn load-portfolio-optimizer-constraint-profiles-effect
+  "Load the wallet's remembered profiles into state and, when the draft is still pristine and a
+  default exists for the current universe, seed the draft constraints from it. Never clobbers a
+  user-edited (dirty) draft."
+  [_ store]
+  (let [address (account-context/effective-account-address @store)]
+    (if-not address
+      (js/Promise.resolve nil)
+      (-> (*load-constraint-profiles!* address)
+          (.then (fn [loaded]
+                   (let [profile-map (if (map? loaded) loaded {})]
+                     (swap! store assoc-in contracts/constraint-profiles-path profile-map)
+                     (when-let [remembered (constraint-profiles/auto-apply-constraints
+                                            {:profiles profile-map
+                                             :universe-key (constraint-profiles/universe-key
+                                                            (get-in @store contracts/draft-universe-path))
+                                             :dirty? (boolean (get-in @store contracts/draft-dirty-path))})]
+                       (swap! store assoc-in contracts/draft-constraints-path remembered))
+                     profile-map)))
+          (.catch (fn [_err] nil))))))
 
 (defn- run-portfolio-optimizer-pipeline-effect*
   [controller-resolver _ store]

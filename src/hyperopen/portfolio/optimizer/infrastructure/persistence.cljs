@@ -32,6 +32,13 @@
   (when-let [scenario-id* (non-blank-text scenario-id)]
     (str "tracking::" scenario-id*)))
 
+(defn constraint-profiles-key
+  "One record per wallet holds the whole {universe-hash -> profile} map of remembered
+  positioning policies."
+  [address]
+  (when-let [address* (address-token address)]
+    (str "constraint-profiles::" address*)))
+
 (defn- get-record!
   [key]
   (if (seq key)
@@ -149,3 +156,11 @@
 (defn save-tracking!
   [scenario-id tracking]
   (put-encoded-record! (tracking-key scenario-id) tracking))
+
+(defn load-constraint-profiles!
+  [address]
+  (get-encoded-record! (constraint-profiles-key address)))
+
+(defn save-constraint-profiles!
+  [address profiles]
+  (put-encoded-record! (constraint-profiles-key address) profiles))

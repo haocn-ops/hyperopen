@@ -22,7 +22,11 @@
 	   [:effects/refresh-portfolio-optimizer-rebalance-slippage-snapshots
 	    :refresh-portfolio-optimizer-rebalance-slippage-snapshots]
 	   [:effects/enable-portfolio-optimizer-manual-tracking
-	    :enable-portfolio-optimizer-manual-tracking]])
+	    :enable-portfolio-optimizer-manual-tracking]
+   [:effects/save-portfolio-optimizer-constraint-default
+    :save-portfolio-optimizer-constraint-default]
+   [:effects/load-portfolio-optimizer-constraint-profiles
+    :load-portfolio-optimizer-constraint-profiles]])
 
 (def effect-order-policy-required-action-ids
   #{:actions/select-portfolio-summary-time-range
@@ -96,6 +100,10 @@
     :apply-portfolio-optimizer-exposure-preset]
    [:actions/reset-portfolio-optimizer-constraints-to-system
     :reset-portfolio-optimizer-constraints-to-system]
+   [:actions/save-portfolio-optimizer-constraint-default
+    :save-portfolio-optimizer-constraint-default]
+   [:actions/apply-portfolio-optimizer-constraint-default
+    :apply-portfolio-optimizer-constraint-default]
    [:actions/set-portfolio-optimizer-objective-parameter :set-portfolio-optimizer-objective-parameter]
    [:actions/set-portfolio-optimizer-objective-parameter-percent
     :set-portfolio-optimizer-objective-parameter-percent]

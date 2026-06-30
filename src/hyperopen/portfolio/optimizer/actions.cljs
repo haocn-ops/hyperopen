@@ -65,6 +65,12 @@
 (def reset-portfolio-optimizer-constraints-to-system
   exposure/reset-portfolio-optimizer-constraints-to-system)
 
+(def save-portfolio-optimizer-constraint-default
+  exposure/save-portfolio-optimizer-constraint-default)
+
+(def apply-portfolio-optimizer-constraint-default
+  exposure/apply-portfolio-optimizer-constraint-default)
+
 (def set-portfolio-optimizer-objective-parameter
   draft/set-portfolio-optimizer-objective-parameter)
 

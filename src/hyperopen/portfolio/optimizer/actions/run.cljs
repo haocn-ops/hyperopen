@@ -197,19 +197,24 @@
 
 (defn load-portfolio-optimizer-route
   [state path]
-  (let [route (portfolio-routes/parse-portfolio-route path)]
-    (into
-     (case (:kind route)
-       :optimize-index [[:effects/load-portfolio-optimizer-scenario-index]]
-       :optimize-scenario [[:effects/load-portfolio-optimizer-scenario
-                            (:scenario-id route)]]
-       [])
-      (if (contains? #{:optimize-index :optimize-new :optimize-scenario}
-                    (:kind route))
-       (into (history-discovery-effects route)
-             (into (asset-selector-market-fetch-effects state)
-                   (action-common/vault-list-metadata-fetch-effects state)))
-       []))))
+  (let [route (portfolio-routes/parse-portfolio-route path)
+        optimizer-route? (contains? #{:optimize-index :optimize-new :optimize-scenario}
+                                    (:kind route))]
+    (cond-> (into
+             (case (:kind route)
+               :optimize-index [[:effects/load-portfolio-optimizer-scenario-index]]
+               :optimize-scenario [[:effects/load-portfolio-optimizer-scenario
+                                    (:scenario-id route)]]
+               [])
+             (if optimizer-route?
+               (into (history-discovery-effects route)
+                     (into (asset-selector-market-fetch-effects state)
+                           (action-common/vault-list-metadata-fetch-effects state)))
+               []))
+      ;; Hydrate the wallet's remembered constraint profiles and (if the draft is pristine)
+      ;; seed the draft from the default for this universe, so the trader stops re-entering it.
+      optimizer-route?
+      (conj [:effects/load-portfolio-optimizer-constraint-profiles]))))
 
 (defn archive-portfolio-optimizer-scenario
   [_state scenario-id]

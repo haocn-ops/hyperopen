@@ -1,5 +1,6 @@
 (ns hyperopen.views.portfolio.optimize.setup-sections
-  (:require [hyperopen.portfolio.optimizer.application.current-portfolio :as current-portfolio]
+  (:require [hyperopen.portfolio.optimizer.application.constraint-profiles :as constraint-profiles]
+            [hyperopen.portfolio.optimizer.application.current-portfolio :as current-portfolio]
             [hyperopen.portfolio.optimizer.application.view-model :as optimizer-view-model]
             [hyperopen.portfolio.optimizer.application.view-model.exposure :as exposure-vm]
             [hyperopen.portfolio.optimizer.contracts :as optimizer-contracts]
@@ -28,8 +29,12 @@
    (model-controls/model-section draft)
    (constraint-controls/constraints-section
     draft highlighted-controls
-    (exposure-vm/snapshot->current-exposure
-     (current-portfolio/current-portfolio-snapshot state)))
+    {:current-exposure (exposure-vm/snapshot->current-exposure
+                        (current-portfolio/current-portfolio-snapshot state))
+     :has-saved-default? (constraint-profiles/has-default?
+                          (get-in state optimizer-contracts/constraint-profiles-path)
+                          (constraint-profiles/universe-key
+                           (get-in state optimizer-contracts/draft-universe-path)))})
    (controls/disclosure-panel
     "portfolio-optimizer-advanced-overrides-shell"
     (controls/disclosure-heading

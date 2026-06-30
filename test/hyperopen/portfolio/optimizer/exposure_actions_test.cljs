@@ -1,6 +1,7 @@
 (ns hyperopen.portfolio.optimizer.exposure-actions-test
   (:require [cljs.test :refer-macros [deftest is testing]]
             [hyperopen.portfolio.optimizer.actions :as actions]
+            [hyperopen.portfolio.optimizer.application.constraint-profiles :as profiles]
             [hyperopen.portfolio.optimizer.domain.exposure-policy :as policy]))
 
 (def ^:private constraints-path [:portfolio :optimizer :draft :constraints])
@@ -59,6 +60,26 @@
   (is (= [] (actions/apply-portfolio-optimizer-exposure-preset
              (state-with base-constraints) :nonsense))
       "an unknown preset is a no-op"))
+
+(deftest save-constraint-default-emits-persist-effect-test
+  (is (= [[:effects/save-portfolio-optimizer-constraint-default]]
+         (actions/save-portfolio-optimizer-constraint-default (state-with base-constraints)))
+      "the action is pure; the effect reads the draft, stamps time, and persists"))
+
+(deftest apply-constraint-default-writes-remembered-constraints-test
+  (let [remembered {:gross-max 1.5 :net-min 0.0 :net-max 0.0 :max-asset-weight 0.3}
+        universe [{:instrument-id "perp:BTC"} {:instrument-id "perp:ETH"}]
+        uk (profiles/universe-key universe)
+        state {:portfolio {:optimizer
+                           {:draft {:constraints base-constraints :universe universe}
+                            :constraint-profiles nil}}}]
+    (testing "no profile for this universe ⇒ no-op"
+      (is (= [] (actions/apply-portfolio-optimizer-constraint-default state))))
+    (testing "a saved profile is written to the draft"
+      (let [state* (assoc-in state [:portfolio :optimizer :constraint-profiles]
+                             {uk {:universe-key uk :controls remembered}})]
+        (is (= (expect-write remembered)
+               (actions/apply-portfolio-optimizer-constraint-default state*)))))))
 
 (deftest reset-constraints-to-system-restores-defaults-test
   (let [out (actions/reset-portfolio-optimizer-constraints-to-system

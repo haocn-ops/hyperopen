@@ -71,6 +71,7 @@
 (def scenario-save-modal-error-path paths/scenario-save-modal-error-path)
 (def last-successful-run-path paths/last-successful-run-path)
 (def last-successful-run-result-path paths/last-successful-run-result-path)
+(def constraint-profiles-path paths/constraint-profiles-path)
 (def refinement-path paths/refinement-path)
 (def refinement-active-path paths/refinement-active-path)
 (def refinement-depth-path paths/refinement-depth-path)

@@ -52,7 +52,7 @@
   "Build the exposure-map display model. `current-exposure` is `{:gross r :net r}` (ratios of
   capital) or nil when the current portfolio is not loaded; `highlighted-controls` is the set of
   constraint keys the last run flagged infeasible."
-  [{:keys [constraints current-exposure highlighted-controls]}]
+  [{:keys [constraints current-exposure highlighted-controls has-saved-default?]}]
   (let [constraints* (or constraints {})
         policy* (policy/constraints->policy constraints*)
         active (policy/active-preset constraints*)
@@ -78,6 +78,7 @@
      :preview (exposure-preview {:current-exposure current-exposure
                                  :constraints constraints*})
      :active-preset active
+     :profile {:has-default? (boolean has-saved-default?)}
      :presets (mapv (fn [k]
                       {:key k
                        :label (get policy/preset-labels k)

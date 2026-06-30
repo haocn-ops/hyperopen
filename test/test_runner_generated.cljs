@@ -212,6 +212,7 @@
             [hyperopen.portfolio.optimizer.application.black-litterman-calibration-test]
             [hyperopen.portfolio.optimizer.application.black-litterman-editor-model-test]
             [hyperopen.portfolio.optimizer.application.black-litterman-preview-test]
+            [hyperopen.portfolio.optimizer.application.constraint-profiles-test]
             [hyperopen.portfolio.optimizer.application.current-portfolio-test]
             [hyperopen.portfolio.optimizer.application.display-frontier-test]
             [hyperopen.portfolio.optimizer.application.engine-blocklist-test]
@@ -339,6 +340,7 @@
             [hyperopen.runtime.effect-adapters.funding-test]
             [hyperopen.runtime.effect-adapters.leaderboard-test]
             [hyperopen.runtime.effect-adapters.order-test]
+            [hyperopen.runtime.effect-adapters.portfolio-optimizer-constraint-profiles-test]
             [hyperopen.runtime.effect-adapters.portfolio-optimizer-execution-test]
             [hyperopen.runtime.effect-adapters.portfolio-optimizer-history-facade-test]
             [hyperopen.runtime.effect-adapters.portfolio-optimizer-history-test]
@@ -959,6 +961,7 @@
              'hyperopen.portfolio.optimizer.application.black-litterman-calibration-test
              'hyperopen.portfolio.optimizer.application.black-litterman-editor-model-test
              'hyperopen.portfolio.optimizer.application.black-litterman-preview-test
+             'hyperopen.portfolio.optimizer.application.constraint-profiles-test
              'hyperopen.portfolio.optimizer.application.current-portfolio-test
              'hyperopen.portfolio.optimizer.application.display-frontier-test
              'hyperopen.portfolio.optimizer.application.engine-blocklist-test
@@ -1086,6 +1089,7 @@
              'hyperopen.runtime.effect-adapters.funding-test
              'hyperopen.runtime.effect-adapters.leaderboard-test
              'hyperopen.runtime.effect-adapters.order-test
+             'hyperopen.runtime.effect-adapters.portfolio-optimizer-constraint-profiles-test
              'hyperopen.runtime.effect-adapters.portfolio-optimizer-execution-test
              'hyperopen.runtime.effect-adapters.portfolio-optimizer-history-facade-test
              'hyperopen.runtime.effect-adapters.portfolio-optimizer-history-test

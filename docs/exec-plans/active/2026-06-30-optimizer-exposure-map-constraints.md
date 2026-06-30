@@ -77,7 +77,15 @@ Local scratch refs (non-authoritative):
 - [x] (2026-06-30) M4 — Named presets (wired in M2/M3: chips apply + active-preset detection)
   and an honest live preview (current exposure + on-policy verdict; no stale/fabricated trade
   count — see Decision Log). `npm test` green (+3 view-model tests); styles pass.
-- [ ] M5 — Profile memory persistence (remember last-used per wallet + universe).
+- [x] (2026-06-30) M5 — Profile memory persistence. Added the IndexedDB profiles boundary
+  (`persistence.cljs`), pure `application/constraint_profiles.cljs` (stable universe-key, save/
+  select/auto-apply), save + load effect adapters with dynamic seams, `:constraint-profiles`
+  state slot + path, save/apply actions, and a Profile row (Save as default / Use saved / Reset)
+  in the exposure map. Load is wired into `load-portfolio-optimizer-route`; it hydrates profiles
+  and seeds a pristine draft from the default for the universe (never clobbers a dirty draft).
+  `npm test` green (4933 tests; +pure/action/async-effect tests); all structural lints +
+  `portfolio` build clean. Note: save is gated on `mutations-allowed?` (no persist in spectate)
+  and a valid wallet address.
 - [ ] M6 — Workbench scene, Playwright spec, and full validation gates.
 
 ## Surprises & Discoveries

@@ -205,6 +205,32 @@
     gap: 0.625rem;
   }
 
+  .portfolio-optimizer .optimizer-exposure-map__profile {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.4rem;
+  }
+
+  .portfolio-optimizer .optimizer-exposure-map__profile-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+  }
+
+  .portfolio-optimizer .optimizer-exposure-map__profile-btn {
+    border: 1px solid var(--optimizer-border);
+    background-color: transparent;
+    padding: 0.15rem 0.45rem;
+    font-family: var(--font-mono, monospace);
+    font-size: 0.5625rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--optimizer-text-2);
+    cursor: pointer;
+  }
+
   /* The pad sits in a square frame with axis labels on each edge. */
   .portfolio-optimizer .optimizer-exposure-map__frame {
     position: relative;

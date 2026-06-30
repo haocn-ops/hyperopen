@@ -51,6 +51,7 @@
 (def scenario-save-modal-error-path (conj scenario-save-modal-path :error))
 (def last-successful-run-path (conj optimizer-path :last-successful-run))
 (def last-successful-run-result-path (conj last-successful-run-path :result))
+(def constraint-profiles-path (conj optimizer-path :constraint-profiles))
 (def refinement-path (conj optimizer-path :refinement))
 (def refinement-active-path (conj refinement-path :active?))
 (def refinement-depth-path (conj refinement-path :depth))
@@ -149,6 +150,7 @@
    :optimizer/scenario-save-modal-error scenario-save-modal-error-path
    :optimizer/last-successful-run last-successful-run-path
    :optimizer/last-successful-run-result last-successful-run-result-path
+   :optimizer/constraint-profiles constraint-profiles-path
    :optimizer/refinement refinement-path
    :optimizer/refinement-active refinement-active-path
    :optimizer/refinement-depth refinement-depth-path

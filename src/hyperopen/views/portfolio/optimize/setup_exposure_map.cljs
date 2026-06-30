@@ -147,12 +147,37 @@
             :on {:click [[:actions/apply-portfolio-optimizer-exposure-preset key]]}}
    label])
 
+(defn- profile-row
+  [{:keys [has-default?]}]
+  [:div {:class ["optimizer-exposure-map__profile"]
+         :data-role "portfolio-optimizer-exposure-profile"}
+   [:span {:class controls/eyebrow-class}
+    (if has-default? "Saved default for this universe" "Memory")]
+   [:div {:class ["optimizer-exposure-map__profile-actions"]}
+    [:button {:type "button"
+              :class ["optimizer-exposure-map__profile-btn"]
+              :data-role "portfolio-optimizer-exposure-save-default"
+              :on {:click [[:actions/save-portfolio-optimizer-constraint-default]]}}
+     "Save as default"]
+    (when has-default?
+      [:button {:type "button"
+                :class ["optimizer-exposure-map__profile-btn"]
+                :data-role "portfolio-optimizer-exposure-apply-default"
+                :on {:click [[:actions/apply-portfolio-optimizer-constraint-default]]}}
+       "Use saved"])
+    [:button {:type "button"
+              :class ["optimizer-exposure-map__profile-btn"]
+              :data-role "portfolio-optimizer-exposure-reset-default"
+              :on {:click [[:actions/reset-portfolio-optimizer-constraints-to-system]]}}
+     "Reset"]]])
+
 (defn exposure-map
   "Render the Positioning control from the exposure-map view-model."
   [model]
-  (let [{:keys [gross-band net-band max-band echo presets preview]} model]
+  (let [{:keys [gross-band net-band max-band echo presets preview profile]} model]
     [:div {:class ["optimizer-exposure-map"]
            :data-role "portfolio-optimizer-exposure-map"}
+     (profile-row profile)
      (axis-frame (exposure-pad model))
      [:div {:class ["optimizer-exposure-map__bands"]}
       (band-slider {:label "Gross band" :axis :gross :value gross-band

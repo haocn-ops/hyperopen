@@ -69,8 +69,16 @@
              :quantity 0.25
              :delta-notional-usd 1000}]}}))
 
+(def ^:private current-run-signature
+  ;; A run-state whose signature matches the retained run marks the solve as *current* (via
+  ;; run-identity/completed-run?), so the staged plan is not flagged stale. This mirrors the
+  ;; real app, where a staged execution plan always comes from an up-to-date solved run.
+  {:scenario-id "scn_01" :input-signature "sig-current"})
+
 (defn- scenario-view
-  "Renders the optimizer scenario surface at the given results-tab + optimizer state."
+  "Renders the optimizer scenario surface at the given results-tab + optimizer state. The run is
+  current by default (matching run-state/last-run signature); override :draft with a dirty
+  metadata map to exercise the stale path."
   [results-tab optimizer]
   (portfolio-view/portfolio-view
    {:router {:path "/portfolio/optimize/scn_01"}
@@ -78,7 +86,10 @@
     :portfolio {:optimizer
                 (merge {:active-scenario {:loaded-id "scn_01" :status :computed}
                         :draft {:id "scn_01"}
-                        :last-successful-run {:result solved-result}}
+                        :run-state {:status :succeeded
+                                    :request-signature current-run-signature}
+                        :last-successful-run {:result solved-result
+                                              :request-signature current-run-signature}}
                        optimizer)}}))
 
 (def ^:private staged-plan
@@ -135,6 +146,22 @@
     (is (some #(str/includes? % "snapshot") strings))
     (is (contains? strings "Account leverage after"))
     (is (contains? strings "spot-submit-unsupported"))))
+
+(deftest execution-tab-stale-recommendation-disables-arm-test
+  ;; Inputs edited since the solve (dirty draft) => the staged plan is stale. The Arm button is
+  ;; disabled (no click action) and a re-run notice is shown, so a stale recommendation can't be
+  ;; armed into live orders from the surface.
+  (let [view-node (scenario-view :execution
+                                 {:draft {:id "scn_01" :metadata {:dirty? true}}
+                                  :execution {:status :idle :history []}
+                                  :execution-modal {:open? true :phase :staged :plan staged-plan}})
+        arm (node-by-role view-node "portfolio-optimizer-execution-arm")
+        stale-notice (node-by-role view-node "portfolio-optimizer-execution-stale")]
+    (is (some? arm))
+    (is (true? (get-in arm [1 :disabled])))
+    (is (nil? (click-actions arm)))
+    (is (some? stale-notice))
+    (is (str/includes? (node-text stale-notice) "re-run"))))
 
 (deftest execution-tab-orders-largest-first-exact-notional-test
   ;; The pre-commit table leads with the largest-notional order so the riskiest line is never

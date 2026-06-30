@@ -160,7 +160,9 @@
                         row))
                     (or rows []))))))
 
-(defn- coin-for-row
+(defn coin-for-row
+  "Bare coin token for a plan/ledger row (strips the perp:/spot: prefix), used to match a row
+  against the live order/fill feeds, which key on the coin token."
   [row]
   (or (non-blank-text (:coin row))
       (let [instrument-id (non-blank-text (:instrument-id row))]
@@ -391,6 +393,27 @@
     (status-entry-has? resp :resting) :resting
     :else :submitted))
 
+(defn realized-from-avg
+  "Realized fill map from a known average fill price + filled quantity, measured against
+   (:price row). Shared by the settled-response path (`realized-fill`) and the live-fill
+   reconciliation overlay (which derives avg-px/qty from [:orders :fills]) so both produce an
+   identical :realized shape. Returns nil when no average fill price is available."
+  [row avg-px filled-qty]
+  (when (coercion/positive-number? avg-px)
+    (let [bps (rebalance/realized-slippage-bps (:side row) (:price row) avg-px)
+          ;; Realized $ slippage scales with the quantity ACTUALLY filled (a partial fill costs
+          ;; slippage only on the filled qty, the remainder resting): bps × filled notional at the
+          ;; REFERENCE price (filled-qty × :price) -- not avgPx, which `bps` already prices in.
+          ;; Fall back to the full intended notional when the filled qty is absent (legacy shape).
+          ref-px (:price row)
+          filled-notional (if (and (coercion/positive-number? filled-qty)
+                                   (coercion/positive-number? ref-px))
+                            (* filled-qty ref-px)
+                            (js/Math.abs (or (:delta-notional-usd row) 0)))]
+      (cond-> {:avg-px avg-px}
+        (some? bps) (assoc :slippage-bps bps
+                           :slippage-usd (* filled-notional (/ bps 10000)))))))
+
 (defn realized-fill
   "Realized average fill + slippage from a settled order response, measured against
    (:price row) -- the same reference the slippage ESTIMATE used. One order is submitted
@@ -403,20 +426,17 @@
                        coercion/parse-float-number)
         filled-qty (some-> (get-in status-entry [:filled :totalSz])
                            coercion/parse-float-number)]
-    (when (coercion/positive-number? avg-px)
-      (let [bps (rebalance/realized-slippage-bps (:side row) (:price row) avg-px)
-            ;; Realized $ slippage scales with the quantity ACTUALLY filled (a partial fill costs
-            ;; slippage only on totalSz, the remainder resting): bps × filled notional at the
-            ;; REFERENCE price (totalSz × :price) -- not avgPx, which `bps` already prices in.
-            ;; Fall back to the full intended notional when totalSz is absent (legacy shape).
-            ref-px (:price row)
-            filled-notional (if (and (coercion/positive-number? filled-qty)
-                                     (coercion/positive-number? ref-px))
-                              (* filled-qty ref-px)
-                              (js/Math.abs (or (:delta-notional-usd row) 0)))]
-        (cond-> {:avg-px avg-px}
-          (some? bps) (assoc :slippage-bps bps
-                             :slippage-usd (* filled-notional (/ bps 10000))))))))
+    (realized-from-avg row avg-px filled-qty)))
+
+(defn resting-oid
+  "The exchange order id of a row that rested on the book (status :resting), read from the
+   settled response at [:response :data :statuses 0 :resting :oid]. nil for any non-resting row
+   or a row whose response carries no resting entry. The id is the key the live order/fill feeds
+   ([:orders :open-orders] / [:orders :fills]) use, so it links a frozen ledger row to its live
+   fate."
+  [row]
+  (when (= :resting (:status row))
+    (get-in (first (response-statuses (:response row))) [:resting :oid])))
 
 (defn final-ledger-status
   [rows]

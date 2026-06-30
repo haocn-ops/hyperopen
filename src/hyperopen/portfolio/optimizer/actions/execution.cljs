@@ -3,9 +3,35 @@
             [hyperopen.portfolio.optimizer.actions.common :as common]
             [hyperopen.portfolio.optimizer.application.execution :as execution]
             [hyperopen.portfolio.optimizer.application.rebalance-preview :as rebalance-preview]
+            [hyperopen.portfolio.optimizer.application.run-identity :as run-identity]
             [hyperopen.portfolio.optimizer.application.setup-readiness :as setup-readiness]
             [hyperopen.portfolio.optimizer.contracts :as contracts]
             [hyperopen.portfolio.optimizer.defaults :as optimizer-defaults]))
+
+(def stale-recommendation-message
+  "Inputs changed since this recommendation was computed — re-run the optimizer before executing.")
+
+(defn- optimizer-running?
+  [state]
+  (or (= :running (get-in state contracts/run-state-status-path))
+      (= :running (get-in state contracts/optimization-progress-status-path))))
+
+(defn stale-recommendation?
+  "True when there IS a solved run but the current draft/readiness no longer matches it
+  (universe / constraints / objective / model edited since the solve), so the staged plan
+  is computed from inputs the trader has since moved off. Mirrors the Recommendation tab's
+  `:stale?` signal but enforced in the execution gates, where a stale plan would otherwise
+  release live orders. Short-circuits on `solved-run?` so a hand-built plan with no retained
+  run (and the cheap pre-submit toggles) never pays for `build-readiness`."
+  [state]
+  (let [last-successful-run (get-in state contracts/last-successful-run-path)]
+    (and (run-identity/solved-run? last-successful-run)
+         (run-identity/stale-run?
+          {:draft (get-in state contracts/draft-path)
+           :readiness (setup-readiness/build-readiness state)
+           :run-state (get-in state contracts/run-state-path)
+           :running? (optimizer-running? state)
+           :last-successful-run last-successful-run}))))
 
 (def ^:private phase-path (conj contracts/execution-modal-path :phase))
 (def ^:private default-order-type-path
@@ -17,7 +43,13 @@
 
 (defn- staged-plan
   "Builds the execution plan from the last successful run, or nil when there is no
-  solved run with a rebalance preview to stage."
+  solved run with a rebalance preview to stage.
+
+  The entry gates on currency, not merely `solved?`: a stale recommendation (inputs edited
+  since the solve) stages a plan flagged `:execution-disabled? :stale-recommendation`, so the
+  trader sees what WOULD trade but can't arm or commit until the optimizer is re-run. A
+  read-only (spectate) block takes precedence — it is the harder restriction and its message
+  wins."
   [state]
   (let [readiness (setup-readiness/build-readiness state)
         last-successful-run
@@ -28,13 +60,20 @@
         preview (:rebalance-preview result)]
     (when (and (= :solved (:status result))
                (map? preview))
-      (execution/build-execution-plan
-       {:scenario-id (common/current-scenario-id state)
-        :rebalance-preview preview
-        :execution-assumptions (get-in state
-                                        contracts/draft-execution-assumptions-path)
-        :mutations-blocked-message
-        (account-context/mutations-blocked-message state)}))))
+      (let [plan (execution/build-execution-plan
+                  {:scenario-id (common/current-scenario-id state)
+                   :rebalance-preview preview
+                   :execution-assumptions (get-in state
+                                                  contracts/draft-execution-assumptions-path)
+                   :mutations-blocked-message
+                   (account-context/mutations-blocked-message state)})]
+        (if (and (not (:execution-disabled? plan))
+                 (stale-recommendation? state))
+          (assoc plan
+                 :execution-disabled? true
+                 :disabled-reason :stale-recommendation
+                 :disabled-message stale-recommendation-message)
+          plan)))))
 
 (defn open-portfolio-optimizer-execution
   "Stages the current rebalance into an execution plan and switches the scenario
@@ -55,10 +94,16 @@
 
 (defn set-portfolio-optimizer-execution-phase
   "Pre-submit phase toggle: :armed asks for a second confirm, :staged returns to the
-  default order-type selector. Clears any stale confirm-time error."
-  [_state phase]
-  [[:effects/save phase-path (if (= :armed (keyword phase)) :armed :staged)]
-   [:effects/save contracts/execution-modal-error-path nil]])
+  default order-type selector. Clears any stale confirm-time error. Arming a stale
+  recommendation is refused (the surface stays :staged with a re-run prompt) so a plan
+  computed from since-edited inputs can never reach the live-commit button."
+  [state phase]
+  (let [arm? (= :armed (keyword phase))]
+    (if (and arm? (stale-recommendation? state))
+      [[:effects/save phase-path :staged]
+       [:effects/save contracts/execution-modal-error-path stale-recommendation-message]]
+      [[:effects/save phase-path (if arm? :armed :staged)]
+       [:effects/save contracts/execution-modal-error-path nil]])))
 
 (defn set-portfolio-optimizer-execution-default-order-type
   [_state order-type]
@@ -118,6 +163,15 @@
         contracts/execution-modal-error-path
         (or (:disabled-message plan)
             "Execution is disabled for this scenario.")]]
+
+      ;; Stale recommendation: the staged plan was solved against inputs the trader has since
+      ;; changed (the Recommendation tab is already showing the same `:stale?` banner). Refuse
+      ;; to send — a re-run is the only honest way to bring the orders back in line with intent.
+      ;; This backstops the Arm gate in case the surface goes stale between arming and confirming.
+      (stale-recommendation? state)
+      [[:effects/save
+        contracts/execution-modal-error-path
+        stale-recommendation-message]]
 
       (not (pos? (or ready-count 0)))
       [[:effects/save

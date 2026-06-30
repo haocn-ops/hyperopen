@@ -118,7 +118,7 @@
          "Confirm discard"]]])]])
 
 (defn- header
-  [{:keys [phase read-only? disabled-message] :as model}]
+  [{:keys [phase arm-disabled? arm-disabled-message] :as model}]
   [:div {:class ["flex" "flex-wrap" "items-end" "justify-between" "gap-3"
                  "border-b" "border-base-300" "bg-base-100/95" "px-5" "py-3"]
          :data-role "portfolio-optimizer-execution-header"}
@@ -148,9 +148,9 @@
                         "disabled:cursor-not-allowed" "disabled:border-base-300"
                         "disabled:bg-base-200/40" "disabled:text-trading-muted"]
                 :data-role "portfolio-optimizer-execution-arm"
-                :disabled (boolean read-only?)
-                :title (when read-only? disabled-message)
-                :on (when-not read-only?
+                :disabled (boolean arm-disabled?)
+                :title (when arm-disabled? arm-disabled-message)
+                :on (when-not arm-disabled?
                       {:click [[:actions/set-portfolio-optimizer-execution-phase :armed]]})}
        "Arm execution"])]])
 
@@ -183,7 +183,7 @@
    [:span {:class ["pl-4" "font-mono" "text-[0.6rem]" "text-trading-muted"]} sub]])
 
 (defn- staged-band
-  [{:keys [default-order-type read-only? disabled-message]} rows]
+  [{:keys [default-order-type read-only? disabled-message stale? stale-message]} rows]
   [:div {:class ["border-b" "border-base-300"]
          :data-role "portfolio-optimizer-execution-control-band"
          :data-phase "staged"}
@@ -192,6 +192,12 @@
                   "text-xs" "font-semibold" "text-warning"]
           :data-role "portfolio-optimizer-execution-readonly"}
       disabled-message])
+   ;; A stale plan can't be armed (the action gate refuses it); say why and point to the re-run.
+   (when stale?
+     [:p {:class ["optimizer-exec-readonly" "border-b" "border-base-300" "px-5" "py-2"
+                  "text-xs" "font-semibold" "text-warning"]
+          :data-role "portfolio-optimizer-execution-stale"}
+      stale-message])
    [:div {:class ["flex" "items-stretch"]}
     [:div {:class ["flex" "flex-col" "justify-center" "gap-0.5" "px-5" "py-2" "shrink-0"]}
      [:span {:class ["font-mono" "text-[0.6rem]" "uppercase" "tracking-[0.08em]" "text-trading-muted/70"]}

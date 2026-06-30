@@ -1,7 +1,16 @@
 (ns hyperopen.portfolio.optimizer.application.view-model.execution
   (:require [clojure.string :as str]
+            [hyperopen.portfolio.optimizer.application.execution :as execution]
+            [hyperopen.portfolio.optimizer.application.setup-readiness :as setup-readiness]
             [hyperopen.portfolio.optimizer.application.spot-token-labels :as spot-token-labels]
+            [hyperopen.portfolio.optimizer.application.view-model.execution-reconcile :as reconcile]
+            [hyperopen.portfolio.optimizer.application.view-model.workspace :as workspace]
             [hyperopen.portfolio.optimizer.contracts :as contracts]))
+
+;; Keep in sync with hyperopen.portfolio.optimizer.actions.execution/stale-recommendation-message
+;; (the action emits the same sentence as the modal error when a stale arm/confirm is refused).
+(def ^:private stale-recommendation-message
+  "Inputs changed since this recommendation was computed — re-run the optimizer before executing.")
 
 (defn- labels-by-instrument
   [state]
@@ -129,9 +138,18 @@
         summary (:summary plan)
         labels (labels-by-instrument state)
         resolve-label (label-resolver state)
-        latest-attempt (enrich-execution-attempt
-                        resolve-label
-                        (latest-record (get-in state contracts/execution-history-path)))
+        ;; Reconcile the frozen ledger rows against the live order/fill feeds so a resting passive
+        ;; order that has since filled reads as filled (the persisted ledger stays untouched — it
+        ;; is the audit record). A no-op for any non-resting row. The latest-attempt's own :status
+        ;; chip is re-derived from the reconciled rows so it flips :resting -> :executed too.
+        latest-attempt (when-let [attempt (enrich-execution-attempt
+                                           resolve-label
+                                           (latest-record
+                                            (get-in state contracts/execution-history-path)))]
+                         (let [rrows (reconcile/reconcile-rows state (:rows attempt))]
+                           (assoc attempt
+                                  :rows rrows
+                                  :status (execution/final-ledger-status rrows))))
         run-attempt (enrich-execution-attempt
                      resolve-label
                      (get-in state contracts/execution-run-attempt-path))
@@ -139,24 +157,45 @@
         status (run-status state)
         terminal? (boolean (terminal-run-statuses status))
         ui-phase (or (:phase modal) :staged)
-        phase (derive-phase {:submitting? submitting? :ui-phase ui-phase :status status})
         plan-rows (enrich-instrument-rows resolve-label (:rows plan))
         ;; During a run, show the live in-flight rows (queued -> working ->
         ;; submitted/failed); after a run, the latest ledger attempt; otherwise the
         ;; static staged plan.
-        display-rows (order-numbered-and-sorted
-                      (cond
-                        (and submitting? (seq (:rows run-attempt)))
-                        (:rows run-attempt)
+        reconciled-rows (reconcile/reconcile-rows
+                         state
+                         (cond
+                           (and submitting? (seq (:rows run-attempt)))
+                           (:rows run-attempt)
 
-                        (and terminal? (seq (:rows latest-attempt)))
-                        (:rows latest-attempt)
+                           (and terminal? (seq (:rows latest-attempt)))
+                           (:rows latest-attempt)
 
-                        :else plan-rows))
+                           :else plan-rows))
+        display-rows (order-numbered-and-sorted reconciled-rows)
+        ;; When the run settled as :resting, re-derive its status from the reconciled rows so the
+        ;; phase advances :resting -> :done as the open orders fill on the book.
+        reconciled-status (if (= :resting status)
+                            (execution/final-ledger-status reconciled-rows)
+                            status)
+        phase (derive-phase {:submitting? submitting? :ui-phase ui-phase :status reconciled-status})
         ready? (pos? (or (:ready-count summary) 0))
         execution-disabled? (boolean (:execution-disabled? plan))
+        ;; Inputs edited since the solve => the staged plan no longer reflects intent. The entry
+        ;; already stages a stale plan as :execution-disabled? (its read-only banner carries the
+        ;; re-run message), and the action gates refuse a stale arm/confirm. This recomputes
+        ;; staleness live so post-staging drift (a plan that was current when staged) still
+        ;; disables Arm reactively instead of only erroring on click.
+        scenario-stale? (boolean (workspace/scenario-stale?
+                                  state (setup-readiness/build-readiness state)))
+        ;; Show the standalone notice only when the disabled banner isn't already carrying the
+        ;; stale message — avoids a duplicate banner for a stale-at-entry plan.
+        stale-notice? (and scenario-stale? (not execution-disabled?))
+        disabled-message (when execution-disabled?
+                           (or (:disabled-message plan)
+                               "Execution is disabled for this scenario."))
         confirm-disabled? (or submitting?
                               execution-disabled?
+                              scenario-stale?
                               (not ready?))
         ;; Side-split notional of the rows that will actually send (status :ready), so the
         ;; armed/confirm band can restate "how much money moves" — buys vs sells — alongside
@@ -189,8 +228,16 @@
      :error (:error modal)
      :ready? ready?
      :read-only? execution-disabled?
+     :stale? stale-notice?
+     :stale-message (when stale-notice? stale-recommendation-message)
+     ;; Arming is blocked by either a read-only/disabled plan (spectate or stale-at-entry) or
+     ;; live post-staging staleness; the header reads the combined flag + reason so the button
+     ;; explains itself on hover.
+     :arm-disabled? (or execution-disabled? scenario-stale?)
+     :arm-disabled-message (cond
+                             execution-disabled? disabled-message
+                             scenario-stale? stale-recommendation-message
+                             :else nil)
      :confirm-disabled? (boolean confirm-disabled?)
-     :disabled-message (when execution-disabled?
-                         (or (:disabled-message plan)
-                             "Execution is disabled for this scenario."))
+     :disabled-message disabled-message
      :has-plan? (boolean (seq (:rows plan)))}))

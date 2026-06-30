@@ -9,4 +9,5 @@ test("coverage script uses the coverage-safe optimizer worker solver", () => {
 
   assert.match(script, /HYPEROPEN_OPTIMIZER_WORKER_SOLVER=quadprog/);
   assert.match(script, /NODE_V8_COVERAGE=\.coverage/);
+  assert.match(script, /--merge-async/);
 });

@@ -1,6 +1,7 @@
 (ns hyperopen.portfolio.optimizer.actions
   (:require [hyperopen.portfolio.optimizer.actions.draft :as draft]
             [hyperopen.portfolio.optimizer.actions.execution :as execution]
+            [hyperopen.portfolio.optimizer.actions.exposure :as exposure]
             [hyperopen.portfolio.optimizer.actions.refinement :as refinement]
             [hyperopen.portfolio.optimizer.actions.run :as run]
             [hyperopen.portfolio.optimizer.actions.target-sigma :as target-sigma]
@@ -51,6 +52,18 @@
 
 (def set-portfolio-optimizer-constraint
   draft/set-portfolio-optimizer-constraint)
+
+(def set-portfolio-optimizer-exposure-point
+  exposure/set-portfolio-optimizer-exposure-point)
+
+(def set-portfolio-optimizer-exposure-band
+  exposure/set-portfolio-optimizer-exposure-band)
+
+(def apply-portfolio-optimizer-exposure-preset
+  exposure/apply-portfolio-optimizer-exposure-preset)
+
+(def reset-portfolio-optimizer-constraints-to-system
+  exposure/reset-portfolio-optimizer-constraints-to-system)
 
 (def set-portfolio-optimizer-objective-parameter
   draft/set-portfolio-optimizer-objective-parameter)

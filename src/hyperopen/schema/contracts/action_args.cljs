@@ -93,6 +93,10 @@
   (s/tuple ::common/non-empty-string any?))
 (s/def ::portfolio-optimizer-constraint-args
   (s/tuple ::common/keyword-or-string any?))
+(s/def ::portfolio-optimizer-exposure-point-args
+  ;; [client-x client-y bounds-map buttons] — pad pointer coordinates + the resolved
+  ;; bounding-rect map + the pressed-button bitmask. All positional, runtime-resolved.
+  (s/tuple any? any? any? any?))
 (s/def ::portfolio-optimizer-key-value-args
   (s/tuple ::common/keyword-or-string any?))
 (s/def ::portfolio-optimizer-view-key-value-args
@@ -273,6 +277,10 @@
    :actions/set-portfolio-optimizer-risk-model-kind ::portfolio-optimizer-model-kind-args
    :actions/apply-portfolio-optimizer-setup-preset ::portfolio-optimizer-model-kind-args
    :actions/set-portfolio-optimizer-constraint ::portfolio-optimizer-constraint-args
+   :actions/set-portfolio-optimizer-exposure-point ::portfolio-optimizer-exposure-point-args
+   :actions/set-portfolio-optimizer-exposure-band ::portfolio-optimizer-key-value-args
+   :actions/apply-portfolio-optimizer-exposure-preset ::portfolio-optimizer-model-kind-args
+   :actions/reset-portfolio-optimizer-constraints-to-system ::common/no-args
    :actions/set-portfolio-optimizer-objective-parameter ::portfolio-optimizer-key-value-args
    :actions/set-portfolio-optimizer-objective-parameter-percent ::portfolio-optimizer-key-value-args
    :actions/set-portfolio-optimizer-target-sigma-draft ::common/single-input-args

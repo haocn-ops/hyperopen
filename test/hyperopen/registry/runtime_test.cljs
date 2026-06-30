@@ -95,7 +95,9 @@
                        :metaKey true
                        :ctrlKey false
                        :timeStamp 1001
-                       :clientX 480}
+                       :clientX 480
+                       :clientY 600
+                       :buttons 1}
         ctx {:replicant/dom-event dom-event}
         scalar-placeholder-ids [:event.target/value
                                 :event.target/checked
@@ -104,8 +106,10 @@
                                 :event/ctrlKey
                                 :event.target/scrollTop
                                 :event/timeStamp
-                                :event/clientX]]
-    (is (= 10 (count placeholders)))
+                                :event/clientX
+                                :event/clientY
+                                :event/pointer-buttons]]
+    (is (= 12 (count placeholders)))
     (is (= "BTC" ((get placeholders :event.target/value) ctx)))
     (is (= true ((get placeholders :event.target/checked) ctx)))
     (is (= "Enter" ((get placeholders :event/key) ctx)))
@@ -114,6 +118,8 @@
     (is (= 24 ((get placeholders :event.target/scrollTop) ctx)))
     (is (= 1001 ((get placeholders :event/timeStamp) ctx)))
     (is (= 480 ((get placeholders :event/clientX) ctx)))
+    (is (= 600 ((get placeholders :event/clientY) ctx)))
+    (is (= 1 ((get placeholders :event/pointer-buttons) ctx)))
     (testing "missing dom-event returns nil for scalar placeholders"
       (doseq [placeholder-id scalar-placeholder-ids]
         (is (nil? ((get placeholders placeholder-id) {}))

@@ -90,6 +90,12 @@
    [:actions/set-portfolio-optimizer-risk-model-kind :set-portfolio-optimizer-risk-model-kind]
    [:actions/apply-portfolio-optimizer-setup-preset :apply-portfolio-optimizer-setup-preset]
    [:actions/set-portfolio-optimizer-constraint :set-portfolio-optimizer-constraint]
+   [:actions/set-portfolio-optimizer-exposure-point :set-portfolio-optimizer-exposure-point]
+   [:actions/set-portfolio-optimizer-exposure-band :set-portfolio-optimizer-exposure-band]
+   [:actions/apply-portfolio-optimizer-exposure-preset
+    :apply-portfolio-optimizer-exposure-preset]
+   [:actions/reset-portfolio-optimizer-constraints-to-system
+    :reset-portfolio-optimizer-constraints-to-system]
    [:actions/set-portfolio-optimizer-objective-parameter :set-portfolio-optimizer-objective-parameter]
    [:actions/set-portfolio-optimizer-objective-parameter-percent
     :set-portfolio-optimizer-objective-parameter-percent]

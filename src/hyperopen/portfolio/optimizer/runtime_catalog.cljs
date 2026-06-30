@@ -38,6 +38,14 @@
     actions/apply-portfolio-optimizer-setup-preset
     :set-portfolio-optimizer-constraint
     actions/set-portfolio-optimizer-constraint
+    :set-portfolio-optimizer-exposure-point
+    actions/set-portfolio-optimizer-exposure-point
+    :set-portfolio-optimizer-exposure-band
+    actions/set-portfolio-optimizer-exposure-band
+    :apply-portfolio-optimizer-exposure-preset
+    actions/apply-portfolio-optimizer-exposure-preset
+    :reset-portfolio-optimizer-constraints-to-system
+    actions/reset-portfolio-optimizer-constraints-to-system
     :set-portfolio-optimizer-objective-parameter
     actions/set-portfolio-optimizer-objective-parameter
     :set-portfolio-optimizer-objective-parameter-percent

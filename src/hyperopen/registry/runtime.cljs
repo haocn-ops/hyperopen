@@ -81,6 +81,14 @@
     (fn [{:replicant/keys [dom-event]}]
       (some-> dom-event .-clientX)))
 
+  (nxr/register-placeholder! :event/clientY
+    (fn [{:replicant/keys [dom-event]}]
+      (some-> dom-event .-clientY)))
+
+  (nxr/register-placeholder! :event/pointer-buttons
+    (fn [{:replicant/keys [dom-event]}]
+      (some-> dom-event .-buttons)))
+
   (nxr/register-placeholder! :event.currentTarget/bounds
     (fn [{:replicant/keys [dom-event]}]
       (when-let [target (some-> dom-event .-currentTarget)]

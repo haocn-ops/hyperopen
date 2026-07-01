@@ -227,13 +227,17 @@
   []
   (-> (indexed-db/get-json! indexed-db/vault-index-store
                             vault-index-cache-key)
-      (.then normalize-vault-index-cache-record)))
+      (.then normalize-vault-index-cache-record
+             (fn [_error]
+               nil))))
 
 (defn load-vault-index-cache-metadata!
   []
   (-> (indexed-db/get-json! indexed-db/vault-index-store
                             vault-index-cache-metadata-key)
-      (.then normalize-vault-index-cache-metadata)))
+      (.then normalize-vault-index-cache-metadata
+             (fn [_error]
+               nil))))
 
 (defn persist-vault-index-cache-record!
   [rows metadata]
@@ -247,4 +251,6 @@
                    false
                    (indexed-db/put-json! indexed-db/vault-index-store
                                          vault-index-cache-metadata-key
-                                         metadata-record)))))))
+                                         metadata-record))))
+        (.catch (fn [_error]
+                  false)))))

@@ -175,3 +175,33 @@
                                     (.catch fail!))))
                        (.catch fail!))))
           (.catch fail!)))))
+
+(deftest vault-index-cache-helpers-gracefully-handle-indexed-db-open-failures-test
+  (async done
+    (let [original-indexed-db (.-indexedDB js/globalThis)
+          restore! (fn []
+                     (set! (.-indexedDB js/globalThis) original-indexed-db)
+                     (indexed-db/clear-open-db-cache!))
+          fail! (fn [error]
+                  (restore!)
+                  ((async-support/unexpected-error done) error))]
+      (indexed-db/clear-open-db-cache!)
+      (set! (.-indexedDB js/globalThis)
+            #js {:open (fn [& _args]
+                         (throw (js/Error. "storage-unavailable")))})
+      (-> (list-cache/load-vault-index-cache-record!)
+          (.then (fn [record]
+                   (is (nil? record))
+                   (-> (list-cache/load-vault-index-cache-metadata!)
+                       (.then (fn [metadata-record]
+                                (is (nil? metadata-record))
+                                (-> (list-cache/persist-vault-index-cache-record!
+                                     [{:vault-address "0xabc"}]
+                                     {:etag "\"etag-1\""})
+                                    (.then (fn [persisted?]
+                                             (is (false? persisted?))
+                                             (restore!)
+                                             (done)))
+                                    (.catch fail!))))
+                       (.catch fail!))))
+          (.catch fail!)))))

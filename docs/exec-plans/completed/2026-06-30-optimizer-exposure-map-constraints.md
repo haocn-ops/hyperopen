@@ -596,6 +596,18 @@ Dependencies: nexus dispatch runtime, Replicant, the existing optimizer constrai
 
 ## Note on revisions
 
+2026-07-01 (post-review refinement): Addressed maintainer feedback on the rendered pad — explicit
+axis titles ("Gross leverage (×)" on Y with numeric ticks; color-coded "◄ Short" / "Net bias" /
+"Long ►" on X, short=red/long=green); confirmed "leverage" is correct (`:gross-max` renames to
+`:gross-leverage` for the solver); and replaced the fixed 3× gross cap with an ADAPTIVE axis
+(`exposure-policy/axis-scale`, nice steps 3/5/10/20/40+, no hard cap) that grows to frame the
+policy band and current exposure, with the scale baked into the pad drag (exposure-point action is
+now a 6-tuple). Added adaptive-axis tests + a `high-leverage` workbench scene; browser-verified the
+axis growing to 10× for a 5–6× gross policy. Note: `npm run gates` currently reds only on
+`lint:namespace-sizes`, because ~154 PRE-EXISTING repo size-exceptions all carried
+`retire-by 2026-06-30` and expired when UTC rolled to 2026-07-01 — repo maintenance unrelated to
+this feature (none of these namespaces are touched here; the feature's own files pass the gate).
+
 2026-06-30 (initial): Authored from a full subsystem mapping. Records the canonical-vs-view
 constraint model, the honest nil-floor gross-band decision, the placeholder-based drag seam, the
 wallet+universe profile persistence design, and the six-milestone sequence. Reason: maintainer

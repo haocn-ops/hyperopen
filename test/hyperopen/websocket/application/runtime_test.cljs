@@ -52,6 +52,29 @@
     (online?* [_] true)
     (hidden-tab?* [_] false)))
 
+(defn- make-manual-timeout-scheduler []
+  (let [timeouts (atom {})
+        next-id (atom 0)]
+    {:scheduler (reify infra/IScheduler
+                  (schedule-timeout* [_ f _ms]
+                    (let [timer-id (swap! next-id inc)]
+                      (swap! timeouts assoc timer-id f)
+                      timer-id))
+                  (clear-timeout* [_ timer-id]
+                    (swap! timeouts dissoc timer-id))
+                  (schedule-interval* [_ f ms] (js/setInterval f ms))
+                  (clear-interval* [_ timer-id] (js/clearInterval timer-id))
+                  (window-object* [_] nil)
+                  (document-object* [_] nil)
+                  (navigator-object* [_] nil)
+                  (add-event-listener* [_ _ _ _] nil)
+                  (online?* [_] true)
+                  (hidden-tab?* [_] false))
+     :flush-timeouts! (fn []
+                        (doseq [[timer-id f] @timeouts]
+                          (swap! timeouts dissoc timer-id)
+                          (f)))}))
+
 (defn- make-test-clock []
   (reify infra/IClock
     (now-ms* [_] (.now js/Date))
@@ -66,7 +89,7 @@
     (detach-handlers! [_ _] nil)))
 
 (defn- make-test-runtime
-  [{:keys [parse-raw-envelope topic->tier router runtime-view]
+  [{:keys [parse-raw-envelope topic->tier router runtime-view scheduler clock]
     :or {topic->tier (constantly :lossless)}}]
   (runtime/start-runtime!
     {:config {:control-buffer-size 8
@@ -88,9 +111,19 @@
      :router router
      :runtime-view runtime-view
      :transport (make-test-transport)
-     :scheduler (make-test-scheduler)
-     :clock (make-test-clock)
+     :scheduler (or scheduler (make-test-scheduler))
+     :clock (or clock (make-test-clock))
      :calculate-retry-delay-ms (fn [_ _ _ _] 10)}))
+
+(defn- eventually!
+  [predicate on-success on-timeout]
+  (let [deadline-ms (+ (.now js/Date) 1000)]
+    (letfn [(check! []
+              (cond
+                (predicate) (on-success)
+                (< (.now js/Date) deadline-ms) (js/setTimeout check! 5)
+                :else (on-timeout)))]
+      (check!))))
 
 (deftest create-runtime-channels-contract-test
   (let [channels (runtime/create-runtime-channels {:mailbox-buffer-size 4
@@ -127,6 +160,7 @@
   (async done
     (let [runtime-view (atom nil)
           _ (reset-runtime-view! runtime-view)
+          {:keys [scheduler flush-timeouts!]} (make-manual-timeout-scheduler)
           routed (atom [])
           router (reify runtime/IMessageRouter
                    (route-domain-message! [_ envelope]
@@ -145,7 +179,8 @@
           rt (make-test-runtime {:parse-raw-envelope parse-raw-envelope
                                  :topic->tier (constantly :market)
                                  :router router
-                                 :runtime-view runtime-view})]
+                                 :runtime-view runtime-view
+                                 :scheduler scheduler})]
       (runtime/publish-command! rt {:op :connection/connect
                                     :ws-url "wss://example.test/ws"})
       (runtime/publish-transport-event! rt {:event/type :socket/open
@@ -156,19 +191,32 @@
       (runtime/publish-transport-event! rt {:event/type :socket/message
                                             :socket-id 1
                                             :raw "{\"channel\":\"trades\",\"seq\":2,\"data\":[{\"coin\":\"BTC\"}]}"})
-      (let [deadline-ms (+ (.now js/Date) 250)]
-        (letfn [(check! []
-                  (if (or (= 1 (count @routed))
-                          (>= (.now js/Date) deadline-ms))
-                    (do
-                      (is (= 1 (count @routed)))
-                      (is (= 2 (get-in (first @routed) [:payload :seq])))
-                      (is (>= (get-in @runtime-view [:stream :metrics :market-coalesced]) 1))
-                      (is (= 1 (get-in @runtime-view [:stream :metrics :market-dispatched])))
-                      (runtime/stop-runtime! rt)
-                      (done))
-                    (js/setTimeout check! 5)))]
-          (check!))))))
+      (eventually!
+        (fn []
+          (let [pending (vals (get-in @(:state (:engine rt))
+                                      [:market-coalesce :pending]
+                                      {}))]
+            (and (= 1 (count pending))
+                 (= 2 (get-in (first pending) [:payload :seq])))))
+        (fn []
+          (flush-timeouts!)
+          (eventually!
+            #(= 1 (count @routed))
+            (fn []
+              (is (= 1 (count @routed)))
+              (is (= 2 (get-in (first @routed) [:payload :seq])))
+              (is (>= (get-in @runtime-view [:stream :metrics :market-coalesced]) 1))
+              (is (= 1 (get-in @runtime-view [:stream :metrics :market-dispatched])))
+              (runtime/stop-runtime! rt)
+              (done))
+            (fn []
+              (is false "market coalescing flush did not route the pending envelope")
+              (runtime/stop-runtime! rt)
+              (done))))
+        (fn []
+          (is false "market coalescing did not retain the latest pending envelope")
+          (runtime/stop-runtime! rt)
+          (done))))))
 
 (deftest lossless-ordering-invariant-test
   (async done

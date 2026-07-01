@@ -65,7 +65,40 @@ Local scratch refs (non-authoritative): None.
   "Show N assets" list (`data-role portfolio-optimizer-readiness-warning-assets`), keeping the
   `portfolio-optimizer-readiness-warning` role. Raw readiness is untouched. Updated the boundary
   test to the grouped shape + added a 3-warning→2-group test. `npm test` green (4937 tests).
-- [ ] R3 — Playwright layout-spec updates, full gates, browser verification.
+- [x] (2026-07-01) R3 — Playwright layout-spec updates + full gates + browser verification.
+  Rewrote the control-rail-order spec for the new IA (left=universe, center=policy-pane order),
+  retargeted the vault summary assertion to the compact card, replaced the brittle Run
+  boundingBox poll with a DOM-order check, and fixed pre-existing drift (panel numbering,
+  "Load my holdings", percent target-return, ambiguous constraints `<summary>`). Fixed a
+  Black-Litterman regression (keep objective/model/constraint pickers visible; the belief
+  workspace follows). `npm run gates` 34/34 PASS; the layout / exposure-map (4) / turnover
+  Playwright specs pass against the live app. The one failing BL spec ("run applies a valid
+  pending BTC view") fails on the pre-IA commit too — pre-existing, not caused by this work.
+
+## Outcomes & Retrospective
+
+Completed 2026-07-01. All three milestones landed; `npm run gates` is 34/34 PASS, and the
+IA-relevant Playwright specs (which render the live app) pass.
+
+What a trader gains: the editable policy — objective, return/risk model, the 2D exposure map,
+risk guards, rebalance behavior, advanced solver drawer — now lives above the fold in the wide
+CENTER column instead of a narrow left rail; the LEFT column is just universe selection; the
+RIGHT column leads with a one-line summary card and a readiness panel whose repeated warnings are
+grouped ("13 assets use stale cached history" with an expandable list) instead of shown fifteen
+times. The Run stays a bottom bar in the center (the designer allowed "right column or bottom
+bar"), and "why this preset is safe" is a small collapsed note below the controls.
+
+Complexity: the common configuration path is far more usable; internal complexity rose only
+modestly and additively (a column-content reshuffle, one compact-summary-card model, one pure
+warning-grouping fn). No action/effect/spec/solver/worker behavior changed — it is a view-layer
+restructure — so the heaviest cost was updating the many placement/copy tests that pinned the old
+layout. Black-Litterman required care: the belief workspace must not replace the whole center or
+the model/constraint pickers vanish.
+
+Deferred / designer follow-ups (flagged to the maintainer): whether to redesign the objective
+picker into inline segmented buttons (moved as-is for now); a second Run in the header vs. the
+single center bottom bar; per-column independent scrolling; and the mobile stacking order. The
+pre-existing "run applies a valid pending BTC view" Playwright regression is separate debt.
 
 ## Surprises & Discoveries
 

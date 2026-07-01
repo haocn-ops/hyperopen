@@ -51,8 +51,31 @@
   (let [black-litterman? (= :black-litterman (get-in draft [:return-model :kind]))]
     (into
      [:main {:class ["optimizer-policy-pane" "space-y-4" "leading-4"]
-             :data-role "portfolio-optimizer-setup-policy-pane"}]
+             :data-role "portfolio-optimizer-setup-policy-pane"}
+      ;; The objective/model/constraint PICKERS are always shown so the trader can change any of
+      ;; them (including switching Black-Litterman off) without losing the controls.
+      (objective-controls/objective-section
+       draft
+       highlighted-controls
+       (target-sigma/frontier-sigma-bounds
+        (get-in state optimizer-contracts/last-successful-run-result-path)))
+      (model-controls/model-section draft)
+      (constraint-controls/constraints-section
+       draft highlighted-controls
+       {:current-exposure (exposure-vm/snapshot->current-exposure
+                           (current-portfolio/current-portfolio-snapshot state))
+        :has-saved-default? (constraint-profiles/has-default?
+                             (get-in state optimizer-contracts/constraint-profiles-path)
+                             (constraint-profiles/universe-key
+                              (get-in state optimizer-contracts/draft-universe-path)))})
+      (controls/disclosure-panel
+       "portfolio-optimizer-advanced-overrides-shell"
+       (controls/disclosure-heading
+        "Advanced Overrides"
+        (instrument-overrides-panel/overrides-trailing-label draft))
+       (instrument-overrides-panel/instrument-overrides-panel draft))]
      (if black-litterman?
+       ;; Black-Litterman: the belief workspace carries its own run + assumptions.
        [(use-my-views-workspace/use-my-views-workspace
          {:draft draft
           :readiness readiness
@@ -61,27 +84,7 @@
           :saving-scenario? saving-scenario?
           :solved-run? solved-run?
           :result-path result-path})]
-       [(objective-controls/objective-section
-         draft
-         highlighted-controls
-         (target-sigma/frontier-sigma-bounds
-          (get-in state optimizer-contracts/last-successful-run-result-path)))
-        (model-controls/model-section draft)
-        (constraint-controls/constraints-section
-         draft highlighted-controls
-         {:current-exposure (exposure-vm/snapshot->current-exposure
-                             (current-portfolio/current-portfolio-snapshot state))
-          :has-saved-default? (constraint-profiles/has-default?
-                               (get-in state optimizer-contracts/constraint-profiles-path)
-                               (constraint-profiles/universe-key
-                                (get-in state optimizer-contracts/draft-universe-path)))})
-        (controls/disclosure-panel
-         "portfolio-optimizer-advanced-overrides-shell"
-         (controls/disclosure-heading
-          "Advanced Overrides"
-          (instrument-overrides-panel/overrides-trailing-label draft))
-         (instrument-overrides-panel/instrument-overrides-panel draft))
-        (why-safe-note)
+       [(why-safe-note)
         [:div {:class ["space-y-2"]
                :data-role "portfolio-optimizer-model-assumptions-stack"}
          (setup-actions/model-assumptions-panel)

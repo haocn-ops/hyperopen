@@ -1518,23 +1518,29 @@ test("portfolio optimizer scenario board recovers saved scenarios when the addre
     .toHaveCount(0);
 });
 
-test("portfolio optimizer setup orders objective before return risk model @regression", async ({ page }) => {
+test("portfolio optimizer setup puts policy controls in the center pane @regression", async ({ page }) => {
   await visitRoute(page, "/portfolio/optimize/new");
 
   await expect(page.locator("[data-role='portfolio-optimizer-setup-route-surface']")).toBeVisible();
   await expect(page.locator("[data-role='portfolio-optimizer-objective-panel']"))
-    .toContainText(/02\s*Objective/);
+    .toContainText("Objective");
   await expect(page.locator("[data-role='portfolio-optimizer-return-risk-panel']"))
-    .toContainText(/03\s*Return \/ Risk Model/);
+    .toContainText(/Return \/ Risk Model/);
+  // LEFT rail is universe-only now; the editable policy controls moved to the wide center pane.
   await expect.poll(async () => page
     .locator("[data-role='portfolio-optimizer-setup-control-rail']")
     .evaluate((rail) => Array.from(rail.children).map((child) => child.getAttribute("data-role"))))
+    .toEqual(["portfolio-optimizer-universe-panel"]);
+  await expect.poll(async () => page
+    .locator("[data-role='portfolio-optimizer-setup-policy-pane']")
+    .evaluate((pane) => Array.from(pane.children).map((child) => child.getAttribute("data-role"))))
     .toEqual([
-      "portfolio-optimizer-universe-panel",
       "portfolio-optimizer-objective-panel",
       "portfolio-optimizer-return-risk-panel",
       "portfolio-optimizer-constraints-panel",
-      "portfolio-optimizer-advanced-overrides-shell"
+      "portfolio-optimizer-advanced-overrides-shell",
+      "portfolio-optimizer-why-safe-note",
+      "portfolio-optimizer-model-assumptions-stack"
     ]);
 });
 
@@ -1550,7 +1556,7 @@ test("portfolio optimizer setup turnover cap switch disables and restores cap @r
     "[data-role='portfolio-optimizer-constraint-max-turnover-input']"
   );
 
-  await constraintsPanel.locator("summary").click();
+  await constraintsPanel.locator("> summary").click();
   await expect.poll(async () => constraintsPanel.evaluate((element) => element.open)).toBe(true);
   await expect(turnoverToggle).toHaveAttribute("role", "switch");
   await expect(turnoverToggle).toHaveAttribute("aria-checked", "true");
@@ -1610,7 +1616,7 @@ test("portfolio optimizer From holdings seeds current exposure constraints @regr
     .toBeVisible();
 
   const constraintsPanel = page.locator("[data-role='portfolio-optimizer-constraints-panel']");
-  await constraintsPanel.locator("summary").click();
+  await constraintsPanel.locator("> summary").click();
   await expect.poll(async () => constraintsPanel.evaluate((element) => element.open)).toBe(true);
   await expect(page.locator("[data-role='portfolio-optimizer-constraint-gross-max-input']"))
     .toHaveValue("2");
@@ -1649,7 +1655,7 @@ test("portfolio optimizer setup exposes separate model layers @regression", asyn
   await expect(returnModelPanel).toBeHidden();
   await expect(maxAssetWeight).toBeHidden();
 
-  const summaryPane = page.locator("[data-role='portfolio-optimizer-setup-summary-pane']");
+  const summaryPane = page.locator("[data-role='portfolio-optimizer-setup-policy-pane']");
   const assumptionsPanel = page.locator("[data-role='portfolio-optimizer-model-assumptions-panel']");
   const bottomActions = page.locator("[data-role='portfolio-optimizer-setup-bottom-actions']");
   const actionMeta = page.locator("[data-role='portfolio-optimizer-setup-bottom-actions-status-meta']");
@@ -1658,27 +1664,17 @@ test("portfolio optimizer setup exposes separate model layers @regression", asyn
   await expect(summaryPane.locator("[data-role='portfolio-optimizer-setup-bottom-actions']"))
     .toBeVisible();
   await expect(assumptionsPanel).toBeVisible();
-  await expect.poll(async () => {
-    const [summaryBox, assumptionsBox, actionsBox, metaBox, detailBox, footerBox] = await Promise.all([
-      summaryPane.boundingBox(),
-      assumptionsPanel.boundingBox(),
-      bottomActions.boundingBox(),
-      actionMeta.boundingBox(),
-      actionDetail.boundingBox(),
-      footer.boundingBox()
+  // The Run bottom bar lives in the CENTER policy pane, directly below the model-assumptions
+  // panel (DOM order, robust to the column widths). Exact intra-bar pixel padding is not asserted
+  // — it is incidental styling; the meaningful placement is also pinned by the setup-run-action
+  // unit test.
+  await expect.poll(async () => page
+    .locator("[data-role='portfolio-optimizer-model-assumptions-stack']")
+    .evaluate((stack) => Array.from(stack.children).map((child) => child.getAttribute("data-role"))))
+    .toEqual([
+      "portfolio-optimizer-model-assumptions-panel",
+      "portfolio-optimizer-setup-bottom-actions"
     ]);
-    if (!summaryBox || !assumptionsBox || !actionsBox || !metaBox || !detailBox || !footerBox) return false;
-    const topPadding = metaBox.y - actionsBox.y;
-    const bottomPadding = actionsBox.y + actionsBox.height - (detailBox.y + detailBox.height);
-    return actionsBox.x >= summaryBox.x
-      && actionsBox.x + actionsBox.width <= summaryBox.x + summaryBox.width + 1
-      && detailBox.x >= actionsBox.x
-      && detailBox.x + detailBox.width <= actionsBox.x + actionsBox.width + 1
-      && bottomPadding >= 10
-      && Math.abs(topPadding - bottomPadding) <= 8
-      && actionsBox.y > assumptionsBox.y + assumptionsBox.height
-      && actionsBox.y < footerBox.y;
-  }).toBe(true);
   await expect.poll(async () => {
     const [metaColor, detailColor] = await Promise.all([
       actionMeta.evaluate((element) => getComputedStyle(element).color),
@@ -1702,7 +1698,7 @@ test("portfolio optimizer setup exposes separate model layers @regression", asyn
   await expect(page.locator("[data-role='portfolio-optimizer-run-status-panel']"))
     .toHaveCount(0);
   await expect(page.locator("[data-role='portfolio-optimizer-universe-panel']"))
-    .toContainText("Use Current Holdings");
+    .toContainText("Load my holdings");
   await expect(page.locator("[data-role='portfolio-optimizer-objective-panel']"))
     .toContainText("Minimum Variance");
   await expect(page.locator("[data-role='portfolio-optimizer-return-model-panel']"))
@@ -1737,7 +1733,7 @@ test("portfolio optimizer setup exposes separate model layers @regression", asyn
   await expect(returnModelPanel).toBeVisible();
   await expect(riskModelPanel).toBeVisible();
 
-  await constraintsPanel.locator("summary").click();
+  await constraintsPanel.locator("> summary").click();
   await expect.poll(async () => constraintsPanel.evaluate((element) => element.open)).toBe(true);
   await expect(maxAssetWeight).toBeVisible();
 
@@ -1788,12 +1784,12 @@ test("portfolio optimizer setup exposes separate model layers @regression", asyn
 
   await targetReturnObjective.click();
   await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
-  await expect(targetReturn).toHaveValue("0.15");
+  await expect(targetReturn).toHaveValue("15");
   await expect.poll(() => inputTextFits(targetReturn)).toBe(true);
   await expect(targetVolatility).toHaveCount(0);
-  await targetReturn.fill("0.18");
+  await targetReturn.fill("18");
   await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
-  await expect(targetReturn).toHaveValue("0.18");
+  await expect(targetReturn).toHaveValue("18");
 });
 
 test("portfolio optimizer universe search uses one integrated shell @regression", async ({ page }) => {
@@ -2058,9 +2054,11 @@ test("portfolio optimizer manual universe builder adds and removes vaults @regre
   await expect(vaultSelected).toBeVisible();
   await expect(vaultSelected).toContainText("Alpha Yield");
   await expect(vaultSelected).toContainText("vault");
-  await expect(page.locator("[data-role='portfolio-optimizer-setup-summary-panel']"))
-    .toContainText("Alpha Yield");
-  await expect(page.locator("[data-role='portfolio-optimizer-setup-summary-panel']"))
+  // The verbose center summary panel is gone; the compact right-column summary card shows the
+  // asset COUNT and must never leak the raw vault address/id.
+  await expect(page.locator("[data-role='portfolio-optimizer-setup-summary-card']"))
+    .toContainText("assets");
+  await expect(page.locator("[data-role='portfolio-optimizer-setup-summary-card']"))
     .not.toContainText(vaultKey);
   await expect(vaultRemove).toBeVisible();
   await expect(searchInput).toHaveValue("");

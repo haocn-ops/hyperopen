@@ -6,7 +6,9 @@
 
 (deftest setup-black-litterman-summary-pane-uses-dedicated-center-workspace-contract-test
   (let [view-node (setup-sections/policy-pane
-                   {:draft (black-litterman-ready-draft)
+                   {:state {}
+                    :highlighted-controls #{}
+                    :draft (black-litterman-ready-draft)
                     :readiness (black-litterman-ready-readiness)
                     :running? false
                     :run-triggerable? true
@@ -86,7 +88,9 @@
 
 (deftest setup-black-litterman-insight-cards-render-empty-view-state-test
   (let [view-node (setup-sections/policy-pane
-                   {:draft (black-litterman-empty-draft)
+                   {:state {}
+                    :highlighted-controls #{}
+                    :draft (black-litterman-empty-draft)
                     :readiness (black-litterman-empty-readiness)
                     :running? false
                     :run-triggerable? true

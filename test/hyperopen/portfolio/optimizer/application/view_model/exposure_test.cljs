@@ -47,4 +47,16 @@
     (is (some? (:current-marker model)))
     (is (true? (get-in model [:preview :on-policy?])))
     (is (= 2.0 (get-in model [:echo :gross-max])))
-    (is (false? (get-in model [:echo :gross-floored?])))))
+    (is (false? (get-in model [:echo :gross-floored?])))
+    (is (= 3.0 (get-in model [:axis :gross-max])) "small default policy uses the floor axis")))
+
+(deftest exposure-map-model-axis-grows-for-high-gross-test
+  (let [model (vm/exposure-map-model
+               {:constraints {:gross-max 6.0 :net-min 1.0 :net-max 1.0 :max-asset-weight 0.5}
+                :current-exposure {:gross 5.0 :net 1.0}
+                :highlighted-controls #{}})]
+    (is (= 10.0 (get-in model [:axis :gross-max]))
+        "a 6x gross ceiling grows the axis past 3x to the next nice step")
+    (is (<= (get-in model [:target-marker :y]) 1.0))
+    (is (>= (get-in model [:target-marker :y]) 0.0)
+        "the handle stays inside the pad instead of clipping at the top")))

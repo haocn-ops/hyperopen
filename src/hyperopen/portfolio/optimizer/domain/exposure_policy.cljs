@@ -24,8 +24,16 @@
 ;; `target-snap` for clean values. Advanced raw fields may exceed these bounds; the pad simply
 ;; clamps the plotted marker.
 
-(def gross-axis-max 3.0)
-(def net-axis-extent 2.0)
+;; The pad axes are ADAPTIVE, not fixed. `gross-axis-floor`/`net-axis-floor` are the smallest a
+;; comfortable default view uses; the visible max grows (quantized to the nice steps below, with
+;; headroom) to contain whatever leverage/bias the policy or the current portfolio actually uses,
+;; so the trader is never capped at an arbitrary ceiling. Gross ≈ leverage (the request builder
+;; renames :gross-max → :gross-leverage), so the Y axis is surfaced as "Gross leverage".
+(def gross-axis-floor 3.0)
+(def net-axis-floor 2.0)
+(def gross-axis-steps [3.0 5.0 10.0 20.0 40.0])
+(def net-axis-steps [2.0 3.0 5.0 10.0 20.0])
+(def ^:private axis-headroom 1.12)
 (def target-snap 0.05)
 (def band-eps 1e-6)
 (def max-band 0.5)
@@ -55,6 +63,29 @@
   [a b]
   (and (finite-number? a) (finite-number? b)
        (< (js/Math.abs (- a b)) 1e-4)))
+
+;; --- Adaptive axis scale ------------------------------------------------------------------
+
+(defn- nice-axis-max
+  "Smallest nice step (with headroom) that contains `needed`, never below `floor`, with no hard
+  upper cap (rounds up to the next multiple of 20 beyond the largest listed step)."
+  [steps floor needed]
+  (let [n (max floor (* axis-headroom (max 0.0 (or needed 0.0))))]
+    (or (first (filter #(>= % n) steps))
+        (* 20.0 (js/Math.ceil (/ n 20.0))))))
+
+(def default-axis {:gross-max gross-axis-floor :net-extent net-axis-floor})
+
+(defn axis-scale
+  "Adaptive {:gross-max :net-extent} that frames the policy band and the current portfolio
+  exposure. Grows to fit; never shrinks below the floor; never caps the trader."
+  [{:keys [gross-target gross-band net-target net-band current-gross current-net]}]
+  {:gross-max (nice-axis-max gross-axis-steps gross-axis-floor
+                             (max (+ (or gross-target 0.0) (or gross-band 0.0))
+                                  (or current-gross 0.0)))
+   :net-extent (nice-axis-max net-axis-steps net-axis-floor
+                              (max (+ (js/Math.abs (or net-target 0.0)) (or net-band 0.0))
+                                   (js/Math.abs (or current-net 0.0))))})
 
 ;; --- Forward: canonical constraints -> exposure policy ------------------------------------
 
@@ -171,10 +202,14 @@
 
 (defn point->targets
   "Convert a pad pointer event to snapped gross/net targets, or nil when this is not an active
-  drag (no pressed button) or the pad bounds are degenerate. `bounds` is the pad's bounding
-  rect {:left :top :width :height} resolved by the :event.currentTarget/bounds placeholder."
-  [{:keys [client-x client-y bounds buttons]}]
+  drag (no pressed button) or the pad bounds are degenerate. `bounds` is the pad's bounding rect
+  resolved by :event.currentTarget/bounds; `gross-axis-max`/`net-axis-extent` are the current
+  adaptive scale (baked into the dispatch) so the pointer maps to exactly the values the axis
+  shows. They default to the floor scale."
+  [{:keys [client-x client-y bounds buttons gross-axis-max net-axis-extent]}]
   (let [{:keys [left top width height]} bounds
+        g-max (if (finite-number? gross-axis-max) gross-axis-max gross-axis-floor)
+        n-ext (if (finite-number? net-axis-extent) net-axis-extent net-axis-floor)
         pressed? (and (number? buttons) (pos? buttons))]
     (when (and pressed?
                (finite-number? client-x) (finite-number? client-y)
@@ -183,8 +218,8 @@
                (pos? width) (pos? height))
       (let [fx (clamp (/ (- client-x left) width) 0.0 1.0)
             fy (clamp (/ (- client-y top) height) 0.0 1.0)
-            net-target (snap (+ (- net-axis-extent) (* fx (* 2 net-axis-extent))))
-            gross-target (snap (* gross-axis-max (- 1.0 fy)))
+            net-target (snap (+ (- n-ext) (* fx (* 2 n-ext))))
+            gross-target (snap (* g-max (- 1.0 fy)))
             ;; Gross is total absolute exposure, so it can never be below the absolute net
             ;; target; clamp to keep the box physically meaningful.
             gross-target* (max gross-target (js/Math.abs net-target))]
@@ -192,38 +227,44 @@
          :net-target (round4 net-target)}))))
 
 ;; --- Plotting helpers for the view (0..1 fractions; y grows downward like SVG) ------------
+;;
+;; Each takes the adaptive axis {:gross-max :net-extent}; the 1-arity overloads use the floor
+;; scale so callers that don't care about adaptive framing (and tests) stay simple.
 
 (defn- net->fraction
-  [net]
-  (clamp (/ (+ net net-axis-extent) (* 2 net-axis-extent)) 0.0 1.0))
+  [net n-ext]
+  (clamp (/ (+ net n-ext) (* 2 n-ext)) 0.0 1.0))
 
 (defn- gross->fraction
-  [gross]
-  (clamp (- 1.0 (/ gross gross-axis-max)) 0.0 1.0))
+  [gross g-max]
+  (clamp (- 1.0 (/ gross g-max)) 0.0 1.0))
 
 (defn target-marker
   "Fractional {:x :y} (0..1) position of the policy target point on the pad."
-  [{:keys [gross-target net-target]}]
-  {:x (net->fraction (or net-target 0.0))
-   :y (gross->fraction (or gross-target 0.0))})
+  ([policy] (target-marker policy default-axis))
+  ([{:keys [gross-target net-target]} {:keys [gross-max net-extent]}]
+   {:x (net->fraction (or net-target 0.0) net-extent)
+    :y (gross->fraction (or gross-target 0.0) gross-max)}))
 
 (defn band-rect
   "Fractional {:x :y :w :h} (0..1) rectangle of the allowed exposure region (the band box)."
-  [{:keys [gross-target gross-band net-target net-band]}]
-  (let [gt (or gross-target 0.0)
-        gb (max 0.0 (or gross-band 0.0))
-        nt (or net-target 0.0)
-        nb (max 0.0 (or net-band 0.0))
-        x0 (net->fraction (- nt nb))
-        x1 (net->fraction (+ nt nb))
-        y-top (gross->fraction (+ gt gb))
-        y-bot (gross->fraction (- gt gb))]
-    {:x x0 :y y-top :w (max 0.0 (- x1 x0)) :h (max 0.0 (- y-bot y-top))}))
+  ([policy] (band-rect policy default-axis))
+  ([{:keys [gross-target gross-band net-target net-band]} {:keys [gross-max net-extent]}]
+   (let [gt (or gross-target 0.0)
+         gb (max 0.0 (or gross-band 0.0))
+         nt (or net-target 0.0)
+         nb (max 0.0 (or net-band 0.0))
+         x0 (net->fraction (- nt nb) net-extent)
+         x1 (net->fraction (+ nt nb) net-extent)
+         y-top (gross->fraction (+ gt gb) gross-max)
+         y-bot (gross->fraction (- gt gb) gross-max)]
+     {:x x0 :y y-top :w (max 0.0 (- x1 x0)) :h (max 0.0 (- y-bot y-top))})))
 
 (defn current-exposure-marker
   "Fractional {:x :y} position of the current portfolio's {:gross :net} exposure, or nil when
   either value is missing."
-  [{:keys [gross net]}]
-  (when (and (finite-number? gross) (finite-number? net))
-    {:x (net->fraction net)
-     :y (gross->fraction gross)}))
+  ([exposure] (current-exposure-marker exposure default-axis))
+  ([{:keys [gross net]} {:keys [gross-max net-extent]}]
+   (when (and (finite-number? gross) (finite-number? net))
+     {:x (net->fraction net net-extent)
+      :y (gross->fraction gross gross-max)})))

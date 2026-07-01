@@ -15,6 +15,15 @@
   [x]
   (if (number? x) (str (.toFixed x 2) "×") "--"))
 
+(defn- fmt-axis
+  "Compact tick label: whole numbers show without decimals (10×), else one decimal (2.5×)."
+  [x]
+  (if (number? x)
+    (if (== x (js/Math.round x))
+      (str (js/Math.round x) "×")
+      (str (.toFixed x 1) "×"))
+    "--"))
+
 (defn- pct
   "Fraction (0..1) → SVG user-space coordinate on the 0..100 pad."
   [f]
@@ -38,15 +47,20 @@
 
 ;; --- the SVG pad --------------------------------------------------------------------------
 
-(def ^:private pad-pointer-action
+(defn- pad-pointer-action
+  "Bake the current adaptive axis scale into the drag dispatch so the pointer maps to exactly the
+  values the axis shows."
+  [{:keys [gross-max net-extent]}]
   [[:actions/set-portfolio-optimizer-exposure-point
     [:event/clientX]
     [:event/clientY]
     [:event.currentTarget/bounds]
-    [:event/pointer-buttons]]])
+    [:event/pointer-buttons]
+    gross-max
+    net-extent]])
 
 (defn- exposure-pad
-  [{:keys [target-marker band-rect current-marker highlighted policy]}]
+  [{:keys [target-marker band-rect current-marker highlighted policy axis]}]
   (let [{tx :x ty :y} target-marker
         {bx :x by :y bw :w bh :h} band-rect
         x0 (pct bx)
@@ -68,8 +82,8 @@
            :data-role "portfolio-optimizer-exposure-pad"
            :data-gross-infeasible (when gross-warn? "true")
            :data-net-infeasible (when net-warn? "true")
-           :on {:pointerdown pad-pointer-action
-                :pointermove pad-pointer-action}}
+           :on {:pointerdown (pad-pointer-action axis)
+                :pointermove (pad-pointer-action axis)}}
      ;; surface + gridlines
      [:rect {:class ["optimizer-exposure-map__surface"] :x 0 :y 0 :width 100 :height 100}]
      [:line {:class ["optimizer-exposure-map__grid"] :x1 50 :y1 0 :x2 50 :y2 100}]
@@ -95,13 +109,30 @@
 ;; --- axis frame + band sliders + echo + presets -------------------------------------------
 
 (defn- axis-frame
-  [pad]
-  [:div {:class ["optimizer-exposure-map__frame"]}
-   [:span {:class ["optimizer-exposure-map__axis-y-top"]} "more gross"]
-   [:span {:class ["optimizer-exposure-map__axis-y-bot"]} "less gross"]
-   [:span {:class ["optimizer-exposure-map__axis-x-left"]} "short"]
-   [:span {:class ["optimizer-exposure-map__axis-x-right"]} "long"]
-   pad])
+  [axis pad]
+  (let [g-max (:gross-max axis)]
+    [:div {:class ["optimizer-exposure-map__frame"]}
+     ;; Y-axis title — gross exposure IS leverage (:gross-max renames to :gross-leverage for the
+     ;; solver), so name it plainly. The axis grows, so we show the live max as the top tick.
+     [:span {:class ["optimizer-exposure-map__axis-title"
+                     "optimizer-exposure-map__axis-title--y"]
+             :data-role "portfolio-optimizer-exposure-y-title"}
+      "Gross leverage (×)"]
+     [:div {:class ["optimizer-exposure-map__yticks"]}
+      [:span {:data-role "portfolio-optimizer-exposure-y-max"} (fmt-axis g-max)]
+      [:span (fmt-axis (/ g-max 2))]
+      [:span "0×"]]
+     pad
+     [:div {:class ["optimizer-exposure-map__xaxis"]}
+      [:span {:class ["optimizer-exposure-map__axis-end"
+                      "optimizer-exposure-map__axis-end--short"]}
+       "◄ Short"]
+      [:span {:class ["optimizer-exposure-map__axis-title"
+                      "optimizer-exposure-map__axis-title--x"]}
+       "Net bias"]
+      [:span {:class ["optimizer-exposure-map__axis-end"
+                      "optimizer-exposure-map__axis-end--long"]}
+       "Long ►"]]]))
 
 (defn- band-slider
   [{:keys [label axis value max-band role]}]
@@ -174,11 +205,11 @@
 (defn exposure-map
   "Render the Positioning control from the exposure-map view-model."
   [model]
-  (let [{:keys [gross-band net-band max-band echo presets preview profile]} model]
+  (let [{:keys [gross-band net-band max-band echo presets preview profile axis]} model]
     [:div {:class ["optimizer-exposure-map"]
            :data-role "portfolio-optimizer-exposure-map"}
      (profile-row profile)
-     (axis-frame (exposure-pad model))
+     (axis-frame axis (exposure-pad model))
      [:div {:class ["optimizer-exposure-map__bands"]}
       (band-slider {:label "Gross band" :axis :gross :value gross-band
                     :max-band max-band

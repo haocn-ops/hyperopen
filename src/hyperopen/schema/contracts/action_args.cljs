@@ -94,9 +94,10 @@
 (s/def ::portfolio-optimizer-constraint-args
   (s/tuple ::common/keyword-or-string any?))
 (s/def ::portfolio-optimizer-exposure-point-args
-  ;; [client-x client-y bounds-map buttons] — pad pointer coordinates + the resolved
-  ;; bounding-rect map + the pressed-button bitmask. All positional, runtime-resolved.
-  (s/tuple any? any? any? any?))
+  ;; [client-x client-y bounds-map buttons gross-axis-max net-axis-extent] — pad pointer
+  ;; coordinates + resolved bounding rect + pressed-button bitmask + the baked adaptive axis
+  ;; scale. All positional; coords/buttons are runtime-resolved, the scale is a baked literal.
+  (s/tuple any? any? any? any? any? any?))
 (s/def ::portfolio-optimizer-key-value-args
   (s/tuple ::common/keyword-or-string any?))
 (s/def ::portfolio-optimizer-view-key-value-args

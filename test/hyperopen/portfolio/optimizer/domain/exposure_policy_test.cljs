@@ -94,6 +94,30 @@
                                         :bounds {:left 0 :top 0 :width 0 :height 0}
                                         :buttons 1}))))))
 
+(deftest axis-scale-is-adaptive-and-uncapped-test
+  (testing "small policy + no current exposure ⇒ floor scale"
+    (is (= {:gross-max policy/gross-axis-floor :net-extent policy/net-axis-floor}
+           (policy/axis-scale {:gross-target 2.0 :gross-band 0.0 :net-target 1.0 :net-band 0.0}))))
+  (testing "a gross target beyond the floor grows the axis to the next nice step"
+    (is (= 10.0 (:gross-max (policy/axis-scale {:gross-target 6.0 :gross-band 0.5}))))
+    (is (= 5.0 (:gross-max (policy/axis-scale {:gross-target 4.0 :gross-band 0.0})))))
+  (testing "the current portfolio exposure also expands the frame"
+    (is (= 10.0 (:gross-max (policy/axis-scale {:gross-target 2.0 :current-gross 8.0})))))
+  (testing "net extent grows with a wide long/short bias"
+    (is (= 3.0 (:net-extent (policy/axis-scale {:net-target 2.5 :net-band 0.0})))))
+  (testing "there is no hard cap — huge leverage rounds up past the largest step"
+    (is (<= 60.0 (:gross-max (policy/axis-scale {:gross-target 55.0 :gross-band 0.0}))))))
+
+(deftest point->targets-honors-the-baked-scale-test
+  (let [bounds {:left 0.0 :top 0.0 :width 100.0 :height 100.0}]
+    (testing "top of a 10x-scaled pad yields gross 10x, not the 3x floor"
+      (is (= 10.0 (:gross-target (policy/point->targets
+                                  {:client-x 50.0 :client-y 0.0 :bounds bounds :buttons 1
+                                   :gross-axis-max 10.0 :net-axis-extent 2.0})))))
+    (testing "a missing scale falls back to the floor"
+      (is (= 3.0 (:gross-target (policy/point->targets
+                                 {:client-x 50.0 :client-y 0.0 :bounds bounds :buttons 1})))))))
+
 (deftest presets-apply-and-are-detected-test
   (testing "each preset applies its partial and clears the gross floor"
     (let [out (policy/apply-preset {:gross-min 1.5 :gross-max 1.5} :balanced)]

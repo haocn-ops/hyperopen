@@ -44,6 +44,15 @@
            :current-exposure {:gross 1.6 :net 1.5}
            :highlighted-controls #{}}))
 
+(portfolio/defscene high-leverage
+  []
+  ;; A 6x gross ceiling grows the Y axis past the 3x floor to the 10x nice step, so the handle is
+  ;; never clipped and the trader is not capped at 3x.
+  (render {:constraints {:gross-min 5.0 :gross-max 6.0 :net-min 1.5 :net-max 2.5
+                         :max-asset-weight 0.5}
+           :current-exposure {:gross 5.4 :net 1.9}
+           :highlighted-controls #{}}))
+
 (portfolio/defscene off-policy-current
   []
   ;; Current portfolio sits outside the target band on both axes → off-policy verdict + warn dot.

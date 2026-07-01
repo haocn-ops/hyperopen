@@ -27,15 +27,21 @@
 (defn set-portfolio-optimizer-exposure-point
   "Drag/click on the pad. `client-x`/`client-y` are pointer coordinates, `bounds` the pad's
   bounding rect (resolved by :event.currentTarget/bounds), `buttons` the pressed-button bitmask
-  (resolved by :event/pointer-buttons). A hover (no pressed button) or degenerate bounds is a
-  no-op so passive pointer moves don't rewrite the draft."
-  [state client-x client-y bounds buttons]
-  (if-let [targets (policy/point->targets {:client-x client-x
-                                           :client-y client-y
-                                           :bounds bounds
-                                           :buttons buttons})]
-    (write-constraints (policy/apply-point (current-constraints state) targets))
-    []))
+  (resolved by :event/pointer-buttons). `gross-axis-max`/`net-axis-extent` are the pad's current
+  adaptive scale (baked into the dispatch) so the pointer maps to the values the axis displays; a
+  hover (no pressed button) or degenerate bounds is a no-op so passive pointer moves don't rewrite
+  the draft."
+  ([state client-x client-y bounds buttons]
+   (set-portfolio-optimizer-exposure-point state client-x client-y bounds buttons nil nil))
+  ([state client-x client-y bounds buttons gross-axis-max net-axis-extent]
+   (if-let [targets (policy/point->targets {:client-x client-x
+                                            :client-y client-y
+                                            :bounds bounds
+                                            :buttons buttons
+                                            :gross-axis-max gross-axis-max
+                                            :net-axis-extent net-axis-extent})]
+     (write-constraints (policy/apply-point (current-constraints state) targets))
+     [])))
 
 (defn set-portfolio-optimizer-exposure-band
   "Set the gross or net band (half-width) from a slider. `axis` is :gross|:net, `value` the

@@ -59,17 +59,21 @@
         gross-min (:gross-min constraints*)
         gross-max (:gross-max constraints*)
         net-min (:net-min constraints*)
-        net-max (:net-max constraints*)]
+        net-max (:net-max constraints*)
+        ;; The axis grows to frame the policy band and the current portfolio exposure so the
+        ;; trader is never capped at an arbitrary gross ceiling.
+        axis (policy/axis-scale (assoc policy*
+                                       :current-gross (:gross current-exposure)
+                                       :current-net (:net current-exposure)))]
     {:policy policy*
-     :target-marker (policy/target-marker policy*)
-     :band-rect (policy/band-rect policy*)
-     :current-marker (policy/current-exposure-marker current-exposure)
+     :target-marker (policy/target-marker policy* axis)
+     :band-rect (policy/band-rect policy* axis)
+     :current-marker (policy/current-exposure-marker current-exposure axis)
      :current-exposure current-exposure
      :gross-band (:gross-band policy*)
      :net-band (:net-band policy*)
      :max-band policy/max-band
-     :axis {:gross-max policy/gross-axis-max
-            :net-extent policy/net-axis-extent}
+     :axis axis
      :echo {:gross-min gross-min
             :gross-max gross-max
             :gross-floored? (some? gross-min)

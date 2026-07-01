@@ -231,14 +231,14 @@
     cursor: pointer;
   }
 
-  /* The pad sits in a square frame with axis labels on each edge. */
+  /* Frame: Y-axis title across the top, numeric Y ticks in the left gutter aligned with the pad,
+     and the X-axis (short ◄ · net bias · ► long) below. */
   .portfolio-optimizer .optimizer-exposure-map__frame {
     position: relative;
     display: grid;
     grid-template-columns: auto 1fr;
     grid-template-rows: auto 1fr auto;
-    align-items: center;
-    gap: 0.25rem 0.4rem;
+    gap: 0.3rem 0.45rem;
   }
 
   .portfolio-optimizer .optimizer-exposure-map__pad {
@@ -257,37 +257,61 @@
     border-color: var(--optimizer-warn);
   }
 
-  .portfolio-optimizer
-    :is(.optimizer-exposure-map__axis-y-top, .optimizer-exposure-map__axis-y-bot,
-        .optimizer-exposure-map__axis-x-left, .optimizer-exposure-map__axis-x-right) {
+  /* Axis titles are the load-bearing labels, so they read at full text weight, not the faint
+     tertiary tone the old direction hints used. */
+  .portfolio-optimizer .optimizer-exposure-map__axis-title {
     font-family: var(--font-mono, monospace);
-    font-size: 0.5rem;
-    letter-spacing: 0.06em;
+    font-size: 0.5625rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
     text-transform: uppercase;
-    color: var(--optimizer-text-3);
+    color: var(--optimizer-text);
     white-space: nowrap;
   }
 
-  .portfolio-optimizer .optimizer-exposure-map__axis-y-top {
-    grid-column: 1;
+  .portfolio-optimizer .optimizer-exposure-map__axis-title--y {
+    grid-column: 1 / -1;
     grid-row: 1;
-  }
-
-  .portfolio-optimizer .optimizer-exposure-map__axis-y-bot {
-    grid-column: 1;
-    grid-row: 3;
-  }
-
-  .portfolio-optimizer .optimizer-exposure-map__axis-x-left {
-    grid-column: 2;
-    grid-row: 3;
     justify-self: start;
   }
 
-  .portfolio-optimizer .optimizer-exposure-map__axis-x-right {
+  .portfolio-optimizer .optimizer-exposure-map__yticks {
+    grid-column: 1;
+    grid-row: 2;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: flex-end;
+    font-family: var(--font-mono, monospace);
+    font-size: 0.5rem;
+    color: var(--optimizer-text-2);
+  }
+
+  .portfolio-optimizer .optimizer-exposure-map__xaxis {
     grid-column: 2;
     grid-row: 3;
-    justify-self: end;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.4rem;
+  }
+
+  .portfolio-optimizer .optimizer-exposure-map__axis-end {
+    font-family: var(--font-mono, monospace);
+    font-size: 0.5625rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  /* Short = red, Long = green: the trading convention makes the X axis meaning obvious at a glance. */
+  .portfolio-optimizer .optimizer-exposure-map__axis-end--short {
+    color: var(--optimizer-short);
+  }
+
+  .portfolio-optimizer .optimizer-exposure-map__axis-end--long {
+    color: var(--optimizer-long);
   }
 
   /* SVG primitives reference tokens via class so no raw colors live in the view. */

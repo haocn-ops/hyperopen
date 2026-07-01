@@ -1,5 +1,6 @@
 (ns hyperopen.views.portfolio.optimize.setup-readiness-panel
-  (:require [hyperopen.portfolio.optimizer.application.view-model :as optimizer-view-model]))
+  (:require [clojure.string :as str]
+            [hyperopen.portfolio.optimizer.application.view-model :as optimizer-view-model]))
 
 (defn readiness-panel
   [readiness history-load-state]
@@ -29,7 +30,7 @@
      (when (seq warnings)
        (into
         [:div {:class ["mt-3" "space-y-2"]}]
-        (map (fn [{:keys [message code-label]}]
+        (map (fn [{:keys [message code-label count assets]}]
                [:div {:class ["rounded-md"
                               "border"
                               "border-warning/40"
@@ -39,9 +40,26 @@
                               "text-xs"
                               "text-warning"]
                       :data-role "portfolio-optimizer-readiness-warning"}
-                [:p {:class ["font-semibold"]}
-                 message]
-                (when code-label
+                [:div {:class ["flex" "items-start" "justify-between" "gap-2"]}
+                 [:p {:class ["font-semibold"]}
+                  message]
+                 (when (and (number? count) (> count 1))
+                   [:span {:class ["shrink-0" "rounded-full" "border" "border-warning/50"
+                                   "px-1.5" "font-mono" "text-[0.625rem]"]
+                           :data-role "portfolio-optimizer-readiness-warning-count"}
+                    count])]
+                ;; Repeated same-code warnings collapse into one row with an expandable list of the
+                ;; affected assets, instead of N near-identical rows.
+                (when (and (number? count) (> count 1) (seq assets))
+                  [:details {:class ["mt-1"]}
+                   [:summary {:class ["cursor-pointer" "select-none" "font-mono"
+                                      "text-[0.65rem]" "uppercase" "tracking-[0.08em]"
+                                      "text-warning/80"]}
+                    (str "Show " count " assets")]
+                   [:p {:class ["mt-1" "leading-[1.5]" "text-warning/80"]
+                        :data-role "portfolio-optimizer-readiness-warning-assets"}
+                    (str/join ", " (map :label assets))]])
+                (when (and code-label (or (not (number? count)) (<= count 1)))
                   [:p {:class ["mt-1"
                                "font-mono"
                                "text-[0.65rem]"

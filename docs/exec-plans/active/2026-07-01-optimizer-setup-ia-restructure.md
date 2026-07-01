@@ -58,7 +58,13 @@ Local scratch refs (non-authoritative): None.
   cljs placement/copy tests (control-rail→universe order, policy-pane order, summary-card, run
   placement). `npm test` green (4936 tests); hiccup/theme/boundary/styles lints + portfolio build
   clean.
-- [ ] R2 — Grouped/expandable readiness warnings (pure view-model + panel).
+- [x] (2026-07-01) R2 — Grouped/expandable readiness warnings. Pure `group-readiness-warnings`
+  (by `:code`, first-seen order; count + affected-asset labels via a now-public
+  `setup-readiness/warning-asset-label` + new `warning-code-summary`); `readiness-panel-model`
+  emits grouped rows; the panel renders one row per kind with a count badge and a `<details>`
+  "Show N assets" list (`data-role portfolio-optimizer-readiness-warning-assets`), keeping the
+  `portfolio-optimizer-readiness-warning` role. Raw readiness is untouched. Updated the boundary
+  test to the grouped shape + added a 3-warning→2-group test. `npm test` green (4937 tests).
 - [ ] R3 — Playwright layout-spec updates, full gates, browser verification.
 
 ## Surprises & Discoveries

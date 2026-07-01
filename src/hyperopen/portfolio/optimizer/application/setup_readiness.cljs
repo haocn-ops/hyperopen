@@ -218,7 +218,7 @@
   [request warning]
   (get (requested-instrument-by-id request) (:instrument-id warning)))
 
-(defn- warning-asset-label
+(defn warning-asset-label
   [request warning]
   (let [instrument (warning-instrument request warning)
         coin (non-blank-text (:coin instrument))]
@@ -229,6 +229,22 @@
         (non-blank-text (:vault-address warning))
         (non-blank-text (:instrument-id warning))
         "Selected asset")))
+
+(defn warning-code-summary
+  "A code-level, count-aware sentence for a GROUP of same-code warnings (the grouped readiness
+  panel shows this once instead of repeating a per-asset message N times)."
+  [code count]
+  (let [n count
+        assets (str n (if (= 1 n) " asset" " assets"))]
+    (cond
+      (contains? stale-history-warning-codes code)
+      (str assets (if (= 1 n) " uses" " use") " stale cached history")
+
+      (contains? insufficient-history-warning-codes code)
+      (str assets (if (= 1 n) " has" " have") " insufficient common history")
+
+      :else
+      (str assets " · " (str/replace (name code) "-" " ")))))
 
 (defn- observation-count-message
   [warning noun]

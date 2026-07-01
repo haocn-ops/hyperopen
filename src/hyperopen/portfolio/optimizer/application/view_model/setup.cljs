@@ -34,17 +34,38 @@
     :failed "History load failed. Existing history, if any, is retained."
     (readiness-copy readiness)))
 
+(defn group-readiness-warnings
+  "Group the chosen readiness warnings by :code (first-seen order) so the panel shows each KIND
+  once with a count and an expandable affected-asset list, instead of repeating one row per asset
+  (a 13-stale-history universe used to render 13 near-identical rows). Pure projection — it does
+  not touch the raw readiness lists that history-status/assumption-cards depend on."
+  [readiness]
+  (let [request (:request readiness)
+        warnings (vec (or (seq (:blocking-warnings readiness))
+                          (:warnings readiness)))
+        order (distinct (map :code warnings))
+        by-code (group-by :code warnings)]
+    (mapv (fn [code]
+            (let [group (get by-code code)
+                  cnt (count group)]
+              {:code code
+               :code-label (some-> code name)
+               :count cnt
+               :message (if (= 1 cnt)
+                          (warning-message readiness (first group))
+                          (setup-readiness/warning-code-summary code cnt))
+               :assets (mapv (fn [warning]
+                               {:instrument-id (:instrument-id warning)
+                                :label (setup-readiness/warning-asset-label request warning)})
+                             group)}))
+          order)))
+
 (defn readiness-panel-model
   [readiness history-load-state]
-  (let [warnings (vec (or (seq (:blocking-warnings readiness))
-                          (:warnings readiness)))]
-    {:title "Readiness"
-     :copy (history-load-copy history-load-state readiness)
-     :error-message (get-in history-load-state [:error :message])
-     :warnings (mapv (fn [warning]
-                       {:message (warning-message readiness warning)
-                        :code-label (warning-code-label warning)})
-                     warnings)}))
+  {:title "Readiness"
+   :copy (history-load-copy history-load-state readiness)
+   :error-message (get-in history-load-state [:error :message])
+   :warnings (group-readiness-warnings readiness)})
 
 (defn- title-case-token
   [token]

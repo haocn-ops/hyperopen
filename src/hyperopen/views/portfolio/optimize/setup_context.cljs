@@ -1,12 +1,47 @@
 (ns hyperopen.views.portfolio.optimize.setup-context
-  (:require [hyperopen.portfolio.routes :as portfolio-routes]
+  (:require [hyperopen.portfolio.optimizer.application.view-model :as optimizer-view-model]
+            [hyperopen.portfolio.routes :as portfolio-routes]
             [hyperopen.views.portfolio.optimize.optimization-progress-panel :as optimization-progress-panel]
             [hyperopen.views.portfolio.optimize.run-status-panel :as run-status-panel]
             [hyperopen.views.portfolio.optimize.scenario-objective-menu :as scenario-objective-menu]
+            [hyperopen.views.portfolio.optimize.setup-controls :as controls]
             [hyperopen.views.portfolio.optimize.setup-readiness-panel :as setup-readiness-panel]))
 
 (def ^:private eyebrow-class
   ["font-mono" "text-[0.625rem]" "font-semibold" "uppercase" "tracking-[0.08em]" "text-trading-muted/70"])
+
+(defn- fmt-mult
+  [x]
+  (when (number? x) (str (.toFixed x 2) "×")))
+
+(defn- gross-range
+  [{:keys [gross-min gross-max]}]
+  (if (number? gross-min)
+    (str "gross " (fmt-mult gross-min) "–" (fmt-mult gross-max))
+    (str "gross ≤ " (or (fmt-mult gross-max) "--"))))
+
+(defn- net-range
+  [{:keys [net-min net-max]}]
+  (cond
+    (and (number? net-min) (number? net-max)) (str "net " (fmt-mult net-min) "–" (fmt-mult net-max))
+    (number? net-max) (str "net ≤ " (fmt-mult net-max))
+    (number? net-min) (str "net ≥ " (fmt-mult net-min))
+    :else "net --"))
+
+(defn- summary-card
+  "Compact one-line scenario summary. Derived output, kept small so it does not compete with the
+  center policy controls."
+  [draft]
+  (let [{:keys [preset-label asset-count objective-label return-label cap] :as card}
+        (optimizer-view-model/setup-summary-card-model draft {:labelize controls/labelize})]
+    [:section {:class ["optimizer-setup-panel" "border" "border-base-300" "bg-base-100/90" "p-3"]
+               :data-role "portfolio-optimizer-setup-summary-card"}
+     [:p {:class eyebrow-class} "Scenario summary"]
+     [:p {:class ["mt-2" "text-[0.6875rem]" "font-medium" "text-trading-text"]}
+      (str preset-label " · " asset-count " assets · " objective-label " · " return-label)]
+     [:p {:class ["mt-1" "font-mono" "text-[0.625rem]" "text-trading-muted"]}
+      (str (gross-range card) " · " (net-range card)
+           " · cap " (controls/percent-label cap))]]))
 
 (defn context-rail
   [{:keys [draft state readiness snapshot preview-snapshot run-state optimization-progress
@@ -32,11 +67,13 @@
                             read-only-message)]
     [:aside {:class ["optimizer-context-rail" "min-h-0"]
              :data-role "portfolio-optimizer-right-rail"}
-     [:section {:class ["optimizer-setup-panel" "border" "border-base-300" "bg-base-100/90" "p-3"]
-                :data-role "portfolio-optimizer-assumptions-rail"}
-      [:p {:class eyebrow-class}
-       (if bl? "Edit views" "Why this preset is safe")]
-      (if bl?
+     (summary-card draft)
+     ;; The non-BL "why this preset is safe" copy moved to a collapsed note below the center
+     ;; controls; only the Black-Litterman belief editor remains as a right-rail panel.
+     (when bl?
+       [:section {:class ["optimizer-setup-panel" "border" "border-base-300" "bg-base-100/90" "p-3"]
+                  :data-role "portfolio-optimizer-assumptions-rail"}
+        [:p {:class eyebrow-class} "Edit views"]
         [:div {:class ["mt-3"]}
          (scenario-objective-menu/views-editor-section
           draft
@@ -45,13 +82,7 @@
           readiness
           {:container-role "portfolio-optimizer-setup-use-my-views-editor"
            :title "Your views"
-           :description "Change annualized return views and confidence, then run the recommendation."})]
-        [:div {:class ["mt-3" "space-y-3" "text-[0.6875rem]" "leading-[1.55]" "text-trading-muted"]}
-         [:p "Stabilized inputs reduce dependence on a single historical window."]
-         [:p "Minimum variance does not rely on return forecasts."]
-         [:p "Cash floor and turnover caps protect against destructive rebalances."]
-         [:p {:class ["font-semibold" "text-warning"]}
-          "Switch to Use my views to add beliefs and compare posterior output."]])]
+           :description "Change annualized return views and confidence, then run the recommendation."})]])
      (when status-visible?
        [:section {:class ["optimizer-setup-panel" "border-t" "border-base-300" "bg-base-100/90" "p-3"]
                   :data-role "portfolio-optimizer-trust-freshness-panel"}

@@ -152,6 +152,24 @@
        (summary-row "Horizon" "Annualized"
                     "Displayed return and volatility metrics use the optimizer annualization convention.")]})))
 
+(defn setup-summary-card-model
+  "Compact one-line scenario summary for the right column: preset, asset count, objective, return
+  model, and the exposure/cap numbers. Derived output, not primary input — kept small so it does
+  not compete with the center policy controls."
+  ([draft] (setup-summary-card-model draft nil))
+  ([draft {:keys [labelize]}]
+   (let [constraints (:constraints draft)
+         labelize* #(apply-labelize labelize %)]
+     {:preset-label (labelize* (active-preset draft))
+      :asset-count (count (:universe draft))
+      :objective-label (labelize* (get-in draft [:objective :kind]))
+      :return-label (labelize* (get-in draft [:return-model :kind]))
+      :gross-min (:gross-min constraints)
+      :gross-max (:gross-max constraints)
+      :net-min (:net-min constraints)
+      :net-max (:net-max constraints)
+      :cap (:max-asset-weight constraints)})))
+
 ;; --- History-assumption cards ------------------------------------------------
 ;;
 ;; Views render these rows and dispatch the carried action ids; they never touch

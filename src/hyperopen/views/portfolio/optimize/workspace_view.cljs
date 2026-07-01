@@ -42,20 +42,21 @@
                         "grid-cols-1"
                         "gap-5"
                         "xl:gap-6"
-                        "xl:grid-cols-[minmax(420px,7fr)_minmax(0,11fr)_minmax(360px,6fr)]"]
+                        "xl:grid-cols-[minmax(300px,5fr)_minmax(0,12fr)_minmax(360px,7fr)]"]
                 :data-role "portfolio-optimizer-setup-surface"}
       (setup/control-rail {:state state
                            :draft draft
-                           :highlighted-controls highlighted-controls
                            :readiness readiness
                            :history-load-state history-load-state})
-      (setup/summary-pane {:draft draft
-                           :readiness readiness
-                           :running? running?
-                           :run-triggerable? run-triggerable?
-                           :saving-scenario? saving-scenario?
-                           :solved-run? current-result?
-                           :result-path result-path})
+      (setup/policy-pane {:state state
+                          :draft draft
+                          :highlighted-controls highlighted-controls
+                          :readiness readiness
+                          :running? running?
+                          :run-triggerable? run-triggerable?
+                          :saving-scenario? saving-scenario?
+                          :solved-run? current-result?
+                          :result-path result-path})
       (setup-context/context-rail {:draft draft
                                    :state state
                                    :editor-state editor-state

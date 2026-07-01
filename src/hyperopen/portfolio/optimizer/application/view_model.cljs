@@ -92,6 +92,12 @@
   ([draft formatters]
    (setup/setup-summary-model draft formatters)))
 
+(defn setup-summary-card-model
+  ([draft]
+   (setup/setup-summary-card-model draft))
+  ([draft formatters]
+   (setup/setup-summary-card-model draft formatters)))
+
 (defn history-assumption-cards
   ([state draft readiness history-load-state]
    (setup/history-assumption-cards state draft readiness history-load-state))

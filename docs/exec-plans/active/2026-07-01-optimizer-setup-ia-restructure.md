@@ -49,8 +49,15 @@ Local scratch refs (non-authoritative): None.
 - [x] (2026-07-01) Mapped the current 3-column IA (rails, grid CSS, readiness/warnings pipeline,
   summary+actions, and every layout test that asserts control placement/copy).
 - [x] (2026-07-01) Authored this ExecPlan.
-- [ ] R1 — Column content move: left=universe, center=policy, right=compact summary + Run +
-  readiness; grid widths + CSS; update cljs placement/copy tests. Preserve Black-Litterman path.
+- [x] (2026-07-01) R1 — Column content move. `control-rail` → universe-only; new `policy-pane`
+  (center) holds objective/model/constraints/advanced + a collapsed "Why this preset is safe"
+  note + the Run bottom bar (kept in center per the designer's "right column OR bottom bar");
+  the passive 6-row summary is replaced by a compact `summary-card` in the right column, and the
+  non-BL "why safe" moved out of the right rail. Grid widened center (5/12/7); Tailwind safelist +
+  CSS updated; orphan `setup_summary.cljs` deleted. Black-Litterman path preserved. Updated the
+  cljs placement/copy tests (control-rail→universe order, policy-pane order, summary-card, run
+  placement). `npm test` green (4936 tests); hiccup/theme/boundary/styles lints + portfolio build
+  clean.
 - [ ] R2 — Grouped/expandable readiness warnings (pure view-model + panel).
 - [ ] R3 — Playwright layout-spec updates, full gates, browser verification.
 

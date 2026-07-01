@@ -5,7 +5,7 @@
             [hyperopen.views.portfolio.optimize.setup-layout-fixtures :refer [node-children find-first-node collect-strings node-by-role child-roles node-text click-actions input-actions keydown-actions day-start-ms summary-from-points class-token-set count-nodes btc-instrument eth-instrument black-litterman-ready-readiness black-litterman-ready-draft black-litterman-empty-readiness black-litterman-empty-draft candle-rows]]))
 
 (deftest setup-black-litterman-summary-pane-uses-dedicated-center-workspace-contract-test
-  (let [view-node (setup-sections/summary-pane
+  (let [view-node (setup-sections/policy-pane
                    {:draft (black-litterman-ready-draft)
                     :readiness (black-litterman-ready-readiness)
                     :running? false
@@ -85,7 +85,7 @@
            (click-actions save-button)))))
 
 (deftest setup-black-litterman-insight-cards-render-empty-view-state-test
-  (let [view-node (setup-sections/summary-pane
+  (let [view-node (setup-sections/policy-pane
                    {:draft (black-litterman-empty-draft)
                     :readiness (black-litterman-empty-readiness)
                     :running? false

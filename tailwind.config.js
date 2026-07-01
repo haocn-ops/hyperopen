@@ -54,6 +54,7 @@ module.exports = {
     "xl:grid-cols-[82px_minmax(0,1fr)]",
     "xl:grid-cols-[minmax(0,1fr)_380px]",
     "xl:grid-cols-[minmax(420px,7fr)_minmax(0,11fr)_minmax(360px,6fr)]",
+    "xl:grid-cols-[minmax(300px,5fr)_minmax(0,12fr)_minmax(360px,7fr)]",
   ],
   content: ["./src/**/*.{cljs,clj}", "./resources/public/**/*.html"],
   theme: {

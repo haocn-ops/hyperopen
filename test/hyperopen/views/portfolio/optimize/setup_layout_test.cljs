@@ -14,16 +14,20 @@
     (is (some? (node-by-role view-node "portfolio-optimizer-setup-preset-row")))
     (is (some? (node-by-role view-node "portfolio-optimizer-setup-surface")))
     (is (some? (node-by-role view-node "portfolio-optimizer-setup-control-rail")))
-    (is (some? (node-by-role view-node "portfolio-optimizer-setup-summary-pane")))
-    (is (some? (node-by-role view-node "portfolio-optimizer-assumptions-rail")))
-    (is (nil? (node-by-role view-node "portfolio-optimizer-trust-freshness-panel")))
+    ;; CENTER column is now the editable policy pane (was the passive summary pane); the RIGHT
+    ;; column leads with a compact summary card (the verbose 6-row summary + non-BL assumptions
+    ;; rail are gone).
+    (is (some? (node-by-role view-node "portfolio-optimizer-setup-policy-pane")))
+    (is (some? (node-by-role view-node "portfolio-optimizer-setup-summary-card")))
+    (is (nil? (node-by-role view-node "portfolio-optimizer-assumptions-rail")))
     (is (nil? (node-by-role view-node "portfolio-optimizer-left-rail")))
     (is (contains? strings "Portfolio Optimizer"))
     (is (contains? strings "Start with"))
     (is (contains? strings "Load my holdings"))
     (is (contains? strings "Custom"))
     (is (not (contains? strings "Index")))
-    (is (contains? strings "What this scenario will solve for"))
+    (is (contains? strings "Scenario summary"))
+    (is (not (contains? strings "What this scenario will solve for")))
     (is (contains? strings "Why this preset is safe"))
     (is (not (contains? strings "Execution Assumptions")))))
 
@@ -61,7 +65,7 @@
     ;; the duplicate empty-state button is gone
     (is (nil? (node-by-role view-node "portfolio-optimizer-universe-load-holdings")))))
 
-(deftest setup-control-rail-orders-objective-before-return-risk-model-test
+(deftest setup-policy-pane-orders-objective-before-return-risk-model-test
   (let [view-node (portfolio-view/portfolio-view
                    {:router {:path "/portfolio/optimize/new"}
                     :portfolio {:optimizer
@@ -72,13 +76,18 @@
                                          :return-model {:kind :historical-mean}
                                          :risk-model {:kind :diagonal-shrink}
                                          :constraints {:long-only? true}}}}})
-        control-rail (node-by-role view-node "portfolio-optimizer-setup-control-rail")]
-    (is (= ["portfolio-optimizer-universe-panel"
-            "portfolio-optimizer-objective-panel"
+        control-rail (node-by-role view-node "portfolio-optimizer-setup-control-rail")
+        policy-pane (node-by-role view-node "portfolio-optimizer-setup-policy-pane")]
+    ;; LEFT rail is universe-only now; the editable policy controls moved to the wide CENTER pane.
+    (is (= ["portfolio-optimizer-universe-panel"]
+           (child-roles control-rail)))
+    (is (= ["portfolio-optimizer-objective-panel"
             "portfolio-optimizer-return-risk-panel"
             "portfolio-optimizer-constraints-panel"
-            "portfolio-optimizer-advanced-overrides-shell"]
-           (child-roles control-rail)))
+            "portfolio-optimizer-advanced-overrides-shell"
+            "portfolio-optimizer-why-safe-note"
+            "portfolio-optimizer-model-assumptions-stack"]
+           (child-roles policy-pane)))
     ;; The leading section numbers (01..05) are gone: the panels read as a
     ;; sovereign workbench, not a required wizard sequence. Titles remain.
     (is (str/includes? (node-text (node-by-role view-node "portfolio-optimizer-objective-panel"))
@@ -219,10 +228,13 @@
                                          :constraints {:long-only? true
                                                        :max-asset-weight 0.25
                                                        :gross-max 1}}}}})
-        summary-panel (node-by-role view-node "portfolio-optimizer-setup-summary-panel")
-        summary-text (node-text summary-panel)]
-    (is (str/includes? summary-text "2 assets - BTC, Alpha Yield"))
-    (is (not (str/includes? summary-text vault-id)))))
+        summary-card (node-by-role view-node "portfolio-optimizer-setup-summary-card")
+        summary-text (node-text summary-card)]
+    ;; The compact summary card shows the asset COUNT (the labelled list lives in the universe
+    ;; panel now); it must never leak a raw vault address/id.
+    (is (str/includes? summary-text "2 assets"))
+    (is (not (str/includes? summary-text vault-id)))
+    (is (not (str/includes? summary-text vault-address)))))
 
 (deftest setup-run-action-renders-under-center-assumptions-panel-test
   (let [view-node (portfolio-view/portfolio-view
@@ -239,7 +251,7 @@
                                                        :gross-max 2}}}}})
         route-surface (node-by-role view-node "portfolio-optimizer-setup-route-surface")
         header (node-by-role view-node "portfolio-optimizer-setup-header")
-        summary-pane (node-by-role view-node "portfolio-optimizer-setup-summary-pane")
+        policy-pane (node-by-role view-node "portfolio-optimizer-setup-policy-pane")
         assumptions-stack (node-by-role view-node "portfolio-optimizer-model-assumptions-stack")
         assumptions-panel (node-by-role view-node "portfolio-optimizer-model-assumptions-panel")
         action-bar (node-by-role view-node "portfolio-optimizer-setup-bottom-actions")
@@ -252,7 +264,7 @@
         assumptions-index (.indexOf assumptions-stack-children assumptions-panel)
         action-bar-index (.indexOf assumptions-stack-children action-bar)
         route-child-action-index (.indexOf (vec (node-children route-surface)) action-bar)]
-    (is (some? summary-pane))
+    (is (some? policy-pane))
     (is (some? assumptions-stack))
     (is (some? action-bar))
     (is (< assumptions-index action-bar-index))

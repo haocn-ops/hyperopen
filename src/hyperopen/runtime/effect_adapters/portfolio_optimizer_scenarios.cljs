@@ -4,6 +4,7 @@
             [hyperopen.portfolio.optimizer.application.scenario-operations :as scenario-operations]
             [hyperopen.portfolio.optimizer.application.scenario-workflow :as scenario-workflow]
             [hyperopen.portfolio.optimizer.contracts :as contracts]
+            [hyperopen.portfolio.optimizer.defaults :as optimizer-defaults]
             [hyperopen.portfolio.routes :as portfolio-routes]))
 
 (defn- env-fn
@@ -334,3 +335,38 @@
        :address address
        :scenario-id scenario-id
        :started-at-ms started-at-ms}))))
+
+(defn restore-portfolio-optimizer-draft-effect
+  "Restore the per-wallet persisted draft into an untouched /optimize/new draft,
+  or fall back to the holdings preseed when nothing was persisted. The persisted
+  draft always wins over the machine preseed, so this effect is the single funnel
+  both the route loader and the holdings-arrival watcher dispatch through."
+  [env store _path]
+  (let [address (account-context/effective-account-address @store)
+        load-draft! (env-fn env :load-draft!)
+        dispatch! (env-fn env :dispatch!)
+        note-restored! (or (env-fn env :note-restored!) (fn [_draft]))
+        untouched? (fn []
+                     (optimizer-defaults/untouched-draft?
+                      (get-in @store contracts/draft-path)))
+        preseed! (fn []
+                   (when (untouched?)
+                     (dispatch! store
+                                nil
+                                [[:actions/set-portfolio-optimizer-universe-from-current]]))
+                   nil)]
+    (if (and address load-draft! dispatch!)
+      (-> (load-draft! address)
+          (.then (fn [record]
+                   (if (and (map? record)
+                            (map? (:draft record))
+                            (untouched?))
+                     (do (note-restored! (:draft record))
+                         (dispatch! store
+                                    nil
+                                    [[:actions/hydrate-portfolio-optimizer-draft record]]))
+                     (preseed!))
+                   nil))
+          (.catch (fn [_err]
+                    (preseed!))))
+      (js/Promise.resolve (preseed!)))))

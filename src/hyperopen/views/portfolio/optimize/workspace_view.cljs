@@ -1,5 +1,6 @@
 (ns hyperopen.views.portfolio.optimize.workspace-view
   (:require [hyperopen.portfolio.optimizer.application.view-model :as optimizer-view-model]
+            [hyperopen.portfolio.optimizer.contracts :as optimizer-contracts]
             [hyperopen.views.portfolio.optimize.infeasible-panel :as infeasible-panel]
             [hyperopen.views.portfolio.optimize.setup-context :as setup-context]
             [hyperopen.views.portfolio.optimize.setup-header :as setup-header]
@@ -30,6 +31,8 @@
                :data-scenario-id scenario-id}
      (setup-header/setup-header {:draft draft
                                  :route route
+                                 :draft-persist (get-in state
+                                                        optimizer-contracts/draft-persist-path)
                                  :running? running?
                                  :run-triggerable? run-triggerable?
                                  :saving-scenario? saving-scenario?

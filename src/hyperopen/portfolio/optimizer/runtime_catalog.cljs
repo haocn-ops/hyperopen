@@ -130,6 +130,12 @@
     actions/remove-portfolio-optimizer-universe-instrument
     :set-portfolio-optimizer-universe-from-current
     actions/set-portfolio-optimizer-universe-from-current
+    :clear-portfolio-optimizer-universe
+    actions/clear-portfolio-optimizer-universe
+    :restore-or-preseed-portfolio-optimizer-draft
+    actions/restore-or-preseed-portfolio-optimizer-draft
+    :hydrate-portfolio-optimizer-draft
+    actions/hydrate-portfolio-optimizer-draft
     :load-portfolio-optimizer-history-from-draft
     actions/load-portfolio-optimizer-history-from-draft
     :save-portfolio-optimizer-scenario-from-current
@@ -233,4 +239,6 @@
       :save-portfolio-optimizer-constraint-default
       effect-adapters/save-portfolio-optimizer-constraint-default-effect
       :load-portfolio-optimizer-constraint-profiles
-      effect-adapters/load-portfolio-optimizer-constraint-profiles-effect}}))
+      effect-adapters/load-portfolio-optimizer-constraint-profiles-effect
+      :restore-portfolio-optimizer-draft
+      effect-adapters/restore-portfolio-optimizer-draft-effect}}))

@@ -121,6 +121,24 @@
       (get-in state [:spot :balances])
       []))
 
+(defn holdings-sources-signature
+  "Cheap per-source availability slices (no snapshot build). Store watchers
+  re-attempt the holdings preseed on EACH source's false->true transition: the
+  spot balances routinely land before the perp clearinghouse snapshot, and a
+  single any-source trigger would be consumed by the spot arrival while the perp
+  book — usually the seedable part — is still in flight."
+  [state]
+  {:perp? (some? (clearinghouse-state state))
+   :spot? (boolean (seq (spot-balances state)))})
+
+(defn holdings-source-arrived?
+  "True when `new-state` gained a holdings source `old-state` did not have."
+  [old-state new-state]
+  (let [old-sig (holdings-sources-signature old-state)
+        new-sig (holdings-sources-signature new-state)]
+    (boolean (or (and (:perp? new-sig) (not (:perp? old-sig)))
+                 (and (:spot? new-sig) (not (:spot? old-sig)))))))
+
 (defn- position-rows
   [state]
   (let [base-rows (or (get-in state [:webdata2 :clearinghouseState :assetPositions])
@@ -149,6 +167,29 @@
         (val entry))
       (let [market (markets/resolve-market-by-coin market-by-key coin)]
         (vreset! market-resolution-memo
+                 (assoc-in memo [:by-coin coin] market))
+        market))))
+
+(defonce ^:private spot-market-resolution-memo
+  (volatile! nil))
+
+(defn- resolve-spot-market-cached
+  ;; Spot balances must NEVER resolve to a perp market: a bare token ("HYPE")
+  ;; hits the perp candidate key first when the token also trades as a perp,
+  ;; which used to hand the spot exposure the perp instrument id / symbol and
+  ;; collide with the real perp exposure in :by-instrument. Separate memo — the
+  ;; same coin string legitimately resolves differently for perps and spot.
+  [market-by-key coin]
+  (let [memo @spot-market-resolution-memo
+        memo (if (and memo (identical? (:market-by-key memo) market-by-key))
+               memo
+               {:market-by-key market-by-key :by-coin {}})]
+    (if-let [entry (find (:by-coin memo) coin)]
+      (do
+        (vreset! spot-market-resolution-memo memo)
+        (val entry))
+      (let [market (markets/resolve-spot-market-by-coin market-by-key coin)]
+        (vreset! spot-market-resolution-memo
                  (assoc-in memo [:by-coin coin] market))
         market))))
 
@@ -306,8 +347,14 @@
                     hold (or (parse-number (:hold balance)) 0)
                     available (when (number? total)
                                 (- total hold))
-                    market (resolve-market-cached market-by-key coin)
-                    price (spot-price market-by-key coin)
+                    market (resolve-spot-market-cached market-by-key coin)
+                    ;; Price from the SPOT market when one exists; fall back to
+                    ;; the general resolution (which may borrow the perp mark for
+                    ;; a token with no listed spot pair) so NAV keeps covering
+                    ;; such balances — only the identity fields must never come
+                    ;; from the perp market.
+                    price (or (market-mark-price market)
+                              (spot-price market-by-key coin))
                     instrument-id (spot-instrument-id market coin)]
                 (cond
                   (or (not (seq coin))

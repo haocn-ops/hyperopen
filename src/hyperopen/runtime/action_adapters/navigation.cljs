@@ -87,13 +87,13 @@
         (concat (leaderboard-actions/load-leaderboard-route state normalized-path)
                 (portfolio-optimizer-actions/load-portfolio-optimizer-route state
                                                                             normalized-path)
-                ;; On entry to a fresh /optimize/new draft, auto-seed the universe
-                ;; from the user's holdings (no-op for every other route and for an
-                ;; already-touched draft). Returns an :effects/save-many projection
-                ;; (+ history prefetch), which split-projection-effects orders
-                ;; correctly. A cold load before account data is ready falls back to
-                ;; the prominent "Load my holdings" empty state.
-                (portfolio-optimizer-actions/auto-preseed-portfolio-optimizer-universe-from-current
+                ;; On entry to a fresh /optimize/new draft, restore the wallet's
+                ;; persisted draft or, when none exists, seed the universe from the
+                ;; user's holdings (no-op for every other route and for an
+                ;; already-touched draft). A cold load before account data is ready
+                ;; is retried by the holdings-arrival watcher installed in
+                ;; portfolio.optimizer.infrastructure.draft-autosave.
+                (portfolio-optimizer-actions/restore-or-preseed-portfolio-optimizer-draft
                  state normalized-path)
                 (vault-actions/load-vault-route state normalized-path)
                 (funding-comparison-actions/load-funding-comparison-route state normalized-path)

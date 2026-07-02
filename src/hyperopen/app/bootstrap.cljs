@@ -10,6 +10,7 @@
             [hyperopen.runtime.validation :as runtime-validation]
             [hyperopen.runtime.wiring :as runtime-wiring]
             [hyperopen.portfolio.optimizer.contracts :as optimizer-contracts]
+            [hyperopen.portfolio.optimizer.infrastructure.draft-autosave :as optimizer-draft-autosave]
             [hyperopen.portfolio.optimizer.infrastructure.progress-ticker :as optimizer-progress-ticker]
             [hyperopen.platform :as platform]
             [hyperopen.telemetry :as telemetry]
@@ -70,7 +71,10 @@
      :install-optimization-progress-ticker! optimizer-progress-ticker/install-optimization-progress-ticker!
      :optimization-progress-ticker-deps
      {:store store
-      :progress-path optimizer-contracts/optimization-progress-path}}
+      :progress-path optimizer-contracts/optimization-progress-path}
+     :install-optimizer-draft-watchers! optimizer-draft-autosave/install-optimizer-draft-watchers!
+     :optimizer-draft-watchers-deps
+     {:store store}}
     :validation-deps
     {:store store
      :install-store-state-validation! runtime-validation/install-store-state-validation!}}))

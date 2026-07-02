@@ -96,11 +96,11 @@
     (is (= "ready" (ts/node-attr status-meta :data-run-status)))
     (is (some #{"Ready to run"} (ts/collect-strings status-meta)))))
 
-(deftest setup-bottom-actions-run-button-leads-with-safe-defaults-copy-test
-  ;; The only required input to run is a non-empty universe; the objective,
-  ;; return/risk models, and constraints are all pre-filled by default-draft.
-  ;; The primary CTA says so, so a first-timer knows they can run immediately
-  ;; instead of working through the (optional) setup panels first.
+(deftest setup-bottom-actions-run-button-uses-goal-language-test
+  ;; The CTA names the user's goal ("Run optimization"), not the app's internal
+  ;; posture ("safe defaults" turned misleading the moment anything was
+  ;; customized). The status-detail line beside it still names the exact
+  ;; objective/model being solved.
   (let [node (setup-actions/setup-bottom-actions
               {:draft sample-draft
                :readiness {:runnable? true}
@@ -109,7 +109,7 @@
                :saving-scenario? false
                :solved-run? false})
         run-button (ts/node-by-role node "portfolio-optimizer-run-draft")]
-    (is (some #{"Run on safe defaults"} (ts/collect-strings run-button)))))
+    (is (some #{"Run optimization"} (ts/collect-strings run-button)))))
 
 (deftest setup-bottom-actions-links-to-results-and-rebalance-after-solved-run-test
   ;; A solved run must expose a direct path from the draft action bar to both the

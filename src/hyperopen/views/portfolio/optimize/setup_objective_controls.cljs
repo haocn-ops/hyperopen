@@ -4,14 +4,27 @@
 
 (declare objective-card)
 
+(defn- objective-summary
+  "Header one-liner for the collapsed Objective panel: the selected objective plus
+  what choosing it means, so the panel reads without opening it."
+  [objective-kind]
+  (case objective-kind
+    :max-sharpe "Maximum Sharpe — best risk-adjusted return"
+    :target-volatility "Target volatility — max return at a pinned σ"
+    :target-return "Target return — lowest risk at a required return"
+    "Minimum variance — lowest risk, no return assumption"))
+
 (defn objective-section
   ([draft highlighted-controls]
    (objective-section draft highlighted-controls nil))
   ([draft highlighted-controls sigma-bounds]
    (let [objective-kind (get-in draft [:objective :kind])]
-     (controls/panel
+     ;; A disclosure (open by default) rather than a fixed section: after the
+     ;; choice is made the header line summarizes it, and the user can collapse
+     ;; the 2x2 cards to keep the center column a scannable policy contract.
+     (controls/disclosure-panel-open
       "portfolio-optimizer-objective-panel"
-      (controls/section-heading "Objective" (controls/labelize objective-kind))
+      (controls/disclosure-heading "Objective" (objective-summary objective-kind))
       [:div {:class ["mt-3" "grid" "grid-cols-1" "gap-1.5" "sm:grid-cols-2"]}
        (objective-card "Minimum Variance" "Lowest risk - no return assumption. Recommended"
                        (= :minimum-variance objective-kind)

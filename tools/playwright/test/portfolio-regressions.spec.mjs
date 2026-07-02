@@ -1540,7 +1540,10 @@ test("portfolio optimizer setup puts policy controls in the center pane @regress
       "portfolio-optimizer-constraints-panel",
       "portfolio-optimizer-advanced-overrides-shell",
       "portfolio-optimizer-why-safe-note",
-      "portfolio-optimizer-model-assumptions-stack"
+      "portfolio-optimizer-model-assumptions-stack",
+      // The Run bar is the LAST direct child of the pane so `position: sticky`
+      // can pin it to the viewport bottom (see setup_sections/policy-pane).
+      "portfolio-optimizer-setup-bottom-actions"
     ]);
 });
 

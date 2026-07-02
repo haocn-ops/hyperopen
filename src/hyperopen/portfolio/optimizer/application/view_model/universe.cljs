@@ -434,7 +434,12 @@
       :markets markets
       :candidate-rows candidate-rows
       :active-index active-index
-      :market-keys market-keys})))
+      :market-keys market-keys
+      ;; Where the current universe came from. :holdings carries the omission
+      ;; accounting recorded at load time; a non-empty universe with no recorded
+      ;; source (legacy drafts) reads as :custom.
+      :universe-source (or (get-in draft [:metadata :universe-source])
+                           (when (seq universe) {:kind :custom}))})))
 
 (defn universe-panel-model
   [state draft]

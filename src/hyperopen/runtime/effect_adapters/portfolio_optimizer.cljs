@@ -10,6 +10,7 @@
             [hyperopen.portfolio.optimizer.contracts :as contracts]
             [hyperopen.portfolio.optimizer.coercion :as coercion]
             [hyperopen.portfolio.optimizer.defaults :as optimizer-defaults]
+            [hyperopen.portfolio.optimizer.infrastructure.draft-autosave :as draft-autosave]
             [hyperopen.portfolio.optimizer.infrastructure.history-api-v2-client :as history-api-v2-client]
             [hyperopen.portfolio.optimizer.infrastructure.history-client :as history-client]
             [hyperopen.portfolio.optimizer.infrastructure.persistence :as persistence]
@@ -37,6 +38,7 @@
          (js/Math.floor (* 1000000000 (js/Math.random))))))
 (def ^:dynamic *load-scenario-index!* persistence/load-scenario-index!)
 (def ^:dynamic *load-scenario!* persistence/load-scenario!)
+(def ^:dynamic *load-draft!* persistence/load-draft!)
 (def ^:dynamic *save-scenario!* persistence/save-scenario!)
 (def ^:dynamic *save-scenario-index!* persistence/save-scenario-index!)
 (def ^:dynamic *load-tracking!* persistence/load-tracking!)
@@ -487,3 +489,14 @@
    (scenario-effects/enable-portfolio-optimizer-manual-tracking-effect
     (scenario-env)
     store)))
+
+(defn restore-portfolio-optimizer-draft-effect
+  ([_ store]
+   (restore-portfolio-optimizer-draft-effect nil store nil))
+  ([_ store path]
+   (scenario-effects/restore-portfolio-optimizer-draft-effect
+    {:load-draft! *load-draft!*
+     :dispatch! *dispatch!*
+     :note-restored! draft-autosave/note-persisted!}
+    store
+    path)))

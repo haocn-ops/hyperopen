@@ -430,3 +430,35 @@
                                               :dex "xyz"
                                               :base "GOLD"}
                                              "xyz:GOLD")))))
+
+(deftest resolve-spot-market-by-coin-never-returns-a-perp-test
+  (let [market-by-key {"perp:HYPE" {:key "perp:HYPE"
+                                    :market-type :perp
+                                    :coin "HYPE"
+                                    :symbol "HYPE-USDC"
+                                    :base "HYPE"
+                                    :quote "USDC"
+                                    :mark "40"}
+                       "spot:HYPE/USDC" {:key "spot:HYPE/USDC"
+                                         :market-type :spot
+                                         :coin "HYPE/USDC"
+                                         :symbol "HYPE/USDC"
+                                         :base "HYPE"
+                                         :quote "USDC"
+                                         :mark "39.8"}}]
+    (testing "the general resolver hands a bare dual-listed token to the PERP (the trap spot consumers must avoid)"
+      (is (= "perp:HYPE"
+             (:key (markets/resolve-market-by-coin market-by-key "HYPE")))))
+    (testing "the spot resolver skips the perp candidate hit and finds the spot pair via the base-token scan"
+      (is (= "spot:HYPE/USDC"
+             (:key (markets/resolve-spot-market-by-coin market-by-key "HYPE")))))
+    (testing "explicit spot coins resolve directly"
+      (is (= "spot:HYPE/USDC"
+             (:key (markets/resolve-spot-market-by-coin market-by-key "HYPE/USDC")))))
+    (testing "a perp-only token yields nil instead of the perp market"
+      (is (nil? (markets/resolve-spot-market-by-coin
+                 {"perp:BTC" {:key "perp:BTC"
+                              :market-type :perp
+                              :coin "BTC"
+                              :base "BTC"}}
+                 "BTC"))))))

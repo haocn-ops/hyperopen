@@ -1,5 +1,6 @@
 (ns hyperopen.views.portfolio.optimize.setup-constraint-controls
-  (:require [hyperopen.portfolio.optimizer.application.view-model.exposure :as exposure-vm]
+  (:require [hyperopen.portfolio.optimizer.application.view-model :as optimizer-view-model]
+            [hyperopen.portfolio.optimizer.application.view-model.exposure :as exposure-vm]
             [hyperopen.portfolio.optimizer.domain.exposure-policy :as exposure-policy]
             [hyperopen.views.portfolio.optimize.setup-controls :as controls]
             [hyperopen.views.portfolio.optimize.setup-exposure-map :as exposure-map]
@@ -233,10 +234,17 @@
                            (:active-preset exposure-model) "Custom")]
      (controls/disclosure-panel
       "portfolio-optimizer-constraints-panel"
-      ;; The trailing eyebrow now reflects the active positioning preset (Balanced / Custom / …)
-      ;; instead of the old "defaults applied": the panel leads with one draggable control, not
-      ;; an eight-input form, so the at-a-glance state worth showing is the chosen policy.
-      (controls/disclosure-heading "Constraints" active-label)
+      ;; The collapsed header carries the actual policy, not just a preset name:
+      ;; constraints are a main determinant of the result, so the live numbers
+      ;; ("gross 1.90–1.91× · net 1.30–1.41× · cap 50% · band 3.0 pp") stay
+      ;; scannable while the panel is closed.
+      (controls/disclosure-heading
+       "Constraints"
+       [:span {:class ["flex" "min-w-0" "flex-col" "items-end" "gap-0.5" "text-right"]}
+        [:span active-label]
+        [:span {:class ["normal-case" "tracking-normal" "text-trading-muted"]
+                :data-role "portfolio-optimizer-constraints-header-summary"}
+         (optimizer-view-model/constraints-summary-line constraints)]])
       [:div {:class ["mt-3" "space-y-4"]}
        (group-block "Positioning" "gross leverage + net bias"
                     (exposure-map/exposure-map exposure-model))

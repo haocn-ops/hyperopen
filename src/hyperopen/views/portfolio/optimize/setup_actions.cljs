@@ -126,7 +126,11 @@
                :on {:click [(if black-litterman?
                                [:actions/apply-portfolio-optimizer-objective-menu-selection-and-run]
                                [:actions/run-portfolio-optimizer-from-draft])]}}
-      (if running? "Running Optimization" "Run on safe defaults")]
+      ;; Goal language, not policy language: "safe defaults" described the app's
+      ;; internal posture and turned misleading the moment the user customized
+      ;; anything. The status-detail line below still names the exact
+      ;; objective/model being solved.
+      (if running? "Optimizing…" "Run optimization")]
      [:button {:type "button"
                :class ["border" "border-base-300" "bg-base-200/30" "px-3" "py-2"
                        "whitespace-nowrap" "text-[0.6875rem]" "font-semibold" "text-trading-text"
@@ -135,7 +139,10 @@
                :data-role "portfolio-optimizer-save-scenario"
                :disabled (or (not solved-run?) saving-scenario?)
                :on {:click [[:actions/open-portfolio-optimizer-scenario-save-modal]]}}
-      (if saving-scenario? "Saving" "Save draft")]
+      ;; Honest label: this snapshots a NAMED scenario (modal + own URL) after a
+      ;; solved run. The draft itself autosaves per wallet on every edit — see the
+      ;; "Saved <time>" note in the setup header.
+      (if saving-scenario? "Saving" "Save scenario")]
      (when (and solved-run? result-path)
        (result-nav-button {:result-path result-path
                            :tab :recommendation

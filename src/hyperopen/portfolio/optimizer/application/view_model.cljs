@@ -98,6 +98,14 @@
   ([draft formatters]
    (setup/setup-summary-card-model draft formatters)))
 
+(defn constraints-summary-line
+  [constraints]
+  (setup/constraints-summary-line constraints))
+
+(def return-model-display-names setup/return-model-display-names)
+
+(def risk-model-display-names setup/risk-model-display-names)
+
 (defn history-assumption-cards
   ([state draft readiness history-load-state]
    (setup/history-assumption-cards state draft readiness history-load-state))

@@ -44,6 +44,8 @@
     (is (= [[:effects/save-many
              [[[:portfolio :optimizer :draft :universe]
                [eth-instrument]]
+              [[:portfolio :optimizer :draft :metadata :universe-source]
+               {:kind :custom}]
               [[:portfolio-ui :optimizer :universe-search-query]
                ""]
               [[:portfolio-ui :optimizer :universe-search-active-index]

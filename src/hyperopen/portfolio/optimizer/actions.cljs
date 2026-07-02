@@ -1,5 +1,6 @@
 (ns hyperopen.portfolio.optimizer.actions
   (:require [hyperopen.portfolio.optimizer.actions.draft :as draft]
+            [hyperopen.portfolio.optimizer.actions.draft-persistence :as draft-persistence]
             [hyperopen.portfolio.optimizer.actions.execution :as execution]
             [hyperopen.portfolio.optimizer.actions.exposure :as exposure]
             [hyperopen.portfolio.optimizer.actions.refinement :as refinement]
@@ -152,8 +153,17 @@
 (def set-portfolio-optimizer-universe-from-current
   universe/set-portfolio-optimizer-universe-from-current)
 
+(def clear-portfolio-optimizer-universe
+  universe/clear-portfolio-optimizer-universe)
+
 (def auto-preseed-portfolio-optimizer-universe-from-current
   universe/auto-preseed-portfolio-optimizer-universe-from-current)
+
+(def restore-or-preseed-portfolio-optimizer-draft
+  draft-persistence/restore-or-preseed-portfolio-optimizer-draft)
+
+(def hydrate-portfolio-optimizer-draft
+  draft-persistence/hydrate-portfolio-optimizer-draft)
 
 (def load-portfolio-optimizer-history-from-draft
   run/load-portfolio-optimizer-history-from-draft)

@@ -10,38 +10,43 @@
 (def ^:private eyebrow-class
   ["font-mono" "text-[0.625rem]" "font-semibold" "uppercase" "tracking-[0.08em]" "text-trading-muted/70"])
 
-(defn- fmt-mult
-  [x]
-  (when (number? x) (str (.toFixed x 2) "×")))
-
-(defn- gross-range
-  [{:keys [gross-min gross-max]}]
-  (if (number? gross-min)
-    (str "gross " (fmt-mult gross-min) "–" (fmt-mult gross-max))
-    (str "gross ≤ " (or (fmt-mult gross-max) "--"))))
-
-(defn- net-range
-  [{:keys [net-min net-max]}]
-  (cond
-    (and (number? net-min) (number? net-max)) (str "net " (fmt-mult net-min) "–" (fmt-mult net-max))
-    (number? net-max) (str "net ≤ " (fmt-mult net-max))
-    (number? net-min) (str "net ≥ " (fmt-mult net-min))
-    :else "net --"))
+(defn- contract-row
+  [label value]
+  [:div {:class ["grid" "grid-cols-[74px_minmax(0,1fr)]" "items-baseline" "gap-2"]}
+   [:span {:class ["font-mono" "text-[0.575rem]" "font-semibold" "uppercase"
+                   "tracking-[0.1em]" "text-trading-muted/60"]}
+    label]
+   [:span {:class ["min-w-0" "text-[0.65625rem]" "font-medium" "leading-[1.4]"
+                   "text-trading-text"]}
+    value]])
 
 (defn- summary-card
-  "Compact one-line scenario summary. Derived output, kept small so it does not compete with the
-  center policy controls."
+  "The scenario contract: the exact universe/objective/model/constraint policy the
+  solver will receive, as a labeled stack the user can verify at a glance instead
+  of inferring it from scattered controls. Derived output, not primary input."
   [draft]
-  (let [{:keys [preset-label asset-count objective-label return-label cap] :as card}
+  (let [{:keys [preset-label asset-count universe-source-kind objective-label
+                return-label risk-label constraints-line]}
         (optimizer-view-model/setup-summary-card-model draft {:labelize controls/labelize})]
     [:section {:class ["optimizer-setup-panel" "border" "border-base-300" "bg-base-100/90" "p-3"]
                :data-role "portfolio-optimizer-setup-summary-card"}
-     [:p {:class eyebrow-class} "Scenario summary"]
-     [:p {:class ["mt-2" "text-[0.6875rem]" "font-medium" "text-trading-text"]}
-      (str preset-label " · " asset-count " assets · " objective-label " · " return-label)]
-     [:p {:class ["mt-1" "font-mono" "text-[0.625rem]" "text-trading-muted"]}
-      (str (gross-range card) " · " (net-range card)
-           " · cap " (controls/percent-label cap))]]))
+     [:div {:class ["flex" "items-baseline" "justify-between" "gap-2"]}
+      [:p {:class eyebrow-class} "Scenario contract"]
+      [:span {:class ["font-mono" "text-[0.6rem]" "uppercase" "tracking-[0.1em]"
+                      "text-trading-muted/70"]}
+       preset-label]]
+     [:div {:class ["mt-2" "space-y-1"]}
+      (contract-row "Universe"
+                    (str asset-count " assets"
+                         (case universe-source-kind
+                           :holdings " · from holdings"
+                           :custom " · custom"
+                           nil)))
+      (contract-row "Objective" objective-label)
+      (contract-row "Model" (str return-label " · " risk-label))
+      (contract-row "Constraints"
+                    [:span {:class ["font-mono" "text-[0.625rem]" "text-trading-muted"]}
+                     constraints-line])]]))
 
 (defn context-rail
   [{:keys [draft state readiness snapshot preview-snapshot run-state optimization-progress

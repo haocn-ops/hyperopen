@@ -37,6 +37,16 @@
                    :data-role role}]
         children))
 
+(defn disclosure-panel-open
+  "Disclosure panel that starts expanded. The attribute only sets the initial
+  state — a user toggle survives re-renders because the attribute value never
+  changes between renders."
+  [role & children]
+  (into [:details {:class ["optimizer-setup-panel" "border" "border-base-300" "bg-base-100/90" "p-3"]
+                   :data-role role
+                   :open true}]
+        children))
+
 (defn section-heading
   ;; No leading section number: the optimizer setup is a sovereign workbench, not
   ;; an ordered wizard. Numbering the panels 01..05 falsely implied a required

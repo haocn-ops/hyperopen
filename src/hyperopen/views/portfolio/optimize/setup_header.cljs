@@ -1,5 +1,15 @@
 (ns hyperopen.views.portfolio.optimize.setup-header)
 
+(defn- clock-label
+  "Local wall-clock label for the autosave note (\"10:42 PM\"). Rendered from the
+  epoch with local getters; tests assert presence, not the exact string, so the
+  label stays timezone-safe."
+  [at-ms]
+  (when (number? at-ms)
+    (.toLocaleTimeString (js/Date. at-ms)
+                         js/undefined
+                         #js {:hour "numeric" :minute "2-digit"})))
+
 (def ^:private eyebrow-class
   ["font-mono" "text-[0.625rem]" "font-semibold" "uppercase" "tracking-[0.08em]" "text-trading-muted/70"])
 
@@ -20,7 +30,7 @@
       :else :conservative)))
 
 (defn setup-header
-  [{:keys [draft route]}]
+  [{:keys [draft route draft-persist]}]
   [:header {:class ["optimizer-setup-header" "border" "border-base-300" "bg-base-100/90" "px-3" "py-2"]
             :data-role "portfolio-optimizer-setup-header"}
    [:div {:class ["flex" "items-center" "justify-between" "gap-4"]}
@@ -35,7 +45,14 @@
                       "font-mono" "text-[0.6rem]" "font-semibold" "uppercase"
                       "tracking-[0.12em]" "text-trading-muted/70"]
               :data-role "portfolio-optimizer-setup-status-tag"}
-       (if (= :computed (:status draft)) "computed" "draft")]]
+       (if (= :computed (:status draft)) "computed" "draft")]
+      ;; Modeless autosave feedback: the draft persists per wallet on every edit,
+      ;; so the header reports it instead of asking for a manual "save draft".
+      (when-let [saved-label (clock-label (:at-ms draft-persist))]
+        [:span {:class ["font-mono" "text-[0.6rem]" "uppercase" "tracking-[0.12em]"
+                        "text-trading-muted/60"]
+                :data-role "portfolio-optimizer-draft-autosave-note"}
+         (str "Saved " saved-label)])]
      [:span {:class ["sr-only"]
              :data-role "portfolio-optimizer-draft-state"}
       (if (get-in draft [:metadata :dirty?])

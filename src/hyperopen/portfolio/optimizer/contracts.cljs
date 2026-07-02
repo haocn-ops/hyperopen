@@ -37,6 +37,8 @@
 (def draft-history-assumptions-path paths/draft-history-assumptions-path)
 (def draft-metadata-path paths/draft-metadata-path)
 (def draft-dirty-path paths/draft-dirty-path)
+(def draft-universe-source-path paths/draft-universe-source-path)
+(def draft-persist-path paths/draft-persist-path)
 (def active-scenario-path paths/active-scenario-path)
 (def active-scenario-loaded-id-path paths/active-scenario-loaded-id-path)
 (def active-scenario-name-path paths/active-scenario-name-path)

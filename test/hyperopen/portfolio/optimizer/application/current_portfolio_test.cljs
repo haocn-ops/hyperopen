@@ -298,3 +298,75 @@
                         :net-exposure-usdc 0}
               :exposures []}
              {:gross-max 2.0}))))
+
+(deftest spot-balance-never-adopts-the-perp-instrument-identity-test
+  ;; A token that trades as BOTH a perp and a spot pair (e.g. HYPE): the spot
+  ;; BALANCE must resolve to the spot market's identity. It used to adopt the
+  ;; perp id/symbol/mark (the coin-based resolver hits the perp candidate key
+  ;; first), which overwrote the real perp exposure in :by-instrument.
+  (let [state {:wallet {:address owner-address}
+               :router {:path "/portfolio"}
+               :webdata2 {:clearinghouseState
+                          {:marginSummary {:accountValue "100000"}
+                           :assetPositions [{:position {:coin "HYPE"
+                                                        :szi "-100"
+                                                        :markPx "40"
+                                                        :leverage {:type "cross"
+                                                                   :value "5"}}}]}}
+               :spot {:clearinghouse-state
+                      {:balances [{:coin "HYPE" :total "50" :hold "0"}]}}
+               :asset-selector {:market-by-key
+                                {"perp:HYPE" {:key "perp:HYPE"
+                                              :market-type :perp
+                                              :coin "HYPE"
+                                              :symbol "HYPE-USDC"
+                                              :base "HYPE"
+                                              :quote "USDC"
+                                              :mark "40"}
+                                 "spot:HYPE/USDC" {:key "spot:HYPE/USDC"
+                                                   :market-type :spot
+                                                   :coin "HYPE/USDC"
+                                                   :symbol "HYPE/USDC"
+                                                   :base "HYPE"
+                                                   :quote "USDC"
+                                                   :mark "39.8"}}}}
+        snapshot (current-portfolio/current-portfolio-snapshot state)
+        perp (exposure-by-id snapshot "perp:HYPE")
+        spot (exposure-by-id snapshot "spot:HYPE/USDC")]
+    (is (= 2 (count (:exposures snapshot))))
+    ;; The perp exposure survives in :by-instrument (it used to be overwritten
+    ;; by the mislabeled spot row).
+    (is (= :perp (:market-type perp)))
+    (is (= -4000 (:signed-notional-usdc perp)))
+    ;; The spot balance carries the SPOT identity and the SPOT mark.
+    (is (some? spot))
+    (is (= :spot (:market-type spot)))
+    (is (= "HYPE/USDC" (:symbol spot)))
+    (is (near? 1990 (:signed-notional-usdc spot)))
+    (is (near? 39.8 (:mark-price spot)))))
+
+(deftest spot-balance-without-a-spot-market-keeps-a-spot-id-test
+  ;; A token with a perp but NO listed spot pair: the balance keeps a synthesized
+  ;; spot:<coin> id (never the perp id); pricing may still borrow the perp mark
+  ;; so NAV keeps covering the balance.
+  (let [state {:wallet {:address owner-address}
+               :router {:path "/portfolio"}
+               :webdata2 {:clearinghouseState
+                          {:marginSummary {:accountValue "100000"}
+                           :assetPositions []}}
+               :spot {:clearinghouse-state
+                      {:balances [{:coin "XYZ" :total "10" :hold "0"}]}}
+               :asset-selector {:market-by-key
+                                {"perp:XYZ" {:key "perp:XYZ"
+                                             :market-type :perp
+                                             :coin "XYZ"
+                                             :symbol "XYZ-USDC"
+                                             :base "XYZ"
+                                             :quote "USDC"
+                                             :mark "2"}}}}
+        snapshot (current-portfolio/current-portfolio-snapshot state)
+        spot (exposure-by-id snapshot "spot:XYZ")]
+    (is (some? spot))
+    (is (= :spot (:market-type spot)))
+    (is (nil? (exposure-by-id snapshot "perp:XYZ")))
+    (is (near? 20 (:signed-notional-usdc spot)))))

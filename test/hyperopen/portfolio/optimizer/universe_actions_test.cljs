@@ -1,6 +1,11 @@
 (ns hyperopen.portfolio.optimizer.universe-actions-test
   (:require [cljs.test :refer-macros [deftest is]]
-            [hyperopen.portfolio.optimizer.actions :as actions]))
+            [hyperopen.portfolio.optimizer.actions :as actions]
+            [hyperopen.portfolio.optimizer.defaults :as optimizer-defaults]))
+
+(def ^:private custom-universe-source-path-value
+  ;; Hand-editing the universe flips the recorded source to a custom set.
+  [[:portfolio :optimizer :draft :metadata :universe-source] {:kind :custom}])
 
 (def ^:private selection-prefetch-effect
   [:effects/load-portfolio-optimizer-history
@@ -72,15 +77,28 @@
                                               :base "PURR"
                                               :quote "USDC"
                                               :mark "2"}}}}]
-    (is (= [[:effects/save-many
-             [[[:portfolio :optimizer :draft :universe]
-               [btc-instrument]]
-              [[:portfolio :optimizer :history-prefetch]
-               (queued-prefetch-state [btc-instrument])]
-              [[:portfolio :optimizer :draft :metadata :dirty?]
-               true]]]
-            selection-prefetch-effect]
-           (actions/set-portfolio-optimizer-universe-from-current state)))
+    (let [effects (actions/set-portfolio-optimizer-universe-from-current state)
+          values (effect-values-by-path effects)]
+      ;; An untouched (nil) draft is materialized as a full default draft first,
+      ;; so the persisted/autosaved draft is always spec-complete.
+      (is (= (optimizer-defaults/default-draft)
+             (get values [:portfolio :optimizer :draft])))
+      (is (= [btc-instrument]
+             (get values [:portfolio :optimizer :draft :universe])))
+      ;; Loading from holdings records the source and accounts for what was
+      ;; omitted (spot assets are excluded while :include-spot? is off).
+      (is (= {:kind :holdings
+              :omitted [{:instrument-id "spot:PURR"
+                         :label "PURR/USDC"
+                         :reason :spot-excluded}]}
+             (get values [:portfolio :optimizer :draft :metadata :universe-source])))
+      ;; Materializing the default also seeds the holdings-derived constraint
+      ;; bands (the button path now matches the route preseed path).
+      (is (number? (:gross-min (get values [:portfolio :optimizer :draft :constraints]))))
+      (is (= (queued-prefetch-state [btc-instrument])
+             (get values [:portfolio :optimizer :history-prefetch])))
+      (is (true? (get values [:portfolio :optimizer :draft :metadata :dirty?])))
+      (is (= selection-prefetch-effect (second effects))))
     (let [include-spot-effects
           (actions/set-portfolio-optimizer-universe-from-current
            (assoc-in state
@@ -89,6 +107,9 @@
           include-spot-values (effect-values-by-path include-spot-effects)]
       (is (= [btc-instrument purr-instrument]
              (get include-spot-values [:portfolio :optimizer :draft :universe])))
+      (is (= {:kind :holdings :omitted []}
+             (get include-spot-values
+                  [:portfolio :optimizer :draft :metadata :universe-source])))
       (is (= (queued-prefetch-state [btc-instrument purr-instrument])
              (get include-spot-values [:portfolio :optimizer :history-prefetch])))
       (is (= selection-prefetch-effect
@@ -139,6 +160,7 @@
     (is (= [[:effects/save-many
              [[[:portfolio :optimizer :draft :universe]
                [btc-instrument eth-instrument]]
+              custom-universe-source-path-value
               [[:portfolio-ui :optimizer :universe-search-query]
                ""]
               [[:portfolio-ui :optimizer :universe-search-active-index]
@@ -154,6 +176,7 @@
     (is (= [[:effects/save-many
              [[[:portfolio :optimizer :draft :universe]
                [btc-instrument purr-instrument]]
+              custom-universe-source-path-value
               [[:portfolio-ui :optimizer :universe-search-query]
                ""]
               [[:portfolio-ui :optimizer :universe-search-active-index]
@@ -212,6 +235,7 @@
     (is (= [[:effects/save-many
              [[[:portfolio :optimizer :draft :universe]
                [btc-instrument eth-instrument]]
+              custom-universe-source-path-value
               [[:portfolio-ui :optimizer :universe-search-query]
                ""]
               [[:portfolio-ui :optimizer :universe-search-active-index]
@@ -403,6 +427,7 @@
     (is (= [[:effects/save-many
              [[[:portfolio :optimizer :draft :universe]
                [eth-instrument]]
+              custom-universe-source-path-value
               [[:portfolio-ui :optimizer :universe-search-query]
                ""]
               [[:portfolio-ui :optimizer :universe-search-active-index]
@@ -442,6 +467,7 @@
                  :coin "BTC"
                  :shortable? true}
                 vault-instrument]]
+              custom-universe-source-path-value
               [[:portfolio-ui :optimizer :universe-search-query]
                ""]
               [[:portfolio-ui :optimizer :universe-search-active-index]
@@ -476,6 +502,7 @@
     (is (= [[:effects/save-many
              [[[:portfolio :optimizer :draft :universe]
                [eth-instrument]]
+              custom-universe-source-path-value
               [[:portfolio-ui :optimizer :universe-search-query]
                ""]
               [[:portfolio-ui :optimizer :universe-search-active-index]
@@ -562,3 +589,36 @@
            (actions/remove-portfolio-optimizer-universe-instrument
             state
             "perp:SOL")))))
+
+(deftest clear-universe-empties-selection-and-per-asset-residue-test
+  ;; The "start from scratch" escape hatch: one action empties the universe and
+  ;; every per-asset constraint/assumption remnant, and records the custom source
+  ;; so the holdings preseed will not refill the cleared draft.
+  (let [state {:portfolio
+               {:optimizer
+                {:draft
+                 {:universe [{:instrument-id "perp:BTC"
+                              :market-type :perp
+                              :coin "BTC"}]
+                  :constraints {:allowlist ["perp:BTC"]
+                                :blocklist ["perp:BTC"]
+                                :held-locks ["perp:BTC"]
+                                :asset-overrides {"perp:BTC" {:max-weight 0.5}}
+                                :perp-leverage {"perp:BTC" {:max-weight 0.4}}}
+                  :history-assumptions {"perp:BTC" {:behavior :conservative}}}}}}
+        effects (actions/clear-portfolio-optimizer-universe state)
+        path-values (into {} (second (first effects)))]
+    (is (= :effects/save-many (ffirst effects)))
+    (is (= [] (get path-values [:portfolio :optimizer :draft :universe])))
+    (is (= {:kind :custom}
+           (get path-values [:portfolio :optimizer :draft :metadata :universe-source])))
+    (is (= [] (get path-values [:portfolio :optimizer :draft :constraints :allowlist])))
+    (is (= [] (get path-values [:portfolio :optimizer :draft :constraints :blocklist])))
+    (is (= [] (get path-values [:portfolio :optimizer :draft :constraints :held-locks])))
+    (is (= {} (get path-values [:portfolio :optimizer :draft :constraints :asset-overrides])))
+    (is (= {} (get path-values [:portfolio :optimizer :draft :constraints :perp-leverage])))
+    (is (= {} (get path-values [:portfolio :optimizer :draft :history-assumptions])))
+    (is (true? (get path-values [:portfolio :optimizer :draft :metadata :dirty?]))))
+  ;; Clearing an already-empty universe is a no-op.
+  (is (= [] (actions/clear-portfolio-optimizer-universe
+             {:portfolio {:optimizer {:draft {:universe []}}}}))))

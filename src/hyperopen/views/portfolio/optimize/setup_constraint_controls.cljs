@@ -26,7 +26,7 @@
   [:span {:class ["pointer-events-none" "absolute" "left-0" "top-[calc(100%+6px)]"
                   "z-30" "w-[min(22rem,calc(100vw-2rem))]" "border"
                   "border-base-300" "bg-base-100" "px-2" "py-1.5"
-                  "font-sans" "text-[0.65625rem]" "font-normal"
+                  "font-sans" "text-[0.75rem]" "font-normal"
                   "normal-case" "leading-[1.45]" "tracking-normal"
                   "text-trading-muted" "opacity-0" "shadow-[0_12px_32px_rgba(0,0,0,0.45)]"
                   "transition-opacity" "duration-150" "group-hover:opacity-100"
@@ -40,7 +40,7 @@
   [label tooltip-id help-copy]
   [:span {:class ["relative" "inline-flex" "min-w-0" "items-center" "gap-1.5"]}
    [:span {:class controls/eyebrow-class} label]
-   [:span {:class ["font-mono" "text-[0.5625rem]" "text-trading-muted/70"]
+   [:span {:class ["font-mono" "text-[0.625rem]" "text-trading-muted/70"]
            :aria-hidden "true"}
     "?"]
    (constraint-tooltip tooltip-id help-copy)])
@@ -74,11 +74,11 @@
          [:span {:class controls/eyebrow-class} label])
        (when hidden-label
          [:span {:class ["sr-only"]} hidden-label])
-       [:span {:class ["ml-2" "font-mono" "text-[0.59375rem]" "uppercase"
+       [:span {:class ["ml-2" "font-mono" "text-[0.625rem]" "uppercase"
                        "tracking-[0.08em]" "text-trading-muted"]}
         "edit"]
        (when echo
-         [:span {:class ["mt-0.5" "block" "font-mono" "text-[0.5625rem]"
+         [:span {:class ["mt-0.5" "block" "font-mono" "text-[0.625rem]"
                          "normal-case" "tracking-normal" "text-trading-muted/70"]
                  :data-role (str role "-echo")}
           echo])]
@@ -112,7 +112,7 @@
      [:span {:class ["min-w-0"]}
       [:span {:class ["min-w-0"]}
        (constraint-label "Turnover cap" tooltip-id help-copy)
-       [:span {:class ["ml-2" "font-mono" "text-[0.59375rem]" "uppercase"
+       [:span {:class ["ml-2" "font-mono" "text-[0.625rem]" "uppercase"
                        "tracking-[0.08em]" "text-trading-muted"]}
         (if enabled? "edit" "no cap")]]]
      [:span {:class ["optimizer-turnover-cap-control" "inline-flex" "items-center" "gap-1.5"]}
@@ -185,7 +185,7 @@
    [:div {:class ["flex" "items-baseline" "justify-between" "gap-2"]}
     [:span {:class controls/eyebrow-class} eyebrow]
     (when hint
-      [:span {:class ["font-mono" "text-[0.5625rem]" "normal-case"
+      [:span {:class ["font-mono" "text-[0.625rem]" "normal-case"
                       "tracking-normal" "text-trading-muted/70"]}
        hint])]
    [:div {:class ["mt-2"]} body]])

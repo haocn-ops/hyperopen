@@ -8,44 +8,51 @@
             [hyperopen.views.portfolio.optimize.setup-readiness-panel :as setup-readiness-panel]))
 
 (def ^:private eyebrow-class
-  ["font-mono" "text-[0.625rem]" "font-semibold" "uppercase" "tracking-[0.08em]" "text-trading-muted/70"])
+  ["font-mono" "text-[0.6875rem]" "font-semibold" "uppercase" "tracking-[0.08em]" "text-trading-muted/70"])
 
 (defn- contract-row
   [label value]
-  [:div {:class ["grid" "grid-cols-[74px_minmax(0,1fr)]" "items-baseline" "gap-2"]}
-   [:span {:class ["font-mono" "text-[0.575rem]" "font-semibold" "uppercase"
+  ;; 92px label track: the 10px uppercase-mono tags ("CONSTRAINTS") need the
+  ;; room at the raised scale without wrapping.
+  [:div {:class ["grid" "grid-cols-[92px_minmax(0,1fr)]" "items-baseline" "gap-2"]}
+   [:span {:class ["font-mono" "text-[0.625rem]" "font-semibold" "uppercase"
                    "tracking-[0.1em]" "text-trading-muted/60"]}
     label]
-   [:span {:class ["min-w-0" "text-[0.65625rem]" "font-medium" "leading-[1.4]"
+   [:span {:class ["min-w-0" "text-[0.75rem]" "font-medium" "leading-[1.4]"
                    "text-trading-text"]}
     value]])
 
 (defn- summary-card
   "The scenario contract: the exact universe/objective/model/constraint policy the
   solver will receive, as a labeled stack the user can verify at a glance instead
-  of inferring it from scattered controls. Derived output, not primary input."
-  [draft]
+  of inferring it from scattered controls. Derived output, not primary input.
+  While the holdings auto-seed is pending the Universe row says so — the rail is
+  where the user looks to confirm readiness, so it must reflect the wait."
+  [draft readiness]
   (let [{:keys [preset-label asset-count universe-source-kind objective-label
                 return-label risk-label constraints-line]}
-        (optimizer-view-model/setup-summary-card-model draft {:labelize controls/labelize})]
+        (optimizer-view-model/setup-summary-card-model draft {:labelize controls/labelize})
+        holdings-loading? (= :holdings-loading (:reason readiness))]
     [:section {:class ["optimizer-setup-panel" "border" "border-base-300" "bg-base-100/90" "p-3"]
                :data-role "portfolio-optimizer-setup-summary-card"}
      [:div {:class ["flex" "items-baseline" "justify-between" "gap-2"]}
       [:p {:class eyebrow-class} "Scenario contract"]
-      [:span {:class ["font-mono" "text-[0.6rem]" "uppercase" "tracking-[0.1em]"
+      [:span {:class ["font-mono" "text-[0.6875rem]" "uppercase" "tracking-[0.1em]"
                       "text-trading-muted/70"]}
        preset-label]]
      [:div {:class ["mt-2" "space-y-1"]}
       (contract-row "Universe"
-                    (str asset-count " assets"
-                         (case universe-source-kind
-                           :holdings " · from holdings"
-                           :custom " · custom"
-                           nil)))
+                    (if holdings-loading?
+                      "Loading holdings…"
+                      (str asset-count " assets"
+                           (case universe-source-kind
+                             :holdings " · from holdings"
+                             :custom " · custom"
+                             nil))))
       (contract-row "Objective" objective-label)
       (contract-row "Model" (str return-label " · " risk-label))
       (contract-row "Constraints"
-                    [:span {:class ["font-mono" "text-[0.625rem]" "text-trading-muted"]}
+                    [:span {:class ["font-mono" "text-[0.75rem]" "text-trading-muted"]}
                      constraints-line])]]))
 
 (defn context-rail
@@ -59,7 +66,8 @@
                                (contains? #{:no-eligible-history
                                             :incomplete-history
                                             :missing-history-assumptions
-                                            :history-loading}
+                                            :history-loading
+                                            :holdings-loading}
                                           (:reason readiness))
                                (seq (:warnings readiness)))
         run-visible? (not= :idle (:status run-state))
@@ -72,7 +80,7 @@
                             read-only-message)]
     [:aside {:class ["optimizer-context-rail" "min-h-0"]
              :data-role "portfolio-optimizer-right-rail"}
-     (summary-card draft)
+     (summary-card draft readiness)
      ;; The non-BL "why this preset is safe" copy moved to a collapsed note below the center
      ;; controls; only the Black-Litterman belief editor remains as a right-rail panel.
      (when bl?
@@ -92,7 +100,7 @@
        [:section {:class ["optimizer-setup-panel" "border-t" "border-base-300" "bg-base-100/90" "p-3"]
                   :data-role "portfolio-optimizer-trust-freshness-panel"}
         [:p {:class eyebrow-class} "Trust & Freshness"]
-        [:p {:class ["mt-2" "text-[0.6875rem]" "leading-[1.45]" "text-trading-muted"]}
+        [:p {:class ["mt-2" "text-[0.75rem]" "leading-[1.45]" "text-trading-muted"]}
          (cond
            (not (:snapshot-loaded? snapshot))
            (if (= :manual (get-in preview-snapshot [:capital :source]))
@@ -117,18 +125,18 @@
                    :data-role "portfolio-optimizer-results-links"}
              [:button {:type "button"
                        :class ["border" "border-warning/60" "bg-warning/10"
-                               "px-3" "py-2" "text-center" "text-[0.6875rem]" "font-medium" "text-warning"]
+                               "px-3" "py-2" "text-center" "text-[0.8125rem]" "font-medium" "text-warning"]
                        :data-role "portfolio-optimizer-results-link"
                        :on {:click [[:actions/navigate result-path*]]}}
               "Results"]
              [:button {:type "button"
                        :class ["border" "border-primary/50" "bg-primary/10"
-                               "px-3" "py-2" "text-center" "text-[0.6875rem]" "font-medium" "text-primary"]
+                               "px-3" "py-2" "text-center" "text-[0.8125rem]" "font-medium" "text-primary"]
                        :data-role "portfolio-optimizer-rebalance-link"
                        :on {:click [[:actions/navigate result-path*]
                                     [:actions/open-portfolio-optimizer-execution]]}}
               "Review & execute"]]))
         (when read-only-message
           [:p {:class ["mt-3" "border" "border-warning/40" "bg-warning/10" "p-2"
-                       "text-[0.6875rem]" "text-warning"]}
+                       "text-[0.8125rem]" "text-warning"]}
            read-only-message])])]))

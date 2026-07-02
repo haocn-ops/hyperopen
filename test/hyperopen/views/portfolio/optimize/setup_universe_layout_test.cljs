@@ -28,6 +28,38 @@
     (is (= 0 @calls))
     (is (nil? (node-by-role view-node "portfolio-optimizer-universe-search-results")))))
 
+(deftest setup-universe-shows-holdings-loading-state-while-seed-pending-test
+  ;; While readiness reports :holdings-loading the panel must present the wait
+  ;; (active "My holdings" segment, loading copy, skeleton rows) instead of the
+  ;; empty-universe copy that asks the user to add assets manually.
+  (let [view-node (setup-universe/universe-section
+                   {:portfolio-ui {:optimizer {:universe-search-query ""}}}
+                   {:universe []}
+                   {:readiness {:status :blocked
+                                :reason :holdings-loading
+                                :runnable? false}})
+        panel (node-by-role view-node "portfolio-optimizer-universe-panel")
+        loading-block (node-by-role view-node "portfolio-optimizer-universe-holdings-loading")
+        source-button (node-by-role view-node "portfolio-optimizer-universe-use-current")
+        strings (collect-strings view-node)]
+    (is (= "true" (get-in panel [1 :data-holdings-loading])))
+    (is (some? loading-block))
+    (is (some #{"Loading holdings…"} (collect-strings loading-block)))
+    (is (some #{"Fetching the current portfolio for this account."}
+              (collect-strings loading-block)))
+    (is (= "true" (get-in source-button [1 :data-active]))
+        "The pending source shows as active, not as a manual command.")
+    (is (some #{"My holdings"} (collect-strings source-button)))
+    (is (not (some #{"No assets selected yet."} strings)))))
+
+(deftest setup-universe-keeps-empty-state-copy-without-holdings-loading-test
+  (let [view-node (setup-universe/universe-section
+                   {:portfolio-ui {:optimizer {:universe-search-query ""}}}
+                   {:universe []})
+        strings (collect-strings view-node)]
+    (is (nil? (node-by-role view-node "portfolio-optimizer-universe-holdings-loading")))
+    (is (some #{"No assets selected yet."} strings))))
+
 (deftest setup-universe-search-renders-as-single-integrated-control-test
   (let [view-node (portfolio-view/portfolio-view
                    {:router {:path "/portfolio/optimize/new"}

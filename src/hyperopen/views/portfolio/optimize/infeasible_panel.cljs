@@ -113,7 +113,7 @@
                          "p-4"
                          "text-warning"]
                  :data-role "portfolio-optimizer-infeasible-banner"}
-       [:p {:class ["text-[0.65rem]"
+       [:p {:class ["text-[0.75rem]"
                     "font-semibold"
                     "uppercase"
                     "tracking-[0.24em]"]}

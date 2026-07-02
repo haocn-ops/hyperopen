@@ -8,7 +8,7 @@
         (optimizer-view-model/readiness-panel-model readiness history-load-state)]
     [:div {:class ["mt-4" "rounded-lg" "border" "border-base-300" "bg-base-200/40" "p-3"]
            :data-role "portfolio-optimizer-readiness-panel"}
-     [:p {:class ["text-[0.65rem]"
+     [:p {:class ["text-[0.75rem]"
                   "font-semibold"
                   "uppercase"
                   "tracking-[0.18em]"
@@ -45,7 +45,7 @@
                   message]
                  (when (and (number? count) (> count 1))
                    [:span {:class ["shrink-0" "rounded-full" "border" "border-warning/50"
-                                   "px-1.5" "font-mono" "text-[0.625rem]"]
+                                   "px-1.5" "font-mono" "text-[0.6875rem]"]
                            :data-role "portfolio-optimizer-readiness-warning-count"}
                     count])]
                 ;; A warning that can be fixed in-app carries its fix: one click,
@@ -53,7 +53,7 @@
                 (when action
                   [:button {:type "button"
                             :class ["mt-1.5" "border" "border-warning/50" "bg-warning/10"
-                                    "px-2" "py-1" "font-mono" "text-[0.625rem]"
+                                    "px-2" "py-1" "font-mono" "text-[0.6875rem]"
                                     "font-semibold" "uppercase" "tracking-[0.08em]"
                                     "text-warning" "hover:bg-warning/20"]
                             :data-role "portfolio-optimizer-readiness-warning-action"
@@ -64,7 +64,7 @@
                 (when (and (number? count) (> count 1) (seq assets))
                   [:details {:class ["mt-1"]}
                    [:summary {:class ["cursor-pointer" "select-none" "font-mono"
-                                      "text-[0.65rem]" "uppercase" "tracking-[0.08em]"
+                                      "text-[0.75rem]" "uppercase" "tracking-[0.08em]"
                                       "text-warning/80"]}
                     (str "Show " count " assets")]
                    [:p {:class ["mt-1" "leading-[1.5]" "text-warning/80"]
@@ -73,7 +73,7 @@
                 (when (and code-label (or (not (number? count)) (<= count 1)))
                   [:p {:class ["mt-1"
                                "font-mono"
-                               "text-[0.65rem]"
+                               "text-[0.75rem]"
                                "uppercase"
                                "tracking-[0.08em]"
                                "text-warning/80"]}

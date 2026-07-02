@@ -44,7 +44,7 @@
                                    "portfolio-optimizer-return-model-black-litterman"
                                    [:actions/set-portfolio-optimizer-return-model-kind :black-litterman])
         [:span {:class ["sr-only"]} "Black-Litterman"]]
-       [:p {:class ["mt-2" "text-[0.6875rem]" "text-trading-muted"]}
+       [:p {:class ["mt-2" "text-[0.8125rem]" "text-trading-muted"]}
         (case return-kind
           :black-litterman "Black-Litterman stays here as a return-model mode, not an objective."
           :ew-mean "Exponentially weighted returns emphasize recent history."

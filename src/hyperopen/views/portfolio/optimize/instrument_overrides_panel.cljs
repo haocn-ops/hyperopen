@@ -47,7 +47,7 @@
   [column]
   [:span {:class ["pointer-events-none" "absolute" "left-0" "right-0"
                   "top-[calc(100%+4px)]" "z-30" "border" "border-base-300"
-                  "bg-base-100" "px-2" "py-1.5" "font-sans" "text-[0.65625rem]"
+                  "bg-base-100" "px-2" "py-1.5" "font-sans" "text-[0.75rem]"
                   "font-normal" "normal-case" "leading-[1.45]" "tracking-normal"
                   "text-trading-muted" "opacity-0"
                   "shadow-[0_12px_32px_rgba(0,0,0,0.45)]" "transition-opacity"
@@ -67,7 +67,7 @@
 (defn- header-row
   []
   [:div {:class (into ["relative" "border-b" "border-base-300" "bg-base-200/40"
-                       "font-mono" "text-[0.55rem]" "font-semibold" "uppercase"
+                       "font-mono" "text-[0.625rem]" "font-semibold" "uppercase"
                        "tracking-[0.12em]" "text-trading-muted/70"]
                       row-grid-class)
          :data-role "portfolio-optimizer-instrument-overrides-header"}
@@ -124,9 +124,9 @@
            :data-role "portfolio-optimizer-instrument-override-row"
            :data-active (when (row-active? constraints id perp?) "true")}
      [:span {:class ["min-w-0"]}
-      [:span {:class ["block" "truncate" "font-mono" "text-[0.6875rem]" "font-semibold"]}
+      [:span {:class ["block" "truncate" "font-mono" "text-[0.8125rem]" "font-semibold"]}
        primary-label]
-      [:span {:class ["block" "truncate" "font-mono" "text-[0.55rem]" "uppercase"
+      [:span {:class ["block" "truncate" "font-mono" "text-[0.625rem]" "uppercase"
                       "tracking-[0.08em]" "text-trading-muted/70"]}
        (str secondary-token " · " (market-label instrument))]]
      (override-checkbox
@@ -180,7 +180,7 @@
                   :perp-max-weight
                   id
                   [:event.target/value]]})
-       [:span {:class ["text-center" "font-mono" "text-[0.6875rem]"
+       [:span {:class ["text-center" "font-mono" "text-[0.8125rem]"
                        "text-trading-muted/60"]
                :aria-hidden "true"}
         "—"])]))
@@ -220,18 +220,18 @@
     [:div {:class ["flex" "items-center" "gap-2" "border-b" "border-base-300"
                    "px-2" "py-1.5"]
            :data-role "portfolio-optimizer-instrument-overrides-toolbar"}
-     [:span {:class ["font-mono" "text-[0.6rem]" "uppercase" "tracking-[0.12em]"
+     [:span {:class ["font-mono" "text-[0.6875rem]" "uppercase" "tracking-[0.12em]"
                      "text-trading-muted"]}
       (str eligible " of " total " eligible")]
      (when allowlist-on?
        [:span {:class ["optimizer-chip" "border" "px-1.5" "py-[1px]" "font-mono"
-                       "text-[0.53125rem]" "font-semibold" "uppercase"
+                       "text-[0.625rem]" "font-semibold" "uppercase"
                        "tracking-[0.12em]"]
                :data-optimizer-chip "true"
                :data-tone "accent"}
         "allowlist on"])
      (when (pos? locked)
-       [:span {:class ["ml-auto" "font-mono" "text-[0.6rem]" "uppercase"
+       [:span {:class ["ml-auto" "font-mono" "text-[0.6875rem]" "uppercase"
                        "tracking-[0.12em]" "text-trading-muted/70"]}
         (str locked " locked")])]))
 
@@ -243,7 +243,7 @@
                        domain-constraints/default-max-asset-weight)]
     [:div {:class ["mt-3"]
            :data-role "portfolio-optimizer-instrument-overrides-panel"}
-     [:p {:class ["text-[0.6875rem]" "leading-[1.45]" "text-trading-muted"]}
+     [:p {:class ["text-[0.8125rem]" "leading-[1.45]" "text-trading-muted"]}
       "Row-level eligibility and weight caps layered on top of the global constraints. Hover a column header for details."]
      (if (seq universe)
        [:div {:class ["mt-2" "border" "border-base-300" "bg-base-100/50"]}
@@ -256,6 +256,6 @@
                     "py-3" "text-xs" "text-trading-muted"]}
         "No instruments selected yet. Add assets in Universe (01) to edit row-level overrides."])
      (when (seq universe)
-       [:div {:class ["mt-2" "font-mono" "text-[0.58rem]" "leading-5"
+       [:div {:class ["mt-2" "font-mono" "text-[0.6875rem]" "leading-5"
                       "text-trading-muted/70"]}
         "Caps are weight fractions — 0.25 caps an asset at 25% of equity. Blank inputs inherit the global cap."])]))

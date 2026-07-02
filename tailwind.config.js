@@ -40,6 +40,7 @@ module.exports = {
     "grid-cols-[132px_minmax(0,1fr)]",
     "grid-cols-[58px_minmax(0,1fr)_44px]",
     "grid-cols-[8rem_minmax(0,1fr)_4rem]",
+    "grid-cols-[92px_minmax(0,1fr)]",
     "grid-cols-[auto_auto_minmax(0,1fr)]",
     "grid-cols-[minmax(0,1fr)_34px_34px_34px_60px_60px]",
     "grid-cols-[minmax(0,1fr)_92px]",

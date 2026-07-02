@@ -8,16 +8,18 @@
             [hyperopen.views.portfolio.optimize.target-exposure-table :as target-exposure-table]))
 
 (defn- active-views-editor
+  ;; Rendered whenever the return model consumes views, regardless of objective —
+  ;; views are an input policy, not an objective.
   [state draft result readiness]
-  (when (= :use-my-views (objective-menu/current-objective-menu-key draft result))
+  (when (= :black-litterman (get-in draft [:return-model :kind]))
     (objective-menu/views-editor-section
      draft
      state
      result
      readiness
      {:container-role "portfolio-optimizer-results-your-views-editor"
-      :title "Your views"
-      :description "Change annualized return views and confidence, then rerun the recommendation."
+      :title "Return views"
+      :description "Annualized. Your views tilt the forecast; implied rows use the baseline estimate. Edits save and rerun automatically."
       :extra-class "optimizer-results-your-views-editor"
       :include-apply? true
       :apply-role "portfolio-optimizer-results-your-views-apply"})))

@@ -28,9 +28,11 @@
   [:effects/run-portfolio-optimizer-pipeline])
 
 (defn- black-litterman-run-effects
+  ;; Zero authored views is a valid run: the posterior equals the baseline
+  ;; expected returns, exactly the pre-views Maximum Sharpe behavior. Only a
+  ;; half-entered structured-editor draft still blocks (with its field errors).
   [state]
-  (let [pending (bl-editor-model/pending-editor-view-result state)
-        active-views (bl-common/black-litterman-views state)]
+  (let [pending (bl-editor-model/pending-editor-view-result state)]
     (case (:status pending)
       :valid
       (conj (bl-common/save-draft-path-values
@@ -41,10 +43,7 @@
       (bl-common/save-ui-path-values
        (bl-editor-model/error-path-values (:errors pending)))
 
-      (if (seq active-views)
-        [(run-pipeline-effect)]
-        (bl-common/save-ui-path-values
-         (bl-editor-model/missing-view-error-path-values))))))
+      [(run-pipeline-effect)])))
 
 (defn run-portfolio-optimizer-from-draft
   [state]
@@ -88,11 +87,6 @@
            :run-state (get-in state contracts/run-state-path)
            :running? (optimizer-running? state)}))))
 
-(defn- runnable-black-litterman-draft?
-  [state]
-  (or (not (bl-common/black-litterman-return-model? state))
-      (seq (bl-common/black-litterman-views state))))
-
 (defn auto-recompute-stale-portfolio-optimizer-scenario
   [state]
   (let [readiness (setup-readiness/build-readiness state)
@@ -109,7 +103,6 @@
              input-signature
              (not (optimizer-running? state))
              (seq (get-in state contracts/draft-universe-path))
-             (runnable-black-litterman-draft? state)
              (stale-solved-run? state readiness)
              (not= input-signature last-requested-input-signature))
       [[:effects/save
@@ -211,10 +204,12 @@
                      (into (asset-selector-market-fetch-effects state)
                            (action-common/vault-list-metadata-fetch-effects state)))
                []))
-      ;; Hydrate the wallet's remembered constraint profiles and (if the draft is pristine)
-      ;; seed the draft from the default for this universe, so the trader stops re-entering it.
+      ;; Hydrate the wallet's remembered constraint profiles and return-view
+      ;; library (and, if the draft is pristine, seed the draft from the default
+      ;; for this universe), so the trader stops re-entering them.
       optimizer-route?
-      (conj [:effects/load-portfolio-optimizer-constraint-profiles]))))
+      (conj [:effects/load-portfolio-optimizer-constraint-profiles]
+            [:effects/load-portfolio-optimizer-view-library]))))
 
 (defn archive-portfolio-optimizer-scenario
   [_state scenario-id]

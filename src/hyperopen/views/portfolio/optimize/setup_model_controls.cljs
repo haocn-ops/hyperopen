@@ -5,7 +5,7 @@
 (def ^:private model-help
   {:historical-mean "Uses the arithmetic mean of historical returns for each selected asset."
    :ew-mean "Uses exponentially weighted historical returns so recent observations count more."
-   :black-litterman "Combines market-implied returns with your Black-Litterman views and confidence inputs."
+   :black-litterman "Tilts the implied baseline with your return views, weighted by confidence. With no views it equals the baseline."
    :diagonal-shrink "Shrinks the covariance estimate toward a diagonal model to reduce noisy cross-asset correlations."
    :ledoit-wolf-dense "Estimates the optimal shrinkage intensity from your data, raising it automatically as assets grow relative to available history."
    :mixed-frequency "Keeps dense assets on daily history while aggregating them over sparse asset intervals when needed."
@@ -40,15 +40,15 @@
         (controls/segmented-button "EW Mean" nil (:ew-mean model-help) :center (= :ew-mean return-kind)
                                    "portfolio-optimizer-return-model-ew-mean"
                                    [:actions/set-portfolio-optimizer-return-model-kind :ew-mean])
-        (controls/segmented-button "Use my views" nil (:black-litterman model-help) :end (= :black-litterman return-kind)
+        (controls/segmented-button "With my views" "Views + baseline" (:black-litterman model-help) :end (= :black-litterman return-kind)
                                    "portfolio-optimizer-return-model-black-litterman"
                                    [:actions/set-portfolio-optimizer-return-model-kind :black-litterman])
         [:span {:class ["sr-only"]} "Black-Litterman"]]
        [:p {:class ["mt-2" "text-[0.8125rem]" "text-trading-muted"]}
         (case return-kind
-          :black-litterman "Black-Litterman stays here as a return-model mode, not an objective."
-          :ew-mean "Exponentially weighted returns emphasize recent history."
-          "Average of past returns. Simple and auditable for first runs.")]]
+          :black-litterman "Your views tilt the baseline where you have them; every other asset stays on the implied estimate."
+          :ew-mean "Exponentially weighted returns emphasize recent history. Return views are off in this mode."
+          "Average of past returns. Simple and auditable. Return views are off in this mode.")]]
       [:div {:class ["optimizer-model-column"]
              :data-role "portfolio-optimizer-setup-model-column"}
        [:div {:class ["optimizer-model-panel"]

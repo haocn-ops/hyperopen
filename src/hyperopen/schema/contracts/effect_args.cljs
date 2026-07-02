@@ -228,6 +228,8 @@
         :with-opts (s/tuple map?)))
 (s/def ::portfolio-optimizer-execution-plan-args
   (s/tuple map?))
+(s/def ::portfolio-optimizer-view-library-sync-args
+  (s/tuple map?))
 
 (s/def ::apply-ui-theme-args (s/tuple ::common/non-empty-string))
 
@@ -359,4 +361,6 @@
 	   :effects/enable-portfolio-optimizer-manual-tracking ::common/no-args
 	   :effects/save-portfolio-optimizer-constraint-default ::common/no-args
 	   :effects/load-portfolio-optimizer-constraint-profiles ::common/no-args
+	   :effects/load-portfolio-optimizer-view-library ::common/no-args
+	   :effects/sync-portfolio-optimizer-view-library ::portfolio-optimizer-view-library-sync-args
 	   :effects/restore-portfolio-optimizer-draft ::common/no-args})

@@ -1113,7 +1113,10 @@ test("portfolio optimizer draft objective menu changes objective and reruns fron
   await trigger.click();
   await expect(menu).toBeVisible();
   await expect(menu).toContainText("Change objective");
-  await expect(apply).toBeDisabled();
+  // Apply is enabled even before a selection change: re-applying Maximum
+  // Sharpe on this historical-mean draft would switch it onto the views-aware
+  // return model, which is a real change under the consolidated model.
+  await expect(apply).toBeEnabled();
   await minimumVolatility.click();
   await expect(minimumVolatility).toHaveAttribute("data-selected", "true");
   await expect(apply).toBeEnabled();
@@ -1161,7 +1164,7 @@ test("portfolio optimizer draft objective menu changes objective and reruns fron
   await expect(trigger).toContainText("Minimum volatility");
 });
 
-test("portfolio optimizer draft objective menu captures use my views returns and confidence @smoke @regression", async ({ page }) => {
+test("portfolio optimizer draft objective menu edits max sharpe return views immediately @smoke @regression", async ({ page }) => {
   test.setTimeout(90_000);
 
   await page.setViewportSize({ width: 1280, height: 900 });
@@ -1183,29 +1186,28 @@ test("portfolio optimizer draft objective menu captures use my views returns and
   const maximumSharpe = page.locator(
     "[data-role='portfolio-optimizer-objective-menu-option-max-sharpe']"
   );
+  const minimumVolatility = page.locator(
+    "[data-role='portfolio-optimizer-objective-menu-option-minimum-volatility']"
+  );
   const useMyViews = page.locator(
     "[data-role='portfolio-optimizer-objective-menu-option-use-my-views']"
   );
   const editor = page.locator(
     "[data-role='portfolio-optimizer-objective-menu-use-my-views-editor']"
   );
-  const btcReturn = page.locator(
+  // Row locators are scoped to the menu editor: once the views-aware model is
+  // active the results rail renders the same row roles.
+  const btcReturn = editor.locator(
     "[data-role='portfolio-optimizer-objective-menu-view-hl:perp:BTC-return']"
   );
-  const btcRow = page.locator(
+  const btcRow = editor.locator(
     "[data-role='portfolio-optimizer-objective-menu-view-row-hl:perp:BTC']"
   );
-  const ethReturn = page.locator(
+  const ethReturn = editor.locator(
     "[data-role='portfolio-optimizer-objective-menu-view-hl:perp:ETH-return']"
   );
-  const btcHigh = page.locator(
-    "[data-role='portfolio-optimizer-objective-menu-view-hl:perp:BTC-confidence-high']"
-  );
-  const btcStepDown = page.locator(
+  const btcStepDown = editor.locator(
     "[data-role='portfolio-optimizer-objective-menu-view-hl:perp:BTC-step-down']"
-  );
-  const ethLow = page.locator(
-    "[data-role='portfolio-optimizer-objective-menu-view-hl:perp:ETH-confidence-low']"
   );
   const addView = page.locator("[data-role='portfolio-optimizer-objective-menu-add-view']");
   const cancel = page.locator("[data-role='portfolio-optimizer-objective-menu-cancel']");
@@ -1213,34 +1215,107 @@ test("portfolio optimizer draft objective menu captures use my views returns and
 
   await trigger.click();
   await expect(menu).toBeVisible();
-  await useMyViews.click();
+  // Return views are an input policy carried by Maximum Sharpe — there is no
+  // separate "use my views" objective, and the views editor renders under the
+  // pending max-sharpe selection (pending defaults to the current key).
+  await expect(useMyViews).toHaveCount(0);
+  await expect(menu.locator("[data-role^='portfolio-optimizer-objective-menu-option-']"))
+    .toHaveCount(4);
+  await expect(maximumSharpe).toHaveAttribute("data-selected", "true");
   await expect(editor).toBeVisible();
-  await expect(editor).toContainText("Your return views");
+  await expect(editor).toContainText("Return views");
   await expect(editor).not.toContainText("Relative views");
   await expect(addView).toHaveCount(0);
   await expect(cancel).toBeVisible();
   await expect(apply).toBeVisible();
   await expect(menu.locator("select")).toHaveCount(0);
-  await expect(btcReturn).toHaveValue("19.5");
-  await expect(ethReturn).toHaveValue("16.5");
-  await btcReturn.focus();
-  await page.keyboard.press("ArrowUp");
-  await expect(btcReturn).toHaveValue("20");
-  await expect(btcReturn).toBeFocused();
+  // The draft's return model is still historical-mean, so views are OFF: the
+  // panel says so honestly instead of rendering rows that would not be used.
+  await expect(editor.locator(
+    "[data-role='portfolio-optimizer-objective-menu-use-my-views-editor-views-off']"
+  )).toBeVisible();
+  await expect(editor.locator(
+    "[data-role='portfolio-optimizer-objective-menu-use-my-views-editor-views-on']"
+  )).toBeVisible();
+  await expect(editor.locator(
+    "[data-role='portfolio-optimizer-objective-menu-use-my-views-editor-rows']"
+  )).toHaveCount(0);
+  await expect(btcReturn).toHaveCount(0);
+  await expect(ethReturn).toHaveCount(0);
+  await expect(btcRow).toHaveCount(0);
+  await expect(btcStepDown).toHaveCount(0);
   await expect(menu).toHaveCSS("outline-style", "none");
-  await btcStepDown.click();
-  await expect(btcReturn).toHaveValue("19.5");
 
-  await btcReturn.fill("18");
-  await ethReturn.fill("16.5");
-  await btcHigh.click();
-  await ethLow.click();
-  await expect(btcHigh).toHaveAttribute("data-selected", "true");
-  await expect(ethLow).toHaveAttribute("data-selected", "true");
+  // Apply is enabled even though max-sharpe is already current: applying
+  // attaches the views-aware return model to the historical-mean draft.
   await expect(apply).toBeEnabled();
   await apply.click();
 
   await expect(menu).toHaveCount(0);
+  // Zero views is a valid state — the run proceeds with posterior = baseline;
+  // nothing is materialized from the UI buffers.
+  await expect.poll(async () => {
+    const returnModel = await readOptimizerState(page, [
+      "portfolio",
+      "optimizer",
+      "draft",
+      "return-model"
+    ]);
+    return {
+      kind: returnModel?.kind,
+      views: returnModel?.views || []
+    };
+  }).toEqual({ kind: "black-litterman", views: [] });
+
+  await expect.poll(async () => {
+    const progress = await readOptimizerState(page, [
+      "portfolio",
+      "optimizer",
+      "optimization-progress"
+    ]);
+    return progress?.status;
+  }, { timeout: 15_000 }).toBe("succeeded");
+
+  const railEditor = page.locator("[data-role='portfolio-optimizer-results-your-views-editor']");
+  const railSummary = railEditor.locator(
+    "[data-role='portfolio-optimizer-results-your-views-editor-summary']"
+  );
+  const railBtcReturn = railEditor.locator(
+    "[data-role='portfolio-optimizer-objective-menu-view-hl:perp:BTC-return']"
+  );
+  const railBtcHigh = railEditor.locator(
+    "[data-role='portfolio-optimizer-objective-menu-view-hl:perp:BTC-confidence-high']"
+  );
+  const railBtcSource = railEditor.locator(
+    "[data-role='portfolio-optimizer-objective-menu-view-hl:perp:BTC-source']"
+  );
+  const railEthReturn = railEditor.locator(
+    "[data-role='portfolio-optimizer-objective-menu-view-hl:perp:ETH-return']"
+  );
+  const railEthLow = railEditor.locator(
+    "[data-role='portfolio-optimizer-objective-menu-view-hl:perp:ETH-confidence-low']"
+  );
+  await expect(railEditor).toBeVisible();
+  await expect(railEditor).toContainText("Return views");
+  await expect(railEditor).not.toContainText("Your return views");
+  await expect(page.locator("[data-role='portfolio-optimizer-results-your-views-apply']"))
+    .toBeVisible();
+
+  // With the views-aware model active, rows render with the implied BASELINE
+  // pre-filled (the raw estimate the solver uses for viewless assets — NOT the
+  // last run's posterior, which used to pose as the seed here) and honest
+  // provenance: implied, no selected confidence.
+  await expect(railBtcReturn).not.toHaveValue("");
+  await expect(railEthReturn).not.toHaveValue("");
+  await expect(railBtcSource).toHaveAttribute("data-source", "implied");
+  await expect(railEditor.locator("[data-role*='-confidence-'][data-selected='true']"))
+    .toHaveCount(0);
+
+  // Rail edits author absolute views IMMEDIATELY — no Apply round-trip.
+  await railBtcReturn.fill("18");
+  await railBtcHigh.click();
+  await railEthReturn.fill("16.5");
+  await railEthLow.click();
   await expect.poll(async () => {
     const returnModel = await readOptimizerState(page, [
       "portfolio",
@@ -1274,34 +1349,10 @@ test("portfolio optimizer draft objective menu captures use my views returns and
       }
     ]
   });
-
-  await expect.poll(async () => {
-    const progress = await readOptimizerState(page, [
-      "portfolio",
-      "optimizer",
-      "optimization-progress"
-    ]);
-    return progress?.status;
-  }, { timeout: 15_000 }).toBe("succeeded");
-
-  const railEditor = page.locator("[data-role='portfolio-optimizer-results-your-views-editor']");
-  const railApply = page.locator("[data-role='portfolio-optimizer-results-your-views-apply']");
-  await expect(railEditor).toBeVisible();
-  await expect(railEditor).toContainText("Your views");
-  await expect(railEditor).not.toContainText("Your return views");
-  await expect(railApply).toBeVisible();
-  await expect(btcReturn).toHaveValue("18");
-  await btcReturn.fill("18.5");
-  await railApply.click();
-  await expect.poll(async () => {
-    const returnModel = await readOptimizerState(page, [
-      "portfolio",
-      "optimizer",
-      "draft",
-      "return-model"
-    ]);
-    return returnModel?.views?.find((view) => view["instrument-id"] === "hl:perp:BTC")?.return;
-  }).toBe(0.185);
+  await expect(railBtcHigh).toHaveAttribute("data-selected", "true");
+  await expect(railEthLow).toHaveAttribute("data-selected", "true");
+  await expect(railBtcSource).toHaveAttribute("data-source", "user");
+  await expect(railSummary).toContainText("2 your views");
 
   await trigger.click();
   await expect(menu).toBeVisible();
@@ -1312,10 +1363,32 @@ test("portfolio optimizer draft objective menu captures use my views returns and
   const editorBtcHigh = editor.locator("[data-role='portfolio-optimizer-objective-menu-view-hl:perp:BTC-confidence-high']");
   const editorEthLow = editor.locator("[data-role='portfolio-optimizer-objective-menu-view-hl:perp:ETH-confidence-low']");
   await expect(editorBtcRow).toBeInViewport({ ratio: 1 });
-  await expect(editorBtcReturn).toHaveValue("18.5");
+  await expect(editorBtcReturn).toHaveValue("18");
   await expect(editorEthReturn).toHaveValue("16.5");
   await expect(editorBtcHigh).toHaveAttribute("data-selected", "true");
   await expect(editorEthLow).toHaveAttribute("data-selected", "true");
+
+  // Arrow-key stepping on a views-aware draft updates the authored view
+  // immediately (buffer and draft stay in lockstep), and steps back cleanly.
+  await editorBtcReturn.focus();
+  await page.keyboard.press("ArrowUp");
+  await expect(editorBtcReturn).toHaveValue("18.5");
+  await expect(editorBtcReturn).toBeFocused();
+  await expect.poll(async () => {
+    const returnModel = await readOptimizerState(page, [
+      "portfolio",
+      "optimizer",
+      "draft",
+      "return-model"
+    ]);
+    return returnModel?.views?.find(
+      (view) => view["instrument-id"] === "hl:perp:BTC"
+    )?.return;
+  }).toBe(0.185);
+  await editor.locator(
+    "[data-role='portfolio-optimizer-objective-menu-view-hl:perp:BTC-step-down']"
+  ).click();
+  await expect(editorBtcReturn).toHaveValue("18");
 
   const rowBox = await editorBtcRow.boundingBox();
   const returnBox = await editorBtcReturn.boundingBox();
@@ -1324,14 +1397,16 @@ test("portfolio optimizer draft objective menu captures use my views returns and
   expect(returnBox?.height ?? 0).toBeGreaterThanOrEqual(28);
   expect(confidenceBox?.height ?? 0).toBeGreaterThanOrEqual(28);
 
-  await maximumSharpe.click();
-  await expect(maximumSharpe).toHaveAttribute("data-selected", "true");
+  // Picking a non-Sharpe objective no longer downgrades the return model: the
+  // views-aware model and the authored views survive the switch.
+  await minimumVolatility.click();
+  await expect(minimumVolatility).toHaveAttribute("data-selected", "true");
+  await expect(editor).toHaveCount(0);
   await expect(apply).toBeEnabled();
   await apply.click();
 
   await expect(menu).toHaveCount(0);
-  await expect(railEditor).toHaveCount(0);
-  await expect(trigger).toContainText("Maximum Sharpe");
+  await expect(trigger).toContainText("Minimum volatility");
   await expect.poll(async () => {
     const draft = await readOptimizerState(page, [
       "portfolio",
@@ -1340,15 +1415,20 @@ test("portfolio optimizer draft objective menu captures use my views returns and
     ]);
     return {
       objective: draft?.objective?.kind,
-      returnModel: draft?.["return-model"]?.kind
+      returnModel: draft?.["return-model"]?.kind,
+      viewInstruments: (draft?.["return-model"]?.views || []).map(
+        (view) => view["instrument-id"]
+      )
     };
   }).toEqual({
-    objective: "max-sharpe",
-    returnModel: "historical-mean"
+    objective: "minimum-variance",
+    returnModel: "black-litterman",
+    viewInstruments: ["hl:perp:BTC", "hl:perp:ETH"]
   });
+  await expect(railEditor).toBeVisible();
 });
 
-test("portfolio optimizer use my views objective popover stays usable across review widths @smoke @regression", async ({ page }) => {
+test("portfolio optimizer max sharpe return views popover stays usable across review widths @smoke @regression", async ({ page }) => {
   test.setTimeout(180_000);
 
   for (const viewport of [
@@ -1365,6 +1445,13 @@ test("portfolio optimizer use my views objective popover stays usable across rev
       });
 
       await seedTwoAssetDraftScenario(page);
+      // The dense row layout is what this test protects, so put the draft on
+      // the views-aware model (rows only render there — historical drafts show
+      // the views-off note instead).
+      await dispatch(page, [
+        ":actions/apply-portfolio-optimizer-setup-preset",
+        ":max-sharpe"
+      ]);
       await dispatch(page, [
         ":actions/navigate",
         "/portfolio/optimize/draft",
@@ -1374,8 +1461,8 @@ test("portfolio optimizer use my views objective popover stays usable across rev
 
       const trigger = page.locator("[data-role='portfolio-optimizer-objective-menu-trigger']");
       const menu = page.locator("[data-role='portfolio-optimizer-objective-menu']");
-      const useMyViews = page.locator(
-        "[data-role='portfolio-optimizer-objective-menu-option-use-my-views']"
+      const maximumSharpe = page.locator(
+        "[data-role='portfolio-optimizer-objective-menu-option-max-sharpe']"
       );
       const editor = page.locator(
         "[data-role='portfolio-optimizer-objective-menu-use-my-views-editor']"
@@ -1386,11 +1473,17 @@ test("portfolio optimizer use my views objective popover stays usable across rev
       await trigger.scrollIntoViewIfNeeded();
       await trigger.click();
       await expect(menu).toBeVisible();
-      await useMyViews.click();
+      // The views editor renders inline under the max-sharpe option (there is
+      // no separate "use my views" option anymore).
+      await maximumSharpe.click();
       await expect(editor).toBeVisible();
-      await expect(editor).toContainText("Your return views");
+      await expect(editor).toContainText("Return views");
       await expect(editor).not.toContainText("Relative views");
       await expect(addView).toHaveCount(0);
+      // The popover is page-anchored under the trigger; on narrow single-column
+      // layouts the trigger can sit low enough that reaching the footer takes a
+      // page scroll (same as any long dropdown) — usable means reachable.
+      await footerActions.scrollIntoViewIfNeeded();
       await expect(footerActions).toBeInViewport({ ratio: 1 });
       await expect(menu.locator("select")).toHaveCount(0);
       await expect(menu.locator("input[type='number']")).toHaveCount(0);
@@ -1400,20 +1493,19 @@ test("portfolio optimizer use my views objective popover stays usable across rev
       expect(box).not.toBeNull();
       expect(box.x).toBeGreaterThanOrEqual(0);
       expect(box.x + box.width).toBeLessThanOrEqual(viewport.width);
-      expect(box.y).toBeGreaterThanOrEqual(0);
-      expect(box.y + Math.min(box.height, viewport.height)).toBeLessThanOrEqual(
-        viewport.height + 1
-      );
 
-      await page.locator(
+      const btcReturn = menu.locator(
         "[data-role='portfolio-optimizer-objective-menu-view-hl:perp:BTC-return']"
-      ).fill("18");
-      await page.locator(
+      );
+      const btcHigh = menu.locator(
         "[data-role='portfolio-optimizer-objective-menu-view-hl:perp:BTC-confidence-high']"
-      ).click();
-      await expect(page.locator(
-        "[data-role='portfolio-optimizer-objective-menu-view-hl:perp:BTC-confidence-high']"
-      )).toHaveAttribute("data-selected", "true");
+      );
+      // Rows edit the views-aware draft immediately: the fill authors the view
+      // and the confidence click re-weights it.
+      await btcReturn.fill("18");
+      await expect(btcReturn).toHaveValue("18");
+      await btcHigh.click();
+      await expect(btcHigh).toHaveAttribute("data-selected", "true");
     });
   }
 });

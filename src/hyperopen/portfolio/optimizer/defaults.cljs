@@ -191,6 +191,7 @@
                     :by-id {}}
    :last-successful-run nil
    :constraint-profiles {}
+   :view-library {}
    :history-data {:candle-history-by-coin {}
                   :funding-history-by-coin {}
                   :vault-details-by-address {}
@@ -229,6 +230,7 @@
    :refinement-open? false
    :refinement-depth nil
    :exposure-zoom-level nil
+   :return-views-filter :all
    :stale-auto-recompute {:request-signature nil
                           :input-signature nil
                           :scenario-id nil}})

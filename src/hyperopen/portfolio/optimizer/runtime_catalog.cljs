@@ -30,6 +30,8 @@
     actions/add-portfolio-optimizer-objective-menu-view
     :apply-portfolio-optimizer-objective-menu-selection-and-run
     actions/apply-portfolio-optimizer-objective-menu-selection-and-run
+    :set-portfolio-optimizer-return-views-filter
+    actions/set-portfolio-optimizer-return-views-filter
     :set-portfolio-optimizer-return-model-kind
     actions/set-portfolio-optimizer-return-model-kind
     :set-portfolio-optimizer-risk-model-kind
@@ -240,5 +242,9 @@
       effect-adapters/save-portfolio-optimizer-constraint-default-effect
       :load-portfolio-optimizer-constraint-profiles
       effect-adapters/load-portfolio-optimizer-constraint-profiles-effect
+      :load-portfolio-optimizer-view-library
+      effect-adapters/load-portfolio-optimizer-view-library-effect
+      :sync-portfolio-optimizer-view-library
+      effect-adapters/sync-portfolio-optimizer-view-library-effect
       :restore-portfolio-optimizer-draft
       effect-adapters/restore-portfolio-optimizer-draft-effect}}))

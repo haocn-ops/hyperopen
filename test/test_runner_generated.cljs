@@ -546,7 +546,6 @@
             [hyperopen.views.portfolio.montecarlo.chart-test]
             [hyperopen.views.portfolio.montecarlo.controls-test]
             [hyperopen.views.portfolio.optimize.black-litterman-preview-chart-test]
-            [hyperopen.views.portfolio.optimize.black-litterman-views-panel-test]
             [hyperopen.views.portfolio.optimize.execution-tab-test]
             [hyperopen.views.portfolio.optimize.format-test]
             [hyperopen.views.portfolio.optimize.frontier-callout-test]
@@ -1301,7 +1300,6 @@
              'hyperopen.views.portfolio.montecarlo.chart-test
              'hyperopen.views.portfolio.montecarlo.controls-test
              'hyperopen.views.portfolio.optimize.black-litterman-preview-chart-test
-             'hyperopen.views.portfolio.optimize.black-litterman-views-panel-test
              'hyperopen.views.portfolio.optimize.execution-tab-test
              'hyperopen.views.portfolio.optimize.format-test
              'hyperopen.views.portfolio.optimize.frontier-callout-test

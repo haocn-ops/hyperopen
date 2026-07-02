@@ -477,6 +477,7 @@
                          fallback))]
     (case (:reason readiness)
       :missing-universe "Select a universe before running."
+      :holdings-loading "Holdings are still loading for this account."
       :history-loading "Optimizer history is already loading."
       :missing-black-litterman-views "Add a view before running Use my views."
       :no-eligible-history

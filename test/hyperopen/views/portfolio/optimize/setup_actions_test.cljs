@@ -56,6 +56,37 @@
     (is (= :empty (:tone status)))
     (is (= "Add assets to run" (:label status)))))
 
+(deftest run-status-reports-holdings-loading-over-empty-universe-test
+  ;; While the holdings auto-seed is pending the universe is necessarily empty;
+  ;; the pill must report the machine's wait ("Loading holdings"), never
+  ;; instruct the user to add the assets the seed is about to add.
+  (let [status (setup-actions/run-status {:run-triggerable? false
+                                          :running? false
+                                          :readiness {:runnable? false
+                                                      :reason :holdings-loading}
+                                          :asset-count 0})]
+    (is (false? (:ready? status)))
+    (is (= :busy (:tone status)))
+    (is (= "Loading holdings" (:label status)))))
+
+(deftest setup-bottom-actions-run-button-reads-loading-holdings-while-seed-pending-test
+  ;; The CTA is the eye's landing point: while the auto-seed is pending it says
+  ;; what the app is doing and stays disabled (an empty universe is never
+  ;; triggerable), instead of a dead "Run optimization".
+  (let [node (setup-actions/setup-bottom-actions
+              {:draft {}
+               :readiness {:runnable? false :reason :holdings-loading}
+               :running? false
+               :run-triggerable? false
+               :saving-scenario? false
+               :solved-run? false})
+        run-button (ts/node-by-role node "portfolio-optimizer-run-draft")
+        status-meta (ts/node-by-role node "portfolio-optimizer-setup-bottom-actions-status-meta")]
+    (is (true? (ts/node-attr run-button :disabled)))
+    (is (some #{"Loading holdings…"} (ts/collect-strings run-button)))
+    (is (= "busy" (ts/node-attr status-meta :data-run-status)))
+    (is (some #{"Loading holdings"} (ts/collect-strings status-meta)))))
+
 (deftest run-status-reports-busy-while-running-test
   (let [status (setup-actions/run-status {:run-triggerable? false
                                           :running? true

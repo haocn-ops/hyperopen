@@ -3,14 +3,16 @@
             [hyperopen.views.portfolio.optimize.setup-history-assumptions :as setup-history-assumptions]))
 
 (def ^:private eyebrow-class
-  ["font-mono" "text-[0.625rem]" "font-semibold" "uppercase" "tracking-[0.08em]" "text-trading-muted/70"])
+  ["font-mono" "text-[0.6875rem]" "font-semibold" "uppercase" "tracking-[0.08em]" "text-trading-muted/70"])
 
+;; Sentence-case 14px, matching setup-controls/section-title-class — see the
+;; type-ladder note there.
 (def ^:private section-title-class
-  ["text-[0.6875rem]" "font-semibold" "uppercase" "tracking-[0.08em]" "text-trading-text"])
+  ["text-[0.875rem]" "font-semibold" "text-trading-text"])
 
 (def ^:private input-class
   ["w-full" "border" "border-base-300" "bg-base-100/80" "px-2" "py-1.5"
-   "font-mono" "text-[0.6875rem]" "font-medium" "outline-none"
+   "font-mono" "text-[0.8125rem]" "font-medium" "outline-none"
    "transition-shadow" "focus:border-warning/70"
    "focus:shadow-[0_0_0_1px_rgba(212,181,88,0.75)]"])
 
@@ -19,7 +21,7 @@
    (tag label tone nil))
   ([label tone extra-class]
    [:span {:class (cond-> ["optimizer-chip" "border" "px-1.5" "py-[1px]" "font-mono"
-                           "text-[0.53125rem]" "font-semibold" "uppercase"
+                           "text-[0.625rem]" "font-semibold" "uppercase"
                            "tracking-[0.12em]"]
                     (= tone :accent) (conj "border-warning/40" "text-warning")
                     (= tone :info) (conj "border-info/40" "text-info")
@@ -48,7 +50,7 @@
                      short-selectable?)]
     [:button {:type "button"
               :class (cond-> ["h-6" "w-6" "border" "border-base-300"
-                              "font-mono" "text-[0.6rem]" "font-semibold"
+                              "font-mono" "text-[0.6875rem]" "font-semibold"
                               "uppercase" "leading-none" "transition-colors"]
                        (and selected? (= :long side))
                        (conj "bg-success/70" "text-base-100")
@@ -96,7 +98,7 @@
   [instrument-id badge badge-label]
   (when (and badge (not= :ready badge))
     [:span {:class ["optimizer-chip" "border" "px-1.5"
-                    "py-[1px]" "font-mono" "text-[0.53125rem]" "font-semibold"
+                    "py-[1px]" "font-mono" "text-[0.625rem]" "font-semibold"
                     "uppercase" "tracking-[0.1em]"]
             :data-optimizer-chip "true"
             :data-tone (if (contains? #{:conservative :using-proxy} badge) "accent" "warn")
@@ -110,7 +112,7 @@
   [instrument-id history-label history-tone]
   (when history-label
     [:span {:class (cond-> ["optimizer-chip" "border" "px-1.5" "py-[1px]" "font-mono"
-                            "text-[0.53125rem]" "font-semibold" "uppercase"
+                            "text-[0.625rem]" "font-semibold" "uppercase"
                             "tracking-[0.12em]"]
                      (= history-tone :muted) (conj "border-base-300" "text-trading-muted")
                      (not= history-tone :muted) (conj "border-warning/40" "text-warning"))
@@ -151,16 +153,18 @@
            :data-history-status (some-> history-status name)}
      [:span {:class ["text-warning"]} "☑"]
      [:span {:class ["min-w-0"]}
-      [:span {:class ["block" "truncate" "font-mono" "text-[0.6875rem]" "font-semibold"]}
+      [:span {:class ["block" "truncate" "font-mono" "text-[0.8125rem]" "font-semibold"]}
        primary-label]
-      [:span {:class ["block" "truncate" "text-[0.65625rem]" "text-trading-muted"]}
+      ;; Demoted a full tier below the symbol: the canonical id/name is context,
+      ;; and must not compete with the tradable symbol the user scans for.
+      [:span {:class ["block" "truncate" "text-[0.6875rem]" "text-trading-muted/80"]}
        secondary-label]
       (row-flags instrument-id history-label history-tone assumption-badge assumption-badge-label)]
      [:span {:class ["flex" "justify-center"]} (market-type-tags market-type)]
      (side-control instrument-id position-side short-selectable?)
      [:span {:class ["text-right"]}
       [:button {:type "button"
-                :class ["font-mono" "text-[0.6875rem]" "text-trading-muted" "hover:text-warning"]
+                :class ["font-mono" "text-[0.8125rem]" "text-trading-muted" "hover:text-warning"]
                 :aria-label (remove-aria-label primary-label market-type instrument-id)
                 :data-role (str "portfolio-optimizer-universe-remove-" instrument-id)
                 :on {:click [[:actions/remove-portfolio-optimizer-universe-instrument
@@ -178,14 +182,14 @@
            :aria-selected (if active? "true" "false")
            :data-active (when active? "true")
            :on {:click [[:actions/add-portfolio-optimizer-universe-instrument market-key]]}}
-     [:span {:class ["truncate" "font-mono" "text-[0.6875rem]" "font-semibold"]}
+     [:span {:class ["truncate" "font-mono" "text-[0.8125rem]" "font-semibold"]}
       label]
-     [:span {:class ["truncate" "text-[0.6875rem]" "text-trading-muted"]}
+     [:span {:class ["truncate" "text-[0.8125rem]" "text-trading-muted"]}
       name]
      (market-type-tags market-type)
      [:button {:type "button"
                :class ["optimizer-universe-add-button"
-                       "text-right" "font-mono" "text-[0.65625rem]" "font-semibold"
+                       "text-right" "font-mono" "text-[0.75rem]" "font-semibold"
                        "text-warning" "hover:text-warning"]
                :data-role (str "portfolio-optimizer-universe-add-" market-key)
                :on {:click [[:actions/add-portfolio-optimizer-universe-instrument market-key]]}}
@@ -196,7 +200,7 @@
   [:div {:class ["optimizer-universe-selected-header"
                  "grid" "items-center" "gap-2" "border-b" "border-base-300"
                  "bg-base-200/40" "px-2" "py-1.5" "font-mono"
-                 "text-[0.55rem]" "font-semibold" "uppercase"
+                 "text-[0.625rem]" "font-semibold" "uppercase"
                  "tracking-[0.12em]" "text-trading-muted/70"]
          :data-role "portfolio-optimizer-universe-selected-header"}
    [:span ""]
@@ -210,7 +214,7 @@
   [:div {:class ["optimizer-universe-candidate-header"
                  "grid" "items-center" "gap-2" "border-b" "border-base-300"
                  "bg-base-200/40" "px-2" "py-1.5" "font-mono"
-                 "text-[0.55rem]" "font-semibold" "uppercase"
+                 "text-[0.625rem]" "font-semibold" "uppercase"
                  "tracking-[0.12em]" "text-trading-muted/70"]
          :data-role "portfolio-optimizer-universe-candidate-header"
          :role "presentation"}
@@ -219,31 +223,56 @@
    [:span "Type"]
    [:span {:class ["sr-only"]} "Add"]])
 
+(defn- holdings-loading-block
+  "Modeless inline loading state for the auto-seed window: the machine is
+  fetching the portfolio on the user's behalf, so the panel says so instead of
+  showing the empty-universe copy that asks the user to add assets."
+  []
+  [:div {:class ["px-2" "py-3"]
+         :data-role "portfolio-optimizer-universe-holdings-loading"}
+   [:p {:class ["text-[0.8125rem]" "font-medium" "text-trading-text"]}
+    "Loading holdings…"]
+   [:p {:class ["mt-1" "text-[0.75rem]" "text-trading-muted"]}
+    "Fetching the current portfolio for this account."]
+   [:div {:class ["mt-3" "space-y-2"]
+          :aria-hidden "true"}
+    [:div {:class ["optimizer-universe-skeleton-row"]}]
+    [:div {:class ["optimizer-universe-skeleton-row"]}]
+    [:div {:class ["optimizer-universe-skeleton-row"]}]]])
+
 (defn- selected-table
-  [selected-rows universe]
+  [selected-rows universe holdings-loading?]
   [:div {:class ["mt-2" "border" "border-base-300" "bg-base-100/50"]}
    [:div {:class ["flex" "items-center" "justify-between" "gap-2" "border-b"
                   "border-base-300" "px-2" "py-1.5"]}
-    [:span {:class ["font-mono" "text-[0.6rem]" "uppercase" "tracking-[0.12em]"
+    [:span {:class ["font-mono" "text-[0.6875rem]" "uppercase" "tracking-[0.12em]"
                     "text-trading-muted"]}
-     (str (count universe) " included")]
+     (if holdings-loading?
+       "Loading holdings…"
+       (str (count universe) " included"))]
     (when (seq universe)
       [:button {:type "button"
-                :class ["font-mono" "text-[0.6rem]" "uppercase" "tracking-[0.12em]"
+                :class ["font-mono" "text-[0.6875rem]" "uppercase" "tracking-[0.12em]"
                         "text-trading-muted" "hover:text-warning"]
                 :data-role "portfolio-optimizer-universe-clear"
                 :on {:click [[:actions/clear-portfolio-optimizer-universe]]}}
        "Clear universe"])]
-   (if (seq universe)
+   (cond
+     (seq universe)
      (into [:div {:class ["text-xs"]}]
            (cons (selected-table-header)
                  (map selected-row selected-rows)))
-     ;; Empty universe: holdings load automatically once account data arrives;
-     ;; this state is either "no account/holdings" or a deliberately cleared set.
+
+     holdings-loading?
+     (holdings-loading-block)
+
+     ;; Empty universe: either "no account/holdings" or a deliberately cleared
+     ;; set (a clear records a custom source, which ends the loading state).
+     :else
      [:div {:class ["flex" "flex-col" "items-start" "gap-1" "px-2" "py-3"]}
       [:p {:class ["text-xs" "text-trading-muted"]}
        "No assets selected yet."]
-      [:p {:class ["text-[0.65625rem]" "text-trading-muted/80"]}
+      [:p {:class ["text-[0.75rem]" "text-trading-muted/80"]}
        "Holdings load automatically when your account is connected — use “My holdings” above to re-import them, or search to build a custom set."]])])
 
 (defn- omission-reason-copy
@@ -261,7 +290,7 @@
   (let [holdings? (= :holdings (:kind universe-source))
         omitted (vec (or (:omitted universe-source) []))]
     (when universe-source
-      [:div {:class ["mt-1.5" "font-mono" "text-[0.6rem]" "leading-4" "text-trading-muted"]
+      [:div {:class ["mt-1.5" "font-mono" "text-[0.6875rem]" "leading-4" "text-trading-muted"]
              :data-role "portfolio-optimizer-universe-source-line"
              :data-universe-source (name (or (:kind universe-source) :custom))}
        (if holdings?
@@ -298,38 +327,46 @@
                  active-index
                  market-keys
                  universe-source]} (optimizer-view-model/universe-section-model state draft opts)
-         holdings-source? (= :holdings (:kind universe-source))]
+         holdings-source? (= :holdings (:kind universe-source))
+         holdings-loading? (= :holdings-loading (:reason readiness))
+         ;; While the auto-seed is pending, "My holdings" is the source in
+         ;; flight, so the strip shows it active instead of offering it as a
+         ;; manual command the machine is already executing.
+         holdings-active? (or holdings-source? holdings-loading?)]
     [:section {:class ["optimizer-universe-panel" "optimizer-setup-panel"
                        "border" "border-base-300" "bg-base-100/90" "p-3" "leading-4"]
-               :data-role "portfolio-optimizer-universe-panel"}
+               :data-role "portfolio-optimizer-universe-panel"
+               :data-holdings-loading (when holdings-loading? "true")}
      [:div {:class ["flex" "items-center" "justify-between" "gap-3" "border-b"
                     "border-base-300" "pb-2"]}
       [:p {:class section-title-class} "Universe"]
-      [:span {:class ["font-mono" "text-[0.65625rem]" "uppercase" "tracking-[0.08em]"
+      [:span {:class ["font-mono" "text-[0.75rem]" "uppercase" "tracking-[0.08em]"
                       "text-trading-muted/70"]}
-       (str (count universe) " included")]]
+       (if holdings-loading?
+         "loading…"
+         (str (count universe) " included"))]]
      ;; Source strip: "My holdings" is the default path (the universe seeds itself
      ;; from holdings when account data is available) and doubles as the
      ;; load/refresh action; "Custom" lights up once the set is hand-edited or
      ;; cleared. The active segment reflects the recorded universe source.
      [:div {:class ["mt-3" "grid" "grid-cols-2" "border" "border-base-300" "text-center"
-                    "text-[0.65625rem]" "font-medium" "uppercase"
+                    "text-[0.75rem]" "font-medium"
                     "tracking-[0.04em]" "text-trading-muted"]
             :data-role "portfolio-optimizer-universe-source-strip"}
       [:button {:type "button"
-                :class (cond-> ["border-r" "border-base-300" "px-2" "py-2" "uppercase"
+                :class (cond-> ["border-r" "border-base-300" "px-2" "py-2"
                                 "hover:text-warning"]
-                         holdings-source?
+                         holdings-active?
                          (conj "border-warning/60" "bg-warning/10" "text-warning"))
                 :data-role "portfolio-optimizer-universe-use-current"
-                :data-active (when holdings-source? "true")
+                :data-active (when holdings-active? "true")
                 :on {:click [[:actions/set-portfolio-optimizer-universe-from-current]]}}
-       (if holdings-source? "My holdings" "Load my holdings")
+       (if holdings-active? "My holdings" "Load my holdings")
        [:span {:class ["sr-only"]}
-        (if holdings-source?
+        (if holdings-active?
           "Refresh the universe from your current holdings"
           "Load my current holdings into the universe")]]
-      [:span {:class (cond-> ["px-2" "py-2" "uppercase"]
+      [:span {:class (cond-> ["px-2" "py-2"]
                        (and universe-source (not holdings-source?))
                        (conj "bg-warning/10" "text-warning"))
               :data-role "portfolio-optimizer-universe-source-custom"
@@ -349,7 +386,7 @@
               :data-searching (when searching? "true")}
        [:span {:class ["optimizer-universe-search-affordance"
                        "portfolio-optimizer-universe-search-affordance"
-                       "font-mono" "text-[0.65rem]" "text-trading-muted"]
+                       "font-mono" "text-[0.75rem]" "text-trading-muted"]
                :data-role "portfolio-optimizer-universe-search-icon"}
         "⌕"]
        [:input {:type "search"
@@ -380,7 +417,7 @@
        [:span {:class ["optimizer-universe-search-add-hint"
                        "portfolio-optimizer-universe-search-add-hint"
                        "border" "border-base-300"
-                       "font-mono" "text-[0.55rem]" "text-trading-muted"]
+                       "font-mono" "text-[0.625rem]" "text-trading-muted"]
                :data-role "portfolio-optimizer-universe-search-add-hint"}
         "↵ add"]]
       (when searching?
@@ -396,13 +433,15 @@
                        "text-xs" "text-trading-muted"]
                :data-role "portfolio-optimizer-universe-search-results-empty"}
            "No matching unused instruments found."]))]
-     (selected-table selected-rows universe)
+     (selected-table selected-rows universe holdings-loading?)
      (setup-history-assumptions/history-assumptions-section
       {:state state
        :draft draft
        :readiness readiness
        :history-load-state history-load-state})
-     [:div {:class ["mt-2" "font-mono" "text-[0.58rem]" "leading-5"
+     ;; Prose help, not log output: sans-serif — monospace stays reserved for
+     ;; numbers and identifiers per the setup type ladder.
+     [:div {:class ["mt-2" "text-[0.6875rem]" "leading-[1.5]"
                     "text-trading-muted/70"]}
       "Search adds tradeable spot, perp, or vault return legs. Symbols with limited history use stabilized covariance with a longer pull toward the market reference."
       [:span {:class ["sr-only"]}

@@ -102,6 +102,38 @@
     box-shadow: inset 2px 0 0 var(--optimizer-accent);
   }
 
+  /* Holdings auto-seed pending state: three placeholder rows with a slow
+     shimmer sweep (modeless — the panel keeps its chrome, no spinner). Colors
+     derive from the optimizer surface vars so themes keep working. */
+  .portfolio-optimizer .optimizer-universe-skeleton-row {
+    height: 30px;
+    border: 1px solid var(--optimizer-border);
+    background-color: var(--optimizer-surface-2);
+    background-image: linear-gradient(
+      90deg,
+      transparent 20%,
+      color-mix(in srgb, var(--optimizer-text-2) 12%, transparent) 50%,
+      transparent 80%
+    );
+    background-size: 200% 100%;
+    animation: optimizer-universe-skeleton-sweep 1.6s linear infinite;
+  }
+
+  @keyframes optimizer-universe-skeleton-sweep {
+    from {
+      background-position: 200% 0;
+    }
+    to {
+      background-position: -200% 0;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .portfolio-optimizer .optimizer-universe-skeleton-row {
+      animation: none;
+    }
+  }
+
   .portfolio-optimizer .optimizer-universe-panel table td {
     border-bottom: 1px solid var(--optimizer-border);
   }

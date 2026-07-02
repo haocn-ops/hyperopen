@@ -115,13 +115,13 @@
                     (str row-id))]
     [:div {:class ["space-y-1.5"]
            :data-role (str "portfolio-optimizer-progress-step-" row-token)}
-     [:div {:class ["flex" "items-center" "justify-between" "gap-3" "text-[0.65625rem]"]}
+     [:div {:class ["flex" "items-center" "justify-between" "gap-3" "text-[0.75rem]"]}
       [:p {:class ["min-w-0" "font-mono" "font-semibold" "text-trading-text"]}
        [:span {:class ["text-trading-muted"]} (str (inc idx) ". ")]
        (:label step)
        (when (seq (:detail step))
          [:span {:class ["text-trading-muted"]} (str " · " (:detail step))])]
-      [:span {:class ["font-mono" "text-[0.625rem]" "text-trading-muted"]}
+      [:span {:class ["font-mono" "text-[0.6875rem]" "text-trading-muted"]}
        (str (.toFixed percent 0) "%")]]
      [:div {:class ["h-1.5" "overflow-hidden" "rounded-full" "bg-base-300/60"]}
       [:div {:class ["h-full"
@@ -161,7 +161,7 @@
         (when show-header?
           [:div {:class ["flex" "items-center" "justify-between" "gap-3"]}
            [:p {:class ["font-mono"
-                        "text-[0.625rem]"
+                        "text-[0.6875rem]"
                         "font-semibold"
                         "uppercase"
                         "tracking-[0.08em]"
@@ -173,7 +173,7 @@
                            "px-1.5"
                            "py-0.5"
                            "font-mono"
-                           "text-[0.59375rem]"
+                           "text-[0.625rem]"
                            "font-semibold"
                            "uppercase"
                            "tracking-[0.08em]"
@@ -220,7 +220,7 @@
                             "list-none"
                             "[&::-webkit-details-marker]:hidden"
                             "font-mono"
-                            "text-[0.625rem]"
+                            "text-[0.6875rem]"
                             "text-trading-muted"]
                     :data-role "portfolio-optimizer-progress-footer"}
           [:span {:class ["min-w-0" "truncate"]}
@@ -243,7 +243,7 @@
                        "bg-error/10"
                        "px-2"
                        "py-1.5"
-                       "text-[0.6875rem]"
+                       "text-[0.8125rem]"
                        "text-error"]
                :data-role "portfolio-optimizer-progress-error"}
            message])]))))

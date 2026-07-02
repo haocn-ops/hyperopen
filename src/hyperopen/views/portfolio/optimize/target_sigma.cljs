@@ -121,19 +121,19 @@
                            "outline-none" "focus:outline-none"]
                           (if (= :menu size)
                             ["w-[52px]" "py-1" "text-[0.75rem]"]
-                            ["w-12" "py-[3px]" "text-[0.71875rem]"]))
+                            ["w-12" "py-[3px]" "text-[0.8125rem]"]))
              :aria-label "Target volatility percent"
              :data-role role
              :value (str value-text)
              :on {:change [action]}}]
-    [:span {:class ["pr-1.5" "pl-0.5" "font-mono" "text-[0.65625rem]"
+    [:span {:class ["pr-1.5" "pl-0.5" "font-mono" "text-[0.75rem]"
                     "text-trading-muted"]}
      "%"]]))
 
 (defn- sigma-scale-row
   [max-percent]
   [:div {:class ["mt-0.5" "flex" "items-center" "justify-between" "font-mono"
-                 "text-[0.5625rem]" "text-trading-muted/70"]}
+                 "text-[0.625rem]" "text-trading-muted/70"]}
    [:span (str slider-min-percent "% · defensive")]
    [:span (str max-percent "% · aggressive")]])
 
@@ -160,7 +160,7 @@
                     max-percent
                     action)]
      (sigma-scale-row max-percent)
-     [:p {:class ["mt-2" "text-[0.65625rem]" "leading-[1.45]" "text-trading-muted"]
+     [:p {:class ["mt-2" "text-[0.75rem]" "leading-[1.45]" "text-trading-muted"]
           :data-role "portfolio-optimizer-target-sigma-helper"}
       (sigma-helper-copy sigma sigma-bounds)]]))
 
@@ -194,7 +194,7 @@
     [:div {:class ["mt-2.5" "pl-[22px]"]
            :data-role "portfolio-optimizer-objective-menu-target-sigma-editor"}
      [:div {:class ["mb-1.5" "flex" "items-center" "gap-2.5"]}
-      [:span {:class ["flex-1" "text-[0.65625rem]" "text-trading-muted"]}
+      [:span {:class ["flex-1" "text-[0.75rem]" "text-trading-muted"]}
        "Target σ (annualized)"]
       (sigma-percent-input "portfolio-optimizer-objective-menu-target-sigma-input"
                            (sigma-percent-text sigma)
@@ -205,7 +205,7 @@
                    max-percent
                    action)
      (sigma-scale-row max-percent)
-     [:div {:class ["mt-1.5" "text-[0.625rem]" "leading-[1.45]" "text-trading-muted"]
+     [:div {:class ["mt-1.5" "text-[0.6875rem]" "leading-[1.45]" "text-trading-muted"]
             :data-role "portfolio-optimizer-objective-menu-target-sigma-helper"}
       (sigma-helper-copy sigma sigma-bounds)]]))
 
@@ -238,25 +238,25 @@
                           changed? (conj "bg-warning/5")
                           (not changed?) (conj "bg-base-100/95"))
                  :data-role "portfolio-optimizer-target-sigma-strip"}
-       [:span {:class ["shrink-0" "font-mono" "text-[0.59375rem]" "uppercase"
+       [:span {:class ["shrink-0" "font-mono" "text-[0.625rem]" "uppercase"
                        "tracking-[0.08em]" "text-trading-muted/70"]}
         "Target σ"]
        [:div {:class ["flex" "min-w-[220px]" "flex-[0_1_380px]" "items-center"
                       "gap-2.5"]}
-        [:span {:class ["shrink-0" "font-mono" "text-[0.5625rem]"
+        [:span {:class ["shrink-0" "font-mono" "text-[0.625rem]"
                         "text-trading-muted/70"]}
          (str slider-min-percent "%")]
         (sigma-slider "portfolio-optimizer-target-sigma-slider"
                       (sigma-percent effective)
                       max-percent
                       set-action)
-        [:span {:class ["shrink-0" "font-mono" "text-[0.5625rem]"
+        [:span {:class ["shrink-0" "font-mono" "text-[0.625rem]"
                         "text-trading-muted/70"]}
          (str max-percent "%")]]
        (sigma-percent-input "portfolio-optimizer-target-sigma-input"
                             (sigma-percent-text effective)
                             set-action)
-       [:span {:class ["text-[0.65625rem]" "text-trading-muted"]
+       [:span {:class ["text-[0.75rem]" "text-trading-muted"]
                :data-role "portfolio-optimizer-target-sigma-status"}
         (if changed?
           [:span "σ " (sigma-label current) " → "
@@ -268,14 +268,14 @@
          [:div {:class ["flex" "items-center" "gap-2"]}
           [:button {:type "button"
                     :class ["border" "border-base-300" "bg-base-200/40" "px-2.5"
-                            "py-1" "text-[0.65625rem]" "font-semibold"
+                            "py-1" "text-[0.75rem]" "font-semibold"
                             "text-trading-text"]
                     :data-role "portfolio-optimizer-target-sigma-reset"
                     :on {:click [[:actions/reset-portfolio-optimizer-target-sigma-draft]]}}
            "Reset"]
           [:button {:type "button"
                     :class ["optimizer-primary-action" "border" "border-base-300"
-                            "px-2.5" "py-1" "text-[0.65625rem]" "font-semibold"
+                            "px-2.5" "py-1" "text-[0.75rem]" "font-semibold"
                             "disabled:cursor-not-allowed"
                             "disabled:text-trading-muted"]
                     :data-role "portfolio-optimizer-target-sigma-rerun"

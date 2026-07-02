@@ -1,6 +1,10 @@
 @layer components {
   .portfolio-optimizer .optimizer-setup-route-surface {
     background-color: var(--optimizer-bg);
+    /* Raised setup type ladder (2026-07-02 design review): unclassed text
+       inherits 13px here instead of the optimizer-wide 12px base. Explicitly
+       classed text follows the ladder documented in setup_controls.cljs. */
+    font-size: 0.8125rem;
   }
 
   .portfolio-optimizer
@@ -97,7 +101,7 @@
   .portfolio-optimizer .views-trust-panel__eyebrow {
     color: var(--optimizer-text-3);
     font-family: "JetBrains Mono", var(--font-mono);
-    font-size: 9.5px;
+    font-size: 11px;
     font-weight: 600;
     letter-spacing: 0.08em;
     line-height: 1.35;
@@ -119,7 +123,7 @@
   .portfolio-optimizer .views-trust-panel__description {
     margin-top: 10px;
     color: var(--optimizer-text-2);
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 500;
     line-height: 1.55;
   }
@@ -129,7 +133,7 @@
     display: grid;
     gap: 4px;
     font-family: "JetBrains Mono", var(--font-mono);
-    font-size: 10.5px;
+    font-size: 12px;
     line-height: 1.35;
   }
 
@@ -144,7 +148,7 @@
   .portfolio-optimizer .views-trust-panel__empty {
     color: var(--optimizer-text-2);
     font-family: "Inter Variable", var(--font-ui-system);
-    font-size: 10.5px;
+    font-size: 12px;
     font-weight: 500;
     line-height: 1.45;
   }
@@ -173,7 +177,7 @@
     padding: 8px;
     color: var(--optimizer-text-2);
     font-family: "Inter Variable", var(--font-ui-system);
-    font-size: 10.5px;
+    font-size: 12px;
     font-weight: 500;
     line-height: 1.45;
   }
@@ -276,7 +280,7 @@
     background-color: transparent;
     padding: 0.15rem 0.45rem;
     font-family: var(--font-mono, monospace);
-    font-size: 0.5625rem;
+    font-size: 0.625rem;
     letter-spacing: 0.04em;
     text-transform: uppercase;
     color: var(--optimizer-text-2);
@@ -313,7 +317,7 @@
      tertiary tone the old direction hints used. */
   .portfolio-optimizer .optimizer-exposure-map__axis-title {
     font-family: var(--font-mono, monospace);
-    font-size: 0.5625rem;
+    font-size: 0.6875rem;
     font-weight: 600;
     letter-spacing: 0.08em;
     text-transform: uppercase;
@@ -339,7 +343,7 @@
 
   .portfolio-optimizer .optimizer-exposure-map__zoom-range {
     font-family: var(--font-mono, monospace);
-    font-size: 0.5625rem;
+    font-size: 0.625rem;
     letter-spacing: 0.04em;
     text-transform: uppercase;
     color: var(--optimizer-text-3);
@@ -374,7 +378,7 @@
     justify-content: space-between;
     align-items: flex-end;
     font-family: var(--font-mono, monospace);
-    font-size: 0.625rem;
+    font-size: 0.6875rem;
     color: var(--optimizer-text-2);
     font-variant-numeric: tabular-nums;
   }
@@ -390,7 +394,7 @@
 
   .portfolio-optimizer .optimizer-exposure-map__axis-end {
     font-family: var(--font-mono, monospace);
-    font-size: 0.5625rem;
+    font-size: 0.6875rem;
     font-weight: 600;
     letter-spacing: 0.06em;
     text-transform: uppercase;
@@ -459,7 +463,7 @@
   }
 
   .portfolio-optimizer .optimizer-exposure-map__readout-label {
-    font-size: 0.625rem;
+    font-size: 0.6875rem;
     font-weight: 600;
     letter-spacing: 0.08em;
     text-transform: uppercase;
@@ -468,7 +472,7 @@
 
   .portfolio-optimizer .optimizer-exposure-map__readout-sep {
     color: var(--optimizer-text-3);
-    font-size: 0.625rem;
+    font-size: 0.6875rem;
   }
 
   .portfolio-optimizer
@@ -501,7 +505,7 @@
 
   .portfolio-optimizer .optimizer-exposure-map__band-value {
     font-family: var(--font-mono, monospace);
-    font-size: 0.5625rem;
+    font-size: 0.625rem;
     color: var(--optimizer-text-2);
   }
 
@@ -517,13 +521,13 @@
 
   .portfolio-optimizer .optimizer-exposure-map__echo-value {
     font-family: var(--font-mono, monospace);
-    font-size: 0.625rem;
+    font-size: 0.6875rem;
     color: var(--optimizer-text);
   }
 
   .portfolio-optimizer .optimizer-exposure-map__echo-current {
     font-family: var(--font-mono, monospace);
-    font-size: 0.5625rem;
+    font-size: 0.625rem;
     color: var(--optimizer-text-3);
   }
 
@@ -538,7 +542,7 @@
     background-color: transparent;
     padding: 0.2rem 0.5rem;
     font-family: var(--font-mono, monospace);
-    font-size: 0.5625rem;
+    font-size: 0.625rem;
     letter-spacing: 0.04em;
     text-transform: uppercase;
     color: var(--optimizer-text-2);
@@ -560,13 +564,13 @@
 
   .portfolio-optimizer .optimizer-exposure-map__preview-value {
     font-family: var(--font-mono, monospace);
-    font-size: 0.5625rem;
+    font-size: 0.625rem;
     color: var(--optimizer-text-2);
   }
 
   .portfolio-optimizer .optimizer-exposure-map__preview-verdict {
     font-family: var(--font-mono, monospace);
-    font-size: 0.5625rem;
+    font-size: 0.625rem;
     color: var(--optimizer-warn);
   }
 

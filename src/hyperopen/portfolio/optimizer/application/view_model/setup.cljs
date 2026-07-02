@@ -19,6 +19,7 @@
   [readiness]
   (case (:reason readiness)
     :missing-universe "Select a universe before running."
+    :holdings-loading "Waiting for your holdings snapshot — the universe fills itself when account data arrives."
     :no-eligible-history "History starts loading as assets are included. Run Optimization retries anything still missing."
     :incomplete-history "History is incomplete for this universe. Run Optimization retries anything still missing."
     :missing-history-assumptions "Some assets need history assumptions before this universe can run."

@@ -23,7 +23,10 @@
     (is (nil? (node-by-role view-node "portfolio-optimizer-left-rail")))
     (is (contains? strings "Portfolio Optimizer"))
     (is (contains? strings "Start with"))
-    (is (contains? strings "Load my holdings"))
+    ;; A connected account with no clearinghouse data yet is the holdings
+    ;; auto-seed window: the strip presents "My holdings" as the source in
+    ;; flight rather than offering "Load my holdings" as a manual command.
+    (is (contains? strings "My holdings"))
     (is (contains? strings "Custom"))
     (is (not (contains? strings "Index")))
     (is (contains? strings "Scenario contract"))
@@ -31,14 +34,32 @@
     (is (contains? strings "Why this preset is safe"))
     (is (not (contains? strings "Execution Assumptions")))))
 
-(deftest setup-universe-source-strip-reflects-live-source-test
-  ;; The source strip leads with "My holdings" (the default path — the universe
-  ;; seeds itself from holdings) and shows "Custom" as the alternate state; with
-  ;; no holdings loaded yet, neither segment is active and the holdings segment
-  ;; reads as the load action.
+(deftest setup-holdings-loading-window-mirrors-across-rail-and-run-bar-test
+  ;; Cold load with a connected account and no clearinghouse data yet: the wait
+  ;; must be visible everywhere the user checks readiness — the scenario
+  ;; contract's Universe row, the Readiness copy, and the Run CTA — and the CTA
+  ;; must not ask the user to add assets the seed is about to add.
   (let [view-node (portfolio-view/portfolio-view
                    {:router {:path "/portfolio/optimize/new"}
                     :wallet {:address "0x1111111111111111111111111111111111111111"}})
+        summary-card (node-by-role view-node "portfolio-optimizer-setup-summary-card")
+        run-button (node-by-role view-node "portfolio-optimizer-run-draft")
+        strings (set (collect-strings view-node))]
+    (is (str/includes? (node-text summary-card) "Loading holdings…"))
+    (is (str/includes? (node-text run-button) "Loading holdings…"))
+    (is (true? (get-in run-button [1 :disabled])))
+    (is (contains? strings
+                   "Waiting for your holdings snapshot — the universe fills itself when account data arrives."))
+    (is (not (contains? strings "Add assets to run")))
+    (is (some? (node-by-role view-node "portfolio-optimizer-universe-holdings-loading")))))
+
+(deftest setup-universe-source-strip-reflects-live-source-test
+  ;; The source strip leads with "My holdings" (the default path — the universe
+  ;; seeds itself from holdings) and shows "Custom" as the alternate state; with
+  ;; NO account connected there is nothing to wait for, so neither segment is
+  ;; active and the holdings segment reads as the manual load action.
+  (let [view-node (portfolio-view/portfolio-view
+                   {:router {:path "/portfolio/optimize/new"}})
         universe-panel (node-by-role view-node "portfolio-optimizer-universe-panel")
         source-strip (node-by-role universe-panel
                                    "portfolio-optimizer-universe-source-strip")
@@ -58,8 +79,7 @@
   ;; The old duplicate prominent empty-state button (…-universe-load-holdings) was
   ;; removed; the empty state points at the strip button instead.
   (let [view-node (portfolio-view/portfolio-view
-                   {:router {:path "/portfolio/optimize/new"}
-                    :wallet {:address "0x1111111111111111111111111111111111111111"}})
+                   {:router {:path "/portfolio/optimize/new"}})
         load-strip (node-by-role view-node "portfolio-optimizer-universe-use-current")]
     (is (some? load-strip))
     (is (= [[:actions/set-portfolio-optimizer-universe-from-current]]

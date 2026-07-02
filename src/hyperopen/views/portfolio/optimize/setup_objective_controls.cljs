@@ -70,8 +70,8 @@
             :aria-pressed (str selected?)
             :data-role role
             :on {:click [action]}}
-   [:p {:class ["text-[0.6875rem]" "font-medium" "text-trading-text"]}
+   [:p {:class ["text-[0.8125rem]" "font-medium" "text-trading-text"]}
     [:span {:class (if selected? "text-warning" "text-trading-muted")} (if selected? "◉ " "○ ")]
     title
     [:span {:class ["sr-only"]} title]]
-   [:p {:class ["mt-1" "text-[0.65625rem]" "text-trading-muted"]} subtitle]])
+   [:p {:class ["mt-1" "text-[0.75rem]" "text-trading-muted"]} subtitle]])

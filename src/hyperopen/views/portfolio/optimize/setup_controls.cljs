@@ -1,15 +1,22 @@
 (ns hyperopen.views.portfolio.optimize.setup-controls
   (:require [clojure.string :as str]))
 
+;; Setup-surface type ladder (2026-07-02 design review): section titles 0.875rem
+;; sentence case; primary body/values/inputs/CTAs 0.8125rem; secondary metadata
+;; 0.75rem; micro labels/eyebrows 0.6875rem; chips/table headers floor at
+;; 0.625rem. Uppercase-mono is reserved for genuine tags (eyebrows, chips,
+;; status tags) — titles, picker labels, and prose stay sentence case so the
+;; page reads as a product, not log output. Keep new text on this ladder.
+
 (def eyebrow-class
-  ["font-mono" "text-[0.625rem]" "font-semibold" "uppercase" "tracking-[0.08em]" "text-trading-muted/70"])
+  ["font-mono" "text-[0.6875rem]" "font-semibold" "uppercase" "tracking-[0.08em]" "text-trading-muted/70"])
 
 (def section-title-class
-  ["text-[0.6875rem]" "font-semibold" "uppercase" "tracking-[0.08em]" "text-trading-text"])
+  ["text-[0.875rem]" "font-semibold" "text-trading-text"])
 
 (def input-class
   ["w-full" "border" "border-base-300" "bg-base-100/80" "px-2" "py-1.5"
-   "font-mono" "text-[0.6875rem]" "font-medium" "outline-none"
+   "font-mono" "text-[0.8125rem]" "font-medium" "outline-none"
    "transition-shadow" "focus:border-warning/70"
    "focus:shadow-[0_0_0_1px_rgba(212,181,88,0.75)]"])
 
@@ -57,8 +64,10 @@
   [:div {:class ["flex" "items-center" "justify-between" "gap-3" "border-b" "border-base-300" "pb-2"]}
    [:p {:class section-title-class} title]
    (when trailing
-     [:span {:class ["font-mono" "text-[0.65625rem]" "uppercase" "tracking-[0.08em]"
-                      "text-trading-muted/70"]}
+     ;; Live-value summary ("Historical mean · Ledoit-Wolf", constraint numbers):
+     ;; mono for the numbers, sentence case so a collapsed header reads as a
+     ;; value, not a shouted tag.
+     [:span {:class ["font-mono" "text-[0.75rem]" "text-trading-muted/70"]}
       trailing])])
 
 (defn disclosure-heading
@@ -81,7 +90,7 @@
                :class (cond-> ["optimizer-segment-button"
                                "group" "relative" "border-r" "border-base-300"
                                "bg-transparent" "px-2" "py-1.5" "text-center"
-                               "text-[0.65625rem]" "font-medium" "uppercase"
+                               "text-[0.75rem]" "font-medium"
                                "tracking-[0.04em]" "text-trading-muted"
                                "transition-colors" "last:border-r-0"
                                "hover:text-warning" "focus:outline-none"
@@ -99,7 +108,7 @@
         [:span {:class (into ["pointer-events-none" "absolute" "top-[calc(100%+6px)]"
                               "z-30" "w-72" "max-w-[calc(100vw-2rem)]"
                               "border" "border-base-300" "bg-base-100" "px-2" "py-1.5"
-                              "font-sans" "text-[0.65625rem]" "font-normal"
+                              "font-sans" "text-[0.75rem]" "font-normal"
                               "normal-case" "leading-[1.45]" "tracking-normal"
                               "text-trading-muted" "opacity-0"
                               "shadow-[0_12px_32px_rgba(0,0,0,0.45)]"
@@ -158,6 +167,6 @@
              :aria-invalid (when highlighted? "true")
              :value (str value-text)
              :on {:change [action]}}]
-    [:span {:class ["font-mono" "text-[0.6875rem]" "text-trading-muted"]} "%"]]
+    [:span {:class ["font-mono" "text-[0.8125rem]" "text-trading-muted"]} "%"]]
    (when hint
-     [:span {:class ["mt-1" "block" "font-mono" "text-[0.5625rem]" "text-trading-muted/70"]} hint])])
+     [:span {:class ["mt-1" "block" "font-mono" "text-[0.625rem]" "text-trading-muted/70"]} hint])])

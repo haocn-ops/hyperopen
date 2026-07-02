@@ -11,7 +11,7 @@
                         swatch-class)
            :aria-hidden "true"}]
    [:div {:class ["flex" "flex-wrap" "items-baseline" "gap-x-1.5" "gap-y-0.5"
-                  "text-[0.6875rem]" "leading-[1.4]"]}
+                  "text-[0.8125rem]" "leading-[1.4]"]}
     [:span {:class ["font-medium" "text-trading-text"]} label]
     [:span {:class ["text-trading-muted"]} qualifier]]])
 

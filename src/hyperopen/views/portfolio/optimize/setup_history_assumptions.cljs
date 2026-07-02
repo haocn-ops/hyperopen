@@ -20,7 +20,7 @@
              :data-role role
              :value (or (:input-text field) "")
              :on {:input [action]}}]
-    [:span {:class ["font-mono" "text-[0.6875rem]" "text-trading-muted"]} "%"]]])
+    [:span {:class ["font-mono" "text-[0.8125rem]" "text-trading-muted"]} "%"]]])
 
 (defn- enable-conservative-button
   "Single opt-in affordance for a not-yet-configured asset: there is only one
@@ -31,7 +31,7 @@
   (let [id (:instrument-id card)]
     [:button {:type "button"
               :class ["optimizer-primary-action" "mt-3" "w-full" "border" "border-warning/70"
-                      "bg-warning/80" "px-3" "py-2" "text-[0.6875rem]" "font-semibold" "text-base-100"]
+                      "bg-warning/80" "px-3" "py-2" "text-[0.8125rem]" "font-semibold" "text-base-100"]
               :data-role (str "portfolio-optimizer-history-assumption-enable-" id)
               :on {:click [[(get-in card [:actions :set-mode]) id :conservative]]}}
      "Use a conservative assumption"]))
@@ -62,7 +62,7 @@
 (defn- card-errors
   [card]
   (when (seq (:errors card))
-    (into [:ul {:class ["space-y-1" "text-[0.65rem]" "text-warning"]
+    (into [:ul {:class ["space-y-1" "text-[0.75rem]" "text-warning"]
                 :data-role (str "portfolio-optimizer-history-assumption-errors-"
                                 (:instrument-id card))}]
           (map (fn [message] [:li message]) (:errors card)))))
@@ -76,28 +76,28 @@
       [:div
        [:p {:class controls/section-title-class}
         (str "Assumptions needed for " (:label card))]
-       [:p {:class ["mt-1" "font-mono" "text-[0.6rem]" "uppercase" "tracking-[0.08em]"
+       [:p {:class ["mt-1" "font-mono" "text-[0.6875rem]" "uppercase" "tracking-[0.08em]"
                     "text-trading-muted/70"]}
         (:status-label card)]]
       (when (:mode card)
         [:button {:type "button"
-                  :class ["text-[0.6rem]" "uppercase" "tracking-[0.08em]"
+                  :class ["text-[0.6875rem]" "uppercase" "tracking-[0.08em]"
                           "text-trading-muted" "hover:text-warning"]
                   :data-role (str "portfolio-optimizer-history-assumption-clear-" id)
                   :on {:click [[(get-in card [:actions :clear]) id]]}}
          "Clear"])]
-     [:p {:class ["text-[0.65rem]" "leading-[1.5]" "text-trading-muted"]} intro-copy]
+     [:p {:class ["text-[0.75rem]" "leading-[1.5]" "text-trading-muted"]} intro-copy]
      (if (:mode card)
        (card-fields card)
        (enable-conservative-button card))
      (when (:note card)
        [:p {:class ["border" "border-warning/40" "bg-warning/10" "p-2"
-                    "text-[0.65rem]" "text-warning"]
+                    "text-[0.75rem]" "text-warning"]
             :data-role (str "portfolio-optimizer-history-assumption-note-" id)}
         (:note card)])
      (card-errors card)
      (when (:summary card)
-       [:p {:class ["text-[0.65rem]" "text-trading-text"]
+       [:p {:class ["text-[0.75rem]" "text-trading-text"]
             :data-role (str "portfolio-optimizer-history-assumption-summary-" id)}
         (str (:label card) ": " (:summary card))])]))
 
@@ -113,6 +113,6 @@
                        :data-role "portfolio-optimizer-history-assumptions-section"}
              [:div
               [:p {:class controls/eyebrow-class} "Assets needing assumptions"]
-              [:p {:class ["mt-1" "text-[0.65rem]" "leading-[1.45]" "text-trading-muted"]}
+              [:p {:class ["mt-1" "text-[0.75rem]" "leading-[1.45]" "text-trading-muted"]}
                "Some selected assets don't have enough history for optimizer-safe risk estimates."]]]
             (map assumption-card cards)))))

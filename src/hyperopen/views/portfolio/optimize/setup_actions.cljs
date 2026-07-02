@@ -2,13 +2,16 @@
   (:require [hyperopen.views.portfolio.optimize.setup-controls :as controls]))
 
 (defn model-assumptions-panel
+  "Collapsed by default: assumptions are explanation, not configuration, so they
+  sit on the same tertiary tier as 'Why this preset is safe' instead of
+  competing with the constraint numbers for attention."
   []
-  [:section {:class ["optimizer-note" "optimizer-model-assumptions-note"
+  [:details {:class ["optimizer-note" "optimizer-model-assumptions-note"
                      "border" "border-base-300" "bg-base-100/90"]
              :data-role "portfolio-optimizer-model-assumptions-panel"
              :data-optimizer-note "true"}
-   [:p {:class controls/eyebrow-class} "What this model assumes"]
-   [:ul {:class ["mt-1" "space-y-px" "text-[0.65625rem]" "leading-[1.32]" "text-trading-muted"]}
+   (controls/disclosure-heading "What this model assumes" nil)
+   [:ul {:class ["mt-2" "space-y-px" "text-[0.75rem]" "leading-[1.45]" "text-trading-muted"]}
     [:li "Returns are roughly normal at the chosen horizon."]
     [:li "Past covariance is informative about future covariance."]
     [:li "Cross-margin is treated as one book."]
@@ -33,6 +36,7 @@
 (defn- run-status-label
   [reason]
   (case reason
+    :holdings-loading "Loading holdings"
     :history-loading "Loading history"
     :no-eligible-history "No usable history"
     :incomplete-history "History incomplete"
@@ -58,6 +62,12 @@
       ready?
       {:ready? true :tone :ready :label "Ready to run"}
 
+      ;; Waiting on the holdings snapshot is a machine state, not a user task:
+      ;; it must win over the zero-asset "Add assets to run" instruction, which
+      ;; would tell the user to do the work the seed is about to do.
+      (= :holdings-loading (:reason readiness))
+      {:ready? false :tone :busy :label "Loading holdings"}
+
       (zero? (or asset-count 0))
       {:ready? false :tone :empty :label "Add assets to run"}
 
@@ -82,7 +92,7 @@
   [{:keys [result-path tab label data-role accent? actions]}]
   [:button {:type "button"
             :class (into ["border" "px-3" "py-2" "whitespace-nowrap"
-                          "text-[0.6875rem]" "font-semibold" "scroll-mb-12"]
+                          "text-[0.8125rem]" "font-semibold" "scroll-mb-12"]
                          (if accent?
                            ["border-primary/50" "bg-primary/10" "text-primary"]
                            ["border-base-300" "bg-base-200/30" "text-trading-text"]))
@@ -101,7 +111,8 @@
                             :running? running?
                             :readiness readiness
                             :asset-count asset-count})
-        ready? (:ready? status)]
+        ready? (:ready? status)
+        holdings-loading? (= :holdings-loading (:reason readiness))]
     [:section {:class ["optimizer-setup-actions"
                        "relative" "z-[180]" "mt-2" "flex" "flex-col" "items-start" "gap-3"
                        "border" "border-base-300" "bg-[#101518]"
@@ -111,7 +122,7 @@
      [:button {:type "button"
                :class ["optimizer-primary-action"
                        "border" "border-warning/70" "bg-warning/80" "px-6" "py-2.5"
-                       "whitespace-nowrap" "text-[0.71875rem]" "font-semibold" "text-base-100"
+                       "whitespace-nowrap" "text-[0.8125rem]" "font-semibold" "text-base-100"
                        "shadow-[0_0_0_1px_rgba(0,0,0,0.25)]"
                        "scroll-mb-12"
                        "disabled:cursor-not-allowed" "disabled:border-base-300"
@@ -130,10 +141,13 @@
       ;; internal posture and turned misleading the moment the user customized
       ;; anything. The status-detail line below still names the exact
       ;; objective/model being solved.
-      (if running? "Optimizing…" "Run optimization")]
+      (cond
+        running? "Optimizing…"
+        holdings-loading? "Loading holdings…"
+        :else "Run optimization")]
      [:button {:type "button"
                :class ["border" "border-base-300" "bg-base-200/30" "px-3" "py-2"
-                       "whitespace-nowrap" "text-[0.6875rem]" "font-semibold" "text-trading-text"
+                       "whitespace-nowrap" "text-[0.8125rem]" "font-semibold" "text-trading-text"
                        "scroll-mb-12"
                        "disabled:cursor-not-allowed" "disabled:text-trading-muted"]
                :data-role "portfolio-optimizer-save-scenario"
@@ -157,9 +171,13 @@
                                      [:actions/open-portfolio-optimizer-execution]]}))
      [:div {:class ["flex" "max-w-full" "flex-col" "items-start" "gap-1.5" "font-mono"
                     "sm:ml-auto" "sm:min-w-[220px]" "sm:items-end" "sm:text-right"]}
-      [:div {:class ["flex" "items-center" "gap-2" "text-[0.6875rem]" "font-semibold"
-                     "whitespace-nowrap" "uppercase" "tracking-[0.14em]"
-                     (if ready? "text-[#5a5f68]" "text-[#444951]")
+      ;; Status tag stays a small uppercase-mono TAG (0.75rem), but in the
+      ;; readable muted tier: when blocked it is the explanation of why Run is
+      ;; gated, so it cannot whisper at ~2:1 contrast (the old #444951/#5a5f68
+      ;; literals failed WCAG AA on the bar background).
+      [:div {:class ["flex" "items-center" "gap-2" "text-[0.75rem]" "font-semibold"
+                     "whitespace-nowrap" "uppercase" "tracking-[0.08em]"
+                     (if ready? "text-trading-muted/80" "text-trading-muted")
                      "sm:justify-end"]
              :data-role "portfolio-optimizer-setup-bottom-actions-status-meta"
              :data-run-status (name (:tone status))}
@@ -172,7 +190,10 @@
        [:span (:label status)]
        [:span {:class ["text-trading-muted/50"]} "·"]
        [:span (str asset-count " assets")]]
-      [:div {:class ["max-w-full" "text-[0.625rem]" "font-semibold" "normal-case"
-                     "tracking-normal" "text-trading-muted" "sm:max-w-[260px]"]
+      ;; The detail line names the exact objective/model being solved — the most
+      ;; informative text in the bar, so it sits a tier brighter than the status
+      ;; tag above it (portfolio-regressions pins that relationship).
+      [:div {:class ["max-w-full" "text-[0.6875rem]" "font-semibold" "normal-case"
+                     "tracking-normal" "text-trading-text/90" "sm:max-w-[260px]"]
              :data-role "portfolio-optimizer-setup-bottom-actions-status-detail"}
        (str "Solving " objective-copy " · " model-copy)]]]))

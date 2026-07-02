@@ -1,11 +1,37 @@
 (ns hyperopen.portfolio.optimizer.application.view-model.workspace
-  (:require [hyperopen.portfolio.optimizer.application.current-portfolio :as current-portfolio]
+  (:require [hyperopen.account.context :as account-context]
+            [hyperopen.portfolio.optimizer.application.current-portfolio :as current-portfolio]
             [hyperopen.portfolio.optimizer.application.rebalance-preview :as rebalance-preview]
             [hyperopen.portfolio.optimizer.application.run-identity :as run-identity]
             [hyperopen.portfolio.optimizer.application.setup-readiness :as setup-readiness]
             [hyperopen.portfolio.optimizer.contracts :as contracts]
             [hyperopen.portfolio.optimizer.defaults :as optimizer-defaults]
             [hyperopen.portfolio.routes :as portfolio-routes]))
+
+(defn holdings-loading?
+  "True while the /optimize/new default path is still waiting for account data to
+  seed the universe: an untouched draft (no restored, cleared, or hand-edited
+  input — a deliberate clear records a custom universe source, which makes the
+  draft touched), an account whose holdings are coming, and no perp
+  clearinghouse snapshot yet. Keyed off source ARRIVAL rather than \"seed
+  happened\" because the seed writes nothing for an empty book — an empty
+  account must resolve to the normal empty-universe copy, not load forever."
+  [state route draft]
+  (boolean
+   (and (= :optimize-new (:kind route))
+        (optimizer-defaults/untouched-draft? draft)
+        (some? (account-context/effective-account-address state))
+        (not (:perp? (current-portfolio/holdings-sources-signature state))))))
+
+(defn- with-holdings-loading-reason
+  "While holdings are being waited on, the honest blocker is the wait itself, not
+  \"select a universe\". Only the :missing-universe reason is rewritten so every
+  readiness consumer (status pill, Run CTA, readiness panel, universe panel,
+  contract card) tells the same story without new plumbing."
+  [readiness loading?]
+  (if (and loading? (= :missing-universe (:reason readiness)))
+    (assoc readiness :reason :holdings-loading)
+    readiness))
 
 (defn optimizer-draft
   [state]
@@ -53,7 +79,10 @@
   [state route]
   (let [snapshot (current-portfolio/current-portfolio-snapshot state)
         draft (optimizer-draft state)
-        readiness (setup-readiness/build-readiness state)
+        holdings-loading?* (holdings-loading? state route draft)
+        readiness (with-holdings-loading-reason
+                   (setup-readiness/build-readiness state)
+                   holdings-loading?*)
         preview-snapshot (or (get-in readiness [:request :current-portfolio])
                              snapshot)
         run-state (or (get-in state contracts/run-state-path)

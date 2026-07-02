@@ -38,7 +38,7 @@
         error (:error run-state)]
     [:div {:class ["mt-4" "rounded-lg" "border" "border-base-300" "bg-base-200/40" "p-3"]
            :data-role "portfolio-optimizer-run-status-panel"}
-     [:p {:class ["text-[0.65rem]"
+     [:p {:class ["text-[0.75rem]"
                   "font-semibold"
                   "uppercase"
                   "tracking-[0.18em]"
@@ -64,7 +64,7 @@
     (when result
       [:div {:class ["mt-4" "rounded-lg" "border" "border-base-300" "bg-base-200/40" "p-3"]
              :data-role "portfolio-optimizer-last-successful-run"}
-       [:p {:class ["text-[0.65rem]"
+       [:p {:class ["text-[0.75rem]"
                     "font-semibold"
                     "uppercase"
                     "tracking-[0.18em]"

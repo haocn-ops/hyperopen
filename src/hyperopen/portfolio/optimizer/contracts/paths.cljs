@@ -54,6 +54,7 @@
 (def last-successful-run-path (conj optimizer-path :last-successful-run))
 (def last-successful-run-result-path (conj last-successful-run-path :result))
 (def constraint-profiles-path (conj optimizer-path :constraint-profiles))
+(def view-library-path (conj optimizer-path :view-library))
 (def refinement-path (conj optimizer-path :refinement))
 (def refinement-active-path (conj refinement-path :active?))
 (def refinement-depth-path (conj refinement-path :depth))
@@ -102,6 +103,7 @@
 (def ui-refinement-open-path (conj optimizer-ui-path :refinement-open?))
 (def ui-refinement-depth-path (conj optimizer-ui-path :refinement-depth))
 (def ui-exposure-zoom-level-path (conj optimizer-ui-path :exposure-zoom-level))
+(def ui-return-views-filter-path (conj optimizer-ui-path :return-views-filter))
 
 (def path-catalog
   {:optimizer/root optimizer-path
@@ -156,6 +158,7 @@
    :optimizer/last-successful-run last-successful-run-path
    :optimizer/last-successful-run-result last-successful-run-result-path
    :optimizer/constraint-profiles constraint-profiles-path
+   :optimizer/view-library view-library-path
    :optimizer/refinement refinement-path
    :optimizer/refinement-active refinement-active-path
    :optimizer/refinement-depth refinement-depth-path
@@ -192,7 +195,8 @@
    :optimizer-ui/stale-auto-recompute ui-stale-auto-recompute-path
    :optimizer-ui/refinement-open ui-refinement-open-path
    :optimizer-ui/refinement-depth ui-refinement-depth-path
-   :optimizer-ui/exposure-zoom-level ui-exposure-zoom-level-path})
+   :optimizer-ui/exposure-zoom-level ui-exposure-zoom-level-path
+   :optimizer-ui/return-views-filter ui-return-views-filter-path})
 
 (defn optimizer-state-path
   [& segments]

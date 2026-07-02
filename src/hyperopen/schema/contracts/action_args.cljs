@@ -287,6 +287,7 @@
    :actions/remove-portfolio-optimizer-objective-menu-view ::portfolio-optimizer-instrument-id-args
    :actions/add-portfolio-optimizer-objective-menu-view ::common/no-args
    :actions/apply-portfolio-optimizer-objective-menu-selection-and-run ::common/no-args
+   :actions/set-portfolio-optimizer-return-views-filter ::portfolio-optimizer-model-kind-args
    :actions/set-portfolio-optimizer-return-model-kind ::portfolio-optimizer-model-kind-args
    :actions/set-portfolio-optimizer-risk-model-kind ::portfolio-optimizer-model-kind-args
    :actions/apply-portfolio-optimizer-setup-preset ::portfolio-optimizer-model-kind-args

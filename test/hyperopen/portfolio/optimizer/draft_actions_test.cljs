@@ -68,7 +68,9 @@
             state))
         "re-applying target-volatility keeps the user-chosen sigma instead of the 12% preset")))
 
-(deftest objective-menu-apply-use-my-views-updates-return-model-and-reruns-test
+(deftest objective-menu-apply-max-sharpe-keeps-authored-views-as-is-test
+  ;; Applying Maximum Sharpe attaches the views-aware return model with the
+  ;; draft's authored views untouched — no normalization pass, no re-authoring.
   (let [state {:portfolio {:optimizer {:draft {:universe [{:instrument-id "perp:BTC"}]
                                                :objective {:kind :minimum-variance}
                                                :return-model {:kind :black-litterman
@@ -77,20 +79,16 @@
                                                                        :return 0.2
                                                                        :confidence 0.75
                                                                        :weights {"perp:BTC" 1}}]}}}}
-               :portfolio-ui {:optimizer {:objective-menu-selection :use-my-views}}}]
+               :portfolio-ui {:optimizer {:objective-menu-selection :max-sharpe}}}]
     (is (= [[:effects/save-many
              [[[:portfolio :optimizer :draft :objective]
                {:kind :max-sharpe}]
               [[:portfolio :optimizer :draft :return-model]
                {:kind :black-litterman
-                :views [{:id "bl_view_1"
-                         :kind :absolute
+                :views [{:kind :absolute
                          :instrument-id "perp:BTC"
                          :return 0.2
-                         :confidence-level :high
                          :confidence 0.75
-                         :confidence-variance 0.25
-                         :horizon :3m
                          :weights {"perp:BTC" 1}}]}]
               [[:portfolio-ui :optimizer :objective-menu-open?] false]
               [[:portfolio-ui :optimizer :objective-menu-selection] nil]
@@ -101,7 +99,41 @@
            (actions/apply-portfolio-optimizer-objective-menu-selection-and-run
             state)))))
 
-(deftest objective-menu-apply-leaving-use-my-views-restores-baseline-return-model-test
+(deftest objective-menu-apply-max-sharpe-hydrates-views-from-wallet-library-test
+  ;; An old historical-mean draft picking Maximum Sharpe gets the wallet's
+  ;; remembered views for universe instruments, not an empty slate.
+  (let [state {:portfolio {:optimizer {:draft {:universe [{:instrument-id "perp:BTC"}
+                                                          {:instrument-id "perp:ETH"}]
+                                               :objective {:kind :minimum-variance}
+                                               :return-model {:kind :historical-mean}}
+                                       :view-library {"perp:BTC" {:instrument-id "perp:BTC"
+                                                                  :return 0.2
+                                                                  :confidence-level :high
+                                                                  :updated-at-ms 1700000000000}
+                                                      "perp:SOL" {:instrument-id "perp:SOL"
+                                                                  :return 0.3
+                                                                  :confidence-level :low
+                                                                  :updated-at-ms 1700000000000}}}}
+               :portfolio-ui {:optimizer {:objective-menu-selection :max-sharpe}}}
+        effects (actions/apply-portfolio-optimizer-objective-menu-selection-and-run state)
+        saved-values (second (first effects))
+        return-model (second (second saved-values))]
+    (is (= {:kind :black-litterman
+            :views [{:id "bl_view_1"
+                     :kind :absolute
+                     :instrument-id "perp:BTC"
+                     :return 0.2
+                     :confidence-level :high
+                     :confidence 0.75
+                     :confidence-variance 0.25
+                     :horizon :3m
+                     :weights {"perp:BTC" 1}}]}
+           return-model)
+        "Only remembered views for CURRENT universe instruments hydrate — perp:SOL stays in the library.")))
+
+(deftest objective-menu-apply-non-sharpe-objective-keeps-views-model-test
+  ;; Views are an input policy, not an objective: picking Minimum volatility no
+  ;; longer downgrades the return model to historical-mean.
   (let [state {:portfolio {:optimizer {:draft {:universe [{:instrument-id "perp:BTC"}]
                                                :objective {:kind :max-sharpe}
                                                :return-model {:kind :black-litterman
@@ -114,8 +146,6 @@
     (is (= [[:effects/save-many
              [[[:portfolio :optimizer :draft :objective]
                {:kind :minimum-variance}]
-              [[:portfolio :optimizer :draft :return-model]
-               {:kind :historical-mean}]
               [[:portfolio-ui :optimizer :objective-menu-open?] false]
               [[:portfolio-ui :optimizer :objective-menu-selection] nil]
               [[:portfolio-ui :optimizer :objective-menu-target-sigma] nil]
@@ -125,20 +155,17 @@
            (actions/apply-portfolio-optimizer-objective-menu-selection-and-run
             state)))))
 
-(deftest objective-menu-use-my-views-inline-actions-and-apply-test
+(deftest inline-view-edits-buffer-only-outside-views-model-test
+  ;; With a historical/EW estimator the panel is a note, not an editor: typing
+  ;; and stepping only move the display buffer, and confidence is a no-op.
   (let [state {:portfolio {:optimizer {:draft {:universe [{:instrument-id "perp:BTC"}
                                                            {:instrument-id "perp:ETH"}
                                                            {:instrument-id "perp:HYPE"}]
                                                :objective {:kind :minimum-variance}
                                                :return-model {:kind :historical-mean}}}}
-               :portfolio-ui {:optimizer {:objective-menu-selection :use-my-views
-                                           :objective-menu-view-drafts
+               :portfolio-ui {:optimizer {:objective-menu-view-drafts
                                            {:perp:BTC {:return-text "18"
-                                                       :confidence :medium}
-                                            :perp:ETH {:return-text "16.5"
-                                                       :confidence :low}
-                                            :perp:HYPE {:return-text "45"
-                                                        :confidence :high}}}}}]
+                                                       :confidence :medium}}}}}]
     (is (= [[:effects/save
              [:portfolio-ui :optimizer :objective-menu-view-drafts
               :perp:BTC
@@ -148,11 +175,7 @@
             state
             "perp:BTC"
             "19.25")))
-    (is (= [[:effects/save
-             [:portfolio-ui :optimizer :objective-menu-view-drafts
-              :perp:BTC
-              :confidence]
-             :high]]
+    (is (= []
            (actions/set-portfolio-optimizer-objective-menu-view-confidence
             state
             "perp:BTC"
@@ -179,84 +202,231 @@
            (actions/add-portfolio-optimizer-objective-menu-view
             (assoc-in state
                       [:portfolio-ui :optimizer :objective-menu-view-order]
-                      ["perp:BTC" "perp:ETH"]))))
+                      ["perp:BTC" "perp:ETH"]))))))
+
+(def ^:private views-model-state
+  ;; A views-aware draft with one authored view. Universe has no history data, so
+  ;; the implied baseline is unknown — exactly the worst case the actions must
+  ;; stay honest in.
+  {:portfolio {:optimizer {:draft {:universe [{:instrument-id "perp:BTC"}
+                                              {:instrument-id "perp:ETH"}]
+                                   :objective {:kind :max-sharpe}
+                                   :return-model
+                                   {:kind :black-litterman
+                                    :views [{:id "bl_view_1"
+                                             :kind :absolute
+                                             :instrument-id "perp:BTC"
+                                             :return 0.2
+                                             :confidence-level :high
+                                             :confidence 0.75
+                                             :confidence-variance 0.25
+                                             :horizon :3m
+                                             :weights {"perp:BTC" 1}}]}
+                                   :metadata {:dirty? false}}}}})
+
+(def ^:private views-path
+  [:portfolio :optimizer :draft :return-model :views])
+
+(def ^:private dirty-path*
+  [:portfolio :optimizer :draft :metadata :dirty?])
+
+(deftest inline-view-return-edit-authors-view-and-syncs-library-test
+  ;; Typing a parseable return on a fresh row authors the view immediately and
+  ;; upserts it into the wallet's view library.
+  (let [effects (actions/set-portfolio-optimizer-objective-menu-view-return
+                 views-model-state
+                 "perp:ETH"
+                 "12.5")]
     (is (= [[:effects/save-many
-             [[[:portfolio :optimizer :draft :objective]
-               {:kind :max-sharpe}]
-              [[:portfolio :optimizer :draft :return-model]
-               {:kind :black-litterman
-                :views [{:id "bl_view_1"
-                         :kind :absolute
-                         :instrument-id "perp:BTC"
-                         :return 0.18
-                         :confidence-level :medium
-                         :confidence 0.5
-                         :confidence-variance 0.5
-                         :horizon :3m
-                         :weights {"perp:BTC" 1}}
-                        {:id "bl_view_2"
-                         :kind :absolute
-                         :instrument-id "perp:ETH"
-                         :return 0.165
-                         :confidence-level :low
-                         :confidence 0.25
-                         :confidence-variance 0.75
-                         :horizon :3m
-                         :weights {"perp:ETH" 1}}
-                        {:id "bl_view_3"
-                         :kind :absolute
-                         :instrument-id "perp:HYPE"
-                         :return 0.45
-                         :confidence-level :high
-                         :confidence 0.75
-                         :confidence-variance 0.25
-                         :horizon :3m
-                         :weights {"perp:HYPE" 1}}]}]
-              [[:portfolio-ui :optimizer :objective-menu-open?] false]
-              [[:portfolio-ui :optimizer :objective-menu-selection] nil]
-              [[:portfolio-ui :optimizer :objective-menu-target-sigma] nil]
-              [[:portfolio-ui :optimizer :target-sigma-draft] nil]
-              [[:portfolio :optimizer :draft :metadata :dirty?] true]]]
-            [:effects/run-portfolio-optimizer-pipeline]]
-           (actions/apply-portfolio-optimizer-objective-menu-selection-and-run
-            state)))))
+             [[views-path
+               [{:id "bl_view_1"
+                 :kind :absolute
+                 :instrument-id "perp:BTC"
+                 :return 0.2
+                 :confidence-level :high
+                 :confidence 0.75
+                 :confidence-variance 0.25
+                 :horizon :3m
+                 :weights {"perp:BTC" 1}}
+                {:id "bl_view_2"
+                 :kind :absolute
+                 :instrument-id "perp:ETH"
+                 :return 0.125
+                 :confidence-level :medium
+                 :confidence 0.5
+                 :confidence-variance 0.5
+                 :horizon :3m
+                 :weights {"perp:ETH" 1}}]]
+              [[:portfolio-ui :optimizer :objective-menu-view-drafts :perp:ETH :return-text]
+               "12.5"]
+              [dirty-path* true]]]
+            [:effects/sync-portfolio-optimizer-view-library
+             {:upserts [{:instrument-id "perp:ETH"
+                         :return 0.125
+                         :confidence-level :medium}]
+              :removes []}]]
+           effects))))
 
-(deftest objective-menu-use-my-views-prefills-from-baseline-return-data-on-apply-test
-  (let [state {:portfolio {:optimizer {:draft {:universe [{:instrument-id "perp:BTC"}]
-                                               :objective {:kind :minimum-variance}
-                                               :return-model {:kind :historical-mean}
-                                               :risk-model {:kind :sample-covariance}}
-                                      :last-successful-run
-                                      {:result {:expected-returns-by-instrument
-                                                {"perp:BTC" 0.2}}}}}
-               :portfolio-ui {:optimizer {:objective-menu-selection :use-my-views}}}]
-    (let [effects (actions/apply-portfolio-optimizer-objective-menu-selection-and-run state)
-          saved-values (second (first effects))
-          return-model (second (second saved-values))]
-      (is (= {:kind :black-litterman
-              :views [{:id "bl_view_1"
-                       :kind :absolute
-                       :instrument-id "perp:BTC"
-                       :return 0.2
-                       :confidence-level :medium
-                       :confidence 0.5
-                       :confidence-variance 0.5
-                       :horizon :3m
-                       :weights {"perp:BTC" 1}}]}
-             return-model)))))
+(deftest inline-view-return-edit-updates-existing-view-preserving-confidence-test
+  (let [effects (actions/set-portfolio-optimizer-objective-menu-view-return
+                 views-model-state
+                 "perp:BTC"
+                 "25")
+        saved-views (get-in (vec effects) [0 1 0 1])]
+    (is (= [{:id "bl_view_1"
+             :kind :absolute
+             :instrument-id "perp:BTC"
+             :return 0.25
+             :confidence-level :high
+             :confidence 0.75
+             :confidence-variance 0.25
+             :horizon :3m
+             :weights {"perp:BTC" 1}}]
+           saved-views)
+        "Editing the return keeps the user's confidence level.")))
 
-(deftest objective-menu-use-my-views-preserves-relative-views-and-removes-edited-absolute-rows-test
+(deftest inline-view-blank-return-resets-row-to-implied-test
+  (let [effects (actions/set-portfolio-optimizer-objective-menu-view-return
+                 views-model-state
+                 "perp:BTC"
+                 "")]
+    (is (= [[:effects/save-many
+             [[views-path []]
+              [[:portfolio-ui :optimizer :objective-menu-view-drafts :perp:BTC :return-text]
+               ""]
+              [dirty-path* true]]]
+            [:effects/sync-portfolio-optimizer-view-library
+             {:upserts []
+              :removes ["perp:BTC"]}]]
+           effects)
+        "Blank text clears the authored view and removes the library entry."))
+  (is (= [[:effects/save
+           [:portfolio-ui :optimizer :objective-menu-view-drafts :perp:ETH :return-text]
+           ""]]
+         (actions/set-portfolio-optimizer-objective-menu-view-return
+          views-model-state
+          "perp:ETH"
+          ""))
+      "Blank text on an already-implied row only clears the buffer."))
+
+(deftest inline-view-unparseable-text-keeps-existing-view-test
+  (is (= [[:effects/save
+           [:portfolio-ui :optimizer :objective-menu-view-drafts :perp:BTC :return-text]
+           "-"]]
+         (actions/set-portfolio-optimizer-objective-menu-view-return
+          views-model-state
+          "perp:BTC"
+          "-"))
+      "Mid-typing text (\"-\") moves only the buffer; the authored view survives."))
+
+(deftest inline-view-confidence-reweights-authored-view-test
+  (let [effects (actions/set-portfolio-optimizer-objective-menu-view-confidence
+                 views-model-state
+                 "perp:BTC"
+                 "low")]
+    (is (= [[:effects/save-many
+             [[views-path
+               [{:id "bl_view_1"
+                 :kind :absolute
+                 :instrument-id "perp:BTC"
+                 :return 0.2
+                 :confidence-level :low
+                 :confidence 0.25
+                 :confidence-variance 0.75
+                 :horizon :3m
+                 :weights {"perp:BTC" 1}}]]
+              [dirty-path* true]]]
+            [:effects/sync-portfolio-optimizer-view-library
+             {:upserts [{:instrument-id "perp:BTC"
+                         :return 0.2
+                         :confidence-level :low}]
+              :removes []}]]
+           effects))))
+
+(deftest inline-view-confidence-adopts-buffer-value-on-implied-row-test
+  ;; Confidence on an implied row adopts the shown value as the user's view —
+  ;; here the typing buffer holds the shown value.
+  (let [state (assoc-in views-model-state
+                        [:portfolio-ui :optimizer :objective-menu-view-drafts
+                         :perp:ETH :return-text]
+                        "18")
+        effects (actions/set-portfolio-optimizer-objective-menu-view-confidence
+                 state
+                 "perp:ETH"
+                 "high")
+        saved-views (get-in (vec effects) [0 1 0 1])]
+    (is (= {:id "bl_view_2"
+            :kind :absolute
+            :instrument-id "perp:ETH"
+            :return 0.18
+            :confidence-level :high
+            :confidence 0.75
+            :confidence-variance 0.25
+            :horizon :3m
+            :weights {"perp:ETH" 1}}
+           (last saved-views))))
+  ;; With no buffer, no authored view, and no computable baseline (this fixture
+  ;; has no history), there is nothing honest to adopt: no-op.
+  (is (= []
+         (actions/set-portfolio-optimizer-objective-menu-view-confidence
+          views-model-state
+          "perp:ETH"
+          "high"))))
+
+(deftest inline-view-step-authors-view-from-effective-value-test
+  (let [effects (actions/step-portfolio-optimizer-objective-menu-view-return
+                 views-model-state
+                 "perp:BTC"
+                 :up)
+        saved-views (get-in (vec effects) [0 1 0 1])
+        buffer-text (get-in (vec effects) [0 1 1 1])]
+    (is (= 0.205 (:return (first saved-views))))
+    (is (= "20.5" buffer-text))
+    (is (= [:effects/sync-portfolio-optimizer-view-library
+            {:upserts [{:instrument-id "perp:BTC"
+                        :return 0.205
+                        :confidence-level :high}]
+             :removes []}]
+           (last effects)))))
+
+(deftest remove-inline-view-resets-row-and-library-test
+  (let [state (assoc-in views-model-state
+                        [:portfolio-ui :optimizer :objective-menu-view-drafts]
+                        {:perp:BTC {:return-text "20"}})
+        effects (actions/remove-portfolio-optimizer-objective-menu-view
+                 state
+                 "perp:BTC")]
+    (is (= [[:effects/save-many
+             [[views-path []]
+              [[:portfolio-ui :optimizer :objective-menu-view-order] ["perp:ETH"]]
+              [[:portfolio-ui :optimizer :objective-menu-view-drafts] {}]
+              [dirty-path* true]]]
+            [:effects/sync-portfolio-optimizer-view-library
+             {:upserts []
+              :removes ["perp:BTC"]}]]
+           effects)))
+  ;; Removing a row that has no authored view stays a UI-only cleanup.
+  (is (= [[:effects/save-many
+           [[[:portfolio-ui :optimizer :objective-menu-view-order] ["perp:BTC"]]
+            [[:portfolio-ui :optimizer :objective-menu-view-drafts] {}]]]]
+         (actions/remove-portfolio-optimizer-objective-menu-view
+          (assoc-in views-model-state
+                    [:portfolio :optimizer :draft :return-model :views]
+                    [])
+          "perp:ETH"))))
+
+(deftest remove-inline-view-preserves-relative-views-test
   (let [state {:portfolio {:optimizer {:draft {:universe [{:instrument-id "perp:BTC"}
                                                            {:instrument-id "perp:ETH"}]
                                                :objective {:kind :max-sharpe}
                                                :return-model
                                                {:kind :black-litterman
-                                                :views [{:id "abs-btc"
+                                                :views [{:id "abs-eth"
                                                          :kind :absolute
-                                                         :instrument-id "perp:BTC"
-                                                         :return 0.1
-                                                         :confidence 0.25
-                                                         :weights {"perp:BTC" 1}}
+                                                         :instrument-id "perp:ETH"
+                                                         :return 0.12
+                                                         :confidence 0.5
+                                                         :weights {"perp:ETH" 1}}
                                                         {:id "rel-eth-btc"
                                                          :kind :relative
                                                          :instrument-id "perp:ETH"
@@ -264,49 +434,20 @@
                                                          :return 0.04
                                                          :confidence 0.5
                                                          :weights {"perp:ETH" 1
-                                                                   "perp:BTC" -1}}]}}}}
-               :portfolio-ui {:optimizer {:objective-menu-selection :use-my-views
-                                           :objective-menu-view-order ["perp:ETH"]
-                                           :objective-menu-view-drafts
-                                           {:perp:ETH {:return-text "12"
-                                                       :confidence :high}}}}}]
-    (is (= [[:effects/save-many
-             [[[:portfolio-ui :optimizer :objective-menu-view-order] ["perp:BTC"]]
-              [[:portfolio-ui :optimizer :objective-menu-view-drafts] {}]]]]
-           (actions/remove-portfolio-optimizer-objective-menu-view
-            state
-            "perp:ETH")))
-    (let [effects (actions/apply-portfolio-optimizer-objective-menu-selection-and-run state)
-          saved-values (second (first effects))
-          return-model (second (second saved-values))]
-      (is (= {:kind :black-litterman
-              :views [{:id "rel-eth-btc"
-                      :kind :relative
-                      :instrument-id "perp:ETH"
-                      :comparator-instrument-id "perp:BTC"
-                       :return 0.04
-                       :confidence 0.5
-                       :weights {"perp:ETH" 1
-                                 "perp:BTC" -1}}
-                      {:id "abs-btc"
-                       :kind :absolute
-                       :instrument-id "perp:BTC"
-                       :return 0.1
-                       :confidence-level :low
-                       :confidence 0.25
-                       :confidence-variance 0.75
-                       :horizon :3m
-                       :weights {"perp:BTC" 1}}
-                      {:id "bl_view_3"
-                       :kind :absolute
-                       :instrument-id "perp:ETH"
-                       :return 0.12
-                       :confidence-level :high
-                       :confidence 0.75
-                       :confidence-variance 0.25
-                       :horizon :3m
-                       :weights {"perp:ETH" 1}}]}
-             return-model)))))
+                                                                   "perp:BTC" -1}}]}
+                                               :metadata {:dirty? false}}}}}
+        effects (actions/remove-portfolio-optimizer-objective-menu-view state "perp:ETH")
+        saved-views (get-in (vec effects) [0 1 0 1])]
+    (is (= [{:id "rel-eth-btc"
+             :kind :relative
+             :instrument-id "perp:ETH"
+             :comparator-instrument-id "perp:BTC"
+             :return 0.04
+             :confidence 0.5
+             :weights {"perp:ETH" 1
+                       "perp:BTC" -1}}]
+           saved-views)
+        "Reset-to-implied removes only the ABSOLUTE view; relative views survive.")))
 
 (deftest set-draft-constraint-normalizes-supported-values-test
   (is (= [[:effects/save-many [[[:portfolio :optimizer :draft :constraints :max-asset-weight]

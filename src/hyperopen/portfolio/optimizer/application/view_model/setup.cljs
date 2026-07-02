@@ -1,5 +1,6 @@
 (ns hyperopen.portfolio.optimizer.application.view-model.setup
   (:require [clojure.string :as str]
+            [hyperopen.portfolio.optimizer.application.return-views :as return-views]
             [hyperopen.portfolio.optimizer.application.setup-readiness :as setup-readiness]
             [hyperopen.portfolio.optimizer.application.view-model.universe :as universe]
             [hyperopen.portfolio.optimizer.coercion :as coercion]
@@ -24,7 +25,6 @@
     :incomplete-history "History is incomplete for this universe. Run Optimization retries anything still missing."
     :missing-history-assumptions "Some assets need history assumptions before this universe can run."
     :history-loading "History is loading for the selected assets."
-    :missing-black-litterman-views "Add a view before running Use my views."
     "Optimizer inputs are ready to run."))
 
 (defn- history-load-copy
@@ -122,13 +122,19 @@
     (str value)))
 
 (defn- active-preset
+  ;; Two presets: a views-aware (Black-Litterman) return model belongs to
+  ;; Maximum Sharpe — views are an input policy, not a strategy.
   [draft]
   (let [objective-kind (get-in draft [:objective :kind])
         return-kind (get-in draft [:return-model :kind])]
-    (cond
-      (= :black-litterman return-kind) :use-my-views
-      (= :max-sharpe objective-kind) :risk-adjusted
-      :else :conservative)))
+    (if (or (= :black-litterman return-kind)
+            (= :max-sharpe objective-kind))
+      :max-sharpe
+      :conservative)))
+
+(def ^:private preset-display-names
+  {:conservative "Conservative"
+   :max-sharpe "Maximum Sharpe"})
 
 (defn- universe-label
   [instrument]
@@ -234,7 +240,7 @@
   scenario-contract card so both say \"Historical mean\", not \"Historical-mean\"."
   {:historical-mean "Historical mean"
    :ew-mean "EW mean"
-   :black-litterman "Use my views"})
+   :black-litterman "Views + implied baseline"})
 
 (def risk-model-display-names
   {:diagonal-shrink "Stabilized covariance"
@@ -242,18 +248,34 @@
    :mixed-frequency "Mixed frequency"
    :sample-covariance "Sample covariance"})
 
+(defn- returns-source-label
+  "Honest returns-source line for the scenario contract. For the views-aware
+  model it reports the live provenance split (\"2 your views · 12 implied\");
+  the estimator-only models name the estimate."
+  [draft]
+  (let [return-kind (get-in draft [:return-model :kind])]
+    (if (= :black-litterman return-kind)
+      (return-views/returns-contract-label
+       (return-views/summary
+        (return-views/rows {:universe (:universe draft)
+                            :views (get-in draft [:return-model :views])})))
+      (get return-model-display-names return-kind))))
+
 (defn setup-summary-card-model
   "Scenario-contract card for the right column: universe (count + source),
-  objective, model, and the live constraint numbers — the exact policy the solver
-  receives. Derived output, not primary input."
+  objective, returns source, risk model, and the live constraint numbers — the
+  exact policy the solver receives. Derived output, not primary input."
   ([draft] (setup-summary-card-model draft nil))
   ([draft {:keys [labelize]}]
    (let [constraints (:constraints draft)
-         labelize* #(apply-labelize labelize %)]
-     {:preset-label (labelize* (active-preset draft))
+         labelize* #(apply-labelize labelize %)
+         preset (active-preset draft)]
+     {:preset-label (get preset-display-names preset (labelize* preset))
       :asset-count (count (:universe draft))
       :universe-source-kind (get-in draft [:metadata :universe-source :kind])
       :objective-label (labelize* (get-in draft [:objective :kind]))
+      :returns-label (or (returns-source-label draft)
+                         (labelize* (get-in draft [:return-model :kind])))
       :return-label (or (get return-model-display-names
                              (get-in draft [:return-model :kind]))
                         (labelize* (get-in draft [:return-model :kind])))

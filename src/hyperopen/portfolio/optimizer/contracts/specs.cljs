@@ -259,7 +259,8 @@
   (and (map? value)
        (finite-field? value :created-at-ms)
        (finite-field? value :updated-at-ms)
-       (boolean-field? value :dirty?)))
+       (boolean-field? value :dirty?)
+       (optional? map? (:universe-source value))))
 
 (defn- current-portfolio?
   [value]

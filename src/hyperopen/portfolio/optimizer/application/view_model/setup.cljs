@@ -34,6 +34,15 @@
     :failed "History load failed. Existing history, if any, is retained."
     (readiness-copy readiness)))
 
+(defn- warning-group-action
+  "Remediation for a warning group, so warnings tell the user what to do next
+  instead of only describing the problem. Stale/failed-fetch history is fixable
+  in-app: a full history load refetches the bundle at a fresh as-of."
+  [code]
+  (when (contains? setup-readiness/stale-history-warning-codes code)
+    {:label "Refresh history"
+     :actions [[:actions/load-portfolio-optimizer-history-from-draft]]}))
+
 (defn group-readiness-warnings
   "Group the chosen readiness warnings by :code (first-seen order) so the panel shows each KIND
   once with a count and an expandable affected-asset list, instead of repeating one row per asset
@@ -48,16 +57,18 @@
     (mapv (fn [code]
             (let [group (get by-code code)
                   cnt (count group)]
-              {:code code
-               :code-label (some-> code name)
-               :count cnt
-               :message (if (= 1 cnt)
-                          (warning-message readiness (first group))
-                          (setup-readiness/warning-code-summary code cnt))
-               :assets (mapv (fn [warning]
-                               {:instrument-id (:instrument-id warning)
-                                :label (setup-readiness/warning-asset-label request warning)})
-                             group)}))
+              (cond-> {:code code
+                       :code-label (some-> code name)
+                       :count cnt
+                       :message (if (= 1 cnt)
+                                  (warning-message readiness (first group))
+                                  (setup-readiness/warning-code-summary code cnt))
+                       :assets (mapv (fn [warning]
+                                       {:instrument-id (:instrument-id warning)
+                                        :label (setup-readiness/warning-asset-label request warning)})
+                                     group)}
+                (warning-group-action code)
+                (assoc :action (warning-group-action code)))))
           order)))
 
 (defn readiness-panel-model
@@ -173,23 +184,88 @@
        (summary-row "Horizon" "Annualized"
                     "Displayed return and volatility metrics use the optimizer annualization convention.")]})))
 
+(defn- fmt-mult
+  [x]
+  (when (number? x)
+    (str (.toFixed x 2) "×")))
+
+(defn gross-range-label
+  [{:keys [gross-min gross-max]}]
+  (if (number? gross-min)
+    (str "gross " (fmt-mult gross-min) "–" (fmt-mult gross-max))
+    (str "gross ≤ " (or (fmt-mult gross-max) "--"))))
+
+(defn net-range-label
+  [{:keys [net-min net-max]}]
+  (cond
+    (and (number? net-min) (number? net-max))
+    (str "net " (fmt-mult net-min) "–" (fmt-mult net-max))
+
+    (number? net-max) (str "net ≤ " (fmt-mult net-max))
+    (number? net-min) (str "net ≥ " (fmt-mult net-min))
+    :else "net --"))
+
+(defn- cap-label
+  [cap]
+  (when (number? cap)
+    (str "cap " (js/Math.round (* 100 cap)) "%")))
+
+(defn- band-label
+  [tolerance]
+  (when (number? tolerance)
+    (str "band " (.toFixed (* 100 tolerance) 1) " pp")))
+
+(defn constraints-summary-line
+  "One scannable line of the live constraint numbers (\"gross 1.90–1.91× · net
+  1.30–1.41× · cap 50% · band 3.0 pp\") shared by the collapsed Constraints header
+  and the scenario-contract card, so the policy that determines the result is
+  never hidden behind a closed panel."
+  [constraints]
+  (->> [(gross-range-label constraints)
+        (net-range-label constraints)
+        (cap-label (:max-asset-weight constraints))
+        (band-label (:rebalance-tolerance constraints))]
+       (keep identity)
+       (str/join " · ")))
+
+(def return-model-display-names
+  "Human names for return-model kinds, shared by the model-section header and the
+  scenario-contract card so both say \"Historical mean\", not \"Historical-mean\"."
+  {:historical-mean "Historical mean"
+   :ew-mean "EW mean"
+   :black-litterman "Use my views"})
+
+(def risk-model-display-names
+  {:diagonal-shrink "Stabilized covariance"
+   :ledoit-wolf-dense "Ledoit-Wolf"
+   :mixed-frequency "Mixed frequency"
+   :sample-covariance "Sample covariance"})
+
 (defn setup-summary-card-model
-  "Compact one-line scenario summary for the right column: preset, asset count, objective, return
-  model, and the exposure/cap numbers. Derived output, not primary input — kept small so it does
-  not compete with the center policy controls."
+  "Scenario-contract card for the right column: universe (count + source),
+  objective, model, and the live constraint numbers — the exact policy the solver
+  receives. Derived output, not primary input."
   ([draft] (setup-summary-card-model draft nil))
   ([draft {:keys [labelize]}]
    (let [constraints (:constraints draft)
          labelize* #(apply-labelize labelize %)]
      {:preset-label (labelize* (active-preset draft))
       :asset-count (count (:universe draft))
+      :universe-source-kind (get-in draft [:metadata :universe-source :kind])
       :objective-label (labelize* (get-in draft [:objective :kind]))
-      :return-label (labelize* (get-in draft [:return-model :kind]))
+      :return-label (or (get return-model-display-names
+                             (get-in draft [:return-model :kind]))
+                        (labelize* (get-in draft [:return-model :kind])))
+      :risk-label (or (get risk-model-display-names
+                           (get-in draft [:risk-model :kind]))
+                      (labelize* (get-in draft [:risk-model :kind])))
       :gross-min (:gross-min constraints)
       :gross-max (:gross-max constraints)
       :net-min (:net-min constraints)
       :net-max (:net-max constraints)
-      :cap (:max-asset-weight constraints)})))
+      :cap (:max-asset-weight constraints)
+      :rebalance-tolerance (:rebalance-tolerance constraints)
+      :constraints-line (constraints-summary-line constraints)})))
 
 ;; --- History-assumption cards ------------------------------------------------
 ;;

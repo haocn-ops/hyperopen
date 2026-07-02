@@ -169,6 +169,35 @@
 
 (declare market-with-selected-outcome-coin)
 
+(defn- spot-market-by-base-token
+  "Best spot market whose base token matches a bare coin (\"HYPE\" ->
+   HYPE/USDC), USDC-quoted pairs first."
+  [market-by-key coin*]
+  (let [base-token (some-> coin* str/trim str/upper-case)
+        base-coin? (and (seq base-token)
+                        (not (numeric-coin-string? coin*))
+                        (not (str/includes? coin* "/"))
+                        (not (str/includes? coin* ":"))
+                        (not (str/starts-with? coin* "@")))]
+    (when base-coin?
+      (some->> (vals market-by-key)
+               (keep (fn [market]
+                       (let [market-coin* (some-> (:coin market) str str/trim)
+                             [coin-base coin-quote] (when (and (seq market-coin*)
+                                                               (str/includes? market-coin* "/"))
+                                                      (str/split market-coin* #"/" 2))
+                             market-base (some-> (or (:base market) coin-base) str str/trim str/upper-case)
+                             market-quote (some-> (or (:quote market) coin-quote) str str/trim str/upper-case)]
+                         (when (and (= :spot (:market-type market))
+                                    (= base-token market-base))
+                           {:market market
+                            :rank [(if (= "USDC" market-quote) 0 1)
+                                   (or market-quote "")
+                                   (or (:key market) "")]}))))
+               (sort-by :rank)
+               first
+               :market))))
+
 (defn resolve-market-by-coin
   "Resolve a market from market-by-key using deterministic fallback keys."
   [market-by-key coin]
@@ -182,30 +211,24 @@
                   (vals market-by-key)))
           (some #(get market-by-key %)
                 (candidate-market-keys coin*))
-          (let [base-token (some-> coin* str/trim str/upper-case)
-                base-coin? (and (seq base-token)
-                                (not (numeric-coin-string? coin*))
-                                (not (str/includes? coin* "/"))
-                                (not (str/includes? coin* ":"))
-                                (not (str/starts-with? coin* "@")))]
-            (when base-coin?
-              (some->> (vals market-by-key)
-                       (keep (fn [market]
-                               (let [market-coin* (some-> (:coin market) str str/trim)
-                                     [coin-base coin-quote] (when (and (seq market-coin*)
-                                                                       (str/includes? market-coin* "/"))
-                                                              (str/split market-coin* #"/" 2))
-                                     market-base (some-> (or (:base market) coin-base) str str/trim str/upper-case)
-                                     market-quote (some-> (or (:quote market) coin-quote) str str/trim str/upper-case)]
-                                 (when (and (= :spot (:market-type market))
-                                            (= base-token market-base))
-                                   {:market market
-                                    :rank [(if (= "USDC" market-quote) 0 1)
-                                           (or market-quote "")
-                                           (or (:key market) "")]}))))
-                       (sort-by :rank)
-                       first
-                       :market)))))))
+          (spot-market-by-base-token market-by-key coin*)))))
+
+(defn resolve-spot-market-by-coin
+  "Resolve a SPOT market for a coin/token, never a perp. Spot balances carry bare
+   base tokens (\"HYPE\") whose primary candidate key is the PERP market key when
+   the token also trades as a perp, so `resolve-market-by-coin` hands spot
+   consumers the perp market (wrong instrument id, symbol, and mark source).
+   This variant filters the candidate-key hits to spot markets and falls through
+   to the base-token spot scan."
+  [market-by-key coin]
+  (let [coin* (when (scalar-coin-id? coin) (str coin))]
+    (when (and (map? market-by-key) (seq coin*))
+      (or (some (fn [market-key]
+                  (let [market (get market-by-key market-key)]
+                    (when (= :spot (:market-type market))
+                      market)))
+                (candidate-market-keys coin*))
+          (spot-market-by-base-token market-by-key coin*)))))
 
 (declare inferred-perp-market)
 

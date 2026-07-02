@@ -15,6 +15,8 @@
 (def draft-history-assumptions-path (conj draft-path :history-assumptions))
 (def draft-metadata-path (conj draft-path :metadata))
 (def draft-dirty-path (conj draft-metadata-path :dirty?))
+(def draft-universe-source-path (conj draft-metadata-path :universe-source))
+(def draft-persist-path (conj optimizer-path :draft-persist))
 (def active-scenario-path (conj optimizer-path :active-scenario))
 (def active-scenario-loaded-id-path (conj active-scenario-path :loaded-id))
 (def active-scenario-name-path (conj active-scenario-path :name))
@@ -117,6 +119,8 @@
    :optimizer/draft-history-assumptions draft-history-assumptions-path
    :optimizer/draft-metadata draft-metadata-path
    :optimizer/draft-dirty draft-dirty-path
+   :optimizer/draft-universe-source draft-universe-source-path
+   :optimizer/draft-persist draft-persist-path
    :optimizer/active-scenario active-scenario-path
    :optimizer/active-scenario-loaded-id active-scenario-loaded-id-path
    :optimizer/active-scenario-name active-scenario-name-path

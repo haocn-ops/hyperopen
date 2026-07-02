@@ -222,23 +222,65 @@
 (defn- selected-table
   [selected-rows universe]
   [:div {:class ["mt-2" "border" "border-base-300" "bg-base-100/50"]}
-   [:div {:class ["flex" "items-center" "border-b" "border-base-300" "px-2" "py-1.5"]}
+   [:div {:class ["flex" "items-center" "justify-between" "gap-2" "border-b"
+                  "border-base-300" "px-2" "py-1.5"]}
     [:span {:class ["font-mono" "text-[0.6rem]" "uppercase" "tracking-[0.12em]"
                     "text-trading-muted"]}
-     (str (count universe) " included")]]
+     (str (count universe) " included")]
+    (when (seq universe)
+      [:button {:type "button"
+                :class ["font-mono" "text-[0.6rem]" "uppercase" "tracking-[0.12em]"
+                        "text-trading-muted" "hover:text-warning"]
+                :data-role "portfolio-optimizer-universe-clear"
+                :on {:click [[:actions/clear-portfolio-optimizer-universe]]}}
+       "Clear universe"])]
    (if (seq universe)
      (into [:div {:class ["text-xs"]}]
            (cons (selected-table-header)
                  (map selected-row selected-rows)))
-     ;; Empty universe (e.g. account data wasn't ready for the auto-seed on a cold
-     ;; load): point at the single "Load my holdings" control in the strip above —
-     ;; the same set-…-universe-from-current action — rather than duplicating it with
-     ;; a second prominent button here.
+     ;; Empty universe: holdings load automatically once account data arrives;
+     ;; this state is either "no account/holdings" or a deliberately cleared set.
      [:div {:class ["flex" "flex-col" "items-start" "gap-1" "px-2" "py-3"]}
       [:p {:class ["text-xs" "text-trading-muted"]}
        "No assets selected yet."]
       [:p {:class ["text-[0.65625rem]" "text-trading-muted/80"]}
-       "Use “Load my holdings” above to import your portfolio, or search to build a custom set."]])])
+       "Holdings load automatically when your account is connected — use “My holdings” above to re-import them, or search to build a custom set."]])])
+
+(defn- omission-reason-copy
+  [reason]
+  (case reason
+    :spot-excluded "spot balance — excluded while spot assets are off in constraints"
+    :unusable-history "no usable optimizer history"
+    "excluded"))
+
+(defn- universe-source-line
+  "Visible-automation line under the source strip: says where the universe came
+  from and accounts for every asset a holdings load left out (nothing is dropped
+  silently)."
+  [universe-source universe-count]
+  (let [holdings? (= :holdings (:kind universe-source))
+        omitted (vec (or (:omitted universe-source) []))]
+    (when universe-source
+      [:div {:class ["mt-1.5" "font-mono" "text-[0.6rem]" "leading-4" "text-trading-muted"]
+             :data-role "portfolio-optimizer-universe-source-line"
+             :data-universe-source (name (or (:kind universe-source) :custom))}
+       (if holdings?
+         [:p (str "From holdings · " universe-count " included"
+                  (when (pos? (count omitted))
+                    (str " · " (count omitted) " omitted")))]
+         [:p "Custom universe"])
+       (when (and holdings? (seq omitted))
+         [:details {:class ["mt-0.5"]}
+          [:summary {:class ["cursor-pointer" "text-trading-muted/80" "hover:text-warning"]
+                     :data-role "portfolio-optimizer-universe-omitted-summary"}
+           (str "Show " (count omitted) " omitted")]
+          (into [:ul {:class ["mt-1" "space-y-0.5" "pl-3" "text-trading-muted/80"]
+                      :data-role "portfolio-optimizer-universe-omitted-list"}]
+                (map (fn [{:keys [instrument-id label reason]}]
+                       [:li {:data-omitted-instrument instrument-id}
+                        (str (or label instrument-id) " — "
+                             (omission-reason-copy reason))])
+                     omitted))])])))
 
 (defn universe-section
   ([state draft]
@@ -254,7 +296,9 @@
                  markets
                  candidate-rows
                  active-index
-                 market-keys]} (optimizer-view-model/universe-section-model state draft opts)]
+                 market-keys
+                 universe-source]} (optimizer-view-model/universe-section-model state draft opts)
+         holdings-source? (= :holdings (:kind universe-source))]
     [:section {:class ["optimizer-universe-panel" "optimizer-setup-panel"
                        "border" "border-base-300" "bg-base-100/90" "p-3" "leading-4"]
                :data-role "portfolio-optimizer-universe-panel"}
@@ -264,20 +308,34 @@
       [:span {:class ["font-mono" "text-[0.65625rem]" "uppercase" "tracking-[0.08em]"
                       "text-trading-muted/70"]}
        (str (count universe) " included")]]
+     ;; Source strip: "My holdings" is the default path (the universe seeds itself
+     ;; from holdings when account data is available) and doubles as the
+     ;; load/refresh action; "Custom" lights up once the set is hand-edited or
+     ;; cleared. The active segment reflects the recorded universe source.
      [:div {:class ["mt-3" "grid" "grid-cols-2" "border" "border-base-300" "text-center"
                     "text-[0.65625rem]" "font-medium" "uppercase"
-                    "tracking-[0.04em]" "text-trading-muted"]}
-      [:span {:class ["border-r" "border-warning/60" "bg-warning/10" "px-2" "py-2" "text-warning"]}
-       "Custom"]
-      ;; Single "Load my holdings" affordance: this segment fires the same
-      ;; set-…-universe-from-current action the old empty-state button did, so that
-      ;; duplicate button was removed (see selected-table).
+                    "tracking-[0.04em]" "text-trading-muted"]
+            :data-role "portfolio-optimizer-universe-source-strip"}
       [:button {:type "button"
-                :class ["px-2" "py-2" "uppercase" "hover:text-warning"]
+                :class (cond-> ["border-r" "border-base-300" "px-2" "py-2" "uppercase"
+                                "hover:text-warning"]
+                         holdings-source?
+                         (conj "border-warning/60" "bg-warning/10" "text-warning"))
                 :data-role "portfolio-optimizer-universe-use-current"
+                :data-active (when holdings-source? "true")
                 :on {:click [[:actions/set-portfolio-optimizer-universe-from-current]]}}
-       "Load my holdings"
-       [:span {:class ["sr-only"]} "Load my current holdings into the universe"]]]
+       (if holdings-source? "My holdings" "Load my holdings")
+       [:span {:class ["sr-only"]}
+        (if holdings-source?
+          "Refresh the universe from your current holdings"
+          "Load my current holdings into the universe")]]
+      [:span {:class (cond-> ["px-2" "py-2" "uppercase"]
+                       (and universe-source (not holdings-source?))
+                       (conj "bg-warning/10" "text-warning"))
+              :data-role "portfolio-optimizer-universe-source-custom"
+              :data-active (when (and universe-source (not holdings-source?)) "true")}
+       "Custom"]]
+     (universe-source-line universe-source (count universe))
      [:div {:class ["sr-only"]} "Manual Add"]
      [:div {:class ["mt-3" "relative"]}
       [:div {:class ["optimizer-universe-search-shell"

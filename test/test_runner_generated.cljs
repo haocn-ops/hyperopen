@@ -284,11 +284,13 @@
             [hyperopen.portfolio.optimizer.domain.weight-cleaning-test]
             [hyperopen.portfolio.optimizer.draft-actions-test]
             [hyperopen.portfolio.optimizer.draft-model-actions-test]
+            [hyperopen.portfolio.optimizer.draft-persistence-actions-test]
             [hyperopen.portfolio.optimizer.execution-actions-test]
             [hyperopen.portfolio.optimizer.exposure-actions-test]
             [hyperopen.portfolio.optimizer.fixtures-test]
             [hyperopen.portfolio.optimizer.frontier-actions-test]
             [hyperopen.portfolio.optimizer.ids-test]
+            [hyperopen.portfolio.optimizer.infrastructure.draft-autosave-test]
             [hyperopen.portfolio.optimizer.infrastructure.history-api-v2-client-test]
             [hyperopen.portfolio.optimizer.infrastructure.history-client-fallback-test]
             [hyperopen.portfolio.optimizer.infrastructure.history-client-test]
@@ -1033,11 +1035,13 @@
              'hyperopen.portfolio.optimizer.domain.weight-cleaning-test
              'hyperopen.portfolio.optimizer.draft-actions-test
              'hyperopen.portfolio.optimizer.draft-model-actions-test
+             'hyperopen.portfolio.optimizer.draft-persistence-actions-test
              'hyperopen.portfolio.optimizer.execution-actions-test
              'hyperopen.portfolio.optimizer.exposure-actions-test
              'hyperopen.portfolio.optimizer.fixtures-test
              'hyperopen.portfolio.optimizer.frontier-actions-test
              'hyperopen.portfolio.optimizer.ids-test
+             'hyperopen.portfolio.optimizer.infrastructure.draft-autosave-test
              'hyperopen.portfolio.optimizer.infrastructure.history-api-v2-client-test
              'hyperopen.portfolio.optimizer.infrastructure.history-client-fallback-test
              'hyperopen.portfolio.optimizer.infrastructure.history-client-test

@@ -157,16 +157,32 @@
    (- abs-notional-usdc)
    idx])
 
-(defn- usable-universe-from-current-exposures
+(defn- holdings-omission
+  [reason exposure-or-instrument]
+  {:instrument-id (:instrument-id exposure-or-instrument)
+   :label (or (common/non-blank-text (:symbol exposure-or-instrument))
+              (common/non-blank-text (:coin exposure-or-instrument))
+              (:instrument-id exposure-or-instrument))
+   :reason reason})
+
+(defn- universe-from-current-partition
+  "Split the holdings exposures into the usable universe and the assets omitted for
+  unusable optimizer history, so a holdings load can show what it left out instead
+  of silently dropping it."
   [state exposures]
-  (->> exposures
-       (map-indexed #(from-current-candidate state %1 %2))
-       (keep identity)
-       (remove #(known-unusable-history? (:instrument %)))
-       (sort-by from-current-sort-key)
-       (map :instrument)
-       common/dedupe-instruments
-       vec))
+  (let [candidates (->> exposures
+                        (map-indexed #(from-current-candidate state %1 %2))
+                        (keep identity))
+        unusable (filter #(known-unusable-history? (:instrument %)) candidates)
+        universe (->> candidates
+                      (remove #(known-unusable-history? (:instrument %)))
+                      (sort-by from-current-sort-key)
+                      (map :instrument)
+                      common/dedupe-instruments
+                      vec)]
+    {:universe universe
+     :omitted (mapv #(holdings-omission :unusable-history (:instrument %))
+                    unusable)}))
 
 (defn add-portfolio-optimizer-universe-instrument
   [state market-key]
@@ -191,6 +207,9 @@
                            [instrument])
             path-values (with-prefetch-path-value
                           [[contracts/draft-universe-path (conj universe instrument)]
+                           ;; Hand-adding an asset makes the set a custom universe,
+                           ;; not a mirror of holdings; the source line follows.
+                           [contracts/draft-universe-source-path {:kind :custom}]
                            [contracts/ui-universe-search-query-path ""]
                            [contracts/ui-universe-search-active-index-path 0]]
                           prefetch-plan)]
@@ -393,14 +412,58 @@
         (common/save-draft-path-values path-values))
       [])))
 
+(defn clear-portfolio-optimizer-universe
+  "Empty the draft universe and every per-asset residue (allow/block lists, held
+  locks, asset overrides, per-perp leverage, history assumptions, Black-Litterman
+  views) in one step — the \"start from scratch\" escape hatch from the
+  holdings-seeded default. The resulting draft is non-default, so the holdings
+  preseed will not refill it, and the per-wallet draft autosave remembers the
+  cleared choice across reloads."
+  [state]
+  (let [universe (common/draft-universe state)]
+    (if (seq universe)
+      (let [prefetch-state (history-prefetch/cleanup-to-instrument-ids
+                            (history-prefetch/prefetch-state state)
+                            [])
+            prefetch-changed? (not= (history-prefetch/prefetch-state state)
+                                    prefetch-state)
+            path-values (cond-> (into [[contracts/draft-universe-path []]
+                                       [contracts/draft-universe-source-path {:kind :custom}]
+                                       [(conj contracts/draft-constraints-path :allowlist) []]
+                                       [(conj contracts/draft-constraints-path :blocklist) []]
+                                       [(conj contracts/draft-constraints-path :held-locks) []]
+                                       [(conj contracts/draft-constraints-path :asset-overrides) {}]
+                                       [(conj contracts/draft-constraints-path :perp-leverage) {}]
+                                       [contracts/draft-history-assumptions-path {}]]
+                                      (black-litterman-universe-path-values state []))
+                          prefetch-changed?
+                          (conj [contracts/history-prefetch-path prefetch-state]))]
+        (common/save-draft-path-values path-values))
+      [])))
+
 (defn set-portfolio-optimizer-universe-from-current
   [state]
-  (let [snapshot (current-portfolio/current-portfolio-snapshot state)
+  ;; An untouched (nil or pristine-default) draft is first materialized as a full
+  ;; default draft — both for the computation (the holdings-derived constraints
+  ;; need a base) and as the first written path-value, so the in-store draft is
+  ;; always a complete ::draft that the per-wallet autosave can persist and the
+  ;; restore can validate. A touched draft is only updated in place.
+  (let [draft (get-in state contracts/draft-path)
+        untouched? (optimizer-defaults/untouched-draft? draft)
+        state (cond-> state
+                untouched? (assoc-in contracts/draft-path
+                                     (optimizer-defaults/default-draft)))
+        snapshot (current-portfolio/current-portfolio-snapshot state)
         draft-exposures (draft-universe-exposures-from-current state snapshot)
         draft-snapshot (snapshot-with-exposures snapshot draft-exposures)
-        universe (usable-universe-from-current-exposures
-                  state
-                  draft-exposures)
+        {:keys [universe omitted]} (universe-from-current-partition
+                                    state
+                                    draft-exposures)
+        spot-omitted (when-not (include-spot-assets? state)
+                       (mapv #(holdings-omission :spot-excluded %)
+                             (filter spot-instrument? (:exposures snapshot))))
+        universe-source {:kind :holdings
+                         :omitted (vec (concat spot-omitted omitted))}
         current-derived-constraints
         (when-let [constraints (get-in state contracts/draft-constraints-path)]
           (current-portfolio/current-derived-constraints draft-snapshot constraints))]
@@ -417,7 +480,13 @@
             prefetch-changed? (or (not= (history-prefetch/prefetch-state state)
                                         prefetch-state)
                                   (:changed? prefetch-plan))
-            path-values (cond-> (into [[contracts/draft-universe-path universe]]
+            path-values (cond-> (into (cond-> []
+                                        untouched?
+                                        (conj [contracts/draft-path
+                                               (optimizer-defaults/default-draft)])
+                                        :always
+                                        (into [[contracts/draft-universe-path universe]
+                                               [contracts/draft-universe-source-path universe-source]]))
                                       (black-litterman-universe-path-values state universe))
                           current-derived-constraints
                           (conj [contracts/draft-constraints-path
@@ -441,21 +510,16 @@
   Fires only on the :optimize-new route and only while the draft is UNTOUCHED
   (absent, or still exactly default-draft), so it never clobbers a universe the
   user has built or deliberately cleared. The underlying seed no-ops when the
-  holdings snapshot has not loaded yet, so the route-load naturally re-attempts
-  until account + market data are ready; a cold direct page-load where data is not
-  yet present (and no further route event fires) is covered by the prominent
-  \"Load my holdings\" empty-state CTA in setup-universe."
+  holdings snapshot has not loaded yet; a cold direct page-load where data lands
+  after the route event is covered by the holdings-arrival watcher in
+  `infrastructure/draft-autosave`, which re-dispatches the restore-or-preseed
+  funnel on the data-arrival transition."
   [state path]
   (let [route (portfolio-routes/parse-portfolio-route path)
         draft (get-in state contracts/draft-path)]
     (if (and (= :optimize-new (:kind route))
-             (or (nil? draft)
-                 (= draft optimizer-defaults/default-draft)))
-      ;; Materialize default-draft for the computation so the holdings-derived
-      ;; constraints have a base to derive from (a fresh draft holds no
-      ;; constraints in state yet). Only the universe + derived constraints are
-      ;; actually persisted by the underlying save.
-      (set-portfolio-optimizer-universe-from-current
-       (cond-> state
-         (nil? draft) (assoc-in contracts/draft-path optimizer-defaults/default-draft)))
+             (optimizer-defaults/untouched-draft? draft))
+      ;; The underlying seed materializes the full default draft itself before
+      ;; layering the holdings universe + derived constraints on top.
+      (set-portfolio-optimizer-universe-from-current state)
       [])))

@@ -112,29 +112,63 @@
     (is (false?
          (get-in result [:state :portfolio :optimizer :draft :metadata :dirty?])))))
 
-(deftest handle-worker-message-on-new-route-reveals-result-in-place-without-navigating-test
-  ;; Single-workspace Phase 1: a run on /optimize/new reveals the result in-place
-  ;; rather than force-navigating to the results page, so the user keeps their
-  ;; inputs in view. The only post-run command is the slippage-snapshot refresh.
-  (let [state {:router {:path "/portfolio/optimize/new"}
+(defn- solved-run-commands
+  [{:keys [path run-scenario-id]}]
+  (let [state {:router {:path path}
                :portfolio {:optimizer {:draft {:metadata {:dirty? true}}
                                         :optimization-progress
                                         (progress/begin-progress
                                          {:run-id "run-1"
-                                          :scenario-id nil
-                                          :request {:scenario-id nil}
+                                          :scenario-id run-scenario-id
+                                          :request {:scenario-id run-scenario-id}
                                           :started-at-ms 100})
                                         :run-state {:status :running
                                                     :run-id "run-1"
-                                                    :scenario-id nil
-                                                    :request-signature {:seed 1}}}}}
-        result (workflow/handle-worker-message
+                                                    :scenario-id run-scenario-id
+                                                    :request-signature {:seed 1}}}}}]
+    (:commands (workflow/handle-worker-message
                 {:state state
                  :message {:id "run-1"
                            :type "optimizer-result"
-                           :payload {:status :solved}}
-                 :computed-at-ms 400})]
-    (is (= [{:command/type
-             :optimizer.workflow/refresh-portfolio-optimizer-rebalance-slippage-snapshots}]
-           (:commands result))
-        "No navigate command — the result reveals in-place on the workspace.")))
+                           :payload (cond-> {:status :solved}
+                                      run-scenario-id
+                                      (assoc :scenario-id run-scenario-id))}
+                 :computed-at-ms 400}))))
+
+(def ^:private refresh-command
+  {:command/type
+   :optimizer.workflow/refresh-portfolio-optimizer-rebalance-slippage-snapshots})
+
+(deftest handle-worker-message-on-new-route-reveals-results-test
+  ;; A successful solve is the outcome the user asked for: a run watched from
+  ;; /optimize/new navigates straight to the draft results surface instead of
+  ;; reporting "Succeeded" and waiting for another click.
+  (is (= [refresh-command
+          {:command/type :optimizer.workflow/reveal-results
+           :path "/portfolio/optimize/draft"}]
+         (solved-run-commands {:path "/portfolio/optimize/new"
+                               :run-scenario-id nil}))))
+
+(deftest handle-worker-message-on-own-scenario-route-stays-in-place-test
+  ;; A refine/rerun watched from the run's own scenario surface updates in place —
+  ;; no navigation, no toast.
+  (is (= [refresh-command]
+         (solved-run-commands {:path "/portfolio/optimize/scenario-1"
+                               :run-scenario-id "scenario-1"})))
+  ;; The draft results surface counts as the draft run's own scenario surface.
+  (is (= [refresh-command]
+         (solved-run-commands {:path "/portfolio/optimize/draft"
+                               :run-scenario-id nil}))))
+
+(deftest handle-worker-message-elsewhere-announces-instead-of-navigating-test
+  ;; The user wandered off mid-run: never teleport them; announce completion via
+  ;; the global toast instead.
+  (is (= [refresh-command
+          {:command/type :optimizer.workflow/announce-run-complete}]
+         (solved-run-commands {:path "/trade"
+                               :run-scenario-id nil})))
+  ;; Viewing a DIFFERENT scenario than the one that finished also announces.
+  (is (= [refresh-command
+          {:command/type :optimizer.workflow/announce-run-complete}]
+         (solved-run-commands {:path "/portfolio/optimize/other-scenario"
+                               :run-scenario-id "scenario-1"}))))

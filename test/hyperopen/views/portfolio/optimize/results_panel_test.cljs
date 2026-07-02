@@ -178,7 +178,9 @@
     (is (= "80%" (get (node-attr purr-bar :style)
                       :--optimizer-delta-bar-size)))))
 
-(deftest results-panel-renders-use-my-views-editor-in-right-rail-test
+(deftest results-panel-renders-return-views-editor-in-right-rail-test
+  ;; The editor renders whenever the draft's return model consumes views —
+  ;; views are an input policy, not an objective/menu selection.
   (let [draft {:universe [{:instrument-id "perp:BTC"
                            :market-type :perp
                            :coin "BTC"}
@@ -202,8 +204,7 @@
                                        :confidence 0.5
                                        :weights {"perp:BTC" 1}}]}}
         state {:portfolio-ui {:optimizer {:objective-menu-view-drafts
-                                          {:perp:BTC {:return-text "19.5"
-                                                      :confidence :high}}}}}
+                                          {:perp:BTC {:return-text "19.5"}}}}}
         view-node (results-panel/results-panel
                    {:result solved-result
                     :computed-at-ms 2600}
@@ -214,13 +215,27 @@
                              "portfolio-optimizer-results-your-views-editor")
         rows (node-by-role editor
                            "portfolio-optimizer-results-your-views-editor-rows")
+        summary (node-by-role editor
+                              "portfolio-optimizer-results-your-views-editor-summary")
+        filter-all (node-by-role editor
+                                 "portfolio-optimizer-results-your-views-editor-filter-all")
+        btc-row (node-by-role editor
+                              "portfolio-optimizer-objective-menu-view-row-perp:BTC")
+        sol-row (node-by-role editor
+                              "portfolio-optimizer-objective-menu-view-row-perp:SOL")
         btc-return (node-by-role editor
                                  "portfolio-optimizer-objective-menu-view-perp:BTC-return")
         sol-return (node-by-role editor
                                  "portfolio-optimizer-objective-menu-view-perp:SOL-return")
+        btc-confidence-medium (node-by-role
+                               editor
+                               "portfolio-optimizer-objective-menu-view-perp:BTC-confidence-medium")
         btc-confidence-high (node-by-role
                              editor
                              "portfolio-optimizer-objective-menu-view-perp:BTC-confidence-high")
+        sol-confidence-medium (node-by-role
+                               editor
+                               "portfolio-optimizer-objective-menu-view-perp:SOL-confidence-medium")
         add-view (node-by-role editor
                                "portfolio-optimizer-objective-menu-add-view")
         apply (node-by-role editor
@@ -228,19 +243,41 @@
         strings (set (collect-strings editor))]
     (is (some? editor))
     (is (contains? (set (node-attr rows :class)) "overflow-x-hidden"))
-    (is (contains? strings "Your views"))
-    (is (contains? strings "Change annualized return views and confidence, then rerun the recommendation."))
+    (is (contains? strings "Return views"))
+    (is (contains? strings "Annualized. Your views tilt the forecast; implied rows use the baseline estimate. Edits save and rerun automatically."))
+    (is (= ["1 your view · 3 implied"] (collect-strings summary)))
+    (is (= "true" (node-attr filter-all :data-selected)))
+    (is (= "user" (node-attr btc-row :data-source)))
+    (is (= ["Your view"]
+           (collect-strings
+            (node-by-role btc-row
+                          "portfolio-optimizer-objective-menu-view-perp:BTC-source"))))
+    (is (= "implied" (node-attr sol-row :data-source)))
+    (is (= ["Implied"]
+           (collect-strings
+            (node-by-role sol-row
+                          "portfolio-optimizer-objective-menu-view-perp:SOL-source"))))
     (is (= "19.5" (node-attr btc-return :value)))
-    (is (some? sol-return))
+    (is (= "" (node-attr sol-return :value))
+        "Without readiness history the implied row prefills nothing.")
+    (is (= "—" (node-attr sol-return :placeholder)))
     (is (= [[:actions/set-portfolio-optimizer-objective-menu-view-return
              "perp:BTC"
              [:event.target/value]]]
            (get-in btc-return [1 :on :input])))
-    (is (= "true" (node-attr btc-confidence-high :data-selected)))
+    (is (= "true" (node-attr btc-confidence-medium :data-selected))
+        "Selected confidence comes from the materialized view, not the typing buffer.")
+    (is (= "false" (node-attr btc-confidence-high :data-selected)))
+    (is (= "false" (node-attr sol-confidence-medium :data-selected))
+        "Implied rows have no selected confidence.")
     (is (= [[:actions/set-portfolio-optimizer-objective-menu-view-confidence
              "perp:BTC"
              :high]]
            (click-actions btc-confidence-high)))
+    (is (some? (node-by-role btc-row
+                             "portfolio-optimizer-objective-menu-view-perp:BTC-reset")))
+    (is (nil? (node-by-role sol-row
+                            "portfolio-optimizer-objective-menu-view-perp:SOL-reset")))
     (is (nil? add-view))
     (is (= [[:actions/apply-portfolio-optimizer-objective-menu-selection-and-run]]
            (click-actions apply)))))

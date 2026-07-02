@@ -15,11 +15,18 @@
     (is (some? (node-by-role view-node "portfolio-optimizer-setup-surface")))
     (is (some? (node-by-role view-node "portfolio-optimizer-setup-control-rail")))
     ;; CENTER column is now the editable policy pane (was the passive summary pane); the RIGHT
-    ;; column leads with a compact summary card (the verbose 6-row summary + non-BL assumptions
-    ;; rail are gone).
+    ;; column leads with a compact summary card followed by the ALWAYS-present "Return views"
+    ;; panel — it edits views under the views-aware model and states honestly why views are
+    ;; inert otherwise, instead of vanishing for non-BL drafts.
     (is (some? (node-by-role view-node "portfolio-optimizer-setup-policy-pane")))
     (is (some? (node-by-role view-node "portfolio-optimizer-setup-summary-card")))
-    (is (nil? (node-by-role view-node "portfolio-optimizer-assumptions-rail")))
+    (is (some? (node-by-role view-node "portfolio-optimizer-assumptions-rail")))
+    (is (contains? strings "Return views"))
+    ;; The default draft is the Conservative preset (minimum variance): the rail
+    ;; renders the "views are not used here" note, not a dead editor.
+    (is (some? (node-by-role
+                view-node
+                "portfolio-optimizer-setup-use-my-views-editor-conservative-note")))
     (is (nil? (node-by-role view-node "portfolio-optimizer-left-rail")))
     (is (contains? strings "Portfolio Optimizer"))
     (is (contains? strings "Start with"))
@@ -216,7 +223,7 @@
                       ["portfolio-optimizer-return-model-ew-mean"
                        "Uses exponentially weighted historical returns so recent observations count more."]
                       ["portfolio-optimizer-return-model-black-litterman"
-                       "Combines market-implied returns with your Black-Litterman views and confidence inputs."]
+                       "Tilts the implied baseline with your return views, weighted by confidence. With no views it equals the baseline."]
                       ["portfolio-optimizer-risk-model-diagonal-shrink"
                        "Shrinks the covariance estimate toward a diagonal model to reduce noisy cross-asset correlations."]
                       ["portfolio-optimizer-risk-model-ledoit-wolf-dense"
@@ -233,7 +240,15 @@
         (is (contains? (class-token-set button)
                        "focus:shadow-[inset_0_0_0_1px_rgba(212,181,88,0.75)]"))
         (is (= "tooltip" (get-in tooltip [1 :role])))
-        (is (= copy (node-text tooltip)))))))
+        (is (= copy (node-text tooltip)))))
+    ;; The views-aware option is an input policy, not a persona: "With my views"
+    ;; (sublabel "Views + baseline"), no longer the "Use my views" strategy label.
+    (let [bl-button (node-by-role view-node
+                                  "portfolio-optimizer-return-model-black-litterman")
+          bl-strings (set (collect-strings bl-button))]
+      (is (contains? bl-strings "With my views"))
+      (is (contains? bl-strings "Views + baseline"))
+      (is (not (contains? bl-strings "Use my views"))))))
 
 (deftest setup-summary-renders-vault-names-instead-of-addresses-test
   (let [vault-address "0x2222222222222222222222222222222222222222"

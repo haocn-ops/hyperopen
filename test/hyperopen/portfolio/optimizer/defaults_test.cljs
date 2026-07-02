@@ -134,6 +134,7 @@
           :refinement-open? false
           :refinement-depth nil
           :exposure-zoom-level nil
+          :return-views-filter :all
           :stale-auto-recompute {:request-signature nil
                                  :input-signature nil
                                  :scenario-id nil}}

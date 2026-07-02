@@ -33,18 +33,12 @@
                                            :running? false
                                            :readiness {:runnable? false
                                                        :reason :history-loading}
-                                           :asset-count 4})
-        bl (setup-actions/run-status {:run-triggerable? true
-                                      :running? false
-                                      :readiness {:runnable? false
-                                                  :reason :missing-black-litterman-views}
-                                      :asset-count 4})]
+                                           :asset-count 4})]
     (is (false? (:ready? incomplete)))
     (is (= :blocked (:tone incomplete)))
     (is (= "History incomplete" (:label incomplete)))
     (is (= "No usable history" (:label no-history)))
-    (is (= "Loading history" (:label loading)))
-    (is (= "Add a view" (:label bl)))))
+    (is (= "Loading history" (:label loading)))))
 
 (deftest run-status-prefers-empty-message-when-no-assets-test
   (let [status (setup-actions/run-status {:run-triggerable? false

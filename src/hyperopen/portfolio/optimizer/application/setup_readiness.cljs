@@ -199,11 +199,6 @@
   (not= (instrument-ids requested-universe)
         (instrument-ids (:universe request))))
 
-(defn- missing-black-litterman-views?
-  [request]
-  (and (= :black-litterman (get-in request [:return-model :kind]))
-       (empty? (get-in request [:return-model :views]))))
-
 (defn- requested-instrument-by-id
   [request]
   (into {}
@@ -479,7 +474,6 @@
       :missing-universe "Select a universe before running."
       :holdings-loading "Holdings are still loading for this account."
       :history-loading "Optimizer history is already loading."
-      :missing-black-litterman-views "Add a view before running Use my views."
       :no-eligible-history
       (with-details "No eligible history was available for this universe."
                     "No eligible history was available")
@@ -521,13 +515,11 @@
             incomplete? (incomplete-history? requested-universe request)
             risk-history-incomplete? (boolean (seq risk-blocking-warnings))
             assumptions-flagged? (boolean (seq assumption-warnings))
-            missing-bl-views? (missing-black-litterman-views? request)
             runnable? (and eligible?
                            (not incomplete?)
                            (not risk-history-incomplete?)
                            (not assumptions-flagged?)
-                           (not history-loading?)
-                           (not missing-bl-views?))
+                           (not history-loading?))
             blocking-warnings (if (or (not eligible?)
                                       incomplete?
                                       risk-history-incomplete?
@@ -541,7 +533,6 @@
                    assumptions-flagged? :missing-history-assumptions
                    (not eligible?) :no-eligible-history
                    (or incomplete? risk-history-incomplete?) :incomplete-history
-                   missing-bl-views? :missing-black-litterman-views
                    :else nil)
          :runnable? (boolean runnable?)
          :request request

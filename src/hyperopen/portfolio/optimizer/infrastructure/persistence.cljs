@@ -39,6 +39,13 @@
   (when-let [address* (address-token address)]
     (str "constraint-profiles::" address*)))
 
+(defn view-library-key
+  "One record per wallet holds the whole {instrument-id -> remembered return view}
+  map — the user's authored views, durable across drafts and preset switches."
+  [address]
+  (when-let [address* (address-token address)]
+    (str "view-library::" address*)))
+
 (defn- get-record!
   [key]
   (if (seq key)
@@ -164,3 +171,11 @@
 (defn save-constraint-profiles!
   [address profiles]
   (put-encoded-record! (constraint-profiles-key address) profiles))
+
+(defn load-view-library!
+  [address]
+  (get-encoded-record! (view-library-key address)))
+
+(defn save-view-library!
+  [address record]
+  (put-encoded-record! (view-library-key address) record))

@@ -243,6 +243,7 @@
             [hyperopen.portfolio.optimizer.application.request-builder-refinement-test]
             [hyperopen.portfolio.optimizer.application.request-builder-test]
             [hyperopen.portfolio.optimizer.application.return-inputs-test]
+            [hyperopen.portfolio.optimizer.application.return-views-test]
             [hyperopen.portfolio.optimizer.application.run-bridge-boundary-test]
             [hyperopen.portfolio.optimizer.application.run-bridge-workflow-test]
             [hyperopen.portfolio.optimizer.application.run-identity-test]
@@ -254,6 +255,7 @@
             [hyperopen.portfolio.optimizer.application.universe-candidates-cache-test]
             [hyperopen.portfolio.optimizer.application.universe-candidates-test]
             [hyperopen.portfolio.optimizer.application.universe-candidates-vault-ordering-test]
+            [hyperopen.portfolio.optimizer.application.view-library-test]
             [hyperopen.portfolio.optimizer.application.view-model-facade-test]
             [hyperopen.portfolio.optimizer.application.view-model-frontier-test]
             [hyperopen.portfolio.optimizer.application.view-model-index-test]
@@ -353,6 +355,7 @@
             [hyperopen.runtime.effect-adapters.portfolio-optimizer-scenarios-test]
             [hyperopen.runtime.effect-adapters.portfolio-optimizer-test]
             [hyperopen.runtime.effect-adapters.portfolio-optimizer-tracking-test]
+            [hyperopen.runtime.effect-adapters.portfolio-optimizer-view-library-test]
             [hyperopen.runtime.effect-adapters.referrals-test]
             [hyperopen.runtime.effect-adapters.staking-test]
             [hyperopen.runtime.effect-adapters.vaults-test]
@@ -543,7 +546,6 @@
             [hyperopen.views.portfolio.montecarlo.chart-test]
             [hyperopen.views.portfolio.montecarlo.controls-test]
             [hyperopen.views.portfolio.optimize.black-litterman-preview-chart-test]
-            [hyperopen.views.portfolio.optimize.black-litterman-views-panel-test]
             [hyperopen.views.portfolio.optimize.execution-tab-test]
             [hyperopen.views.portfolio.optimize.format-test]
             [hyperopen.views.portfolio.optimize.frontier-callout-test]
@@ -995,6 +997,7 @@
              'hyperopen.portfolio.optimizer.application.request-builder-refinement-test
              'hyperopen.portfolio.optimizer.application.request-builder-test
              'hyperopen.portfolio.optimizer.application.return-inputs-test
+             'hyperopen.portfolio.optimizer.application.return-views-test
              'hyperopen.portfolio.optimizer.application.run-bridge-boundary-test
              'hyperopen.portfolio.optimizer.application.run-bridge-workflow-test
              'hyperopen.portfolio.optimizer.application.run-identity-test
@@ -1006,6 +1009,7 @@
              'hyperopen.portfolio.optimizer.application.universe-candidates-cache-test
              'hyperopen.portfolio.optimizer.application.universe-candidates-test
              'hyperopen.portfolio.optimizer.application.universe-candidates-vault-ordering-test
+             'hyperopen.portfolio.optimizer.application.view-library-test
              'hyperopen.portfolio.optimizer.application.view-model-facade-test
              'hyperopen.portfolio.optimizer.application.view-model-frontier-test
              'hyperopen.portfolio.optimizer.application.view-model-index-test
@@ -1105,6 +1109,7 @@
              'hyperopen.runtime.effect-adapters.portfolio-optimizer-scenarios-test
              'hyperopen.runtime.effect-adapters.portfolio-optimizer-test
              'hyperopen.runtime.effect-adapters.portfolio-optimizer-tracking-test
+             'hyperopen.runtime.effect-adapters.portfolio-optimizer-view-library-test
              'hyperopen.runtime.effect-adapters.referrals-test
              'hyperopen.runtime.effect-adapters.staking-test
              'hyperopen.runtime.effect-adapters.vaults-test
@@ -1295,7 +1300,6 @@
              'hyperopen.views.portfolio.montecarlo.chart-test
              'hyperopen.views.portfolio.montecarlo.controls-test
              'hyperopen.views.portfolio.optimize.black-litterman-preview-chart-test
-             'hyperopen.views.portfolio.optimize.black-litterman-views-panel-test
              'hyperopen.views.portfolio.optimize.execution-tab-test
              'hyperopen.views.portfolio.optimize.format-test
              'hyperopen.views.portfolio.optimize.frontier-callout-test

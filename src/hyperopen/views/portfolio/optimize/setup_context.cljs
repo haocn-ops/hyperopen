@@ -30,7 +30,7 @@
   where the user looks to confirm readiness, so it must reflect the wait."
   [draft readiness]
   (let [{:keys [preset-label asset-count universe-source-kind objective-label
-                return-label risk-label constraints-line]}
+                returns-label risk-label constraints-line]}
         (optimizer-view-model/setup-summary-card-model draft {:labelize controls/labelize})
         holdings-loading? (= :holdings-loading (:reason readiness))]
     [:section {:class ["optimizer-setup-panel" "border" "border-base-300" "bg-base-100/90" "p-3"]
@@ -50,7 +50,10 @@
                              :custom " · custom"
                              nil))))
       (contract-row "Objective" objective-label)
-      (contract-row "Model" (str return-label " · " risk-label))
+      ;; Returns is a SOURCE line ("2 your views · 12 implied"), not a model
+      ;; name — "Use my views" was never a model, it was an input policy.
+      (contract-row "Returns" returns-label)
+      (contract-row "Risk model" risk-label)
       (contract-row "Constraints"
                     [:span {:class ["font-mono" "text-[0.75rem]" "text-trading-muted"]}
                      constraints-line])]]))
@@ -58,8 +61,7 @@
 (defn context-rail
   [{:keys [draft state readiness snapshot preview-snapshot run-state optimization-progress
            history-load-state last-successful-run current-result? result-path]}]
-  (let [bl? (= :black-litterman (get-in draft [:return-model :kind]))
-        progress-visible? (contains? #{:running :succeeded :failed}
+  (let [progress-visible? (contains? #{:running :succeeded :failed}
                                      (:status optimization-progress))
         readiness-visible? (or (contains? #{:loading :failed :succeeded}
                                           (:status history-load-state))
@@ -81,21 +83,21 @@
     [:aside {:class ["optimizer-context-rail" "min-h-0"]
              :data-role "portfolio-optimizer-right-rail"}
      (summary-card draft readiness)
-     ;; The non-BL "why this preset is safe" copy moved to a collapsed note below the center
-     ;; controls; only the Black-Litterman belief editor remains as a right-rail panel.
-     (when bl?
-       [:section {:class ["optimizer-setup-panel" "border" "border-base-300" "bg-base-100/90" "p-3"]
-                  :data-role "portfolio-optimizer-assumptions-rail"}
-        [:p {:class eyebrow-class} "Edit views"]
-        [:div {:class ["mt-3"]}
-         (scenario-objective-menu/views-editor-section
-          draft
-          state
-          (:result last-successful-run)
-          readiness
-          {:container-role "portfolio-optimizer-setup-use-my-views-editor"
-           :title "Your views"
-           :description "Change annualized return views and confidence, then run the recommendation."})]])
+     ;; The Return views panel is always present: it edits views when the
+     ;; views-aware model is active, and states honestly why views are inert
+     ;; under Conservative / estimator-only models instead of vanishing.
+     [:section {:class ["optimizer-setup-panel" "border" "border-base-300" "bg-base-100/90" "p-3"]
+                :data-role "portfolio-optimizer-assumptions-rail"}
+      [:p {:class eyebrow-class} "Return views"]
+      [:div {:class ["mt-3"]}
+       (scenario-objective-menu/views-editor-section
+        draft
+        state
+        (:result last-successful-run)
+        readiness
+        {:container-role "portfolio-optimizer-setup-use-my-views-editor"
+         :title "Used by Maximum Sharpe"
+         :description "Your views tilt the forecast where you have them; implied rows fall back to the baseline estimate. Edits save automatically."})]]
      (when status-visible?
        [:section {:class ["optimizer-setup-panel" "border-t" "border-base-300" "bg-base-100/90" "p-3"]
                   :data-role "portfolio-optimizer-trust-freshness-panel"}

@@ -22,24 +22,34 @@
    :sample-covariance {:kind :sample-covariance}
    :mixed-frequency {:kind :mixed-frequency}})
 
+(def ^:private max-sharpe-preset
+  ;; Maximum Sharpe consumes return views: user views where authored, the implied
+  ;; baseline otherwise. The apply action hydrates :views from the wallet's view
+  ;; library for the current universe; zero views is valid (posterior = baseline).
+  {:objective {:kind :max-sharpe}
+   :return-model {:kind :black-litterman
+                  :views []}})
+
 (def setup-presets
+  ;; Two presets: the objective choice. "Risk-adjusted" and "Use my views" were
+  ;; both Maximum Sharpe with different return-input policies; they are aliases
+  ;; now so persisted dispatches and older callers keep working.
   {:conservative {:objective {:kind :minimum-variance}
                   :return-model {:kind :historical-mean}}
-   :risk-adjusted {:objective {:kind :max-sharpe}
-                   :return-model {:kind :historical-mean}}
-   :use-my-views {:objective {:kind :max-sharpe}
-                  :return-model {:kind :black-litterman
-                                 :views []}}})
+   :max-sharpe max-sharpe-preset
+   :risk-adjusted max-sharpe-preset
+   :use-my-views max-sharpe-preset})
 
 (def objective-menu-options
+  ;; Maximum Sharpe carries the views-aware return model; the other objectives
+  ;; leave the return model untouched (views are an input, not an objective).
   {:minimum-volatility {:objective {:kind :minimum-variance}}
-   :max-sharpe {:objective {:kind :max-sharpe}}
+   :max-sharpe {:objective {:kind :max-sharpe}
+                :return-model-kind :black-litterman}
    :target-volatility {:objective {:kind :target-volatility
                                    :target-volatility 0.12}}
    :maximum-return {:objective {:kind :target-return
-                                :target-return 0.3}}
-   :use-my-views {:objective {:kind :max-sharpe}
-                  :return-model-kind :black-litterman}})
+                                :target-return 0.3}}})
 
 (def numeric-constraint-keys
   #{:max-asset-weight

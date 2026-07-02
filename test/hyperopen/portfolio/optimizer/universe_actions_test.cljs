@@ -249,7 +249,9 @@
             state
             "perp:ETH")))))
 
-(deftest add-draft-universe-instrument-and-run-preserves-black-litterman-run-gate-test
+(deftest add-draft-universe-instrument-and-run-runs-with-zero-black-litterman-views-test
+  ;; Zero authored views no longer gates the run: the posterior equals the
+  ;; baseline, so adding an asset to a views-aware draft runs immediately.
   (let [btc-instrument {:instrument-id "perp:BTC"
                         :market-type :perp
                         :coin "BTC"
@@ -264,16 +266,7 @@
                                                               :views []}
                                                :risk-model {:kind :sample-covariance}
                                                :constraints {:long-only? true}}}}
-               :portfolio-ui {:optimizer {:draft-add-asset-open? true
-                                          :black-litterman-editor
-                                          {:selected-kind :absolute
-                                           :drafts {:absolute {:instrument-id "perp:BTC"
-                                                               :return-text ""
-                                                               :return-text-touched? false
-                                                               :confidence :medium
-                                                               :horizon :3m
-                                                               :notes ""}}
-                                           :errors {}}}}
+               :portfolio-ui {:optimizer {:draft-add-asset-open? true}}
                :asset-selector {:market-by-key
                                 {"perp:ETH" {:key "perp:ETH"
                                              :market-type :perp
@@ -282,17 +275,14 @@
                  state
                  "perp:ETH")
         values (effect-values-by-path effects)]
-    (is (= [:effects/save-many
-            :effects/save-many]
-           (mapv first effects)))
+    (is (some #(= :effects/run-portfolio-optimizer-pipeline (first %))
+              effects)
+        "The run is no longer gated on having at least one view.")
     (is (= [btc-instrument eth-instrument]
            (get values [:portfolio :optimizer :draft :universe])))
     (is (= false
-           (get values [:portfolio-ui :optimizer :draft-add-asset-open?])))
-    (is (= "Add a view before running Use my views."
-           (get values [:portfolio-ui :optimizer :black-litterman-editor :errors :return-text])))
-    (is (not (some #(= :effects/run-portfolio-optimizer-pipeline (first %))
-                   effects)))))
+           (get values [:portfolio-ui :optimizer :draft-add-asset-open?])))))
+
 
 (deftest toggle-draft-universe-instrument-exclusion-and-run-keeps-row-in-universe-test
   (let [btc-instrument {:instrument-id "perp:BTC"

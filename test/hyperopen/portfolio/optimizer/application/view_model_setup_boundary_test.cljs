@@ -145,9 +145,10 @@
         row-by-label (into {}
                            (map (juxt :label identity))
                            (:summary-rows model))]
-    (is (= :risk-adjusted (:active-preset model)))
+    (is (= :max-sharpe (:active-preset model))
+        "Risk-adjusted / Use my views consolidated: a max-sharpe objective IS the Maximum Sharpe preset.")
     (is (false? (:black-litterman? model)))
-    (is (= "Risk Adjusted" (get-in row-by-label ["Preset" :title])))
+    (is (= "Max Sharpe" (get-in row-by-label ["Preset" :title])))
     (is (= "Historical Mean" (get-in row-by-label ["Expected Returns" :title])))
     (is (= "Max Sharpe" (get-in row-by-label ["Objective" :title])))
     (is (= "gross <= 1.5 - cap <= 40%" (get-in row-by-label ["Constraints" :title]))))

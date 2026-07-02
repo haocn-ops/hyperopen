@@ -1,9 +1,12 @@
 (ns hyperopen.portfolio.optimizer.actions.draft
-  (:require [hyperopen.portfolio.optimizer.actions.common :as common]
+  (:require [clojure.string :as str]
+            [hyperopen.portfolio.optimizer.actions.common :as common]
             [hyperopen.portfolio.optimizer.actions.draft-options :as draft-options]
             [hyperopen.portfolio.optimizer.application.black-litterman-editor-model :as bl-model]
             [hyperopen.portfolio.optimizer.application.return-inputs :as return-inputs]
+            [hyperopen.portfolio.optimizer.application.return-views :as return-views]
             [hyperopen.portfolio.optimizer.application.setup-readiness :as setup-readiness]
+            [hyperopen.portfolio.optimizer.application.view-library :as view-library]
             [hyperopen.portfolio.optimizer.actions.run :as run-actions]
             [hyperopen.portfolio.optimizer.coercion :as coercion]
             [hyperopen.portfolio.optimizer.contracts :as contracts]
@@ -16,11 +19,12 @@
     []))
 
 (defn- current-objective-menu-option
+  ;; The menu key follows the OBJECTIVE only: return views are an input policy,
+  ;; not an objective, so a Black-Litterman return model no longer claims its own
+  ;; menu entry.
   [state]
-  (let [objective-kind (get-in state (conj contracts/draft-objective-path :kind))
-        return-model-kind (get-in state (conj contracts/draft-return-model-path :kind))]
+  (let [objective-kind (get-in state (conj contracts/draft-objective-path :kind))]
     (cond
-      (= :black-litterman return-model-kind) :use-my-views
       (= :minimum-variance objective-kind) :minimum-volatility
       (= :target-volatility objective-kind) :target-volatility
       (= :target-return objective-kind) :maximum-return
@@ -61,89 +65,100 @@
                                   (get-in state contracts/draft-universe-path)))]
     (vec (distinct (concat universe-order existing-order ui-order)))))
 
-(defn- objective-menu-inline-draft
-  [state views return-inputs-by-instrument instrument-id]
-  (let [view (existing-absolute-view-by-instrument views instrument-id)
-        ui-draft (get-in state (conj contracts/ui-objective-menu-view-drafts-path
-                                     (keyword instrument-id)))]
-    (merge
-     {:return-text (cond
-                     (some? (:return view))
-                     (bl-model/decimal->percent-text (:return view))
-
-                     (contains? return-inputs-by-instrument instrument-id)
-                     (bl-model/decimal->percent-text
-                      (get return-inputs-by-instrument instrument-id))
-
-                     :else
-                     "")
-      :confidence (black-litterman-view-confidence-level view)}
-     ui-draft)))
-
-(defn- result-return-inputs
-  [state]
-  (or (get-in state (conj contracts/last-successful-run-result-path
-                          :expected-returns-by-instrument))
-      {}))
-
-(defn- readiness-return-inputs
+(defn- implied-return-inputs
+  ;; Baseline (prior) expected returns only — never the last run's posterior.
+  ;; The implied value a row shows (and the value a confidence click adopts) must
+  ;; be exactly the number the solver uses when the user has no view there.
   [state]
   (return-inputs/readiness-inputs-by-instrument
    (setup-readiness/build-readiness state)))
 
-(defn- objective-menu-return-inputs
+(defn- black-litterman-return-model?
   [state]
-  (merge (readiness-return-inputs state)
-         (result-return-inputs state)))
+  (= :black-litterman
+     (get-in state (conj contracts/draft-return-model-path :kind))))
 
-(defn- next-inline-view-id
-  [views]
-  (bl-model/next-view-id views))
-
-(defn- inline-draft->absolute-view
-  [existing-views id-views instrument-id draft]
-  (let [return-value (bl-model/parse-percent-text (:return-text draft))]
-    (when (some? return-value)
-      (let [existing (existing-absolute-view-by-instrument existing-views instrument-id)
-            confidence-level (bl-model/normalize-confidence-level
-                              (:confidence draft))
-            confidence (bl-model/confidence-weight confidence-level)]
-        {:id (or (:id existing)
-                 (next-inline-view-id id-views))
-         :kind :absolute
-         :instrument-id instrument-id
-         :return return-value
-         :confidence-level confidence-level
-         :confidence confidence
-         :confidence-variance (bl-model/confidence-variance confidence)
-         :horizon (or (:horizon existing) :3m)
-         :weights {instrument-id 1}}))))
-
-(defn- objective-menu-inline-views
+(defn- draft-views
   [state]
-  (let [views (vec (or (get-in state contracts/draft-return-model-views-path) []))
-        return-inputs-by-instrument (objective-menu-return-inputs state)
-        order (objective-menu-inline-order state)
-        edited-instruments (set order)
-        preserved-views (vec (remove (fn [view]
-                                       (and (absolute-view? view)
-                                            (contains? edited-instruments
-                                                       (:instrument-id view))))
-                                     views))]
-    (reduce (fn [acc instrument-id]
-              (if-let [view (inline-draft->absolute-view
-                             views
-                             acc
-                             instrument-id
-                             (objective-menu-inline-draft
-                              state
-                              views
-                              return-inputs-by-instrument
-                              instrument-id))]
-                (conj acc view)
-                acc))
-            preserved-views
-            order)))
+  (vec (or (get-in state contracts/draft-return-model-views-path) [])))
+
+(defn- ui-view-return-text
+  [state instrument-id]
+  (get-in state (conj contracts/ui-objective-menu-view-drafts-path
+                      (keyword instrument-id)
+                      :return-text)))
+
+(defn- effective-return-text
+  ;; What the row currently displays: the typing buffer wins, then the authored
+  ;; view, then the implied baseline.
+  [state views implied-by-instrument instrument-id]
+  (let [view (existing-absolute-view-by-instrument views instrument-id)
+        ui-text (ui-view-return-text state instrument-id)]
+    (cond
+      (some? ui-text) (str ui-text)
+
+      (some? (:return view))
+      (bl-model/decimal->percent-text (:return view))
+
+      (contains? implied-by-instrument instrument-id)
+      (bl-model/decimal->percent-text (get implied-by-instrument instrument-id))
+
+      :else "")))
+
+(defn- upsert-absolute-view
+  ;; Author or update the user's absolute view for an instrument. Returns
+  ;; {:views ... :view ...}; the caller persists the view to the wallet library.
+  [views instrument-id return-value confidence-level]
+  (let [existing (existing-absolute-view-by-instrument views instrument-id)
+        level (bl-model/normalize-confidence-level
+               (or confidence-level
+                   (when existing (black-litterman-view-confidence-level existing))))
+        confidence (bl-model/confidence-weight level)
+        view (if existing
+               (assoc existing
+                      :return return-value
+                      :confidence-level level
+                      :confidence confidence
+                      :confidence-variance (bl-model/confidence-variance confidence))
+               {:id (bl-model/next-view-id views)
+                :kind :absolute
+                :instrument-id instrument-id
+                :return return-value
+                :confidence-level level
+                :confidence confidence
+                :confidence-variance (bl-model/confidence-variance confidence)
+                :horizon :3m
+                :weights {instrument-id 1}})]
+    {:views (if existing
+              (mapv (fn [candidate]
+                      (if (= (:id existing) (:id candidate)) view candidate))
+                    views)
+              (conj views view))
+     :view view}))
+
+(defn- remove-absolute-view
+  [views instrument-id]
+  (vec (remove (fn [view]
+                 (and (absolute-view? view)
+                      (= instrument-id (:instrument-id view))))
+               views)))
+
+(defn- view-library-sync-effect
+  [{:keys [upserts removes]}]
+  [:effects/sync-portfolio-optimizer-view-library
+   {:upserts (vec (or upserts []))
+    :removes (vec (or removes []))}])
+
+(defn- hydrated-black-litterman-return-model
+  ;; The views-aware return model: the draft's authored views, plus remembered
+  ;; library views for universe instruments that have none yet. Zero views is a
+  ;; valid state (the posterior equals the baseline).
+  [state]
+  {:kind :black-litterman
+   :views (view-library/hydrate-views
+           (draft-views state)
+           (get-in state contracts/view-library-path)
+           (get-in state contracts/draft-universe-path))})
 
 (defn- preserve-objective-parameters
   ;; Menu models carry preset parameter values (e.g. target-volatility 0.12);
@@ -171,6 +186,9 @@
       objective)))
 
 (defn- objective-menu-model-for-state
+  ;; Objective and return model are orthogonal now: picking a non-Sharpe
+  ;; objective leaves the return model (and any authored views) alone instead of
+  ;; downgrading to historical-mean.
   [state value]
   (when-let [model (objective-menu-model value)]
     (let [model (update model :objective
@@ -181,13 +199,8 @@
       (if (= :black-litterman (:return-model-kind model))
         (-> model
             (dissoc :return-model-kind)
-            (assoc :return-model
-                   {:kind :black-litterman
-                    :views (objective-menu-inline-views state)}))
-        (cond-> model
-          (= :black-litterman
-             (get-in state (conj contracts/draft-return-model-path :kind)))
-          (assoc :return-model {:kind :historical-mean}))))))
+            (assoc :return-model (hydrated-black-litterman-return-model state)))
+        model))))
 
 (defn open-portfolio-optimizer-objective-menu
   [state]
@@ -219,13 +232,44 @@
     []))
 
 (defn set-portfolio-optimizer-objective-menu-view-return
-  [_state instrument-id value]
+  "Typing in a row's return input. The text buffer always updates; when the text
+  parses the row is authored (or updated) as the user's view immediately and
+  synced to the wallet's view library. Blank text clears the view — the row
+  resets to implied. Unparseable mid-typing text (\"-\", \"1.\") keeps the
+  existing view until the number completes."
+  [state instrument-id value]
   (if-let [instrument-id* (common/non-blank-text instrument-id)]
-    [[:effects/save
-      (conj contracts/ui-objective-menu-view-drafts-path
-            (keyword instrument-id*)
-            :return-text)
-      (str (or value ""))]]
+    (let [text (str (or value ""))
+          ui-path (conj contracts/ui-objective-menu-view-drafts-path
+                        (keyword instrument-id*)
+                        :return-text)
+          buffer-only [[:effects/save ui-path text]]
+          views (draft-views state)
+          existing (existing-absolute-view-by-instrument views instrument-id*)
+          parsed (bl-model/parse-percent-text text)]
+      (cond
+        (not (black-litterman-return-model? state))
+        buffer-only
+
+        (str/blank? text)
+        (if existing
+          (conj (common/save-draft-path-values
+                 [[contracts/draft-return-model-views-path
+                   (remove-absolute-view views instrument-id*)]
+                  [ui-path text]])
+                (view-library-sync-effect {:removes [instrument-id*]}))
+          buffer-only)
+
+        (some? parsed)
+        (let [{:keys [views view]} (upsert-absolute-view views instrument-id* parsed nil)]
+          (conj (common/save-draft-path-values
+                 [[contracts/draft-return-model-views-path views]
+                  [ui-path text]])
+                (view-library-sync-effect
+                 {:upserts [(view-library/view->upsert view)]})))
+
+        :else
+        buffer-only))
     []))
 
 (def ^:private inline-return-step-decimal
@@ -241,48 +285,84 @@
     nil))
 
 (defn step-portfolio-optimizer-objective-menu-view-return
+  "Stepper/arrow-key nudge (±0.5 pp) from the row's effective value (buffer, then
+  authored view, then implied). The result always parses, so the step authors the
+  view immediately."
   [state instrument-id direction]
   (if-let [instrument-id* (common/non-blank-text instrument-id)]
     (if-let [step-direction (objective-menu-return-step-direction direction)]
-      (let [views (vec (or (get-in state contracts/draft-return-model-views-path)
-                           []))
-            draft (objective-menu-inline-draft
-                   state
-                   views
-                   (objective-menu-return-inputs state)
-                   instrument-id*)
-            current (or (bl-model/parse-percent-text (:return-text draft))
+      (let [ui-path (conj contracts/ui-objective-menu-view-drafts-path
+                          (keyword instrument-id*)
+                          :return-text)
+            views (draft-views state)
+            current (or (bl-model/parse-percent-text
+                         (effective-return-text state
+                                                views
+                                                (implied-return-inputs state)
+                                                instrument-id*))
                         0)
-            next-value (+ current (* step-direction inline-return-step-decimal))]
-        [[:effects/save
-          (conj contracts/ui-objective-menu-view-drafts-path
-                (keyword instrument-id*)
-                :return-text)
-          (bl-model/decimal->percent-text next-value)]])
+            next-text (bl-model/decimal->percent-text
+                       (+ current (* step-direction inline-return-step-decimal)))
+            ;; Store the value the DISPLAYED text parses back to, so the authored
+            ;; view and the input can never drift by a float ulp.
+            next-value (bl-model/parse-percent-text next-text)]
+        (if (black-litterman-return-model? state)
+          (let [{:keys [views view]} (upsert-absolute-view views instrument-id* next-value nil)]
+            (conj (common/save-draft-path-values
+                   [[contracts/draft-return-model-views-path views]
+                    [ui-path next-text]])
+                  (view-library-sync-effect
+                   {:upserts [(view-library/view->upsert view)]})))
+          [[:effects/save ui-path next-text]]))
       [])
     []))
 
 (defn set-portfolio-optimizer-objective-menu-view-confidence
-  [_state instrument-id confidence]
+  "Confidence click. On an authored row it re-weights the view; on an implied row
+  it ADOPTS the shown value as the user's view at that confidence (confidence
+  only exists on views — adopting is the honest interpretation of \"trust this
+  estimate\"). No-op while the implied value is still unknown (history loading)."
+  [state instrument-id confidence]
   (if-let [instrument-id* (common/non-blank-text instrument-id)]
-    [[:effects/save
-      (conj contracts/ui-objective-menu-view-drafts-path
-            (keyword instrument-id*)
-            :confidence)
-      (bl-model/normalize-confidence-level confidence)]]
+    (let [level (bl-model/normalize-confidence-level confidence)
+          views (draft-views state)
+          existing (existing-absolute-view-by-instrument views instrument-id*)
+          return-value (or (:return existing)
+                           (bl-model/parse-percent-text
+                            (ui-view-return-text state instrument-id*))
+                           (get (implied-return-inputs state) instrument-id*))]
+      (if (and (black-litterman-return-model? state)
+               (coercion/finite-number? return-value))
+        (let [{:keys [views view]} (upsert-absolute-view views instrument-id* return-value level)]
+          (conj (common/save-draft-path-values
+                 [[contracts/draft-return-model-views-path views]])
+                (view-library-sync-effect
+                 {:upserts [(view-library/view->upsert view)]})))
+        []))
     []))
 
 (defn remove-portfolio-optimizer-objective-menu-view
+  "Reset a row to implied: drop the authored view, clear the typing buffer, and
+  remove the wallet-library entry."
   [state instrument-id]
   (if-let [instrument-id* (common/non-blank-text instrument-id)]
     (let [order (vec (remove #(= instrument-id* %)
                              (objective-menu-inline-order state)))
           drafts (dissoc (or (get-in state contracts/ui-objective-menu-view-drafts-path)
                              {})
-                         (keyword instrument-id*))]
-      [[:effects/save-many
-        [[contracts/ui-objective-menu-view-order-path order]
-         [contracts/ui-objective-menu-view-drafts-path drafts]]]])
+                         (keyword instrument-id*))
+          ui-path-values [[contracts/ui-objective-menu-view-order-path order]
+                          [contracts/ui-objective-menu-view-drafts-path drafts]]
+          views (draft-views state)
+          existing (when (black-litterman-return-model? state)
+                     (existing-absolute-view-by-instrument views instrument-id*))]
+      (if existing
+        (conj (common/save-draft-path-values
+               (into [[contracts/draft-return-model-views-path
+                       (remove-absolute-view views instrument-id*)]]
+                     ui-path-values))
+              (view-library-sync-effect {:removes [instrument-id*]}))
+        [[:effects/save-many ui-path-values]]))
     []))
 
 (defn add-portfolio-optimizer-objective-menu-view
@@ -345,10 +425,22 @@
                    kind))
 
 (defn set-portfolio-optimizer-return-model-kind
-  [_state kind]
-  (set-draft-model contracts/draft-return-model-path
-                   draft-options/return-models
-                   kind))
+  [state kind]
+  (if (= :black-litterman (common/normalize-keyword-like kind))
+    ;; Switching the estimator to the views-aware model restores the user's
+    ;; remembered views for this universe instead of starting from zero.
+    (common/save-draft-path-values
+     [[contracts/draft-return-model-path
+       (hydrated-black-litterman-return-model state)]])
+    (set-draft-model contracts/draft-return-model-path
+                     draft-options/return-models
+                     kind)))
+
+(defn set-portfolio-optimizer-return-views-filter
+  [_state filter-key]
+  [[:effects/save
+    contracts/ui-return-views-filter-path
+    (return-views/normalize-filter filter-key)]])
 
 (defn set-portfolio-optimizer-risk-model-kind
   [_state kind]
@@ -357,12 +449,18 @@
                    kind))
 
 (defn apply-portfolio-optimizer-setup-preset
-  [_state preset]
+  [state preset]
   (if-let [{:keys [objective return-model]} (get draft-options/setup-presets
                                                  (common/normalize-keyword-like preset))]
     (common/save-draft-path-values
      [[contracts/draft-objective-path objective]
-      [contracts/draft-return-model-path return-model]])
+      [contracts/draft-return-model-path
+       ;; The Maximum Sharpe preset consumes return views; restore the wallet's
+       ;; remembered views for this universe rather than the preset's empty
+       ;; vector, so switching presets never loses authored views.
+       (if (= :black-litterman (:kind return-model))
+         (hydrated-black-litterman-return-model state)
+         return-model)]])
     []))
 
 (defn set-portfolio-optimizer-constraint

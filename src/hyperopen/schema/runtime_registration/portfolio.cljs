@@ -98,6 +98,8 @@
    [:actions/set-portfolio-optimizer-exposure-band :set-portfolio-optimizer-exposure-band]
    [:actions/apply-portfolio-optimizer-exposure-preset
     :apply-portfolio-optimizer-exposure-preset]
+   [:actions/set-portfolio-optimizer-exposure-zoom-level
+    :set-portfolio-optimizer-exposure-zoom-level]
    [:actions/reset-portfolio-optimizer-constraints-to-system
     :reset-portfolio-optimizer-constraints-to-system]
    [:actions/save-portfolio-optimizer-constraint-default

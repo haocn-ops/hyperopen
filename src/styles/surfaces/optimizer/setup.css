@@ -57,6 +57,11 @@
 
   .portfolio-optimizer .optimizer-setup-actions {
     background-color: #101518;
+    /* Pin the Run bar to the viewport bottom while the policy pane is in view, so expanding the
+       Constraints disclosure never pushes the primary action below the fold. The bar already
+       has a solid background and a high z-index, so pinning costs nothing visually. */
+    position: sticky;
+    bottom: 0;
   }
 
   .portfolio-optimizer .optimizer-model-assumptions-note {
@@ -199,10 +204,57 @@
     padding-top: 0.75rem;
   }
 
+  /* Risk guards + Rebalance behavior share one row on wide screens; the row carries the
+     separator against Positioning above it, and the sibling separator only applies while the
+     two groups are stacked (narrow screens). */
+  .portfolio-optimizer .optimizer-constraint-group-row {
+    border-top: 1px solid var(--optimizer-border);
+    padding-top: 0.75rem;
+  }
+
+  @media (min-width: 768px) {
+    .portfolio-optimizer
+      .optimizer-constraint-group-row
+      .optimizer-constraint-group
+      + .optimizer-constraint-group {
+      border-top: 0;
+      padding-top: 0;
+    }
+  }
+
   .portfolio-optimizer .optimizer-exposure-map {
     display: flex;
     flex-direction: column;
     gap: 0.625rem;
+  }
+
+  /* Two columns on wide screens: the bounded pad beside its controls, so the open Constraints
+     panel stays inside one screen instead of stacking everything under a full-width pad. */
+  .portfolio-optimizer .optimizer-exposure-map__layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.875rem 1.5rem;
+    align-items: start;
+  }
+
+  @media (min-width: 640px) {
+    .portfolio-optimizer .optimizer-exposure-map__layout {
+      grid-template-columns: minmax(0, 21rem) minmax(13rem, 1fr);
+    }
+  }
+
+  .portfolio-optimizer .optimizer-exposure-map__pad-col {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    max-width: 21rem;
+  }
+
+  .portfolio-optimizer .optimizer-exposure-map__controls {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    min-width: 0;
   }
 
   .portfolio-optimizer .optimizer-exposure-map__profile {
@@ -269,10 +321,49 @@
     white-space: nowrap;
   }
 
-  .portfolio-optimizer .optimizer-exposure-map__axis-title--y {
+  /* Header row: Y-axis title on the left, the explicit zoom control on the right. */
+  .portfolio-optimizer .optimizer-exposure-map__axis-header {
     grid-column: 1 / -1;
     grid-row: 1;
-    justify-self: start;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+  }
+
+  .portfolio-optimizer .optimizer-exposure-map__zoom {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+  }
+
+  .portfolio-optimizer .optimizer-exposure-map__zoom-range {
+    font-family: var(--font-mono, monospace);
+    font-size: 0.5625rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--optimizer-text-3);
+    white-space: nowrap;
+  }
+
+  .portfolio-optimizer .optimizer-exposure-map__zoom-btn {
+    width: 1.35rem;
+    height: 1.35rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--optimizer-border);
+    background-color: transparent;
+    font-family: var(--font-mono, monospace);
+    font-size: 0.75rem;
+    line-height: 1;
+    color: var(--optimizer-text-2);
+    cursor: pointer;
+  }
+
+  .portfolio-optimizer .optimizer-exposure-map__zoom-btn:disabled {
+    opacity: 0.35;
+    cursor: default;
   }
 
   .portfolio-optimizer .optimizer-exposure-map__yticks {
@@ -283,8 +374,9 @@
     justify-content: space-between;
     align-items: flex-end;
     font-family: var(--font-mono, monospace);
-    font-size: 0.5rem;
+    font-size: 0.625rem;
     color: var(--optimizer-text-2);
+    font-variant-numeric: tabular-nums;
   }
 
   .portfolio-optimizer .optimizer-exposure-map__xaxis {
@@ -324,6 +416,10 @@
     stroke-width: 0.5;
   }
 
+  .portfolio-optimizer .optimizer-exposure-map__grid--mid {
+    stroke: var(--optimizer-border-strong);
+  }
+
   .portfolio-optimizer .optimizer-exposure-map__band {
     fill: color-mix(in srgb, var(--optimizer-accent) 18%, transparent);
     stroke: color-mix(in srgb, var(--optimizer-accent) 55%, transparent);
@@ -346,6 +442,49 @@
     stroke: var(--optimizer-text-2);
     stroke-width: 1;
     stroke-dasharray: 1.5 1.5;
+  }
+
+  /* The large live readout under the pad: the tiny axis ticks orient, THIS is where the trader
+     reads the exact leverage/bias the drag is asking for. */
+  .portfolio-optimizer .optimizer-exposure-map__readout {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.35rem;
+    font-family: var(--font-mono, monospace);
+    font-size: 0.9375rem;
+    font-weight: 600;
+    color: var(--optimizer-text);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .portfolio-optimizer .optimizer-exposure-map__readout-label {
+    font-size: 0.625rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--optimizer-text-3);
+  }
+
+  .portfolio-optimizer .optimizer-exposure-map__readout-sep {
+    color: var(--optimizer-text-3);
+    font-size: 0.625rem;
+  }
+
+  .portfolio-optimizer
+    .optimizer-exposure-map__readout-net[data-net-direction="long"] {
+    color: var(--optimizer-long);
+  }
+
+  .portfolio-optimizer
+    .optimizer-exposure-map__readout-net[data-net-direction="short"] {
+    color: var(--optimizer-short);
+  }
+
+  .portfolio-optimizer .optimizer-exposure-map__presets-block {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
   }
 
   .portfolio-optimizer .optimizer-exposure-map__bands {

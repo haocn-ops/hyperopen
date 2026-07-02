@@ -14,11 +14,13 @@
    :collection :optimize})
 
 (defn- shell
+  ;; The control is two-column on wide screens now (bounded pad beside its controls), so the
+  ;; scene shell matches the center policy pane's realistic width instead of a narrow rail.
   [content]
   (layout/page-shell
    (layout/desktop-shell
     [:div {:class ["portfolio-optimizer" "w-full" "p-6"]}
-     [:div {:style {:max-width "360px"}} content]])))
+     [:div {:style {:max-width "720px"}} content]])))
 
 (defn- render
   [opts]
@@ -46,12 +48,22 @@
 
 (portfolio/defscene high-leverage
   []
-  ;; A 6x gross ceiling grows the Y axis past the 3x floor to the 10x nice step, so the handle is
-  ;; never clipped and the trader is not capped at 3x.
+  ;; A 6x gross ceiling fits the 10x zoom level (past the 3x floor), so the handle is never
+  ;; clipped and the trader is not capped at 3x.
   (render {:constraints {:gross-min 5.0 :gross-max 6.0 :net-min 1.5 :net-max 2.5
                          :max-asset-weight 0.5}
            :current-exposure {:gross 5.4 :net 1.9}
            :highlighted-controls #{}}))
+
+(portfolio/defscene zoomed-out
+  []
+  ;; The trader zoomed the view out (stored level 2 = 10x/5x) around a small policy: the band
+  ;; box shrinks toward the origin, the zoom-in button re-arms, and dragging still clamps to the
+  ;; FIXED visible scale instead of growing it.
+  (render {:constraints {:gross-max 2.0 :net-min 1.0 :net-max 1.0 :max-asset-weight 0.5}
+           :current-exposure {:gross 1.8 :net 1.0}
+           :highlighted-controls #{}
+           :zoom-level 2}))
 
 (portfolio/defscene off-policy-current
   []

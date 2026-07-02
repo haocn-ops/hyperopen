@@ -221,13 +221,14 @@
 (defn constraints-section
   ([draft highlighted-controls]
    (constraints-section draft highlighted-controls nil))
-  ([draft highlighted-controls {:keys [current-exposure has-saved-default?]}]
+  ([draft highlighted-controls {:keys [current-exposure has-saved-default? exposure-zoom-level]}]
    (let [constraints (:constraints draft)
          exposure-model (exposure-vm/exposure-map-model
                          {:constraints constraints
                           :current-exposure current-exposure
                           :highlighted-controls highlighted-controls
-                          :has-saved-default? has-saved-default?})
+                          :has-saved-default? has-saved-default?
+                          :zoom-level exposure-zoom-level})
          active-label (get exposure-policy/preset-labels
                            (:active-preset exposure-model) "Custom")]
      (controls/disclosure-panel
@@ -241,24 +242,27 @@
                     (exposure-map/exposure-map exposure-model))
        ;; Risk guards / Rebalance behavior keep each canonical control exactly once (original
        ;; data-roles), just grouped by what the trader is deciding rather than listed flat.
-       (group-block "Risk guards" nil
-                    [:div {:class ["grid" "grid-cols-1" "gap-2"]}
-                     (constraint-row "Per-asset cap" "Max Asset Weight"
-                                     :max-asset-weight (:max-asset-weight constraints)
-                                     "portfolio-optimizer-constraint-max-asset-weight-input"
-                                     (contains? highlighted-controls :max-asset-weight)
-                                     :weight)
-                     (long-only-row constraints)
-                     (include-spot-row constraints)])
-       (group-block "Rebalance behavior" "fewer trades ↔ tighter tracking"
-                    [:div {:class ["grid" "grid-cols-1" "gap-2"]}
-                     (constraint-row "Rebalance tolerance" "Rebalance Tolerance"
-                                     :rebalance-tolerance (:rebalance-tolerance constraints)
-                                     "portfolio-optimizer-constraint-rebalance-tolerance-input" false
-                                     :pts)
-                     (turnover-cap-row constraints
-                                       (contains? highlighted-controls :max-turnover))
-                     (constraint-row "Dust threshold" :dust-usdc (:dust-usdc constraints)
-                                     "portfolio-optimizer-constraint-dust-usdc-input" false
-                                     :usd)])
+       ;; The two groups sit side by side on wide screens so the open panel stays compact.
+       [:div {:class ["optimizer-constraint-group-row"
+                      "grid" "grid-cols-1" "gap-4" "md:grid-cols-2"]}
+        (group-block "Risk guards" nil
+                     [:div {:class ["grid" "grid-cols-1" "gap-2"]}
+                      (constraint-row "Per-asset cap" "Max Asset Weight"
+                                      :max-asset-weight (:max-asset-weight constraints)
+                                      "portfolio-optimizer-constraint-max-asset-weight-input"
+                                      (contains? highlighted-controls :max-asset-weight)
+                                      :weight)
+                      (long-only-row constraints)
+                      (include-spot-row constraints)])
+        (group-block "Rebalance behavior" "fewer trades ↔ tighter tracking"
+                     [:div {:class ["grid" "grid-cols-1" "gap-2"]}
+                      (constraint-row "Rebalance tolerance" "Rebalance Tolerance"
+                                      :rebalance-tolerance (:rebalance-tolerance constraints)
+                                      "portfolio-optimizer-constraint-rebalance-tolerance-input" false
+                                      :pts)
+                      (turnover-cap-row constraints
+                                        (contains? highlighted-controls :max-turnover))
+                      (constraint-row "Dust threshold" :dust-usdc (:dust-usdc constraints)
+                                      "portfolio-optimizer-constraint-dust-usdc-input" false
+                                      :usd)])]
        (advanced-drawer constraints highlighted-controls)]))))

@@ -81,12 +81,16 @@
     ;; LEFT rail is universe-only now; the editable policy controls moved to the wide CENTER pane.
     (is (= ["portfolio-optimizer-universe-panel"]
            (child-roles control-rail)))
+    ;; The Run bar is the LAST DIRECT child of the policy pane (not nested in the assumptions
+    ;; stack) so its sticky positioning can pin it to the viewport bottom while the tall pane
+    ;; scrolls.
     (is (= ["portfolio-optimizer-objective-panel"
             "portfolio-optimizer-return-risk-panel"
             "portfolio-optimizer-constraints-panel"
             "portfolio-optimizer-advanced-overrides-shell"
             "portfolio-optimizer-why-safe-note"
-            "portfolio-optimizer-model-assumptions-stack"]
+            "portfolio-optimizer-model-assumptions-stack"
+            "portfolio-optimizer-setup-bottom-actions"]
            (child-roles policy-pane)))
     ;; The leading section numbers (01..05) are gone: the panels read as a
     ;; sovereign workbench, not a required wizard sequence. Titles remain.
@@ -237,6 +241,9 @@
     (is (not (str/includes? summary-text vault-address)))))
 
 (deftest setup-run-action-renders-under-center-assumptions-panel-test
+  ;; The Run bar sits AFTER the assumptions stack as the policy pane's LAST direct child: that
+  ;; placement is what lets `position: sticky; bottom: 0` pin it to the viewport bottom while
+  ;; the tall pane (e.g. an expanded Constraints panel) scrolls.
   (let [view-node (portfolio-view/portfolio-view
                    {:router {:path "/portfolio/optimize/new"}
                     :portfolio {:optimizer
@@ -260,14 +267,18 @@
         action-bar-children (vec (node-children action-bar))
         run-index (.indexOf action-bar-children run-button)
         save-index (.indexOf action-bar-children save-button)
-        assumptions-stack-children (vec (node-children assumptions-stack))
-        assumptions-index (.indexOf assumptions-stack-children assumptions-panel)
-        action-bar-index (.indexOf assumptions-stack-children action-bar)
+        policy-pane-children (vec (node-children policy-pane))
+        stack-index (.indexOf policy-pane-children assumptions-stack)
+        action-bar-index (.indexOf policy-pane-children action-bar)
         route-child-action-index (.indexOf (vec (node-children route-surface)) action-bar)]
     (is (some? policy-pane))
     (is (some? assumptions-stack))
+    (is (some? (node-by-role assumptions-stack "portfolio-optimizer-model-assumptions-panel")))
+    (is (some? assumptions-panel))
     (is (some? action-bar))
-    (is (< assumptions-index action-bar-index))
+    (is (< stack-index action-bar-index))
+    (is (= action-bar-index (dec (count policy-pane-children)))
+        "the Run bar is the policy pane's last direct child so sticky positioning can pin it")
     (is (= -1 route-child-action-index))
     (is (= 0 run-index))
     (is (= 1 save-index))

@@ -1,8 +1,14 @@
 (ns hyperopen.views.portfolio.optimize.setup-exposure-map
   "The 2D exposure-map Positioning control. A trader drags one point on a small pad: the vertical
   axis is gross leverage, the horizontal axis is net (long/short) bias. A shaded box around the
-  point is the exact min/max band sent to the solver. Two sliders set how tight each band is,
-  preset chips seed sensible policies, and a read-only echo shows the exact gross/net ranges.
+  point is the exact min/max band sent to the solver. A large readout under the pad echoes the
+  targets live, two sliders set how tight each band is, preset chips seed sensible policies, and
+  a read-only echo shows the exact gross/net ranges.
+
+  The pad scale is FIXED while dragging: values clamp to the visible axis, and only the explicit
+  zoom buttons (or a preset/profile/reset re-fit) change the scale, so the mapping under the
+  pointer can never shift mid-gesture. On wide screens the pad sits beside its controls so the
+  open Constraints panel stays inside one screen.
 
   All dispatch goes through the atomic exposure actions; the pad's pointer coordinates are
   resolved by the :event/clientX, :event/clientY, :event.currentTarget/bounds, and
@@ -14,6 +20,13 @@
 (defn- fmt-mult
   [x]
   (if (number? x) (str (.toFixed x 2) "×") "--"))
+
+(defn- fmt-signed-mult
+  "Net-bias multiple with an explicit sign so long/short is unambiguous (+1.00×, −0.50×)."
+  [x]
+  (if (number? x)
+    (str (when (pos? x) "+") (.toFixed x 2) "×")
+    "--"))
 
 (defn- fmt-axis
   "Compact tick label: whole numbers show without decimals (10×), else one decimal (2.5×)."
@@ -48,19 +61,21 @@
 ;; --- the SVG pad --------------------------------------------------------------------------
 
 (defn- pad-pointer-action
-  "Bake the current adaptive axis scale into the drag dispatch so the pointer maps to exactly the
-  values the axis shows."
-  [{:keys [gross-max net-extent]}]
+  "Bake the current fixed axis scale AND its zoom level into the drag dispatch: the pointer maps
+  to exactly the values the axis shows, and the handler pins the stored zoom to that level so
+  the scale cannot shrink under the pointer when the policy re-fits smaller mid-gesture."
+  [{:keys [axis zoom]}]
   [[:actions/set-portfolio-optimizer-exposure-point
     [:event/clientX]
     [:event/clientY]
     [:event.currentTarget/bounds]
     [:event/pointer-buttons]
-    gross-max
-    net-extent]])
+    (:gross-max axis)
+    (:net-extent axis)
+    (:level zoom)]])
 
 (defn- exposure-pad
-  [{:keys [target-marker band-rect current-marker highlighted policy axis]}]
+  [{:keys [target-marker band-rect current-marker highlighted policy] :as model}]
   (let [{tx :x ty :y} target-marker
         {bx :x by :y bw :w bh :h} band-rect
         x0 (pct bx)
@@ -73,7 +88,8 @@
         net-warn? (:net highlighted)
         aria (str "Exposure map. Gross target " (fmt-mult (:gross-target policy))
                   ", net target " (fmt-mult (:net-target policy))
-                  ". Drag the point, or use the band sliders, presets, and advanced fields.")]
+                  ". Drag the point, or use the zoom buttons, band sliders, presets, and"
+                  " advanced fields.")]
     [:svg {:class ["optimizer-exposure-map__pad"]
            :viewBox "0 0 100 100"
            :preserveAspectRatio "none"
@@ -82,13 +98,16 @@
            :data-role "portfolio-optimizer-exposure-pad"
            :data-gross-infeasible (when gross-warn? "true")
            :data-net-infeasible (when net-warn? "true")
-           :on {:pointerdown (pad-pointer-action axis)
-                :pointermove (pad-pointer-action axis)}}
-     ;; surface + gridlines
+           :on {:pointerdown (pad-pointer-action model)
+                :pointermove (pad-pointer-action model)}}
+     ;; surface + gridlines: horizontals at the quartiles so the mid tick label lines up with a
+     ;; drawn line; the vertical centre line is net 0.
      [:rect {:class ["optimizer-exposure-map__surface"] :x 0 :y 0 :width 100 :height 100}]
      [:line {:class ["optimizer-exposure-map__grid"] :x1 50 :y1 0 :x2 50 :y2 100}]
-     [:line {:class ["optimizer-exposure-map__grid"] :x1 0 :y1 33.333 :x2 100 :y2 33.333}]
-     [:line {:class ["optimizer-exposure-map__grid"] :x1 0 :y1 66.667 :x2 100 :y2 66.667}]
+     [:line {:class ["optimizer-exposure-map__grid"] :x1 0 :y1 25 :x2 100 :y2 25}]
+     [:line {:class ["optimizer-exposure-map__grid" "optimizer-exposure-map__grid--mid"]
+             :x1 0 :y1 50 :x2 100 :y2 50}]
+     [:line {:class ["optimizer-exposure-map__grid"] :x1 0 :y1 75 :x2 100 :y2 75}]
      ;; the allowed-region band box (visible when both bands are positive)
      [:rect {:class ["optimizer-exposure-map__band"]
              :data-role "portfolio-optimizer-exposure-band-box"
@@ -106,18 +125,45 @@
                :data-role "portfolio-optimizer-exposure-handle"
                :cx target-x :cy target-y :r 3.4}]]))
 
-;; --- axis frame + band sliders + echo + presets -------------------------------------------
+;; --- axis frame + zoom + readout ----------------------------------------------------------
+
+(defn- zoom-button
+  "One step of the explicit scale control. `level` is the exact zoom level this button selects,
+  baked into the dispatch by the view model; nil means the step is unavailable (disabled)."
+  [{:keys [label level role aria-label]}]
+  [:button (cond-> {:type "button"
+                    :class ["optimizer-exposure-map__zoom-btn"]
+                    :aria-label aria-label
+                    :data-role role
+                    :disabled (nil? level)}
+             (some? level)
+             (assoc :on {:click [[:actions/set-portfolio-optimizer-exposure-zoom-level level]]}))
+   label])
 
 (defn- axis-frame
-  [axis pad]
-  (let [g-max (:gross-max axis)]
+  [axis zoom pad]
+  (let [g-max (:gross-max axis)
+        n-ext (:net-extent axis)]
     [:div {:class ["optimizer-exposure-map__frame"]}
-     ;; Y-axis title — gross exposure IS leverage (:gross-max renames to :gross-leverage for the
-     ;; solver), so name it plainly. The axis grows, so we show the live max as the top tick.
-     [:span {:class ["optimizer-exposure-map__axis-title"
-                     "optimizer-exposure-map__axis-title--y"]
-             :data-role "portfolio-optimizer-exposure-y-title"}
-      "Gross leverage (×)"]
+     ;; Header row: the Y-axis title (gross exposure IS leverage — :gross-max renames to
+     ;; :gross-leverage for the solver) plus the explicit zoom control. The scale NEVER changes
+     ;; from dragging; − widens the visible range, + tightens it back down to the policy's fit.
+     [:div {:class ["optimizer-exposure-map__axis-header"]}
+      [:span {:class ["optimizer-exposure-map__axis-title"]
+              :data-role "portfolio-optimizer-exposure-y-title"}
+       "Gross leverage (×)"]
+      [:span {:class ["optimizer-exposure-map__zoom"]
+              :data-role "portfolio-optimizer-exposure-zoom"}
+       [:span {:class ["optimizer-exposure-map__zoom-range"]}
+        (str "view 0–" (fmt-axis g-max))]
+       (zoom-button {:label "−"
+                     :level (:zoom-out-level zoom)
+                     :role "portfolio-optimizer-exposure-zoom-out"
+                     :aria-label "Zoom out to a higher leverage range"})
+       (zoom-button {:label "+"
+                     :level (:zoom-in-level zoom)
+                     :role "portfolio-optimizer-exposure-zoom-in"
+                     :aria-label "Zoom in to a tighter leverage range"})]]
      [:div {:class ["optimizer-exposure-map__yticks"]}
       [:span {:data-role "portfolio-optimizer-exposure-y-max"} (fmt-axis g-max)]
       [:span (fmt-axis (/ g-max 2))]
@@ -126,16 +172,40 @@
      [:div {:class ["optimizer-exposure-map__xaxis"]}
       [:span {:class ["optimizer-exposure-map__axis-end"
                       "optimizer-exposure-map__axis-end--short"]}
-       "◄ Short"]
+       (str "◄ Short −" (fmt-axis n-ext))]
       [:span {:class ["optimizer-exposure-map__axis-title"
                       "optimizer-exposure-map__axis-title--x"]}
        "Net bias"]
       [:span {:class ["optimizer-exposure-map__axis-end"
                       "optimizer-exposure-map__axis-end--long"]}
-       "Long ►"]]]))
+       (str "+" (fmt-axis n-ext) " Long ►")]]]))
+
+(defn- target-readout
+  "The large live echo of the dragged targets. The tiny axis ticks orient the pad; THIS is where
+  the trader reads how much leverage the policy asks for."
+  [{:keys [policy net-direction]}]
+  [:p {:class ["optimizer-exposure-map__readout"]
+       :data-role "portfolio-optimizer-exposure-readout"}
+   [:span {:class ["optimizer-exposure-map__readout-value"]
+           :data-role "portfolio-optimizer-exposure-readout-gross"}
+    (fmt-mult (:gross-target policy))]
+   [:span {:class ["optimizer-exposure-map__readout-label"]} "gross"]
+   [:span {:class ["optimizer-exposure-map__readout-sep"] :aria-hidden "true"} "·"]
+   [:span {:class ["optimizer-exposure-map__readout-value"
+                   "optimizer-exposure-map__readout-net"]
+           :data-role "portfolio-optimizer-exposure-readout-net"
+           :data-net-direction (name (or net-direction :neutral))}
+    (fmt-signed-mult (:net-target policy))]
+   [:span {:class ["optimizer-exposure-map__readout-label"]}
+    (str "net" (case net-direction
+                 :long " long"
+                 :short " short"
+                 ""))]])
+
+;; --- band sliders + echo + presets + memory ------------------------------------------------
 
 (defn- band-slider
-  [{:keys [label axis value max-band role]}]
+  [{:keys [label axis value max-band role level]}]
   [:label {:class ["optimizer-exposure-map__band-row"]}
    [:span {:class controls/eyebrow-class} label]
    [:input {:type "range"
@@ -146,8 +216,11 @@
             :class ["optimizer-exposure-band" "w-full" "accent-warning"]
             :aria-label (str label " band")
             :data-role role
-            ;; Sliders commit per-input (no free-text decimal problem); the action clamps.
-            :on {:input [[:actions/set-portfolio-optimizer-exposure-band axis [:event.target/value]]]}}]
+            ;; Sliders commit per-input (no free-text decimal problem); the action clamps. The
+            ;; current zoom level is baked in so narrowing a band never shrinks the pad scale
+            ;; mid-slide (widening may still grow it one step — the box must stay visible).
+            :on {:input [[:actions/set-portfolio-optimizer-exposure-band
+                          axis [:event.target/value] level]]}}]
    [:span {:class ["optimizer-exposure-map__band-value"]
            :data-role (str role "-value")}
     (str "± " (fmt-mult value))]])
@@ -178,6 +251,14 @@
             :on {:click [[:actions/apply-portfolio-optimizer-exposure-preset key]]}}
    label])
 
+(defn- presets-block
+  [presets]
+  [:div {:class ["optimizer-exposure-map__presets-block"]}
+   [:span {:class controls/eyebrow-class} "Start with"]
+   (into [:div {:class ["optimizer-exposure-map__presets"]
+                :data-role "portfolio-optimizer-exposure-presets"}]
+         (map preset-chip presets))])
+
 (defn- profile-row
   [{:keys [has-default?]}]
   [:div {:class ["optimizer-exposure-map__profile"]
@@ -203,26 +284,33 @@
      "Reset"]]])
 
 (defn exposure-map
-  "Render the Positioning control from the exposure-map view-model."
+  "Render the Positioning control from the exposure-map view-model. Two columns on wide screens:
+  the bounded pad (with axes, zoom, and the live readout) beside its controls (presets first,
+  then bands, the generated-constraints echo, the current-portfolio preview, and the remembered-
+  profile row last)."
   [model]
-  (let [{:keys [gross-band net-band max-band echo presets preview profile axis]} model]
+  (let [{:keys [gross-band net-band max-band echo presets preview profile axis zoom]} model]
     [:div {:class ["optimizer-exposure-map"]
            :data-role "portfolio-optimizer-exposure-map"}
-     (profile-row profile)
-     (axis-frame axis (exposure-pad model))
-     [:div {:class ["optimizer-exposure-map__bands"]}
-      (band-slider {:label "Gross band" :axis :gross :value gross-band
-                    :max-band max-band
-                    :role "portfolio-optimizer-exposure-gross-band"})
-      (band-slider {:label "Net band" :axis :net :value net-band
-                    :max-band max-band
-                    :role "portfolio-optimizer-exposure-net-band"})]
-     [:p {:class ["optimizer-exposure-map__echo"]
-          :data-role "portfolio-optimizer-exposure-echo"}
-      [:span {:class controls/eyebrow-class} "Sent to solver"]
-      [:span {:class ["optimizer-exposure-map__echo-value"]}
-       (str (gross-echo echo) " · " (net-echo echo))]]
-     (preview-block preview)
-     (into [:div {:class ["optimizer-exposure-map__presets"]
-                  :data-role "portfolio-optimizer-exposure-presets"}]
-           (map preset-chip presets))]))
+     [:div {:class ["optimizer-exposure-map__layout"]}
+      [:div {:class ["optimizer-exposure-map__pad-col"]}
+       (axis-frame axis zoom (exposure-pad model))
+       (target-readout model)]
+      [:div {:class ["optimizer-exposure-map__controls"]}
+       (presets-block presets)
+       [:div {:class ["optimizer-exposure-map__bands"]}
+        (band-slider {:label "Gross band" :axis :gross :value gross-band
+                      :max-band max-band
+                      :level (:level zoom)
+                      :role "portfolio-optimizer-exposure-gross-band"})
+        (band-slider {:label "Net band" :axis :net :value net-band
+                      :max-band max-band
+                      :level (:level zoom)
+                      :role "portfolio-optimizer-exposure-net-band"})]
+       [:p {:class ["optimizer-exposure-map__echo"]
+            :data-role "portfolio-optimizer-exposure-echo"}
+        [:span {:class controls/eyebrow-class} "Sent to solver"]
+        [:span {:class ["optimizer-exposure-map__echo-value"]}
+         (str (gross-echo echo) " · " (net-echo echo))]]
+       (preview-block preview)
+       (profile-row profile)]]]))

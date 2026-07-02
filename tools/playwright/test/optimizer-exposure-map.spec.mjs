@@ -39,6 +39,83 @@ test.describe("optimizer exposure-map Positioning control", () => {
     );
   });
 
+  test("the pad is bounded and the Run bar stays visible with the panel open", async ({
+    page
+  }) => {
+    // The open Constraints panel must not consume more than a screen: the pad renders in a
+    // bounded column (~21rem) instead of spanning the full center pane.
+    const pad = page.locator("[data-role='portfolio-optimizer-exposure-pad']");
+    await expect(pad).toBeVisible();
+    const box = await pad.boundingBox();
+    expect(box.height).toBeLessThanOrEqual(360);
+    expect(box.width).toBeLessThanOrEqual(360);
+    // The sticky Run bar is pinned inside the viewport even while the tall panel is expanded.
+    await expect(
+      page.locator("[data-role='portfolio-optimizer-setup-bottom-actions']")
+    ).toBeInViewport();
+    // The live readout mirrors the Balanced targets in large type next to the pad.
+    await expect(
+      page.locator("[data-role='portfolio-optimizer-exposure-readout-gross']")
+    ).toHaveText("2.00×");
+    await expect(
+      page.locator("[data-role='portfolio-optimizer-exposure-readout-net']")
+    ).toHaveText("+1.00×");
+  });
+
+  test("the zoom control steps the fixed axis scale and dragging never grows it", async ({
+    page
+  }) => {
+    const yMax = page.locator("[data-role='portfolio-optimizer-exposure-y-max']");
+    const zoomOut = page.locator("[data-role='portfolio-optimizer-exposure-zoom-out']");
+    const zoomIn = page.locator("[data-role='portfolio-optimizer-exposure-zoom-in']");
+    // The Balanced policy fits the floor level: 0–3x, zoom-in disabled.
+    await expect(yMax).toHaveText("3×");
+    await expect(zoomIn).toBeDisabled();
+    await zoomOut.click();
+    await waitForIdle(page);
+    await expect(yMax).toHaveText("5×");
+    await expect(zoomIn).toBeEnabled();
+    // Zooming back in returns to the smallest level that frames the policy.
+    await zoomIn.click();
+    await waitForIdle(page);
+    await expect(yMax).toHaveText("3×");
+    await zoomOut.click();
+    await waitForIdle(page);
+    await expect(yMax).toHaveText("5×");
+    // Dragging to the pad's very top edge clamps to the visible scale instead of re-scaling
+    // (the old adaptive axis ratcheted upward while the pointer was held at the edge).
+    // The bounding box is re-captured before each drag: prior clicks/renders may scroll the
+    // page, and a drag against stale viewport coordinates silently misses the pad.
+    const pad = page.locator("[data-role='portfolio-optimizer-exposure-pad']");
+    await pad.scrollIntoViewIfNeeded();
+    const box = await pad.boundingBox();
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width / 2, box.y + 1, { steps: 5 });
+    await page.mouse.move(box.x + box.width / 2, box.y + 1, { steps: 3 });
+    await page.mouse.up();
+    await waitForIdle(page);
+    await expect(yMax).toHaveText("5×");
+    expect(
+      await readOptimizerState(page, optimizerPath("draft", "constraints", "gross-max"))
+    ).toBeLessThanOrEqual(5);
+    // The dragged policy now needs the 5x level itself, so zooming further in is disabled
+    // (zooming in may never clip the band box).
+    await expect(zoomIn).toBeDisabled();
+    // Dragging back DOWN re-fits the policy smaller, but the scale stays pinned at the level
+    // the drag was performed at — the pad never shrinks under the pointer. Zooming back in
+    // re-arms instead.
+    await pad.scrollIntoViewIfNeeded();
+    const box2 = await pad.boundingBox();
+    await page.mouse.move(box2.x + box2.width / 2, box2.y + box2.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(box2.x + box2.width / 2, box2.y + box2.height * 0.6, { steps: 5 });
+    await page.mouse.up();
+    await waitForIdle(page);
+    await expect(yMax).toHaveText("5×");
+    await expect(zoomIn).toBeEnabled();
+  });
+
   test("clicking a preset round-trips through the runtime into the draft constraints", async ({
     page
   }) => {

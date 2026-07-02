@@ -62,6 +62,9 @@
 (def apply-portfolio-optimizer-exposure-preset
   exposure/apply-portfolio-optimizer-exposure-preset)
 
+(def set-portfolio-optimizer-exposure-zoom-level
+  exposure/set-portfolio-optimizer-exposure-zoom-level)
+
 (def reset-portfolio-optimizer-constraints-to-system
   exposure/reset-portfolio-optimizer-constraints-to-system)
 

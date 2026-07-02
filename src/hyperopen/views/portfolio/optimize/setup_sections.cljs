@@ -67,7 +67,8 @@
         :has-saved-default? (constraint-profiles/has-default?
                              (get-in state optimizer-contracts/constraint-profiles-path)
                              (constraint-profiles/universe-key
-                              (get-in state optimizer-contracts/draft-universe-path)))})
+                              (get-in state optimizer-contracts/draft-universe-path)))
+        :exposure-zoom-level (get-in state optimizer-contracts/ui-exposure-zoom-level-path)})
       (controls/disclosure-panel
        "portfolio-optimizer-advanced-overrides-shell"
        (controls/disclosure-heading
@@ -84,14 +85,17 @@
           :saving-scenario? saving-scenario?
           :solved-run? solved-run?
           :result-path result-path})]
+       ;; The Run bar is the LAST DIRECT child of the policy pane so `position: sticky` can pin
+       ;; it to the viewport bottom while any part of the pane is in view — expanding the
+       ;; Constraints disclosure can no longer push Run below the fold.
        [(why-safe-note)
         [:div {:class ["space-y-2"]
                :data-role "portfolio-optimizer-model-assumptions-stack"}
-         (setup-actions/model-assumptions-panel)
-         (setup-actions/setup-bottom-actions {:draft draft
-                                              :readiness readiness
-                                              :running? running?
-                                              :run-triggerable? run-triggerable?
-                                              :saving-scenario? saving-scenario?
-                                              :solved-run? solved-run?
-                                              :result-path result-path})]]))))
+         (setup-actions/model-assumptions-panel)]
+        (setup-actions/setup-bottom-actions {:draft draft
+                                             :readiness readiness
+                                             :running? running?
+                                             :run-triggerable? run-triggerable?
+                                             :saving-scenario? saving-scenario?
+                                             :solved-run? solved-run?
+                                             :result-path result-path})]))))

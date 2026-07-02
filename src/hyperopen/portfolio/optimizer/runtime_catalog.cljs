@@ -44,6 +44,8 @@
     actions/set-portfolio-optimizer-exposure-band
     :apply-portfolio-optimizer-exposure-preset
     actions/apply-portfolio-optimizer-exposure-preset
+    :set-portfolio-optimizer-exposure-zoom-level
+    actions/set-portfolio-optimizer-exposure-zoom-level
     :reset-portfolio-optimizer-constraints-to-system
     actions/reset-portfolio-optimizer-constraints-to-system
     :save-portfolio-optimizer-constraint-default

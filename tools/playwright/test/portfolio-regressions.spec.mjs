@@ -1664,17 +1664,23 @@ test("portfolio optimizer setup exposes separate model layers @regression", asyn
   await expect(summaryPane.locator("[data-role='portfolio-optimizer-setup-bottom-actions']"))
     .toBeVisible();
   await expect(assumptionsPanel).toBeVisible();
-  // The Run bottom bar lives in the CENTER policy pane, directly below the model-assumptions
-  // panel (DOM order, robust to the column widths). Exact intra-bar pixel padding is not asserted
-  // — it is incidental styling; the meaningful placement is also pinned by the setup-run-action
-  // unit test.
+  // The Run bottom bar lives in the CENTER policy pane as its LAST direct child (after the
+  // model-assumptions stack), where `position: sticky; bottom: 0` pins it to the viewport while
+  // the tall pane scrolls — expanding Constraints can no longer push Run below the fold. The
+  // placement is also pinned by the setup-run-action unit test.
   await expect.poll(async () => page
     .locator("[data-role='portfolio-optimizer-model-assumptions-stack']")
     .evaluate((stack) => Array.from(stack.children).map((child) => child.getAttribute("data-role"))))
-    .toEqual([
-      "portfolio-optimizer-model-assumptions-panel",
-      "portfolio-optimizer-setup-bottom-actions"
-    ]);
+    .toEqual(["portfolio-optimizer-model-assumptions-panel"]);
+  await expect.poll(async () => summaryPane
+    .evaluate((pane) => {
+      const children = Array.from(pane.children).map((child) => child.getAttribute("data-role"));
+      return children[children.length - 1];
+    }))
+    .toBe("portfolio-optimizer-setup-bottom-actions");
+  await expect.poll(async () => bottomActions
+    .evaluate((element) => getComputedStyle(element).position))
+    .toBe("sticky");
   await expect.poll(async () => {
     const [metaColor, detailColor] = await Promise.all([
       actionMeta.evaluate((element) => getComputedStyle(element).color),

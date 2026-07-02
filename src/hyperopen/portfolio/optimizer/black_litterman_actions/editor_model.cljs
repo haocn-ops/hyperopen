@@ -5,9 +5,6 @@
             [hyperopen.portfolio.optimizer.black-litterman-actions.common :as common]
             [hyperopen.portfolio.optimizer.contracts :as contracts]))
 
-(def missing-view-error-message
-  "Add a view before running Use my views.")
-
 (defn draft->view
   [kind draft view-id]
   (model/draft->view kind draft view-id))
@@ -82,7 +79,3 @@
         (map (fn [[field message]]
                [(conj common/editor-path :errors field) message])
              errors)))
-
-(defn missing-view-error-path-values
-  []
-  (error-path-values {:return-text missing-view-error-message}))

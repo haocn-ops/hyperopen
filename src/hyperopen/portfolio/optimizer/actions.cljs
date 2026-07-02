@@ -48,6 +48,9 @@
 (def apply-portfolio-optimizer-objective-menu-selection-and-run
   draft/apply-portfolio-optimizer-objective-menu-selection-and-run)
 
+(def set-portfolio-optimizer-return-views-filter
+  draft/set-portfolio-optimizer-return-views-filter)
+
 (def apply-portfolio-optimizer-setup-preset
   draft/apply-portfolio-optimizer-setup-preset)
 

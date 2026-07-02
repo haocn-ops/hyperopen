@@ -1,0 +1,64 @@
+(ns hyperopen.portfolio.optimizer.application.view-library-test
+  (:require [cljs.test :refer-macros [deftest is]]
+            [hyperopen.portfolio.optimizer.application.view-library :as view-library]))
+
+(deftest apply-sync-upserts-stamp-and-removes-drop-test
+  (let [entries {"perp:ETH" {:instrument-id "perp:ETH" :return 0.1
+                             :confidence-level :low :updated-at-ms 1}}
+        result (view-library/apply-sync
+                entries
+                {:upserts [{:instrument-id "perp:BTC"
+                            :return 0.2
+                            :confidence-level :high}
+                           ;; an upsert without a finite return can never enter
+                           {:instrument-id "perp:SOL" :return nil}]
+                 :removes ["perp:ETH" "  "]}
+                4242)]
+    (is (= {"perp:BTC" {:instrument-id "perp:BTC" :return 0.2
+                        :confidence-level :high :updated-at-ms 4242}}
+           result))))
+
+(deftest view->upsert-accepts-only-authored-absolute-views-test
+  (is (= {:instrument-id "perp:BTC" :return 0.2 :confidence-level :high}
+         (view-library/view->upsert {:kind :absolute :instrument-id "perp:BTC"
+                                     :return 0.2 :confidence-level :high})))
+  (is (nil? (view-library/view->upsert {:kind :relative :instrument-id "perp:BTC"
+                                        :comparator-instrument-id "perp:ETH"
+                                        :return 0.05}))
+      "Relative views are draft-scoped; they never enter the per-asset library.")
+  (is (nil? (view-library/view->upsert {:kind :absolute :instrument-id "perp:BTC"
+                                        :return nil}))))
+
+(deftest record-round-trip-test
+  (let [entries {"perp:BTC" {:instrument-id "perp:BTC" :return 0.2
+                             :confidence-level :medium :updated-at-ms 7}}
+        record (view-library/library-record "0xabc" entries)]
+    (is (= entries (view-library/record->entries record)))
+    (is (= {} (view-library/record->entries nil)))
+    (is (= {} (view-library/record->entries {:version 999 :entries entries}))
+        "A future/unknown record version reads as empty, never as garbage.")))
+
+(deftest hydrate-views-fills-gaps-without-touching-authored-views-test
+  (let [universe [{:instrument-id "perp:BTC"}
+                  {:instrument-id "perp:ETH"}
+                  {:instrument-id "perp:SOL"}]
+        existing [{:id "bl_view_1" :kind :absolute :instrument-id "perp:BTC"
+                   :return 0.99 :confidence-level :low :confidence 0.25
+                   :confidence-variance 0.75 :horizon :3m :weights {"perp:BTC" 1}}]
+        entries {"perp:BTC" {:instrument-id "perp:BTC" :return 0.2
+                             :confidence-level :high :updated-at-ms 1}
+                 "perp:ETH" {:instrument-id "perp:ETH" :return 0.12
+                             :confidence-level :medium :updated-at-ms 2}
+                 "perp:DOGE" {:instrument-id "perp:DOGE" :return 0.5
+                              :confidence-level :high :updated-at-ms 3}}
+        hydrated (view-library/hydrate-views existing entries universe)]
+    (is (= [{:id "bl_view_1" :kind :absolute :instrument-id "perp:BTC"
+             :return 0.99 :confidence-level :low :confidence 0.25
+             :confidence-variance 0.75 :horizon :3m :weights {"perp:BTC" 1}}
+            {:id "bl_view_2" :kind :absolute :instrument-id "perp:ETH"
+             :return 0.12 :confidence-level :medium :confidence 0.5
+             :confidence-variance 0.5 :horizon :3m :weights {"perp:ETH" 1}}]
+           hydrated)
+        "The draft's view wins for perp:BTC; perp:ETH hydrates from the library; perp:DOGE stays out (not in universe).")
+    (is (= [] (view-library/hydrate-views nil {} universe))
+        "No views and no library is a valid empty state.")))

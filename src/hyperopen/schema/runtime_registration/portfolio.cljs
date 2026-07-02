@@ -27,6 +27,10 @@
     :save-portfolio-optimizer-constraint-default]
    [:effects/load-portfolio-optimizer-constraint-profiles
     :load-portfolio-optimizer-constraint-profiles]
+   [:effects/load-portfolio-optimizer-view-library
+    :load-portfolio-optimizer-view-library]
+   [:effects/sync-portfolio-optimizer-view-library
+    :sync-portfolio-optimizer-view-library]
    [:effects/restore-portfolio-optimizer-draft
     :restore-portfolio-optimizer-draft]])
 
@@ -92,6 +96,8 @@
     :add-portfolio-optimizer-objective-menu-view]
    [:actions/apply-portfolio-optimizer-objective-menu-selection-and-run
     :apply-portfolio-optimizer-objective-menu-selection-and-run]
+   [:actions/set-portfolio-optimizer-return-views-filter
+    :set-portfolio-optimizer-return-views-filter]
    [:actions/set-portfolio-optimizer-return-model-kind :set-portfolio-optimizer-return-model-kind]
    [:actions/set-portfolio-optimizer-risk-model-kind :set-portfolio-optimizer-risk-model-kind]
    [:actions/apply-portfolio-optimizer-setup-preset :apply-portfolio-optimizer-setup-preset]

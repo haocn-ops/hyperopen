@@ -5,6 +5,7 @@
             [hyperopen.api.trading :as trading-api]
             [hyperopen.config :as app-config]
             [hyperopen.portfolio.optimizer.application.constraint-profiles :as constraint-profiles]
+            [hyperopen.portfolio.optimizer.application.view-library :as view-library]
             [hyperopen.portfolio.optimizer.application.rebalance-snapshot :as rebalance-snapshot]
             [hyperopen.portfolio.optimizer.application.history-loader.api-v2 :as history-api-v2]
             [hyperopen.portfolio.optimizer.contracts :as contracts]
@@ -45,6 +46,8 @@
 (def ^:dynamic *save-tracking!* persistence/save-tracking!)
 (def ^:dynamic *load-constraint-profiles!* persistence/load-constraint-profiles!)
 (def ^:dynamic *save-constraint-profiles!* persistence/save-constraint-profiles!)
+(def ^:dynamic *load-view-library!* persistence/load-view-library!)
+(def ^:dynamic *save-view-library!* persistence/save-view-library!)
 (def ^:dynamic *next-scenario-id* (fn [now-ms] (str "scn_" now-ms)))
 (def ^:dynamic *now-ms* #(.now js/Date))
 (def ^:dynamic *submit-order!* trading-api/submit-order!)
@@ -364,6 +367,40 @@
             (swap! store assoc-in contracts/constraint-profiles-path profile-map)
             (-> (*save-constraint-profiles!* address profile-map)
                 (.catch (fn [_err] false)))))))))
+
+(defn load-portfolio-optimizer-view-library-effect
+  "Load the wallet's remembered return views into the state mirror. Read-only with
+  respect to the draft: hydration into draft views happens through the preset /
+  return-model actions (which read the mirror), so a slow IndexedDB read can never
+  clobber edits or race the draft restore."
+  [_ store]
+  (let [address (account-context/effective-account-address @store)]
+    (if-not address
+      (js/Promise.resolve nil)
+      (-> (*load-view-library!* address)
+          (.then (fn [record]
+                   (let [entries (view-library/record->entries record)]
+                     (swap! store assoc-in contracts/view-library-path entries)
+                     entries)))
+          (.catch (fn [_err] nil))))))
+
+(defn sync-portfolio-optimizer-view-library-effect
+  "Apply row-level upserts/removes from the view-edit actions to the wallet's
+  remembered return views. Timestamps are stamped here. State always updates (the
+  panel's provenance ages read from it); the IndexedDB write is skipped for
+  read-only/spectated accounts, matching the constraint-default effect."
+  [_ store sync]
+  (let [state @store
+        address (account-context/effective-account-address state)
+        entries (view-library/apply-sync
+                 (get-in state contracts/view-library-path)
+                 (or sync {})
+                 (*now-ms*))]
+    (swap! store assoc-in contracts/view-library-path entries)
+    (if-not (and address (account-context/mutations-allowed? state))
+      (js/Promise.resolve false)
+      (-> (*save-view-library!* address (view-library/library-record address entries))
+          (.catch (fn [_err] false))))))
 
 (defn load-portfolio-optimizer-constraint-profiles-effect
   "Load the wallet's remembered profiles into state and, when the draft is still pristine and a

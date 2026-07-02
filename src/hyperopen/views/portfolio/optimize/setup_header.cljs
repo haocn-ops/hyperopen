@@ -1,4 +1,5 @@
-(ns hyperopen.views.portfolio.optimize.setup-header)
+(ns hyperopen.views.portfolio.optimize.setup-header
+  (:require [hyperopen.portfolio.optimizer.application.return-views :as return-views]))
 
 (defn- clock-label
   "Local wall-clock label for the autosave note (\"10:42 PM\"). Rendered from the
@@ -21,13 +22,27 @@
     "Optimizer scenario"))
 
 (defn- active-preset
+  ;; Two presets: the objective choice. A views-aware (Black-Litterman) return
+  ;; model belongs to Maximum Sharpe — views are an input, not a strategy.
   [draft]
   (let [objective-kind (get-in draft [:objective :kind])
         return-kind (get-in draft [:return-model :kind])]
-    (cond
-      (= :black-litterman return-kind) :use-my-views
-      (= :max-sharpe objective-kind) :risk-adjusted
-      :else :conservative)))
+    (if (or (= :black-litterman return-kind)
+            (= :max-sharpe objective-kind))
+      :max-sharpe
+      :conservative)))
+
+(defn- max-sharpe-kicker
+  ;; Live provenance counts ("2 YOUR VIEWS · 12 IMPLIED") once the views-aware
+  ;; model is active, so the card shows the user their views are involved without
+  ;; pretending views are a separate strategy.
+  [draft]
+  (if (= :black-litterman (get-in draft [:return-model :kind]))
+    (return-views/returns-contract-label
+     (return-views/summary
+      (return-views/rows {:universe (:universe draft)
+                          :views (get-in draft [:return-model :views])})))
+    "Uses your return views"))
 
 (defn setup-header
   [{:keys [draft route draft-persist]}]
@@ -82,7 +97,7 @@
       (when selected?
         [:span {:class ["border" "border-base-300" "px-1.5" "py-0.5" "font-mono"
                         "text-[0.625rem]" "uppercase" "tracking-[0.12em]" "text-trading-muted/70"]}
-         "default"])]]))
+         "active"])]]))
 
 (defn preset-row
   [draft]
@@ -90,13 +105,10 @@
              :data-role "portfolio-optimizer-setup-preset-row"}
    [:div {:class ["grid" "grid-cols-1" "gap-2" "xl:grid-cols-[82px_minmax(0,1fr)]"]}
     [:p {:class (conj eyebrow-class "pt-1.5")} "Start with"]
-    [:div {:class ["grid" "grid-cols-1" "gap-2" "lg:grid-cols-3"]}
+    [:div {:class ["grid" "grid-cols-1" "gap-2" "lg:grid-cols-2"]}
      (preset-card draft :conservative "Conservative"
-                  "Minimum variance - stabilized historical returns"
+                  "Minimum variance - no return forecast needed"
                   "Recommended for first runs")
-     (preset-card draft :risk-adjusted "Risk-adjusted"
-                  "Maximum Sharpe - stabilized historical returns"
-                  "Best risk-adjusted return")
-     (preset-card draft :use-my-views "Use my views"
-                  "Combine the market reference with your absolute / relative beliefs"
-                  "For experienced users")]]])
+     (preset-card draft :max-sharpe "Maximum Sharpe"
+                  "Best risk-adjusted return - your saved views where available, implied returns otherwise"
+                  (max-sharpe-kicker draft))]]])

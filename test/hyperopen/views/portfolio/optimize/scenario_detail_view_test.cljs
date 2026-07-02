@@ -2,6 +2,7 @@
   (:require [cljs.test :refer-macros [deftest is]]
             [clojure.string :as str]
             [hyperopen.portfolio.optimizer.actions.common :as action-common]
+            [hyperopen.portfolio.optimizer.application.return-inputs :as return-inputs]
             [hyperopen.portfolio.optimizer.application.setup-readiness :as setup-readiness]
             [hyperopen.portfolio.optimizer.fixtures :as fixtures]
             [hyperopen.views.portfolio-view :as portfolio-view]
@@ -688,103 +689,95 @@
   (let [scenario-id "draft"
         base-state (ready-scenario-state scenario-id {:kind :historical-mean})
         solved-run (solved-run-for-state base-state)
-        closed-view (portfolio-view/portfolio-view
-                     (assoc-in base-state
+        solved-state (assoc-in base-state
                                [:portfolio :optimizer :last-successful-run]
-                               solved-run))
-        open-view (portfolio-view/portfolio-view
-                   (-> base-state
-                       (assoc-in [:portfolio :optimizer :last-successful-run]
-                                 solved-run)
-                       (assoc-in [:portfolio-ui :optimizer :objective-menu-open?]
-                                 true)
-                       (assoc-in [:portfolio-ui :optimizer :objective-menu-selection]
-                                 :max-sharpe)))
+                               solved-run)
+        open-menu-state (fn [selection]
+                          (cond-> (assoc-in solved-state
+                                            [:portfolio-ui :optimizer :objective-menu-open?]
+                                            true)
+                            selection
+                            (assoc-in [:portfolio-ui :optimizer :objective-menu-selection]
+                                      selection)))
+        closed-view (portfolio-view/portfolio-view solved-state)
+        open-view (portfolio-view/portfolio-view (open-menu-state :max-sharpe))
         changed-view (portfolio-view/portfolio-view
-                      (-> base-state
-                          (assoc-in [:portfolio :optimizer :last-successful-run]
-                                    solved-run)
-                          (assoc-in [:portfolio-ui :optimizer :objective-menu-open?]
-                                    true)
-                          (assoc-in [:portfolio-ui :optimizer :objective-menu-selection]
-                                    :minimum-volatility)))
-        use-my-views-view (portfolio-view/portfolio-view
-                           (-> base-state
-                               (assoc-in [:portfolio :optimizer :last-successful-run]
-                                         solved-run)
-                               (assoc-in [:portfolio :optimizer :draft :universe]
-                                         [{:instrument-id "perp:BTC"
-                                           :market-type :perp
-                                           :coin "BTC"}
-                                          {:instrument-id "perp:ETH"
-                                           :market-type :perp
-                                           :coin "ETH"}
-                                          {:instrument-id "perp:SOL"
-                                           :market-type :perp
-                                           :coin "SOL"}
-                                          {:instrument-id "perp:DOGE"
-                                           :market-type :perp
-                                           :coin "DOGE"}])
-                               (assoc-in [:portfolio-ui :optimizer :objective-menu-open?]
-                                         true)
-                               (assoc-in [:portfolio-ui :optimizer :objective-menu-selection]
-                                         :use-my-views)
-                               (assoc-in [:portfolio-ui :optimizer :objective-menu-view-drafts]
-                                         {:perp:BTC {:return-text "18"
-                                                     :confidence :medium}})))
-        use-my-views-prefilled-view (portfolio-view/portfolio-view
-                                     (-> base-state
-                                         (assoc-in [:portfolio :optimizer :last-successful-run]
-                                                   solved-run)
-                                         (assoc-in [:portfolio-ui :optimizer :objective-menu-open?]
-                                                   true)
-                                         (assoc-in [:portfolio-ui :optimizer :objective-menu-selection]
-                                                   :use-my-views)))
+                      (open-menu-state :minimum-volatility))
+        ;; Views are Maximum Sharpe's input policy: a Black-Litterman draft renders rows.
+        views-view (portfolio-view/portfolio-view
+                    (-> (open-menu-state :max-sharpe)
+                        (assoc-in [:portfolio :optimizer :draft :universe]
+                                  [{:instrument-id "perp:BTC"
+                                    :market-type :perp
+                                    :coin "BTC"}
+                                   {:instrument-id "perp:DOGE"
+                                    :market-type :perp
+                                    :coin "DOGE"}])
+                        (assoc-in [:portfolio :optimizer :draft :return-model]
+                                  {:kind :black-litterman
+                                   :views [{:id "bl_view_1"
+                                            :kind :absolute
+                                            :instrument-id "perp:BTC"
+                                            :return 0.15
+                                            :confidence-level :medium
+                                            :confidence 0.5
+                                            :weights {"perp:BTC" 1}}]})
+                        (assoc-in [:portfolio-ui :optimizer :objective-menu-view-drafts]
+                                  {:perp:BTC {:return-text "18"}})))
+        ;; No authored view and no typing buffer: implied rows prefill from readiness.
+        implied-state (-> (open-menu-state nil)
+                          (assoc-in [:portfolio :optimizer :draft :return-model]
+                                    {:kind :black-litterman :views []}))
+        implied-view (portfolio-view/portfolio-view implied-state)
+        implied-btc-text (-> (setup-readiness/build-readiness implied-state)
+                             return-inputs/readiness-inputs-by-instrument
+                             (get "perp:BTC")
+                             return-inputs/decimal->percent-text)
         trigger (node-by-role closed-view
                               "portfolio-optimizer-objective-menu-trigger")
         open-trigger (node-by-role open-view
                                    "portfolio-optimizer-objective-menu-trigger")
         menu (node-by-role open-view "portfolio-optimizer-objective-menu")
-        apply-current (node-by-role open-view
-                                    "portfolio-optimizer-objective-menu-apply")
+        menu-classes (set (get-in menu [1 :class]))
+        apply-model-switch (node-by-role open-view
+                                         "portfolio-optimizer-objective-menu-apply")
+        apply-noop (node-by-role views-view
+                                 "portfolio-optimizer-objective-menu-apply")
         apply-changed (node-by-role changed-view
                                     "portfolio-optimizer-objective-menu-apply")
         minimum-row (node-by-role open-view
                                   "portfolio-optimizer-objective-menu-option-minimum-volatility")
-        use-my-views-row (node-by-role open-view
-                                       "portfolio-optimizer-objective-menu-option-use-my-views")
-        inline-editor (node-by-role use-my-views-view
+        max-sharpe-row (node-by-role open-view
+                                     "portfolio-optimizer-objective-menu-option-max-sharpe")
+        inline-editor (node-by-role views-view
                                     "portfolio-optimizer-objective-menu-use-my-views-editor")
-        btc-row (node-by-role use-my-views-view
+        btc-row (node-by-role views-view
                               "portfolio-optimizer-objective-menu-view-row-perp:BTC")
-        btc-icon (node-by-role use-my-views-view
-                               "portfolio-optimizer-objective-menu-view-perp:BTC-icon-img")
-        btc-return (node-by-role use-my-views-view
+        doge-row (node-by-role views-view
+                               "portfolio-optimizer-objective-menu-view-row-perp:DOGE")
+        btc-return (node-by-role views-view
                                  "portfolio-optimizer-objective-menu-view-perp:BTC-return")
-        btc-step-up (node-by-role use-my-views-view
+        btc-step-up (node-by-role views-view
                                   "portfolio-optimizer-objective-menu-view-perp:BTC-step-up")
-        btc-step-down (node-by-role use-my-views-view
+        btc-step-down (node-by-role views-view
                                     "portfolio-optimizer-objective-menu-view-perp:BTC-step-down")
-        doge-return (node-by-role use-my-views-view
+        doge-return (node-by-role views-view
                                   "portfolio-optimizer-objective-menu-view-perp:DOGE-return")
-        btc-prefilled-return (node-by-role use-my-views-prefilled-view
-                                           "portfolio-optimizer-objective-menu-view-perp:BTC-return")
-        btc-return-suffix (first (filter (fn [node]
-                                           (contains? (set (get-in node [1 :class]))
-                                                      "optimizer-objective-view-return-suffix"))
-                                         (collect-nodes btc-row vector?)))
-        btc-confidence-medium (node-by-role use-my-views-view
+        btc-implied-return (node-by-role implied-view
+                                         "portfolio-optimizer-objective-menu-view-perp:BTC-return")
+        btc-confidence-medium (node-by-role views-view
                                             "portfolio-optimizer-objective-menu-view-perp:BTC-confidence-medium")
-        btc-remove (node-by-role use-my-views-view
-                                 "portfolio-optimizer-objective-menu-view-perp:BTC-remove")
+        btc-confidence-high (node-by-role views-view
+                                          "portfolio-optimizer-objective-menu-view-perp:BTC-confidence-high")
+        doge-confidence-medium (node-by-role views-view
+                                             "portfolio-optimizer-objective-menu-view-perp:DOGE-confidence-medium")
+        btc-reset (node-by-role views-view
+                                "portfolio-optimizer-objective-menu-view-perp:BTC-reset")
         option-roles (->> (collect-nodes menu vector?)
                           (keep #(get-in % [1 :data-role]))
-                          (filter #(str/starts-with? %
-                                                     "portfolio-optimizer-objective-menu-option-"))
+                          (filter #(str/starts-with? % "portfolio-optimizer-objective-menu-option-"))
                           vec)
-        strings (set (collect-strings open-view))
-        use-my-views-strings (set (collect-strings use-my-views-view))]
-    (is (some? trigger))
+        strings (set (collect-strings open-view))]
     (is (= [[:actions/open-portfolio-optimizer-objective-menu]]
            (click-actions trigger)))
     (is (= "true" (get-in trigger [1 :aria-haspopup])))
@@ -792,80 +785,89 @@
     (is (= "true" (get-in open-trigger [1 :aria-expanded])))
     (is (nil? (node-by-role closed-view "portfolio-optimizer-objective-menu")))
     (is (nil? (node-by-role open-view "portfolio-optimizer-objective-menu-backdrop")))
-    (is (some? menu))
-    (is (contains? (set (get-in menu [1 :class]))
-                   "optimizer-objective-menu"))
-    (is (contains? (set (get-in menu [1 :class]))
-                   "optimizer-objective-popover"))
+    (is (every? menu-classes ["optimizer-objective-menu" "optimizer-objective-popover"
+                              "focus:outline-none" "focus:ring-0"]))
     (is (= "region" (get-in menu [1 :role])))
     (is (nil? (get-in menu [1 :aria-modal])))
-    (is (= [[:actions/handle-portfolio-optimizer-objective-menu-keydown
-             [:event/key]]]
+    (is (= [[:actions/handle-portfolio-optimizer-objective-menu-keydown [:event/key]]]
            (get-in menu [1 :on :keydown])))
-    (is (contains? strings "Change objective"))
-    (is (contains? strings "Re-runs the solver with the same universe and constraints"))
-    (is (contains? strings "Minimum volatility"))
-    (is (contains? strings "Maximum Sharpe"))
-    (is (contains? strings "· 12%"))
-    (is (contains? strings "Maximum return"))
-    (is (contains? strings "Use my views"))
+    (doseq [label ["Change objective"
+                   "Re-runs the solver with the same universe and constraints"
+                   "Minimum volatility" "Maximum Sharpe" "· 12%" "Maximum return"]]
+      (is (contains? strings label)))
+    (is (not (contains? strings "Use my views"))
+        "Views are an input policy of Maximum Sharpe now, not an objective.")
     (is (= ["portfolio-optimizer-objective-menu-option-minimum-volatility"
             "portfolio-optimizer-objective-menu-option-max-sharpe"
-            "portfolio-optimizer-objective-menu-option-use-my-views"
             "portfolio-optimizer-objective-menu-option-target-volatility"
             "portfolio-optimizer-objective-menu-option-maximum-return"]
-           option-roles))
-    (is (= [[:actions/select-portfolio-optimizer-objective-menu-option
-             :minimum-volatility]]
+           option-roles)
+        "All four objective options always render; the use-my-views option is gone.")
+    (is (= [[:actions/select-portfolio-optimizer-objective-menu-option :minimum-volatility]]
            (click-actions minimum-row)))
-    (is (= [[:actions/select-portfolio-optimizer-objective-menu-option
-             :use-my-views]]
-           (click-actions use-my-views-row)))
-    (is (some? inline-editor))
-    (is (contains? (set (collect-strings inline-editor)) "Your return views"))
-    (is (not (contains? use-my-views-strings "Relative views (e.g. ETH > SOL by 4%) and per-view caveats - open full editor")))
-    (is (some? (node-by-role use-my-views-view
-                              "portfolio-optimizer-objective-menu-cancel")))
-    (is (some? (node-by-role use-my-views-view
-                              "portfolio-optimizer-objective-menu-apply")))
+    (is (= [[:actions/select-portfolio-optimizer-objective-menu-option :max-sharpe]]
+           (click-actions max-sharpe-row)))
+    ;; Pending Maximum Sharpe always shows the views section: a historical-mean
+    ;; draft gets the views-off note; other pending objectives get nothing.
+    (is (nil? (node-by-role open-view
+                            "portfolio-optimizer-objective-menu-use-my-views-editor-rows")))
+    (is (= [[:actions/set-portfolio-optimizer-return-model-kind :black-litterman]]
+           (click-actions (node-by-role open-view
+                                        "portfolio-optimizer-objective-menu-use-my-views-editor-views-on"))))
+    (is (nil? (node-by-role changed-view
+                            "portfolio-optimizer-objective-menu-use-my-views-editor")))
+    (is (contains? (set (collect-strings inline-editor)) "Return views"))
+    (is (= "user" (node-attr btc-row :data-source)))
+    (is (= "implied" (node-attr doge-row :data-source)))
     (is (= "https://app.hyperliquid.xyz/coins/BTC.svg"
-           (get-in btc-icon [1 :src])))
-    (is (= "18" (get-in btc-return [1 :value])))
-    (is (some? doge-return))
-    (is (= "20" (get-in btc-prefilled-return [1 :value])))
+           (get-in (node-by-role btc-row
+                                 "portfolio-optimizer-objective-menu-view-perp:BTC-icon")
+                   [2 1 :src])))
+    (is (= "18" (get-in btc-return [1 :value]))
+        "The typing buffer wins over the authored view's 15.")
+    (is (= "" (get-in doge-return [1 :value]))
+        "No readiness history for DOGE, so the implied row prefills nothing.")
+    (is (= "—" (get-in doge-return [1 :placeholder])))
+    (is (and (seq implied-btc-text) (not= "20" implied-btc-text))
+        "Implied inputs come from the readiness baseline, never the run's posterior.")
+    (is (= implied-btc-text (get-in btc-implied-return [1 :value])))
     (is (contains? (set (get-in btc-return [1 :class])) "pr-9"))
-    (is (= ["%"] (collect-strings btc-return-suffix)))
-    (is (= [[:actions/set-portfolio-optimizer-objective-menu-view-return
-             "perp:BTC"
+    (is (contains? (set (collect-strings btc-row)) "%"))
+    (is (= [[:actions/set-portfolio-optimizer-objective-menu-view-return "perp:BTC"
              [:event.target/value]]]
            (get-in btc-return [1 :on :input])))
     (is (fn? (get-in btc-return [1 :on :keydown])))
-    (is (contains? (set (get-in menu [1 :class])) "focus:outline-none"))
-    (is (contains? (set (get-in menu [1 :class])) "focus:ring-0"))
     (is (= "Increase BTC return" (get-in btc-step-up [1 :aria-label])))
     (is (= "Decrease BTC return" (get-in btc-step-down [1 :aria-label])))
-    (is (= [[:actions/step-portfolio-optimizer-objective-menu-view-return
-             "perp:BTC"
-             :up]]
+    (is (= [[:actions/step-portfolio-optimizer-objective-menu-view-return "perp:BTC" :up]]
            (click-actions btc-step-up)))
-    (is (= [[:actions/step-portfolio-optimizer-objective-menu-view-return
-             "perp:BTC"
-             :down]]
+    (is (= [[:actions/step-portfolio-optimizer-objective-menu-view-return "perp:BTC" :down]]
            (click-actions btc-step-down)))
-    (is (= "true" (get-in btc-confidence-medium [1 :data-selected])))
-    (is (= "medium" (get-in btc-confidence-medium [1 :data-tooltip])))
-    (is (= "medium" (get-in btc-confidence-medium [1 :title])))
+    (is (= "true" (get-in btc-confidence-medium [1 :data-selected]))
+        "Selected confidence comes from the authored view.")
+    (is (= "false" (get-in btc-confidence-high [1 :data-selected])))
+    (is (= "false" (get-in doge-confidence-medium [1 :data-selected]))
+        "Implied rows select no confidence; medium is no longer a default.")
+    (is (= ["medium trust in this return" "adopt as your view · medium"]
+           [(get-in btc-confidence-medium [1 :data-tooltip])
+            (get-in doge-confidence-medium [1 :data-tooltip])]))
     (is (= "Set medium confidence" (get-in btc-confidence-medium [1 :aria-label])))
-    (is (= ["M"] (collect-strings btc-confidence-medium)))
-    (is (= [[:actions/set-portfolio-optimizer-objective-menu-view-confidence
-             "perp:BTC"
+    (is (= ["▮▮▯" "Med"] (collect-strings btc-confidence-medium)))
+    (is (= [[:actions/set-portfolio-optimizer-objective-menu-view-confidence "perp:BTC"
              :medium]]
            (click-actions btc-confidence-medium)))
-    (is (nil? btc-remove))
-    (is (nil? (node-by-role use-my-views-view
-                            "portfolio-optimizer-objective-menu-add-view")))
-    (is (= true (get-in apply-current [1 :disabled])))
-    (is (nil? (click-actions apply-current)))
+    (is (= [[:actions/remove-portfolio-optimizer-objective-menu-view "perp:BTC"]]
+           (click-actions btc-reset)))
+    (is (nil? (node-by-role doge-row
+                            "portfolio-optimizer-objective-menu-view-perp:DOGE-reset"))
+        "Implied rows have nothing to reset.")
+    (is (= false (get-in apply-model-switch [1 :disabled]))
+        "Applying moves this historical-mean draft onto the views-aware model.")
+    (is (= [[:actions/apply-portfolio-optimizer-objective-menu-selection-and-run]]
+           (click-actions apply-model-switch)))
+    (is (= true (get-in apply-noop [1 :disabled]))
+        "Maximum Sharpe re-applied to an already views-aware draft is a no-op.")
+    (is (nil? (click-actions apply-noop)))
     (is (= false (get-in apply-changed [1 :disabled])))
     (is (= [[:actions/apply-portfolio-optimizer-objective-menu-selection-and-run]]
            (click-actions apply-changed)))

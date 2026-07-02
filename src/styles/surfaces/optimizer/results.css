@@ -88,6 +88,12 @@
     }
   }
 
+  /* Inside the popover the row list yields to the footer: a large universe
+     scrolls within the list instead of growing the menu past the fold. */
+  .portfolio-optimizer .optimizer-objective-menu .optimizer-objective-view-rows {
+    max-height: min(320px, 34vh);
+  }
+
   .portfolio-optimizer
     :is(.optimizer-objective-menu-body, .optimizer-objective-view-rows) {
     scrollbar-width: thin;
@@ -254,6 +260,65 @@
     background-color: var(--optimizer-accent);
     border-color: var(--optimizer-accent);
     color: #191407;
+  }
+
+  /* Return views provenance: source chips, ages, filters, implied styling. */
+
+  .portfolio-optimizer .optimizer-return-view-row {
+    display: block;
+  }
+
+  .portfolio-optimizer .optimizer-return-view-chip {
+    border-color: var(--optimizer-border-strong);
+    color: var(--optimizer-text-3);
+  }
+
+  .portfolio-optimizer .optimizer-return-view-chip--user {
+    background-color: var(--optimizer-accent-soft);
+    border-color: var(--optimizer-accent-border);
+    color: var(--optimizer-accent);
+  }
+
+  .portfolio-optimizer .optimizer-return-view-chip--stale {
+    background-color: color-mix(in srgb, var(--optimizer-warn) 14%, transparent);
+    border-color: color-mix(in srgb, var(--optimizer-warn) 55%, transparent);
+    color: var(--optimizer-warn);
+  }
+
+  .portfolio-optimizer .optimizer-return-view-chip--implied {
+    background-color: transparent;
+    border-style: dashed;
+  }
+
+  /* An implied value is the machine's number, not the user's: render it in the
+     muted tier until the row is authored. */
+  .portfolio-optimizer .optimizer-objective-view-return-input--implied {
+    color: var(--optimizer-text-3);
+  }
+
+  .portfolio-optimizer .optimizer-return-view-meter {
+    font-size: 7px;
+    letter-spacing: 1px;
+  }
+
+  .portfolio-optimizer .optimizer-return-view-reset {
+    opacity: 0.55;
+  }
+
+  .portfolio-optimizer .optimizer-return-view-reset:is(:hover, :focus-visible) {
+    color: var(--optimizer-warn);
+    opacity: 1;
+  }
+
+  .portfolio-optimizer .optimizer-return-view-filter {
+    background-color: var(--optimizer-surface);
+    color: var(--optimizer-text-3);
+  }
+
+  .portfolio-optimizer .optimizer-return-view-filter[data-selected="true"] {
+    border-color: var(--optimizer-accent-border);
+    background-color: var(--optimizer-accent-soft);
+    color: var(--optimizer-accent);
   }
 
   @media (max-width: 360px) {

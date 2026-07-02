@@ -242,16 +242,12 @@
     (is (= {} (get values bl-errors-path)))
     (is (= true (get values dirty-path)))))
 
-(deftest run-portfolio-optimizer-from-draft-blocks-empty-black-litterman-views-test
-  (let [effects (actions/run-portfolio-optimizer-from-draft
-                 (black-litterman-draft-state))
-        values (effect-values-by-path effects)]
-    (is (= [:effects/save-many]
-           (mapv first effects)))
-    (is (= "Add a view before running Use my views."
-           (get values (conj bl-errors-path :return-text))))
-    (is (not (some #(= :effects/run-portfolio-optimizer-pipeline (first %))
-                   effects)))))
+(deftest run-portfolio-optimizer-from-draft-runs-with-zero-black-litterman-views-test
+  ;; Zero authored views is a valid Maximum Sharpe run: the posterior equals the
+  ;; baseline expected returns, so nothing blocks and no error is staged.
+  (is (= [[:effects/run-portfolio-optimizer-pipeline]]
+         (actions/run-portfolio-optimizer-from-draft
+          (black-litterman-draft-state)))))
 
 (deftest auto-recompute-stale-portfolio-optimizer-scenario-requests-background-run-once-test
   (let [state (ready-optimizer-state {:kind :historical-mean})
@@ -394,20 +390,23 @@
 (deftest load-portfolio-optimizer-route-emits-scenario-read-effects-test
   (is (= [[:effects/load-portfolio-optimizer-scenario-index]
           [:effects/load-portfolio-optimizer-history-discovery]
-          [:effects/load-portfolio-optimizer-constraint-profiles]]
+          [:effects/load-portfolio-optimizer-constraint-profiles]
+          [:effects/load-portfolio-optimizer-view-library]]
          (actions/load-portfolio-optimizer-route
           {:asset-selector {:phase :full}
            :vaults {:merged-index-rows [{:vault-address "0xloaded"}]}}
           "/portfolio/optimize")))
   (is (= [[:effects/load-portfolio-optimizer-scenario "scn_01"]
           [:effects/load-portfolio-optimizer-history-discovery]
-          [:effects/load-portfolio-optimizer-constraint-profiles]]
+          [:effects/load-portfolio-optimizer-constraint-profiles]
+          [:effects/load-portfolio-optimizer-view-library]]
          (actions/load-portfolio-optimizer-route
           {:asset-selector {:phase :full}
            :vaults {:merged-index-rows [{:vault-address "0xloaded"}]}}
           "/portfolio/optimize/scn_01")))
   (is (= [[:effects/load-portfolio-optimizer-history-discovery]
-          [:effects/load-portfolio-optimizer-constraint-profiles]]
+          [:effects/load-portfolio-optimizer-constraint-profiles]
+          [:effects/load-portfolio-optimizer-view-library]]
          (actions/load-portfolio-optimizer-route
           {:asset-selector {:phase :full}
            :vaults {:merged-index-rows [{:vault-address "0xloaded"}]}}
@@ -421,7 +420,8 @@
   (is (= [[:effects/load-portfolio-optimizer-history-discovery]
           [:effects/api-fetch-vault-index-with-cache]
           [:effects/api-fetch-vault-summaries]
-          [:effects/load-portfolio-optimizer-constraint-profiles]]
+          [:effects/load-portfolio-optimizer-constraint-profiles]
+          [:effects/load-portfolio-optimizer-view-library]]
          (actions/load-portfolio-optimizer-route
           {:asset-selector {:phase :full}}
           "/portfolio/optimize/new")))
@@ -429,7 +429,8 @@
           [:effects/load-portfolio-optimizer-history-discovery]
           [:effects/api-fetch-vault-index-with-cache]
           [:effects/api-fetch-vault-summaries]
-          [:effects/load-portfolio-optimizer-constraint-profiles]]
+          [:effects/load-portfolio-optimizer-constraint-profiles]
+          [:effects/load-portfolio-optimizer-view-library]]
          (actions/load-portfolio-optimizer-route
           {:asset-selector {:phase :full}
            :vaults {}}
@@ -438,13 +439,15 @@
           [:effects/load-portfolio-optimizer-history-discovery]
           [:effects/api-fetch-vault-index-with-cache]
           [:effects/api-fetch-vault-summaries]
-          [:effects/load-portfolio-optimizer-constraint-profiles]]
+          [:effects/load-portfolio-optimizer-constraint-profiles]
+          [:effects/load-portfolio-optimizer-view-library]]
          (actions/load-portfolio-optimizer-route
           {:asset-selector {:phase :full}
            :vaults {}}
           "/portfolio/optimize/scn_01")))
   (is (= [[:effects/load-portfolio-optimizer-history-discovery]
-          [:effects/load-portfolio-optimizer-constraint-profiles]]
+          [:effects/load-portfolio-optimizer-constraint-profiles]
+          [:effects/load-portfolio-optimizer-view-library]]
          (actions/load-portfolio-optimizer-route
           {:asset-selector {:phase :full}
            :vaults {:merged-index-rows [{:vault-address "0xloaded"}]}}
@@ -453,7 +456,8 @@
 (deftest load-portfolio-optimizer-route-refreshes-cache-only-selector-markets-test
   (is (= [[:effects/load-portfolio-optimizer-history-discovery]
           [:effects/fetch-asset-selector-markets {:phase :full}]
-          [:effects/load-portfolio-optimizer-constraint-profiles]]
+          [:effects/load-portfolio-optimizer-constraint-profiles]
+          [:effects/load-portfolio-optimizer-view-library]]
          (actions/load-portfolio-optimizer-route
           {:asset-selector {:cache-hydrated? true
                             :phase :bootstrap

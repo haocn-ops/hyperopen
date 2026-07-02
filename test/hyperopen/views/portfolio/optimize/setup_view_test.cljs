@@ -2,8 +2,8 @@
   (:require [cljs.test :refer-macros [deftest is]]
             [hyperopen.views.portfolio-view :as portfolio-view]
             [hyperopen.views.portfolio.optimize.test-support
-             :refer [change-actions click-actions collect-strings input-actions
-                     node-by-role]]))
+             :refer [change-actions click-actions collect-nodes collect-strings
+                     input-actions node-by-role]]))
 
 (defn- portfolio-optimizer-setup-view
   [objective]
@@ -24,18 +24,19 @@
     (is (some? (node-by-role view-node "portfolio-optimizer-setup-header")))
     (is (some? (node-by-role view-node "portfolio-optimizer-setup-status-tag")))
     (is (some? (node-by-role view-node "portfolio-optimizer-setup-preset-row")))
+    ;; TWO preset cards now — the objective choice. "Risk-adjusted" and
+    ;; "Use my views" merged into Maximum Sharpe (views are an input to it,
+    ;; not a strategy of their own), so the old roles must be gone.
     (is (= [[:actions/apply-portfolio-optimizer-setup-preset :conservative]]
            (click-actions
             (node-by-role view-node
                           "portfolio-optimizer-setup-preset-conservative"))))
-    (is (= [[:actions/apply-portfolio-optimizer-setup-preset :risk-adjusted]]
+    (is (= [[:actions/apply-portfolio-optimizer-setup-preset :max-sharpe]]
            (click-actions
             (node-by-role view-node
-                          "portfolio-optimizer-setup-preset-risk-adjusted"))))
-    (is (= [[:actions/apply-portfolio-optimizer-setup-preset :use-my-views]]
-           (click-actions
-            (node-by-role view-node
-                          "portfolio-optimizer-setup-preset-use-my-views"))))
+                          "portfolio-optimizer-setup-preset-max-sharpe"))))
+    (is (nil? (node-by-role view-node "portfolio-optimizer-setup-preset-risk-adjusted")))
+    (is (nil? (node-by-role view-node "portfolio-optimizer-setup-preset-use-my-views")))
     (is (some? (node-by-role view-node "portfolio-optimizer-draft-state")))
     (is (= true
            (get-in (node-by-role view-node "portfolio-optimizer-run-draft")
@@ -237,12 +238,17 @@
                                                                  :weights {"perp:BTC" 1}}]}
                                          :risk-model {:kind :diagonal-shrink}
                                          :constraints {:long-only? false}}}}})
+        blend-shell (node-by-role view-node "portfolio-optimizer-views-blend-shell")
         inline-editor (node-by-role view-node
                                     "portfolio-optimizer-setup-use-my-views-editor")
+        editor-strings (set (collect-strings inline-editor))
         btc-row (node-by-role view-node
                               "portfolio-optimizer-objective-menu-view-row-perp:BTC")
+        eth-row (node-by-role view-node
+                              "portfolio-optimizer-objective-menu-view-row-perp:ETH")
         btc-icon (node-by-role view-node
-                               "portfolio-optimizer-objective-menu-view-perp:BTC-icon-img")
+                               "portfolio-optimizer-objective-menu-view-perp:BTC-icon")
+        btc-icon-img (first (collect-nodes btc-icon #(= :img (first %))))
         btc-return (node-by-role view-node
                                  "portfolio-optimizer-objective-menu-view-perp:BTC-return")
         btc-confidence-high (node-by-role
@@ -250,18 +256,42 @@
                              "portfolio-optimizer-objective-menu-view-perp:BTC-confidence-high")
         run-button (node-by-role view-node "portfolio-optimizer-run-draft")
         strings (set (collect-strings view-node))]
-    (is (some? (node-by-role view-node "portfolio-optimizer-setup-use-my-views-context")))
-    (is (some? inline-editor))
-    (is (some? btc-row))
+    ;; The BL trust explainer is a collapsed disclosure inside the standard
+    ;; policy-pane tail — no dedicated center workspace, no BL panel.
+    (is (some? blend-shell))
+    (is (some? (node-by-role blend-shell
+                             "portfolio-optimizer-setup-use-my-views-context")))
+    (is (contains? strings "How your views shape the forecast"))
     (is (nil? (node-by-role view-node "portfolio-optimizer-black-litterman-panel")))
+    ;; A views-aware (Black-Litterman) draft belongs to the Maximum Sharpe preset:
+    ;; the third "Use my views" card is gone.
     (is (= "true"
            (get-in (node-by-role view-node
-                                 "portfolio-optimizer-setup-preset-use-my-views")
+                                 "portfolio-optimizer-setup-preset-max-sharpe")
                    [1 :aria-pressed])))
-    (is (contains? strings "Use my views"))
-    (is (contains? (set (collect-strings inline-editor)) "Your views"))
+    (is (= "false"
+           (get-in (node-by-role view-node
+                                 "portfolio-optimizer-setup-preset-conservative")
+                   [1 :aria-pressed])))
+    (is (nil? (node-by-role view-node "portfolio-optimizer-setup-preset-use-my-views")))
+    ;; Live provenance counts (1 authored view over a 2-asset universe) thread
+    ;; through the preset kicker, the scenario contract's Returns row, and the
+    ;; rail editor's summary line.
+    (is (contains? strings "1 your view · 1 implied"))
+    ;; Views are edited in the always-present right-rail "Return views" panel.
+    (is (contains? strings "Return views"))
+    (is (some? inline-editor))
+    (is (contains? editor-strings "Used by Maximum Sharpe"))
+    (is (some? (node-by-role inline-editor
+                             "portfolio-optimizer-setup-use-my-views-editor-summary")))
+    (is (contains? editor-strings "1 your view · 1 implied"))
+    (is (some? (node-by-role inline-editor
+                             "portfolio-optimizer-setup-use-my-views-editor-filter-all")))
+    (is (some? btc-row))
+    (is (= "user" (get-in btc-row [1 :data-source])))
+    (is (= "implied" (get-in eth-row [1 :data-source])))
     (is (= "https://app.hyperliquid.xyz/coins/BTC.svg"
-           (get-in btc-icon [1 :src])))
+           (get-in btc-icon-img [1 :src])))
     (is (= "70" (get-in btc-return [1 :value])))
     (is (= [[:actions/set-portfolio-optimizer-objective-menu-view-return
              "perp:BTC"
@@ -272,5 +302,7 @@
              "perp:BTC"
              :high]]
            (click-actions btc-confidence-high)))
-    (is (= [[:actions/apply-portfolio-optimizer-objective-menu-selection-and-run]]
+    ;; Row edits materialize views into the draft immediately, so Run is the same
+    ;; plain draft action for every return model — no BL apply-and-run special case.
+    (is (= [[:actions/run-portfolio-optimizer-from-draft]]
            (click-actions run-button)))))

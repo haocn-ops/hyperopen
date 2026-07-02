@@ -183,7 +183,9 @@
     (is (nil? (get-in readiness
                       [:request :execution-assumptions :prices-by-id "perp:ETH"])))))
 
-(deftest build-readiness-blocks-empty-black-litterman-views-test
+(deftest build-readiness-allows-empty-black-litterman-views-test
+  ;; Zero authored views is a valid views-aware run: the posterior equals the
+  ;; baseline expected returns, so readiness must not block on it.
   (let [readiness (setup-readiness/build-readiness
                    (optimizer-state
                     {:portfolio
@@ -197,11 +199,9 @@
                          "ETH" [{:time 1000 :close "2000"}
                                 {:time 2000 :close "2200"}]}
                         :funding-history-by-coin {}}}}}))]
-    (is (= :blocked (:status readiness)))
-    (is (= :missing-black-litterman-views (:reason readiness)))
-    (is (= false (:runnable? readiness)))
-    (is (= "Add a view before running Use my views."
-           (setup-readiness/readiness-error-message readiness)))))
+    (is (= :ready (:status readiness)))
+    (is (nil? (:reason readiness)))
+    (is (= true (:runnable? readiness)))))
 
 (deftest build-readiness-applies-manual-capital-when-snapshot-has-no-nav-test
   (let [readiness (setup-readiness/build-readiness

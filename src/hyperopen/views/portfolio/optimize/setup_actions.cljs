@@ -28,7 +28,7 @@
 (defn- action-model-label
   [return-kind risk-kind]
   (cond
-    (= :black-litterman return-kind) "posterior views"
+    (= :black-litterman return-kind) "your views + implied returns"
     (= :mixed-frequency risk-kind) "mixed-frequency covariance"
     (= :sample-covariance risk-kind) "sample historical returns"
     :else "stabilized historical returns"))
@@ -41,7 +41,6 @@
     :no-eligible-history "No usable history"
     :incomplete-history "History incomplete"
     :missing-history-assumptions "Needs assumptions"
-    :missing-black-litterman-views "Add a view"
     :missing-universe "Add assets to run"
     "Not ready to run"))
 
@@ -103,7 +102,6 @@
 (defn setup-bottom-actions
   [{:keys [draft readiness running? run-triggerable? saving-scenario? solved-run? result-path]}]
   (let [asset-count (count (:universe draft))
-        black-litterman? (= :black-litterman (get-in draft [:return-model :kind]))
         objective-copy (action-objective-label (get-in draft [:objective :kind]))
         model-copy (action-model-label (get-in draft [:return-model :kind])
                                        (get-in draft [:risk-model :kind]))
@@ -133,10 +131,11 @@
                ;; readiness is not runnable: clicking is the intentional
                ;; "run retries anything still missing" history-load affordance.
                ;; Honesty lives in the status pill below, not by disabling the CTA.
+               ;; Row edits materialize views into the draft immediately, so BL no
+               ;; longer needs the objective-menu apply path to bulk-collect them:
+               ;; Run is the same plain action for every return model.
                :disabled (not run-triggerable?)
-               :on {:click [(if black-litterman?
-                               [:actions/apply-portfolio-optimizer-objective-menu-selection-and-run]
-                               [:actions/run-portfolio-optimizer-from-draft])]}}
+               :on {:click [[:actions/run-portfolio-optimizer-from-draft]]}}
       ;; Goal language, not policy language: "safe defaults" described the app's
       ;; internal posture and turned misleading the moment the user customized
       ;; anything. The status-detail line below still names the exact

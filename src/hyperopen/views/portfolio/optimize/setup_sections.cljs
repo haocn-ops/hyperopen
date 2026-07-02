@@ -39,13 +39,13 @@
     [:p "Stabilized inputs reduce dependence on a single historical window."]
     [:p "Cash floor and turnover caps protect against destructive rebalances."]
     [:p {:class ["font-semibold" "text-warning"]}
-     "Switch to Use my views to add beliefs and compare posterior output."]]))
+     "Switch to Maximum Sharpe to optimize with your return views."]]))
 
 (defn policy-pane
   "CENTER column: the editable scenario policy. Objective, return/risk model, the constraints
   (2D exposure map + risk guards + rebalance behavior + advanced solver drawer), a collapsed
-  'why safe' note, and the Run bottom bar. For Black-Litterman the whole pane is the use-my-views
-  workspace (it edits the return model = policy)."
+  views-blend explainer when the views-aware model is active, the collapsed 'why safe' note,
+  and the Run bottom bar. Return views themselves are edited in the right rail."
   [{:keys [state draft highlighted-controls readiness running? run-triggerable?
            saving-scenario? solved-run? result-path]}]
   (let [black-litterman? (= :black-litterman (get-in draft [:return-model :kind]))]
@@ -75,27 +75,29 @@
         "Advanced Overrides"
         (instrument-overrides-panel/overrides-trailing-label draft))
        (instrument-overrides-panel/instrument-overrides-panel draft))]
-     (if black-litterman?
-       ;; Black-Litterman: the belief workspace carries its own run + assumptions.
-       [(use-my-views-workspace/use-my-views-workspace
-         {:draft draft
-          :readiness readiness
-          :running? running?
-          :run-triggerable? run-triggerable?
-          :saving-scenario? saving-scenario?
-          :solved-run? solved-run?
-          :result-path result-path})]
-       ;; The Run bar is the LAST DIRECT child of the policy pane so `position: sticky` can pin
-       ;; it to the viewport bottom while any part of the pane is in view — expanding the
-       ;; Constraints disclosure can no longer push Run below the fold.
-       [(why-safe-note)
-        [:div {:class ["space-y-2"]
-               :data-role "portfolio-optimizer-model-assumptions-stack"}
-         (setup-actions/model-assumptions-panel)]
-        (setup-actions/setup-bottom-actions {:draft draft
-                                             :readiness readiness
-                                             :running? running?
-                                             :run-triggerable? run-triggerable?
-                                             :saving-scenario? saving-scenario?
-                                             :solved-run? solved-run?
-                                             :result-path result-path})]))))
+     ;; One pane tail for every model. The Black-Litterman trust explainer no
+     ;; longer replaces it (every Maximum Sharpe scenario is views-aware now) —
+     ;; it collapses into a disclosure above the notes. The Run bar stays the
+     ;; LAST DIRECT child of the policy pane so `position: sticky` can pin it to
+     ;; the viewport bottom while any part of the pane is in view.
+     (concat
+      (when black-litterman?
+        [(controls/disclosure-panel
+          "portfolio-optimizer-views-blend-shell"
+          (controls/disclosure-heading
+           "How your views shape the forecast"
+           "Implied baseline → your views → combined output")
+          (use-my-views-workspace/views-blend-explainer
+           {:draft draft
+            :readiness readiness}))])
+      [(why-safe-note)
+       [:div {:class ["space-y-2"]
+              :data-role "portfolio-optimizer-model-assumptions-stack"}
+        (setup-actions/model-assumptions-panel)]
+       (setup-actions/setup-bottom-actions {:draft draft
+                                            :readiness readiness
+                                            :running? running?
+                                            :run-triggerable? run-triggerable?
+                                            :saving-scenario? saving-scenario?
+                                            :solved-run? solved-run?
+                                            :result-path result-path})]))))

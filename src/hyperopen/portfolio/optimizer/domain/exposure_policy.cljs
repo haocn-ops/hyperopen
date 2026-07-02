@@ -24,16 +24,23 @@
 ;; `target-snap` for clean values. Advanced raw fields may exceed these bounds; the pad simply
 ;; clamps the plotted marker.
 
-;; The pad axes are ADAPTIVE, not fixed. `gross-axis-floor`/`net-axis-floor` are the smallest a
-;; comfortable default view uses; the visible max grows (quantized to the nice steps below, with
-;; headroom) to contain whatever leverage/bias the policy or the current portfolio actually uses,
-;; so the trader is never capped at an arbitrary ceiling. Gross ≈ leverage (the request builder
-;; renames :gross-max → :gross-leverage), so the Y axis is surfaced as "Gross leverage".
-(def gross-axis-floor 3.0)
-(def net-axis-floor 2.0)
-(def gross-axis-steps [3.0 5.0 10.0 20.0 40.0])
-(def net-axis-steps [2.0 3.0 5.0 10.0 20.0])
-(def ^:private axis-headroom 1.12)
+;; The pad scale is FIXED while the trader interacts with it. The earlier adaptive axis grew
+;; with 1.12 headroom on every render, so holding the pointer at the top edge remapped the pad
+;; under the cursor and ratcheted gross 3×→5×→10×→… without bound. Instead the view renders one
+;; of these paired zoom levels; dragging clamps to the visible scale and NEVER changes it, an
+;; explicit zoom control steps both axes together, and only discontinuous policy changes
+;; (preset / saved profile / reset / advanced raw fields) may re-fit the level. Gross ≈ leverage
+;; (the request builder renames :gross-max → :gross-leverage), so the Y axis is surfaced as
+;; "Gross leverage".
+(def axis-levels
+  [{:gross-max 3.0 :net-extent 2.0}
+   {:gross-max 5.0 :net-extent 3.0}
+   {:gross-max 10.0 :net-extent 5.0}
+   {:gross-max 20.0 :net-extent 10.0}
+   {:gross-max 40.0 :net-extent 20.0}])
+(def max-zoom-level (dec (count axis-levels)))
+(def gross-axis-floor (:gross-max (first axis-levels)))
+(def net-axis-floor (:net-extent (first axis-levels)))
 (def target-snap 0.05)
 (def band-eps 1e-6)
 (def max-band 0.5)
@@ -64,28 +71,56 @@
   (and (finite-number? a) (finite-number? b)
        (< (js/Math.abs (- a b)) 1e-4)))
 
-;; --- Adaptive axis scale ------------------------------------------------------------------
+;; --- Fixed zoom levels --------------------------------------------------------------------
 
-(defn- nice-axis-max
-  "Smallest nice step (with headroom) that contains `needed`, never below `floor`, with no hard
-  upper cap (rounds up to the next multiple of 20 beyond the largest listed step)."
-  [steps floor needed]
-  (let [n (max floor (* axis-headroom (max 0.0 (or needed 0.0))))]
-    (or (first (filter #(>= % n) steps))
-        (* 20.0 (js/Math.ceil (/ n 20.0))))))
+(def default-axis (first axis-levels))
 
-(def default-axis {:gross-max gross-axis-floor :net-extent net-axis-floor})
-
-(defn axis-scale
-  "Adaptive {:gross-max :net-extent} that frames the policy band and the current portfolio
-  exposure. Grows to fit; never shrinks below the floor; never caps the trader."
+(defn- axis-needs
+  "The gross/net magnitudes the view must contain: the far band edges of the policy plus the
+  current portfolio exposure (so the 'current' dot is always framed)."
   [{:keys [gross-target gross-band net-target net-band current-gross current-net]}]
-  {:gross-max (nice-axis-max gross-axis-steps gross-axis-floor
-                             (max (+ (or gross-target 0.0) (or gross-band 0.0))
-                                  (or current-gross 0.0)))
-   :net-extent (nice-axis-max net-axis-steps net-axis-floor
-                              (max (+ (js/Math.abs (or net-target 0.0)) (or net-band 0.0))
-                                   (js/Math.abs (or current-net 0.0))))})
+  {:gross (max (+ (max 0.0 (or gross-target 0.0)) (max 0.0 (or gross-band 0.0)))
+               (or current-gross 0.0))
+   :net (max (+ (js/Math.abs (or net-target 0.0)) (max 0.0 (or net-band 0.0)))
+             (js/Math.abs (or current-net 0.0)))})
+
+(defn- overflow-axis
+  "Scale for values beyond the largest zoom level (only reachable through the advanced raw
+  fields): round each axis up to the next multiple of 20, and disable zooming."
+  [{:keys [gross net]}]
+  {:gross-max (max (:gross-max (peek axis-levels)) (* 20.0 (js/Math.ceil (/ gross 20.0))))
+   :net-extent (max (:net-extent (peek axis-levels)) (* 20.0 (js/Math.ceil (/ net 20.0))))})
+
+(defn fit-level
+  "Index of the smallest zoom level whose paired axes contain the policy band and the current
+  exposure, or nil when even the largest level cannot (the overflow case). No headroom: a target
+  dragged exactly to the visible max still fits its own level, so dragging can never re-fit."
+  [inputs]
+  (let [{:keys [gross net]} (axis-needs inputs)]
+    (->> (map-indexed vector axis-levels)
+         (some (fn [[i {:keys [gross-max net-extent]}]]
+                 (when (and (<= gross gross-max) (<= net net-extent)) i))))))
+
+(defn render-axis
+  "Resolve the pad's display scale from the policy (+ current exposure) and the trader's stored
+  zoom level. The stored level only ever WIDENS the view (zooming in below what the policy needs
+  would clip the band box), and an unfittable policy falls back to a computed overflow scale.
+  Returns {:axis {:gross-max :net-extent} :level int|nil :fit-level int|nil
+           :zoom-in-level int|nil :zoom-out-level int|nil}; the view bakes the neighbour levels
+  into the zoom-button dispatches, so the action layer never re-derives them."
+  [inputs stored-level]
+  (let [fit (fit-level inputs)]
+    (if (nil? fit)
+      {:axis (overflow-axis (axis-needs inputs))
+       :level nil :fit-level nil :zoom-in-level nil :zoom-out-level nil}
+      (let [stored (when (and (number? stored-level) (js/isFinite stored-level))
+                     (clamp (js/Math.round stored-level) 0 max-zoom-level))
+            level (max fit (or stored fit))]
+        {:axis (nth axis-levels level)
+         :level level
+         :fit-level fit
+         :zoom-in-level (when (> level fit) (dec level))
+         :zoom-out-level (when (< level max-zoom-level) (inc level))}))))
 
 ;; --- Forward: canonical constraints -> exposure policy ------------------------------------
 
@@ -203,13 +238,18 @@
 (defn point->targets
   "Convert a pad pointer event to snapped gross/net targets, or nil when this is not an active
   drag (no pressed button) or the pad bounds are degenerate. `bounds` is the pad's bounding rect
-  resolved by :event.currentTarget/bounds; `gross-axis-max`/`net-axis-extent` are the current
-  adaptive scale (baked into the dispatch) so the pointer maps to exactly the values the axis
-  shows. They default to the floor scale."
-  [{:keys [client-x client-y bounds buttons gross-axis-max net-axis-extent]}]
+  resolved by :event.currentTarget/bounds; `gross-axis-max`/`net-axis-extent` are the pad's
+  current fixed scale (baked into the dispatch) so the pointer maps to exactly the values the
+  axis shows. They default to the floor scale. `gross-band`/`net-band` (default 0) shrink the
+  reachable range so the WHOLE band box stays inside the view: `target + band ≤ axis max` is the
+  fixpoint that keeps a drag from ever forcing a re-fit of the scale mid-gesture."
+  [{:keys [client-x client-y bounds buttons gross-axis-max net-axis-extent
+           gross-band net-band]}]
   (let [{:keys [left top width height]} bounds
         g-max (if (finite-number? gross-axis-max) gross-axis-max gross-axis-floor)
         n-ext (if (finite-number? net-axis-extent) net-axis-extent net-axis-floor)
+        g-band (if (finite-number? gross-band) (max 0.0 gross-band) 0.0)
+        n-band (if (finite-number? net-band) (max 0.0 net-band) 0.0)
         pressed? (and (number? buttons) (pos? buttons))]
     (when (and pressed?
                (finite-number? client-x) (finite-number? client-y)
@@ -218,8 +258,15 @@
                (pos? width) (pos? height))
       (let [fx (clamp (/ (- client-x left) width) 0.0 1.0)
             fy (clamp (/ (- client-y top) height) 0.0 1.0)
-            net-target (snap (+ (- n-ext) (* fx (* 2 n-ext))))
-            gross-target (snap (* g-max (- 1.0 fy)))
+            gross-reach (max 0.0 (- g-max g-band))
+            ;; Net reach also respects the gross reach: gross ≥ |net| lifts the gross target to
+            ;; |net|, so a net target beyond gross-reach would push gross-target + gross-band
+            ;; past the axis max (reachable via advanced raw fields, where the gross band is not
+            ;; capped at max-band) and force a mid-drag re-fit.
+            net-reach (max 0.0 (min (- n-ext n-band) gross-reach))
+            net-target (clamp (snap (+ (- n-ext) (* fx (* 2 n-ext))))
+                              (- net-reach) net-reach)
+            gross-target (min (snap (* g-max (- 1.0 fy))) gross-reach)
             ;; Gross is total absolute exposure, so it can never be below the absolute net
             ;; target; clamp to keep the box physically meaningful.
             gross-target* (max gross-target (js/Math.abs net-target))]
@@ -228,8 +275,8 @@
 
 ;; --- Plotting helpers for the view (0..1 fractions; y grows downward like SVG) ------------
 ;;
-;; Each takes the adaptive axis {:gross-max :net-extent}; the 1-arity overloads use the floor
-;; scale so callers that don't care about adaptive framing (and tests) stay simple.
+;; Each takes the render axis {:gross-max :net-extent}; the 1-arity overloads use the floor
+;; level so callers that don't care about the zoomed framing (and tests) stay simple.
 
 (defn- net->fraction
   [net n-ext]

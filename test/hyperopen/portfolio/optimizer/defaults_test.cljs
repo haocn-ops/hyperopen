@@ -133,6 +133,7 @@
           :constrain-frontier? false
           :refinement-open? false
           :refinement-depth nil
+          :exposure-zoom-level nil
           :stale-auto-recompute {:request-signature nil
                                  :input-signature nil
                                  :scenario-id nil}}

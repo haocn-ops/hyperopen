@@ -94,12 +94,21 @@
 (s/def ::portfolio-optimizer-constraint-args
   (s/tuple ::common/keyword-or-string any?))
 (s/def ::portfolio-optimizer-exposure-point-args
-  ;; [client-x client-y bounds-map buttons gross-axis-max net-axis-extent] — pad pointer
-  ;; coordinates + resolved bounding rect + pressed-button bitmask + the baked adaptive axis
-  ;; scale. All positional; coords/buttons are runtime-resolved, the scale is a baked literal.
-  (s/tuple any? any? any? any? any? any?))
+  ;; [client-x client-y bounds-map buttons gross-axis-max net-axis-extent render-level] — pad
+  ;; pointer coordinates + resolved bounding rect + pressed-button bitmask + the baked fixed
+  ;; axis scale and its zoom level. All positional; coords/buttons are runtime-resolved, the
+  ;; scale/level are baked literals.
+  (s/tuple any? any? any? any? any? any? any?))
+(s/def ::portfolio-optimizer-exposure-band-args
+  ;; [axis value render-level] — band axis + slider value + the baked zoom level the slider was
+  ;; rendered at (pins the pad scale so narrowing a band never shrinks the view mid-slide).
+  (s/tuple ::common/keyword-or-string any? any?))
 (s/def ::portfolio-optimizer-key-value-args
   (s/tuple ::common/keyword-or-string any?))
+(s/def ::portfolio-optimizer-zoom-level-args
+  ;; [level] — a zoom-level index baked into the dispatch by the view (disabled buttons never
+  ;; dispatch); the handler validates the integer range.
+  (s/tuple number?))
 (s/def ::portfolio-optimizer-view-key-value-args
   (s/tuple ::common/non-empty-string ::common/keyword-or-string any?))
 (s/def ::portfolio-optimizer-instrument-key-value-args
@@ -279,8 +288,9 @@
    :actions/apply-portfolio-optimizer-setup-preset ::portfolio-optimizer-model-kind-args
    :actions/set-portfolio-optimizer-constraint ::portfolio-optimizer-constraint-args
    :actions/set-portfolio-optimizer-exposure-point ::portfolio-optimizer-exposure-point-args
-   :actions/set-portfolio-optimizer-exposure-band ::portfolio-optimizer-key-value-args
+   :actions/set-portfolio-optimizer-exposure-band ::portfolio-optimizer-exposure-band-args
    :actions/apply-portfolio-optimizer-exposure-preset ::portfolio-optimizer-model-kind-args
+   :actions/set-portfolio-optimizer-exposure-zoom-level ::portfolio-optimizer-zoom-level-args
    :actions/reset-portfolio-optimizer-constraints-to-system ::common/no-args
    :actions/save-portfolio-optimizer-constraint-default ::common/no-args
    :actions/apply-portfolio-optimizer-constraint-default ::common/no-args

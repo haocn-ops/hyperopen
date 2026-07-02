@@ -99,6 +99,7 @@
   (conj optimizer-ui-path :stale-auto-recompute))
 (def ui-refinement-open-path (conj optimizer-ui-path :refinement-open?))
 (def ui-refinement-depth-path (conj optimizer-ui-path :refinement-depth))
+(def ui-exposure-zoom-level-path (conj optimizer-ui-path :exposure-zoom-level))
 
 (def path-catalog
   {:optimizer/root optimizer-path
@@ -186,7 +187,8 @@
    :optimizer-ui/constrain-frontier ui-constrain-frontier-path
    :optimizer-ui/stale-auto-recompute ui-stale-auto-recompute-path
    :optimizer-ui/refinement-open ui-refinement-open-path
-   :optimizer-ui/refinement-depth ui-refinement-depth-path})
+   :optimizer-ui/refinement-depth ui-refinement-depth-path
+   :optimizer-ui/exposure-zoom-level ui-exposure-zoom-level-path})
 
 (defn optimizer-state-path
   [& segments]

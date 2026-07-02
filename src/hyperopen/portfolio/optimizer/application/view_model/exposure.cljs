@@ -48,11 +48,20 @@
   [highlighted-controls]
   (boolean (some highlighted-controls [:net-min :net-max])))
 
+(defn- net-direction
+  [net-target]
+  (cond
+    (and (number? net-target) (< 0.001 net-target)) :long
+    (and (number? net-target) (< net-target -0.001)) :short
+    :else :neutral))
+
 (defn exposure-map-model
   "Build the exposure-map display model. `current-exposure` is `{:gross r :net r}` (ratios of
   capital) or nil when the current portfolio is not loaded; `highlighted-controls` is the set of
-  constraint keys the last run flagged infeasible."
-  [{:keys [constraints current-exposure highlighted-controls has-saved-default?]}]
+  constraint keys the last run flagged infeasible; `zoom-level` is the trader's stored zoom
+  (optimizer UI state) — the pad scale is fixed at one of the paired zoom levels and only the
+  zoom control (never a drag) changes it."
+  [{:keys [constraints current-exposure highlighted-controls has-saved-default? zoom-level]}]
   (let [constraints* (or constraints {})
         policy* (policy/constraints->policy constraints*)
         active (policy/active-preset constraints*)
@@ -60,12 +69,16 @@
         gross-max (:gross-max constraints*)
         net-min (:net-min constraints*)
         net-max (:net-max constraints*)
-        ;; The axis grows to frame the policy band and the current portfolio exposure so the
-        ;; trader is never capped at an arbitrary gross ceiling.
-        axis (policy/axis-scale (assoc policy*
-                                       :current-gross (:gross current-exposure)
-                                       :current-net (:net current-exposure)))]
+        ;; Fixed scale: the smallest zoom level framing the policy band and the current
+        ;; portfolio dot, widened (never narrowed) by the trader's stored zoom.
+        {:keys [axis] :as zoom} (policy/render-axis
+                                 (assoc policy*
+                                        :current-gross (:gross current-exposure)
+                                        :current-net (:net current-exposure))
+                                 zoom-level)]
     {:policy policy*
+     :net-direction (net-direction (:net-target policy*))
+     :zoom (select-keys zoom [:level :fit-level :zoom-in-level :zoom-out-level])
      :target-marker (policy/target-marker policy* axis)
      :band-rect (policy/band-rect policy* axis)
      :current-marker (policy/current-exposure-marker current-exposure axis)

@@ -94,19 +94,56 @@
                                         :bounds {:left 0 :top 0 :width 0 :height 0}
                                         :buttons 1}))))))
 
-(deftest axis-scale-is-adaptive-and-uncapped-test
-  (testing "small policy + no current exposure ⇒ floor scale"
-    (is (= {:gross-max policy/gross-axis-floor :net-extent policy/net-axis-floor}
-           (policy/axis-scale {:gross-target 2.0 :gross-band 0.0 :net-target 1.0 :net-band 0.0}))))
-  (testing "a gross target beyond the floor grows the axis to the next nice step"
-    (is (= 10.0 (:gross-max (policy/axis-scale {:gross-target 6.0 :gross-band 0.5}))))
-    (is (= 5.0 (:gross-max (policy/axis-scale {:gross-target 4.0 :gross-band 0.0})))))
+(deftest fit-level-frames-policy-without-headroom-test
+  (testing "small policy + no current exposure ⇒ the floor level"
+    (is (= 0 (policy/fit-level {:gross-target 2.0 :gross-band 0.0
+                                :net-target 1.0 :net-band 0.0}))))
+  (testing "a target dragged exactly to the visible max still fits its own level (no headroom),
+            so a drag can never force a re-fit"
+    (is (= 0 (policy/fit-level {:gross-target 3.0 :gross-band 0.0 :net-target 0.0})))
+    (is (= 0 (policy/fit-level {:gross-target 2.5 :gross-band 0.5 :net-target 0.0}))))
+  (testing "a gross need beyond a level steps to the next paired level"
+    (is (= 1 (policy/fit-level {:gross-target 4.0 :gross-band 0.0})))
+    (is (= 2 (policy/fit-level {:gross-target 6.0 :gross-band 0.5}))))
   (testing "the current portfolio exposure also expands the frame"
-    (is (= 10.0 (:gross-max (policy/axis-scale {:gross-target 2.0 :current-gross 8.0})))))
-  (testing "net extent grows with a wide long/short bias"
-    (is (= 3.0 (:net-extent (policy/axis-scale {:net-target 2.5 :net-band 0.0})))))
-  (testing "there is no hard cap — huge leverage rounds up past the largest step"
-    (is (<= 60.0 (:gross-max (policy/axis-scale {:gross-target 55.0 :gross-band 0.0}))))))
+    (is (= 2 (policy/fit-level {:gross-target 2.0 :current-gross 8.0}))))
+  (testing "a wide long/short bias raises the level through the paired net extent"
+    (is (= 1 (policy/fit-level {:net-target 2.5 :net-band 0.0}))))
+  (testing "beyond the largest level nothing fits (the overflow case)"
+    (is (nil? (policy/fit-level {:gross-target 55.0 :gross-band 0.0})))))
+
+(deftest render-axis-is-fixed-and-only-widens-test
+  (testing "no stored zoom ⇒ the fit level's paired axes"
+    (let [{:keys [axis level fit-level zoom-in-level zoom-out-level]}
+          (policy/render-axis {:gross-target 2.0 :net-target 1.0} nil)]
+      (is (= {:gross-max 3.0 :net-extent 2.0} axis))
+      (is (= 0 level))
+      (is (= 0 fit-level))
+      (is (nil? zoom-in-level) "already at the tightest level that fits")
+      (is (= 1 zoom-out-level))))
+  (testing "a stored zoom widens the view and exposes a zoom-in step back toward fit"
+    (let [{:keys [axis level zoom-in-level zoom-out-level]}
+          (policy/render-axis {:gross-target 2.0 :net-target 1.0} 3)]
+      (is (= {:gross-max 20.0 :net-extent 10.0} axis))
+      (is (= 3 level))
+      (is (= 2 zoom-in-level))
+      (is (= 4 zoom-out-level))))
+  (testing "the largest level disables zooming out"
+    (is (nil? (:zoom-out-level (policy/render-axis {:gross-target 2.0 :net-target 1.0}
+                                                   policy/max-zoom-level)))))
+  (testing "a stored zoom below fit is ignored — zooming in can never clip the band box"
+    (let [{:keys [axis level zoom-in-level]}
+          (policy/render-axis {:gross-target 6.0 :gross-band 0.5 :net-target 1.0} 0)]
+      (is (= {:gross-max 10.0 :net-extent 5.0} axis))
+      (is (= 2 level))
+      (is (nil? zoom-in-level))))
+  (testing "an unfittable policy renders a computed overflow scale with zoom disabled"
+    (let [{:keys [axis level zoom-in-level zoom-out-level]}
+          (policy/render-axis {:gross-target 55.0 :net-target 0.0} 2)]
+      (is (= 60.0 (:gross-max axis)))
+      (is (nil? level))
+      (is (nil? zoom-in-level))
+      (is (nil? zoom-out-level)))))
 
 (deftest point->targets-honors-the-baked-scale-test
   (let [bounds {:left 0.0 :top 0.0 :width 100.0 :height 100.0}]
@@ -117,6 +154,35 @@
     (testing "a missing scale falls back to the floor"
       (is (= 3.0 (:gross-target (policy/point->targets
                                  {:client-x 50.0 :client-y 0.0 :bounds bounds :buttons 1})))))))
+
+(deftest point->targets-keeps-the-band-box-inside-the-view-test
+  ;; `target + band ≤ axis max` per axis: the fixpoint that keeps an edge drag from ever
+  ;; forcing the scale to re-fit mid-gesture (the old adaptive axis ratcheted 3×→5×→10×→…).
+  (let [bounds {:left 0.0 :top 0.0 :width 100.0 :height 100.0}]
+    (testing "a positive gross band lowers the reachable gross ceiling"
+      (is (= 2.5 (:gross-target (policy/point->targets
+                                 {:client-x 50.0 :client-y 0.0 :bounds bounds :buttons 1
+                                  :gross-band 0.5})))))
+    (testing "a positive net band pulls the reachable net edges inward"
+      (is (= 1.5 (:net-target (policy/point->targets
+                               {:client-x 100.0 :client-y 0.0 :bounds bounds :buttons 1
+                                :net-band 0.5}))))
+      (is (= -1.5 (:net-target (policy/point->targets
+                                {:client-x 0.0 :client-y 0.0 :bounds bounds :buttons 1
+                                 :net-band 0.5})))))
+    (testing "band 0 keeps the full range reachable"
+      (is (= 3.0 (:gross-target (policy/point->targets
+                                 {:client-x 50.0 :client-y 0.0 :bounds bounds :buttons 1
+                                  :gross-band 0.0})))))
+    (testing "net reach also respects the gross reach: an oversized gross band (advanced raw
+              fields are not capped at max-band) cannot let the gross ≥ |net| lift push
+              target + band past the axis max"
+      ;; gross-reach = 3 − 1.5 = 1.5, so net clamps to ±1.5 and the lifted gross stays 1.5:
+      ;; 1.5 + 1.5 = 3.0 ≤ axis max — no mid-drag re-fit.
+      (let [out (policy/point->targets {:client-x 100.0 :client-y 0.0 :bounds bounds :buttons 1
+                                        :gross-band 1.5})]
+        (is (= 1.5 (:net-target out)))
+        (is (= 1.5 (:gross-target out)))))))
 
 (deftest presets-apply-and-are-detected-test
   (testing "each preset applies its partial and clears the gross floor"

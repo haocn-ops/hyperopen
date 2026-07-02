@@ -6,6 +6,11 @@
 
 (def ^:private constraints-path [:portfolio :optimizer :draft :constraints])
 (def ^:private dirty-path [:portfolio :optimizer :draft :metadata :dirty?])
+(def ^:private zoom-level-path [:portfolio-ui :optimizer :exposure-zoom-level])
+
+(def ^:private clear-zoom-effect
+  ;; Discontinuous policy changes clear the stored zoom so the pad re-fits to the new policy.
+  [:effects/save zoom-level-path nil])
 
 (def ^:private base-constraints
   {:gross-max 2.0 :net-min 1.0 :net-max 1.0 :max-asset-weight 0.5})
@@ -37,6 +42,29 @@
                (state-with base-constraints) 50.0 50.0 bounds 0))
         "a pointer move with no button pressed must not rewrite the draft")))
 
+(deftest exposure-interactions-pin-the-render-level-test
+  ;; The view bakes the pad's current zoom level into drag/band dispatches; the handler pins it
+  ;; so the render scale can never SHRINK under the pointer when the edited policy re-fits
+  ;; smaller (the view model only ever widens past the stored level).
+  (let [bounds {:left 0.0 :top 0.0 :width 100.0 :height 100.0}]
+    (testing "a drag at a baked level stores that level"
+      (let [out (actions/set-portfolio-optimizer-exposure-point
+                 (state-with base-constraints) 50.0 50.0 bounds 1 5.0 3.0 1)]
+        (is (= [:effects/save zoom-level-path 1] (second out)))))
+    (testing "a drag at the already-stored level adds no redundant save"
+      (let [state (assoc-in (state-with base-constraints) zoom-level-path 1)
+            out (actions/set-portfolio-optimizer-exposure-point
+                 state 50.0 50.0 bounds 1 5.0 3.0 1)]
+        (is (= 1 (count out)) "only the constraints save-many is emitted")))
+    (testing "an overflow-scale drag (nil level) never pins"
+      (let [out (actions/set-portfolio-optimizer-exposure-point
+                 (state-with base-constraints) 50.0 50.0 bounds 1 60.0 20.0 nil)]
+        (is (= 1 (count out)))))
+    (testing "a band change pins the baked level too"
+      (let [out (actions/set-portfolio-optimizer-exposure-band
+                 (state-with base-constraints) :net "0.25" 2)]
+        (is (= [:effects/save zoom-level-path 2] (second out)))))))
+
 (deftest exposure-band-writes-one-axis-test
   (testing "net band widens net-min/net-max symmetrically"
     (let [expected (policy/apply-band base-constraints :net 0.25)]
@@ -53,13 +81,29 @@
 
 (deftest exposure-preset-writes-the-merged-preset-test
   (let [expected (policy/apply-preset base-constraints :long-bias)]
-    (is (= (expect-write expected)
+    (is (= (conj (expect-write expected) clear-zoom-effect)
            (actions/apply-portfolio-optimizer-exposure-preset
-            (state-with base-constraints) :long-bias)))
+            (state-with base-constraints) :long-bias))
+        "a preset writes the merged constraints and clears the stored zoom so the pad re-fits")
     (is (= :long-bias (policy/active-preset expected))))
   (is (= [] (actions/apply-portfolio-optimizer-exposure-preset
              (state-with base-constraints) :nonsense))
       "an unknown preset is a no-op"))
+
+(deftest exposure-zoom-level-validates-and-saves-test
+  (is (= [[:effects/save zoom-level-path 2]]
+         (actions/set-portfolio-optimizer-exposure-zoom-level (state-with base-constraints) 2)))
+  (is (= [[:effects/save zoom-level-path 0]]
+         (actions/set-portfolio-optimizer-exposure-zoom-level (state-with base-constraints) 0)))
+  (testing "out-of-range, fractional, or non-numeric levels are no-ops"
+    (is (= [] (actions/set-portfolio-optimizer-exposure-zoom-level
+               (state-with base-constraints) 9)))
+    (is (= [] (actions/set-portfolio-optimizer-exposure-zoom-level
+               (state-with base-constraints) 1.5)))
+    (is (= [] (actions/set-portfolio-optimizer-exposure-zoom-level
+               (state-with base-constraints) -1)))
+    (is (= [] (actions/set-portfolio-optimizer-exposure-zoom-level
+               (state-with base-constraints) "sideways")))))
 
 (deftest save-constraint-default-emits-persist-effect-test
   (is (= [[:effects/save-portfolio-optimizer-constraint-default]]
@@ -75,10 +119,10 @@
                             :constraint-profiles nil}}}]
     (testing "no profile for this universe ⇒ no-op"
       (is (= [] (actions/apply-portfolio-optimizer-constraint-default state))))
-    (testing "a saved profile is written to the draft"
+    (testing "a saved profile is written to the draft (and the stored zoom clears)"
       (let [state* (assoc-in state [:portfolio :optimizer :constraint-profiles]
                              {uk {:universe-key uk :controls remembered}})]
-        (is (= (expect-write remembered)
+        (is (= (conj (expect-write remembered) clear-zoom-effect)
                (actions/apply-portfolio-optimizer-constraint-default state*)))))))
 
 (deftest reset-constraints-to-system-restores-defaults-test
@@ -89,4 +133,5 @@
     (is (= 2.0 (:gross-max written)) "system default gross ceiling restored")
     (is (not (contains? written :gross-min)) "system default has no gross floor")
     (is (= 0.5 (:max-asset-weight written)))
-    (is (= [dirty-path true] (-> out first second second)))))
+    (is (= [dirty-path true] (-> out first second second)))
+    (is (= clear-zoom-effect (second out)) "reset also clears the stored zoom")))

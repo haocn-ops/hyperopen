@@ -30,7 +30,7 @@
      (when (seq warnings)
        (into
         [:div {:class ["mt-3" "space-y-2"]}]
-        (map (fn [{:keys [message code-label count assets]}]
+        (map (fn [{:keys [message code-label count assets action]}]
                [:div {:class ["rounded-md"
                               "border"
                               "border-warning/40"
@@ -48,6 +48,17 @@
                                    "px-1.5" "font-mono" "text-[0.625rem]"]
                            :data-role "portfolio-optimizer-readiness-warning-count"}
                     count])]
+                ;; A warning that can be fixed in-app carries its fix: one click,
+                ;; no hunting for the right control elsewhere.
+                (when action
+                  [:button {:type "button"
+                            :class ["mt-1.5" "border" "border-warning/50" "bg-warning/10"
+                                    "px-2" "py-1" "font-mono" "text-[0.625rem]"
+                                    "font-semibold" "uppercase" "tracking-[0.08em]"
+                                    "text-warning" "hover:bg-warning/20"]
+                            :data-role "portfolio-optimizer-readiness-warning-action"
+                            :on {:click (:actions action)}}
+                   (:label action)])
                 ;; Repeated same-code warnings collapse into one row with an expandable list of the
                 ;; affected assets, instead of N near-identical rows.
                 (when (and (number? count) (> count 1) (seq assets))

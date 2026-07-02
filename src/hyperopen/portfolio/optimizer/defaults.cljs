@@ -35,6 +35,14 @@
               :updated-at-ms nil
               :dirty? false}})
 
+(defn untouched-draft?
+  "True when the in-memory draft carries no user (or machine) input yet: absent, or
+  still structurally equal to a fresh default draft. The holdings preseed and the
+  persisted-draft restore both gate on this so they can never clobber real input."
+  [draft]
+  (or (nil? draft)
+      (= draft (default-draft))))
+
 (def default-history-assumption
   "Default per-asset history-assumption draft for the given behavior. Delegates to
   the pure domain policy so engine, actions, and view models share one source."

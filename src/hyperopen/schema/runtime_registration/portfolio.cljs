@@ -26,7 +26,9 @@
    [:effects/save-portfolio-optimizer-constraint-default
     :save-portfolio-optimizer-constraint-default]
    [:effects/load-portfolio-optimizer-constraint-profiles
-    :load-portfolio-optimizer-constraint-profiles]])
+    :load-portfolio-optimizer-constraint-profiles]
+   [:effects/restore-portfolio-optimizer-draft
+    :restore-portfolio-optimizer-draft]])
 
 (def effect-order-policy-required-action-ids
   #{:actions/select-portfolio-summary-time-range
@@ -179,6 +181,10 @@
 	   [:actions/remove-portfolio-optimizer-universe-instrument
 	    :remove-portfolio-optimizer-universe-instrument]
    [:actions/set-portfolio-optimizer-universe-from-current :set-portfolio-optimizer-universe-from-current]
+   [:actions/clear-portfolio-optimizer-universe :clear-portfolio-optimizer-universe]
+   [:actions/restore-or-preseed-portfolio-optimizer-draft
+    :restore-or-preseed-portfolio-optimizer-draft]
+   [:actions/hydrate-portfolio-optimizer-draft :hydrate-portfolio-optimizer-draft]
    [:actions/load-portfolio-optimizer-history-from-draft :load-portfolio-optimizer-history-from-draft]
    [:actions/save-portfolio-optimizer-scenario-from-current :save-portfolio-optimizer-scenario-from-current]
    [:actions/open-portfolio-optimizer-scenario-save-modal

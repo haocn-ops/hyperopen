@@ -1,5 +1,6 @@
 (ns hyperopen.views.portfolio.optimize.setup-model-controls
-  (:require [hyperopen.views.portfolio.optimize.setup-controls :as controls]))
+  (:require [hyperopen.portfolio.optimizer.application.view-model :as optimizer-view-model]
+            [hyperopen.views.portfolio.optimize.setup-controls :as controls]))
 
 (def ^:private model-help
   {:historical-mean "Uses the arithmetic mean of historical returns for each selected asset."
@@ -16,7 +17,17 @@
         risk-kind (get-in draft [:risk-model :kind])]
     (controls/disclosure-panel
      "portfolio-optimizer-return-risk-panel"
-     (controls/disclosure-heading "Return / Risk Model" (controls/labelize return-kind))
+     ;; The collapsed header carries BOTH live choices ("Historical mean ·
+     ;; Stabilized covariance"), so the model policy is scannable without opening.
+     (controls/disclosure-heading
+      "Return / Risk Model"
+      (str (get optimizer-view-model/return-model-display-names
+                return-kind
+                (controls/labelize return-kind))
+           " · "
+           (get optimizer-view-model/risk-model-display-names
+                risk-kind
+                (controls/labelize risk-kind))))
      [:div {:class ["mt-3" "space-y-3"] :data-role "portfolio-optimizer-setup-model-grid"}
       [:div {:class ["optimizer-model-panel"]
              :data-role "portfolio-optimizer-return-model-panel"}

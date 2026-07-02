@@ -1,6 +1,7 @@
 (ns hyperopen.portfolio.optimizer.application.run-bridge-workflow
   (:require [hyperopen.portfolio.optimizer.application.progress :as progress]
-            [hyperopen.portfolio.optimizer.contracts :as contracts]))
+            [hyperopen.portfolio.optimizer.contracts :as contracts]
+            [hyperopen.portfolio.routes :as portfolio-routes]))
 
 (defn- run-state
   [state]
@@ -147,15 +148,35 @@
         (update-progress id progress/fail-progress computed-at-ms payload))))
 
 (defn- success-commands
-  [_state _state*]
-  ;; Phase 1 of the single-workspace collapse: a run on /optimize/new no longer
-  ;; force-navigates to the results page. The result reveals in-place in the
-  ;; workspace (context rail + KPI strip + the "View results" actions), so the user
-  ;; keeps their inputs in view instead of being teleported to a separate page.
-  ;; (Saved-{id} reruns already never navigated; the first save still promotes the
-  ;; draft to its own URL through the save flow.)
-  [{:command/type
-    :optimizer.workflow/refresh-portfolio-optimizer-rebalance-slippage-snapshots}])
+  ;; A successful solve IS the outcome the user asked for, so the app takes them to
+  ;; it instead of reporting "Succeeded" and waiting for another click:
+  ;;
+  ;; - Still on /optimize/new (the run they just started): reveal the results
+  ;;   surface (navigate + select the Recommendation tab).
+  ;; - Already on the scenario surface this run belongs to (a refine-in-place or a
+  ;;   rerun watched from the results page): stay put — the page live-updates.
+  ;; - Anywhere else (the user wandered off mid-run): never teleport them; announce
+  ;;   completion through the global toast region instead.
+  ;;
+  ;; Only :solved results reach this fn — infeasible/failed/error runs keep the
+  ;; user on the setup page with the banner + readiness rail focused on the fix.
+  [_state state*]
+  (let [route (portfolio-routes/parse-portfolio-route (get-in state* [:router :path]))
+        run-scenario-id (or (:scenario-id (run-state state*)) "draft")
+        refresh {:command/type
+                 :optimizer.workflow/refresh-portfolio-optimizer-rebalance-slippage-snapshots}]
+    (case (:kind route)
+      :optimize-new
+      [refresh
+       {:command/type :optimizer.workflow/reveal-results
+        :path (portfolio-routes/portfolio-optimize-scenario-path "draft")}]
+
+      :optimize-scenario
+      (if (= run-scenario-id (:scenario-id route))
+        [refresh]
+        [refresh {:command/type :optimizer.workflow/announce-run-complete}])
+
+      [refresh {:command/type :optimizer.workflow/announce-run-complete}])))
 
 (defn handle-worker-message
   [{:keys [state message computed-at-ms]}]

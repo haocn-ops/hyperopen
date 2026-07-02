@@ -86,7 +86,9 @@
            install-websocket-watchers!
            websocket-watchers-deps
            install-optimization-progress-ticker!
-           optimization-progress-ticker-deps]}]
+           optimization-progress-ticker-deps
+           install-optimizer-draft-watchers!
+           optimizer-draft-watchers-deps]}]
   (install-store-cache-watchers!
    store
    store-cache-watchers-deps)
@@ -95,7 +97,9 @@
   (install-websocket-watchers!
    websocket-watchers-deps)
   (when (fn? install-optimization-progress-ticker!)
-    (install-optimization-progress-ticker! optimization-progress-ticker-deps)))
+    (install-optimization-progress-ticker! optimization-progress-ticker-deps))
+  (when (fn? install-optimizer-draft-watchers!)
+    (install-optimizer-draft-watchers! optimizer-draft-watchers-deps)))
 
 (defn install-state-validation!
   [{:keys [store

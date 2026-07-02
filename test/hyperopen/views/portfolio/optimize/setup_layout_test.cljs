@@ -26,25 +26,28 @@
     (is (contains? strings "Load my holdings"))
     (is (contains? strings "Custom"))
     (is (not (contains? strings "Index")))
-    (is (contains? strings "Scenario summary"))
+    (is (contains? strings "Scenario contract"))
     (is (not (contains? strings "What this scenario will solve for")))
     (is (contains? strings "Why this preset is safe"))
     (is (not (contains? strings "Execution Assumptions")))))
 
-(deftest setup-universe-source-toggle-has-two-equal-options-test
+(deftest setup-universe-source-strip-reflects-live-source-test
+  ;; The source strip leads with "My holdings" (the default path — the universe
+  ;; seeds itself from holdings) and shows "Custom" as the alternate state; with
+  ;; no holdings loaded yet, neither segment is active and the holdings segment
+  ;; reads as the load action.
   (let [view-node (portfolio-view/portfolio-view
                    {:router {:path "/portfolio/optimize/new"}
                     :wallet {:address "0x1111111111111111111111111111111111111111"}})
         universe-panel (node-by-role view-node "portfolio-optimizer-universe-panel")
-        source-toggle (find-first-node
-                       universe-panel
-                       #(and (vector? %)
-                             (contains? (class-token-set %) "grid-cols-2")
-                             (= ["portfolio-optimizer-universe-use-current"]
-                                (child-roles %))
-                             (str/starts-with? (node-text %) "Custom")))
-        strings (set (collect-strings source-toggle))]
-    (is (some? source-toggle))
+        source-strip (node-by-role universe-panel
+                                   "portfolio-optimizer-universe-source-strip")
+        strings (set (collect-strings source-strip))]
+    (is (some? source-strip))
+    (is (= ["portfolio-optimizer-universe-use-current"
+            "portfolio-optimizer-universe-source-custom"]
+           (child-roles source-strip))
+        "Holdings leads the strip; Custom is the alternate state.")
     (is (contains? strings "Load my holdings"))
     (is (contains? strings "Custom"))
     (is (not (contains? strings "Index")))))

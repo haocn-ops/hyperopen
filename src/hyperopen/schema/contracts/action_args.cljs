@@ -117,6 +117,10 @@
   (s/tuple map? map?))
 (s/def ::portfolio-optimizer-scenario-id-args
   (s/tuple ::common/non-empty-string))
+(s/def ::portfolio-optimizer-draft-record-args
+  ;; [record] — a persisted draft record loaded from IndexedDB; the hydrate action
+  ;; migrates and spec-validates the contained draft before applying it.
+  (s/tuple map?))
 (s/def ::portfolio-optimizer-instrument-id-args
   (s/tuple ::common/non-empty-string))
 (s/def ::portfolio-optimizer-instrument-side-args
@@ -339,6 +343,9 @@
 	   ::portfolio-optimizer-instrument-side-args
 	   :actions/remove-portfolio-optimizer-universe-instrument ::portfolio-optimizer-instrument-id-args
    :actions/set-portfolio-optimizer-universe-from-current ::common/no-args
+   :actions/clear-portfolio-optimizer-universe ::common/no-args
+   :actions/restore-or-preseed-portfolio-optimizer-draft ::common/path-args
+   :actions/hydrate-portfolio-optimizer-draft ::portfolio-optimizer-draft-record-args
    :actions/load-portfolio-optimizer-history-from-draft ::common/no-args
    :actions/save-portfolio-optimizer-scenario-from-current ::common/no-args
    :actions/open-portfolio-optimizer-scenario-save-modal ::common/no-args

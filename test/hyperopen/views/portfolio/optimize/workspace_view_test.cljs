@@ -153,7 +153,7 @@
     (is (nil? (node-by-role view-node "portfolio-optimizer-current-summary")))
     (is (nil? (node-by-role view-node "portfolio-optimizer-signed-exposure-table")))
     (is (contains? strings "Draft has unsaved changes"))
-    (is (contains? strings "Running Optimization"))
+    (is (contains? strings "Optimizing…"))
     (is (contains? strings "Running"))
     (is (contains? strings "Retaining last successful result while rerunning."))
     (is (contains? strings "2 assets"))))

@@ -2,6 +2,7 @@
   (:require [hyperopen.portfolio.optimizer.application.view-model :as optimizer-view-model]
             [hyperopen.portfolio.optimizer.contracts :as optimizer-contracts]
             [hyperopen.views.portfolio.optimize.infeasible-panel :as infeasible-panel]
+            [hyperopen.views.portfolio.optimize.run-status-banner :as run-status-banner]
             [hyperopen.views.portfolio.optimize.setup-context :as setup-context]
             [hyperopen.views.portfolio.optimize.setup-header :as setup-header]
             [hyperopen.views.portfolio.optimize.setup-sections :as setup]))
@@ -38,6 +39,15 @@
                                  :saving-scenario? saving-scenario?
                                  :solved-run? current-result?
                                  :result-path result-path})
+     ;; Layer 1 run feedback: a sticky, full-width banner that keeps the live run
+     ;; state in the user's main field of attention regardless of scroll position
+     ;; or how long the right rail grows under Maximum Sharpe. It sits directly
+     ;; below the scenario header (above the preset cards) so it is never trapped
+     ;; in the right-rail scroll area. The right-rail progress/readiness panels
+     ;; remain as Layer 2 detail.
+     (run-status-banner/run-status-banner {:optimization-progress optimization-progress
+                                           :run-state run-state
+                                           :draft draft})
      (setup-header/preset-row draft)
      (infeasible-panel/infeasible-banner infeasible-result highlighted-controls)
      [:section {:class ["optimizer-setup-surface"

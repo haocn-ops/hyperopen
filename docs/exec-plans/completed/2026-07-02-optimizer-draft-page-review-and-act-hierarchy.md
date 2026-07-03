@@ -196,9 +196,20 @@ Retro:
   this surface) and unkeyed sibling reconciliation resetting `<details>` state
   mid-edit (fixed with `:replicant/key`). Both would have shipped invisible under
   unit tests alone.
-- Follow-up left open (small): the latent `open-/close-portfolio-optimizer-refinement`
-  actions are still unused — retire them or wire them if a controlled disclosure is
-  ever wanted; other route surfaces likely deserve the same footer-clearance padding.
+- Follow-up (addressed 2026-07-03, same branch): the latent
+  `open-/close-portfolio-optimizer-refinement` actions were retired end-to-end
+  (handlers, facade, runtime catalog/registration, action-args, the
+  `ui-refinement-open-path` contract + default, view-model `:open?`, tests).
+  The footer-eclipse mechanism was also pinned down more precisely than the Step-8
+  observation: `main`'s clamped flex cell only breaks clearance when the route root
+  ALSO defeats the `min-height: auto` content floor — via an explicit `min-height`
+  (the optimizer frame) or explicit `height` (`h-full` on funding-comparison). Fixes:
+  `shrink-0` on the optimizer route frame (its existing 3.5rem padding now lands at
+  the true page end, so the interim `.optimizer-scenario-surface` 56px CSS was
+  removed), `h-full` dropped from the funding-comparison root, and vaults/leaderboard
+  roots bumped from 16px to `pb-16` (the fixed footer is ~49px). Verified live per
+  route (boxes no longer clamped, padding at the content end) plus 34/34 gates and
+  the 46-test Playwright smoke suite at --workers=1.
 
 ## Context and Orientation
 

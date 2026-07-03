@@ -375,8 +375,6 @@
 	   :actions/auto-recompute-stale-portfolio-optimizer-scenario ::common/no-args
 	   :actions/run-portfolio-optimizer-from-draft ::common/no-args
    :actions/run-portfolio-optimizer ::portfolio-optimizer-run-args
-   :actions/open-portfolio-optimizer-refinement ::common/no-args
-   :actions/close-portfolio-optimizer-refinement ::common/no-args
    :actions/set-portfolio-optimizer-refinement-depth ::common/keyword-or-string-args
    :actions/refine-portfolio-optimizer ::common/no-args
    :actions/stop-portfolio-optimizer-refinement ::common/no-args

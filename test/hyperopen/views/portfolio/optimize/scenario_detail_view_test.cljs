@@ -852,7 +852,7 @@
            [(get-in btc-confidence-medium [1 :data-tooltip])
             (get-in doge-confidence-medium [1 :data-tooltip])]))
     (is (= "Set medium confidence" (get-in btc-confidence-medium [1 :aria-label])))
-    (is (= ["▮▮▯" "Med"] (collect-strings btc-confidence-medium)))
+    (is (= ["Medium"] (collect-strings btc-confidence-medium)))
     (is (= [[:actions/set-portfolio-optimizer-objective-menu-view-confidence "perp:BTC"
              :medium]]
            (click-actions btc-confidence-medium)))

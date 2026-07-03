@@ -156,62 +156,60 @@
                                          :return-model {:kind :historical-mean}
                                          :risk-model {:kind :diagonal-shrink}
                                          :constraints {:long-only? true}}}}}
-        row-strings (fn [state]
-                      (-> (portfolio-view/portfolio-view state)
-                          (node-by-role "portfolio-optimizer-universe-selected-row-perp:BTC")
-                          collect-strings
-                          set))
-        pending-strings (row-strings base-state)
-        queued-strings (row-strings
-                        (assoc-in base-state
-                                  [:portfolio
-                                   :optimizer
-                                   :history-prefetch
-                                   :by-instrument-id
-                                   "perp:BTC"]
-                                  {:status :queued
-                                   :started-at-ms nil
-                                   :completed-at-ms nil
-                                   :error nil
-                                   :warnings []}))
-        loading-strings (row-strings
-                         (assoc-in base-state
-                                   [:portfolio :optimizer :history-load-state]
-                                   {:status :loading
-                                    :request-signature {:universe [btc-instrument]}}))
-        missing-strings (row-strings
-                         (assoc-in base-state
-                                   [:portfolio :optimizer :history-load-state]
-                                   {:status :succeeded
-                                    :request-signature {:universe [btc-instrument]}}))
-        insufficient-strings (row-strings
-                              (-> base-state
-                                  (assoc-in [:portfolio :optimizer :history-load-state]
-                                            {:status :succeeded
-                                             :request-signature {:universe [btc-instrument]}})
-                                  (assoc-in [:portfolio :optimizer :history-data
-                                             :candle-history-by-coin "BTC"]
-                                            (candle-rows [[1000 100]]))))
-        sufficient-strings (row-strings
-                            (-> base-state
-                                (assoc-in [:portfolio :optimizer :history-load-state]
-                                          {:status :succeeded
-                                           :request-signature {:universe [btc-instrument]}})
-                                (assoc-in [:portfolio :optimizer :history-data
-                                           :candle-history-by-coin "BTC"]
-                                          (candle-rows [[1000 100]
-                                                        [2000 101]]))))]
-    (is (contains? pending-strings "pending"))
-    (is (not (contains? pending-strings "sufficient")))
-    (is (contains? queued-strings "queued"))
-    (is (contains? loading-strings "loading"))
-    (is (contains? missing-strings "missing"))
-    (is (contains? insufficient-strings "insufficient"))
-    ;; A :sufficient asset no longer renders the always-on history chip; the
-    ;; column is by-exception. (This two-bar row instead surfaces the depth
-    ;; flag, "Short history", which is the by-exception limited-history signal.)
-    (is (not (contains? sufficient-strings "sufficient")))
-    (is (contains? sufficient-strings "Short history"))))
+        selected-row (fn [state]
+                       (-> (portfolio-view/portfolio-view state)
+                           (node-by-role "portfolio-optimizer-universe-selected-row-perp:BTC")))
+        row-status (fn [state] (get-in (selected-row state) [1 :data-history-status]))
+        row-strings (fn [state] (set (collect-strings (selected-row state))))
+        queued-state (assoc-in base-state
+                               [:portfolio :optimizer :history-prefetch
+                                :by-instrument-id "perp:BTC"]
+                               {:status :queued
+                                :started-at-ms nil
+                                :completed-at-ms nil
+                                :error nil
+                                :warnings []})
+        loading-state (assoc-in base-state
+                                [:portfolio :optimizer :history-load-state]
+                                {:status :loading
+                                 :request-signature {:universe [btc-instrument]}})
+        missing-state (assoc-in base-state
+                                [:portfolio :optimizer :history-load-state]
+                                {:status :succeeded
+                                 :request-signature {:universe [btc-instrument]}})
+        insufficient-state (-> base-state
+                               (assoc-in [:portfolio :optimizer :history-load-state]
+                                         {:status :succeeded
+                                          :request-signature {:universe [btc-instrument]}})
+                               (assoc-in [:portfolio :optimizer :history-data
+                                          :candle-history-by-coin "BTC"]
+                                         (candle-rows [[1000 100]])))
+        sufficient-state (-> base-state
+                             (assoc-in [:portfolio :optimizer :history-load-state]
+                                       {:status :succeeded
+                                        :request-signature {:universe [btc-instrument]}})
+                             (assoc-in [:portfolio :optimizer :history-data
+                                        :candle-history-by-coin "BTC"]
+                                       (candle-rows [[1000 100]
+                                                     [2000 101]])))]
+    ;; The row no longer paints per-status chips — those diagnostics moved to the
+    ;; grouped Readiness panel. The computed status still rides on the row's
+    ;; :data-history-status attribute (a QA/telemetry hook), so the status
+    ;; mapping stays asserted here.
+    (is (= "pending" (row-status base-state)))
+    (is (= "queued" (row-status queued-state)))
+    (is (= "loading" (row-status loading-state)))
+    (is (= "missing" (row-status missing-state)))
+    (is (= "insufficient" (row-status insufficient-state)))
+    (is (contains? #{"sufficient" "stale"} (row-status sufficient-state)))
+    ;; And none of the solver-readiness jargon is rendered on the row itself.
+    (doseq [state [base-state queued-state loading-state missing-state
+                   insufficient-state sufficient-state]]
+      (let [strings (row-strings state)]
+        (doseq [word ["pending" "queued" "loading" "missing" "insufficient"
+                      "sufficient" "shared gap" "Short history"]]
+          (is (not (contains? strings word))
+              (str "The universe row must not paint the '" word "' diagnostic chip.")))))))
 
 (deftest setup-selected-universe-row-renders-position-side-controls-test
   (let [spot-instrument {:instrument-id "spot:PURR"
@@ -281,7 +279,7 @@
              "spot:PURR"]]
            (click-actions remove-button)))))
 
-(deftest setup-selected-vault-row-shows-shared-gap-when-loaded-history-is-misaligned-test
+(deftest setup-selected-vault-row-reflects-shared-gap-status-without-a-chip-test
   (let [vault-a "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         vault-b "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
         vault-a-id (str "vault:" vault-a)
@@ -320,8 +318,11 @@
         row (node-by-role view-node
                           (str "portfolio-optimizer-universe-selected-row-" vault-a-id))
         row-text (node-text row)]
-    (is (str/includes? row-text "shared gap"))
-    (is (not (str/includes? row-text "sufficient")))))
+    ;; The misaligned-history status is still computed and exposed on the row's
+    ;; :data-history-status attribute; it is no longer painted as a "shared gap"
+    ;; chip — that detail now lives in the grouped Readiness panel.
+    (is (= "shared-gap" (get-in row [1 :data-history-status])))
+    (is (not (str/includes? row-text "shared gap")))))
 
 (deftest setup-universe-search-skips-blank-lookups-but-renders-nonblank-candidates-test
   (let [vault-address "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"

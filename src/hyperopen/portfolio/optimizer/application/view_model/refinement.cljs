@@ -57,7 +57,6 @@
         in-flight? (boolean (and active? running?*))]
     {:solved? solved?
      :can-refine? (boolean (and solved? (not running?*)))
-     :open? (boolean (get-in state contracts/ui-refinement-open-path))
      :depth selected-depth
      :depth-options (depth-options selected-depth)
      :in-flight? in-flight?

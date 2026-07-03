@@ -227,7 +227,6 @@
    :diagnostics-tab :conditioning
    :frontier-overlay-mode :standalone
    :constrain-frontier? false
-   :refinement-open? false
    :refinement-depth nil
    :exposure-zoom-level nil
    :return-views-filter :all

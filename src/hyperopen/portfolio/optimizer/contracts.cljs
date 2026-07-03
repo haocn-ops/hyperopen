@@ -109,7 +109,6 @@
 (def ui-target-sigma-draft-path paths/ui-target-sigma-draft-path)
 (def ui-constrain-frontier-path paths/ui-constrain-frontier-path)
 (def ui-stale-auto-recompute-path paths/ui-stale-auto-recompute-path)
-(def ui-refinement-open-path paths/ui-refinement-open-path)
 (def ui-refinement-depth-path paths/ui-refinement-depth-path)
 (def ui-exposure-zoom-level-path paths/ui-exposure-zoom-level-path)
 (def ui-return-views-filter-path paths/ui-return-views-filter-path)

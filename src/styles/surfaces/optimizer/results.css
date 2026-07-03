@@ -1,13 +1,10 @@
 @layer components {
+  /* Footer clearance for the scenario surface comes from the optimizer route
+     frame's padding-bottom (portfolio_view.cljs) — effective now that the frame
+     is shrink-0 and its box grows with content instead of clamping to the
+     viewport and letting content overflow past its padding. */
   .portfolio-optimizer .optimizer-scenario-surface {
     background-color: var(--optimizer-bg);
-    /* The app footer is fixed (z-170) over the root scroll container, and the
-       route content overflows `main`'s fixed flex cell, so `main`'s own bottom
-       padding never reaches tall pages — at max scroll the page tail sat 13px
-       from the viewport bottom, eclipsed by the ~43px footer. Give the surface
-       real clearance so the last rail row (e.g. the collapsed return-views
-       toggle) stays visible and clickable at full scroll. */
-    padding-bottom: 56px;
   }
 
   .portfolio-optimizer .optimizer-scenario-header {

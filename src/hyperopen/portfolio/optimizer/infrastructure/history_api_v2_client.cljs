@@ -32,45 +32,20 @@
   [proxy-policy]
   (str/replace (keyword-name proxy-policy "approved-proxy-allowed") #"-" "_"))
 
-(defn- approved-proxy-allowed?
-  [proxy-policy]
-  (= "approved-proxy-allowed"
-     (keyword-name proxy-policy "approved-proxy-allowed")))
-
-(def ^:private trading-calendar-proxy-providers
-  #{"tiingo" "yahoo_finance" "yahoo-finance"})
-
-(def ^:private default-allowed-proxy-policies
-  #{"default_allowed" "default-allowed"})
-
-(defn- trading-calendar-proxy-provider?
-  [provider]
-  (contains? trading-calendar-proxy-providers
-             (keyword-name provider "")))
-
-(defn- stitched-proxy-mapping?
-  [mapping-kind]
-  (= "stitched-native-proxy"
-     (str/replace (keyword-name mapping-kind "") #"_" "-")))
-
-(defn- default-allowed-proxy?
-  [proxy]
-  (contains? default-allowed-proxy-policies
-             (keyword-name (:optimizer-proxy-policy proxy) "")))
-
 (defn- optimizer-history-request-id
-  [proxy-policy instrument]
-  (let [backend-id (coercion/non-blank-text
-                    (:optimizer-history/instrument-id instrument))
-        proxy (:optimizer-history/proxy instrument)
-        proxy-id (coercion/non-blank-text (:proxy-instrument-id proxy))]
-    (if (and (approved-proxy-allowed? proxy-policy)
-             proxy-id
-             (stitched-proxy-mapping? (:mapping-kind proxy))
-             (trading-calendar-proxy-provider? (:provider proxy))
-             (default-allowed-proxy? proxy))
-      proxy-id
-      backend-id)))
+  "The request identity is ALWAYS the canonical backend instrument id from
+  discovery (e.g. hl:hip3:xyz:NOW). The backend selects the lineage — native,
+  approved proxy, or stitched — server-side from the top-level `proxy_policy`, so
+  the frontend must NOT substitute a proxy id (external:tiingo:*) here.
+
+  Sending the proxy id makes the backend treat it as a bare external identity
+  whose standalone cache is a tiny recent slice, which collapses the shared
+  calendar to ~0 usable observations across the basket (the \"not enough usable
+  candle observations / 0 usable shared return observations\" failure). Per
+  API_CONTRACT.md, `instrument_id` is the canonical backend id from discovery and
+  \"the only accepted request identity\"; `client_instrument_id` is the row key."
+  [instrument]
+  (coercion/non-blank-text (:optimizer-history/instrument-id instrument)))
 
 (defn- interval-wire
   [interval]
@@ -138,9 +113,9 @@
                    api-v2/normalize-api-map)))
 
 (defn- api-instrument-row
-  [proxy-policy instrument]
+  [instrument]
   (let [local-id (coercion/non-blank-text (:instrument-id instrument))
-        request-id (optimizer-history-request-id proxy-policy instrument)]
+        request-id (optimizer-history-request-id instrument)]
     (when (and local-id request-id)
       {:client_instrument_id local-id
        :instrument_id request-id})))
@@ -159,9 +134,8 @@
    :include_aligned_returns (true? include-aligned-returns?)})
 
 (defn- instrument-rows
-  [{:keys [proxy-policy]} request]
-  (vec (keep #(api-instrument-row proxy-policy %)
-             (:universe request))))
+  [request]
+  (vec (keep api-instrument-row (:universe request))))
 
 (defn- instrument-row-chunks
   [rows]
@@ -230,7 +204,7 @@
 (defn request-history-bundle!
   [{:keys [on-chunk-progress] :as deps} request]
   (let [body-base (history-body-base deps request)
-        rows (instrument-rows deps request)
+        rows (instrument-rows request)
         chunks (instrument-row-chunks rows)
         total-chunks (count chunks)
         total-instruments (count rows)

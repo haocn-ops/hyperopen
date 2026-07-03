@@ -87,7 +87,15 @@
              (done)))
           (.catch (async-support/unexpected-error done))))))
 
-(deftest request-history-bundle-uses-default-allowed-trading-calendar-proxy-id-test
+(deftest request-history-bundle-posts-canonical-target-id-for-proxied-hip3-test
+  ;; Regression guard for the "0 usable shared observations" bug: even for a HIP-3
+  ;; market with an approved, default-allowed, stitched trading-calendar (tiingo)
+  ;; proxy under approved-proxy-allowed policy, the request identity is the
+  ;; canonical backend target id — NEVER the proxy id (external:tiingo:*). The
+  ;; backend selects the proxy/stitched lineage itself from `proxy_policy`;
+  ;; sending the proxy id made it a bare external identity with a tiny cache and
+  ;; collapsed the shared calendar. (API_CONTRACT.md: instrument_id is the only
+  ;; accepted request identity.)
   (async done
     (let [calls (atom [])
           fetch-fn (fn [url init]
@@ -122,7 +130,7 @@
              (let [[_url init] (first @calls)
                    body (js->clj (js/JSON.parse (get init "body")))]
                (is (= [{"client_instrument_id" "perp:xyz:SP500"
-                        "instrument_id" "external:tiingo:SPY"}]
+                        "instrument_id" "hl:hip3:xyz:SP500"}]
                       (get body "instruments"))))
              (done)))
           (.catch (async-support/unexpected-error done))))))

@@ -68,6 +68,103 @@
     bottom: 0;
   }
 
+  /* --- Layer 1 run-status banner ---------------------------------------------
+     A running optimization is the page's primary state, not a right-rail detail.
+     This banner pins to the top of the scroll viewport (the app header is not
+     sticky, so top:0 is the viewport top once the header scrolls away) and spans
+     the full setup surface, so the live state is visible regardless of scroll
+     position or how long the right rail grows under Maximum Sharpe. It reads as a
+     live operation — stronger than the passive warning cards — via a solid
+     elevated surface, a bold tone-colored left edge, a faint tone wash, and a
+     lift shadow. Opaque background is required so scrolled content never bleeds
+     through while pinned; z-index clears the low-stacked policy/exposure content
+     (1-70) and the sticky Run bar (180) but stays under modals/tooltips. */
+  .portfolio-optimizer .optimizer-run-banner {
+    position: sticky;
+    top: 0;
+    z-index: 190;
+    padding: 0.75rem 1rem;
+    border: 1px solid var(--optimizer-border-strong);
+    border-left-width: 3px;
+    background-color: var(--optimizer-surface-2);
+    box-shadow: 0 8px 18px -10px color-mix(in srgb, var(--optimizer-bg) 78%, transparent);
+  }
+
+  .portfolio-optimizer .optimizer-run-banner[data-run-tone="running"] {
+    border-left-color: var(--optimizer-accent);
+    background-image: linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--optimizer-accent) 11%, transparent),
+      transparent 42%
+    );
+  }
+
+  .portfolio-optimizer .optimizer-run-banner[data-run-tone="succeeded"] {
+    border-left-color: var(--optimizer-long);
+    background-image: linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--optimizer-long) 11%, transparent),
+      transparent 42%
+    );
+  }
+
+  .portfolio-optimizer .optimizer-run-banner[data-run-tone="failed"] {
+    border-left-color: var(--optimizer-short);
+    background-image: linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--optimizer-short) 13%, transparent),
+      transparent 42%
+    );
+  }
+
+  /* Tone-colored accents inside the banner are driven straight from tokens rather
+     than the DaisyUI solid semantic classes: the optimizer only remaps the
+     *opacity* variants (bg-primary/10 …), so plain bg-primary/bg-success would
+     fall through to the off-palette DaisyUI theme colors. */
+  .portfolio-optimizer .optimizer-run-banner__dot {
+    border-radius: 9999px;
+  }
+
+  .portfolio-optimizer
+    .optimizer-run-banner[data-run-tone="running"]
+    .optimizer-run-banner__dot {
+    background-color: var(--optimizer-accent);
+  }
+
+  .portfolio-optimizer
+    .optimizer-run-banner[data-run-tone="succeeded"]
+    .optimizer-run-banner__dot {
+    background-color: var(--optimizer-long);
+  }
+
+  .portfolio-optimizer
+    .optimizer-run-banner[data-run-tone="failed"]
+    .optimizer-run-banner__dot {
+    background-color: var(--optimizer-short);
+  }
+
+  /* The stepper segments double as the progress bar: done = green, active =
+     amber (with a pulse), still-to-run = a dim track. */
+  .portfolio-optimizer .optimizer-run-banner__seg-track {
+    background-color: color-mix(in srgb, var(--optimizer-border-strong) 60%, transparent);
+  }
+
+  .portfolio-optimizer .optimizer-run-banner__seg-fill[data-seg-status="succeeded"] {
+    background-color: var(--optimizer-long);
+  }
+
+  .portfolio-optimizer .optimizer-run-banner__seg-fill[data-seg-status="running"] {
+    background-color: var(--optimizer-accent);
+  }
+
+  .portfolio-optimizer .optimizer-run-banner__seg-fill[data-seg-status="failed"] {
+    background-color: var(--optimizer-short);
+  }
+
+  .portfolio-optimizer .optimizer-run-banner__seg-fill[data-seg-status="pending"] {
+    background-color: transparent;
+  }
+
   .portfolio-optimizer .optimizer-model-assumptions-note {
     padding: 7px 12px;
   }

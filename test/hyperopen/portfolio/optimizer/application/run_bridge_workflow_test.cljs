@@ -113,9 +113,10 @@
          (get-in result [:state :portfolio :optimizer :draft :metadata :dirty?])))))
 
 (defn- solved-run-commands
-  [{:keys [path run-scenario-id]}]
+  [{:keys [path run-scenario-id loaded-id]}]
   (let [state {:router {:path path}
-               :portfolio {:optimizer {:draft {:metadata {:dirty? true}}
+               :portfolio {:optimizer {:active-scenario {:loaded-id loaded-id}
+                                        :draft {:metadata {:dirty? true}}
                                         :optimization-progress
                                         (progress/begin-progress
                                          {:run-id "run-1"
@@ -170,7 +171,19 @@
           {:command/type :optimizer.workflow/reveal-results
            :path "/portfolio/optimize/scn-1"}]
          (solved-run-commands {:path "/portfolio/optimize/new"
-                               :run-scenario-id "scn-1"}))))
+                               :run-scenario-id "scn-1"
+                               :loaded-id "scn-1"}))))
+
+(deftest handle-worker-message-unsaved-synthetic-draft-id-still-reveals-draft-alias-test
+  ;; An UNSAVED draft may carry a synthetic id (e.g. "draft-current") with no
+  ;; loaded scenario: that run is not scenario-bound and must keep revealing on
+  ;; the draft alias.
+  (is (= [refresh-command
+          {:command/type :optimizer.workflow/reveal-results
+           :path "/portfolio/optimize/draft"}]
+         (solved-run-commands {:path "/portfolio/optimize/new"
+                               :run-scenario-id "draft-current"
+                               :loaded-id nil}))))
 
 (deftest handle-worker-message-on-draft-alias-reveals-save-bound-scenario-test
   ;; Watching from /optimize/draft while the workspace is save-bound: the draft
@@ -180,7 +193,8 @@
           {:command/type :optimizer.workflow/reveal-results
            :path "/portfolio/optimize/scn-1"}]
          (solved-run-commands {:path "/portfolio/optimize/draft"
-                               :run-scenario-id "scn-1"}))))
+                               :run-scenario-id "scn-1"
+                               :loaded-id "scn-1"}))))
 
 (deftest handle-worker-message-elsewhere-announces-instead-of-navigating-test
   ;; The user wandered off mid-run: never teleport them; announce completion via

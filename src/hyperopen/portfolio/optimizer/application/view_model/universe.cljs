@@ -1,5 +1,6 @@
 (ns hyperopen.portfolio.optimizer.application.view-model.universe
   (:require [clojure.string :as str]
+            [hyperopen.portfolio.optimizer.application.current-portfolio :as current-portfolio]
             [hyperopen.portfolio.optimizer.application.setup-readiness :as setup-readiness]
             [hyperopen.portfolio.optimizer.application.universe-candidates :as universe-candidates]
             [hyperopen.portfolio.optimizer.coercion :as coercion]
@@ -376,6 +377,25 @@
                                 instrument)
        "pending"))
 
+(defn- no-importable-holdings?
+  "True when the account snapshot HAS arrived but a holdings import would add
+  nothing — perp exposures always import; spot exposures import only when the
+  draft's constraints include spot assets. Without this fact the empty state
+  keeps promising \"holdings load automatically\" (and the Load-my-holdings
+  button keeps no-oping) with zero feedback on a positionless account."
+  [state]
+  (let [arrived? (:perp? (current-portfolio/holdings-sources-signature state))
+        include-spot? (true? (get-in state
+                                     (conj contracts/draft-constraints-path
+                                           :include-spot?)))
+        exposures (when arrived?
+                    (:exposures (current-portfolio/current-portfolio-snapshot state)))]
+    (boolean
+     (and arrived?
+          (not-any? #(or (= :perp (:market-type %))
+                         (and include-spot? (= :spot (:market-type %))))
+                    exposures)))))
+
 (defn universe-section-model
   ([state draft]
    (universe-section-model state draft nil))
@@ -439,7 +459,9 @@
       ;; accounting recorded at load time; a non-empty universe with no recorded
       ;; source (legacy drafts) reads as :custom.
       :universe-source (or (get-in draft [:metadata :universe-source])
-                           (when (seq universe) {:kind :custom}))})))
+                           (when (seq universe) {:kind :custom}))
+      :no-importable-holdings? (when (empty? universe)
+                                 (no-importable-holdings? state))})))
 
 (defn universe-panel-model
   [state draft]

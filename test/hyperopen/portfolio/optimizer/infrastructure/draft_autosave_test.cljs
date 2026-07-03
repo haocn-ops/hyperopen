@@ -156,3 +156,45 @@
       (swap! store assoc-in [:webdata2 :clearinghouseState] {:ok true})
       (remove-watch store :hyperopen.portfolio.optimizer.infrastructure.draft-autosave/holdings-preseed))
     (is (= [] @dispatches))))
+
+(deftest identity-arrival-restores-draft-test
+  ;; A full page reload under spectate resolves the effective identity AFTER the
+  ;; optimizer route loads, so the route-time restore silently no-ops (nil
+  ;; address) and the persisted draft appears lost. Identity arrival must
+  ;; re-dispatch the restore-or-preseed funnel.
+  (let [dispatches (atom [])
+        store (atom {:router {:path "/portfolio/optimize/new"}
+                     :portfolio {:optimizer {:draft nil}}})]
+    (draft-autosave/install-identity-restore-watcher!
+     {:store store
+      :dispatch! (fn [_store _event actions]
+                   (swap! dispatches conj actions))})
+    (swap! store assoc-in [:wallet :address] address)
+    (is (= [[[:actions/restore-or-preseed-portfolio-optimizer-draft
+              "/portfolio/optimize/new"]]]
+           @dispatches))
+    ;; Same identity on later updates: no re-fire.
+    (swap! store assoc :unrelated 1)
+    (is (= 1 (count @dispatches)))
+    (remove-watch store :hyperopen.portfolio.optimizer.infrastructure.draft-autosave/identity-restore)))
+
+(deftest identity-arrival-respects-touched-draft-and-route-gates-test
+  (let [dispatches (atom [])
+        install! (fn [store]
+                   (draft-autosave/install-identity-restore-watcher!
+                    {:store store
+                     :dispatch! (fn [_ _ actions]
+                                  (swap! dispatches conj actions))})
+                   store)]
+    ;; Touched draft: an identity switch must never clobber real input.
+    (let [store (install! (atom {:router {:path "/portfolio/optimize/new"}
+                                 :portfolio {:optimizer {:draft (touched-draft)}}}))]
+      (swap! store assoc-in [:wallet :address] address)
+      (is (empty? @dispatches))
+      (remove-watch store :hyperopen.portfolio.optimizer.infrastructure.draft-autosave/identity-restore))
+    ;; Wrong route: no dispatch.
+    (let [store (install! (atom {:router {:path "/trade"}
+                                 :portfolio {:optimizer {:draft nil}}}))]
+      (swap! store assoc-in [:wallet :address] address)
+      (is (empty? @dispatches))
+      (remove-watch store :hyperopen.portfolio.optimizer.infrastructure.draft-autosave/identity-restore))))

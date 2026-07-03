@@ -203,7 +203,7 @@
     [:div {:class ["optimizer-universe-skeleton-row"]}]]])
 
 (defn- selected-table
-  [selected-rows universe holdings-loading?]
+  [selected-rows universe holdings-loading? no-importable-holdings?]
   [:div {:class ["mt-2" "border" "border-base-300" "bg-base-100/50"]}
    [:div {:class ["flex" "items-center" "justify-between" "gap-2" "border-b"
                   "border-base-300" "px-2" "py-1.5"]}
@@ -227,6 +227,18 @@
 
      holdings-loading?
      (holdings-loading-block)
+
+     ;; The account snapshot arrived and there is nothing to import: say so
+     ;; instead of repeating a "holdings load automatically" promise this
+     ;; account can never keep — and so "Load my holdings" is never a silent
+     ;; no-op.
+     no-importable-holdings?
+     [:div {:class ["flex" "flex-col" "items-start" "gap-1" "px-2" "py-3"]
+            :data-role "portfolio-optimizer-universe-holdings-empty"}
+      [:p {:class ["text-xs" "text-trading-muted"]}
+       "No open positions to import for this account."]
+      [:p {:class ["text-[0.75rem]" "text-trading-muted/80"]}
+       "Search above to add perps, spot, or vault return legs and build a custom set."]]
 
      ;; Empty universe: either "no account/holdings" or a deliberately cleared
      ;; set (a clear records a custom source, which ends the loading state).
@@ -288,7 +300,8 @@
                  candidate-rows
                  active-index
                  market-keys
-                 universe-source]} (optimizer-view-model/universe-section-model state draft opts)
+                 universe-source
+                 no-importable-holdings?]} (optimizer-view-model/universe-section-model state draft opts)
          holdings-source? (= :holdings (:kind universe-source))
          holdings-loading? (= :holdings-loading (:reason readiness))
          ;; While the auto-seed is pending, "My holdings" is the source in
@@ -395,7 +408,7 @@
                        "text-xs" "text-trading-muted"]
                :data-role "portfolio-optimizer-universe-search-results-empty"}
            "No matching unused instruments found."]))]
-     (selected-table selected-rows universe holdings-loading?)
+     (selected-table selected-rows universe holdings-loading? no-importable-holdings?)
      (setup-history-assumptions/history-assumptions-section
       {:state state
        :draft draft

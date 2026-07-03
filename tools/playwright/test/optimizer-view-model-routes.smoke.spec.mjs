@@ -1298,6 +1298,23 @@ test("portfolio optimizer draft objective menu edits max sharpe return views imm
   await expect(railEditor).toBeVisible();
   await expect(railEditor).toContainText("Return views");
   await expect(railEditor).not.toContainText("Your return views");
+  // The rail editor is collapsed by default — input editing is by-exception on
+  // the results page — so the summary toggle carries the title + live counts and
+  // the rows stay hidden until opened.
+  const railToggle = railEditor.locator(
+    "[data-role='portfolio-optimizer-results-your-views-editor-toggle']"
+  );
+  await expect(railToggle).toBeVisible();
+  await expect(railBtcReturn).toBeHidden();
+  // Scroll the app root fully to the bottom first: the collapsed editor is the
+  // last rail row, and a minimal scroll-into-view leaves it flush with the
+  // viewport bottom where the fixed footer (z-170) intercepts the click point.
+  // At max scroll the main pb clearance lifts it above the footer.
+  await page.evaluate(() => {
+    const root = document.querySelector("[data-parity-id='app-root']");
+    if (root) root.scrollTop = root.scrollHeight;
+  });
+  await railToggle.click();
   await expect(page.locator("[data-role='portfolio-optimizer-results-your-views-apply']"))
     .toBeVisible();
 
@@ -1610,7 +1627,11 @@ test("portfolio optimizer draft add asset selector stays contained and focused a
       const searchInput = page.locator("[data-role='portfolio-optimizer-draft-add-asset-search-input']");
       const ethRow = page.locator("[data-role='portfolio-optimizer-draft-add-asset-candidate-row-perp:ETH']");
 
-      await addAsset.scrollIntoViewIfNeeded();
+      // Center the anchor first: a minimal scroll can leave the button flush
+      // with the viewport bottom, where the downward-opening popover's
+      // containment depends on incidental page height above the anchor rather
+      // than on the popover's own sizing (which is what this test pins).
+      await addAsset.evaluate((el) => el.scrollIntoView({ block: "center" }));
       await addAsset.click();
       await expect(popover).toBeVisible();
       await expect(searchInput).toHaveAttribute("type", "search");

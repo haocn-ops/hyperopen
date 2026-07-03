@@ -112,14 +112,9 @@
           age-label (str "· " age-label)
           :else nil)])]))
 
-(def ^:private confidence-meter
-  {:low "▮▯▯"
-   :medium "▮▮▯"
-   :high "▮▮▮"})
-
 (def ^:private confidence-word
   {:low "Low"
-   :medium "Med"
+   :medium "Medium"
    :high "High"})
 
 (defn- confidence-button
@@ -128,8 +123,8 @@
         word (get confidence-word level)]
     [:button {:type "button"
               :class ["optimizer-objective-view-confidence-button"
-                      "inline-flex" "items-center" "justify-center" "gap-1"
-                      "border" "border-base-300" "font-mono" "text-[0.58rem]"
+                      "inline-flex" "items-center" "justify-center"
+                      "border" "border-base-300" "font-mono" "text-[0.75rem]"
                       "font-semibold"
                       "focus:outline-none" "focus:ring-0" "focus:ring-offset-0"]
               :data-role (str "portfolio-optimizer-objective-menu-view-"
@@ -141,12 +136,13 @@
               :data-tooltip (if user?
                               (str (name level) " trust in this return")
                               (str "adopt as your view · " (name level)))
-              :aria-label (str "Set " (name level) " confidence")
+              :aria-label (if user?
+                            (str "Set " (name level) " confidence")
+                            (str "Adopt implied return as your view at "
+                                 (name level) " confidence"))
               :on {:click [[:actions/set-portfolio-optimizer-objective-menu-view-confidence
                             instrument-id
                             level]]}}
-     [:span {:class ["optimizer-return-view-meter"] :aria-hidden "true"}
-      (get confidence-meter level)]
      word]))
 
 (defn- return-input
@@ -239,13 +235,26 @@
                      "text-trading-muted"]}
        [:span "return"]
        (return-input asset-label instrument-id (row-return-text state row) (not user?))]]
-     [:div {:class ["mt-1.5" "flex" "items-center" "justify-between" "gap-2"]}
-      [:div {:class ["flex" "min-w-0" "items-center" "gap-1"]}
-       (source-chip row)
-       (when user? (reset-button asset-label instrument-id))]
+     [:div {:class ["mt-1.5" "flex" "min-w-0" "items-center" "gap-1"]}
+      (source-chip row)
+      (when user? (reset-button asset-label instrument-id))]
+     ;; Confidence gets its own labeled line. The control now says what it is —
+     ;; "Confidence" on your rows, "Adopt at" on implied rows (where clicking
+     ;; adopts the shown estimate as your view at that confidence) — and the
+     ;; buttons are full-size, readable hit targets, not a cramped meter strip.
+     [:div {:class ["optimizer-objective-view-confidence-line" "mt-2" "flex"
+                    "items-center" "gap-2" "flex-wrap"]}
+      [:span {:class ["optimizer-objective-view-confidence-label" "font-mono"
+                      "text-[0.6875rem]" "uppercase" "tracking-[0.08em]"
+                      "text-trading-muted"]}
+       (if user? "Confidence" "Adopt at")]
       (into
-       [:div {:class ["optimizer-objective-view-confidence" "grid" "grid-cols-3"]
-              :aria-label (str asset-label " confidence")}]
+       [:div {:class ["optimizer-objective-view-confidence" "flex"]
+              :role "group"
+              :aria-label (str asset-label
+                               (if user?
+                                 " confidence"
+                                 " — adopt implied return at confidence"))}]
        (map #(confidence-button instrument-id (:confidence-level row) user? %)
             bl-model/confidence-options))]]))
 
@@ -342,7 +351,14 @@
        title]
       (when description*
         [:p {:class ["mt-1" "text-[0.6875rem]" "leading-[1.35]" "text-trading-muted"]}
-         description*])]
+         description*])
+      ;; Say once, at the top, what the per-row Low/Medium/High control means, so
+      ;; the row controls can stay label-light. Only shown when views (and thus
+      ;; the confidence controls) are actually live.
+      (when black-litterman?
+        [:p {:class ["mt-1" "text-[0.6875rem]" "leading-[1.35]" "text-trading-muted/80"]
+             :data-role (str container-role "-confidence-help")}
+         "Confidence sets how strongly the optimizer trusts each return — a low setting tilts gently, a high setting pulls hard."])]
      (cond
        (and (not black-litterman?) min-variance?)
        (conservative-note container-role)

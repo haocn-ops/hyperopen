@@ -212,14 +212,16 @@
   }
 
   .portfolio-optimizer .optimizer-objective-view-confidence {
-    min-height: 28px;
-    gap: 1px;
+    display: flex;
+    gap: 6px;
   }
 
   .portfolio-optimizer .optimizer-objective-view-confidence-button {
     position: relative;
-    min-height: 28px;
-    height: 28px;
+    min-width: 60px;
+    min-height: 30px;
+    height: 30px;
+    padding: 0 12px;
     border-radius: 0;
     background-color: var(--optimizer-surface);
     color: var(--optimizer-text-3);
@@ -296,11 +298,6 @@
     color: var(--optimizer-text-3);
   }
 
-  .portfolio-optimizer .optimizer-return-view-meter {
-    font-size: 7px;
-    letter-spacing: 1px;
-  }
-
   .portfolio-optimizer .optimizer-return-view-reset {
     opacity: 0.55;
   }
@@ -322,21 +319,18 @@
   }
 
   @media (max-width: 360px) {
-    .portfolio-optimizer .optimizer-objective-view-row {
-      grid-template-columns: minmax(0, 1fr);
-    }
-
-    .portfolio-optimizer .optimizer-objective-view-return-shell,
-    .portfolio-optimizer .optimizer-objective-view-confidence {
-      grid-column: 1 / -1;
-    }
-
-    .portfolio-optimizer .optimizer-objective-view-return-input {
-      width: 100%;
-    }
-
+    .portfolio-optimizer .optimizer-objective-view-return-input,
     .portfolio-optimizer .optimizer-objective-view-return-input-shell {
       width: 100%;
+    }
+
+    .portfolio-optimizer .optimizer-objective-view-confidence {
+      width: 100%;
+    }
+
+    .portfolio-optimizer .optimizer-objective-view-confidence-button {
+      flex: 1 1 0;
+      min-width: 0;
     }
   }
 

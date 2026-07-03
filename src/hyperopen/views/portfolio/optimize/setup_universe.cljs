@@ -94,45 +94,12 @@
        (when-let [market-type-label (some-> market-type name)]
          (str " " market-type-label))))
 
-(defn- assumption-badge-chip
-  [instrument-id badge badge-label]
-  (when (and badge (not= :ready badge))
-    [:span {:class ["optimizer-chip" "border" "px-1.5"
-                    "py-[1px]" "font-mono" "text-[0.625rem]" "font-semibold"
-                    "uppercase" "tracking-[0.1em]"]
-            :data-optimizer-chip "true"
-            :data-tone (if (contains? #{:conservative :using-proxy} badge) "accent" "warn")
-            :data-role (str "portfolio-optimizer-universe-assumption-badge-" instrument-id)}
-     badge-label]))
-
-(defn- history-row-chip
-  "By-exception history chip rendered inline on the row (no dedicated column).
-  history-label is nil for all-clear rows, so nothing renders; the tone is
-  :muted for transient load states and :warn for genuine coverage problems."
-  [instrument-id history-label history-tone]
-  (when history-label
-    [:span {:class (cond-> ["optimizer-chip" "border" "px-1.5" "py-[1px]" "font-mono"
-                            "text-[0.625rem]" "font-semibold" "uppercase"
-                            "tracking-[0.12em]"]
-                     (= history-tone :muted) (conj "border-base-300" "text-trading-muted")
-                     (not= history-tone :muted) (conj "border-warning/40" "text-warning"))
-            :data-optimizer-chip "true"
-            :data-tone (name history-tone)
-            :data-role (str "portfolio-optimizer-universe-history-chip-" instrument-id)}
-     history-label]))
-
-(defn- row-flags
-  "By-exception row flags rendered inline under the asset name (there is no
-  dedicated History column). All-clear rows pass history-label = nil and a
-  :ready assumption badge, so nothing renders; only load states, genuine
-  coverage problems, and non-default assumptions surface a chip."
-  [instrument-id history-label history-tone assumption-badge assumption-badge-label]
-  (let [history (history-row-chip instrument-id history-label history-tone)
-        assumption (assumption-badge-chip instrument-id assumption-badge assumption-badge-label)]
-    (when (or history assumption)
-      [:span {:class ["mt-0.5" "flex" "flex-wrap" "items-center" "gap-1"]}
-       history
-       assumption])))
+;; Per-row history/assumption diagnostics (shared gap, short history,
+;; insufficient, …) are deliberately NOT painted on the row. They are
+;; solver-readiness signals, not asset-selection information, and they made the
+;; universe list read like an error log. The grouped Readiness panel and the
+;; assets-needing-assumptions section (both in the right rail) own that detail;
+;; each row still carries its computed status on :data-history-status for QA.
 
 (defn- selected-row
   [{:keys [instrument-id
@@ -140,10 +107,6 @@
            primary-label
            secondary-label
            history-status
-           history-label
-           history-tone
-           assumption-badge
-           assumption-badge-label
            position-side
            short-selectable?]}]
     [:div {:class ["optimizer-universe-row"
@@ -158,8 +121,7 @@
       ;; Demoted a full tier below the symbol: the canonical id/name is context,
       ;; and must not compete with the tradable symbol the user scans for.
       [:span {:class ["block" "truncate" "text-[0.6875rem]" "text-trading-muted/80"]}
-       secondary-label]
-      (row-flags instrument-id history-label history-tone assumption-badge assumption-badge-label)]
+       secondary-label]]
      [:span {:class ["flex" "justify-center"]} (market-type-tags market-type)]
      (side-control instrument-id position-side short-selectable?)
      [:span {:class ["text-right"]}

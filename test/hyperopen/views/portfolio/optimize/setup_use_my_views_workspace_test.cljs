@@ -46,8 +46,8 @@
     ;; inserted — bottom actions and model assumptions come from the shared tail,
     ;; not from a BL-owned workspace.
     (is (= ["portfolio-optimizer-objective-panel"
-            "portfolio-optimizer-return-risk-panel"
             "portfolio-optimizer-constraints-panel"
+            "portfolio-optimizer-return-risk-panel"
             "portfolio-optimizer-advanced-overrides-shell"
             "portfolio-optimizer-views-blend-shell"
             "portfolio-optimizer-why-safe-note"

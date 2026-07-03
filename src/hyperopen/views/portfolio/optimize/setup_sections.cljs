@@ -14,7 +14,7 @@
             [hyperopen.views.portfolio.optimize.target-sigma :as target-sigma]))
 
 ;; The setup route is a 3-column grid (workspace_view). LEFT = universe selection only; CENTER =
-;; the editable scenario policy (objective / model / constraints / advanced); RIGHT = the compact
+;; the editable scenario policy (objective / exposure / model / advanced); RIGHT = the compact
 ;; summary + Run readiness (setup_context). This namespace owns the LEFT and CENTER columns.
 
 (defn control-rail
@@ -42,7 +42,7 @@
      "Switch to Maximum Sharpe to optimize with your return views."]]))
 
 (defn policy-pane
-  "CENTER column: the editable scenario policy. Objective, return/risk model, the constraints
+  "CENTER column: the editable scenario policy. Objective, portfolio exposure, return/risk model,
   (2D exposure map + risk guards + rebalance behavior + advanced solver drawer), a collapsed
   views-blend explainer when the views-aware model is active, the collapsed 'why safe' note,
   and the Run bottom bar. Return views themselves are edited in the right rail."
@@ -59,7 +59,6 @@
        highlighted-controls
        (target-sigma/frontier-sigma-bounds
         (get-in state optimizer-contracts/last-successful-run-result-path)))
-      (model-controls/model-section draft)
       (constraint-controls/constraints-section
        draft highlighted-controls
        {:current-exposure (exposure-vm/snapshot->current-exposure
@@ -69,6 +68,7 @@
                              (constraint-profiles/universe-key
                               (get-in state optimizer-contracts/draft-universe-path)))
         :exposure-zoom-level (get-in state optimizer-contracts/ui-exposure-zoom-level-path)})
+      (model-controls/model-section draft)
       (controls/disclosure-panel
        "portfolio-optimizer-advanced-overrides-shell"
        (controls/disclosure-heading

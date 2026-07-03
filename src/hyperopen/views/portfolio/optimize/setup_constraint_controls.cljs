@@ -231,7 +231,14 @@
                           :has-saved-default? has-saved-default?
                           :zoom-level exposure-zoom-level})
          active-label (get exposure-policy/preset-labels
-                           (:active-preset exposure-model) "Custom")]
+                           (:active-preset exposure-model) "Custom")
+         ;; A holdings import derives the envelope from the current book; the
+         ;; collapsed header says so instead of a bare "Custom".
+         active-label (if (and (= "Custom" active-label)
+                               (= :holdings
+                                  (get-in draft [:metadata :universe-source :kind])))
+                        "Custom · from holdings"
+                        active-label)]
      (controls/disclosure-panel
       "portfolio-optimizer-constraints-panel"
       ;; The collapsed header carries the actual policy, not just a preset name:

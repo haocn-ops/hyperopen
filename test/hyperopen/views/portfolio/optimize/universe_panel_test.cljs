@@ -277,3 +277,27 @@
     (is (= false (get-in run-button [1 :disabled])))
     (is (contains? strings "History is incomplete for this universe. Run Optimization retries anything still missing."))
     (is (contains? strings "missing-candle-history"))))
+
+(deftest portfolio-optimizer-universe-empty-holdings-states-why-test
+  ;; The account snapshot arrived with nothing importable: the empty state says
+  ;; so instead of repeating the "holdings load automatically" promise — and so
+  ;; "Load my holdings" is never a silent no-op.
+  (let [view-node (portfolio-view/portfolio-view
+                   {:router {:path "/portfolio/optimize/new"}
+                    :webdata2 {:clearinghouseState
+                               {:marginSummary {:accountValue "1000"}
+                                :assetPositions []}}
+                    :portfolio {:optimizer {:draft nil}}})
+        note (node-by-role view-node "portfolio-optimizer-universe-holdings-empty")]
+    (is (some? note))
+    (is (some #(= "No open positions to import for this account." %)
+              (collect-strings note)))))
+
+(deftest portfolio-optimizer-universe-empty-before-snapshot-keeps-promise-copy-test
+  ;; Before the account snapshot arrives the auto-load promise is still true, so
+  ;; the "nothing to import" note must NOT render.
+  (let [view-node (portfolio-view/portfolio-view
+                   {:router {:path "/portfolio/optimize/new"}
+                    :portfolio {:optimizer {:draft nil}}})]
+    (is (nil? (node-by-role view-node
+                            "portfolio-optimizer-universe-holdings-empty")))))

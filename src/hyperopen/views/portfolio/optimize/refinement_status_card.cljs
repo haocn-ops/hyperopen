@@ -45,7 +45,6 @@
 (defn- status-header
   [{:keys [assessment runtime-ms]}]
   (let [tier (:tier assessment)
-        exact? (:exact-selection? assessment)
         points (:point-count assessment)
         quality (:frontier-quality assessment)
         stability (:selection-stability assessment)]
@@ -62,14 +61,7 @@
      [:p {:class ["optimizer-refinement-title" "mt-3" "text-sm" "font-semibold"
                   "text-trading-text"]}
       (opt-format/refinement-tier-ready-label tier)]
-     [:p {:class ["mt-1" "text-xs" "text-trading-muted"]}
-      (str (if (= :draft tier)
-             "Fast draft based on the current frontier sample. Refine for higher confidence"
-             "Refined over a denser frontier")
-           (if exact?
-             " — the selection is exact for this objective, so refinement only sharpens the chart."
-             " — the selection is sampled from the frontier and may shift when refined."))]
-     [:div {:class ["mt-3" "flex" "flex-wrap" "items-center" "gap-1.5"]}
+     [:div {:class ["mt-2" "flex" "flex-wrap" "items-center" "gap-1.5"]}
       (tag "portfolio-optimizer-refinement-points"
            :neutral "Points" (str (or points "—")))
       (tag "portfolio-optimizer-refinement-runtime"
@@ -102,10 +94,6 @@
   (let [selected (some #(when (:selected? %) %) depth-options)]
     [:div {:class ["optimizer-refinement-options"]
            :data-role "portfolio-optimizer-refinement-options"}
-     [:p {:class ["optimizer-refinement-eyebrow"]}
-      [:span {:class ["optimizer-refinement-eyebrow-label"]} "Refinement options"]
-      [:span {:class ["optimizer-refinement-eyebrow-hint"]}
-       "· denser sweep = higher confidence, longer solve"]]
      (into [:div {:class ["optimizer-refinement-depth-grid" "mt-2" "grid" "grid-cols-3"]}]
            (map depth-tile depth-options))
      [:button {:type "button"
@@ -196,6 +184,31 @@
      [:p {:class ["mt-2" "text-[0.6rem]" "text-trading-muted"]}
       "The refined frontier produced a different recommended portfolio. Review before executing."])])
 
+(defn- refine-disclosure
+  "Progressive disclosure for the refinement depth picker. Refinement is a
+  by-exception tool (a solved draft is already usable), so the options stay behind a
+  native <details> — matching the trust rail's accordions — instead of holding prime
+  center space. Uncontrolled on purpose: no dispatch round-trip, and the card
+  re-renders closed again after a refinement completes."
+  [{:keys [assessment] :as refinement}]
+  (let [exact? (:exact-selection? assessment)
+        tier (:tier assessment)]
+    [:details {:class ["optimizer-refinement-disclosure"]
+               :data-role "portfolio-optimizer-refinement-disclosure"}
+     [:summary {:class ["optimizer-refinement-disclosure-summary" "cursor-pointer"]
+                :data-role "portfolio-optimizer-refinement-disclosure-toggle"}
+      [:span {:class ["optimizer-refinement-eyebrow-label"]} "Refinement options"]
+      [:span {:class ["optimizer-refinement-eyebrow-hint"]}
+       " · denser sweep = higher confidence, longer solve"]]
+     [:p {:class ["mt-2" "text-xs" "text-trading-muted"]}
+      (str (if (= :draft tier)
+             "Fast draft based on the current frontier sample. Refine for higher confidence"
+             "Refined over a denser frontier")
+           (if exact?
+             " — the selection is exact for this objective, so refinement only sharpens the chart."
+             " — the selection is sampled from the frontier and may shift when refined."))]
+     (refine-options refinement)]))
+
 (defn refinement-status-card
   [refinement]
   (when (:solved? refinement)
@@ -205,8 +218,8 @@
                :data-role "portfolio-optimizer-refinement-card"}
      (if (:in-flight? refinement)
        (in-flight-view refinement)
-       [:div {:class ["space-y-4"]}
+       [:div {:class ["space-y-3"]}
         (status-header refinement)
         (when-let [outcome (:outcome refinement)]
           (outcome-view outcome))
-        (refine-options refinement)])]))
+        (refine-disclosure refinement)])]))

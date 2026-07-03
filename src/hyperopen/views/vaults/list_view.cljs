@@ -34,7 +34,9 @@
         desktop-layout? (desktop-vaults-layout?)
         wallet-connected? (boolean (get-in state [:wallet :connected?]))
         wallet-connecting? (boolean (get-in state [:wallet :connecting?]))]
-    [:div {:class ["relative" "w-full" "app-shell-gutter" "py-4" "md:py-6"]
+    ;; pb-16 (not py): the fixed app footer (~49px) overlays the end of the page
+    ;; scroll, so the bottom padding must exceed it or the last rows sit under it.
+    [:div {:class ["relative" "w-full" "app-shell-gutter" "pt-4" "pb-16" "md:pt-6"]
            :data-parity-id "vaults-root"
            :data-preview-state (some-> (:source preview-state) name)}
      [:div {:class ["pointer-events-none"

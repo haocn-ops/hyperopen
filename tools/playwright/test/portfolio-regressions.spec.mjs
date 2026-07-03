@@ -2093,7 +2093,10 @@ test("portfolio optimizer selected vault rows show shared gap for loaded misalig
   );
 
   await expect(vaultARow).toBeVisible();
-  await expect(vaultARow).toContainText("shared gap");
+  // Per-row data-quality chips were removed (2026-07-02 setup readability pass):
+  // the grouped Readiness panel carries the visible copy, and the row keeps only
+  // the data-history-status hook.
+  await expect(vaultARow).not.toContainText("shared gap");
   await expect(vaultARow).toHaveAttribute("data-history-status", "shared-gap");
 });
 

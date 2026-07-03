@@ -315,9 +315,12 @@
   "The provenance-aware Return views panel. Options:
   :container-role/:title/:description — shell identity and copy;
   :include-apply?/:apply-role — the results-page re-run affordance;
+  :collapsible? — render as a closed-by-default <details> whose summary carries the
+  title + live counts (the results rail uses this: view editing is an input task,
+  by-exception on a review page);
   :now-ms — clock for age labels (tests pass a fixed value)."
   [{:keys [draft state readiness now-ms container-role title description
-           extra-class include-apply? apply-role]
+           extra-class include-apply? apply-role collapsible?]
     :or {container-role "portfolio-optimizer-objective-menu-use-my-views-editor"
          title "Return views"
          apply-role "portfolio-optimizer-objective-menu-apply"}}]
@@ -339,67 +342,85 @@
         ;; the model; the conservative / views-off notes carry their own copy.
         description* (when black-litterman?
                        (or description
-                           "Your views tilt the forecast where you have them; implied rows fall back to the baseline estimate. Edits save automatically."))]
-    [:section {:class (cond-> ["optimizer-objective-views-section"
-                               "flex" "min-h-0" "shrink-0" "flex-col"
-                               "border-t" "border-base-300" "px-3" "py-3"]
-                        extra-class (conj extra-class))
-               :data-role container-role}
-     [:div {:class ["mb-2"]}
-      [:p {:class ["font-mono" "text-[0.58rem]" "font-semibold" "uppercase"
-                   "tracking-[0.18em]" "text-warning"]}
-       title]
-      (when description*
-        [:p {:class ["mt-1" "text-[0.6875rem]" "leading-[1.35]" "text-trading-muted"]}
-         description*])
-      ;; Say once, at the top, what the per-row Low/Medium/High control means, so
-      ;; the row controls can stay label-light. Only shown when views (and thus
-      ;; the confidence controls) are actually live.
-      (when black-litterman?
-        [:p {:class ["mt-1" "text-[0.6875rem]" "leading-[1.35]" "text-trading-muted/80"]
-             :data-role (str container-role "-confidence-help")}
-         "Confidence sets how strongly the optimizer trusts each return — a low setting tilts gently, a high setting pulls hard."])]
-     (cond
-       (and (not black-litterman?) min-variance?)
-       (conservative-note container-role)
+                           "Your views tilt the forecast where you have them; implied rows fall back to the baseline estimate. Edits save automatically."))
+        title-el [:p {:class ["font-mono" "text-[0.58rem]" "font-semibold" "uppercase"
+                              "tracking-[0.18em]" "text-warning"]}
+                  title]
+        ;; Say once, at the top, what the per-row Low/Medium/High control means, so
+        ;; the row controls can stay label-light. Only shown when views (and thus
+        ;; the confidence controls) are actually live.
+        note-els [(when description*
+                    [:p {:class ["mt-1" "text-[0.6875rem]" "leading-[1.35]" "text-trading-muted"]}
+                     description*])
+                  (when black-litterman?
+                    [:p {:class ["mt-1" "text-[0.6875rem]" "leading-[1.35]" "text-trading-muted/80"]
+                         :data-role (str container-role "-confidence-help")}
+                     "Confidence sets how strongly the optimizer trusts each return — a low setting tilts gently, a high setting pulls hard."])]
+        body (cond
+               (and (not black-litterman?) min-variance?)
+               (conservative-note container-role)
 
-       (not black-litterman?)
-       (views-off-note container-role)
+               (not black-litterman?)
+               (views-off-note container-role)
 
-       :else
-       [:div {:class ["flex" "min-h-0" "flex-col"]}
-        (when min-variance?
-          [:div {:class ["mb-2"]} (min-variance-note container-role)])
-        [:p {:class ["font-mono" "text-[0.6875rem]" "font-semibold" "text-trading-text"]
-             :data-role (str container-role "-summary")}
-         (return-views/summary-line summary)]
-        (into
-         [:div {:class ["mt-1.5" "mb-2" "flex" "flex-wrap" "gap-1"]
-                :data-role (str container-role "-filters")}]
-         (map #(filter-chip container-role active-filter summary %)
-              return-views/filters))
-        (into
-         [:div {:class ["optimizer-objective-view-rows" "min-h-0" "space-y-1.5"
-                        "overflow-x-hidden" "overflow-y-auto"]
-                :data-role (str container-role "-rows")}]
-         (if (seq visible-rows)
-           (map #(provenance-row state universe %) visible-rows)
-           [[:p {:class ["p-2" "text-[0.6875rem]" "text-trading-muted"]
-                 :data-role (str container-role "-filter-empty")}
-             (case active-filter
-               :yours "No views of yours yet — edit any row to add one."
-               :stale "No stale views."
-               :implied "Every asset has your view — nothing is implied."
-               "Add assets to the universe to edit return views.")]]))
-        (when include-apply?
-          [:button {:type "button"
-                    :class ["optimizer-primary-action" "mt-2" "w-full" "border"
-                            "border-base-300" "px-3" "py-2" "text-left"
-                            "text-[0.6875rem]" "font-semibold"
-                            "focus:outline-none" "focus:ring-0" "focus:ring-offset-0"]
-                    :data-role apply-role
-                    :on {:click [[:actions/apply-portfolio-optimizer-objective-menu-selection-and-run]]}}
-           "Apply & re-run"])])]))
+               :else
+               [:div {:class ["flex" "min-h-0" "flex-col"]}
+                (when min-variance?
+                  [:div {:class ["mb-2"]} (min-variance-note container-role)])
+                [:p {:class ["font-mono" "text-[0.6875rem]" "font-semibold" "text-trading-text"]
+                     :data-role (str container-role "-summary")}
+                 (return-views/summary-line summary)]
+                (into
+                 [:div {:class ["mt-1.5" "mb-2" "flex" "flex-wrap" "gap-1"]
+                        :data-role (str container-role "-filters")}]
+                 (map #(filter-chip container-role active-filter summary %)
+                      return-views/filters))
+                (into
+                 [:div {:class ["optimizer-objective-view-rows" "min-h-0" "space-y-1.5"
+                                "overflow-x-hidden" "overflow-y-auto"]
+                        :data-role (str container-role "-rows")}]
+                 (if (seq visible-rows)
+                   (map #(provenance-row state universe %) visible-rows)
+                   [[:p {:class ["p-2" "text-[0.6875rem]" "text-trading-muted"]
+                         :data-role (str container-role "-filter-empty")}
+                     (case active-filter
+                       :yours "No views of yours yet — edit any row to add one."
+                       :stale "No stale views."
+                       :implied "Every asset has your view — nothing is implied."
+                       "Add assets to the universe to edit return views.")]]))
+                (when include-apply?
+                  [:button {:type "button"
+                            :class ["optimizer-primary-action" "mt-2" "w-full" "border"
+                                    "border-base-300" "px-3" "py-2" "text-left"
+                                    "text-[0.6875rem]" "font-semibold"
+                                    "focus:outline-none" "focus:ring-0" "focus:ring-offset-0"]
+                            :data-role apply-role
+                            :on {:click [[:actions/apply-portfolio-optimizer-objective-menu-selection-and-run]]}}
+                   "Apply & re-run"])])]
+    (if collapsible?
+      ;; Closed by default: the summary row is the whole panel until opened, so the
+      ;; rail stays short on large universes. Native <details> (uncontrolled),
+      ;; matching the trust rail's accordions.
+      [:details {:class (cond-> ["optimizer-objective-views-section"
+                                 "optimizer-return-views-disclosure"
+                                 "border-t" "border-base-300" "px-3" "py-3"]
+                          extra-class (conj extra-class))
+                 :data-role container-role}
+       [:summary {:class ["optimizer-return-views-disclosure-summary" "cursor-pointer"]
+                  :data-role (str container-role "-toggle")}
+        title-el
+        [:span {:class ["optimizer-return-views-disclosure-count" "font-mono"
+                        "text-[0.6875rem]" "text-trading-muted"]}
+         (return-views/summary-line summary)]]
+       (into [:div {:class ["mt-2" "mb-2"]}] note-els)
+       body]
+      [:section {:class (cond-> ["optimizer-objective-views-section"
+                                 "flex" "min-h-0" "shrink-0" "flex-col"
+                                 "border-t" "border-base-300" "px-3" "py-3"]
+                          extra-class (conj extra-class))
+                 :data-role container-role}
+       (into [:div {:class ["mb-2"]} title-el] note-els)
+       body])))
 
 (defn panel-now-ms
   "Render-time clock for age labels. Isolated so view tests can stay deterministic

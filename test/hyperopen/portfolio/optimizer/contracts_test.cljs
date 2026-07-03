@@ -83,8 +83,6 @@
          contracts/refinement-requested-points-path))
   (is (= [:portfolio :optimizer :refinement :baseline-result]
          contracts/refinement-baseline-result-path))
-  (is (= [:portfolio-ui :optimizer :refinement-open?]
-         contracts/ui-refinement-open-path))
   (is (= [:portfolio-ui :optimizer :refinement-depth]
          contracts/ui-refinement-depth-path))
   (is (= [:portfolio :optimizer :history-load-state :request-signature]

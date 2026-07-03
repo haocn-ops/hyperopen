@@ -255,12 +255,6 @@
 (def run-portfolio-optimizer
   run/run-portfolio-optimizer)
 
-(def open-portfolio-optimizer-refinement
-  refinement/open-portfolio-optimizer-refinement)
-
-(def close-portfolio-optimizer-refinement
-  refinement/close-portfolio-optimizer-refinement)
-
 (def set-portfolio-optimizer-refinement-depth
   refinement/set-portfolio-optimizer-refinement-depth)
 

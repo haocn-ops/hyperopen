@@ -66,7 +66,12 @@
                                                     :sections next-sections})
                        next-sections)))]
     (if optimizer-route?
-      [:div {:class ["portfolio-optimizer" "w-full"]
+      ;; shrink-0 is load-bearing: this frame is a flex item of the fixed-height
+      ;; app <main>, and the explicit :min-height below replaces the min-height:auto
+      ;; content floor — without shrink-0 the box clamps to the viewport, content
+      ;; overflows it, and the :padding-bottom footer clearance lands mid-content
+      ;; (the fixed z-170 footer then eclipses the page tail).
+      [:div {:class ["portfolio-optimizer" "w-full" "shrink-0"]
              :style {:background-color "var(--optimizer-bg)"
                      :min-height "calc(100vh - 3.5rem)"
                      :padding-bottom "3.5rem"}

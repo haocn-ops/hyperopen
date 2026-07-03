@@ -164,16 +164,29 @@
   (let [route (portfolio-routes/parse-portfolio-route (get-in state* [:router :path]))
         run-scenario-id (or (:scenario-id (run-state state*)) "draft")
         refresh {:command/type
-                 :optimizer.workflow/refresh-portfolio-optimizer-rebalance-slippage-snapshots}]
+                 :optimizer.workflow/refresh-portfolio-optimizer-rebalance-slippage-snapshots}
+        ;; After "Save scenario" the workspace draft carries the saved scenario id,
+        ;; so its runs are scenario-bound. The "draft" alias route only ever renders
+        ;; UNSAVED runs — revealing a scenario-bound run there shows a masked shell,
+        ;; so the reveal must target the run's own scenario surface.
+        reveal {:command/type :optimizer.workflow/reveal-results
+                :path (portfolio-routes/portfolio-optimize-scenario-path run-scenario-id)}]
     (case (:kind route)
       :optimize-new
-      [refresh
-       {:command/type :optimizer.workflow/reveal-results
-        :path (portfolio-routes/portfolio-optimize-scenario-path "draft")}]
+      [refresh reveal]
 
       :optimize-scenario
-      (if (= run-scenario-id (:scenario-id route))
+      (cond
+        (= run-scenario-id (:scenario-id route))
         [refresh]
+
+        ;; Watching from the draft alias while the workspace is save-bound: this
+        ;; page can never show the finished run, so announcing "complete" would
+        ;; point nowhere. Reveal the run's own surface instead.
+        (= "draft" (:scenario-id route))
+        [refresh reveal]
+
+        :else
         [refresh {:command/type :optimizer.workflow/announce-run-complete}])
 
       [refresh {:command/type :optimizer.workflow/announce-run-complete}])))

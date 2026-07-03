@@ -160,6 +160,28 @@
          (solved-run-commands {:path "/portfolio/optimize/draft"
                                :run-scenario-id nil}))))
 
+(deftest handle-worker-message-on-new-route-reveals-save-bound-scenario-test
+  ;; After "Save scenario" the workspace draft carries the saved scenario id, so a
+  ;; run started from /optimize/new belongs to that scenario. Reveal ITS surface —
+  ;; the unsaved-draft alias can only render unsaved runs, so navigating there
+  ;; would show a masked shell while the toast claims the result is ready (the
+  ;; post-save draft-route wedge).
+  (is (= [refresh-command
+          {:command/type :optimizer.workflow/reveal-results
+           :path "/portfolio/optimize/scn-1"}]
+         (solved-run-commands {:path "/portfolio/optimize/new"
+                               :run-scenario-id "scn-1"}))))
+
+(deftest handle-worker-message-on-draft-alias-reveals-save-bound-scenario-test
+  ;; Watching from /optimize/draft while the workspace is save-bound: the draft
+  ;; alias can never render a scenario-bound run, so announcing "complete" would
+  ;; point at a page that will never show it. Reveal the run's own surface.
+  (is (= [refresh-command
+          {:command/type :optimizer.workflow/reveal-results
+           :path "/portfolio/optimize/scn-1"}]
+         (solved-run-commands {:path "/portfolio/optimize/draft"
+                               :run-scenario-id "scn-1"}))))
+
 (deftest handle-worker-message-elsewhere-announces-instead-of-navigating-test
   ;; The user wandered off mid-run: never teleport them; announce completion via
   ;; the global toast instead.

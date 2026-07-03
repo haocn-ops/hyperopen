@@ -39,11 +39,14 @@
          (or (nil? loaded-id)
              (= loaded-id draft-id)))))
 
+(defn- draft-alias?
+  [scenario-id]
+  (= "draft" scenario-id))
+
 (defn- retained-unsaved-route?
   [state scenario-id]
   (and (retained-unsaved-run? state)
-       (contains? #{"draft"}
-                  scenario-id)))
+       (draft-alias? scenario-id)))
 
 (defn route-mismatched?
   [state scenario-id]
@@ -55,6 +58,15 @@
                   (or (pending-route-load? state scenario-id)
                       (retained-unsaved-run? state)))))))
 
+(defn route-loading?
+  "True when the routed scenario is masked AND a load can actually resolve it.
+  The \"draft\" alias has no loader — once a save binds the workspace to a real
+  scenario id there is simply no unsaved run to show, which is an idle state,
+  never a loading one."
+  [state scenario-id]
+  (and (route-mismatched? state scenario-id)
+       (not (draft-alias? scenario-id))))
+
 (defn scenario-scoped-state
   [state scenario-id]
   (if (route-mismatched? state scenario-id)
@@ -63,9 +75,17 @@
         (assoc-in contracts/last-successful-run-path nil)
         (assoc-in contracts/tracking-path (optimizer-defaults/default-tracking-state))
         (assoc-in contracts/active-scenario-path
-                  {:loaded-id nil
-                   :status :loading
-                   :read-only? true}))
+                  ;; The draft alias masks to an honest idle shell (the user's own
+                  ;; workspace is never read-only and nothing is loading); real
+                  ;; scenario ids mask to the defensive loading shell while the
+                  ;; routed scenario resolves.
+                  (if (draft-alias? scenario-id)
+                    {:loaded-id nil
+                     :status :idle
+                     :read-only? false}
+                    {:loaded-id nil
+                     :status :loading
+                     :read-only? true})))
     state))
 
 (defn scenario-name
@@ -83,7 +103,7 @@
 (defn scenario-detail-model
   [state route]
   (let [scenario-id (:scenario-id route)
-        loading? (route-mismatched? state scenario-id)
+        loading? (route-loading? state scenario-id)
         state* (scenario-scoped-state state scenario-id)
         selected-tab (active-tab state)
         readiness (setup-readiness/build-readiness state*)
@@ -96,11 +116,18 @@
         progress-running? (= :running (:status optimization-progress))
         run-state (get-in state* contracts/run-state-path)
         running? (or (= :running (:status run-state))
-                     progress-running?)]
+                     progress-running?)
+        ;; Rerun dispatches against the REAL draft (actions never see the masked
+        ;; scoped state), so gate it on the real draft's universe: an enabled
+        ;; button whose dispatch silently refuses is a truthfulness violation.
+        rerun-blocked-reason (when-not (seq (get-in state
+                                             (conj contracts/draft-path :universe)))
+                               "Add assets to the universe before rerunning.")]
     {:state state*
      :route route
      :scenario-id scenario-id
      :loading? loading?
+     :rerun-blocked-reason rerun-blocked-reason
      :selected-tab selected-tab
      :readiness readiness
      :current-result? (boolean current-result?*)

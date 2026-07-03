@@ -220,6 +220,55 @@
     (is (not (contains? strings
                         "Run or load a scenario to stage its rebalance here for review and execution.")))))
 
+(deftest draft-route-after-save-renders-idle-not-loading-test
+  ;; Post-save wedge regression: saving stamps the workspace draft with the saved
+  ;; scenario id/status and points active-scenario at it, so the /draft alias no
+  ;; longer has a retained unsaved run to show. It must render the honest idle
+  ;; empty state — never the "is loading" shell (nothing is loading and no loader
+  ;; exists for the id "draft"), and never a read-only claim about the user's own
+  ;; workspace.
+  (let [state (with-current-solved-run
+                {:router {:path "/portfolio/optimize/draft"}
+                 :portfolio {:optimizer
+                             {:active-scenario {:loaded-id "scn-1"
+                                                :status :saved
+                                                :read-only? false}
+                              :draft {:id "scn-1"
+                                      :status :saved
+                                      :name "Saved scenario"
+                                      :universe [{:instrument-id "perp:BTC"
+                                                  :market-type :perp
+                                                  :coin "BTC"}]
+                                      :objective {:kind :minimum-variance}
+                                      :return-model {:kind :historical-mean}
+                                      :risk-model {:kind :diagonal-shrink}
+                                      :constraints {:max-asset-weight 0.4
+                                                    :gross-max 1.5}}}}}
+                solved-result)
+        view-node (portfolio-view/portfolio-view state)
+        strings (set (collect-strings view-node))]
+    (is (some? (node-by-role view-node "portfolio-optimizer-recommendation-empty"))
+        "renders the idle empty tab, not the masked result")
+    (is (nil? (node-by-role view-node "portfolio-optimizer-scenario-loading-state"))
+        "never claims a load is in progress for the draft alias")
+    (is (not-any? #(re-find #"is loading" %) strings)
+        "no loading copy anywhere on the surface")
+    (is (not-any? #(re-find #"read-only" %) strings)
+        "no read-only claim about the user's own draft workspace")))
+
+(deftest draft-route-with-empty-draft-disables-rerun-with-reason-test
+  ;; Rerun dispatches against the real draft; with an empty universe the run
+  ;; action refuses, so the button must be disabled with a reason — never an
+  ;; enabled control that silently does nothing.
+  (let [state {:router {:path "/portfolio/optimize/draft"}
+               :portfolio {:optimizer {:draft {:universe []}}}}
+        view-node (portfolio-view/portfolio-view state)
+        rerun (node-by-role view-node "portfolio-optimizer-scenario-rerun")]
+    (is (some? rerun))
+    (is (true? (get-in rerun [1 :disabled])))
+    (is (= "Add assets to the universe before rerunning."
+           (get-in rerun [1 :title])))))
+
 (deftest unsaved-draft-results-route-uses-draft-vault-name-when-result-label-is-missing-or-raw-test
   (let [vault-address "0x1e37a337ed460039d1b15bd3bc489de789768d5e"
         vault-id (str "vault:" vault-address)

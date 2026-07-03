@@ -1,5 +1,6 @@
 (ns hyperopen.views.portfolio.optimize.results-summary
   (:require [clojure.string :as str]
+            [hyperopen.portfolio.optimizer.application.view-model.results :as results-model]
             [hyperopen.views.portfolio.optimize.format :as opt-format]))
 
 (defn summary-card
@@ -33,6 +34,7 @@
   [stale?]
   (when stale?
     [:div {:class ["rounded-xl" "border" "border-warning/50" "bg-warning/10" "p-4"]
+           :replicant/key "optimizer-stale-result-banner"
            :data-role "portfolio-optimizer-stale-result-banner"}
      [:div {:class ["flex" "flex-col" "gap-3" "md:flex-row" "md:items-center" "md:justify-between"]}
       [:div
@@ -41,13 +43,43 @@
        [:p {:class ["mt-2" "text-sm" "text-trading-muted"]}
         "These allocation weights come from the last successful run. The app is refreshing them automatically; save and execute unlock when the refreshed run completes."]]]]))
 
+(defn- verdict-cta
+  "The page's primary action, rendered inside the verdict bar so 'what happened' and
+  'what to do next' read as one unit at the top of the tab (the previous end-of-grid
+  placement buried it below the fold on real universes). Stages the rebalance straight
+  into the Execution tab in-place (no navigation) so unsaved run state is preserved;
+  the spectate/read-only gate lives downstream in the execution surface. Mutes and
+  relabels when the target already matches the current book so it doesn't invite a
+  no-op."
+  [trade-count]
+  (let [no-trades? (and (opt-format/finite-number? trade-count) (zero? trade-count))]
+    [:button {:type "button"
+              :class (into ["optimizer-review-rebalance-cta" "optimizer-verdict-cta"
+                            "flex" "items-center" "justify-between" "gap-3"
+                            "rounded-lg" "border" "px-4" "py-2.5" "text-left"
+                            "transition-colors"]
+                           (if no-trades?
+                             ["border-base-300" "bg-base-200/30" "text-trading-muted"]
+                             ["border-primary/50" "bg-primary/10" "text-primary" "hover:bg-primary/30"]))
+              :data-role "portfolio-optimizer-recommendation-rebalance-cta"
+              :on {:click [[:actions/open-portfolio-optimizer-execution]]}}
+     [:span {:class ["flex" "flex-col" "gap-0.5"]}
+      [:span {:class ["text-[0.7rem]" "font-semibold"]}
+       (if no-trades? "Already at target" "Review & execute")]
+      [:span {:class ["text-[0.62rem]" "font-medium" "text-trading-muted"]}
+       (if no-trades?
+         "Your current allocation already matches the target — no trades needed."
+         "Review and execute the trades that move you from current to target allocation.")]]
+     [:span {:class ["text-sm" "font-semibold"] :aria-hidden "true"} "→"]]))
+
 (defn verdict-headline
-  "One plain-language sentence at the top of the recommendation tab stating what the
-  recommended portfolio does to the user's risk and return, with the trade count —
-  so the user reads the answer instead of reconstructing it from five KPI cards and
-  a frontier chart. Targets are framed as estimates; deltas are signed (the rest of
-  the UI uses the same convention: lower volatility and higher return are good).
-  Falls back to non-delta phrasing when there is no current baseline.
+  "The verdict bar at the top of the recommendation tab: one plain-language sentence
+  stating what the recommended portfolio does to the user's risk and return, with the
+  trade count — so the user reads the answer instead of reconstructing it from five
+  KPI cards and a frontier chart — paired with the primary Review & execute CTA.
+  Targets are framed as estimates; deltas are signed (the rest of the UI uses the same
+  convention: lower volatility and higher return are good). Falls back to non-delta
+  phrasing when there is no current baseline.
 
   `deltas` is the map produced by scenario-detail-view's `recommendation-deltas`."
   [{:keys [target-vol vol-delta target-return return-delta trade-count]}]
@@ -67,14 +99,111 @@
                         :else (str trade-count " trades get you there."))]
     [:section {:class ["optimizer-results-panel" "optimizer-recommendation-verdict"
                        "rounded-xl" "border" "border-base-300" "bg-base-100/95" "p-4"]
+               ;; Keyed (with its recommendation-tab siblings) so the recompute
+               ;; banner mounting/unmounting between them reconciles by key instead
+               ;; of recreating subtrees — recreation would reset DOM state like
+               ;; open <details> in the results grid mid-edit.
+               :replicant/key "optimizer-recommendation-verdict"
                :data-role "portfolio-optimizer-recommendation-verdict"}
-     [:p {:class ["text-[0.65rem]" "font-semibold" "uppercase" "tracking-[0.24em]" "text-trading-muted"]}
-      "Recommendation"]
-     [:p {:class ["mt-2" "text-sm" "font-medium" "text-trading-text"]} body]
-     (when trades-clause
-       [:p {:class ["mt-1" "text-[0.75rem]" "text-trading-muted"]
-            :data-role "portfolio-optimizer-recommendation-verdict-trades"}
-        trades-clause])]))
+     [:div {:class ["flex" "flex-wrap" "items-center" "justify-between" "gap-3"]}
+      [:div {:class ["min-w-0"]}
+       [:p {:class ["text-[0.65rem]" "font-semibold" "uppercase" "tracking-[0.24em]" "text-trading-muted"]}
+        "Recommendation"]
+       [:p {:class ["mt-2" "text-sm" "font-medium" "text-trading-text"]} body]
+       (when trades-clause
+         [:p {:class ["mt-1" "text-[0.75rem]" "text-trading-muted"]
+              :data-role "portfolio-optimizer-recommendation-verdict-trades"}
+          trades-clause])]
+      (verdict-cta trade-count)]]))
+
+(defn- target-shape
+  "Long/short counts and the largest |target weight| position, from the solved target
+  weights. Weights within ±0.01% of zero count as flat."
+  [weights-by-instrument]
+  (let [epsilon 0.0001
+        entries (filterv (fn [[_ weight]] (opt-format/finite-number? weight))
+                         (vec weights-by-instrument))
+        longs (count (filter (fn [[_ weight]] (> weight epsilon)) entries))
+        shorts (count (filter (fn [[_ weight]] (< weight (- epsilon))) entries))
+        largest (when (seq entries)
+                  (apply max-key (fn [[_ weight]] (js/Math.abs weight)) entries))]
+    {:asset-count (count entries)
+     :longs longs
+     :shorts shorts
+     :largest largest}))
+
+(defn- context-fact
+  [data-role label value]
+  [:div {:class ["optimizer-target-context-fact"]
+         :data-role data-role}
+   [:span {:class ["optimizer-target-context-label"]} label]
+   [:span {:class ["optimizer-target-context-value" "font-mono" "tabular-nums"]} value]])
+
+(defn- context-label
+  ;; Prefer the enriched human label; instrument-label alone returns the raw id for
+  ;; non-vault instruments.
+  [labels-by-instrument instrument-id]
+  (or (get labels-by-instrument instrument-id)
+      (get labels-by-instrument (keyword instrument-id))
+      (results-model/instrument-label labels-by-instrument instrument-id)))
+
+(defn- binding-limit-row
+  ;; Engine truth: a binding constraint is a per-instrument weight sitting on its
+  ;; lower/upper bound (`domain/diagnostics.cljs binding-constraints`), so the copy
+  ;; names the asset and the cap/floor it hit instead of leaking the raw keyword.
+  [labels-by-instrument {:keys [instrument-id constraint bound weight]}]
+  (let [level (or bound weight)
+        level-text (when (opt-format/finite-number? level)
+                     (str " " (opt-format/format-pct level)))]
+    [:p {:class ["optimizer-target-context-binding" "border" "border-warning/40"
+                 "bg-warning/10" "px-2" "py-1" "text-xs" "text-warning"]
+         :data-role (str "portfolio-optimizer-target-context-binding-"
+                         (or instrument-id "portfolio"))}
+     (when instrument-id
+       [:span {:class ["font-semibold"]}
+        (str (context-label labels-by-instrument instrument-id) " ")])
+     [:span (case constraint
+              :upper-bound (str "at cap" level-text)
+              :lower-bound (str "at floor" level-text)
+              (str "at " (str/lower-case (opt-format/keyword-label constraint)) " limit"))]]))
+
+(defn target-context-card
+  "Why this target: engine-derived facts that explain the recommended book's shape —
+  long/short counts, the largest target position, and which constraints bound the
+  solve. Strictly facts the engine reported; no narrative it didn't. Fills the center
+  column between the frontier and the (demoted) refinement card so the chart reads as
+  a decision aid instead of a chart-first dead end."
+  [result]
+  (let [weights (:target-weights-by-instrument result)
+        labels (:labels-by-instrument result)
+        bindings (get-in result [:diagnostics :binding-constraints])]
+    (when (seq weights)
+      (let [{:keys [asset-count longs shorts largest]} (target-shape weights)
+            [largest-id largest-weight] largest]
+        [:section {:class ["optimizer-target-context" "rounded-xl" "border"
+                           "border-base-300" "bg-base-100/95" "p-4"]
+                   :data-role "portfolio-optimizer-target-context"}
+         [:p {:class ["optimizer-target-context-title" "font-mono" "text-[0.62rem]"
+                      "uppercase" "tracking-[0.08em]" "text-trading-muted/70"]}
+          "Why this target"]
+         [:div {:class ["mt-3" "grid" "grid-cols-1" "gap-2" "sm:grid-cols-2"]}
+          (context-fact "portfolio-optimizer-target-context-shape"
+                        "Book shape"
+                        (str longs " long · " shorts " short of " asset-count " assets"))
+          (context-fact "portfolio-optimizer-target-context-largest"
+                        "Largest target position"
+                        (if largest-id
+                          (str (context-label labels largest-id)
+                               " · " (opt-format/format-pct largest-weight))
+                          "—"))]
+         [:div {:class ["mt-2"]
+                :data-role "portfolio-optimizer-target-context-limits"}
+          [:span {:class ["optimizer-target-context-label"]} "Limits hit"]
+          (if (seq bindings)
+            (into [:div {:class ["mt-1" "flex" "flex-wrap" "gap-1.5"]}]
+                  (map (partial binding-limit-row labels) bindings))
+            [:p {:class ["mt-1" "text-xs" "text-trading-muted"]}
+             "None — the target sits inside your constraints."])]]))))
 
 (defn- history-lookback-label
   [result]

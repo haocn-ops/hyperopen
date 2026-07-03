@@ -1,4 +1,8 @@
 @layer components {
+  /* Footer clearance for the scenario surface comes from the optimizer route
+     frame's padding-bottom (portfolio_view.cljs) — effective now that the frame
+     is shrink-0 and its box grows with content instead of clamping to the
+     viewport and letting content overflow past its padding. */
   .portfolio-optimizer .optimizer-scenario-surface {
     background-color: var(--optimizer-bg);
   }
@@ -971,5 +975,95 @@
        rule does not specificity-lock it; see kpi-card value note above. */
     margin-top: 2px;
     font-size: 10px;
+  }
+
+  /* ── Verdict bar CTA ──────────────────────────────────────────
+     The page's primary action, paired with the plain-language verdict at the top
+     of the Recommendation tab. Wide enough to read as a button block on desktop;
+     full-width when it wraps under the verdict text on narrow screens. */
+  .portfolio-optimizer .optimizer-verdict-cta {
+    flex: 0 1 auto;
+    min-width: min(300px, 100%);
+    border-radius: 0;
+  }
+
+  @media (max-width: 767px) {
+    .portfolio-optimizer .optimizer-verdict-cta {
+      width: 100%;
+    }
+  }
+
+  /* ── Refinement disclosure ────────────────────────────────────
+     Refinement is by-exception: the depth picker sits behind a native <details>
+     under the compact status header. The separator that used to live on
+     .optimizer-refinement-options moves up here so the closed state still reads
+     as a footer row of the card. */
+  .portfolio-optimizer .optimizer-refinement-disclosure {
+    border-top: 1px solid var(--optimizer-border);
+    padding-top: 10px;
+  }
+
+  .portfolio-optimizer .optimizer-refinement-disclosure-summary {
+    color: var(--optimizer-text-2);
+  }
+
+  .portfolio-optimizer .optimizer-refinement-disclosure-summary:hover
+    .optimizer-refinement-eyebrow-label {
+    color: var(--optimizer-accent);
+  }
+
+  .portfolio-optimizer .optimizer-refinement-disclosure .optimizer-refinement-options {
+    border-top: 0;
+    padding-top: 0;
+    margin-top: 4px;
+  }
+
+  /* ── Return-views disclosure (results rail) ───────────────────
+     Collapsed by default: the summary row (title + live counts) is the whole
+     panel until opened. The title <p> renders inline so it shares the marker
+     line with the counts. */
+  .portfolio-optimizer .optimizer-return-views-disclosure-summary p {
+    display: inline;
+    margin-right: 8px;
+  }
+
+  .portfolio-optimizer .optimizer-return-views-disclosure-summary:hover p {
+    color: var(--optimizer-accent);
+  }
+
+  /* ── "Why this target" context card ───────────────────────────
+     Engine-derived facts under the frontier: book shape, largest position,
+     binding constraints. Same dense-surface treatment as the refinement card. */
+  .portfolio-optimizer .optimizer-target-context {
+    border-radius: 0;
+    background-color: var(--optimizer-surface);
+  }
+
+  .portfolio-optimizer .optimizer-target-context-fact {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    border: 1px solid var(--optimizer-border);
+    background-color: var(--optimizer-bg);
+    padding: 8px 10px;
+  }
+
+  .portfolio-optimizer .optimizer-target-context-label {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    font-size: 9px;
+    font-weight: 650;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--optimizer-text-3);
+  }
+
+  .portfolio-optimizer .optimizer-target-context-value {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--optimizer-text);
+  }
+
+  .portfolio-optimizer .optimizer-target-context-binding {
+    border-radius: 0;
   }
 }

@@ -25,12 +25,15 @@
                 show-loading?
                 has-results?]}
         (leaderboard-vm/leaderboard-vm state)]
+    ;; pb-16 (not py): the fixed app footer (~49px) overlays the end of the page
+    ;; scroll, so the bottom padding must exceed it or the last rows sit under it.
     [:div {:class ["relative"
                    "w-full"
                    "app-shell-gutter"
-                   "py-4"
+                   "pt-4"
+                   "pb-16"
                    "space-y-4"
-                   "md:py-5"]
+                   "md:pt-5"]
            :style styles/leaderboard-background-style
            :data-parity-id "leaderboard-root"}
      [:div {:class ["pointer-events-none"

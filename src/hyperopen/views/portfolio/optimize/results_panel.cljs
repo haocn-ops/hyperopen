@@ -9,7 +9,9 @@
 
 (defn- active-views-editor
   ;; Rendered whenever the return model consumes views, regardless of objective —
-  ;; views are an input policy, not an objective.
+  ;; views are an input policy, not an objective. Collapsed by default here: on the
+  ;; results page view editing is a by-exception input task, so the rail shows only
+  ;; the title + live counts until opened.
   [state draft result readiness]
   (when (= :black-litterman (get-in draft [:return-model :kind]))
     (objective-menu/views-editor-section
@@ -21,6 +23,7 @@
       :title "Return views"
       :description "Annualized. Your views tilt the forecast; implied rows use the baseline estimate. Edits save and rerun automatically."
       :extra-class "optimizer-results-your-views-editor"
+      :collapsible? true
       :include-apply? true
       :apply-role "portfolio-optimizer-results-your-views-apply"})))
 
@@ -37,11 +40,15 @@
    (let [result (results-model/enrich-result-labels (:result last-successful-run) draft)]
      (when (= :solved (:status result))
        [:section {:class ["optimizer-results-surface" "space-y-0" "leading-4"]
+                  :replicant/key "optimizer-results-surface"
                   :data-role "portfolio-optimizer-results-surface"}
         (summary/stale-result-banner stale?)
+        ;; Keyed so the stale banner toggling above cannot recreate the grid —
+        ;; the rail's collapsible editors hold their open/closed state in the DOM.
         [:div {:class ["optimizer-results-grid" "grid" "grid-cols-1"
                        "xl:grid-cols-[420px_minmax(0,1fr)]"
                        "2xl:grid-cols-[500px_minmax(0,1fr)_320px]"]
+               :replicant/key "optimizer-results-grid"
                :data-role "portfolio-optimizer-results-grid"}
          [:div {:class ["optimizer-results-left-panel" "min-h-0" "space-y-0"]
                 :data-role "portfolio-optimizer-results-left-panel"}
@@ -56,10 +63,17 @@
            result
            frontier-overlay-mode
            constrain-frontier?)
+          ;; Decision-support before solver tuning: the engine-derived "why this
+          ;; target" facts sit directly under the chart; the refinement card below
+          ;; is compact with its options behind a disclosure.
+          (summary/target-context-card result)
           (refinement-card/refinement-status-card refinement)]
+         ;; Rail order is review-first: confidence (leads with the next-step row),
+         ;; then trust diagnostics, then the collapsed views editor — input editing
+         ;; is the by-exception task on this page.
          [:div {:class ["optimizer-results-right-panel" "min-h-0"
                         "xl:col-span-2" "2xl:col-span-1"]
                 :data-role "portfolio-optimizer-results-right-panel"}
-          (active-views-editor state draft result readiness)
           (diagnostics-rail/result-confidence-rail refinement)
-          (diagnostics-rail/trust-diagnostics-rail result)]]]))))
+          (diagnostics-rail/trust-diagnostics-rail result)
+          (active-views-editor state draft result readiness)]]]))))

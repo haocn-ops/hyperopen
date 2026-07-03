@@ -436,38 +436,14 @@
                      "py-3"
                      "text-sm"
                      "text-primary"]
+             ;; Keyed with its siblings so mounting/unmounting this banner cannot
+             ;; recreate the results grid (which holds open-<details> DOM state).
+             :replicant/key "optimizer-recompute-banner"
              :data-role "portfolio-optimizer-recompute-banner"}
    [:p {:class ["font-semibold"]} "Recomputing recommendation"]
    [:p {:class ["mt-1" "text-trading-muted"]}
     "Keeping the previous allocation visible until the new run finishes."]
    (optimization-progress-panel/progress-panel optimization-progress {:show-header? false})])
-
-(defn- review-rebalance-cta
-  "Discoverable bridge from the recommendation read-flow straight into Execution.
-  Stages the rebalance into the Execution tab in-place (no separate preview step) so
-  unsaved run state is preserved; the spectate/read-only gate lives downstream in the
-  execution surface, so this stays enabled in spectate mode (you can still review the
-  staged trades). When the target matches the current book (zero trades) it mutes and
-  relabels so it doesn't invite a no-op."
-  [trade-count]
-  (let [no-trades? (and (opt-format/finite-number? trade-count) (zero? trade-count))]
-    [:button {:type "button"
-              :class (into ["optimizer-review-rebalance-cta"
-                            "mt-3" "flex" "w-full" "items-center" "justify-between" "gap-3"
-                            "rounded-lg" "border" "px-4" "py-3" "text-left" "transition-colors"]
-                           (if no-trades?
-                             ["border-base-300" "bg-base-200/30" "text-trading-muted"]
-                             ["border-primary/50" "bg-primary/10" "text-primary" "hover:bg-primary/30"]))
-              :data-role "portfolio-optimizer-recommendation-rebalance-cta"
-              :on {:click [[:actions/open-portfolio-optimizer-execution]]}}
-     [:span {:class ["flex" "flex-col" "gap-0.5"]}
-      [:span {:class ["text-[0.7rem]" "font-semibold"]}
-       (if no-trades? "Already at target" "Review & execute")]
-      [:span {:class ["text-[0.62rem]" "font-medium" "text-trading-muted"]}
-       (if no-trades?
-         "Your current allocation already matches the target — no trades needed."
-         "Review and execute the trades that move you from current to target allocation.")]]
-     [:span {:class ["text-sm" "font-semibold"] :aria-hidden "true"} "→"]]))
 
 (defn- recommendation-tab
   [{:keys [last-successful-run
@@ -488,7 +464,9 @@
      (solved-result? model)
      (let [deltas (recommendation-deltas result)]
        (cond-> []
-         ;; Lead with the plain-language verdict, before the analyst diagnostics.
+         ;; Lead with the plain-language verdict + the primary Review & execute CTA,
+         ;; before the analyst diagnostics — the page's job is review-and-act, so the
+         ;; action sits above the fold instead of after the results grid.
          true (conj (results-summary/verdict-headline deltas))
          running? (conj (recompute-banner optimization-progress))
          true (conj (results-panel/results-panel
@@ -499,8 +477,7 @@
                       :stale? (and stale? (not running?))
                       :frontier-overlay-mode frontier-overlay-mode
                       :constrain-frontier? constrain-frontier?
-                      :refinement refinement}))
-         true (conj (review-rebalance-cta (:trade-count deltas)))))
+                      :refinement refinement}))))
 
      :else
      [(empty-tab "portfolio-optimizer-recommendation-empty"

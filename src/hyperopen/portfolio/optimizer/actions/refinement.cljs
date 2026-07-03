@@ -24,18 +24,6 @@
   (or (refinement/normalize-depth (get-in state contracts/ui-refinement-depth-path))
       refinement/default-depth))
 
-(defn open-portfolio-optimizer-refinement
-  [state]
-  (if (current-solved-result state)
-    [[:effects/save-many
-      [[contracts/ui-refinement-open-path true]
-       [contracts/ui-refinement-depth-path (selected-depth state)]]]]
-    []))
-
-(defn close-portfolio-optimizer-refinement
-  [_state]
-  [[:effects/save contracts/ui-refinement-open-path false]])
-
 (defn set-portfolio-optimizer-refinement-depth
   [_state depth]
   (if-let [depth* (refinement/normalize-depth depth)]
@@ -53,8 +41,7 @@
           [[contracts/refinement-active-path true]
            [contracts/refinement-depth-path depth]
            [contracts/refinement-requested-points-path requested-points]
-           [contracts/refinement-baseline-result-path result]
-           [contracts/ui-refinement-open-path false]]]
+           [contracts/refinement-baseline-result-path result]]]
          [:effects/run-portfolio-optimizer-pipeline]])
       [])))
 

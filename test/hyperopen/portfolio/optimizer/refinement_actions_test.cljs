@@ -20,25 +20,6 @@
       (assoc-in contracts/refinement-path (or refinement (defaults/default-refinement-state)))
       (assoc-in contracts/ui-refinement-depth-path depth)))
 
-(deftest open-and-close-refinement-test
-  (testing "open seeds the panel + default depth only when a solved result exists"
-    (is (= [[:effects/save-many
-             [[contracts/ui-refinement-open-path true]
-              [contracts/ui-refinement-depth-path :thorough]]]]
-           (refinement-actions/open-portfolio-optimizer-refinement
-            (state-with {:result solved-result}))))
-    (is (= [] (refinement-actions/open-portfolio-optimizer-refinement
-               (state-with {:result nil})))))
-  (testing "open keeps an already-selected depth"
-    (is (= [[:effects/save-many
-             [[contracts/ui-refinement-open-path true]
-              [contracts/ui-refinement-depth-path :maximum]]]]
-           (refinement-actions/open-portfolio-optimizer-refinement
-            (state-with {:result solved-result :depth :maximum})))))
-  (testing "close just lowers the flag"
-    (is (= [[:effects/save contracts/ui-refinement-open-path false]]
-           (refinement-actions/close-portfolio-optimizer-refinement {})))))
-
 (deftest set-depth-test
   (is (= [[:effects/save contracts/ui-refinement-depth-path :quick]]
          (refinement-actions/set-portfolio-optimizer-refinement-depth {} "quick")))
@@ -52,8 +33,7 @@
              [[contracts/refinement-active-path true]
               [contracts/refinement-depth-path :thorough]
               [contracts/refinement-requested-points-path 72]
-              [contracts/refinement-baseline-result-path solved-result]
-              [contracts/ui-refinement-open-path false]]]
+              [contracts/refinement-baseline-result-path solved-result]]]
             [:effects/run-portfolio-optimizer-pipeline]]
            (refinement-actions/refine-portfolio-optimizer
             (state-with {:result solved-result})))))

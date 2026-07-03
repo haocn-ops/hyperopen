@@ -100,7 +100,6 @@
 (def ui-constrain-frontier-path (conj optimizer-ui-path :constrain-frontier?))
 (def ui-stale-auto-recompute-path
   (conj optimizer-ui-path :stale-auto-recompute))
-(def ui-refinement-open-path (conj optimizer-ui-path :refinement-open?))
 (def ui-refinement-depth-path (conj optimizer-ui-path :refinement-depth))
 (def ui-exposure-zoom-level-path (conj optimizer-ui-path :exposure-zoom-level))
 (def ui-return-views-filter-path (conj optimizer-ui-path :return-views-filter))
@@ -193,7 +192,6 @@
    :optimizer-ui/target-sigma-draft ui-target-sigma-draft-path
    :optimizer-ui/constrain-frontier ui-constrain-frontier-path
    :optimizer-ui/stale-auto-recompute ui-stale-auto-recompute-path
-   :optimizer-ui/refinement-open ui-refinement-open-path
    :optimizer-ui/refinement-depth ui-refinement-depth-path
    :optimizer-ui/exposure-zoom-level ui-exposure-zoom-level-path
    :optimizer-ui/return-views-filter ui-return-views-filter-path})

@@ -232,6 +232,13 @@
   (let [n count
         assets (str n (if (= 1 n) " asset" " assets"))]
     (cond
+      ;; The two staleness codes need DISTINCT sentences: rendering both as
+      ;; "use stale cached history" produced two identically-worded groups with
+      ;; different counts side by side (audited live: "15 assets…" and
+      ;; "6 assets…" with overlapping asset lists).
+      (= :source-fetch-failed code)
+      (str assets " could not refresh from the history provider — using cached or native history")
+
       (contains? stale-history-warning-codes code)
       (str assets (if (= 1 n) " uses" " use") " stale cached history")
 

@@ -8,7 +8,7 @@
   The pad scale is FIXED while dragging: values clamp to the visible axis, and only the explicit
   zoom buttons (or a preset/profile/reset re-fit) change the scale, so the mapping under the
   pointer can never shift mid-gesture. On wide screens the pad sits beside its controls so the
-  open Constraints panel stays inside one screen.
+  open Portfolio exposure panel stays inside one screen.
 
   All dispatch goes through the atomic exposure actions; the pad's pointer coordinates are
   resolved by the :event/clientX, :event/clientY, :event.currentTarget/bounds, and
@@ -231,16 +231,16 @@
     [:p {:class ["optimizer-exposure-map__preview"]
          :data-role "portfolio-optimizer-exposure-preview"
          :data-on-policy (str (boolean on-policy?))}
-     [:span {:class controls/eyebrow-class} "Now"]
+     [:span {:class controls/eyebrow-class} "Current"]
      [:span {:class ["optimizer-exposure-map__preview-value"]}
       (str (fmt-mult (:gross current-exposure)) " gross · "
            (fmt-mult (:net current-exposure)) " net")]
      [:span {:class ["optimizer-exposure-map__preview-verdict"]}
       (cond
-        on-policy? "on policy — no rebalance needed"
-        (and (not gross-ok?) (not net-ok?)) "off policy — gross & net out of range"
-        (not gross-ok?) "off policy — gross out of range"
-        :else "off policy — net out of range")]]))
+        on-policy? "Current portfolio is inside this exposure policy."
+        (and (not gross-ok?) (not net-ok?)) "Current portfolio is outside this exposure policy: gross and net are out of range."
+        (not gross-ok?) "Current portfolio is outside this exposure policy: gross is out of range."
+        :else "Current portfolio is outside this exposure policy: net is out of range.")]]))
 
 (defn- preset-chip
   [{:keys [key label active?]}]
@@ -295,7 +295,10 @@
      [:div {:class ["optimizer-exposure-map__layout"]}
       [:div {:class ["optimizer-exposure-map__pad-col"]}
        (axis-frame axis zoom (exposure-pad model))
-       (target-readout model)]
+       (target-readout model)
+       [:p {:class ["optimizer-exposure-map__caption"]
+            :data-role "portfolio-optimizer-exposure-caption"}
+        "The dot shows the target gross leverage and net long/short bias. Drag it to adjust how aggressive and directional the rebalance can be."]]
       [:div {:class ["optimizer-exposure-map__controls"]}
        (presets-block presets)
        [:div {:class ["optimizer-exposure-map__bands"]}

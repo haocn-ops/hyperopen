@@ -121,6 +121,8 @@
     (formatter value)
     (str value)))
 
+(declare constraints-summary-line)
+
 (defn- active-preset
   ;; Two presets: a views-aware (Black-Litterman) return model belongs to
   ;; Maximum Sharpe — views are an input policy, not a strategy.
@@ -168,7 +170,6 @@
          return-kind (get-in draft [:return-model :kind])
          constraints (:constraints draft)
          labelize* #(apply-labelize labelize %)
-         percent-label* #(apply-percent-label percent-label %)
          bl? (= :black-litterman return-kind)]
      {:active-preset preset
       :black-litterman? bl?
@@ -181,13 +182,9 @@
                     "Funding-adjusted return assumptions are kept separate from covariance.")
        (summary-row "Objective" (labelize* objective-kind)
                     "Objective remains separate from return model selection.")
-       (summary-row "Constraints"
-                    (str "gross "
-                         (if (:gross-min constraints)
-                           (str (:gross-min constraints) ".." (or (:gross-max constraints) "--"))
-                           (str "<= " (or (:gross-max constraints) "--")))
-                         " - cap <= " (percent-label* (:max-asset-weight constraints)))
-                    "Constraints are enforced before the recommendation is accepted.")
+       (summary-row "Portfolio exposure"
+                    (constraints-summary-line constraints)
+                    "Exposure limits are enforced before the recommendation is accepted.")
        (summary-row "Horizon" "Annualized"
                     "Displayed return and volatility metrics use the optimizer annualization convention.")]})))
 
@@ -196,37 +193,85 @@
   (when (number? x)
     (str (.toFixed x 2) "×")))
 
+(defn- fmt-abs-mult
+  [x]
+  (when (number? x)
+    (str (.toFixed (js/Math.abs x) 2) "×")))
+
+(defn- fmt-signed-mult
+  [x]
+  (when (number? x)
+    (str (cond
+           (pos? x) "+"
+           (neg? x) "-"
+           :else "")
+         (.toFixed (js/Math.abs x) 2)
+         "×")))
+
 (defn gross-range-label
   [{:keys [gross-min gross-max]}]
   (if (number? gross-min)
-    (str "gross " (fmt-mult gross-min) "–" (fmt-mult gross-max))
-    (str "gross ≤ " (or (fmt-mult gross-max) "--"))))
+    (str "Gross " (fmt-mult gross-min) "–" (fmt-mult gross-max))
+    (str "Gross ≤ " (or (fmt-mult gross-max) "--"))))
+
+(defn- net-range-direction
+  [net-min net-max]
+  (cond
+    (and (zero? net-min) (zero? net-max)) :neutral
+    (and (not (neg? net-min)) (pos? net-max)) :long
+    (and (neg? net-min) (not (pos? net-max))) :short
+    :else :neutral-range))
+
+(defn- net-direction-copy
+  [direction]
+  (case direction
+    :long "long"
+    :short "short"
+    :neutral "neutral"
+    :neutral-range "neutral range"
+    nil))
+
+(defn- net-range-copy
+  [net-min net-max]
+  (let [direction (net-range-direction net-min net-max)
+        direction-copy (net-direction-copy direction)]
+    (cond
+      (= net-min net-max)
+      (str (fmt-signed-mult net-min) " " direction-copy)
+
+      (= direction :long)
+      (str (fmt-signed-mult net-min) "–" (fmt-abs-mult net-max) " " direction-copy)
+
+      (= direction :short)
+      (str (fmt-signed-mult net-min) "–" (fmt-abs-mult net-max) " " direction-copy)
+
+      :else
+      (str (fmt-signed-mult net-min) "–" (fmt-signed-mult net-max) " " direction-copy))))
 
 (defn net-range-label
   [{:keys [net-min net-max]}]
   (cond
     (and (number? net-min) (number? net-max))
-    (str "net " (fmt-mult net-min) "–" (fmt-mult net-max))
+    (str "Net " (net-range-copy net-min net-max))
 
-    (number? net-max) (str "net ≤ " (fmt-mult net-max))
-    (number? net-min) (str "net ≥ " (fmt-mult net-min))
-    :else "net --"))
+    (number? net-max) (str "Net ≤ " (fmt-signed-mult net-max))
+    (number? net-min) (str "Net ≥ " (fmt-signed-mult net-min))
+    :else nil))
 
 (defn- cap-label
   [cap]
   (when (number? cap)
-    (str "cap " (js/Math.round (* 100 cap)) "%")))
+    (str "Max asset " (js/Math.round (* 100 cap)) "%")))
 
 (defn- band-label
   [tolerance]
   (when (number? tolerance)
-    (str "band " (.toFixed (* 100 tolerance) 1) " pp")))
+    (str "Rebalance " (.toFixed (* 100 tolerance) 1) " pp")))
 
 (defn constraints-summary-line
-  "One scannable line of the live constraint numbers (\"gross 1.90–1.91× · net
-  1.30–1.41× · cap 50% · band 3.0 pp\") shared by the collapsed Constraints header
-  and the scenario-contract card, so the policy that determines the result is
-  never hidden behind a closed panel."
+  "One scannable line of the live exposure-policy numbers (\"Gross 1.90–1.91× ·
+  Net +1.30×–1.41× long · Max asset 50% · Rebalance 3.0 pp\") shared by the
+  Portfolio exposure header and the scenario-contract card."
   [constraints]
   (->> [(gross-range-label constraints)
         (net-range-label constraints)

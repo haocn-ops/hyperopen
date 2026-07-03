@@ -4,20 +4,20 @@ import { optimizerPath, readOptimizerState } from "../support/optimizer_state.mj
 
 const PANEL = "[data-role='portfolio-optimizer-constraints-panel']";
 
-async function openConstraintsPanel(page) {
+async function expectPortfolioExposureOpen(page) {
   const panel = page.locator(PANEL);
   await expect(panel).toHaveCount(1);
-  // The panel is a native <details>; open it directly so the assertions don't depend on a
-  // click toggling the right one among several disclosure panels.
-  await panel.evaluate((el) => {
-    el.open = true;
-  });
+  await expect.poll(async () => panel.evaluate((el) => el.open)).toBe(true);
+  await expect(panel.locator("> summary")).toContainText("Portfolio exposure");
+  await expect(panel).toContainText(
+    "Set how levered and net long/short the target portfolio can be."
+  );
 }
 
 test.describe("optimizer exposure-map Positioning control", () => {
   test.beforeEach(async ({ page }) => {
     await visitRoute(page, "/portfolio/optimize/new");
-    await openConstraintsPanel(page);
+    await expectPortfolioExposureOpen(page);
   });
 
   test("renders the 2D pad, echo, presets, and profile row", async ({ page }) => {
@@ -27,6 +27,8 @@ test.describe("optimizer exposure-map Positioning control", () => {
     await expect(page.locator("[data-role='portfolio-optimizer-exposure-echo']")).toContainText(
       "Sent to solver"
     );
+    await expect(page.locator("[data-role='portfolio-optimizer-exposure-caption']"))
+      .toContainText("The dot shows the target gross leverage and net long/short bias.");
     await expect(
       page.locator("[data-role='portfolio-optimizer-exposure-gross-band']")
     ).toBeVisible();
@@ -42,7 +44,7 @@ test.describe("optimizer exposure-map Positioning control", () => {
   test("the pad is bounded and the Run bar stays visible with the panel open", async ({
     page
   }) => {
-    // The open Constraints panel must not consume more than a screen: the pad renders in a
+    // The open Portfolio exposure panel must not consume more than a screen: the pad renders in a
     // bounded column (~21rem) instead of spanning the full center pane.
     const pad = page.locator("[data-role='portfolio-optimizer-exposure-pad']");
     await expect(pad).toBeVisible();

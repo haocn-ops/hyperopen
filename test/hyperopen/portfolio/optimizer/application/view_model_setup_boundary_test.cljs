@@ -151,12 +151,35 @@
     (is (= "Max Sharpe" (get-in row-by-label ["Preset" :title])))
     (is (= "Historical Mean" (get-in row-by-label ["Expected Returns" :title])))
     (is (= "Max Sharpe" (get-in row-by-label ["Objective" :title])))
-    (is (= "gross <= 1.5 - cap <= 40%" (get-in row-by-label ["Constraints" :title]))))
+    (is (= "Gross ≤ 1.50× · Max asset 40%" (get-in row-by-label ["Portfolio exposure" :title]))))
   (is (true? (:black-litterman?
               (view-model/setup-summary-model
                {:return-model {:kind :black-litterman}}
                {:labelize name
                 :percent-label str})))))
+
+(deftest constraints-summary-line-uses-readable-exposure-copy-test
+  (is (= "Gross 4.80×–5.80× · Net +0.55×–1.55× long · Max asset 574% · Rebalance 3.0 pp"
+         (view-model/constraints-summary-line
+          {:gross-min 4.8
+           :gross-max 5.8
+           :net-min 0.55
+           :net-max 1.55
+           :max-asset-weight 5.74
+           :rebalance-tolerance 0.03})))
+  (is (= "Gross ≤ 2.00× · Net +1.00× long · Max asset 50% · Rebalance 3.0 pp"
+         (view-model/constraints-summary-line
+          {:gross-max 2
+           :net-min 1
+           :net-max 1
+           :max-asset-weight 0.5
+           :rebalance-tolerance 0.03})))
+  (is (= "Gross ≤ 3.00× · Net -0.25×–+0.25× neutral range · Max asset 25%"
+         (view-model/constraints-summary-line
+          {:gross-max 3
+           :net-min -0.25
+           :net-max 0.25
+           :max-asset-weight 0.25}))))
 
 (deftest black-litterman-cards-model-projects-preview-card-data-test
   (let [formatters {:pct (fn [value] (str "pct:" value))

@@ -336,7 +336,10 @@
   [{:keys [rebalance-tolerance]} instrument price capital-usd delta-weight delta-notional-usd quantity]
   (cond
     (<= (abs-num delta-weight) (or rebalance-tolerance 0))
-    {:status :within-tolerance}
+    ;; Carry the band so downstream surfaces can say WHY the leg is skipped
+    ;; ("within 3.0 pp band") instead of a bare unexplained "skipped".
+    {:status :within-tolerance
+     :tolerance (or rebalance-tolerance 0)}
 
     (nil? instrument)
     {:status :blocked

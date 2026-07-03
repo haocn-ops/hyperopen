@@ -51,8 +51,8 @@
   the spectate/read-only gate lives downstream in the execution surface. Mutes and
   relabels when the target already matches the current book so it doesn't invite a
   no-op."
-  [trade-count]
-  (let [no-trades? (and (opt-format/finite-number? trade-count) (zero? trade-count))]
+  [at-target?]
+  (let [no-trades? (true? at-target?)]
     [:button {:type "button"
               :class (into ["optimizer-review-rebalance-cta" "optimizer-verdict-cta"
                             "flex" "items-center" "justify-between" "gap-3"
@@ -82,7 +82,8 @@
   phrasing when there is no current baseline.
 
   `deltas` is the map produced by scenario-detail-view's `recommendation-deltas`."
-  [{:keys [target-vol vol-delta target-return return-delta trade-count]}]
+  [{:keys [target-vol vol-delta target-return return-delta trade-count
+           blocked-count at-target?]}]
   (let [vol-clause (if (opt-format/finite-number? vol-delta)
                      (str "estimated volatility " (opt-format/format-pct target-vol)
                           " (" (opt-format/format-pct-delta vol-delta) " vs current)")
@@ -94,7 +95,14 @@
         body (str "Targets " vol-clause " and " return-clause ".")
         trades-clause (cond
                         (not (opt-format/finite-number? trade-count)) nil
-                        (zero? trade-count) "No trades needed — you're already at target."
+                        ;; Sendable trades only. An all-blocked plan is NOT "at
+                        ;; target" — its trades exist but can't be sent yet.
+                        at-target? "No trades needed — you're already at target."
+                        (zero? trade-count)
+                        (str "No trades can be sent — "
+                             blocked-count
+                             (if (= 1 blocked-count) " leg is" " legs are")
+                             " blocked.")
                         (= 1 trade-count) "1 trade gets you there."
                         :else (str trade-count " trades get you there."))]
     [:section {:class ["optimizer-results-panel" "optimizer-recommendation-verdict"
@@ -114,7 +122,7 @@
          [:p {:class ["mt-1" "text-[0.75rem]" "text-trading-muted"]
               :data-role "portfolio-optimizer-recommendation-verdict-trades"}
           trades-clause])]
-      (verdict-cta trade-count)]]))
+      (verdict-cta at-target?)]]))
 
 (defn- target-shape
   "Long/short counts and the largest |target weight| position, from the solved target

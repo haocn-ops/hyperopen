@@ -43,7 +43,8 @@
            scenario-save-state
            current-result?
            result
-           refinement]}]
+           refinement
+           rerun-blocked-reason]}]
   (let [status (:status active-scenario)
         read-only? (true? (:read-only? active-scenario))
         running? (or running?
@@ -150,8 +151,12 @@
                          "disabled:bg-base-200/40"
                          "disabled:text-trading-muted"]
                  :data-role "portfolio-optimizer-scenario-rerun"
-                 :disabled running?
-                 :on {:click [[:actions/run-portfolio-optimizer-from-draft]]}}
+                 ;; An enabled button that silently does nothing is a truthfulness
+                 ;; violation — when the draft cannot run, disable and say why.
+                 :disabled (boolean (or running? rerun-blocked-reason))
+                 :title rerun-blocked-reason
+                 :on (when-not (or running? rerun-blocked-reason)
+                       {:click [[:actions/run-portfolio-optimizer-from-draft]]})}
         (cond
           running? "Running"
           :else "Rerun")]

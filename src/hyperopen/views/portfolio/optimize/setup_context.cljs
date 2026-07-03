@@ -12,9 +12,9 @@
 
 (defn- contract-row
   [label value]
-  ;; 92px label track: the 10px uppercase-mono tags ("CONSTRAINTS") need the
-  ;; room at the raised scale without wrapping.
-  [:div {:class ["grid" "grid-cols-[92px_minmax(0,1fr)]" "items-baseline" "gap-2"]}
+  ;; 120px label track: the 10px uppercase-mono tags include "Portfolio exposure",
+  ;; which should stay readable instead of wrapping in the scenario contract.
+  [:div {:class ["grid" "grid-cols-[120px_minmax(0,1fr)]" "items-baseline" "gap-2"]}
    [:span {:class ["font-mono" "text-[0.625rem]" "font-semibold" "uppercase"
                    "tracking-[0.1em]" "text-trading-muted/60"]}
     label]
@@ -54,7 +54,7 @@
       ;; name — "Use my views" was never a model, it was an input policy.
       (contract-row "Returns" returns-label)
       (contract-row "Risk model" risk-label)
-      (contract-row "Constraints"
+      (contract-row "Portfolio exposure"
                     [:span {:class ["font-mono" "text-[0.75rem]" "text-trading-muted"]}
                      constraints-line])]]))
 

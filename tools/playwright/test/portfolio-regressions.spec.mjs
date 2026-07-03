@@ -1559,8 +1559,8 @@ test("portfolio optimizer setup turnover cap switch disables and restores cap @r
     "[data-role='portfolio-optimizer-constraint-max-turnover-input']"
   );
 
-  await constraintsPanel.locator("> summary").click();
   await expect.poll(async () => constraintsPanel.evaluate((element) => element.open)).toBe(true);
+  await expect(constraintsPanel.locator("> summary")).toContainText("Portfolio exposure");
   await expect(turnoverToggle).toHaveAttribute("role", "switch");
   await expect(turnoverToggle).toHaveAttribute("aria-checked", "true");
   await expect(turnoverInput).toBeEnabled();
@@ -1619,8 +1619,8 @@ test("portfolio optimizer From holdings seeds current exposure constraints @regr
     .toBeVisible();
 
   const constraintsPanel = page.locator("[data-role='portfolio-optimizer-constraints-panel']");
-  await constraintsPanel.locator("> summary").click();
   await expect.poll(async () => constraintsPanel.evaluate((element) => element.open)).toBe(true);
+  await expect(constraintsPanel.locator("> summary")).toContainText("Portfolio exposure");
   await expect(page.locator("[data-role='portfolio-optimizer-constraint-gross-max-input']"))
     .toHaveValue("2");
   await expect(page.locator("[data-role='portfolio-optimizer-constraint-net-min-input']"))
@@ -1653,10 +1653,10 @@ test("portfolio optimizer setup exposes separate model layers @regression", asyn
   );
 
   await expect.poll(async () => modelPanel.evaluate((element) => element.open)).toBe(false);
-  await expect.poll(async () => constraintsPanel.evaluate((element) => element.open)).toBe(false);
+  await expect.poll(async () => constraintsPanel.evaluate((element) => element.open)).toBe(true);
   await expect.poll(async () => advancedPanel.evaluate((element) => element.open)).toBe(false);
   await expect(returnModelPanel).toBeHidden();
-  await expect(maxAssetWeight).toBeHidden();
+  await expect(maxAssetWeight).toBeVisible();
 
   const summaryPane = page.locator("[data-role='portfolio-optimizer-setup-policy-pane']");
   const assumptionsPanel = page.locator("[data-role='portfolio-optimizer-model-assumptions-panel']");
@@ -1717,6 +1717,8 @@ test("portfolio optimizer setup exposes separate model layers @regression", asyn
   await expect(page.locator("[data-role='portfolio-optimizer-risk-model-panel']"))
     .toContainText("Diagonal Shrink");
   await expect(page.locator("[data-role='portfolio-optimizer-constraints-panel']"))
+    .toContainText("Portfolio exposure");
+  await expect(page.locator("[data-role='portfolio-optimizer-constraints-panel']"))
     .toContainText("Max Asset Weight");
   await expect(page.locator("[data-role='portfolio-optimizer-constraints-panel']"))
     .toContainText("Gross Leverage");
@@ -1742,7 +1744,6 @@ test("portfolio optimizer setup exposes separate model layers @regression", asyn
   await expect(returnModelPanel).toBeVisible();
   await expect(riskModelPanel).toBeVisible();
 
-  await constraintsPanel.locator("> summary").click();
   await expect.poll(async () => constraintsPanel.evaluate((element) => element.open)).toBe(true);
   await expect(maxAssetWeight).toBeVisible();
 

@@ -133,7 +133,7 @@
     (is (not (str/includes? (node-text (node-by-role view-node "portfolio-optimizer-return-risk-panel"))
                             "03Return / Risk Model")))))
 
-(deftest setup-return-risk-and-constraints-panels-are-collapsed-disclosures-test
+(deftest setup-policy-pane-opens-portfolio-exposure-by-default-test
   (let [view-node (portfolio-view/portfolio-view
                    {:router {:path "/portfolio/optimize/new"}
                     :portfolio {:optimizer
@@ -148,11 +148,17 @@
                                                        :gross-max 2}}}}})
         model-panel (node-by-role view-node "portfolio-optimizer-return-risk-panel")
         constraints-panel (node-by-role view-node "portfolio-optimizer-constraints-panel")
-        advanced-panel (node-by-role view-node "portfolio-optimizer-advanced-overrides-shell")]
-    (doseq [panel [model-panel constraints-panel advanced-panel]]
+        advanced-panel (node-by-role view-node "portfolio-optimizer-advanced-overrides-shell")
+        strings (set (collect-strings constraints-panel))]
+    (doseq [panel [model-panel advanced-panel]]
       (is (= :details (first panel)))
       (is (not (contains? (second panel) :open)))
       (is (= :summary (first (first (node-children panel))))))
+    (is (= :details (first constraints-panel)))
+    (is (= true (get-in constraints-panel [1 :open])))
+    (is (= :summary (first (first (node-children constraints-panel)))))
+    (is (contains? strings "Portfolio exposure"))
+    (is (contains? strings "Set how levered and net long/short the target portfolio can be."))
     (is (some? (node-by-role model-panel "portfolio-optimizer-return-model-panel")))
     (is (some? (node-by-role model-panel "portfolio-optimizer-risk-model-panel")))
     (is (some? (node-by-role constraints-panel
@@ -380,11 +386,15 @@
     ;; reflects the active positioning preset (here :custom) instead of the old "defaults
     ;; applied", and the controls are grouped by what the trader decides.
     (is (contains? strings "Custom"))
+    (is (contains? strings "Portfolio exposure"))
+    (is (contains? strings "Set how levered and net long/short the target portfolio can be."))
+    (is (some #(str/includes? % "The dot shows the target gross leverage and net long/short bias.")
+              strings))
     (is (contains? strings "Positioning"))
     (is (contains? strings "Risk guards"))
     (is (contains? strings "Rebalance behavior"))
     (is (contains? strings "Sent to solver"))
-    (is (contains? strings "Advanced solver constraints"))
+    (is (contains? strings "Advanced solver limits"))
     ;; Each numeric constraint echoes its interpreted unit persistently (not only in the
     ;; hover tooltip): 0.25 -> "max 25% per asset", 3 -> "3.00× capital", 0.03 -> "3.0 pp band".
     (is (contains? strings "max 25% per asset"))

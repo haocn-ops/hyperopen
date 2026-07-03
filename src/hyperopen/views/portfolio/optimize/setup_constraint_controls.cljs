@@ -178,7 +178,7 @@
                                    (not enabled?)]]})]]))
 
 (defn- group-block
-  "A labelled sub-group inside the Constraints panel. `eyebrow` is the small uppercase label,
+  "A labelled sub-group inside the Portfolio exposure panel. `eyebrow` is the small uppercase label,
   `hint` an optional plain-English caption, `body` the controls."
   [eyebrow hint body]
   [:div {:class ["optimizer-constraint-group"]}
@@ -199,7 +199,7 @@
   [constraints highlighted-controls]
   (controls/disclosure-panel
    "portfolio-optimizer-constraints-advanced"
-   (controls/disclosure-heading "Advanced solver constraints" "raw min/max")
+   (controls/disclosure-heading "Advanced solver limits" "raw min/max")
    [:div {:class ["mt-3" "grid" "grid-cols-1" "gap-2"]}
     (constraint-row "Gross exposure min" :gross-min (:gross-min constraints)
                     "portfolio-optimizer-constraint-gross-min-input"
@@ -232,20 +232,23 @@
                           :zoom-level exposure-zoom-level})
          active-label (get exposure-policy/preset-labels
                            (:active-preset exposure-model) "Custom")]
-     (controls/disclosure-panel
+     (controls/disclosure-panel-open
       "portfolio-optimizer-constraints-panel"
       ;; The collapsed header carries the actual policy, not just a preset name:
-      ;; constraints are a main determinant of the result, so the live numbers
-      ;; ("gross 1.90–1.91× · net 1.30–1.41× · cap 50% · band 3.0 pp") stay
+      ;; exposure limits are a main determinant of the result, so the live numbers
+      ;; ("Gross 1.90–1.91× · Net +1.30×–1.41× long · Max asset 50%") stay
       ;; scannable while the panel is closed.
       (controls/disclosure-heading
-       "Constraints"
+       "Portfolio exposure"
        [:span {:class ["flex" "min-w-0" "flex-col" "items-end" "gap-0.5" "text-right"]}
         [:span active-label]
         [:span {:class ["normal-case" "tracking-normal" "text-trading-muted"]
                 :data-role "portfolio-optimizer-constraints-header-summary"}
          (optimizer-view-model/constraints-summary-line constraints)]])
       [:div {:class ["mt-3" "space-y-4"]}
+       [:p {:class ["text-[0.8125rem]" "leading-[1.45]" "text-trading-muted"]
+            :data-role "portfolio-optimizer-constraints-description"}
+        "Set how levered and net long/short the target portfolio can be."]
        (group-block "Positioning" "gross leverage + net bias"
                     (exposure-map/exposure-map exposure-model))
        ;; Risk guards / Rebalance behavior keep each canonical control exactly once (original

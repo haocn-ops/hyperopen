@@ -95,7 +95,7 @@
     ;; the duplicate empty-state button is gone
     (is (nil? (node-by-role view-node "portfolio-optimizer-universe-load-holdings")))))
 
-(deftest setup-policy-pane-orders-objective-before-return-risk-model-test
+(deftest setup-policy-pane-orders-exposure-before-return-risk-model-test
   (let [view-node (portfolio-view/portfolio-view
                    {:router {:path "/portfolio/optimize/new"}
                     :portfolio {:optimizer
@@ -115,8 +115,8 @@
     ;; stack) so its sticky positioning can pin it to the viewport bottom while the tall pane
     ;; scrolls.
     (is (= ["portfolio-optimizer-objective-panel"
-            "portfolio-optimizer-return-risk-panel"
             "portfolio-optimizer-constraints-panel"
+            "portfolio-optimizer-return-risk-panel"
             "portfolio-optimizer-advanced-overrides-shell"
             "portfolio-optimizer-why-safe-note"
             "portfolio-optimizer-model-assumptions-stack"

@@ -1536,8 +1536,8 @@ test("portfolio optimizer setup puts policy controls in the center pane @regress
     .evaluate((pane) => Array.from(pane.children).map((child) => child.getAttribute("data-role"))))
     .toEqual([
       "portfolio-optimizer-objective-panel",
-      "portfolio-optimizer-return-risk-panel",
       "portfolio-optimizer-constraints-panel",
+      "portfolio-optimizer-return-risk-panel",
       "portfolio-optimizer-advanced-overrides-shell",
       "portfolio-optimizer-why-safe-note",
       "portfolio-optimizer-model-assumptions-stack",

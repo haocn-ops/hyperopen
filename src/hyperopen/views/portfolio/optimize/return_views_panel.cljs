@@ -309,7 +309,7 @@
   [:p {:class ["border" "border-base-300" "bg-base-200/20" "p-3"
                "text-[0.75rem]" "leading-[1.45]" "text-trading-muted"]
        :data-role (str container-role "-conservative-note")}
-   "Return views are not used by Minimum Variance. Switch to the Maximum Sharpe preset to optimize with your expected-return views."])
+   "Return views are not used by Minimum Variance. Switch to the Maximum Sharpe goal to optimize with your expected-return views."])
 
 (defn return-views-panel
   "The provenance-aware Return views panel. Options:

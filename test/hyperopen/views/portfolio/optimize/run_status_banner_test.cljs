@@ -133,10 +133,11 @@
                                        :run-state {:status :succeeded}
                                        :draft (draft {})}))))
 
-(deftest banner-renders-above-presets-and-outside-the-right-rail-test
-  ;; The core fix: the live run state must sit in the main column above the preset
-  ;; cards, never trapped in the right-rail scroll area where Maximum Sharpe can
-  ;; push it below the fold.
+(deftest banner-renders-above-setup-surface-and-outside-the-right-rail-test
+  ;; The core fix: the live run state must sit in the main column above the setup
+  ;; surface, never trapped in the right-rail scroll area where Maximum Sharpe can
+  ;; push it below the fold. (It used to sit above the retired "Start with" preset
+  ;; row; that row is gone, so the grid surface is now the anchor.)
   (let [view-node (portfolio-view/portfolio-view
                    {:router {:path "/portfolio/optimize/new"}
                     :portfolio {:optimizer
@@ -150,7 +151,8 @@
                                  :optimization-progress (running-progress {})}}})
         order (vec (data-role-order view-node))]
     (is (some? (node-by-role view-node "portfolio-optimizer-run-banner")))
+    (is (nil? (node-by-role view-node "portfolio-optimizer-setup-preset-row")))
     (is (< (index-of order "portfolio-optimizer-run-banner")
-           (index-of order "portfolio-optimizer-setup-preset-row")))
+           (index-of order "portfolio-optimizer-setup-surface")))
     (is (< (index-of order "portfolio-optimizer-run-banner")
            (index-of order "portfolio-optimizer-right-rail")))))

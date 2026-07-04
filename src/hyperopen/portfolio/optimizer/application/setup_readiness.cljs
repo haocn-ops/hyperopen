@@ -324,6 +324,18 @@
       :funding-history-missing
       (str label ": funding history is missing; price history availability is separate.")
 
+      ;; Portfolio-level prior fallbacks (no :instrument-id): say what happens
+      ;; instead of leaking the internal code as a headline.
+      :missing-market-cap-prior
+      (str "Market-cap baseline unavailable — implied returns start from "
+           (if (= :equal-weight (:fallback warning))
+             "equal weights"
+             "your current holdings")
+           " instead.")
+
+      :missing-current-portfolio-prior
+      "No current-portfolio baseline — equal weights seed the implied returns."
+
       :stale-history
       (str label ": optimizer history may be stale.")
 

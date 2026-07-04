@@ -88,11 +88,37 @@ Round 2 (2026-07-04, expert follow-up review — "calming pass", P0→P2):
   and aria-labels updated to "save as your view · <level> confidence").
 - [x] P2 Scenario-contract row labels de-teletyped: plain sentence-case muted
   text; mono/uppercase reserved for values and section eyebrows.
-- [ ] Follow-up: consider a compact collapsed-by-default contract once the
-  expanded card proves to be scanned rather than read; revisit whether the
-  provider-limit warning should carry an explicit "configure data source" path;
-  audit selected-state vs keyboard-focus outline colors (gold selection vs blue
-  focus) across the goal cards in a dedicated theming pass.
+Round 3 (2026-07-04, owner + expert follow-up — forecast inputs must be visible
+under Maximum Sharpe):
+
+- [x] The rail Return-views editor is EXPANDED by default under Maximum Sharpe
+  (`:open? true` on the collapsible panel — still a `<details>` the user can
+  tuck away; initial-state-only attribute so a manual toggle survives
+  re-renders). The rows list gets a 24rem CSS cap inside the context rail so a
+  13-asset editor scrolls instead of pushing Data health off screen.
+- [x] Contract "Return forecast" always shows counts ("0 your views · 13
+  implied") — `returns-contract-label` no longer collapses zero-view state to
+  "Implied baseline".
+- [x] Editor description now leads with editability: "Edit any return to save
+  it as your view. Saved views override implied returns; the rest use the
+  implied baseline."
+- [x] Minimum-risk inactive note tightened: trailing reads "Not used by
+  Minimum risk" (was "Inactive for…"), body "Minimum risk ignores
+  expected-return forecasts."
+- [x] `missing-market-cap-prior` / `missing-current-portfolio-prior` no longer
+  leak raw codes: humanized fallback-aware messages ("Market-cap baseline
+  unavailable — implied returns start from your current holdings instead."),
+  classed :info, with a detail line; raw code stays behind Details.
+- [x] Data health verdict carries the issue count ("Ready with cautions · 3
+  issues") so the health state stays legible even with the warning cards
+  further down.
+- [ ] Follow-up: consider moving the full Return-views editor into the CENTER
+  column when Maximum Sharpe is selected (expert's preferred end-state; the
+  rail keeps contract + health summary) — deferred as a larger IA change.
+  Also: compact collapsed-by-default contract once the expanded card proves to
+  be scanned rather than read; "configure data source" path for the
+  provider-limit warning; selected-state vs keyboard-focus outline audit
+  (gold vs blue) in a theming pass.
 
 ## Surprises & Discoveries
 

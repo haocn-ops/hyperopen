@@ -130,8 +130,10 @@
          (str/join " · "))))
 
 (defn returns-contract-label
-  "Compact returns-source line for the scenario contract and preset card."
+  "Compact returns-source line for the scenario contract and preset card.
+  Always counts — \"0 your views · 13 implied\" tells the user how much of the
+  optimization rests on their own assumptions; \"Implied baseline\" did not."
   [{:keys [yours implied]}]
-  (if (zero? (or yours 0))
-    "Implied baseline"
-    (str yours " your " (if (= 1 yours) "view" "views") " · " implied " implied")))
+  (let [yours (or yours 0)]
+    (str yours " your " (if (= 1 yours) "view" "views") " · "
+         (or implied 0) " implied")))

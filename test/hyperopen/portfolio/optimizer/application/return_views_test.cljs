@@ -72,7 +72,9 @@
            (return-views/summary-line {:total 3 :yours 0 :implied 3 :stale 0})))
     (is (= "1 your view · 2 implied"
            (return-views/returns-contract-label summary)))
-    (is (= "Implied baseline"
+    ;; Zero authored views still reports counts — "Implied baseline" hid how
+    ;; much of the forecast was model-generated.
+    (is (= "0 your views · 3 implied"
            (return-views/returns-contract-label {:yours 0 :implied 3})))))
 
 (deftest filters-match-rows-test

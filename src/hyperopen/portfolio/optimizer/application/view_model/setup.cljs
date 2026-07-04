@@ -50,7 +50,9 @@
   #{:proxy-history-used
     :vault-derived-history-used
     :funding-history-missing
-    :manual-capital-base})
+    :manual-capital-base
+    :missing-market-cap-prior
+    :missing-current-portfolio-prior})
 
 (defn- warning-severity
   "Rank a warning group so the panel can render blocking issues, cautions, and
@@ -66,7 +68,8 @@
   ;; run — so the headline can stay short.
   {:proxy-history-used "Used when direct history is limited."
    :stale-history "Refresh pulls fresh history from the provider."
-   :source-fetch-failed "Refresh retries the history provider."})
+   :source-fetch-failed "Refresh retries the history provider."
+   :missing-market-cap-prior "The optimizer could not load market-cap baseline data for some assets."})
 
 (defn- provider-limit-code?
   [code]
@@ -133,21 +136,24 @@
 
 (defn- readiness-status
   "Overall verdict for the Data health header: can the user run, run with
-  cautions, or must they fix something first."
+  cautions, or must they fix something first. :issue-count is the number of
+  warning groups, so the verdict line can read \"Ready with cautions · 3
+  issues\" and stay meaningful even when the cards sit below other panels."
   [readiness history-load-state warnings]
-  (cond
-    (or (contains? #{:history-loading :holdings-loading} (:reason readiness))
-        (= :loading (:status history-load-state)))
-    {:level :loading :label "Loading…"}
+  (let [issue-count (count warnings)]
+    (cond
+      (or (contains? #{:history-loading :holdings-loading} (:reason readiness))
+          (= :loading (:status history-load-state)))
+      {:level :loading :label "Loading…" :issue-count issue-count}
 
-    (= :blocked (:status readiness))
-    {:level :blocked :label "Action needed"}
+      (= :blocked (:status readiness))
+      {:level :blocked :label "Action needed" :issue-count issue-count}
 
-    (some #(= :caution (:severity %)) warnings)
-    {:level :caution :label "Ready with cautions"}
+      (some #(= :caution (:severity %)) warnings)
+      {:level :caution :label "Ready with cautions" :issue-count issue-count}
 
-    :else
-    {:level :ready :label "Ready to run"}))
+      :else
+      {:level :ready :label "Ready to run" :issue-count issue-count})))
 
 (defn readiness-panel-model
   [readiness history-load-state]

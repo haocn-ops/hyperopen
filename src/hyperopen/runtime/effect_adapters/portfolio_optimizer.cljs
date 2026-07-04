@@ -3,6 +3,7 @@
             [hyperopen.account.context :as account-context]
             [hyperopen.api.default :as api]
             [hyperopen.api.trading :as trading-api]
+            [hyperopen.order.effects :as order-effects]
             [hyperopen.config :as app-config]
             [hyperopen.portfolio.optimizer.application.constraint-profiles :as constraint-profiles]
             [hyperopen.portfolio.optimizer.application.view-library :as view-library]
@@ -457,6 +458,25 @@
       controller-resolver
       nil
       store))))
+
+(def ^:dynamic *refresh-account-open-orders!*
+  ;; Rebindable so unit tests of optimizer effects never fire live snapshot fetches.
+  ;; Uses the manual-order-entry mutation refresh, which force-refreshes the base book
+  ;; AND every named dex's frontendOpenOrders snapshot (the only cloid-bearing source —
+  ;; the generic openOrders stream never hydrates named-dex rows). No-op without a
+  ;; connected account.
+  (fn [store]
+    (when-let [address (or (account-context/effective-account-address @store)
+                           (get-in @store [:wallet :address]))]
+      (order-effects/refresh-account-surfaces-after-order-mutation! store address))))
+
+(defn refresh-portfolio-optimizer-open-orders-effect
+  "Force-refreshes every open-order surface (base + per-dex frontendOpenOrders, the
+  cloid-bearing source). Dispatched when the Execution tab is staged so that by
+  confirm time the optimizer can recognize — and cancel — its own resting orders from
+  previous sessions on the live book."
+  [_ store]
+  (*refresh-account-open-orders!* store))
 
 (defn execute-portfolio-optimizer-plan-effect
   ([_ store plan]

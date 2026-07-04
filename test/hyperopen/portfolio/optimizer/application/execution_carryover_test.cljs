@@ -67,3 +67,32 @@
         "string shapes are parsed onto the wire form")
     (is (= [333] (mapv :oid unresolved))
         "an entry without an asset index cannot be cancelled and must halt the run")))
+
+(deftest open-order-rows-merges-all-sources-and-shapes-test
+  ;; Production shapes verified live 2026-07-04: the ws `openOrders` channel stores the
+  ;; WHOLE payload map (not a row vector); per-dex snapshots carry bare coins; webData2
+  ;; is a third partial view. All must merge, deduped by oid.
+  (let [state {:orders {:open-orders {:dex "" :user "0xabc"
+                                      :orders [{:oid 1 :coin "BTC"}]}
+                        :open-orders-snapshot [{:oid 1 :coin "BTC"}
+                                               {:oid 2 :coin "ETH"}]
+                        :open-orders-snapshot-by-dex
+                        {"xyz" [{:oid 3 :coin "ORCL"}]}}
+               :webdata2 {:openOrders [{:oid 4 :coin "SOL"}]}}
+        rows (carryover/open-order-rows state)]
+    (is (= #{"1" "2" "3" "4"} (into #{} (map #(str (:oid %))) rows))
+        "all four sources surface, oid 1 deduped across ws + snapshot")
+    (is (= "xyz:ORCL" (:coin (first (filter #(= 3 (:oid %)) rows))))
+        "per-dex bare coin namespaced with its dex")))
+
+(deftest live-resting-carryover-handles-ws-payload-map-shape-test
+  ;; REGRESSION (found live 2026-07-04): [:orders :open-orders] holds the ws payload
+  ;; map. Treating it as a row seq yielded ZERO oids with hydrated? true, so the live
+  ;; filter dropped every carryover entry and the pre-run cancellation silently
+  ;; vanished — the exact over-allocation bug the carryover exists to prevent.
+  (let [carryover-entries [{:oid 777 :asset-id 42 :coin "xyz:ORCL"}]
+        state {:orders {:open-orders-hydrated? true
+                        :open-orders {:dex "" :user "0xabc"
+                                      :orders [{:oid 777 :coin "xyz:ORCL"}]}}}]
+    (is (= [777] (mapv :oid (carryover/live-resting-carryover state carryover-entries)))
+        "the resting order inside the payload map is recognized as still live")))

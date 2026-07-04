@@ -86,9 +86,12 @@
     (is (= [:effects/save [:portfolio :optimizer :execution]
             {:status :idle :attempt nil :history [] :error nil}]
            (nth effects 1)))
+    ;; Staging refreshes the open-order snapshots (base + per-dex frontendOpenOrders)
+    ;; so confirm can recognize cloid-tagged resting orders from previous sessions.
+    (is (= [:effects/refresh-portfolio-optimizer-open-orders] (nth effects 2)))
     (is (= [:effects/save [:portfolio-ui :optimizer :results-tab] :execution]
-           (nth effects 2)))
-    (is (= [:effects/replace-shareable-route-query] (nth effects 3)))))
+           (nth effects 3)))
+    (is (= [:effects/replace-shareable-route-query] (nth effects 4)))))
 
 (deftest open-execution-derives-preview-when-solved-run-lacks-preview-test
   (let [state {:asset-selector
@@ -177,7 +180,7 @@
                                            {:result {:status :infeasible}})}}})]
     (is (nil? (get-in effects [0 2 :plan])))
     (is (= [:effects/save [:portfolio-ui :optimizer :results-tab] :execution]
-           (nth effects 2)))))
+           (nth effects 3)))))
 
 (deftest open-execution-stages-disabled-plan-when-recommendation-stale-test
   ;; The entry gates on currency, not just solved?: a stale recommendation (dirty draft) stages a

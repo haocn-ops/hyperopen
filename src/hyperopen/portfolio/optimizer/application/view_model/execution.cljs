@@ -213,7 +213,7 @@
         ;; the in-memory carryover); UNTAGGED overlaps (manual / pre-tag) surface for an
         ;; explicit per-order decision.
         {owned-open :optimizer-owned untagged-open :untagged-overlap}
-        (cloid/classify-overlap (cloid/snapshot-open-orders state) ready-rows)
+        (cloid/classify-overlap (cloid/live-open-orders state) ready-rows)
         session-carryover (carryover/live-resting-carryover
                            state
                            (get-in state contracts/execution-resting-carryover-path))

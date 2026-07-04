@@ -8,10 +8,15 @@
   cloid whose leading 4 bytes are a fixed magic tag, so any order carrying that tag is
   recognizably ours regardless of which browser session placed it.
 
-  Recognition MUST read the `frontendOpenOrders` snapshot ([:orders :open-orders-snapshot]);
-  the flat websocket `openOrders` feed ([:orders :open-orders]) strips the cloid."
+  Recognition reads EVERY open-order source the app has (execution-carryover/open-order-rows)
+  because no single one is complete: the websocket `openOrders` feed covers only the default
+  dex (and stores a payload map, not rows), the cloid-bearing `frontendOpenOrders` snapshots
+  cover named dexes but only refresh on demand, and webData2 is another partial view. The
+  optimizer forces a per-dex snapshot refresh at staging so the cloid-bearing rows are fresh
+  by confirm time."
   (:require [clojure.string :as str]
-            [hyperopen.portfolio.optimizer.application.execution :as execution]))
+            [hyperopen.portfolio.optimizer.application.execution :as execution]
+            [hyperopen.portfolio.optimizer.application.execution-carryover :as carryover]))
 
 (def optimizer-cloid-prefix
   "Magic tag every optimizer cloid starts with (0x + 8 hex = 4 bytes). The remaining 12
@@ -43,25 +48,28 @@
                    (subs 0 24))]
     (str optimizer-cloid-prefix padded)))
 
-(def ^:private snapshot-path [:orders :open-orders-snapshot])
+(defn- nested-or-top
+  [o k]
+  (or (get o k) (get-in o [:order k])))
 
-(defn snapshot-open-orders
-  "Normalized rows from the cloid-bearing `frontendOpenOrders` snapshot:
-  {:oid :coin :side :cloid :sz :limit-px}. Empty when the snapshot has not loaded."
+(defn live-open-orders
+  "Normalized rows for every open order the app knows about, across all feed sources:
+  {:oid :coin :side :cloid :sz :limit-px}. Rows without an oid+coin are dropped. The
+  cloid (when the source carries one) is normalized for recognition."
   [state]
   (into []
         (keep (fn [o]
                 (when (map? o)
-                  (let [oid (or (:oid o) (:o o))
-                        coin (some-> (:coin o) str str/trim)]
+                  (let [oid (or (nested-or-top o :oid) (nested-or-top o :o))
+                        coin (some-> (or (:coin o) (nested-or-top o :coin)) str str/trim)]
                     (when (and (some? oid) (seq (or coin "")))
                       {:oid oid
                        :coin coin
-                       :side (:side o)
-                       :cloid (normalize-cloid (:cloid o))
-                       :sz (:sz o)
-                       :limit-px (:limitPx o)})))))
-        (get-in state snapshot-path)))
+                       :side (nested-or-top o :side)
+                       :cloid (normalize-cloid (nested-or-top o :cloid))
+                       :sz (nested-or-top o :sz)
+                       :limit-px (nested-or-top o :limitPx)})))))
+        (carryover/open-order-rows state)))
 
 (defn classify-overlap
   "Splits the live open-order snapshot against a plan's ready rows:

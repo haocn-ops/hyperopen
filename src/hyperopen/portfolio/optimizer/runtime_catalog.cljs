@@ -230,6 +230,8 @@
       effect-adapters/save-portfolio-optimizer-scenario-effect
       :execute-portfolio-optimizer-plan
       effect-adapters/execute-portfolio-optimizer-plan-effect
+      :refresh-portfolio-optimizer-open-orders
+      effect-adapters/refresh-portfolio-optimizer-open-orders-effect
       :refresh-portfolio-optimizer-tracking
       effect-adapters/refresh-portfolio-optimizer-tracking-effect
       :refresh-portfolio-optimizer-rebalance-slippage-snapshots

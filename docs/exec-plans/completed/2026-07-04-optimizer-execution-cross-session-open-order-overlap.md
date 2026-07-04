@@ -74,6 +74,15 @@ For every milestone: from the repo root run `npm run setup:worktree` then `npm r
 - Registering a new action requires a matching entry in `schema/runtime_registration/portfolio.cljs` or the `schema/contracts.cljs` drift check throws at test-bundle load ("Action contract metadata drift detected") — the failure mode is every downstream test erroring, not a lint message.
 - `market-by-key` is keyed by instrument id (`"perp:ZETA"`), not bare coin — a feed-sourced cancel entry resolves its asset index through `cancel-request`'s candidate-key chain, which handles that.
 
+### Live-session validation addendum (2026-07-04, same day)
+
+A supervised live mainnet test (user-driven browser + worktree Shadow nREPL inspection) confirmed the wire path and exposed three client-side read bugs, all fixed and regression-tested the same day:
+
+- CONFIRMED: Hyperliquid accepts cloid-tagged orders — two tagged orders rested with `:c "0x0770c0de…"` echoed back on `frontendOpenOrders`. The signing risk noted in Validation is closed.
+- BUG (fixed): the websocket `openOrders` channel stores the WHOLE payload map `{:dex "" :user 0x… :orders […]}` at `[:orders :open-orders]`, not a row vector. `open-oids` iterated MapEntries, produced an EMPTY set with `hydrated? true`, and `live-resting-carryover` silently dropped every carryover entry — the in-session cancel never fired in production despite green unit tests (whose fixtures used the vector shape). Fixed by a shape-aware `open-order-rows` reader in `execution_carryover.cljs`; regression test pins the payload-map shape.
+- BUG (fixed): recognition read only `[:orders :open-orders-snapshot]`, which covers the DEFAULT dex; named-dex (HIP-3, e.g. `xyz:ORCL`) orders live under `open-orders-snapshot-by-dex` with BARE coins, and webData2 is a third partial view. `cloid/live-open-orders` now merges all four sources, namespacing per-dex coins.
+- BUG (fixed): nothing ever refreshed the per-dex `frontendOpenOrders` snapshots after startup — the account surface-service comment documents that the generic stream "does not hydrate the named-DEX snapshot map". Staging now dispatches a new `:effects/refresh-portfolio-optimizer-open-orders` (reusing manual order entry's `refresh-account-surfaces-after-order-mutation!`), so the cloid-bearing rows are fresh by confirm time.
+
 ## Decision Log
 
 - Recognize via a magic-prefixed cloid rather than server-side state, so recognition survives a reload and needs no persistence.

@@ -63,33 +63,43 @@
         (= :max-sharpe objective-kind)
         "portfolio-optimizer-objective-max-sharpe"
         [:actions/apply-portfolio-optimizer-setup-preset :max-sharpe])]
-      [:p {:class (conj controls/eyebrow-class "mt-3")} "More goals"]
-      [:div {:class ["mt-2" "grid" "grid-cols-1" "gap-1.5" "sm:grid-cols-2"]}
-       (secondary-goal-card "Target volatility" "Pin σ to a fixed level, max return at that σ"
-                            (= :target-volatility objective-kind)
-                            "portfolio-optimizer-objective-target-volatility"
-                            [:actions/set-portfolio-optimizer-objective-kind :target-volatility])
-       (secondary-goal-card "Target return" "Aim for a specific return"
-                            (= :target-return objective-kind)
-                            "portfolio-optimizer-objective-target-return"
-                            [:actions/set-portfolio-optimizer-objective-kind :target-return])]
-      (when (#{:target-volatility :target-return} objective-kind)
-        [:div {:class ["mt-2"]}
-         (case objective-kind
-           :target-volatility
-           (target-sigma/objective-parameter-block draft sigma-bounds)
-           :target-return
-           ;; Percent-entry to match Target σ and Black-Litterman: the user types 15 to mean
-           ;; 15% (the percent handler divides by 100), instead of the old fraction-entry where
-           ;; 0.15 meant 15% and a typed "15" silently requested a 1500% return.
-           (controls/percent-input "Target Return"
-                                   (controls/decimal->percent-text
-                                    (or (get-in draft [:objective :target-return]) 0.15))
-                                   "portfolio-optimizer-objective-target-return-input"
-                                   [:actions/set-portfolio-optimizer-objective-parameter-percent
-                                    :target-return [:event.target/value]]
-                                   (contains? highlighted-controls :target-return)
-                                   "Type a percent — 15 = 15%"))])))))
+      ;; The advanced targets are needed by exception: collapsed by default so
+      ;; the goal section stays two cards tall. Selecting one keeps the drawer
+      ;; open on re-render (the attribute only sets initial state otherwise).
+      (let [advanced? (contains? #{:target-volatility :target-return} objective-kind)]
+        [:details (cond-> {:class ["mt-3"]
+                           :data-role "portfolio-optimizer-more-goals"}
+                    advanced? (assoc :open true))
+         [:summary {:class (into ["cursor-pointer" "select-none" "focus:outline-none"
+                                  "focus:text-warning"]
+                                 controls/eyebrow-class)}
+          "More goals"]
+         [:div {:class ["mt-2" "grid" "grid-cols-1" "gap-1.5" "sm:grid-cols-2"]}
+          (secondary-goal-card "Target volatility" "Pin σ to a fixed level, max return at that σ"
+                               (= :target-volatility objective-kind)
+                               "portfolio-optimizer-objective-target-volatility"
+                               [:actions/set-portfolio-optimizer-objective-kind :target-volatility])
+          (secondary-goal-card "Target return" "Aim for a specific return"
+                               (= :target-return objective-kind)
+                               "portfolio-optimizer-objective-target-return"
+                               [:actions/set-portfolio-optimizer-objective-kind :target-return])]
+         (when advanced?
+           [:div {:class ["mt-2"]}
+            (case objective-kind
+              :target-volatility
+              (target-sigma/objective-parameter-block draft sigma-bounds)
+              :target-return
+              ;; Percent-entry to match Target σ and Black-Litterman: the user types 15 to mean
+              ;; 15% (the percent handler divides by 100), instead of the old fraction-entry where
+              ;; 0.15 meant 15% and a typed "15" silently requested a 1500% return.
+              (controls/percent-input "Target Return"
+                                      (controls/decimal->percent-text
+                                       (or (get-in draft [:objective :target-return]) 0.15))
+                                      "portfolio-optimizer-objective-target-return-input"
+                                      [:actions/set-portfolio-optimizer-objective-parameter-percent
+                                       :target-return [:event.target/value]]
+                                      (contains? highlighted-controls :target-return)
+                                      "Type a percent — 15 = 15%"))])])))))
 
 (defn- primary-goal-card
   "Rich goal card for the two canonical paths (Minimum risk, Maximum Sharpe): a

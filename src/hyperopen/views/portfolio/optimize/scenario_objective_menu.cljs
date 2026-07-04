@@ -16,7 +16,7 @@
 (defn- objective-menu-options
   []
   [{:key :minimum-volatility
-    :title "Minimum volatility"
+    :title "Minimum risk"
     :description "Smallest feasible sigma - defensive baseline. Recommended"}
    {:key :max-sharpe
     :title "Maximum Sharpe"

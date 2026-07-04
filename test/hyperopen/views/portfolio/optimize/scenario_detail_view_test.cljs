@@ -809,7 +809,7 @@
            (get-in menu [1 :on :keydown])))
     (doseq [label ["Change objective"
                    "Re-runs the solver with the same universe and constraints"
-                   "Minimum volatility" "Maximum Sharpe" "· 12%" "Maximum return"]]
+                   "Minimum risk" "Maximum Sharpe" "· 12%" "Maximum return"]]
       (is (contains? strings label)))
     (is (not (contains? strings "Use my views"))
         "Views are an input policy of Maximum Sharpe now, not an objective.")
@@ -864,7 +864,7 @@
     (is (= "false" (get-in btc-confidence-high [1 :data-selected])))
     (is (= "false" (get-in doge-confidence-medium [1 :data-selected]))
         "Implied rows select no confidence; medium is no longer a default.")
-    (is (= ["medium trust in this return" "adopt as your view · medium"]
+    (is (= ["medium trust in this return" "save as your view · medium confidence"]
            [(get-in btc-confidence-medium [1 :data-tooltip])
             (get-in doge-confidence-medium [1 :data-tooltip])]))
     (is (= "Set medium confidence" (get-in btc-confidence-medium [1 :aria-label])))

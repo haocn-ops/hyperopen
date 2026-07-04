@@ -12,11 +12,12 @@
 
 (defn- contract-row
   [label value]
-  ;; 120px label track: the 10px uppercase-mono tags include "Portfolio exposure",
-  ;; which should stay readable instead of wrapping in the scenario contract.
-  [:div {:class ["grid" "grid-cols-[120px_minmax(0,1fr)]" "items-baseline" "gap-2"]}
-   [:span {:class ["font-mono" "text-[0.625rem]" "font-semibold" "uppercase"
-                   "tracking-[0.1em]" "text-trading-muted/60"]}
+  ;; Row labels are plain sentence-case text — mono/uppercase is reserved for
+  ;; VALUES and section eyebrows; a rail full of uppercase-mono labels is what
+  ;; made the contract read like telemetry. 110px label track keeps
+  ;; "Exposure policy" on one line.
+  [:div {:class ["grid" "grid-cols-[110px_minmax(0,1fr)]" "items-baseline" "gap-2"]}
+   [:span {:class ["text-[0.6875rem]" "font-medium" "text-trading-muted"]}
     label]
    [:span {:class ["min-w-0" "text-[0.75rem]" "font-medium" "leading-[1.4]"
                    "text-trading-text"]}
@@ -30,7 +31,7 @@
   where the user looks to confirm readiness, so it must reflect the wait."
   [draft readiness]
   (let [{:keys [preset-label asset-count universe-source-kind objective-label
-                returns-label risk-label constraints-line]}
+                return-forecast-label risk-label exposure-rows]}
         (optimizer-view-model/setup-summary-card-model draft {:labelize controls/labelize})
         holdings-loading? (= :holdings-loading (:reason readiness))]
     [:section {:class ["optimizer-setup-panel" "border" "border-base-300" "bg-base-100/90" "p-3"]
@@ -49,14 +50,24 @@
                              :holdings " · from holdings"
                              :custom " · custom"
                              nil))))
-      (contract-row "Objective" objective-label)
-      ;; Returns is a SOURCE line ("2 your views · 12 implied"), not a model
-      ;; name — "Use my views" was never a model, it was an input policy.
-      (contract-row "Returns" returns-label)
+      (contract-row "Goal" objective-label)
+      ;; Under Minimum Variance the forecast does not drive the result, and the
+      ;; contract says "Not used" instead of implying the estimator matters.
+      ;; Otherwise it is a SOURCE line ("2 your views · 12 implied"), not a
+      ;; model name.
+      (contract-row "Return forecast" return-forecast-label)
       (contract-row "Risk model" risk-label)
-      (contract-row "Portfolio exposure"
-                    [:span {:class ["font-mono" "text-[0.75rem]" "text-trading-muted"]}
-                     constraints-line])]]))
+      ;; Stacked exposure rows: four numbers the user must verify, one per
+      ;; line, instead of a single wrapping compressed string.
+      (contract-row "Exposure policy"
+                    (into [:span {:class ["block" "font-mono" "text-[0.75rem]"
+                                          "text-trading-muted"]
+                                  :data-role "portfolio-optimizer-exposure-policy-rows"}]
+                          (map (fn [[label value]]
+                                 [:span {:class ["flex" "justify-between" "gap-2"]}
+                                  [:span {:class ["text-trading-muted/70"]} label]
+                                  [:span value]]))
+                          exposure-rows))]]))
 
 (defn context-rail
   [{:keys [draft state readiness snapshot preview-snapshot run-state optimization-progress
@@ -79,44 +90,113 @@
                             readiness-visible?
                             run-visible?
                             last-run-visible?
-                            read-only-message)]
+                            read-only-message)
+        views-active? (= :black-litterman (get-in draft [:return-model :kind]))
+        min-variance? (= :minimum-variance (get-in draft [:objective :kind]))
+        readiness-model (optimizer-view-model/readiness-panel-model readiness history-load-state)
+        snapshot-line (cond
+                        (not (:snapshot-loaded? snapshot))
+                        (if (= :manual (get-in preview-snapshot [:capital :source]))
+                          "Manual capital base is being used for preview sizing."
+                          "Current portfolio snapshot is not loaded yet.")
+                        (not (:capital-ready? preview-snapshot))
+                        "Current portfolio snapshot is available, but no positive capital base is available for preview sizing."
+                        (not (:execution-ready? preview-snapshot))
+                        "Current portfolio snapshot is available in read-only mode."
+                        :else
+                        "Current portfolio snapshot is available.")
+        ;; Two generic healthy lines ("snapshot available" + "history loaded")
+        ;; collapse into one status sentence; anything unhealthy keeps its own.
+        combined-status-line (when (and (:snapshot-loaded? snapshot)
+                                        (:capital-ready? preview-snapshot)
+                                        (:execution-ready? preview-snapshot)
+                                        (= :succeeded (:status history-load-state)))
+                               "Portfolio snapshot and optimizer history loaded.")]
     [:aside {:class ["optimizer-context-rail" "min-h-0"]
              :data-role "portfolio-optimizer-right-rail"}
      (summary-card draft readiness)
-     ;; The Return views panel is always present: it edits views when the
-     ;; views-aware model is active, and states honestly why views are inert
-     ;; under Conservative / estimator-only models instead of vanishing.
-     [:section {:class ["optimizer-setup-panel" "border" "border-base-300" "bg-base-100/90" "p-3"]
-                :data-role "portfolio-optimizer-assumptions-rail"}
-      [:p {:class eyebrow-class} "Return views"]
-      [:div {:class ["mt-3"]}
-       (scenario-objective-menu/views-editor-section
-        draft
-        state
-        (:result last-successful-run)
-        readiness
-        {:container-role "portfolio-optimizer-setup-use-my-views-editor"
-         :title "Used by Maximum Sharpe"
-         :description "Your views tilt the forecast where you have them; implied rows fall back to the baseline estimate. Edits save automatically."})]]
+     ;; The full Return views editor renders only while the views-aware model is
+     ;; live; when views are inert the section is demoted to the one-line note
+     ;; below, so inactive functionality never competes with live warnings.
+     (when views-active?
+       [:section {:class ["optimizer-setup-panel" "border" "border-base-300" "bg-base-100/90" "p-3"]
+                  :data-role "portfolio-optimizer-assumptions-rail"
+                  :replicant/key "return-views-editor"}
+        [:p {:class eyebrow-class} "Return views"]
+        [:div {:class ["mt-3"]}
+         (scenario-objective-menu/views-editor-section
+          draft
+          state
+          (:result last-successful-run)
+          readiness
+          ;; OPEN by default: under Maximum Sharpe the per-asset return
+          ;; forecasts are the core input driving the result — hiding them
+          ;; behind a closed disclosure made the optimizer look more objective
+          ;; than it is (owner + expert review, 2026-07-04). Still collapsible
+          ;; so the user can tuck it away; the rows list is height-capped in
+          ;; CSS so Data health stays reachable on large universes.
+          {:container-role "portfolio-optimizer-setup-use-my-views-editor"
+           :title "Used by Maximum Sharpe"
+           :collapsible? true
+           :open? true
+           :description "Edit any return to save it as your view. Saved views override implied returns; the rest use the implied baseline."})]])
+     ;; Demoted inactive note: one line + the one-click way to make views
+     ;; matter. The whole Return-views slot (editor or note) sits ABOVE Data
+     ;; health so the rail order is stable across goals; the folded data notes
+     ;; keep the health section compact (owner review 2026-07-04).
+     (when-not views-active?
+       [:section {:class ["optimizer-setup-panel" "border" "border-base-300" "bg-base-100/90" "p-3"]
+                  :data-role "portfolio-optimizer-assumptions-rail"
+                  :replicant/key "return-views-inactive"}
+        [:div {:class ["flex" "items-baseline" "justify-between" "gap-2"]}
+         [:p {:class eyebrow-class} "Return views"]
+         [:span {:class ["font-mono" "text-[0.6875rem]" "uppercase" "tracking-[0.1em]"
+                         "text-trading-muted/50"]
+                 :data-role "portfolio-optimizer-return-views-inactive"}
+          (if min-variance? "Not used by Minimum risk" "Not used")]]
+        [:p {:class ["mt-1.5" "text-[0.6875rem]" "leading-[1.4]" "text-trading-muted"]}
+         (if min-variance?
+           "Minimum risk ignores expected-return forecasts."
+           "This return model uses the historical estimate directly.")]
+        [:button {:type "button"
+                  :class ["mt-2" "border" "border-base-300" "bg-base-200/40" "px-2"
+                          "py-1" "text-[0.6875rem]" "font-semibold" "text-trading-muted"
+                          "hover:bg-base-200/60"]
+                  :data-role "portfolio-optimizer-return-views-activate"
+                  :on {:click (if min-variance?
+                                [[:actions/apply-portfolio-optimizer-setup-preset :max-sharpe]]
+                                [[:actions/set-portfolio-optimizer-return-model-kind
+                                  :black-litterman]])}}
+         (if min-variance? "Switch to Maximum Sharpe" "Use my views")]])
      (when status-visible?
        [:section {:class ["optimizer-setup-panel" "border-t" "border-base-300" "bg-base-100/90" "p-3"]
-                  :data-role "portfolio-optimizer-trust-freshness-panel"}
-        [:p {:class eyebrow-class} "Trust & Freshness"]
-        [:p {:class ["mt-2" "text-[0.75rem]" "leading-[1.45]" "text-trading-muted"]}
-         (cond
-           (not (:snapshot-loaded? snapshot))
-           (if (= :manual (get-in preview-snapshot [:capital :source]))
-             "Manual capital base is being used for preview sizing."
-             "Current portfolio snapshot is not loaded yet.")
-           (not (:capital-ready? preview-snapshot))
-           "Current portfolio snapshot is available, but no positive capital base is available for preview sizing."
-           (not (:execution-ready? preview-snapshot))
-           "Current portfolio snapshot is available in read-only mode."
-           :else
-           "Current portfolio snapshot is available.")]
+                  :data-role "portfolio-optimizer-trust-freshness-panel"
+                  :replicant/key "data-health"}
+        [:p {:class eyebrow-class} "Data health"]
+        ;; The verdict is the section's headline — the first thing scanned —
+        ;; not a small chip competing with the warning cards below it.
+        (let [{:keys [level label issue-count]} (:status readiness-model)]
+          [:p {:class ["mt-1" "text-[0.8125rem]" "font-semibold"
+                       (case level
+                         :blocked "text-error"
+                         :caution "text-warning"
+                         :ready "text-success"
+                         "text-trading-muted")]
+               :data-role "portfolio-optimizer-data-health-status"}
+           ;; The count keeps the verdict meaningful even when the warning
+           ;; cards sit below other panels ("Ready with cautions · 3 issues").
+           (if (and (pos? (or issue-count 0))
+                    (contains? #{:caution :blocked} level))
+             (str label " · " issue-count
+                  (if (= 1 issue-count) " issue" " issues"))
+             label)])
+        [:p {:class ["mt-1.5" "text-[0.75rem]" "leading-[1.45]" "text-trading-muted"]}
+         (or combined-status-line snapshot-line)]
         (optimization-progress-panel/progress-panel optimization-progress)
         (when readiness-visible?
-          (setup-readiness-panel/readiness-panel readiness history-load-state))
+          (setup-readiness-panel/readiness-panel
+           readiness history-load-state
+           {:suppress-copy? (some? combined-status-line)}))
         (when run-visible?
           (run-status-panel/run-status-panel run-state))
         (run-status-panel/last-successful-run-panel run-state last-successful-run)

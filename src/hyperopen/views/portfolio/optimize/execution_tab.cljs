@@ -364,6 +364,29 @@
        "Open limit orders are live on Hyperliquid — they fill as the market reaches your price. Manage or cancel them from the trade ticket."]]
      [:span {:class ["flex-1"]}]]))
 
+(defn- carryover-note
+  "Pre-submit notice that resting orders from a PREVIOUS run are still live on the book
+  and will be cancelled before this run's orders are sent — without the cancellation
+  those stale orders would fill on top of the new run and over-allocate the account."
+  [{:keys [phase carryover-count]}]
+  (when (and (contains? #{:staged :armed} phase)
+             (pos? (or carryover-count 0)))
+    ;; Keyed: this block appears/disappears between fixed siblings, and unkeyed
+    ;; conditional siblings make Replicant remount the later ones (resetting any open
+    ;; <details> below).
+    [:div {:replicant/key "execution-carryover-note"
+           :class ["flex" "items-center" "gap-2" "border-b" "border-base-300"
+                   "bg-base-200/30" "px-5" "py-2"]
+           :data-role "portfolio-optimizer-execution-carryover-note"}
+     (shared/chip "cleanup" :info)
+     [:p {:class ["text-xs" "text-trading-muted"]}
+      (str carryover-count " resting order" (when (not= 1 carryover-count) "s")
+           " from your previous run "
+           (if (= 1 carryover-count) "is" "are")
+           " still on the book — "
+           (if (= 1 carryover-count) "it" "they")
+           " will be cancelled before new orders are sent.")]]))
+
 (defn- control-band
   [{:keys [phase] :as model} rows]
   (case phase
@@ -655,6 +678,7 @@
      (if has-plan?
        [:div
         (header model)
+        (carryover-note model)
         (control-band model rows)
         (kpi-strip model rows)
         [:div {:class ["grid" "grid-cols-1" "xl:grid-cols-[minmax(0,1fr)_380px]"]}

@@ -1,6 +1,7 @@
 (ns hyperopen.portfolio.optimizer.application.view-model.execution
   (:require [clojure.string :as str]
             [hyperopen.portfolio.optimizer.application.execution :as execution]
+            [hyperopen.portfolio.optimizer.application.execution-carryover :as carryover]
             [hyperopen.portfolio.optimizer.application.setup-readiness :as setup-readiness]
             [hyperopen.portfolio.optimizer.application.spot-token-labels :as spot-token-labels]
             [hyperopen.portfolio.optimizer.application.view-model.execution-reconcile :as reconcile]
@@ -208,6 +209,11 @@
                              (reduce + 0)))]
     {:plan (assoc plan :rows plan-rows)
      :summary summary
+     ;; Resting orders left by PREVIOUS runs that are still live on the book — confirm
+     ;; cancels them before sending new orders, and the staged surface says so.
+     :carryover-count (count (carryover/live-resting-carryover
+                              state
+                              (get-in state contracts/execution-resting-carryover-path)))
      :rows display-rows
      :phase phase
      ;; The live-run pause/abort flag the submit loop checks; surfaced so the running band can

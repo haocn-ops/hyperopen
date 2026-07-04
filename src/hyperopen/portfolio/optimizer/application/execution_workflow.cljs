@@ -1,6 +1,7 @@
 (ns hyperopen.portfolio.optimizer.application.execution-workflow
   (:require [clojure.string :as str]
             [hyperopen.portfolio.optimizer.application.execution :as execution]
+            [hyperopen.portfolio.optimizer.application.execution-carryover :as carryover]
             [hyperopen.portfolio.optimizer.application.scenario-records :as scenario-records]
             [hyperopen.portfolio.optimizer.application.scenario-workflow :as scenario-workflow]
             [hyperopen.portfolio.optimizer.contracts :as contracts]))
@@ -79,6 +80,11 @@
                            :history history
                            :error (when (= :failed scenario-status)
                                     {:message "Execution failed before any rows submitted."})})
+                ;; Track the run's resting orders (and drop the ones a successful pre-run
+                ;; cancellation removed) so the NEXT run can cancel what this one left on
+                ;; the book instead of over-allocating on top of it.
+                (update-in contracts/execution-resting-carryover-path
+                           carryover/record-resting-carryover ledger)
                 (assoc-in contracts/execution-modal-submitting-path false)
                 (assoc-in contracts/execution-modal-error-path
                           (when (= :failed scenario-status)

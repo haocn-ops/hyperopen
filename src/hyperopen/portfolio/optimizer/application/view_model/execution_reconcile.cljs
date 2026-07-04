@@ -23,24 +23,14 @@
   - oid still on the book      => stay :resting (stamp realized partial if it also has fills)
   - oid has fills + off-book    => :submitted (filled) + realized px/size
   - otherwise (no fills)        => row unchanged (:resting), exactly as today."
-  (:require [hyperopen.portfolio.optimizer.application.execution :as execution]))
+  (:require [hyperopen.portfolio.optimizer.application.execution :as execution]
+            [hyperopen.portfolio.optimizer.application.execution-carryover :as carryover]))
 
-(def ^:private open-orders-path [:orders :open-orders])
-(def ^:private open-orders-hydrated-path [:orders :open-orders-hydrated?])
 (def ^:private fills-path [:orders :fills])
 
-(defn- norm-oid
-  [v]
-  (when (some? v)
-    (let [s (str v)]
-      (when (seq s) s))))
-
-(defn- order-oid
-  "oid of a live open-order row, mirroring the trading screen's resolver (oid may be top-level
-  or nested under :order, as a number or string)."
-  [o]
-  (norm-oid (or (:oid o) (:o o)
-                (get-in o [:order :oid]) (get-in o [:order :o]))))
+;; oid helpers live in application.execution-carryover (shared with the stale-order
+;; cancellation flow, which links ledger rows to the same live feeds).
+(def ^:private norm-oid carryover/norm-oid)
 
 (defn- parse-num
   [v]
@@ -48,13 +38,6 @@
     (number? v) v
     (string? v) (let [n (js/parseFloat v)] (when-not (js/isNaN n) n))
     :else nil))
-
-(defn- open-oids
-  "Set of oids currently live on the own-account book, or nil when the book has not hydrated yet
-  (so callers treat 'absent from book' as 'unknown', never as a false fill before the snapshot)."
-  [state]
-  (when (true? (get-in state open-orders-hydrated-path))
-    (into #{} (keep order-oid) (get-in state open-orders-path))))
 
 (defn- fills-by-oid
   "Index of own-account fills by normalized oid."
@@ -113,6 +96,6 @@
   order/fill feeds from `state`. A no-op for any non-resting row, so it is safe to apply to plan
   rows, in-flight run-attempt rows, and the settled ledger alike."
   [state rows]
-  (let [ctx {:open-oids (open-oids state)
+  (let [ctx {:open-oids (carryover/open-oids state)
              :fills-by-oid (fills-by-oid state)}]
     (mapv #(reconcile-row ctx %) (or rows []))))

@@ -1,5 +1,6 @@
 (ns hyperopen.views.portfolio.optimize.setup-header
-  (:require [hyperopen.portfolio.optimizer.application.return-views :as return-views]))
+  (:require [hyperopen.portfolio.optimizer.application.return-views :as return-views]
+            [hyperopen.portfolio.optimizer.domain.exposure-policy :as exposure-policy]))
 
 (defn- clock-label
   "Local wall-clock label for the autosave note (\"10:42 PM\"). Rendered from the
@@ -74,6 +75,16 @@
         "Draft has unsaved changes"
         "Draft clean")]]]])
 
+(defn- holdings-custom-constraints?
+  "True when a holdings import seeded the constraint envelope (gross floor,
+  caps, and net bias mirrored from the current book). The glowing preset card
+  must disclose that, or 'Conservative · active' silently implies the preset's
+  default envelope while e.g. a 152% single-asset cap and a net-short floor are
+  actually in force."
+  [draft]
+  (and (= :holdings (get-in draft [:metadata :universe-source :kind]))
+       (= :custom (exposure-policy/active-preset (:constraints draft)))))
+
 (defn- preset-card
   [draft preset title subtitle kicker]
   (let [selected? (= preset (active-preset draft))]
@@ -93,7 +104,11 @@
        [:p {:class ["mt-1.5" "text-[0.75rem]" "text-trading-muted"]} subtitle]
        [:p {:class ["mt-1.5" "font-mono" "text-[0.625rem]" "uppercase" "tracking-[0.16em]"
                     "text-trading-muted/70"]}
-        kicker]]
+        kicker]
+       (when (and selected? (holdings-custom-constraints? draft))
+         [:p {:class ["mt-1.5" "text-[0.6875rem]" "text-warning"]
+              :data-role "portfolio-optimizer-preset-holdings-constraints-note"}
+          "Constraints were seeded from your holdings — review them in Constraints below."])]
       (when selected?
         [:span {:class ["border" "border-base-300" "px-1.5" "py-0.5" "font-mono"
                         "text-[0.625rem]" "uppercase" "tracking-[0.12em]" "text-trading-muted/70"]}

@@ -401,3 +401,35 @@
     (is (contains? strings "3.00× capital"))
     (is (contains? strings "3.0 pp band"))
     (is (not (contains? strings "mandatory")))))
+
+(deftest setup-preset-card-discloses-holdings-seeded-constraints-test
+  ;; A holdings import rewrites the constraint envelope from the current book
+  ;; (gross floor, cap, net bias). The glowing preset card must disclose that —
+  ;; "Conservative · active" with the preset's default 'safe' envelope silently
+  ;; replaced is a mixed-state lie (audited live: cap 152%, net-short floor,
+  ;; preset row still showing Conservative ACTIVE).
+  (let [holdings-draft
+        {:universe [{:instrument-id "perp:BTC" :market-type :perp :coin "BTC"}]
+         :objective {:kind :minimum-variance}
+         :return-model {:kind :historical-mean}
+         :risk-model {:kind :ledoit-wolf-dense}
+         :constraints {:gross-min 1.76 :gross-max 1.77
+                       :net-min -1.52 :net-max -1.41
+                       :max-asset-weight 1.52}
+         :metadata {:universe-source {:kind :holdings :omitted []}}}
+        view-node (portfolio-view/portfolio-view
+                   {:router {:path "/portfolio/optimize/new"}
+                    :wallet {:address "0x1111111111111111111111111111111111111111"}
+                    :portfolio {:optimizer {:draft holdings-draft}}})
+        strings (set (collect-strings view-node))]
+    (is (some? (node-by-role view-node
+                             "portfolio-optimizer-preset-holdings-constraints-note")))
+    (is (contains? strings "Custom · from holdings"))))
+
+(deftest setup-preset-card-quiet-on-default-constraints-test
+  ;; A pristine default draft keeps the preset defaults: no disclosure note.
+  (let [view-node (portfolio-view/portfolio-view
+                   {:router {:path "/portfolio/optimize/new"}
+                    :wallet {:address "0x1111111111111111111111111111111111111111"}})]
+    (is (nil? (node-by-role view-node
+                            "portfolio-optimizer-preset-holdings-constraints-note")))))

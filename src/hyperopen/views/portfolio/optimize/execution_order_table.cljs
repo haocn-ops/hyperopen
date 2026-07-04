@@ -74,6 +74,24 @@
          (str/join " · ")
          not-empty)))
 
+(defn- skip-reason-label
+  "Plain-language reason a leg was skipped. A bare 'skipped' next to a
+  five-figure notional reads as arbitrarily dropped money at the exact moment
+  the user is deciding whether to send live orders."
+  [{:keys [reason tolerance]}]
+  (case reason
+    :within-tolerance
+    (str "within "
+         (if (and (number? tolerance)
+                  (js/isFinite tolerance)
+                  (pos? tolerance))
+           (str (opt-format/format-decimal (* 100 tolerance)) " pp band")
+           "tolerance band")
+         " — no trade needed")
+    :already-filled "already filled on a previous attempt"
+    :already-resting "already resting on the book"
+    (some-> reason opt-format/keyword-label)))
+
 (defn- state-cell
   [display-state row]
   (case display-state
@@ -82,7 +100,10 @@
     :failed [:span {:class ["text-trading-red"]}
              (str "rejected" (when (:reason row) (str " · " (opt-format/keyword-label (:reason row)))))]
     :blocked [:span {:class ["text-trading-muted"]} (opt-format/keyword-label (:reason row))]
-    :skipped [:span {:class ["text-trading-muted"]} "skipped"]
+    :skipped [:span {:class ["text-trading-muted"]}
+              (if-let [label (skip-reason-label row)]
+                (str "skipped · " label)
+                "skipped")]
     :working [:span {:class ["text-warning"]} "sending…"]
     :queued [:span {:class ["text-warning"]} "queued"]
     [:span {:class ["text-trading-muted"]} "staged"]))

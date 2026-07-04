@@ -75,17 +75,61 @@
     (str label ": " message)
     message))
 
+(defn- warning-message-body
+  [labels-by-instrument warning]
+  (reduce (fn [message instrument-id]
+            (replace-all-text message
+                              instrument-id
+                              (warning-label labels-by-instrument
+                                             warning
+                                             instrument-id)))
+          (:message warning)
+          (warning-instrument-ids warning)))
+
 (defn- warning-message
   [labels-by-instrument warning]
-  (let [message (reduce (fn [message instrument-id]
-                          (replace-all-text message
-                                            instrument-id
-                                            (warning-label labels-by-instrument
-                                                           warning
-                                                           instrument-id)))
-                        (:message warning)
-                        (warning-instrument-ids warning))]
-    (prepend-warning-label message (warning-primary-label labels-by-instrument warning))))
+  (prepend-warning-label (warning-message-body labels-by-instrument warning)
+                         (warning-primary-label labels-by-instrument warning)))
+
+(defn- display-asset-label
+  "Instrument label for text-only trust/warning copy. Falls back to the last
+  segment of a namespaced id (perp:HYPE -> HYPE) so raw internal ids never leak
+  into user-facing sentences."
+  [labels-by-instrument instrument-id]
+  (let [label (results-model/instrument-label labels-by-instrument instrument-id)]
+    (if (= label (str instrument-id))
+      (or (last (str/split (str instrument-id) #":")) label)
+      label)))
+
+(defn warning-rows
+  "One row per warning CODE, not per (code, asset) pair: 25 near-identical
+  per-asset rows bury the signal, so the headline is the plain-language code +
+  the affected assets, and the raw engine messages (which may carry provider
+  internals) demote to deduplicated muted detail lines."
+  [labels-by-instrument warnings]
+  (map (fn [[code group]]
+         (let [assets (->> group
+                           (map :instrument-id)
+                           (remove nil?)
+                           distinct
+                           (map (partial display-asset-label labels-by-instrument)))
+               messages (->> group
+                             (map (partial warning-message-body labels-by-instrument))
+                             (filter #(and (string? %) (seq %)))
+                             distinct)]
+           [:div {:class ["rounded-md" "border" "border-warning/40" "bg-warning/10"
+                          "p-2" "text-xs" "text-warning"]
+                  :data-role "portfolio-optimizer-result-warning"}
+            [:p {}
+             [:span {:class ["font-semibold"]} (opt-format/keyword-label code)]
+             (when (seq assets)
+               [:span {:class ["ml-2"]} (str/join " · " assets)])]
+            (into [:div {}]
+                  (map (fn [message]
+                         [:p {:class ["mt-1" "text-[0.62rem]" "text-warning/80"]}
+                          message])
+                       messages))]))
+       (sort-by (comp str key) (group-by :code warnings))))
 
 (defn warning-row
   [labels-by-instrument warning]
@@ -102,7 +146,7 @@
      "portfolio-optimizer-result-warnings"
      "Result Warnings"
      "Warnings explain assumptions or mathematically valid outcomes that may require a rerun with different controls."
-     (map (partial warning-row (:labels-by-instrument result)) (:warnings result)))))
+     (warning-rows (:labels-by-instrument result) (:warnings result)))))
 
 (defn diagnostics-panel
   [result]
@@ -153,7 +197,30 @@
     :caution {:label "caution" :class "text-warning"}
     :ill-conditioned {:label "caution" :class "text-warning"}
     :singular {:label "bad" :class "text-trading-red"}
+    :bad {:label "bad" :class "text-trading-red"}
     {:label (opt-format/keyword-label status) :class "text-trading-muted"}))
+
+(defn diversification-status
+  "Actually EVALUATE effective N instead of a hardcoded OK (the audit caught a
+  one-position target — effective N 0.5 of 18 — badged green). Below ~1.5 the
+  target is effectively a single position; below a quarter of the universe it is
+  concentrated. Unknown values stay muted rather than falsely reassuring."
+  [effective-n universe-size]
+  (cond
+    (not (and (number? effective-n) (js/isFinite effective-n))) :unknown
+    (< effective-n 1.5) :bad
+    (and (number? universe-size)
+         (pos? universe-size)
+         (< effective-n (* 0.25 universe-size))) :caution
+    :else :ok))
+
+(defn- diversification-subtext
+  [status]
+  (case status
+    :bad "The target is effectively a single position."
+    :caution "A few names dominate the target."
+    :unknown "No diversification diagnostics reported."
+    "Higher effective N means less concentration in one name."))
 
 (defn- top-sensitivity
   [sensitivity]
@@ -275,16 +342,17 @@
                   :value (history-window-value (:history-summary result))
                   :subtext (history-window-subtext result
                                                    (:history-summary result))})
-      (trust-row {:label "Diversification"
-                  :status :ok
-                  :value (str "Effective N · " (opt-format/format-effective-n effective-n universe-size) " of " universe-size)
-                  :subtext "Higher effective N means less concentration in one name."})
+      (let [status (diversification-status effective-n universe-size)]
+        (trust-row {:label "Diversification"
+                    :status status
+                    :value (str "Effective N · " (opt-format/format-effective-n effective-n universe-size) " of " universe-size)
+                    :subtext (diversification-subtext status)}))
       (trust-row {:label "Weight Stability"
                   :status weight-stability-status
                   :value (if sensitivity-top "Moderate" "Stable")
                   :subtext (if sensitivity-top
-                            (str (results-model/instrument-label (:labels-by-instrument result)
-                                                                 (:instrument-id sensitivity-top))
+                            (str (display-asset-label (:labels-by-instrument result)
+                                                      (:instrument-id sensitivity-top))
                                  " is most sensitive (±"
                                  (opt-format/format-pct (/ (:span sensitivity-top) 2))
                                  ").")
@@ -296,8 +364,7 @@
                             "text-[0.62rem]" "font-semibold" "uppercase" "tracking-[0.06em]" "text-warning"]}
           (str "Warnings · " (count warnings))]
          (into [:div {:class ["space-y-2" "px-4" "pb-4"]}]
-               (map (partial warning-row (:labels-by-instrument result))
-                    warnings))])
+               (warning-rows (:labels-by-instrument result) warnings))])
       [:details {:class ["border-b" "border-base-300"]}
        [:summary {:class ["cursor-pointer" "px-4" "py-3" "font-mono" "text-[0.62rem]" "uppercase" "tracking-[0.08em]" "text-trading-muted/70"]}
         "More Diagnostics"]

@@ -43,7 +43,8 @@
            scenario-save-state
            current-result?
            result
-           refinement]}]
+           refinement
+           rerun-blocked-reason]}]
   (let [status (:status active-scenario)
         read-only? (true? (:read-only? active-scenario))
         running? (or running?
@@ -54,10 +55,8 @@
                            (not current-result?))
         can-refine? (boolean (:can-refine? refinement))
         solved? (= :solved (:status result))
-        trade-count (:trade-count (recommendation-deltas result))
         no-trades? (and solved?
-                        (opt-format/finite-number? trade-count)
-                        (zero? trade-count))]
+                        (true? (:at-target? (recommendation-deltas result))))]
     [:header {:class ["optimizer-scenario-header"
                       "border-b"
                       "border-base-300"
@@ -150,8 +149,12 @@
                          "disabled:bg-base-200/40"
                          "disabled:text-trading-muted"]
                  :data-role "portfolio-optimizer-scenario-rerun"
-                 :disabled running?
-                 :on {:click [[:actions/run-portfolio-optimizer-from-draft]]}}
+                 ;; An enabled button that silently does nothing is a truthfulness
+                 ;; violation — when the draft cannot run, disable and say why.
+                 :disabled (boolean (or running? rerun-blocked-reason))
+                 :title rerun-blocked-reason
+                 :on (when-not (or running? rerun-blocked-reason)
+                       {:click [[:actions/run-portfolio-optimizer-from-draft]]})}
         (cond
           running? "Running"
           :else "Rerun")]
@@ -229,7 +232,10 @@
   "Single source of the current→target volatility/return deltas and the trade
   count, so the recommendation headline and the KPI strip never disagree.
   Volatility down is good and expected return up is good; deltas are nil when there
-  is no current baseline, and `trade-count` is nil when no rebalance preview exists."
+  is no current baseline, and `trade-count` is nil when no rebalance preview exists.
+  The trade count is SENDABLE legs only (ready), matching the execution ledger's
+  staged count and fill denominator — blocked and skipped legs never trade, so
+  counting them would promise trades the plan cannot deliver."
   [result]
   (let [current-return (:current-expected-return result)
         current-vol (:current-volatility result)
@@ -245,8 +251,14 @@
      :vol-delta (when (opt-format/finite-number? current-vol)
                   (- (or target-vol 0) current-vol))
      :trade-count (when summary
-                    (+ (or (:ready-count summary) 0)
-                       (or (:blocked-count summary) 0)))
+                    (or (:ready-count summary) 0))
+     :blocked-count (when summary
+                      (or (:blocked-count summary) 0))
+     ;; "Already at target" is only true when NOTHING wants to trade — an
+     ;; all-blocked plan is not at target, its trades just can't be sent yet.
+     :at-target? (when summary
+                   (and (zero? (or (:ready-count summary) 0))
+                        (zero? (or (:blocked-count summary) 0))))
      :rebalance-status (:status (:rebalance-preview result))}))
 
 (defn- kpi-strip

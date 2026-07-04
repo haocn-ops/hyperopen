@@ -116,9 +116,8 @@
              :data-role "portfolio-optimizer-right-rail"}
      (summary-card draft readiness)
      ;; The full Return views editor renders only while the views-aware model is
-     ;; live; when views are inert the section is demoted to a one-line note
-     ;; after Data health (see below) so inactive functionality never competes
-     ;; with readiness warnings.
+     ;; live; when views are inert the section is demoted to the one-line note
+     ;; below, so inactive functionality never competes with live warnings.
      (when views-active?
        [:section {:class ["optimizer-setup-panel" "border" "border-base-300" "bg-base-100/90" "p-3"]
                   :data-role "portfolio-optimizer-assumptions-rail"
@@ -141,6 +140,34 @@
            :collapsible? true
            :open? true
            :description "Edit any return to save it as your view. Saved views override implied returns; the rest use the implied baseline."})]])
+     ;; Demoted inactive note: one line + the one-click way to make views
+     ;; matter. The whole Return-views slot (editor or note) sits ABOVE Data
+     ;; health so the rail order is stable across goals; the folded data notes
+     ;; keep the health section compact (owner review 2026-07-04).
+     (when-not views-active?
+       [:section {:class ["optimizer-setup-panel" "border" "border-base-300" "bg-base-100/90" "p-3"]
+                  :data-role "portfolio-optimizer-assumptions-rail"
+                  :replicant/key "return-views-inactive"}
+        [:div {:class ["flex" "items-baseline" "justify-between" "gap-2"]}
+         [:p {:class eyebrow-class} "Return views"]
+         [:span {:class ["font-mono" "text-[0.6875rem]" "uppercase" "tracking-[0.1em]"
+                         "text-trading-muted/50"]
+                 :data-role "portfolio-optimizer-return-views-inactive"}
+          (if min-variance? "Not used by Minimum risk" "Not used")]]
+        [:p {:class ["mt-1.5" "text-[0.6875rem]" "leading-[1.4]" "text-trading-muted"]}
+         (if min-variance?
+           "Minimum risk ignores expected-return forecasts."
+           "This return model uses the historical estimate directly.")]
+        [:button {:type "button"
+                  :class ["mt-2" "border" "border-base-300" "bg-base-200/40" "px-2"
+                          "py-1" "text-[0.6875rem]" "font-semibold" "text-trading-muted"
+                          "hover:bg-base-200/60"]
+                  :data-role "portfolio-optimizer-return-views-activate"
+                  :on {:click (if min-variance?
+                                [[:actions/apply-portfolio-optimizer-setup-preset :max-sharpe]]
+                                [[:actions/set-portfolio-optimizer-return-model-kind
+                                  :black-litterman]])}}
+         (if min-variance? "Switch to Maximum Sharpe" "Use my views")]])
      (when status-visible?
        [:section {:class ["optimizer-setup-panel" "border-t" "border-base-300" "bg-base-100/90" "p-3"]
                   :data-role "portfolio-optimizer-trust-freshness-panel"
@@ -194,30 +221,4 @@
         (when read-only-message
           [:p {:class ["mt-3" "border" "border-warning/40" "bg-warning/10" "p-2"
                        "text-[0.8125rem]" "text-warning"]}
-           read-only-message])])
-     ;; Demoted inactive note: one line + the one-click way to make views
-     ;; matter, ranked last — after the contract and Data health.
-     (when-not views-active?
-       [:section {:class ["optimizer-setup-panel" "border" "border-base-300" "bg-base-100/90" "p-3"]
-                  :data-role "portfolio-optimizer-assumptions-rail"
-                  :replicant/key "return-views-inactive"}
-        [:div {:class ["flex" "items-baseline" "justify-between" "gap-2"]}
-         [:p {:class eyebrow-class} "Return views"]
-         [:span {:class ["font-mono" "text-[0.6875rem]" "uppercase" "tracking-[0.1em]"
-                         "text-trading-muted/50"]
-                 :data-role "portfolio-optimizer-return-views-inactive"}
-          (if min-variance? "Not used by Minimum risk" "Not used")]]
-        [:p {:class ["mt-1.5" "text-[0.6875rem]" "leading-[1.4]" "text-trading-muted"]}
-         (if min-variance?
-           "Minimum risk ignores expected-return forecasts."
-           "This return model uses the historical estimate directly.")]
-        [:button {:type "button"
-                  :class ["mt-2" "border" "border-base-300" "bg-base-200/40" "px-2"
-                          "py-1" "text-[0.6875rem]" "font-semibold" "text-trading-muted"
-                          "hover:bg-base-200/60"]
-                  :data-role "portfolio-optimizer-return-views-activate"
-                  :on {:click (if min-variance?
-                                [[:actions/apply-portfolio-optimizer-setup-preset :max-sharpe]]
-                                [[:actions/set-portfolio-optimizer-return-model-kind
-                                  :black-litterman]])}}
-         (if min-variance? "Switch to Maximum Sharpe" "Use my views")]])]))
+           read-only-message])])]))

@@ -112,9 +112,28 @@ under Maximum Sharpe):
 - [x] Data health verdict carries the issue count ("Ready with cautions · 3
   issues") so the health state stays legible even with the warning cards
   further down.
-- [ ] Follow-up: consider moving the full Return-views editor into the CENTER
-  column when Maximum Sharpe is selected (expert's preferred end-state; the
-  rail keeps contract + health summary) — deferred as a larger IA change.
+Round 4 (2026-07-04, owner — data-health cautions are over-weighted):
+
+- [x] `:stale-history` reclassified :caution → :info — a refresh adds at most
+  the newest day of data, which does not move a covariance estimate or the
+  allocation; only an actual fetch error (`:source-fetch-failed`, which keeps
+  its caution + Refresh action) deserves attention. Detail copy is now honest:
+  "Cached history is used; refreshing rarely changes the result."
+- [x] `:insufficient-common-history` reclassified :info — the provider window
+  is not user-fixable here (custom loadings are a separate future feature).
+- [x] Info notes FOLD behind a collapsed "N data notes" disclosure in the
+  readiness panel; blocking issues and cautions stay expanded. The verdict's
+  issue count now counts only blocking/caution groups, so an info-only state
+  reads "Ready to run" with the notes tucked away.
+- [x] Rail order unified: the Return-views slot (open editor under Maximum
+  Sharpe, one-line inactive note otherwise) sits ABOVE Data health in both
+  goal states, per owner preference that the folded health details rank below
+  the goal-relevant inputs.
+- [ ] Follow-up: user-supplied custom loadings/assumptions as the real remedy
+  for the provider-limit note (owner: address separately). Also: consider
+  moving the full Return-views editor into the CENTER column when Maximum
+  Sharpe is selected (expert's preferred end-state; the rail keeps contract +
+  health summary) — deferred as a larger IA change.
   Also: compact collapsed-by-default contract once the expanded card proves to
   be scanned rather than read; "configure data source" path for the
   provider-limit warning; selected-state vs keyboard-focus outline audit

@@ -131,11 +131,17 @@
           "the affected-asset labels are resolved from the requested universe")
       (is (= ["perp:BTC" "perp:ETH"] (mapv :instrument-id (:assets stale)))))
     (let [stale (first (filter #(= :stale-history (:code %)) warnings))]
-      (is (= :caution (:severity stale)))
+      ;; Stale cache is an informational NOTE, not a caution: a refresh adds
+      ;; at most the newest day of data, which does not move a covariance
+      ;; estimate or the allocation (owner review 2026-07-04).
+      (is (= :info (:severity stale)))
       (is (some? (:detail stale)) "stale groups carry a plain-language context line"))
     (let [insufficient (first (filter #(= :insufficient-common-history (:code %)) warnings))]
       (is (= 1 (:count insufficient)))
       (is (= ["perp:BTC"] (mapv :instrument-id (:assets insufficient))))
+      ;; Provider limits are not user-fixable here — informational, never an
+      ;; action item.
+      (is (= :info (:severity insufficient)))
       ;; Provider-limit groups lead with the human headline, never the raw
       ;; provider/vendor message.
       (is (= "History source is limited — not enough shared history across the selected assets."

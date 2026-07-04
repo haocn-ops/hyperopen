@@ -120,7 +120,11 @@
        [:circle {:class ["optimizer-exposure-map__current"]
                  :data-role "portfolio-optimizer-exposure-current"
                  :cx (pct (:x current-marker)) :cy (pct (:y current-marker)) :r 2.2}])
-     ;; target handle
+     ;; target handle: an outer grab ring around the dot so it reads as a
+     ;; draggable control, not a plotted marker.
+     [:circle {:class ["optimizer-exposure-map__handle-ring"]
+               :data-role "portfolio-optimizer-exposure-handle-ring"
+               :cx target-x :cy target-y :r 5.6}]
      [:circle {:class ["optimizer-exposure-map__handle"]
                :data-role "portfolio-optimizer-exposure-handle"
                :cx target-x :cy target-y :r 3.4}]]))
@@ -256,7 +260,10 @@
 (defn- presets-block
   [presets]
   [:div {:class ["optimizer-exposure-map__presets-block"]}
-   [:span {:class controls/eyebrow-class} "Start with"]
+   ;; "Exposure presets", not "Start with": these chips seed the exposure
+   ;; envelope only, never the optimization goal (the retired global "Start
+   ;; with" row made that generic phrasing ambiguous).
+   [:span {:class controls/eyebrow-class} "Exposure presets"]
    (into [:div {:class ["optimizer-exposure-map__presets"]
                 :data-role "portfolio-optimizer-exposure-presets"}]
          (map preset-chip presets))])
@@ -313,6 +320,16 @@
             :data-role "portfolio-optimizer-exposure-caption"}
         "Drag the dot to set target exposure."]
        (axis-frame axis zoom (exposure-pad model))
+       ;; Legend: which dot is the draggable target and which is the live book.
+       ;; Without it the off-policy warning ("current is outside…") has no
+       ;; visual anchor on the pad.
+       [:p {:class ["optimizer-exposure-map__legend"]
+            :data-role "portfolio-optimizer-exposure-legend"}
+        [:span {:class ["optimizer-exposure-map__legend-target"]}
+         "● Target — drag to move"]
+        (when (:current-marker model)
+          [:span {:class ["optimizer-exposure-map__legend-current"]}
+           "◌ Current"])]
        (target-readout model)]
       [:div {:class ["optimizer-exposure-map__controls"]}
        (presets-block presets)

@@ -98,7 +98,10 @@
      :else fallback)))
 
 (def ^:private display-labels
-  {:minimum-variance "Minimum variance"
+  ;; "Minimum risk" is the single user-facing objective term (the method name
+  ;; "minimum variance" stays in technical copy only) — see the vocabulary
+  ;; unification in the 2026-07-04 right-rail decision-aid pass.
+  {:minimum-variance "Minimum risk"
    :max-sharpe "Maximum Sharpe"
    :target-volatility "Target volatility"
    :target-return "Target return"

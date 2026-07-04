@@ -135,10 +135,10 @@
               :aria-pressed (str selected?)
               :data-tooltip (if user?
                               (str (name level) " trust in this return")
-                              (str "adopt as your view · " (name level)))
+                              (str "save as your view · " (name level) " confidence"))
               :aria-label (if user?
                             (str "Set " (name level) " confidence")
-                            (str "Adopt implied return as your view at "
+                            (str "Save implied return as your view at "
                                  (name level) " confidence"))
               :on {:click [[:actions/set-portfolio-optimizer-objective-menu-view-confidence
                             instrument-id
@@ -238,23 +238,24 @@
      [:div {:class ["mt-1.5" "flex" "min-w-0" "items-center" "gap-1"]}
       (source-chip row)
       (when user? (reset-button asset-label instrument-id))]
-     ;; Confidence gets its own labeled line. The control now says what it is —
-     ;; "Confidence" on your rows, "Adopt at" on implied rows (where clicking
-     ;; adopts the shown estimate as your view at that confidence) — and the
-     ;; buttons are full-size, readable hit targets, not a cramped meter strip.
+     ;; Confidence gets its own labeled line. The control says what clicking
+     ;; does — "Confidence" on your rows, "Save as my view" on implied rows
+     ;; ("adopt" left ambiguous WHAT was adopted; saving the shown return as
+     ;; your view at that confidence is the actual effect) — and the buttons
+     ;; are full-size, readable hit targets, not a cramped meter strip.
      [:div {:class ["optimizer-objective-view-confidence-line" "mt-2" "flex"
                     "items-center" "gap-2" "flex-wrap"]}
       [:span {:class ["optimizer-objective-view-confidence-label" "font-mono"
                       "text-[0.6875rem]" "uppercase" "tracking-[0.08em]"
                       "text-trading-muted"]}
-       (if user? "Confidence" "Adopt at")]
+       (if user? "Confidence" "Save as my view")]
       (into
        [:div {:class ["optimizer-objective-view-confidence" "flex"]
               :role "group"
               :aria-label (str asset-label
                                (if user?
                                  " confidence"
-                                 " — adopt implied return at confidence"))}]
+                                 " — save implied return as your view at confidence"))}]
        (map #(confidence-button instrument-id (:confidence-level row) user? %)
             bl-model/confidence-options))]]))
 
@@ -299,7 +300,7 @@
   [:p {:class ["border" "border-base-300" "bg-base-200/20" "p-2"
                "text-[0.6875rem]" "leading-[1.4]" "text-trading-muted"]
        :data-role (str container-role "-objective-note")}
-   "Minimum variance ignores expected returns — views change the displayed return, not this recommendation. Switch to Maximum Sharpe to optimize with them."])
+   "Minimum risk ignores expected returns — views change the displayed return, not this recommendation. Switch to Maximum Sharpe to optimize with them."])
 
 (defn- conservative-note
   ;; Conservative preset (minimum variance + historical estimator): views have no
@@ -309,18 +310,23 @@
   [:p {:class ["border" "border-base-300" "bg-base-200/20" "p-3"
                "text-[0.75rem]" "leading-[1.45]" "text-trading-muted"]
        :data-role (str container-role "-conservative-note")}
-   "Return views are not used by Minimum Variance. Switch to the Maximum Sharpe goal to optimize with your expected-return views."])
+   "Return views are not used by Minimum risk. Switch to the Maximum Sharpe goal to optimize with your expected-return views."])
 
 (defn return-views-panel
   "The provenance-aware Return views panel. Options:
   :container-role/:title/:description — shell identity and copy;
   :include-apply?/:apply-role — the results-page re-run affordance;
-  :collapsible? — render as a closed-by-default <details> whose summary carries the
-  title + live counts (the results rail uses this: view editing is an input task,
+  :collapsible? — render as a <details> whose summary carries the title + live
+  counts (the results rail uses this closed: view editing is an input task,
   by-exception on a review page);
+  :open? — initial expansion for the collapsible form. The setup rail passes
+  true under Maximum Sharpe: the forecast inputs DRIVE that objective, so they
+  must be visible by default, not discoverable behind a disclosure. The
+  attribute only sets initial state — a user toggle survives re-renders
+  because the attribute value never changes between renders;
   :now-ms — clock for age labels (tests pass a fixed value)."
   [{:keys [draft state readiness now-ms container-role title description
-           extra-class include-apply? apply-role collapsible?]
+           extra-class include-apply? apply-role collapsible? open?]
     :or {container-role "portfolio-optimizer-objective-menu-use-my-views-editor"
          title "Return views"
          apply-role "portfolio-optimizer-objective-menu-apply"}}]
@@ -398,14 +404,15 @@
                             :on {:click [[:actions/apply-portfolio-optimizer-objective-menu-selection-and-run]]}}
                    "Apply & re-run"])])]
     (if collapsible?
-      ;; Closed by default: the summary row is the whole panel until opened, so the
-      ;; rail stays short on large universes. Native <details> (uncontrolled),
-      ;; matching the trust rail's accordions.
-      [:details {:class (cond-> ["optimizer-objective-views-section"
-                                 "optimizer-return-views-disclosure"
-                                 "border-t" "border-base-300" "px-3" "py-3"]
-                          extra-class (conj extra-class))
-                 :data-role container-role}
+      ;; Native <details> (uncontrolled), matching the trust rail's accordions.
+      ;; Closed by default unless :open? — the summary row is the whole panel
+      ;; until opened, so review-page rails stay short on large universes.
+      [:details (cond-> {:class (cond-> ["optimizer-objective-views-section"
+                                         "optimizer-return-views-disclosure"
+                                         "border-t" "border-base-300" "px-3" "py-3"]
+                                  extra-class (conj extra-class))
+                         :data-role container-role}
+                  open? (assoc :open true))
        [:summary {:class ["optimizer-return-views-disclosure-summary" "cursor-pointer"]
                   :data-role (str container-role "-toggle")}
         title-el

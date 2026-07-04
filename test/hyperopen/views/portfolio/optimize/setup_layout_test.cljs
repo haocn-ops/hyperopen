@@ -161,7 +161,7 @@
     (is (= true (get-in constraints-panel [1 :open])))
     (is (= :summary (first (first (node-children constraints-panel)))))
     (is (contains? strings "Portfolio exposure"))
-    (is (contains? strings "Set how levered and net long/short the target portfolio can be."))
+    (is (contains? strings "Set target leverage and net long/short bias."))
     (is (some? (node-by-role model-panel "portfolio-optimizer-return-model-panel")))
     (is (some? (node-by-role model-panel "portfolio-optimizer-risk-model-panel")))
     (is (some? (node-by-role constraints-panel
@@ -393,13 +393,21 @@
     ;; applied", and the controls are grouped by what the trader decides.
     (is (contains? strings "Custom"))
     (is (contains? strings "Portfolio exposure"))
-    (is (contains? strings "Set how levered and net long/short the target portfolio can be."))
-    (is (some #(str/includes? % "The dot shows the target gross leverage and net long/short bias.")
-              strings))
+    (is (contains? strings "Set target leverage and net long/short bias."))
+    ;; The drag hint is short, actionable, and rendered BEFORE the pad it explains
+    ;; (the old post-chart paragraph is gone).
+    (is (contains? strings "Drag the dot to set target exposure."))
+    (is (not (some #(str/includes? % "The dot shows the target gross leverage")
+                   strings)))
     (is (contains? strings "Positioning"))
     (is (contains? strings "Risk guards"))
     (is (contains? strings "Rebalance behavior"))
+    ;; The exact solver echo is an audit detail: it lives inside the Advanced
+    ;; solver limits drawer, not in the primary controls column.
     (is (contains? strings "Sent to solver"))
+    (is (some? (node-by-role
+                (node-by-role view-node "portfolio-optimizer-constraints-advanced")
+                "portfolio-optimizer-exposure-echo")))
     (is (contains? strings "Advanced solver limits"))
     ;; Each numeric constraint echoes its interpreted unit persistently (not only in the
     ;; hover tooltip): 0.25 -> "max 25% per asset", 3 -> "3.00× capital", 0.03 -> "3.0 pp band".
@@ -408,12 +416,13 @@
     (is (contains? strings "3.0 pp band"))
     (is (not (contains? strings "mandatory")))))
 
-(deftest setup-preset-card-discloses-holdings-seeded-constraints-test
+(deftest setup-exposure-panel-discloses-holdings-seeded-constraints-test
   ;; A holdings import rewrites the constraint envelope from the current book
-  ;; (gross floor, cap, net bias). The selected Minimum risk goal card must
-  ;; disclose that — a bare "Minimum risk" with the preset's default 'safe'
-  ;; envelope silently replaced is a mixed-state lie (audited live: cap 152%,
-  ;; net-short floor).
+  ;; (gross floor, cap, net bias). That is disclosed inside the Portfolio
+  ;; exposure panel — the section that owns the constraints — NOT the goal card:
+  ;; the objective didn't seed them, the holdings import did. A silent replace
+  ;; of the preset's 'safe' envelope is a mixed-state lie (audited live: cap
+  ;; 152%, net-short floor).
   (let [holdings-draft
         {:universe [{:instrument-id "perp:BTC" :market-type :perp :coin "BTC"}]
          :objective {:kind :minimum-variance}
@@ -427,12 +436,16 @@
                    {:router {:path "/portfolio/optimize/new"}
                     :wallet {:address "0x1111111111111111111111111111111111111111"}
                     :portfolio {:optimizer {:draft holdings-draft}}})
+        constraints-panel (node-by-role view-node "portfolio-optimizer-constraints-panel")
+        objective-panel (node-by-role view-node "portfolio-optimizer-objective-panel")
         strings (set (collect-strings view-node))]
-    (is (some? (node-by-role view-node
+    (is (some? (node-by-role constraints-panel
                              "portfolio-optimizer-preset-holdings-constraints-note")))
+    (is (nil? (node-by-role objective-panel
+                            "portfolio-optimizer-preset-holdings-constraints-note")))
     (is (contains? strings "Custom · from holdings"))))
 
-(deftest setup-preset-card-quiet-on-default-constraints-test
+(deftest setup-exposure-panel-quiet-on-default-constraints-test
   ;; A pristine default draft keeps the preset defaults: no disclosure note.
   (let [view-node (portfolio-view/portfolio-view
                    {:router {:path "/portfolio/optimize/new"}

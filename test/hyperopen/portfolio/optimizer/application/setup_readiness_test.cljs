@@ -500,7 +500,7 @@
                  request
                  {:code :proxy-history-used
                   :instrument-id "hl:perp:BTC"})]
-    (is (= "Bitcoin: approved proxy history is included."
+    (is (= "Bitcoin: approved substitute history is included."
            message))))
 
 ;; --- History assumptions (no-history asset: perp:ETH has no candle history) ---
@@ -576,7 +576,13 @@
   ;; with different counts side by side.
   (let [stale (setup-readiness/warning-code-summary :stale-history 15)
         fetch-failed (setup-readiness/warning-code-summary :source-fetch-failed 6)]
-    (is (= "15 assets use stale cached history" stale))
+    (is (= "15 assets use stale history" stale))
     (is (= "6 assets could not refresh from the history provider — using cached or native history"
            fetch-failed))
-    (is (not= stale fetch-failed))))
+    (is (not= stale fetch-failed))
+    ;; "Proxy" is internal mapping language; the grouped summary says
+    ;; "substitute history".
+    (is (= "8 assets use substitute history"
+           (setup-readiness/warning-code-summary :proxy-history-used 8)))
+    (is (= "1 asset uses substitute history"
+           (setup-readiness/warning-code-summary :proxy-history-used 1)))))

@@ -17,18 +17,25 @@
     (is (some? (node-by-role view-node "portfolio-optimizer-setup-surface")))
     (is (some? (node-by-role view-node "portfolio-optimizer-setup-control-rail")))
     ;; CENTER column is now the editable policy pane (was the passive summary pane); the RIGHT
-    ;; column leads with a compact summary card followed by the ALWAYS-present "Return views"
-    ;; panel — it edits views under the views-aware model and states honestly why views are
-    ;; inert otherwise, instead of vanishing for non-BL drafts.
+    ;; column leads with a compact summary card. The "Return views" panel is a full editor only
+    ;; when the views-aware model is active; for the default Conservative draft it is DEMOTED to
+    ;; a one-line inactive note ranked last, so inactive functionality never competes with
+    ;; readiness warnings.
     (is (some? (node-by-role view-node "portfolio-optimizer-setup-policy-pane")))
     (is (some? (node-by-role view-node "portfolio-optimizer-setup-summary-card")))
     (is (some? (node-by-role view-node "portfolio-optimizer-assumptions-rail")))
     (is (contains? strings "Return views"))
-    ;; The default draft is the Conservative preset (minimum variance): the rail
-    ;; renders the "views are not used here" note, not a dead editor.
-    (is (some? (node-by-role
-                view-node
-                "portfolio-optimizer-setup-use-my-views-editor-conservative-note")))
+    (is (some? (node-by-role view-node "portfolio-optimizer-return-views-inactive")))
+    (is (contains? strings "Inactive for Minimum risk"))
+    ;; ...and the full editor (including its old conservative note) is gone.
+    (is (nil? (node-by-role
+               view-node
+               "portfolio-optimizer-setup-use-my-views-editor-conservative-note")))
+    ;; The scenario contract states the goal and that the forecast is not used,
+    ;; instead of the misleading "Returns: Historical mean" under Minimum Variance.
+    (is (contains? strings "Return forecast"))
+    (is (contains? strings "Not used"))
+    (is (not (contains? strings "Trust & Freshness")))
     (is (nil? (node-by-role view-node "portfolio-optimizer-left-rail")))
     (is (contains? strings "Portfolio Optimizer"))
     ;; The single goal control replaces the retired preset row's "Start with".

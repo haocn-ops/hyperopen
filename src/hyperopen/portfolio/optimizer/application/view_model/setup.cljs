@@ -44,6 +44,56 @@
     {:label "Refresh history"
      :actions [[:actions/load-portfolio-optimizer-history-from-draft]]}))
 
+(def ^:private info-warning-codes
+  ;; By-design notes, not problems: the run is unaffected, the user only needs
+  ;; the disclosure. Rendered muted, below cautions.
+  #{:proxy-history-used
+    :vault-derived-history-used
+    :funding-history-missing
+    :manual-capital-base})
+
+(defn- warning-severity
+  "Rank a warning group so the panel can render blocking issues, cautions, and
+  informational notes distinctly instead of one undifferentiated amber wall."
+  [blocking? code]
+  (cond
+    blocking? :blocking
+    (contains? info-warning-codes code) :info
+    :else :caution))
+
+(def ^:private warning-code-details
+  ;; One human sentence of context per code — what the condition means for the
+  ;; run — so the headline can stay short.
+  {:proxy-history-used "Used when direct history is limited."
+   :stale-history "Refresh pulls fresh history from the provider."
+   :source-fetch-failed "Refresh retries the history provider."})
+
+(defn- provider-limit-code?
+  [code]
+  (= :insufficient-common-history code))
+
+(defn- warning-group-detail
+  "Secondary explanation line for a group. Provider-limit warnings demote their
+  raw provider message here so the headline stays human-readable."
+  [readiness code group]
+  (or (get warning-code-details code)
+      (when (provider-limit-code? code)
+        (warning-message readiness (first group)))))
+
+(defn- warning-group-message
+  [readiness code group cnt]
+  (cond
+    ;; The provider message ("CoinGecko Demo provider history window is capped
+    ;; by provider tier.") is vendor telemetry; lead with the user's problem.
+    (provider-limit-code? code)
+    "History source is limited — not enough shared history across the selected assets."
+
+    (= 1 cnt)
+    (warning-message readiness (first group))
+
+    :else
+    (setup-readiness/warning-code-summary code cnt)))
+
 (defn group-readiness-warnings
   "Group the chosen readiness warnings by :code (first-seen order) so the panel shows each KIND
   once with a count and an expandable affected-asset list, instead of repeating one row per asset
@@ -51,33 +101,62 @@
   not touch the raw readiness lists that history-status/assumption-cards depend on."
   [readiness]
   (let [request (:request readiness)
+        blocking? (boolean (seq (:blocking-warnings readiness)))
         warnings (vec (or (seq (:blocking-warnings readiness))
                           (:warnings readiness)))
         order (distinct (map :code warnings))
         by-code (group-by :code warnings)]
-    (mapv (fn [code]
-            (let [group (get by-code code)
-                  cnt (count group)]
-              (cond-> {:code code
-                       :code-label (some-> code name)
-                       :count cnt
-                       :message (if (= 1 cnt)
-                                  (warning-message readiness (first group))
-                                  (setup-readiness/warning-code-summary code cnt))
-                       :assets (mapv (fn [warning]
-                                       {:instrument-id (:instrument-id warning)
-                                        :label (setup-readiness/warning-asset-label request warning)})
-                                     group)}
-                (warning-group-action code)
-                (assoc :action (warning-group-action code)))))
-          order)))
+    (->> order
+         (mapv (fn [code]
+                 (let [group (get by-code code)
+                       cnt (count group)]
+                   (cond-> {:code code
+                            :code-label (some-> code name)
+                            :count cnt
+                            :severity (warning-severity blocking? code)
+                            :message (warning-group-message readiness code group cnt)
+                            :assets (mapv (fn [warning]
+                                            {:instrument-id (:instrument-id warning)
+                                             :label (setup-readiness/warning-asset-label request warning)})
+                                          group)}
+                     (warning-group-detail readiness code group)
+                     (assoc :detail (warning-group-detail readiness code group))
+                     (warning-group-action code)
+                     (assoc :action (warning-group-action code))))))
+         ;; Rank by severity, then actionability: a warning the user can fix
+         ;; here (Refresh history) outranks one they cannot (provider limit).
+         ;; Stable sort, so first-seen order is otherwise preserved.
+         (sort-by (fn [{:keys [severity action]}]
+                    [(get {:blocking 0 :caution 1 :info 2} severity 1)
+                     (if action 0 1)]))
+         vec)))
+
+(defn- readiness-status
+  "Overall verdict for the Data health header: can the user run, run with
+  cautions, or must they fix something first."
+  [readiness history-load-state warnings]
+  (cond
+    (or (contains? #{:history-loading :holdings-loading} (:reason readiness))
+        (= :loading (:status history-load-state)))
+    {:level :loading :label "Loading…"}
+
+    (= :blocked (:status readiness))
+    {:level :blocked :label "Action needed"}
+
+    (some #(= :caution (:severity %)) warnings)
+    {:level :caution :label "Ready with cautions"}
+
+    :else
+    {:level :ready :label "Ready to run"}))
 
 (defn readiness-panel-model
   [readiness history-load-state]
-  {:title "Readiness"
-   :copy (history-load-copy history-load-state readiness)
-   :error-message (get-in history-load-state [:error :message])
-   :warnings (group-readiness-warnings readiness)})
+  (let [warnings (group-readiness-warnings readiness)]
+    {:title "Data health"
+     :status (readiness-status readiness history-load-state warnings)
+     :copy (history-load-copy history-load-state readiness)
+     :error-message (get-in history-load-state [:error :message])
+     :warnings warnings}))
 
 (defn- title-case-token
   [token]
@@ -137,6 +216,15 @@
 (def ^:private preset-display-names
   {:conservative "Conservative"
    :max-sharpe "Maximum Sharpe"})
+
+(def objective-display-names
+  "The ONE user-facing vocabulary for objectives. \"Minimum risk\" is the
+  product term everywhere the user reads; \"minimum variance\" is the method
+  and stays in secondary/technical copy only."
+  {:minimum-variance "Minimum risk"
+   :max-sharpe "Maximum Sharpe"
+   :target-volatility "Target volatility"
+   :target-return "Target return"})
 
 (defn- universe-label
   [instrument]
@@ -314,13 +402,30 @@
   ([draft {:keys [labelize]}]
    (let [constraints (:constraints draft)
          labelize* #(apply-labelize labelize %)
-         preset (active-preset draft)]
+         preset (active-preset draft)
+         objective-kind (get-in draft [:objective :kind])
+         min-variance? (= :minimum-variance objective-kind)
+         returns-label (or (returns-source-label draft)
+                           (labelize* (get-in draft [:return-model :kind])))
+         strip (fn [label prefix]
+                 (when label (str/replace-first label prefix "")))]
      {:preset-label (get preset-display-names preset (labelize* preset))
       :asset-count (count (:universe draft))
       :universe-source-kind (get-in draft [:metadata :universe-source :kind])
-      :objective-label (labelize* (get-in draft [:objective :kind]))
-      :returns-label (or (returns-source-label draft)
-                         (labelize* (get-in draft [:return-model :kind])))
+      :objective-label (get objective-display-names objective-kind
+                            (labelize* objective-kind))
+      :returns-label returns-label
+      ;; Minimum variance does not consume expected returns at all: saying
+      ;; "Historical mean" under Returns implies the forecast drives the result.
+      :return-forecast-label (if min-variance? "Not used" returns-label)
+      :views-active? (= :black-litterman (get-in draft [:return-model :kind]))
+      :min-variance? min-variance?
+      :exposure-rows
+      (filterv (fn [[_ value]] (some? value))
+               [["Gross" (strip (gross-range-label constraints) "Gross ")]
+                ["Net" (strip (net-range-label constraints) "Net ")]
+                ["Max asset" (strip (cap-label (:max-asset-weight constraints)) "Max asset ")]
+                ["Rebalance" (strip (band-label (:rebalance-tolerance constraints)) "Rebalance ")]])
       :return-label (or (get return-model-display-names
                              (get-in draft [:return-model :kind]))
                         (labelize* (get-in draft [:return-model :kind])))

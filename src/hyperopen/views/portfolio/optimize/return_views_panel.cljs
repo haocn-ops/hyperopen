@@ -135,10 +135,10 @@
               :aria-pressed (str selected?)
               :data-tooltip (if user?
                               (str (name level) " trust in this return")
-                              (str "adopt as your view · " (name level)))
+                              (str "save as your view · " (name level) " confidence"))
               :aria-label (if user?
                             (str "Set " (name level) " confidence")
-                            (str "Adopt implied return as your view at "
+                            (str "Save implied return as your view at "
                                  (name level) " confidence"))
               :on {:click [[:actions/set-portfolio-optimizer-objective-menu-view-confidence
                             instrument-id
@@ -238,23 +238,24 @@
      [:div {:class ["mt-1.5" "flex" "min-w-0" "items-center" "gap-1"]}
       (source-chip row)
       (when user? (reset-button asset-label instrument-id))]
-     ;; Confidence gets its own labeled line. The control now says what it is —
-     ;; "Confidence" on your rows, "Adopt at" on implied rows (where clicking
-     ;; adopts the shown estimate as your view at that confidence) — and the
-     ;; buttons are full-size, readable hit targets, not a cramped meter strip.
+     ;; Confidence gets its own labeled line. The control says what clicking
+     ;; does — "Confidence" on your rows, "Save as my view" on implied rows
+     ;; ("adopt" left ambiguous WHAT was adopted; saving the shown return as
+     ;; your view at that confidence is the actual effect) — and the buttons
+     ;; are full-size, readable hit targets, not a cramped meter strip.
      [:div {:class ["optimizer-objective-view-confidence-line" "mt-2" "flex"
                     "items-center" "gap-2" "flex-wrap"]}
       [:span {:class ["optimizer-objective-view-confidence-label" "font-mono"
                       "text-[0.6875rem]" "uppercase" "tracking-[0.08em]"
                       "text-trading-muted"]}
-       (if user? "Confidence" "Adopt at")]
+       (if user? "Confidence" "Save as my view")]
       (into
        [:div {:class ["optimizer-objective-view-confidence" "flex"]
               :role "group"
               :aria-label (str asset-label
                                (if user?
                                  " confidence"
-                                 " — adopt implied return at confidence"))}]
+                                 " — save implied return as your view at confidence"))}]
        (map #(confidence-button instrument-id (:confidence-level row) user? %)
             bl-model/confidence-options))]]))
 
@@ -299,7 +300,7 @@
   [:p {:class ["border" "border-base-300" "bg-base-200/20" "p-2"
                "text-[0.6875rem]" "leading-[1.4]" "text-trading-muted"]
        :data-role (str container-role "-objective-note")}
-   "Minimum variance ignores expected returns — views change the displayed return, not this recommendation. Switch to Maximum Sharpe to optimize with them."])
+   "Minimum risk ignores expected returns — views change the displayed return, not this recommendation. Switch to Maximum Sharpe to optimize with them."])
 
 (defn- conservative-note
   ;; Conservative preset (minimum variance + historical estimator): views have no
@@ -309,7 +310,7 @@
   [:p {:class ["border" "border-base-300" "bg-base-200/20" "p-3"
                "text-[0.75rem]" "leading-[1.45]" "text-trading-muted"]
        :data-role (str container-role "-conservative-note")}
-   "Return views are not used by Minimum Variance. Switch to the Maximum Sharpe goal to optimize with your expected-return views."])
+   "Return views are not used by Minimum risk. Switch to the Maximum Sharpe goal to optimize with your expected-return views."])
 
 (defn return-views-panel
   "The provenance-aware Return views panel. Options:

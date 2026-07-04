@@ -240,7 +240,11 @@
       (str assets " could not refresh from the history provider — using cached or native history")
 
       (contains? stale-history-warning-codes code)
-      (str assets (if (= 1 n) " uses" " use") " stale cached history")
+      (str assets (if (= 1 n) " uses" " use") " stale history")
+
+      ;; "Proxy" is an internal mapping term; traders read "substitute history".
+      (= :proxy-history-used code)
+      (str assets (if (= 1 n) " uses" " use") " substitute history")
 
       (contains? insufficient-history-warning-codes code)
       (str assets (if (= 1 n) " has" " have") " insufficient common history")
@@ -312,7 +316,7 @@
       (str label ": backend rejected optimizer history.")
 
       :proxy-history-used
-      (str label ": approved proxy history is included.")
+      (str label ": approved substitute history is included.")
 
       :vault-derived-history-used
       (str label ": row uses vault return-index history, not market candles.")

@@ -589,6 +589,16 @@
     fill: var(--optimizer-accent);
     stroke: var(--optimizer-bg);
     stroke-width: 1;
+    cursor: grab;
+  }
+
+  /* Outer grab ring: the target must read as a draggable control, not a
+     plotted marker. */
+  .portfolio-optimizer .optimizer-exposure-map__handle-ring {
+    fill: none;
+    stroke: color-mix(in srgb, var(--optimizer-accent) 60%, transparent);
+    stroke-width: 0.75;
+    cursor: grab;
   }
 
   .portfolio-optimizer .optimizer-exposure-map__current {
@@ -631,6 +641,18 @@
     line-height: 1.45;
     color: var(--optimizer-text-2);
     overflow-wrap: anywhere;
+  }
+
+  .portfolio-optimizer .optimizer-exposure-map__legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 0.75rem;
+    font-size: 0.6875rem;
+    color: var(--optimizer-text-2);
+  }
+
+  .portfolio-optimizer .optimizer-exposure-map__legend-target {
+    color: var(--optimizer-accent);
   }
 
   @media (max-width: 420px) {

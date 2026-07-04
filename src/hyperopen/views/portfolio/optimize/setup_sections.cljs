@@ -35,7 +35,7 @@
    "portfolio-optimizer-why-safe-note"
    (controls/disclosure-heading "Why this preset is safe" nil)
    [:div {:class ["mt-3" "space-y-2" "text-[0.8125rem]" "leading-[1.55]" "text-trading-muted"]}
-    [:p "Minimum variance does not rely on return forecasts."]
+    [:p "Minimum risk (a minimum-variance objective) does not rely on return forecasts."]
     [:p "Stabilized inputs reduce dependence on a single historical window."]
     [:p "Cash floor and turnover caps protect against destructive rebalances."]
     [:p {:class ["font-semibold" "text-warning"]}

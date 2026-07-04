@@ -381,11 +381,55 @@
      (shared/chip "cleanup" :info)
      [:p {:class ["text-xs" "text-trading-muted"]}
       (str carryover-count " resting order" (when (not= 1 carryover-count) "s")
-           " from your previous run "
+           " from a previous optimizer run "
            (if (= 1 carryover-count) "is" "are")
            " still on the book — "
            (if (= 1 carryover-count) "it" "they")
            " will be cancelled before new orders are sent.")]]))
+
+(defn- overlap-order-row
+  [{:keys [oid coin side sz limit-px cancel?]}]
+  [:li {:replicant/key (str "overlap-" oid)
+        :class ["flex" "items-center" "justify-between" "gap-3" "py-1.5"]}
+   [:div {:class ["min-w-0" "font-mono" "text-[0.7rem]" "text-trading-text"]}
+    [:span {:class ["font-semibold"]} coin]
+    [:span {:class ["ml-2" "text-trading-muted"]}
+     (str (some-> side str) " · " sz (when limit-px (str " @ " limit-px)))]]
+   [:button {:type "button"
+             :class (into ["border" "px-2" "py-1" "text-[0.7rem]" "font-medium"]
+                          (if cancel?
+                            ["border-error/60" "text-error"]
+                            ["border-base-300" "text-trading-muted"]))
+             :data-role "portfolio-optimizer-execution-overlap-toggle"
+             :data-oid (str oid)
+             :data-cancel (str (boolean cancel?))
+             :on {:click [[:actions/set-portfolio-optimizer-execution-overlap-cancel
+                           oid (not cancel?)]]}}
+    (if cancel? "Will cancel" "Keep")]])
+
+(defn- overlap-decision
+  "Cross-session decision surface: open orders that overlap the rebalance but were NOT
+  placed by the optimizer (manual orders, or optimizer orders from before cloid tagging).
+  The app can't prove they're safe to auto-cancel, so the user chooses per order; checked
+  ones are cancelled before new orders are sent."
+  [{:keys [phase overlap-orders]}]
+  (when (and (contains? #{:staged :armed} phase)
+             (seq overlap-orders))
+    (let [n (count overlap-orders)
+          chosen (count (filter :cancel? overlap-orders))]
+      [:div {:replicant/key "execution-overlap-decision"
+             :class ["border-b" "border-base-300" "bg-base-200/20" "px-5" "py-3"]
+             :data-role "portfolio-optimizer-execution-overlap"}
+       [:div {:class ["flex" "items-center" "gap-2"]}
+        (shared/chip "review" :short)
+        [:p {:class ["text-xs" "text-trading-muted"]}
+         (str n " open order" (when (not= 1 n) "s")
+              " overlap" (when (= 1 n) "s") " this rebalance and "
+              (if (= 1 n) "wasn't" "weren't")
+              " placed by the optimizer. Choose which to cancel before executing"
+              (when (pos? chosen) (str " — " chosen " selected")) ".")]]
+       (into [:ul {:class ["mt-2" "divide-y" "divide-base-300/60"]}]
+             (map overlap-order-row overlap-orders))])))
 
 (defn- control-band
   [{:keys [phase] :as model} rows]
@@ -679,6 +723,7 @@
        [:div
         (header model)
         (carryover-note model)
+        (overlap-decision model)
         (control-band model rows)
         (kpi-strip model rows)
         [:div {:class ["grid" "grid-cols-1" "xl:grid-cols-[minmax(0,1fr)_380px]"]}

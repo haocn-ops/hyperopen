@@ -184,6 +184,8 @@
     actions/open-portfolio-optimizer-execution-in-ticket
     :set-portfolio-optimizer-execution-order-filter
     actions/set-portfolio-optimizer-execution-order-filter
+    :set-portfolio-optimizer-execution-overlap-cancel
+    actions/set-portfolio-optimizer-execution-overlap-cancel
     :refresh-portfolio-optimizer-tracking
     actions/refresh-portfolio-optimizer-tracking
     :enable-portfolio-optimizer-manual-tracking

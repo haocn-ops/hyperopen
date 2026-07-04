@@ -218,6 +218,7 @@
 	   [:actions/discard-portfolio-optimizer-execution :discard-portfolio-optimizer-execution]
 	   [:actions/open-portfolio-optimizer-execution-in-ticket :open-portfolio-optimizer-execution-in-ticket]
 	   [:actions/set-portfolio-optimizer-execution-order-filter :set-portfolio-optimizer-execution-order-filter]
+	   [:actions/set-portfolio-optimizer-execution-overlap-cancel :set-portfolio-optimizer-execution-overlap-cancel]
 	   [:actions/refresh-portfolio-optimizer-tracking :refresh-portfolio-optimizer-tracking]
 	   [:actions/enable-portfolio-optimizer-manual-tracking
 	    :enable-portfolio-optimizer-manual-tracking]

@@ -40,6 +40,13 @@
     border-left: 1px solid var(--optimizer-border);
   }
 
+  /* The open-by-default Return views editor (Maximum Sharpe) shows several
+     rows immediately but caps the list so a 13-asset universe cannot push
+     Data health and the run context out of reach; the list scrolls. */
+  .portfolio-optimizer .optimizer-context-rail .optimizer-objective-view-rows {
+    max-height: 24rem;
+  }
+
   .portfolio-optimizer .optimizer-policy-pane {
     background-color: transparent;
     box-sizing: border-box;

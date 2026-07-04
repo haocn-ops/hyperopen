@@ -285,6 +285,11 @@
     ;; Views are edited in the always-present right-rail "Return views" panel.
     (is (contains? strings "Return views"))
     (is (some? inline-editor))
+    ;; Under Maximum Sharpe the per-asset forecasts DRIVE the result: the rail
+    ;; editor must be expanded by default (owner review 2026-07-04), while
+    ;; staying a collapsible <details> the user can tuck away.
+    (is (= :details (first inline-editor)))
+    (is (true? (get-in inline-editor [1 :open])))
     (is (contains? editor-strings "Used by Maximum Sharpe"))
     (is (some? (node-by-role inline-editor
                              "portfolio-optimizer-setup-use-my-views-editor-summary")))

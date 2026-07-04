@@ -26,7 +26,7 @@
     (is (some? (node-by-role view-node "portfolio-optimizer-assumptions-rail")))
     (is (contains? strings "Return views"))
     (is (some? (node-by-role view-node "portfolio-optimizer-return-views-inactive")))
-    (is (contains? strings "Inactive for Minimum risk"))
+    (is (contains? strings "Not used by Minimum risk"))
     ;; ...and the full editor (including its old conservative note) is gone.
     (is (nil? (node-by-role
                view-node

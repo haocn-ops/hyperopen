@@ -130,14 +130,17 @@
           state
           (:result last-successful-run)
           readiness
-          ;; Collapsed by default: the summary row ("Used by Maximum Sharpe ·
-          ;; 2 your views · 11 implied") is the rail's resting state, so a
-          ;; 13-asset editor can never push Data health and the run context
-          ;; below the fold. Opening it is the "edit return views" action.
+          ;; OPEN by default: under Maximum Sharpe the per-asset return
+          ;; forecasts are the core input driving the result — hiding them
+          ;; behind a closed disclosure made the optimizer look more objective
+          ;; than it is (owner + expert review, 2026-07-04). Still collapsible
+          ;; so the user can tuck it away; the rows list is height-capped in
+          ;; CSS so Data health stays reachable on large universes.
           {:container-role "portfolio-optimizer-setup-use-my-views-editor"
            :title "Used by Maximum Sharpe"
            :collapsible? true
-           :description "Your views tilt the forecast where you have them; implied rows fall back to the baseline estimate. Edits save automatically."})]])
+           :open? true
+           :description "Edit any return to save it as your view. Saved views override implied returns; the rest use the implied baseline."})]])
      (when status-visible?
        [:section {:class ["optimizer-setup-panel" "border-t" "border-base-300" "bg-base-100/90" "p-3"]
                   :data-role "portfolio-optimizer-trust-freshness-panel"
@@ -145,7 +148,7 @@
         [:p {:class eyebrow-class} "Data health"]
         ;; The verdict is the section's headline — the first thing scanned —
         ;; not a small chip competing with the warning cards below it.
-        (let [{:keys [level label]} (:status readiness-model)]
+        (let [{:keys [level label issue-count]} (:status readiness-model)]
           [:p {:class ["mt-1" "text-[0.8125rem]" "font-semibold"
                        (case level
                          :blocked "text-error"
@@ -153,7 +156,13 @@
                          :ready "text-success"
                          "text-trading-muted")]
                :data-role "portfolio-optimizer-data-health-status"}
-           label])
+           ;; The count keeps the verdict meaningful even when the warning
+           ;; cards sit below other panels ("Ready with cautions · 3 issues").
+           (if (and (pos? (or issue-count 0))
+                    (contains? #{:caution :blocked} level))
+             (str label " · " issue-count
+                  (if (= 1 issue-count) " issue" " issues"))
+             label)])
         [:p {:class ["mt-1.5" "text-[0.75rem]" "leading-[1.45]" "text-trading-muted"]}
          (or combined-status-line snapshot-line)]
         (optimization-progress-panel/progress-panel optimization-progress)
@@ -197,10 +206,10 @@
          [:span {:class ["font-mono" "text-[0.6875rem]" "uppercase" "tracking-[0.1em]"
                          "text-trading-muted/50"]
                  :data-role "portfolio-optimizer-return-views-inactive"}
-          (if min-variance? "Inactive for Minimum risk" "Inactive")]]
+          (if min-variance? "Not used by Minimum risk" "Not used")]]
         [:p {:class ["mt-1.5" "text-[0.6875rem]" "leading-[1.4]" "text-trading-muted"]}
          (if min-variance?
-           "Used only by Maximum Sharpe — Minimum risk ignores expected returns."
+           "Minimum risk ignores expected-return forecasts."
            "This return model uses the historical estimate directly.")]
         [:button {:type "button"
                   :class ["mt-2" "border" "border-base-300" "bg-base-200/40" "px-2"

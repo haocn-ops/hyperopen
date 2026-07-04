@@ -53,6 +53,14 @@
     min-width: 0;
   }
 
+  /* Trailing header summaries (selected goal one-liner, live constraint numbers)
+     exist so a COLLAPSED panel reads without opening it. While the panel is open
+     they duplicate the panel body and the right-rail scenario contract, so they
+     hide; collapsing the panel brings the summary back. */
+  .portfolio-optimizer details[open] > summary .optimizer-section-trailing {
+    display: none;
+  }
+
   @media (max-width: 639px) and (hover: hover) and (pointer: fine) {
     .portfolio-optimizer.optimizer-setup-route-surface,
     .portfolio-optimizer .optimizer-setup-route-surface {

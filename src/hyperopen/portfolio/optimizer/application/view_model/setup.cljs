@@ -46,13 +46,23 @@
 
 (def ^:private info-warning-codes
   ;; By-design notes, not problems: the run is unaffected, the user only needs
-  ;; the disclosure. Rendered muted, below cautions.
+  ;; the disclosure. Rendered muted and folded behind a collapsed "data notes"
+  ;; disclosure, below cautions.
+  ;;
+  ;; :stale-history is a NOTE, not a caution (owner review 2026-07-04): a
+  ;; refresh adds at most the newest day of data, which does not move a
+  ;; covariance estimate or the allocation — only an actual fetch error
+  ;; (:source-fetch-failed) is worth the user's attention.
+  ;; :insufficient-common-history is likewise not user-fixable here (the
+  ;; provider window is what it is), so it must not read as an action item.
   #{:proxy-history-used
     :vault-derived-history-used
     :funding-history-missing
     :manual-capital-base
     :missing-market-cap-prior
-    :missing-current-portfolio-prior})
+    :missing-current-portfolio-prior
+    :stale-history
+    :insufficient-common-history})
 
 (defn- warning-severity
   "Rank a warning group so the panel can render blocking issues, cautions, and
@@ -65,9 +75,11 @@
 
 (def ^:private warning-code-details
   ;; One human sentence of context per code — what the condition means for the
-  ;; run — so the headline can stay short.
+  ;; run — so the headline can stay short. The stale-history line is honest
+  ;; about the stakes: a refresh adds at most the newest data and rarely
+  ;; changes the allocation.
   {:proxy-history-used "Used when direct history is limited."
-   :stale-history "Refresh pulls fresh history from the provider."
+   :stale-history "Cached history is used; refreshing rarely changes the result."
    :source-fetch-failed "Refresh retries the history provider."
    :missing-market-cap-prior "The optimizer could not load market-cap baseline data for some assets."})
 
@@ -140,7 +152,9 @@
   warning groups, so the verdict line can read \"Ready with cautions · 3
   issues\" and stay meaningful even when the cards sit below other panels."
   [readiness history-load-state warnings]
-  (let [issue-count (count warnings)]
+  ;; Only blocking/caution groups count as issues — informational notes are
+  ;; folded away and must not inflate the verdict into looking actionable.
+  (let [issue-count (count (remove #(= :info (:severity %)) warnings))]
     (cond
       (or (contains? #{:history-loading :holdings-loading} (:reason readiness))
           (= :loading (:status history-load-state)))

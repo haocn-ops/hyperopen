@@ -95,6 +95,23 @@
                    "text-xs"
                    "text-error"]}
        error-message])
-      (when (seq warnings)
-        (into [:div {:class ["mt-3" "space-y-2"]}]
-              (map warning-card warnings)))])))
+      ;; Blocking issues and cautions stay expanded — they need attention.
+      ;; Informational notes (stale cache, provider limits, by-design
+      ;; fallbacks) fold behind a collapsed disclosure: they are honest
+      ;; disclosures, not action items, and expanded they read as a wall of
+      ;; problems (owner review 2026-07-04).
+      (let [{notes :info, primary :primary}
+            (group-by #(if (= :info (:severity %)) :info :primary) warnings)]
+        (list
+         (when (seq primary)
+           (into [:div {:class ["mt-3" "space-y-2"]}]
+                 (map warning-card primary)))
+         (when (seq notes)
+           [:details {:class ["mt-3"]
+                      :data-role "portfolio-optimizer-readiness-notes"}
+            [:summary {:class ["cursor-pointer" "select-none" "font-mono"
+                               "text-[0.6875rem]" "uppercase" "tracking-[0.08em]"
+                               "text-trading-muted"]}
+             (str (count notes) " data " (if (= 1 (count notes)) "note" "notes"))]
+            (into [:div {:class ["mt-2" "space-y-2"]}]
+                  (map warning-card notes))])))])))

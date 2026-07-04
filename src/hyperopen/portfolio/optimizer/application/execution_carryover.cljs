@@ -9,7 +9,8 @@
   contracts/execution-resting-carryover-path — OUTSIDE execution-path, which is replaced
   wholesale on staging / discard / restage / ledger-apply, exactly the moments the
   carryover must survive."
-  (:require [hyperopen.portfolio.optimizer.application.execution :as execution]))
+  (:require [clojure.string :as str]
+            [hyperopen.portfolio.optimizer.application.execution :as execution]))
 
 (defn norm-oid
   "Exchange order id normalized to a non-empty string, for set membership across the
@@ -26,12 +27,75 @@
   (norm-oid (or (:oid o) (:o o)
                 (get-in o [:order :oid]) (get-in o [:order :o]))))
 
-(defn open-oids
-  "Set of oids currently live on the own-account book, or nil when the book has not
-   hydrated yet (so callers treat 'absent from book' as 'unknown', never as gone)."
+(defn- rows-from-open-orders-value
+  "Order rows from one open-orders state value. The websocket `openOrders` channel
+   stores the WHOLE payload map {:dex \"\" :user 0x… :orders [...]} at
+   [:orders :open-orders] (verified live 2026-07-04) — treating that map as a row seq
+   yields MapEntries and zero oids, which silently emptied the oid set and broke the
+   pre-run cancellation filter. Mirrors the account tab's open-orders-seq."
+  [v]
+  (cond
+    (nil? v) []
+    (sequential? v) v
+    (map? v) (let [nested (or (:orders v) (:openOrders v) (:data v))]
+               (cond
+                 (sequential? nested) nested
+                 (map? (:order v)) [v]
+                 :else []))
+    :else []))
+
+(defn- row-coin
+  [o]
+  (let [coin (or (:coin o) (get-in o [:order :coin]))]
+    (when (some? coin)
+      (let [s (str coin)]
+        (when (seq s) s)))))
+
+(defn- attach-dex-coin
+  "Namespaces a bare per-dex snapshot coin with its dex (\"ORCL\" on dex \"xyz\" →
+   \"xyz:ORCL\") so it matches plan instrument coins, which carry the dex prefix."
+  [o dex]
+  (let [coin (row-coin o)
+        dex* (when (some? dex) (let [s (str dex)] (when (seq s) s)))]
+    (if (and (map? o) coin dex*
+             (not (str/includes? coin ":")))
+      (assoc o :coin (str dex* ":" coin))
+      o)))
+
+(defn open-order-rows
+  "Every open order the app currently knows about, merged across ALL live sources —
+   no single source is complete:
+   - [:orders :open-orders]            websocket feed (default dex only, payload-map shape)
+   - [:orders :open-orders-snapshot]   frontendOpenOrders REST snapshot (carries cloid)
+   - [:orders :open-orders-snapshot-by-dex]  per-dex snapshots (carry cloid; bare coins
+                                              namespaced with their dex)
+   - [:webdata2 :openOrders]           webData2 stream
+   Deduped by oid (first source wins)."
   [state]
-  (when (true? (get-in state [:orders :open-orders-hydrated?]))
-    (into #{} (keep order-oid) (get-in state [:orders :open-orders]))))
+  (let [flat (rows-from-open-orders-value (get-in state [:orders :open-orders]))
+        snapshot (rows-from-open-orders-value (get-in state [:orders :open-orders-snapshot]))
+        by-dex (mapcat (fn [[dex rows]]
+                         (map #(attach-dex-coin % dex)
+                              (rows-from-open-orders-value rows)))
+                       (get-in state [:orders :open-orders-snapshot-by-dex]))
+        wd2 (rows-from-open-orders-value (get-in state [:webdata2 :openOrders]))]
+    (:out (reduce (fn [{:keys [seen out] :as acc} row]
+                    (let [oid (order-oid row)]
+                      (cond
+                        (nil? oid) acc
+                        (contains? seen oid) acc
+                        :else {:seen (conj seen oid) :out (conj out row)})))
+                  {:seen #{} :out []}
+                  (concat flat snapshot by-dex wd2)))))
+
+(defn open-oids
+  "Set of oids currently live on the own-account book (across every source), or nil
+   when the book has not hydrated yet (so callers treat 'absent from book' as
+   'unknown', never as gone)."
+  [state]
+  (when (or (true? (get-in state [:orders :open-orders-hydrated?]))
+            (seq (open-order-rows state)))
+    (into #{} (keep order-oid) (open-order-rows state))))
 
 (defn- parse-int-value
   [value]

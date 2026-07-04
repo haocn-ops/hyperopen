@@ -22,17 +22,33 @@
   (is (= 34 (count (cloid/make-cloid "ffffffffffffffffffffffffffffffff-too-long"))))
   (is (cloid/optimizer-cloid? (cloid/make-cloid "ab"))))
 
-(deftest snapshot-open-orders-normalizes-frontend-rows-test
+(deftest live-open-orders-normalizes-rows-across-sources-test
   (let [state {:orders {:open-orders-snapshot
                         [{:oid 1 :coin "BTC" :side "B" :sz "0.5" :limitPx "60000"
                           :cloid "0x0770C0DE1111222233334444555566ff"}
                          {:oid 2 :coin "ETH" :side "A" :sz "3"}
                          {:coin "no-oid-dropped"}]}}
-        rows (cloid/snapshot-open-orders state)]
+        rows (cloid/live-open-orders state)]
     (is (= [1 2] (mapv :oid rows)) "rows without an oid/coin are dropped")
     (is (= "0x0770c0de1111222233334444555566ff" (:cloid (first rows)))
         "cloid normalized to lowercase")
     (is (nil? (:cloid (second rows))) "absent cloid stays nil")))
+
+(deftest live-open-orders-reads-ws-payload-map-and-per-dex-snapshots-test
+  ;; Production shapes (verified live 2026-07-04): the ws feed stores the WHOLE payload
+  ;; map {:dex :user :orders [...]} and named-dex snapshots key rows by dex with BARE
+  ;; coins. Both must surface, with per-dex coins namespaced to match plan instruments.
+  (let [state {:orders {:open-orders {:dex "" :user "0xabc"
+                                      :orders [{:oid 10 :coin "BTC" :side "B"}]}
+                        :open-orders-snapshot-by-dex
+                        {"xyz" [{:oid 20 :coin "ORCL" :side "B"
+                                 :cloid "0x0770c0deaaaaaaaaaaaaaaaaaaaaaaaa"}]}}}
+        rows (cloid/live-open-orders state)
+        by-oid (into {} (map (juxt :oid identity)) rows)]
+    (is (= #{10 20} (set (keys by-oid))))
+    (is (= "xyz:ORCL" (:coin (get by-oid 20)))
+        "per-dex bare coin namespaced with its dex")
+    (is (= "0x0770c0deaaaaaaaaaaaaaaaaaaaaaaaa" (:cloid (get by-oid 20))))))
 
 (deftest classify-overlap-splits-owned-untagged-and-ignored-test
   (let [snapshot [{:oid 1 :coin "BTC" :cloid "0x0770c0deaaaaaaaaaaaaaaaaaaaaaaaa"}

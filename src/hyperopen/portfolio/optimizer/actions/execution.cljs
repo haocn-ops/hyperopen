@@ -91,6 +91,11 @@
    ;; Reset run-state so re-staging shows a clean staged surface rather than a stale
    ;; terminal status from a previous execution attempt.
    [:effects/save contracts/execution-path (optimizer-defaults/default-execution-state)]
+   ;; Refresh every open-order surface (base + per-dex frontendOpenOrders, the only
+   ;; cloid-bearing source — the generic openOrders stream never hydrates named-dex
+   ;; rows). By confirm time the run can then recognize and cancel its own resting
+   ;; orders from previous sessions, and surface untagged overlaps for review.
+   [:effects/refresh-portfolio-optimizer-open-orders]
    [:effects/save contracts/ui-results-tab-path :execution]
    [:effects/replace-shareable-route-query]])
 
@@ -172,7 +177,7 @@
   (let [carryover (carryover/live-resting-carryover
                    state
                    (get-in state contracts/execution-resting-carryover-path))
-        snapshot (cloid/snapshot-open-orders state)
+        snapshot (cloid/live-open-orders state)
         ready-rows (filter #(= :ready (:status %)) (:rows plan))
         {:keys [optimizer-owned untagged-overlap]} (cloid/classify-overlap snapshot ready-rows)
         selections (get-in state overlap-cancels-path)

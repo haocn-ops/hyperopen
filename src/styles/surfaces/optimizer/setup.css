@@ -40,11 +40,47 @@
     border-left: 1px solid var(--optimizer-border);
   }
 
-  /* The open-by-default Return views editor (Maximum Sharpe) shows several
-     rows immediately but caps the list so a 13-asset universe cannot push
-     Data health and the run context out of reach; the list scrolls. */
+  /* The open-by-default Return views editor (Maximum Sharpe) shows as many
+     rows as the viewport allows — the rail otherwise trails into empty space
+     while the editor scrolls at a fixed height — but still caps the list so a
+     large universe cannot push Data health and the run context out of reach. */
   .portfolio-optimizer .optimizer-context-rail .optimizer-objective-view-rows {
-    max-height: 24rem;
+    max-height: clamp(24rem, 62vh, 48rem);
+  }
+
+  /* The rail editor's scrollbar must be OBVIOUS: it is the cue that more
+     assets exist below the fold. An accent-tinted, always-visible thumb on a
+     faint track — not the near-invisible default. */
+  .portfolio-optimizer .optimizer-context-rail .optimizer-objective-view-rows {
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in srgb, var(--optimizer-accent) 55%, transparent)
+      color-mix(in srgb, var(--optimizer-border-strong) 45%, transparent);
+    scrollbar-gutter: stable;
+  }
+
+  .portfolio-optimizer
+    .optimizer-context-rail
+    .optimizer-objective-view-rows::-webkit-scrollbar {
+    width: 10px;
+  }
+
+  .portfolio-optimizer
+    .optimizer-context-rail
+    .optimizer-objective-view-rows::-webkit-scrollbar-track {
+    background-color: color-mix(in srgb, var(--optimizer-border-strong) 45%, transparent);
+  }
+
+  .portfolio-optimizer
+    .optimizer-context-rail
+    .optimizer-objective-view-rows::-webkit-scrollbar-thumb {
+    background-color: color-mix(in srgb, var(--optimizer-accent) 55%, transparent);
+    border-radius: 5px;
+  }
+
+  .portfolio-optimizer
+    .optimizer-context-rail
+    .optimizer-objective-view-rows::-webkit-scrollbar-thumb:hover {
+    background-color: color-mix(in srgb, var(--optimizer-accent) 75%, transparent);
   }
 
   .portfolio-optimizer .optimizer-policy-pane {

@@ -66,8 +66,10 @@
    (when trailing
      ;; Live-value summary ("Historical mean · Ledoit-Wolf", constraint numbers):
      ;; mono for the numbers, sentence case so a collapsed header reads as a
-     ;; value, not a shouted tag.
-     [:span {:class ["font-mono" "text-[0.75rem]" "text-trading-muted/70"]}
+     ;; value, not a shouted tag. `optimizer-section-trailing` hides it while the
+     ;; owning disclosure panel is OPEN (setup.css) — the summary exists for the
+     ;; collapsed state; open, it duplicates the panel body / scenario contract.
+     [:span {:class ["optimizer-section-trailing" "font-mono" "text-[0.75rem]" "text-trading-muted/70"]}
       trailing])])
 
 (defn disclosure-heading

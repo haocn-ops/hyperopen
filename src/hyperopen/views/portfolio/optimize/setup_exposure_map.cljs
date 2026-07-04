@@ -236,8 +236,10 @@
       (str (fmt-mult (:gross current-exposure)) " gross · "
            (fmt-mult (:net current-exposure)) " net")]
      [:span {:class ["optimizer-exposure-map__preview-verdict"]}
+      ;; Inside policy is the quiet state: chip-length, no sentence. Only the
+      ;; off-policy states earn a full explanation.
       (cond
-        on-policy? "Current portfolio is inside this exposure policy."
+        on-policy? "Inside policy"
         (and (not gross-ok?) (not net-ok?)) "Current portfolio is outside this exposure policy: gross and net are out of range."
         (not gross-ok?) "Current portfolio is outside this exposure policy: gross is out of range."
         :else "Current portfolio is outside this exposure policy: net is out of range.")]]))
@@ -283,22 +285,35 @@
               :on {:click [[:actions/reset-portfolio-optimizer-constraints-to-system]]}}
      "Reset"]]])
 
+(defn solver-echo
+  "The exact generated-constraints line ('Sent to solver gross … · net …'). An
+  implementation-facing audit detail, so it is rendered inside the Advanced
+  solver limits drawer (setup-constraint-controls), not in the primary column."
+  [echo]
+  [:p {:class ["optimizer-exposure-map__echo"]
+       :data-role "portfolio-optimizer-exposure-echo"}
+   [:span {:class controls/eyebrow-class} "Sent to solver"]
+   [:span {:class ["optimizer-exposure-map__echo-value"]}
+    (str (gross-echo echo) " · " (net-echo echo))]])
+
 (defn exposure-map
   "Render the Positioning control from the exposure-map view-model. Two columns on wide screens:
-  the bounded pad (with axes, zoom, and the live readout) beside its controls (presets first,
-  then bands, the generated-constraints echo, the current-portfolio preview, and the remembered-
-  profile row last)."
+  the bounded pad (with the drag hint above it, axes, zoom, and the live readout) beside its
+  controls (presets first, then bands, the current-portfolio preview, and the remembered-profile
+  row last). The exact solver echo renders separately via `solver-echo`."
   [model]
-  (let [{:keys [gross-band net-band max-band echo presets preview profile axis zoom]} model]
+  (let [{:keys [gross-band net-band max-band presets preview profile axis zoom]} model]
     [:div {:class ["optimizer-exposure-map"]
            :data-role "portfolio-optimizer-exposure-map"}
      [:div {:class ["optimizer-exposure-map__layout"]}
       [:div {:class ["optimizer-exposure-map__pad-col"]}
-       (axis-frame axis zoom (exposure-pad model))
-       (target-readout model)
+       ;; The instruction sits BEFORE the interaction it explains — users need to
+       ;; discover the drag affordance before the pad, not in a paragraph after it.
        [:p {:class ["optimizer-exposure-map__caption"]
             :data-role "portfolio-optimizer-exposure-caption"}
-        "The dot shows the target gross leverage and net long/short bias. Drag it to adjust how aggressive and directional the rebalance can be."]]
+        "Drag the dot to set target exposure."]
+       (axis-frame axis zoom (exposure-pad model))
+       (target-readout model)]
       [:div {:class ["optimizer-exposure-map__controls"]}
        (presets-block presets)
        [:div {:class ["optimizer-exposure-map__bands"]}
@@ -310,10 +325,5 @@
                       :max-band max-band
                       :level (:level zoom)
                       :role "portfolio-optimizer-exposure-net-band"})]
-       [:p {:class ["optimizer-exposure-map__echo"]
-            :data-role "portfolio-optimizer-exposure-echo"}
-        [:span {:class controls/eyebrow-class} "Sent to solver"]
-        [:span {:class ["optimizer-exposure-map__echo-value"]}
-         (str (gross-echo echo) " · " (net-echo echo))]]
        (preview-block preview)
        (profile-row profile)]]]))

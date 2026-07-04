@@ -39,15 +39,23 @@
   }
   .portfolio-optimizer .optimizer-exec-order-row.is-muted > td { opacity: 0.55; }
 
+  /* Execution-table legibility: this is the screen where mistakes are expensive, so its
+     rows read a step LARGER than the shared 11px .optimizer-table density baseline —
+     never smaller. */
+  .portfolio-optimizer .optimizer-exec-table { font-size: 12.5px; }
+  .portfolio-optimizer .optimizer-exec-table td { padding: 7px 10px; }
+  .portfolio-optimizer .optimizer-exec-table thead th { font-size: 10px; }
+
   /* per-order type chip in the Type column */
   .portfolio-optimizer .optimizer-exec-type-chip {
     border: 1px solid var(--optimizer-border);
     border-radius: 2px;
     padding: 1px 6px;
     font-family: "JetBrains Mono", "SF Mono", ui-monospace, monospace;
-    font-size: 9px;
+    font-size: 10px;
     letter-spacing: 0.03em;
     color: var(--optimizer-text-2);
+    white-space: nowrap;
   }
   .portfolio-optimizer .optimizer-exec-type-chip.is-overridden {
     border-color: var(--optimizer-accent-border);
@@ -244,8 +252,31 @@
     border-color: var(--optimizer-accent);
     background: var(--optimizer-accent);
   }
+  /* strategy-tile consequence copy — off the 0.6rem floor; these lines carry the
+     tradeoff (est. cost / routing mix) the tile choice is made on. */
+  .portfolio-optimizer .optimizer-exec-mode-sub {
+    font-size: 10.5px;
+    line-height: 1.35;
+  }
   .portfolio-optimizer .optimizer-exec-readonly {
     background: color-mix(in srgb, var(--optimizer-warn) 8%, transparent);
+  }
+  /* high-cost crossing warning (staged band) */
+  .portfolio-optimizer .optimizer-exec-highcost {
+    background: color-mix(in srgb, var(--optimizer-warn) 8%, transparent);
+  }
+  /* skipped (no-order) rows collapsed below the order list */
+  .portfolio-optimizer .optimizer-exec-skipped > summary { list-style: none; }
+  .portfolio-optimizer .optimizer-exec-skipped > summary::-webkit-details-marker { display: none; }
+  .portfolio-optimizer .optimizer-exec-skipped > summary::marker { content: ""; }
+  .portfolio-optimizer .optimizer-exec-skipped > summary::before {
+    content: "▸";
+    margin-right: 6px;
+    color: var(--optimizer-text-3);
+  }
+  .portfolio-optimizer .optimizer-exec-skipped[open] > summary::before { content: "▾"; }
+  .portfolio-optimizer .optimizer-exec-skipped[open] > summary {
+    border-bottom: 1px solid var(--optimizer-border);
   }
 
   /* control bands */

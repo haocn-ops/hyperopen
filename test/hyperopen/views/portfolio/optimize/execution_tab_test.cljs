@@ -131,6 +131,43 @@
     (is (not (str/includes? sells "50,000")))
     (is (str/includes? sells "$0"))))
 
+(deftest execution-tab-staged-buys-sells-exclude-skipped-rows-test
+  ;; A within-tolerance skip is real money that will NOT move: it must never
+  ;; inflate the Buys/Sells dollar headlines at the commit point (audited live:
+  ;; +$632k shown while ~$587k was actually staged).
+  (let [plan {:status :ready :execution-disabled? false
+              :summary {:ready-count 1 :blocked-count 0 :skipped-count 1
+                        :gross-ready-notional-usd 300
+                        :margin {:after-utilization 0.42 :after-gross-leverage 1.85 :before-gross-leverage 1.79 :free-margin-usd 8600 :capital-usd 10000 :warning :none}}
+              :rows [{:row-id "perp:BTC" :instrument-id "perp:BTC" :instrument-type :perp
+                      :status :ready :side :buy :quantity 3 :delta-notional-usd 300
+                      :cost {:source :snapshot :slippage-bps 0 :estimated-slippage-usd 0}}
+                     {:row-id "perp:ZEC" :instrument-id "perp:ZEC" :instrument-type :perp
+                      :status :skipped :side :buy :reason :within-tolerance :tolerance 0.03
+                      :quantity 48 :delta-notional-usd 22000}]}
+        view-node (scenario-view :execution
+                                 {:execution {:status :idle :history []}
+                                  :execution-modal {:open? true :phase :staged :plan plan}})
+        buys (node-text (node-by-role view-node "portfolio-optimizer-execution-kpi-buys"))]
+    (is (str/includes? buys "300"))
+    (is (not (str/includes? buys "22,")))))
+
+(deftest execution-order-table-skipped-row-explains-why-test
+  ;; A bare "skipped" next to a five-figure notional reads as arbitrarily dropped
+  ;; money. Every skipped row states its reason in plain language, with the
+  ;; tolerance band interpolated for within-tolerance skips.
+  (let [plan (update staged-plan :rows conj
+                     {:row-id "perp:ZEC" :instrument-id "perp:ZEC" :instrument-type :perp
+                      :status :skipped :side :buy :reason :within-tolerance :tolerance 0.03
+                      :quantity 48 :delta-notional-usd 22000})
+        view-node (scenario-view :execution
+                                 {:execution {:status :idle :history []}
+                                  :execution-modal {:open? true :phase :staged :plan plan}})
+        row (node-by-role view-node "portfolio-optimizer-execution-order-row-perp-ZEC")]
+    (is (some? row))
+    (is (str/includes? (node-text row)
+                       "skipped · within 3 pp band — no trade needed"))))
+
 (deftest execution-tab-staged-renders-plan-and-arm-action-test
   (let [view-node (scenario-view :execution
                                  {:execution {:status :idle :history []}

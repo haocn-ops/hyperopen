@@ -24,6 +24,7 @@
 
 (def ^:private autosave-watch-key ::draft-autosave)
 (def ^:private preseed-watch-key ::holdings-preseed)
+(def ^:private identity-restore-watch-key ::identity-restore)
 
 (def default-debounce-ms
   "One draft edit rarely comes alone (drags, typed digits); a sub-second debounce
@@ -126,7 +127,37 @@
                               (get-in new-state [:router :path])]]))))
   store)
 
+(defn install-identity-restore-watcher!
+  "Re-dispatch the restore-or-preseed funnel when the EFFECTIVE ACCOUNT IDENTITY
+  resolves or changes while the user sits on /optimize/new with an untouched
+  draft. The restore effect silently no-ops when the effective address is still
+  nil (e.g. a full page reload under spectate mode resolves identity AFTER the
+  optimizer route loads), and the holdings watcher only fires on holdings-arrival
+  transitions — so without this watcher a reload loses a draft the UI claimed was
+  saved, and a late-connecting account never auto-seeds. The untouched-draft gate
+  keeps repeat dispatches idempotent, exactly like the holdings watcher."
+  [{:keys [store dispatch!]
+    :or {dispatch! nxr/dispatch}}]
+  (remove-watch store identity-restore-watch-key)
+  (add-watch store identity-restore-watch-key
+             (fn [_ _ old-state new-state]
+               (let [old-address (account-context/effective-account-address old-state)
+                     new-address (account-context/effective-account-address new-state)]
+                 (when (and (some? new-address)
+                            (not= old-address new-address)
+                            (optimizer-defaults/untouched-draft?
+                             (get-in new-state contracts/draft-path))
+                            (= :optimize-new
+                               (:kind (portfolio-routes/parse-portfolio-route
+                                       (get-in new-state [:router :path])))))
+                   (dispatch! store
+                              nil
+                              [[:actions/restore-or-preseed-portfolio-optimizer-draft
+                                (get-in new-state [:router :path])]])))))
+  store)
+
 (defn install-optimizer-draft-watchers!
   [deps]
   (install-draft-autosave-watcher! deps)
-  (install-holdings-preseed-watcher! deps))
+  (install-holdings-preseed-watcher! deps)
+  (install-identity-restore-watcher! deps))

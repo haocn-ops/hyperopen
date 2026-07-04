@@ -31,8 +31,9 @@
     (if (seq base) base value)))
 
 (defn- side-totals
-  "Buys/Sells dollar flow across the tradeable (non-blocked) rows, so the headline
-  matches the ready-only staged notional and is never inflated by blocked rows."
+  "Buys/Sells dollar flow across the SENDABLE rows only, so the headline matches
+  the staged notional and is never inflated by blocked or skipped legs (a
+  within-tolerance skip is real money that will NOT move)."
   [labels-by-instrument rows]
   (reduce
    (fn [acc {:keys [side delta-notional-usd instrument-id]}]
@@ -43,7 +44,7 @@
          :sell (-> acc (update :sells + amt) (update :sell-assets conj asset))
          acc)))
    {:buys 0 :sells 0 :buy-assets #{} :sell-assets #{}}
-   (remove #(= :blocked (:status %)) rows)))
+   (remove #(contains? #{:blocked :skipped} (:status %)) rows)))
 
 ;; ── counts ──────────────────────────────────────────────────────────────
 

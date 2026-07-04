@@ -558,6 +558,7 @@
             [hyperopen.views.portfolio.optimize.optimization-progress-panel-test]
             [hyperopen.views.portfolio.optimize.refinement-status-card-test]
             [hyperopen.views.portfolio.optimize.result-vault-labels-test]
+            [hyperopen.views.portfolio.optimize.results-diagnostics-rail-test]
             [hyperopen.views.portfolio.optimize.results-panel-hierarchy-test]
             [hyperopen.views.portfolio.optimize.results-panel-test]
             [hyperopen.views.portfolio.optimize.run-status-banner-test]
@@ -1315,6 +1316,7 @@
              'hyperopen.views.portfolio.optimize.optimization-progress-panel-test
              'hyperopen.views.portfolio.optimize.refinement-status-card-test
              'hyperopen.views.portfolio.optimize.result-vault-labels-test
+             'hyperopen.views.portfolio.optimize.results-diagnostics-rail-test
              'hyperopen.views.portfolio.optimize.results-panel-hierarchy-test
              'hyperopen.views.portfolio.optimize.results-panel-test
              'hyperopen.views.portfolio.optimize.run-status-banner-test

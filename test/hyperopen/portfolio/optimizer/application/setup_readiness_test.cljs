@@ -569,3 +569,14 @@
                                        {:kind :max-sharpe}))]
       (is (= :ready (:status supplied))
           "With the expected return supplied, the return-seeking run is allowed."))))
+
+(deftest warning-code-summary-distinguishes-staleness-codes-test
+  ;; Regression: both staleness codes rendered the identical "use stale cached
+  ;; history" sentence, so the readiness panel showed two same-worded groups
+  ;; with different counts side by side.
+  (let [stale (setup-readiness/warning-code-summary :stale-history 15)
+        fetch-failed (setup-readiness/warning-code-summary :source-fetch-failed 6)]
+    (is (= "15 assets use stale cached history" stale))
+    (is (= "6 assets could not refresh from the history provider — using cached or native history"
+           fetch-failed))
+    (is (not= stale fetch-failed))))

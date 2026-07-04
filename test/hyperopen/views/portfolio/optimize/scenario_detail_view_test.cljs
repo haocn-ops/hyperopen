@@ -77,7 +77,8 @@
   "A solved run carrying a current baseline (so vol/return deltas are non-nil) and a
   configurable rebalance trade count, for exercising the recommendation verdict and
   the rebalance CTA hierarchy."
-  [state {:keys [current-vol target-vol current-return target-return ready-count]}]
+  [state {:keys [current-vol target-vol current-return target-return ready-count
+                 blocked-count]}]
   (fixtures/sample-last-successful-run
    {:computed-at-ms 2600
     :request-signature (request-signature-for-state state)
@@ -101,7 +102,8 @@
              :diagnostics {:turnover 1.0 :gross-exposure 1.0 :net-exposure 1.0}
              :rebalance-preview {:status :ready
                                  :capital-usd 1000
-                                 :summary {:ready-count ready-count :blocked-count 0}
+                                 :summary {:ready-count ready-count
+                                           :blocked-count (or blocked-count 0)}
                                  :rows []}}}))
 
 (defn- solved-baseline-view
@@ -134,6 +136,20 @@
     (is (str/includes? verdict-text "-6.00 pts vs current"))
     (is (str/includes? verdict-text "+2.00 pts vs current"))
     (is (str/includes? verdict-text "3 trades get you there"))))
+
+(deftest portfolio-optimizer-all-blocked-plan-is-not-already-at-target-test
+  ;; ready 0 + blocked 2 is NOT "already at target": the trades exist, they just
+  ;; can't be sent yet. The verdict must say so instead of muting the CTA into a
+  ;; false all-done state.
+  (let [view-node (solved-baseline-view {:current-vol 0.30 :target-vol 0.24
+                                         :current-return 0.08 :target-return 0.10
+                                         :ready-count 0 :blocked-count 2})
+        verdict-text (str/join " " (collect-strings
+                                    (node-by-role view-node
+                                                  "portfolio-optimizer-recommendation-verdict")))]
+    (is (str/includes? verdict-text "No trades can be sent — 2 legs are blocked."))
+    (is (not (str/includes? verdict-text "Already at target")))
+    (is (str/includes? verdict-text "Review & execute"))))
 
 (deftest portfolio-optimizer-provenance-strip-drops-invariant-horizon-field-test
   (let [view-node (solved-baseline-view {:current-vol 0.30 :target-vol 0.24

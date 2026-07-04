@@ -78,9 +78,10 @@
              :reason :zero-delta-notional)
 
       (= :within-tolerance (:status row))
-      (assoc base-row
-             :status :skipped
-             :reason :within-tolerance)
+      (cond-> (assoc base-row
+                     :status :skipped
+                     :reason :within-tolerance)
+        (some? (:tolerance row)) (assoc :tolerance (:tolerance row)))
 
       (= :blocked (:status row))
       (assoc base-row

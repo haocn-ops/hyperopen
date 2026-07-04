@@ -12,8 +12,7 @@
     overflow-x: clip;
   }
 
-  .portfolio-optimizer
-    :is(.optimizer-setup-header, .optimizer-setup-preset-row) {
+  .portfolio-optimizer .optimizer-setup-header {
     background-color: var(--optimizer-bg);
   }
 
@@ -77,6 +76,17 @@
     border-color: var(--optimizer-accent-border);
     background-color: var(--optimizer-accent-soft);
     color: var(--optimizer-text);
+  }
+
+  /* Optimization goal cards: the two canonical paths (primary) read heavier than
+     the advanced targets (secondary) so the single goal control has a clear
+     hierarchy without the retired top-of-page preset row. */
+  .portfolio-optimizer .optimizer-goal-card-primary {
+    background-color: var(--optimizer-surface-2, var(--optimizer-surface));
+  }
+
+  .portfolio-optimizer .optimizer-goal-card-secondary {
+    font-size: 0.9375em;
   }
 
   .portfolio-optimizer

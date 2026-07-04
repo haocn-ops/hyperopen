@@ -219,6 +219,7 @@
             [hyperopen.portfolio.optimizer.application.engine-current-portfolio-test]
             [hyperopen.portfolio.optimizer.application.engine-history-window-test]
             [hyperopen.portfolio.optimizer.application.engine-progress-test]
+            [hyperopen.portfolio.optimizer.application.engine-return-inputs-memo-test]
             [hyperopen.portfolio.optimizer.application.engine-solve-test]
             [hyperopen.portfolio.optimizer.application.engine-solver-diagnostics-test]
             [hyperopen.portfolio.optimizer.application.engine-sparse-caps-test]
@@ -980,6 +981,7 @@
              'hyperopen.portfolio.optimizer.application.engine-current-portfolio-test
              'hyperopen.portfolio.optimizer.application.engine-history-window-test
              'hyperopen.portfolio.optimizer.application.engine-progress-test
+             'hyperopen.portfolio.optimizer.application.engine-return-inputs-memo-test
              'hyperopen.portfolio.optimizer.application.engine-solve-test
              'hyperopen.portfolio.optimizer.application.engine-solver-diagnostics-test
              'hyperopen.portfolio.optimizer.application.engine-sparse-caps-test

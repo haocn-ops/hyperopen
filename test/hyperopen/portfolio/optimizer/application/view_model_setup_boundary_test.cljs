@@ -99,15 +99,20 @@
            (:copy failed-model)))
     (is (= "history endpoint unavailable" (:error-message failed-model)))
     ;; Warnings are now GROUPED by code: one row per kind with a count + affected-asset list. A
-    ;; single warning is a count-1 group whose message is the per-asset message.
+    ;; single warning is a count-1 group whose message is the per-asset message. Groups built
+    ;; from blocking-warnings carry :severity :blocking so the panel can rank them.
     (is (= [{:code :missing-candle-history
              :code-label "missing-candle-history"
              :count 1
+             :severity :blocking
              :message "Bitcoin: no candle history returned for BTC."
              :assets [{:instrument-id "perp:BTC" :label "Bitcoin"}]}]
            (:warnings failed-model)))
+    (is (= "Data health" (:title failed-model)))
+    (is (= :blocked (get-in failed-model [:status :level])))
     (is (= "Select a universe before running."
-           (:copy missing-model)))))
+           (:copy missing-model)))
+    (is (= :blocked (get-in missing-model [:status :level])))))
 
 (deftest group-readiness-warnings-collapses-same-code-warnings-test
   (let [readiness {:status :ready
@@ -125,10 +130,16 @@
       (is (= ["Bitcoin" "Ethereum"] (mapv :label (:assets stale)))
           "the affected-asset labels are resolved from the requested universe")
       (is (= ["perp:BTC" "perp:ETH"] (mapv :instrument-id (:assets stale)))))
+    (let [stale (first (filter #(= :stale-history (:code %)) warnings))]
+      (is (= :caution (:severity stale)))
+      (is (some? (:detail stale)) "stale groups carry a plain-language context line"))
     (let [insufficient (first (filter #(= :insufficient-common-history (:code %)) warnings))]
       (is (= 1 (:count insufficient)))
       (is (= ["perp:BTC"] (mapv :instrument-id (:assets insufficient))))
-      (is (some? (:message insufficient))))))
+      ;; Provider-limit groups lead with the human headline, never the raw
+      ;; provider/vendor message.
+      (is (= "History source is limited — not enough shared history across the selected assets."
+             (:message insufficient))))))
 
 (deftest setup-summary-model-projects-summary-row-data-test
   (let [formatters {:labelize {:risk-adjusted "Risk Adjusted"

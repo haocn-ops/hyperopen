@@ -23,7 +23,7 @@
     :max-sharpe "Maximum Sharpe"
     :target-volatility "Target volatility"
     :target-return "Target return"
-    "Minimum variance"))
+    "Minimum risk"))
 
 (defn- action-model-label
   [return-kind risk-kind]

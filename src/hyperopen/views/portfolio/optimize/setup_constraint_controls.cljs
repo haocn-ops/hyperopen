@@ -263,10 +263,17 @@
        ;; A holdings import rewrites the constraint envelope from the current book
        ;; (gross floor, caps, net bias) — disclosed HERE, in the section that owns
        ;; the constraints, not in the goal card (the objective didn't seed them).
+       ;; Chip + short hint instead of a full amber sentence: the seeded-state
+       ;; disclosure must not compete visually with the exposure controls.
        (when (= "Custom · from holdings" active-label)
-         [:p {:class ["text-[0.6875rem]" "text-warning"]
+         [:p {:class ["flex" "flex-wrap" "items-center" "gap-2"]
               :data-role "portfolio-optimizer-preset-holdings-constraints-note"}
-          "Bands were seeded from your current holdings — review before running."])
+          [:span {:class ["border" "border-warning/50" "bg-warning/10" "px-1.5" "py-0.5"
+                          "font-mono" "text-[0.625rem]" "font-semibold" "uppercase"
+                          "tracking-[0.08em]" "text-warning"]}
+           "Custom from holdings"]
+          [:span {:class ["text-[0.6875rem]" "text-trading-muted"]}
+           "Review before running"]])
        (group-block "Positioning" "gross leverage + net bias"
                     (exposure-map/exposure-map exposure-model))
        ;; Risk guards / Rebalance behavior keep each canonical control exactly once (original

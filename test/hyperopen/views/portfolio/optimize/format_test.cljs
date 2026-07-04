@@ -27,7 +27,7 @@
 (deftest formats-optimizer-labels-test
   (is (= "partially-blocked" (opt-format/keyword-label :partially-blocked)))
   (is (= "N/A" (opt-format/keyword-label nil)))
-  (doseq [[value label] [[:minimum-variance "Minimum variance"]
+  (doseq [[value label] [[:minimum-variance "Minimum risk"]
                          [:max-sharpe "Maximum Sharpe"]
                          [:target-volatility "Target volatility"]
                          [:target-return "Target return"]

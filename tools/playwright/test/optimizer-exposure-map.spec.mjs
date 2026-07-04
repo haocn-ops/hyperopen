@@ -1,6 +1,12 @@
 import { expect, test } from "@playwright/test";
 import { visitRoute, waitForIdle } from "../support/hyperopen.mjs";
-import { optimizerPath, readOptimizerState } from "../support/optimizer_state.mjs";
+import {
+  keyword,
+  optimizerPath,
+  readOptimizerState,
+  seedOptimizerState,
+  seedPatch
+} from "../support/optimizer_state.mjs";
 
 const PANEL = "[data-role='portfolio-optimizer-constraints-panel']";
 
@@ -175,5 +181,72 @@ test.describe("optimizer exposure-map Positioning control", () => {
     await expect(
       page.locator("[data-role='portfolio-optimizer-constraint-net-min-input']")
     ).toBeVisible();
+  });
+});
+
+test.describe("optimizer exposure-map drag under Maximum Sharpe", () => {
+  test("dragging the pad never recomputes the risk model per pointermove", async ({ page }) => {
+    // Regression: under Maximum Sharpe the Return-views rail (and BL preview)
+    // read the baseline expected-return inputs on every render, and each read
+    // estimated the full covariance matrix from history. A pad drag renders
+    // once per pointermove, so the drag recomputed the risk model dozens of
+    // times per second and janked. The inputs are memoized on the request
+    // sub-values they consume, so a constraints-only change must not call
+    // risk/estimate-risk-model at all.
+    await visitRoute(page, "/portfolio/optimize/new");
+    await seedOptimizerState(page, [
+      seedPatch(optimizerPath("draft", "universe"), [
+        { "instrument-id": "perp:BTC", "market-type": keyword("perp"), coin: "BTC" },
+        { "instrument-id": "perp:ETH", "market-type": keyword("perp"), coin: "ETH" },
+        { "instrument-id": "perp:SOL", "market-type": keyword("perp"), coin: "SOL" },
+        { "instrument-id": "perp:HYPE", "market-type": keyword("perp"), coin: "HYPE" }
+      ]),
+      seedPatch(optimizerPath("draft", "objective"), { kind: keyword("max-sharpe") }),
+      seedPatch(optimizerPath("draft", "return-model"), {
+        kind: keyword("black-litterman"),
+        views: []
+      })
+    ]);
+    await waitForIdle(page);
+    // The Maximum-Sharpe-only surface that triggered the per-frame recompute.
+    await expect(
+      page.locator("[data-role='portfolio-optimizer-setup-use-my-views-editor']")
+    ).toHaveCount(1);
+
+    const pad = page.locator("[data-role='portfolio-optimizer-exposure-pad']");
+    await pad.scrollIntoViewIfNeeded();
+    const box = await pad.boundingBox();
+
+    // Count risk-model estimations from here on (dev builds expose namespaces).
+    await page.evaluate(() => {
+      const risk = globalThis.hyperopen.portfolio.optimizer.domain.risk;
+      const original = risk.estimate_risk_model;
+      globalThis.__optimizerRiskModelCalls = 0;
+      risk.estimate_risk_model = function (...args) {
+        globalThis.__optimizerRiskModelCalls += 1;
+        return original.apply(this, args);
+      };
+    });
+
+    const grossBefore = await readOptimizerState(
+      page,
+      optimizerPath("draft", "constraints", "gross-max")
+    );
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width * 0.7, box.y + box.height * 0.3, { steps: 12 });
+    await page.mouse.move(box.x + box.width * 0.4, box.y + box.height * 0.55, { steps: 12 });
+    await page.mouse.up();
+    const riskModelCalls = await page.evaluate(() => globalThis.__optimizerRiskModelCalls);
+    await waitForIdle(page);
+
+    // The drag must have actually re-rendered the page per move…
+    expect(
+      await readOptimizerState(page, optimizerPath("draft", "constraints", "gross-max"))
+    ).not.toBe(grossBefore);
+    // …without re-estimating the covariance matrix. A small allowance covers an
+    // async history-load transition landing mid-drag (a legitimate input
+    // change); the unmemoized bug produced one-plus call per pointermove.
+    expect(riskModelCalls).toBeLessThanOrEqual(2);
   });
 });

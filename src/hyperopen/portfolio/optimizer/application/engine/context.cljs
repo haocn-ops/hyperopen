@@ -182,29 +182,58 @@
                               (:warnings base)))})
     (base-return-estimate request)))
 
+;; The two by-instrument helpers below exist for UI reads (return-views panel,
+;; Black-Litterman preview) and are called on every render while those panels
+;; are visible — including once per pointermove during an exposure-pad drag.
+;; Each call estimates the full covariance matrix (plus PSD repair) from
+;; history, which is far too expensive per frame, so both memoize on the exact
+;; request sub-values they consume. A drag rebuilds the request but only its
+;; :constraints differ, so these keys stay value-equal and the cache hits.
+(defn- return-inputs-memo-lookup
+  [memo key compute]
+  (let [cached @memo]
+    (if (and cached (= (:key cached) key))
+      (:value cached)
+      (let [value (compute)]
+        (vreset! memo {:key key :value value})
+        value))))
+
+(defonce ^:private expected-return-inputs-memo (volatile! nil))
+
 (defn expected-return-inputs-by-instrument
   "Returns the same ordered expected-return inputs used by objective scoring."
   [request]
-  (let [risk-result (risk/estimate-risk-model
-                     {:risk-model (:risk-model request)
-                      :periods-per-year (:periods-per-year request)
-                      :history (:history request)})
-        instrument-ids (:instrument-ids risk-result)
-        return-result (expected-return-result request risk-result)
-        expected-returns (expected-return-vector return-result instrument-ids)]
-    (zipmap instrument-ids expected-returns)))
+  (return-inputs-memo-lookup
+   expected-return-inputs-memo
+   (select-keys request [:risk-model :periods-per-year :history
+                         :return-model :black-litterman-prior])
+   (fn []
+     (let [risk-result (risk/estimate-risk-model
+                        {:risk-model (:risk-model request)
+                         :periods-per-year (:periods-per-year request)
+                         :history (:history request)})
+           instrument-ids (:instrument-ids risk-result)
+           return-result (expected-return-result request risk-result)
+           expected-returns (expected-return-vector return-result instrument-ids)]
+       (zipmap instrument-ids expected-returns)))))
+
+(defonce ^:private baseline-return-inputs-memo (volatile! nil))
 
 (defn baseline-expected-return-inputs-by-instrument
   "Returns the baseline historical/funding expected-return inputs before Black-Litterman posterior blending."
   [request]
-  (let [risk-result (risk/estimate-risk-model
-                     {:risk-model (:risk-model request)
-                      :periods-per-year (:periods-per-year request)
-                      :history (:history request)})
-        instrument-ids (:instrument-ids risk-result)
-        return-result (base-return-estimate request)
-        expected-returns (expected-return-vector return-result instrument-ids)]
-    (zipmap instrument-ids expected-returns)))
+  (return-inputs-memo-lookup
+   baseline-return-inputs-memo
+   (select-keys request [:risk-model :periods-per-year :history :return-model])
+   (fn []
+     (let [risk-result (risk/estimate-risk-model
+                        {:risk-model (:risk-model request)
+                         :periods-per-year (:periods-per-year request)
+                         :history (:history request)})
+           instrument-ids (:instrument-ids risk-result)
+           return-result (base-return-estimate request)
+           expected-returns (expected-return-vector return-result instrument-ids)]
+       (zipmap instrument-ids expected-returns)))))
 
 (defn- encoded-constraints
   [request instrument-ids]

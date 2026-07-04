@@ -42,13 +42,11 @@
      ;; Layer 1 run feedback: a sticky, full-width banner that keeps the live run
      ;; state in the user's main field of attention regardless of scroll position
      ;; or how long the right rail grows under Maximum Sharpe. It sits directly
-     ;; below the scenario header (above the preset cards) so it is never trapped
-     ;; in the right-rail scroll area. The right-rail progress/readiness panels
-     ;; remain as Layer 2 detail.
+     ;; below the scenario header so it is never trapped in the right-rail scroll
+     ;; area. The right-rail progress/readiness panels remain as Layer 2 detail.
      (run-status-banner/run-status-banner {:optimization-progress optimization-progress
                                            :run-state run-state
                                            :draft draft})
-     (setup-header/preset-row draft)
      (infeasible-panel/infeasible-banner infeasible-result highlighted-controls)
      [:section {:class ["optimizer-setup-surface"
                         "grid"

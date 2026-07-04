@@ -11,7 +11,9 @@
         strings (set (collect-strings view-node))]
     (is (some? (node-by-role view-node "portfolio-optimizer-setup-route-surface")))
     (is (some? (node-by-role view-node "portfolio-optimizer-setup-header")))
-    (is (some? (node-by-role view-node "portfolio-optimizer-setup-preset-row")))
+    ;; The top "Start with" preset row is retired — the objective/preset choice is
+    ;; consolidated into the center "Optimization goal" control.
+    (is (nil? (node-by-role view-node "portfolio-optimizer-setup-preset-row")))
     (is (some? (node-by-role view-node "portfolio-optimizer-setup-surface")))
     (is (some? (node-by-role view-node "portfolio-optimizer-setup-control-rail")))
     ;; CENTER column is now the editable policy pane (was the passive summary pane); the RIGHT
@@ -29,7 +31,8 @@
                 "portfolio-optimizer-setup-use-my-views-editor-conservative-note")))
     (is (nil? (node-by-role view-node "portfolio-optimizer-left-rail")))
     (is (contains? strings "Portfolio Optimizer"))
-    (is (contains? strings "Start with"))
+    ;; The single goal control replaces the retired preset row's "Start with".
+    (is (contains? strings "Optimization goal"))
     ;; A connected account with no clearinghouse data yet is the holdings
     ;; auto-seed window: the strip presents "My holdings" as the source in
     ;; flight rather than offering "Load my holdings" as a manual command.
@@ -125,9 +128,9 @@
     ;; The leading section numbers (01..05) are gone: the panels read as a
     ;; sovereign workbench, not a required wizard sequence. Titles remain.
     (is (str/includes? (node-text (node-by-role view-node "portfolio-optimizer-objective-panel"))
-                       "Objective"))
+                       "Optimization goal"))
     (is (not (str/includes? (node-text (node-by-role view-node "portfolio-optimizer-objective-panel"))
-                            "02Objective")))
+                            "02Optimization goal")))
     (is (str/includes? (node-text (node-by-role view-node "portfolio-optimizer-return-risk-panel"))
                        "Return / Risk Model"))
     (is (not (str/includes? (node-text (node-by-role view-node "portfolio-optimizer-return-risk-panel"))
@@ -190,7 +193,10 @@
            (input-actions
             (node-by-role view-node
                           "portfolio-optimizer-universe-search-input"))))
-    (is (= [[:actions/set-portfolio-optimizer-objective-kind :max-sharpe]]
+    ;; The Maximum Sharpe goal is a primary card: it applies the setup preset so
+    ;; the objective and its views-aware return model move together (the retired
+    ;; preset row's behavior, now the single goal control).
+    (is (= [[:actions/apply-portfolio-optimizer-setup-preset :max-sharpe]]
            (click-actions
             (node-by-role view-node
                           "portfolio-optimizer-objective-max-sharpe"))))
@@ -404,10 +410,10 @@
 
 (deftest setup-preset-card-discloses-holdings-seeded-constraints-test
   ;; A holdings import rewrites the constraint envelope from the current book
-  ;; (gross floor, cap, net bias). The glowing preset card must disclose that —
-  ;; "Conservative · active" with the preset's default 'safe' envelope silently
-  ;; replaced is a mixed-state lie (audited live: cap 152%, net-short floor,
-  ;; preset row still showing Conservative ACTIVE).
+  ;; (gross floor, cap, net bias). The selected Minimum risk goal card must
+  ;; disclose that — a bare "Minimum risk" with the preset's default 'safe'
+  ;; envelope silently replaced is a mixed-state lie (audited live: cap 152%,
+  ;; net-short floor).
   (let [holdings-draft
         {:universe [{:instrument-id "perp:BTC" :market-type :perp :coin "BTC"}]
          :objective {:kind :minimum-variance}

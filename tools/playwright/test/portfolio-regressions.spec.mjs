@@ -1709,7 +1709,9 @@ test("portfolio optimizer setup exposes separate model layers @regression", asyn
   await expect(page.locator("[data-role='portfolio-optimizer-universe-panel']"))
     .toContainText("Load my holdings");
   await expect(page.locator("[data-role='portfolio-optimizer-objective-panel']"))
-    .toContainText("Minimum Variance");
+    .toContainText("Optimization goal");
+  await expect(page.locator("[data-role='portfolio-optimizer-objective-panel']"))
+    .toContainText("Minimum risk");
   await expect(page.locator("[data-role='portfolio-optimizer-return-model-panel']"))
     .toContainText("Historical Mean");
   await expect(page.locator("[data-role='portfolio-optimizer-return-model-panel']"))
@@ -1762,14 +1764,16 @@ test("portfolio optimizer setup exposes separate model layers @regression", asyn
     input.evaluate((element) => element.scrollWidth <= element.clientWidth + 1);
 
   await expect(maxSharpe).toHaveAttribute("aria-pressed", "false");
+  // Selecting the Maximum Sharpe goal now carries its return-model pairing: it
+  // activates the views-aware Black-Litterman estimator in one move, the way the
+  // retired top-of-page preset did. (Before consolidation the objective card set
+  // only the objective and left the estimator on Historical mean.)
+  await expect(blackLitterman).toHaveAttribute("aria-pressed", "false");
   await maxSharpe.click();
   await expect(maxSharpe).toHaveAttribute("aria-pressed", "true");
+  await expect(blackLitterman).toHaveAttribute("aria-pressed", "true");
   await expect(targetReturn).toHaveCount(0);
   await expect(targetVolatility).toHaveCount(0);
-
-  await expect(blackLitterman).toHaveAttribute("aria-pressed", "false");
-  await blackLitterman.click();
-  await expect(blackLitterman).toHaveAttribute("aria-pressed", "true");
 
   await expect(sampleCovariance).toHaveAttribute("aria-pressed", "false");
   await sampleCovariance.click();

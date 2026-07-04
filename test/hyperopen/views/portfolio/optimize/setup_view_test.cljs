@@ -23,18 +23,19 @@
     (is (nil? (node-by-role view-node "portfolio-optimizer-provenance-strip")))
     (is (some? (node-by-role view-node "portfolio-optimizer-setup-header")))
     (is (some? (node-by-role view-node "portfolio-optimizer-setup-status-tag")))
-    (is (some? (node-by-role view-node "portfolio-optimizer-setup-preset-row")))
-    ;; TWO preset cards now — the objective choice. "Risk-adjusted" and
-    ;; "Use my views" merged into Maximum Sharpe (views are an input to it,
-    ;; not a strategy of their own), so the old roles must be gone.
+    ;; The top "Start with" preset row is retired: the two canonical presets are
+    ;; now the PRIMARY Optimization goal cards, which apply the SAME preset action
+    ;; (objective + its return-model pairing move together). The old preset-row and
+    ;; the merged "Risk-adjusted" / "Use my views" roles must be gone.
+    (is (nil? (node-by-role view-node "portfolio-optimizer-setup-preset-row")))
     (is (= [[:actions/apply-portfolio-optimizer-setup-preset :conservative]]
            (click-actions
             (node-by-role view-node
-                          "portfolio-optimizer-setup-preset-conservative"))))
+                          "portfolio-optimizer-objective-minimum-variance"))))
     (is (= [[:actions/apply-portfolio-optimizer-setup-preset :max-sharpe]]
            (click-actions
             (node-by-role view-node
-                          "portfolio-optimizer-setup-preset-max-sharpe"))))
+                          "portfolio-optimizer-objective-max-sharpe"))))
     (is (nil? (node-by-role view-node "portfolio-optimizer-setup-preset-risk-adjusted")))
     (is (nil? (node-by-role view-node "portfolio-optimizer-setup-preset-use-my-views")))
     (is (some? (node-by-role view-node "portfolio-optimizer-draft-state")))
@@ -132,8 +133,10 @@
            (change-actions
             (node-by-role view-node
                           "portfolio-optimizer-constraint-rebalance-tolerance-input"))))
-    (is (= [[:actions/set-portfolio-optimizer-objective-kind :max-sharpe]]
-           (click-actions (node-by-role view-node "portfolio-optimizer-objective-max-sharpe"))))
+    ;; The advanced targets under "More goals" set only the objective (no
+    ;; return-model pairing), unlike the two canonical-path cards above.
+    (is (= [[:actions/set-portfolio-optimizer-objective-kind :target-volatility]]
+           (click-actions (node-by-role view-node "portfolio-optimizer-objective-target-volatility"))))
     (is (= [[:actions/set-portfolio-optimizer-return-model-kind :black-litterman]]
            (click-actions (node-by-role view-node "portfolio-optimizer-return-model-black-litterman"))))
     (is (= [[:actions/set-portfolio-optimizer-risk-model-kind :sample-covariance]]
@@ -147,7 +150,7 @@
     (is (some? (node-by-role view-node "portfolio-optimizer-advanced-overrides-shell")))
     (is (some? (node-by-role view-node "portfolio-optimizer-instrument-overrides-panel")))
     (let [strings (set (collect-strings view-node))]
-      (is (contains? strings "Minimum Variance"))
+      (is (contains? strings "Minimum risk"))
       (is (contains? strings "Historical Mean"))
       (is (contains? strings "Diagonal Shrink"))
       (is (contains? strings "Draft clean"))
@@ -263,20 +266,21 @@
                              "portfolio-optimizer-setup-use-my-views-context")))
     (is (contains? strings "How your views shape the forecast"))
     (is (nil? (node-by-role view-node "portfolio-optimizer-black-litterman-panel")))
-    ;; A views-aware (Black-Litterman) draft belongs to the Maximum Sharpe preset:
-    ;; the third "Use my views" card is gone.
+    ;; A views-aware (Black-Litterman) draft is the Maximum Sharpe goal: its
+    ;; primary card is selected and Minimum risk is not. The third "Use my views"
+    ;; card is gone.
     (is (= "true"
            (get-in (node-by-role view-node
-                                 "portfolio-optimizer-setup-preset-max-sharpe")
+                                 "portfolio-optimizer-objective-max-sharpe")
                    [1 :aria-pressed])))
     (is (= "false"
            (get-in (node-by-role view-node
-                                 "portfolio-optimizer-setup-preset-conservative")
+                                 "portfolio-optimizer-objective-minimum-variance")
                    [1 :aria-pressed])))
     (is (nil? (node-by-role view-node "portfolio-optimizer-setup-preset-use-my-views")))
     ;; Live provenance counts (1 authored view over a 2-asset universe) thread
-    ;; through the preset kicker, the scenario contract's Returns row, and the
-    ;; rail editor's summary line.
+    ;; through the Maximum Sharpe goal-card kicker, the scenario contract's Returns
+    ;; row, and the rail editor's summary line.
     (is (contains? strings "1 your view · 1 implied"))
     ;; Views are edited in the always-present right-rail "Return views" panel.
     (is (contains? strings "Return views"))

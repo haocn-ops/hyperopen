@@ -6,15 +6,18 @@
 
   This namespace holds the header, phase control bands, the KPI strip, the health rail,
   and the latest-attempt panel. The order table + per-order editor live in the sibling
-  namespace hyperopen.views.portfolio.optimize.execution-order-table; pure presentation
-  helpers shared by both live in hyperopen.views.portfolio.optimize.execution-shared.
+  namespace hyperopen.views.portfolio.optimize.execution-order-table; the staged-phase
+  execution-strategy selector + high-cost warning live in
+  hyperopen.views.portfolio.optimize.execution-strategy-band; pure presentation helpers
+  shared by all live in hyperopen.views.portfolio.optimize.execution-shared.
 
   Honesty: each ready row is submitted with its selected order type (Market/Limit/TWAP/
-  Passive), and the displayed type is the routed type — see execution-order-type."
+  Passive maker), and the displayed type is the routed type — see execution-order-type."
   (:require [clojure.string :as str]
             [hyperopen.portfolio.optimizer.application.view-model :as optimizer-view-model]
             [hyperopen.views.portfolio.optimize.execution-order-table :as order-table]
             [hyperopen.views.portfolio.optimize.execution-shared :as shared]
+            [hyperopen.views.portfolio.optimize.execution-strategy-band :as strategy-band]
             [hyperopen.views.portfolio.optimize.format :as opt-format]))
 
 ;; ── Buys/Sells flow (ported from the retired Rebalance preview) ───────────
@@ -119,7 +122,8 @@
          "Confirm discard"]]])]])
 
 (defn- header
-  [{:keys [phase arm-disabled? arm-disabled-message] :as model}]
+  [{:keys [phase arm-disabled? arm-disabled-message rows] :as model}]
+  (let [ready-count (count (filter #(= :ready (:status %)) rows))]
   [:div {:class ["flex" "flex-wrap" "items-end" "justify-between" "gap-3"
                  "border-b" "border-base-300" "bg-base-100/95" "px-5" "py-3"]
          :data-role "portfolio-optimizer-execution-header"}
@@ -144,6 +148,8 @@
                 :on {:click [[:actions/set-portfolio-optimizer-results-tab :recommendation]]}}
        "Back to recommendation"])
     (when (= :staged phase)
+      ;; The CTA counts exactly what arming covers — never a vague "execution" when the
+      ;; next screen is live money.
       [:button {:type "button"
                 :class ["optimizer-primary-action" "border" "px-3" "py-2" "text-sm" "font-semibold"
                         "disabled:cursor-not-allowed" "disabled:border-base-300"
@@ -153,70 +159,15 @@
                 :title (when arm-disabled? arm-disabled-message)
                 :on (when-not arm-disabled?
                       {:click [[:actions/set-portfolio-optimizer-execution-phase :armed]]})}
-       "Arm execution"])]])
+       (if (pos? ready-count)
+         (str "Arm " ready-count " order" (when (not= 1 ready-count) "s"))
+         "Arm execution")])]]))
 
 ;; ── control band (one per phase) ────────────────────────────────────────
 
 (defn- order-summary-line
   [model rows]
-  (let [counts (frequencies (map #(shared/effective-type model %)
-                                 (filter #(= :ready (:status %)) rows)))
-        parts (->> shared/order-types
-                   (keep (fn [t] (when-let [n (get counts t)]
-                                   (str n " " (str/lower-case (shared/order-type-labels t))))))
-                   (str/join " · "))]
-    (when (seq parts) parts)))
-
-(defn- mode-tile
-  [{:keys [id title sub active? read-only?]}]
-  [:button {:type "button"
-            :class (cond-> ["optimizer-exec-mode-tile" "flex" "flex-col" "gap-0.5" "px-3" "py-2"
-                            "border-l" "border-base-300" "text-left"]
-                     active? (conj "is-active"))
-            :data-role (str "portfolio-optimizer-execution-mode-" (name id))
-            :data-active (str (boolean active?))
-            :disabled (boolean read-only?)
-            :on (when-not read-only?
-                  {:click [[:actions/set-portfolio-optimizer-execution-default-order-type id]]})}
-   [:span {:class ["flex" "items-center" "gap-2"]}
-    [:span {:class ["optimizer-exec-mode-dot"]}]
-    [:span {:class ["text-xs" "font-medium" "text-trading-text"]} title]]
-   [:span {:class ["pl-4" "font-mono" "text-[0.6rem]" "text-trading-muted"]} sub]])
-
-(defn- staged-band
-  [{:keys [default-order-type read-only? disabled-message stale? stale-message]} rows]
-  [:div {:class ["border-b" "border-base-300"]
-         :data-role "portfolio-optimizer-execution-control-band"
-         :data-phase "staged"}
-   (when read-only?
-     [:p {:class ["optimizer-exec-readonly" "border-b" "border-base-300" "px-5" "py-2"
-                  "text-xs" "font-semibold" "text-warning"]
-          :data-role "portfolio-optimizer-execution-readonly"}
-      disabled-message])
-   ;; A stale plan can't be armed (the action gate refuses it); say why and point to the re-run.
-   (when stale?
-     [:p {:class ["optimizer-exec-readonly" "border-b" "border-base-300" "px-5" "py-2"
-                  "text-xs" "font-semibold" "text-warning"]
-          :data-role "portfolio-optimizer-execution-stale"}
-      stale-message])
-   [:div {:class ["flex" "items-stretch"]}
-    [:div {:class ["flex" "flex-col" "justify-center" "gap-0.5" "px-5" "py-2" "shrink-0"]}
-     [:span {:class ["font-mono" "text-[0.6rem]" "uppercase" "tracking-[0.08em]" "text-trading-muted/70"]}
-      "Default order type"]
-     [:span {:class ["font-mono" "text-[0.58rem]" "text-trading-muted"]}
-      "override any order below →"]]
-    [:div {:class ["flex" "flex-1" "border-l" "border-base-300"]}
-     (mode-tile {:id :recommended :title "Recommended" :sub "Algo picks the best type per order"
-                 :active? (= :recommended default-order-type) :read-only? read-only?})
-     (mode-tile {:id :market :title "Market" :sub "Cross the spread on every order"
-                 :active? (= :market default-order-type) :read-only? read-only?})
-     (mode-tile {:id :limit :title "Limit" :sub "Rest every order at a price"
-                 :active? (= :limit default-order-type) :read-only? read-only?})
-     (mode-tile {:id :twap :title "TWAP" :sub "Work every order over time"
-                 :active? (= :twap default-order-type) :read-only? read-only?})]]
-   [:p {:class ["border-t" "border-base-300" "bg-base-200/30" "px-5" "py-1.5"
-                "font-mono" "text-[0.6rem]" "text-trading-muted"]}
-    "Recommended routes each order by clip size. Limit / Passive rest as maker orders and may not fully fill; TWAP works over time."]])
+  (shared/type-mix-summary model (filter #(= :ready (:status %)) rows)))
 
 (defn- armed-band
   [{:keys [confirm-disabled? disabled-message summary
@@ -421,56 +372,16 @@
     :done (done-band rows)
     :resting (resting-band model rows)
     :halted (halted-band model rows)
-    (staged-band model rows)))
+    (strategy-band/staged-band model rows)))
 
 ;; ── KPI strip ───────────────────────────────────────────────────────────
+;; The live type-aware cost recompute (type-aware-costs) lives in execution-shared —
+;; the strategy tiles project per-strategy costs from the same function, so the tiles,
+;; the KPI strip, and the health rail can never disagree.
 
-(defn- type-aware-costs
-  "Recomputes price cost (spread + book impact) + fees from each row's LIVE effective order
-  type so the KPI strip and health rail react to type changes without re-staging. Crossing
-  (market/twap) rows keep their spread + impact + taker fee; resting (limit/passive) rows
-  contribute no spread/impact and the maker fee. Returns the totals, the spread/impact split,
-  the maker/taker split, and the crossing-row price-cost bps samples for the average."
-  [model rows]
-  (reduce
-   (fn [acc row]
-     (let [crossing? (shared/crossing-type? (shared/effective-type model row))
-           cost (:cost row)
-           slip-bps (:slippage-bps cost)
-           slip-usd (if crossing? (or (:estimated-slippage-usd cost) 0) 0)
-           has-split? (some? (:spread-usd cost))
-           spread-usd (if (and crossing? has-split?) (:spread-usd cost) 0)
-           ;; Attribute an un-splittable crossing cost (flat fallback / no book) entirely to
-           ;; impact so spread + impact always reconciles to the price-cost total.
-           impact-usd (cond (not crossing?) 0
-                            has-split? (or (:impact-usd cost) 0)
-                            :else slip-usd)]
-       (cond-> acc
-         true (update :slippage-usd + slip-usd)
-         true (update :spread-usd + spread-usd)
-         true (update :impact-usd + impact-usd)
-         true (update :fees-usd + (if crossing?
-                                    (or (:estimated-fee-usd cost) 0)
-                                    (or (:maker-fee-usd cost) 0)))
-         true (update (if crossing? :taker-count :maker-count) inc)
-         (and crossing? (shared/finite slip-bps)) (update :slip-bps conj (shared/abs-num slip-bps)))))
-   {:slippage-usd 0 :spread-usd 0 :impact-usd 0 :fees-usd 0
-    :taker-count 0 :maker-count 0 :slip-bps []}
-   rows))
-
-(defn- fee-mix-label
-  [{:keys [taker-count maker-count]}]
-  (cond
-    (and (pos? taker-count) (pos? maker-count)) (str taker-count " taker · " maker-count " maker")
-    (pos? maker-count) "maker · resting rows"
-    :else "taker · ready rows"))
-
-(defn- price-cost-split-text
-  "\"spread $X + impact $Y\" for the crossing rows, or nil when nothing crosses the book."
-  [{:keys [spread-usd impact-usd taker-count]}]
-  (when (pos? taker-count)
-    (str "spread " (opt-format/format-usdc spread-usd)
-         " + impact " (opt-format/format-usdc impact-usd))))
+(def ^:private type-aware-costs shared/type-aware-costs)
+(def ^:private fee-mix-label shared/fee-mix-label)
+(def ^:private price-cost-split-text shared/price-cost-split-text)
 
 (defn- price-cost-sub
   [costs avg-bps]
@@ -628,7 +539,7 @@
                                    ["Before you arm"
                                     ["Estimated fills assume top-of-book and recent depth; real fills vary."
                                      "Arming requires a second confirm. No orders are live until then."
-                                     "Each order routes by its selected type — Limit / Passive rest as maker orders, TWAP works over time."]
+                                     "Each order routes by its selected type — Passive maker / Limit rest as maker orders and may not fill; TWAP works over time."]
                                     "text-trading-muted"])]
     [:div {:class ["p-3.5" "border-t" "border-base-300"]}
      [:div {:class ["optimizer-note"]
@@ -643,6 +554,8 @@
         submitted (filter #(= :submitted (:status %)) rows)
         resting (filter #(= :resting (:status %)) rows)
         failed (filter #(= :failed (:status %)) rows)
+        skipped-count (count (filter #(= :skipped (:status %)) rows))
+        blocked-count (count (filter #(= :blocked (:status %)) rows))
         total (+ (count ready) (count submitted) (count resting) (count failed))
         filled (count submitted)
         ;; Fill progress tracks fills only — a resting order has not filled, so the bar stays
@@ -680,6 +593,14 @@
            (shared/leverage-headroom-sub margin true)
            (if margin-warn? "breach" "ok")
            (if margin-warn? "text-trading-red" nil))
+     ;; What will actually route + what won't be sent at all — the checklist facts a
+     ;; trader confirms before arming, stated here so the rail reads top-to-bottom as
+     ;; "how many, how routed, what it costs".
+     (diag "Routing"
+           (let [n (+ (count ready) (count submitted) (count resting))]
+             (str n " order" (when (not= 1 n) "s")))
+           (str (or (shared/type-mix-summary model (concat ready submitted resting)) "—")
+                " · " skipped-count " skipped · " blocked-count " blocked"))
      (diag "Est. price cost"
            (opt-format/format-usdc (:slippage-usd costs))
            (or (not-empty (str/join " · " (remove nil? [(price-cost-split-text costs) sources])))

@@ -1,15 +1,17 @@
 (ns hyperopen.views.portfolio.optimize.execution-shared
   "Pure, presentation-level helpers shared by the Execution tab surface
-  (hyperopen.views.portfolio.optimize.execution-tab) and its extracted order-table
-  namespace (hyperopen.views.portfolio.optimize.execution-order-table). Kept in one place
-  so neither view file carries the other's bulk while both reuse identical formatting,
-  order-type, and chip helpers. No behaviour lives here that isn't a direct move from the
-  original execution-tab namespace."
+  (hyperopen.views.portfolio.optimize.execution-tab), its extracted order-table
+  namespace (hyperopen.views.portfolio.optimize.execution-order-table), and the
+  execution-strategy band (hyperopen.views.portfolio.optimize.execution-strategy-band).
+  Kept in one place so no view file carries the others' bulk while all reuse identical
+  formatting, order-type, cost-recompute, and chip helpers."
   (:require [hyperopen.portfolio.optimizer.application.execution-order-type :as execution-order-type]
             [hyperopen.views.portfolio.optimize.format :as opt-format]))
 
 (def order-type-labels
-  {:market "Market" :limit "Limit" :twap "TWAP" :passive "Passive"})
+  ;; "Passive maker" (not bare "Passive") everywhere the type is named: post-only maker
+  ;; posture is the meaning, and it must never read as a synonym for Limit.
+  {:market "Market" :limit "Limit" :twap "TWAP" :passive "Passive maker"})
 
 (def order-types [:market :limit :twap :passive])
 
@@ -46,6 +48,71 @@
 (def recommend-exec-type execution-order-type/recommend-exec-type)
 (def effective-type execution-order-type/effective-type)
 (def row-params execution-order-type/row-params)
+(def high-cost-crossing-bps execution-order-type/high-cost-crossing-bps)
+(def high-cost-crossing-row? execution-order-type/high-cost-crossing-row?)
+(def crossing-cost-bps execution-order-type/crossing-cost-bps)
+
+;; ── live type-aware cost recompute ────────────────────────────────────────
+
+(defn type-aware-costs
+  "Recomputes price cost (spread + book impact) + fees from each row's LIVE effective order
+  type so the KPI strip, health rail, and strategy tiles react to type changes without
+  re-staging. Crossing (market/twap) rows keep their spread + impact + taker fee; resting
+  (limit/passive) rows contribute no spread/impact and the maker fee. Returns the totals,
+  the spread/impact split, the maker/taker split, and the crossing-row price-cost bps
+  samples for the average."
+  [model rows]
+  (reduce
+   (fn [acc row]
+     (let [crossing? (crossing-type? (effective-type model row))
+           cost (:cost row)
+           slip-bps (:slippage-bps cost)
+           slip-usd (if crossing? (or (:estimated-slippage-usd cost) 0) 0)
+           has-split? (some? (:spread-usd cost))
+           spread-usd (if (and crossing? has-split?) (:spread-usd cost) 0)
+           ;; Attribute an un-splittable crossing cost (flat fallback / no book) entirely to
+           ;; impact so spread + impact always reconciles to the price-cost total.
+           impact-usd (cond (not crossing?) 0
+                            has-split? (or (:impact-usd cost) 0)
+                            :else slip-usd)]
+       (cond-> acc
+         true (update :slippage-usd + slip-usd)
+         true (update :spread-usd + spread-usd)
+         true (update :impact-usd + impact-usd)
+         true (update :fees-usd + (if crossing?
+                                    (or (:estimated-fee-usd cost) 0)
+                                    (or (:maker-fee-usd cost) 0)))
+         true (update (if crossing? :taker-count :maker-count) inc)
+         (and crossing? (finite slip-bps)) (update :slip-bps conj (abs-num slip-bps)))))
+   {:slippage-usd 0 :spread-usd 0 :impact-usd 0 :fees-usd 0
+    :taker-count 0 :maker-count 0 :slip-bps []}
+   rows))
+
+(defn fee-mix-label
+  [{:keys [taker-count maker-count]}]
+  (cond
+    (and (pos? taker-count) (pos? maker-count)) (str taker-count " taker · " maker-count " maker")
+    (pos? maker-count) "maker · resting rows"
+    :else "taker · ready rows"))
+
+(defn price-cost-split-text
+  "\"spread $X + impact $Y\" for the crossing rows, or nil when nothing crosses the book."
+  [{:keys [spread-usd impact-usd taker-count]}]
+  (when (pos? taker-count)
+    (str "spread " (opt-format/format-usdc spread-usd)
+         " + impact " (opt-format/format-usdc impact-usd))))
+
+(defn type-mix-summary
+  "\"7 market · 3 passive maker\" summary of the effective types across the given rows,
+  in the canonical order-type order; nil when there are no rows."
+  [model rows]
+  (let [counts (frequencies (map #(effective-type model %) rows))
+        parts (keep (fn [t]
+                      (when-let [n (get counts t)]
+                        (str n " " (.toLowerCase (order-type-labels t)))))
+                    order-types)]
+    (when (seq parts)
+      (apply str (interpose " · " parts)))))
 
 ;; ── commit-moment margin / leverage copy ──────────────────────────────────
 ;; The execution figure is account leverage (gross notional ÷ equity, the same

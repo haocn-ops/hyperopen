@@ -2,6 +2,7 @@
   (:require [hyperopen.account.context :as account-context]
             [hyperopen.portfolio.optimizer.actions.common :as common]
             [hyperopen.portfolio.optimizer.application.execution :as execution]
+            [hyperopen.portfolio.optimizer.application.execution-carryover :as carryover]
             [hyperopen.portfolio.optimizer.application.rebalance-preview :as rebalance-preview]
             [hyperopen.portfolio.optimizer.application.run-identity :as run-identity]
             [hyperopen.portfolio.optimizer.application.setup-readiness :as setup-readiness]
@@ -139,6 +140,19 @@
   [_state order-filter]
   [[:effects/save order-filter-path (keyword order-filter)]])
 
+(defn- attach-carryover-cancels
+  "Stamps the still-live resting orders from PREVIOUS runs onto the plan as
+  :cancel-orders, so the execute effect cancels them before releasing new orders.
+  Read fresh from state at confirm time (not stashed at staging) so an order that
+  filled in between is not needlessly cancelled. Without this, a stale resting order
+  fills on top of the new run and over-allocates the account."
+  [state plan]
+  (let [carryover (carryover/live-resting-carryover
+                   state
+                   (get-in state contracts/execution-resting-carryover-path))]
+    (cond-> plan
+      (seq carryover) (assoc :cancel-orders carryover))))
+
 (defn confirm-portfolio-optimizer-execution
   [state]
   (let [modal (get-in state contracts/execution-modal-path)
@@ -213,7 +227,7 @@
       :else
       [[:effects/save contracts/execution-modal-submitting-path true]
        [:effects/save contracts/execution-modal-error-path nil]
-       [:effects/execute-portfolio-optimizer-plan plan]])))
+       [:effects/execute-portfolio-optimizer-plan (attach-carryover-cancels state plan)]])))
 
 (defn resume-portfolio-optimizer-execution
   "Resumes a halted run by retrying ONLY the still-recoverable rows. Unlike a plain
@@ -251,7 +265,10 @@
             "No orders are eligible to resume."]]
           [[:effects/save contracts/execution-modal-submitting-path true]
            [:effects/save contracts/execution-modal-error-path nil]
-           [:effects/execute-portfolio-optimizer-plan resume-plan]])))))
+           ;; A halted run may have failed BEFORE its pre-run cancellation succeeded, so
+           ;; resume re-attaches the still-live carryover the same way confirm does.
+           [:effects/execute-portfolio-optimizer-plan
+            (attach-carryover-cancels state resume-plan)]])))))
 
 (defn revert-portfolio-optimizer-execution-filled
   "Unwinds the filled orders from the latest execution attempt by submitting reversing

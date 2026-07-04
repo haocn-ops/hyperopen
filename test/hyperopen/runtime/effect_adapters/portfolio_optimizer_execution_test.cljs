@@ -486,3 +486,4 @@
                               (get-in @store [:portfolio :optimizer :scenario-index])))
                        (done))))
             (.catch (async-support/unexpected-error done)))))))
+

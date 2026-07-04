@@ -552,3 +552,4 @@
            (actions/open-portfolio-optimizer-execution-in-ticket state))))
   (is (= [] (actions/open-portfolio-optimizer-execution-in-ticket
              {:portfolio {:optimizer {:execution-modal {:plan {:rows []}}}}}))))
+

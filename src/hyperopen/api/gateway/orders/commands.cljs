@@ -33,6 +33,18 @@
     (when (contains? #{:perp :spot :outcome} candidate)
       candidate)))
 
+(defn- attach-cloid
+  "Appends the wire client-order-id (:c) to a single order when the form carries a
+   non-blank :cloid. Assoc'd LAST so the array-map field order stays a,b,p,s,r,t,c —
+   Hyperliquid's canonical order struct — because the L1 action is signed by msgpacking
+   the map as-is (hl-signing/compute-connection-id), so field order is part of the hash.
+   No :cloid on the form => the order is byte-for-byte unchanged (every non-optimizer
+   caller)."
+  [order form]
+  (let [cloid (:cloid form)]
+    (cond-> order
+      (and (string? cloid) (seq (str/trim cloid))) (assoc :c (str/trim cloid)))))
+
 (defn- suppress-reduce-only?
   "Reduce-only is perp-only: spot and outcome markets have no position to
    reduce, so the wire :r is forced false for them across all order types."
@@ -208,11 +220,12 @@
                                   :p (or price-text "")
                                   :s (str size)
                                   :r reduce-only)
-            order (shape-builder base-order
-                                 {:post-only post-only
-                                  :tif tif
-                                  :trigger-text trigger-text
-                                  :price-text price-text})
+            order (-> (shape-builder base-order
+                                     {:post-only post-only
+                                      :tif tif
+                                      :trigger-text trigger-text
+                                      :price-text price-text})
+                      (attach-cloid form))
             tpsl-orders (if spot?
                           []
                           (build-tpsl-orders asset-idx side (assoc form :size size) command-context))]

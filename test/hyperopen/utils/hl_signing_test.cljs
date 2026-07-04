@@ -339,3 +339,23 @@
                     (set! (.-ethereum js/globalThis) original-provider)
                     (is false (str "Unexpected error: " err))
                     (done)))))))
+
+(deftest compute-connection-id-includes-optimizer-cloid-field-test
+  ;; Proves a client-order-id (:c) on the wire order flows through the signature: the
+  ;; action-as-is is msgpacked, so adding :c both (a) still produces a valid hash and
+  ;; (b) changes the hash vs the same order without :c — i.e. it is genuinely signed,
+  ;; not silently dropped.
+  (let [base-order {:a 0 :b true :p "100" :s "1" :r false :t {:limit {:tif "Alo"}}}
+        nonce 1234567890
+        with-cloid {:type "order"
+                    :orders [(assoc base-order :c "0x0770c0deaaaaaaaaaaaaaaaaaaaaaaaa")]
+                    :grouping "na"}
+        without-cloid {:type "order"
+                       :orders [base-order]
+                       :grouping "na"}
+        hash-with (signing/compute-connection-id with-cloid nonce)
+        hash-without (signing/compute-connection-id without-cloid nonce)]
+    (is (str/starts-with? hash-with "0x") "signing does not throw on the cloid field")
+    (is (= 66 (count hash-with)) "0x + 64 hex keccak256")
+    (is (not= hash-with hash-without)
+        "the cloid is part of the signed payload, not dropped")))

@@ -53,6 +53,7 @@
              :params {}
              :open-row nil
              :order-filter :all
+             :overlap-cancels {}
              :plan {:scenario-id "draft-1"
                     :status :ready
                     :execution-disabled? false

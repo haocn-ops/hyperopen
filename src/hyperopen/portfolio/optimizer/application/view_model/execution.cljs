@@ -2,6 +2,7 @@
   (:require [clojure.string :as str]
             [hyperopen.portfolio.optimizer.application.execution :as execution]
             [hyperopen.portfolio.optimizer.application.execution-carryover :as carryover]
+            [hyperopen.portfolio.optimizer.application.execution-cloid :as cloid]
             [hyperopen.portfolio.optimizer.application.setup-readiness :as setup-readiness]
             [hyperopen.portfolio.optimizer.application.spot-token-labels :as spot-token-labels]
             [hyperopen.portfolio.optimizer.application.view-model.execution-reconcile :as reconcile]
@@ -206,14 +207,33 @@
                         (->> ready-rows
                              (filter #(= side (:side %)))
                              (map #(js/Math.abs (or (:delta-notional-usd %) 0)))
-                             (reduce + 0)))]
+                             (reduce + 0)))
+        ;; Open orders overlapping this rebalance, classified against the live cloid-bearing
+        ;; frontendOpenOrders snapshot: our OWN tagged orders auto-cancel (counted alongside
+        ;; the in-memory carryover); UNTAGGED overlaps (manual / pre-tag) surface for an
+        ;; explicit per-order decision.
+        {owned-open :optimizer-owned untagged-open :untagged-overlap}
+        (cloid/classify-overlap (cloid/snapshot-open-orders state) ready-rows)
+        session-carryover (carryover/live-resting-carryover
+                           state
+                           (get-in state contracts/execution-resting-carryover-path))
+        auto-cancel-oids (into #{}
+                               (map #(str (:oid %)))
+                               (concat session-carryover owned-open))
+        overlap-selections (or (get-in state (conj contracts/execution-modal-path
+                                                   :overlap-cancels)) {})
+        overlap-orders (mapv (fn [o]
+                               (assoc o :cancel? (boolean
+                                                  (get overlap-selections (str (:oid o))))))
+                             untagged-open)]
     {:plan (assoc plan :rows plan-rows)
      :summary summary
-     ;; Resting orders left by PREVIOUS runs that are still live on the book — confirm
-     ;; cancels them before sending new orders, and the staged surface says so.
-     :carryover-count (count (carryover/live-resting-carryover
-                              state
-                              (get-in state contracts/execution-resting-carryover-path)))
+     ;; Orders (ours) that confirm will cancel automatically before sending new orders —
+     ;; in-session carryover PLUS reload-surviving cloid-recognized orders, deduped by oid.
+     :carryover-count (count auto-cancel-oids)
+     ;; Untagged open orders overlapping the rebalance the user must resolve (each carries
+     ;; its live :cancel? choice); drives the decision surface.
+     :overlap-orders overlap-orders
      :rows display-rows
      :phase phase
      ;; The live-run pause/abort flag the submit loop checks; surfaced so the running band can

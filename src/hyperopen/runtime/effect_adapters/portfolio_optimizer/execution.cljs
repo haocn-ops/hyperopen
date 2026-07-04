@@ -3,7 +3,9 @@
             [hyperopen.order.feedback-runtime :as feedback-runtime]
             [hyperopen.portfolio.optimizer.application.execution :as execution]
             [hyperopen.portfolio.optimizer.application.execution-carryover :as carryover]
+            [hyperopen.portfolio.optimizer.application.execution-cloid :as cloid]
             [hyperopen.portfolio.optimizer.application.execution-workflow :as execution-workflow]
+            [hyperopen.api.trading.cancel-request :as cancel-request]
             [hyperopen.portfolio.optimizer.contracts :as contracts]))
 
 (defn- execution-outcome-toast
@@ -61,6 +63,21 @@
   [responses]
   (some #(when-not (execution/response-ok? %) %) responses))
 
+(defn- random-optimizer-cloid
+  "A fresh magic-tagged cloid for one optimizer order. The 12-byte uniqueness suffix
+  comes from crypto.getRandomValues; falls back to a time+counter hex string in the
+  (test/headless) case where crypto is unavailable, since uniqueness — not
+  unpredictability — is all that matters here."
+  []
+  (let [hex (if (and (exists? js/crypto) (.-getRandomValues js/crypto))
+              (let [buf (js/Uint8Array. 12)]
+                (.getRandomValues js/crypto buf)
+                (->> (array-seq buf)
+                     (map #(.padStart (.toString % 16) 2 "0"))
+                     (apply str)))
+              (.toString (js/Math.floor (* (js/Date.now) 1000000)) 16))]
+    (cloid/make-cloid hex)))
+
 (defn- fail-ready-rows
   [rows message]
   (mapv #(if (= :ready (:status %))
@@ -74,6 +91,26 @@
        " from the previous run — no new orders were sent"
        (when (seq detail) (str " (" detail ")"))
        ". Cancel them from the trade ticket, then resume."))
+
+(defn- resolve-cancel-wires
+  "Turns each :cancel-orders entry into a wire cancel {:a <asset-idx> :o <oid>}, split
+  into {:cancels [...] :unresolved [...]}. Two entry shapes converge here: same-session
+  carryover entries carry a frozen :asset-id (used directly, robust even if the market
+  metadata later drops out of state); live-book-recognized entries carry only :coin +
+  :oid, so their asset index is resolved from state via the shared cancel-request builder
+  (the same resolver manual order cancellation uses). An entry that resolves to neither
+  halts the run — submitting new orders while a stale one may still fill is the bug."
+  [state entries]
+  (reduce (fn [acc entry]
+            (let [frozen (first (:cancels (carryover/carryover-cancels [entry])))
+                  resolved (or frozen
+                               (get-in (cancel-request/build-cancel-order-request state entry)
+                                       [:action :cancels 0]))]
+              (if resolved
+                (update acc :cancels conj resolved)
+                (update acc :unresolved conj entry))))
+          {:cancels [] :unresolved []}
+          (or entries [])))
 
 (defn- cancel-stale-orders!
   "Cancels the plan's :cancel-orders — resting orders left on the book by PREVIOUS
@@ -90,7 +127,7 @@
   (let [entries (:cancel-orders plan)]
     (if-not (seq entries)
       (js/Promise.resolve {:ok? true :cancellations nil})
-      (let [{:keys [cancels unresolved]} (carryover/carryover-cancels entries)
+      (let [{:keys [cancels unresolved]} (resolve-cancel-wires @store entries)
             oids (mapv :oid entries)
             base {:requested (count entries) :oids oids}]
         (if (seq unresolved)
@@ -383,7 +420,12 @@
         attempt (execution/build-execution-attempt
                  {:plan plan
                   :market-by-key (get-in state [:asset-selector :market-by-key])
-                  :orderbooks (:orderbooks state)})]
+                  :orderbooks (:orderbooks state)
+                  ;; Reverts unwind existing fills with reduce-only orders; tagging them
+                  ;; would make a revert order recognizable as a fresh optimizer order to
+                  ;; cancel later. Only tag forward rebalance/refine orders.
+                  :cloid-fn (when-not (= :revert (:kind plan))
+                              random-optimizer-cloid)})]
     (if-not owner-address
       (let [completed-at-ms (now-ms-fn)
             rows (mapv #(if (= :ready (:status %))

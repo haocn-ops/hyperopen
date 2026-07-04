@@ -128,3 +128,57 @@
                                             :execution-resting-carryover]))
                          "a failed cancellation must NOT prune — the order may still be live")
                      (done))))))))
+
+(def ^:private feed-recognized-plan
+  ;; :cancel-orders entry recognized from the live snapshot carries :coin + :oid but NO
+  ;; frozen :asset-id (unlike same-session carryover) — the effect must resolve its asset
+  ;; index from state before it can build the wire cancel.
+  {:scenario-id "scn_feed"
+   :status :ready
+   :execution-disabled? false
+   :summary {:ready-count 1 :blocked-count 0}
+   :cancel-orders [{:oid 900 :coin "ZETA" :side :buy}]
+   :rows [{:row-id "perp:BTC"
+           :instrument-id "perp:BTC"
+           :instrument-type :perp
+           :coin "BTC"
+           :status :ready
+           :side :buy
+           :price 100
+           :quantity 0.25
+           :delta-notional-usd 25
+           :intent {:kind :perp-order :instrument-id "perp:BTC" :side :buy
+                    :quantity 0.25 :order-type :market :reduce-only? false}}]})
+
+(deftest execute-effect-resolves-asset-id-for-feed-recognized-cancel-test
+  ;; A cross-session (cloid-recognized) cancel entry lacks a frozen asset index; the effect
+  ;; resolves it from market metadata in state and still cancels BEFORE any new order.
+  (async done
+    (let [submitted (atom [])
+          ticks (atom [1000 1100])
+          address "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          store (atom {:wallet {:address address :agent {:status :ready}}
+                       :asset-selector {:market-by-key
+                                        {"perp:BTC" {:coin "BTC" :market-type :perp
+                                                     :asset-id 0 :szDecimals 4}
+                                         "perp:ZETA" {:coin "ZETA" :market-type :perp
+                                                      :asset-id 42 :szDecimals 2}}}
+                       :portfolio {:optimizer
+                                   {:active-scenario {:loaded-id "scn_feed" :status :saved}
+                                    :execution-modal {:open? true :submitting? true
+                                                      :plan feed-recognized-plan}}}})]
+      (with-redefs [portfolio-optimizer-adapters/*now-ms*
+                    (fn [] (let [t (first @ticks)] (swap! ticks rest) t))
+                    portfolio-optimizer-adapters/*submit-order!*
+                    (fn [_store _address action]
+                      (swap! submitted conj action)
+                      (js/Promise.resolve {:status "ok" :response {:data {:statuses ["success"]}}}))
+                    portfolio-optimizer-adapters/*dispatch!* (fn [_ _ _])]
+        (-> (portfolio-optimizer-adapters/execute-portfolio-optimizer-plan-effect
+             nil store feed-recognized-plan)
+            (.then (fn [ledger]
+                     (is (= ["cancel" "order"] (mapv :type @submitted)))
+                     (is (= [{:a 42 :o 900}] (:cancels (first @submitted)))
+                         "asset index 42 resolved from market-by-key for the feed-sourced oid")
+                     (is (= :ok (get-in ledger [:cancellations :status])))
+                     (done))))))))

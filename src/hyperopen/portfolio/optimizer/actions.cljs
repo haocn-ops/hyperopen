@@ -237,6 +237,9 @@
 (def set-portfolio-optimizer-execution-order-filter
   execution/set-portfolio-optimizer-execution-order-filter)
 
+(def set-portfolio-optimizer-execution-overlap-cancel
+  execution/set-portfolio-optimizer-execution-overlap-cancel)
+
 (def refresh-portfolio-optimizer-tracking
   tracking/refresh-portfolio-optimizer-tracking)
 

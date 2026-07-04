@@ -277,6 +277,8 @@
 (deftest execution-tab-row-expansion-shows-cost-breakdown-test
   ;; Expanding a market row reveals the execution-cost breakdown: spread crossing + book
   ;; impact = price cost, + fees = all-in. all-in = price cost $0.68 + fees $0.23 = $0.91.
+  ;; The 25bp row is pinned :market via override — the cost-aware Recommended policy
+  ;; would otherwise route it passive (≥ 20bp) and hide the crossing split.
   (let [plan (assoc-in staged-plan [:rows 0 :cost]
                        {:source :snapshot :slippage-bps 25 :estimated-slippage-usd 0.68
                         :spread-bps 18 :spread-usd 0.49 :impact-bps 7 :impact-usd 0.19
@@ -284,6 +286,7 @@
         view-node (scenario-view :execution
                                  {:execution {:status :idle :history []}
                                   :execution-modal {:open? true :phase :staged :plan plan
+                                                    :overrides {"perp:BTC" :market}
                                                     :open-row "perp:BTC"}})
         breakdown (node-by-role view-node "portfolio-optimizer-execution-cost-breakdown")
         text (node-text breakdown)]
@@ -307,6 +310,8 @@
         view-node (scenario-view :execution
                                  {:execution {:status :idle :history []}
                                   :execution-modal {:open? true :phase :staged :plan plan
+                                                    ;; pinned :market — recommended would route this 25bp row passive
+                                                    :overrides {"perp:BTC" :market}
                                                     :open-row "perp:BTC"}})
         breakdown (node-by-role view-node "portfolio-optimizer-execution-cost-breakdown")
         text (node-text breakdown)]

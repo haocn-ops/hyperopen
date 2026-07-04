@@ -129,6 +129,16 @@ Round 4 (2026-07-04, owner — data-health cautions are over-weighted):
   Sharpe, one-line inactive note otherwise) sits ABOVE Data health in both
   goal states, per owner preference that the folded health details rank below
   the goal-relevant inputs.
+Round 5 (2026-07-04, owner — rail editor sizing + scroll affordance):
+
+- [x] The rail Return-views rows list grows with the viewport
+  (`max-height: clamp(24rem, 62vh, 48rem)`, was a fixed 24rem) so the editor
+  uses the empty space at the bottom of the rail and Data health sits nearer
+  the fold, while a large universe still cannot push the run context away.
+- [x] The rows scrollbar is now an explicit affordance: always-visible
+  accent-tinted thumb on a faint track (10px webkit + `scrollbar-color` for
+  Firefox, `scrollbar-gutter: stable`) — the near-invisible default hid that
+  more assets exist below the fold.
 - [ ] Follow-up: user-supplied custom loadings/assumptions as the real remedy
   for the provider-limit note (owner: address separately). Also: consider
   moving the full Return-views editor into the CENTER column when Maximum

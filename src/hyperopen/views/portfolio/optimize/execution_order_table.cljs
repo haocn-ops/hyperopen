@@ -19,22 +19,39 @@
       (str/replace #"(^-+|-+$)" "")))
 
 (defn- rec-reason
-  [order-type]
+  "Plain-language rationale for the algorithm-recommended route of this row — cost-aware
+  first (the policy in execution-order-type), then clip size."
+  [row order-type]
   (case order-type
     :twap "large clip — slice over time to limit market impact"
     :limit "liquid spot sell — rest at mid and capture the spread"
-    :market "small clip — immediacy outweighs impact"
-    "medium position — post passively, avoid crossing the spread"))
+    :market "small clip with a cheap crossing — immediacy outweighs impact"
+    (if (shared/high-cost-crossing-row? row)
+      (str "crossing costs ~" (shared/format-bps (shared/crossing-cost-bps row))
+           " as a market order — post passively instead")
+      "medium position — post passively, avoid crossing the spread")))
+
+(defn- route-hint
+  "By-exception rationale under the Type chip: only for a ready row the RECOMMENDED
+  policy moved off the market default (no override, default strategy :recommended).
+  Market routes and user choices stay quiet — the hint marks exactly the rows where
+  'the algo picked something for a reason' needs to be inspectable in the table."
+  [model row order-type]
+  (when (and (= :recommended (or (:default-order-type model) :recommended))
+             (not (contains? (:overrides model) (:row-id row)))
+             (= :ready (:status row))
+             (not= :market order-type))
+    (case order-type
+      :passive (if (shared/high-cost-crossing-row? row)
+                 (str (shared/format-bps (shared/crossing-cost-bps row)) " as market — rests instead")
+                 "avoids crossing the spread")
+      :twap "large clip — sliced over time"
+      :limit "spot sell — rests at a price"
+      nil)))
 
 (defn- editable?
   [{:keys [phase read-only?]}]
   (and (contains? #{:staged :armed} phase) (not read-only?)))
-
-(defn- venue-label
-  [row]
-  (case (:instrument-type row)
-    (:perp :spot) "Hyperliquid"
-    "—"))
 
 (def ^:private state-glyph
   {:filled "✓"
@@ -204,7 +221,8 @@
         params (shared/row-params model row)
         buy? (= :buy (:side row))
         row-id (:row-id row)
-        source (cost-source-label row)]
+        source (cost-source-label row)
+        rec-reason-text (rec-reason row rec)]
     [:tr {:data-role (str "portfolio-optimizer-execution-order-editor-" (data-role-token (:instrument-id row)))}
      [:td {:colspan colspan :class ["optimizer-exec-order-editor"]}
       [:div {:class ["optimizer-exec-editor-grid"]}
@@ -258,8 +276,8 @@
             [:span {:class ["font-mono" "text-trading-muted/70"]}
              (str (max 2 (js/Math.round (/ (:twap-min params) 2))) " slices · even spacing")]]
            [:span "Post-only at the best price — never crosses the spread, re-pegs as the book moves."])]
-        [:p {:class ["font-mono" "text-[0.6rem]" "text-trading-muted/70"]}
-         (str "Recommended: " (shared/order-type-labels rec) " — " (rec-reason rec))]
+        [:p {:class ["font-mono" "text-[0.65rem]" "text-trading-muted/70"]}
+         (str "Recommended: " (shared/order-type-labels rec) " — " rec-reason-text)]
         (when source
           ;; Cost-basis provenance lifted off the lowest 50% opacity / 0.6rem floor so the
           ;; trust signal (snapshot / orderbook / proxy) is actually readable.
@@ -306,20 +324,25 @@
          [:td {:class ["optimizer-exec-glyph"] :data-state (name display-state)}
           (state-glyph display-state)]
          [:td {:class ["num" "text-trading-muted/70"]} (opt-format/format-decimal (or (:order-no row) (inc index)) {:maximum-fraction-digits 0})]
-         [:td [:span {:class ["font-mono" "font-semibold" "text-trading-text"]} (:instrument-label row)]]
-         [:td (shared/chip (name (or side :flat)) (side-tone side))]
+         ;; The venue is stated once above the table (every order routes to Hyperliquid);
+         ;; only the per-row perp/spot kind stays, folded into the asset cell.
          [:td
-          [:span {:class ["text-[0.7rem]" "text-trading-muted"]} (venue-label row)]
+          [:span {:class ["font-mono" "font-semibold" "text-trading-text"]} (:instrument-label row)]
           (when (:instrument-type row)
             [:span {:class ["optimizer-table-kind-badge" "ml-1.5"]
                     :data-kind (name (:instrument-type row))}
              (name (:instrument-type row))])]
+         [:td (shared/chip (name (or side :flat)) (side-tone side))]
          [:td
           [:span {:class ["inline-flex" "items-center" "gap-1.5"]}
            (when overridden? [:span {:class ["optimizer-exec-override-dot"]}])
            [:span {:class (cond-> ["optimizer-exec-type-chip"] overridden? (conj "is-overridden"))}
             (shared/order-type-labels t)]
-           (when editable [:span {:class ["text-[0.6rem]" "text-trading-muted/70"]} (if open? "▾" "▸")])]]
+           (when editable [:span {:class ["text-[0.6rem]" "text-trading-muted/70"]} (if open? "▾" "▸")])]
+          (when-let [hint (route-hint model row t)]
+            [:span {:class ["block" "mt-0.5" "font-mono" "text-[0.62rem]" "text-trading-muted/80"]
+                    :data-role "portfolio-optimizer-execution-route-hint"}
+             hint])]
          [:td {:class ["num" "right"]} (opt-format/format-decimal (:quantity row) {:maximum-fraction-digits 4})]
          ;; Exact dollar notional (not $Nk-rounded) on the row the trader vets before arming,
          ;; matching the rebalance preview's precision so the same order reads the same in both.
@@ -330,7 +353,7 @@
           (slip-cell t (:status row) (get-in row [:cost :slippage-bps]) (get-in row [:realized :slippage-bps]))]
          [:td {:class ["text-[0.7rem]"]} (state-cell display-state row)]]]
     (if open?
-      [row-tr (order-editor-row model row 10)]
+      [row-tr (order-editor-row model row 9)]
       [row-tr])))
 
 (defn- row-visible?
@@ -353,20 +376,87 @@
                     :on {:click [[:actions/set-portfolio-optimizer-execution-order-filter id]]}}
            label])))
 
+(defn- venue-note
+  "The venue stated ONCE for the whole list (every optimizer order routes to
+  Hyperliquid), with the perp/spot mix of the sendable rows — replacing a Venue column
+  that repeated \"Hyperliquid\" on every row."
+  [model rows]
+  (let [kinds (->> rows
+                   (remove #(= :skipped (row-display-state model %)))
+                   (keep :instrument-type)
+                   frequencies)
+        parts (cond-> []
+                (pos? (get kinds :perp 0)) (conj (str (get kinds :perp) " perp"))
+                (pos? (get kinds :spot 0)) (conj (str (get kinds :spot) " spot")))]
+    (when (seq parts)
+      (str "All orders route to Hyperliquid — " (str/join " · " parts) "."))))
+
+(defn- skipped-section
+  "Within-tolerance / already-live rows collapsed OUT of the order list: they are not
+  orders and must not read as 20 orders when 10 will be sent. Each keeps its ledger #,
+  its data-role, and a plain-language reason."
+  [model rows]
+  (let [skipped (filterv #(= :skipped (row-display-state model %)) rows)]
+    (when (seq skipped)
+      [:details {:class ["optimizer-exec-skipped" "border-t" "border-base-300"]
+                 :replicant/key "portfolio-optimizer-execution-skipped"
+                 :data-role "portfolio-optimizer-execution-skipped"}
+       [:summary {:class ["px-4" "py-2.5" "text-xs" "font-medium" "text-trading-muted"
+                          "select-none" "cursor-pointer"]}
+        (str "Skipped — " (count skipped) " asset" (when (not= 1 (count skipped)) "s")
+             " · no orders will be sent")]
+       [:div {:class ["overflow-x-auto"]}
+        (into
+         [:table {:class ["optimizer-table" "optimizer-exec-table"]}
+          [:thead
+           [:tr
+            [:th {:class ["w-10"]} "#"]
+            [:th "Asset"]
+            [:th "Side"]
+            [:th {:class ["right"]} "Notional"]
+            [:th "Why skipped"]]]]
+         (for [row skipped]
+           [:tbody
+            [:tr {:class ["optimizer-exec-order-row" "is-muted"]
+                  :data-role (str "portfolio-optimizer-execution-order-row-"
+                                  (data-role-token (:instrument-id row)))
+                  :data-exec-state "skipped"}
+             [:td {:class ["num" "text-trading-muted/70"]}
+              (opt-format/format-decimal (:order-no row) {:maximum-fraction-digits 0})]
+             [:td
+              [:span {:class ["font-mono" "font-semibold" "text-trading-text"]} (:instrument-label row)]
+              (when (:instrument-type row)
+                [:span {:class ["optimizer-table-kind-badge" "ml-1.5"]
+                        :data-kind (name (:instrument-type row))}
+                 (name (:instrument-type row))])]
+             [:td (shared/chip (name (or (:side row) :flat)) (side-tone (:side row)))]
+             [:td {:class ["num" "right" "text-trading-muted"]}
+              (str (if (= :buy (:side row)) "+" "−")
+                   (opt-format/format-usdc (shared/abs-num (:delta-notional-usd row))))]
+             [:td {:class ["text-[0.75rem]"]} (state-cell :skipped row)]]]))]])))
+
 (defn order-table
   [{:keys [order-filter] :as model} rows]
   (let [active-filter (or order-filter :all)
-        any-visible? (some #(row-visible? active-filter (row-display-state model %)) rows)]
+        order-rows (remove #(= :skipped (row-display-state model %)) rows)
+        any-visible? (some #(row-visible? active-filter (row-display-state model %)) order-rows)
+        venue (venue-note model rows)]
     [:section {:class ["flex" "flex-col" "min-h-0" "xl:border-r" "border-base-300"]
                :data-role "portfolio-optimizer-execution-order-list"}
      [:div {:class ["border-b" "border-base-300" "px-4" "py-3"]}
       [:div {:class ["flex" "flex-wrap" "items-center" "justify-between" "gap-2"]}
-       (shared/eyebrow "Order list")
+       ;; Pre-run the headline counts what will actually send (ready rows); post-run the
+       ;; phase bands own the outcome counts, so the list header stays neutral.
+       (shared/eyebrow (if (contains? #{:staged :armed} (:phase model))
+                         (let [n (count (filter #(= :ready (:status %)) order-rows))]
+                           (str "Order list — " n " to send"))
+                         "Order list"))
        (order-filter-toggle active-filter)]
       [:p {:class ["mt-1" "text-xs" "text-trading-muted"]}
-       (if (editable? model)
-         "Click any order to change its type. Blocked rows stay visible with their reason."
-         "Order types are locked once execution is armed.")]]
+       (str (when venue (str venue " "))
+            (if (editable? model)
+              "Click any order to change its type. Blocked rows stay visible with their reason."
+              "Order types are locked once execution is armed."))]]
      (cond
        (not (seq rows))
        [:p {:class ["px-4" "py-4" "text-sm" "text-trading-muted"]}
@@ -386,7 +476,6 @@
             [:th {:class ["w-10"]} "#"]
             [:th "Asset"]
             [:th "Side"]
-            [:th "Venue"]
             [:th "Type"]
             [:th {:class ["right"]} "Qty"]
             [:th {:class ["right"]} "Notional"]
@@ -395,8 +484,10 @@
          ;; index over the full row set so the # column keeps stable order numbers
          ;; even when a filter hides rows.
          (mapcat (fn [index row]
-                   (if (row-visible? active-filter (row-display-state model row))
+                   (if (and (not= :skipped (row-display-state model row))
+                            (row-visible? active-filter (row-display-state model row)))
                      (order-row model index row)
                      []))
                  (range)
-                 rows))])]))
+                 rows))])
+     (skipped-section model rows)]))

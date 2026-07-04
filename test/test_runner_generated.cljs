@@ -224,6 +224,7 @@
             [hyperopen.portfolio.optimizer.application.engine-sparse-caps-test]
             [hyperopen.portfolio.optimizer.application.engine-test]
             [hyperopen.portfolio.optimizer.application.engine-warning-labels-test]
+            [hyperopen.portfolio.optimizer.application.execution-order-type-test]
             [hyperopen.portfolio.optimizer.application.execution-test]
             [hyperopen.portfolio.optimizer.application.execution-workflow-test]
             [hyperopen.portfolio.optimizer.application.history-loader-api-v2-legacy-fallback-test]
@@ -546,6 +547,8 @@
             [hyperopen.views.portfolio.montecarlo.chart-test]
             [hyperopen.views.portfolio.montecarlo.controls-test]
             [hyperopen.views.portfolio.optimize.black-litterman-preview-chart-test]
+            [hyperopen.views.portfolio.optimize.execution-order-table-test]
+            [hyperopen.views.portfolio.optimize.execution-strategy-band-test]
             [hyperopen.views.portfolio.optimize.execution-tab-test]
             [hyperopen.views.portfolio.optimize.format-test]
             [hyperopen.views.portfolio.optimize.frontier-callout-test]
@@ -982,6 +985,7 @@
              'hyperopen.portfolio.optimizer.application.engine-sparse-caps-test
              'hyperopen.portfolio.optimizer.application.engine-test
              'hyperopen.portfolio.optimizer.application.engine-warning-labels-test
+             'hyperopen.portfolio.optimizer.application.execution-order-type-test
              'hyperopen.portfolio.optimizer.application.execution-test
              'hyperopen.portfolio.optimizer.application.execution-workflow-test
              'hyperopen.portfolio.optimizer.application.history-loader-api-v2-legacy-fallback-test
@@ -1304,6 +1308,8 @@
              'hyperopen.views.portfolio.montecarlo.chart-test
              'hyperopen.views.portfolio.montecarlo.controls-test
              'hyperopen.views.portfolio.optimize.black-litterman-preview-chart-test
+             'hyperopen.views.portfolio.optimize.execution-order-table-test
+             'hyperopen.views.portfolio.optimize.execution-strategy-band-test
              'hyperopen.views.portfolio.optimize.execution-tab-test
              'hyperopen.views.portfolio.optimize.format-test
              'hyperopen.views.portfolio.optimize.frontier-callout-test

@@ -1,6 +1,5 @@
 (ns hyperopen.views.portfolio.optimize.setup-objective-controls
   (:require [hyperopen.portfolio.optimizer.application.return-views :as return-views]
-            [hyperopen.portfolio.optimizer.domain.exposure-policy :as exposure-policy]
             [hyperopen.views.portfolio.optimize.setup-controls :as controls]
             [hyperopen.views.portfolio.optimize.target-sigma :as target-sigma]))
 
@@ -28,15 +27,6 @@
                           :views (get-in draft [:return-model :views])})))
     "Uses your saved views where available"))
 
-(defn- holdings-custom-constraints?
-  "True when a holdings import seeded the constraint envelope (gross floor, caps,
-  and net bias mirrored from the current book). The selected Minimum risk card
-  must disclose that, or the goal silently implies the preset's default envelope
-  while e.g. a 152% single-asset cap and a net-short floor are actually in force."
-  [draft]
-  (and (= :holdings (get-in draft [:metadata :universe-source :kind]))
-       (= :custom (exposure-policy/active-preset (:constraints draft)))))
-
 (defn objective-section
   ([draft highlighted-controls]
    (objective-section draft highlighted-controls nil))
@@ -57,24 +47,22 @@
       [:p {:class ["mt-2" "text-[0.8125rem]" "text-trading-muted"]}
        "Choose what the optimizer should prioritize."]
       [:div {:class ["mt-3" "grid" "grid-cols-1" "gap-1.5" "sm:grid-cols-2"]}
+       ;; One line per card: the recommendation for Minimum risk is carried by
+       ;; card order + default selection, not a kicker line, and the holdings-
+       ;; seeded-constraints note lives in Portfolio exposure (the section that
+       ;; owns the constraints), not here.
        (primary-goal-card
-        "Minimum risk" "Minimum variance · no return forecast needed"
-        "Recommended for first runs"
+        "Minimum risk" "Lowest volatility · no return forecast needed"
+        nil
         (= :minimum-variance objective-kind)
         "portfolio-optimizer-objective-minimum-variance"
-        [:actions/apply-portfolio-optimizer-setup-preset :conservative]
-        (when (and (= :minimum-variance objective-kind)
-                   (holdings-custom-constraints? draft))
-          [:p {:class ["mt-1.5" "text-[0.6875rem]" "text-warning"]
-               :data-role "portfolio-optimizer-preset-holdings-constraints-note"}
-           "Constraints were seeded from your holdings — review them in Portfolio exposure below."]))
+        [:actions/apply-portfolio-optimizer-setup-preset :conservative])
        (primary-goal-card
         "Maximum Sharpe" "Best risk-adjusted return · sensitive to noisy return estimates"
         (max-sharpe-kicker draft)
         (= :max-sharpe objective-kind)
         "portfolio-optimizer-objective-max-sharpe"
-        [:actions/apply-portfolio-optimizer-setup-preset :max-sharpe]
-        nil)]
+        [:actions/apply-portfolio-optimizer-setup-preset :max-sharpe])]
       [:p {:class (conj controls/eyebrow-class "mt-3")} "More goals"]
       [:div {:class ["mt-2" "grid" "grid-cols-1" "gap-1.5" "sm:grid-cols-2"]}
        (secondary-goal-card "Target volatility" "Pin σ to a fixed level, max return at that σ"
@@ -105,11 +93,11 @@
 
 (defn- primary-goal-card
   "Rich goal card for the two canonical paths (Minimum risk, Maximum Sharpe): a
-  title, a plain-language subtitle, a mono kicker line, an active badge, and an
-  optional disclosure slot (holdings-seeded-constraints note / live views count).
-  Applies the matching setup preset so the objective AND its return-model pairing
-  move together — this is what the retired top-of-page preset cards did."
-  [title subtitle kicker selected? role action extra]
+  title, a plain-language subtitle, an optional mono kicker line (live views
+  count), and an active badge. Applies the matching setup preset so the objective
+  AND its return-model pairing move together — this is what the retired
+  top-of-page preset cards did."
+  [title subtitle kicker selected? role action]
   [:button {:type "button"
             :class (cond-> ["optimizer-choice-card" "optimizer-goal-card" "optimizer-goal-card-primary"
                             "border" "border-base-300" "bg-base-100/70" "px-3" "py-2.5" "text-left"
@@ -124,10 +112,10 @@
       [:span {:class (if selected? "text-warning" "text-trading-muted")} (if selected? "◉ " "○ ")]
       title]
      [:p {:class ["mt-1.5" "text-[0.75rem]" "text-trading-muted"]} subtitle]
-     [:p {:class ["mt-1.5" "font-mono" "text-[0.625rem]" "uppercase" "tracking-[0.16em]"
-                  "text-trading-muted/70"]}
-      kicker]
-     extra]
+     (when kicker
+       [:p {:class ["mt-1.5" "font-mono" "text-[0.625rem]" "uppercase" "tracking-[0.16em]"
+                    "text-trading-muted/70"]}
+        kicker])]
     (when selected?
       [:span {:class ["border" "border-base-300" "px-1.5" "py-0.5" "font-mono"
                       "text-[0.625rem]" "uppercase" "tracking-[0.12em]" "text-trading-muted/70"]}

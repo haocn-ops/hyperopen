@@ -191,15 +191,19 @@
    [:div {:class ["mt-2"]} body]])
 
 (defn- advanced-drawer
-  "The raw gross/net min/max fields the exposure pad abstracts, kept for experts. Editing any raw
-  field writes the canonical key directly, which flips the active preset to Custom (the
-  exposure-map derives the preset from the values). Lives behind a nested disclosure so the
-  common path never sees it. Each field keeps its original data-role and appears exactly once in
-  the panel — these are the only place gross-min/gross-max/net-min/net-max are editable."
-  [constraints highlighted-controls]
+  "The raw gross/net min/max fields the exposure pad abstracts, kept for experts, plus the exact
+  'Sent to solver' echo (implementation-facing audit detail — the primary column shows the
+  user-facing readout instead). Editing any raw field writes the canonical key directly, which
+  flips the active preset to Custom (the exposure-map derives the preset from the values). Lives
+  behind a nested disclosure so the common path never sees it. Each field keeps its original
+  data-role and appears exactly once in the panel — these are the only place
+  gross-min/gross-max/net-min/net-max are editable."
+  [constraints highlighted-controls echo]
   (controls/disclosure-panel
    "portfolio-optimizer-constraints-advanced"
    (controls/disclosure-heading "Advanced solver limits" "raw min/max")
+   [:div {:class ["mt-3"]}
+    (exposure-map/solver-echo echo)]
    [:div {:class ["mt-3" "grid" "grid-cols-1" "gap-2"]}
     (constraint-row "Gross exposure min" :gross-min (:gross-min constraints)
                     "portfolio-optimizer-constraint-gross-min-input"
@@ -255,7 +259,14 @@
       [:div {:class ["mt-3" "space-y-4"]}
        [:p {:class ["text-[0.8125rem]" "leading-[1.45]" "text-trading-muted"]
             :data-role "portfolio-optimizer-constraints-description"}
-        "Set how levered and net long/short the target portfolio can be."]
+        "Set target leverage and net long/short bias."]
+       ;; A holdings import rewrites the constraint envelope from the current book
+       ;; (gross floor, caps, net bias) — disclosed HERE, in the section that owns
+       ;; the constraints, not in the goal card (the objective didn't seed them).
+       (when (= "Custom · from holdings" active-label)
+         [:p {:class ["text-[0.6875rem]" "text-warning"]
+              :data-role "portfolio-optimizer-preset-holdings-constraints-note"}
+          "Bands were seeded from your current holdings — review before running."])
        (group-block "Positioning" "gross leverage + net bias"
                     (exposure-map/exposure-map exposure-model))
        ;; Risk guards / Rebalance behavior keep each canonical control exactly once (original
@@ -283,4 +294,4 @@
                       (constraint-row "Dust threshold" :dust-usdc (:dust-usdc constraints)
                                       "portfolio-optimizer-constraint-dust-usdc-input" false
                                       :usd)])]
-       (advanced-drawer constraints highlighted-controls)]))))
+       (advanced-drawer constraints highlighted-controls (:echo exposure-model))]))))

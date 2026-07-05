@@ -15,6 +15,9 @@
     :objective-kind
     :order-type
     :reason
+    :regression-status
+    :regression-skip-reason
+    :relationship-strength
     :side
     :source
     :status
@@ -32,6 +35,14 @@
     :funding-by-instrument
     :weights-by-instrument
     :history-assumptions
+    ;; Proxy history-assumption payloads: prior/regression exposures and the
+    ;; short-overlap return series are keyed by proxy instrument-id, both on the
+    ;; request (engine-shaped assumption) and in result diagnostics.
+    :proxy-prior-weights
+    :prior-weights
+    :proxy-returns-by-id
+    :regression-beta
+    :final-beta
     :per-asset-overrides
     :per-perp-leverage-caps
     :prices-by-id

@@ -1,5 +1,6 @@
 (ns hyperopen.views.portfolio.optimize.inputs-tab
-  (:require [hyperopen.portfolio.optimizer.application.view-model :as optimizer-view-model]
+  (:require [clojure.string :as str]
+            [hyperopen.portfolio.optimizer.application.view-model :as optimizer-view-model]
             [hyperopen.views.portfolio.optimize.format :as opt-format]))
 
 (defn- audit-card
@@ -81,18 +82,20 @@
   [mode]
   (case mode
     :conservative "Conservative"
-    :proxy "Proxy"
+    :proxy "Proxy behavior"
     "--"))
 
 (defn- history-assumption-summary
-  [{:keys [mode proxy-label relationship volatility max-weight]}]
+  [{:keys [mode proxy-labels relationship-strength volatility max-weight]}]
   (case mode
     :conservative (str "conservative · " (opt-format/format-pct volatility) " vol · "
                        (opt-format/format-pct max-weight) " cap")
-    :proxy (str (or proxy-label "proxy") " proxy"
-                (when relationship (str " · " (name relationship) " relationship"))
+    :proxy (str "proxy basket "
+                (if (seq proxy-labels) (str/join ", " proxy-labels) "--")
+                (when relationship-strength
+                  (str " · " (name relationship-strength) " relationship"))
                 " · " (opt-format/format-pct volatility) " vol · "
-                (opt-format/format-pct max-weight) " cap (saved, not yet applied)")
+                (opt-format/format-pct max-weight) " cap")
     "--"))
 
 (defn- history-assumptions-audit
@@ -112,7 +115,11 @@
                    [:p {:class ["mt-0.5" "text-trading-muted"]}
                     (str "Return " (opt-format/format-pct (:expected-return row))
                          " · " (history-assumption-summary row))]])
-                history-assumption-rows)))))
+                history-assumption-rows))
+     (when (some #(= :proxy (:mode %)) history-assumption-rows)
+       [:p {:class ["mt-2" "text-[0.6875rem]" "text-trading-muted"]
+            :data-role "portfolio-optimizer-inputs-history-assumption-proxy-note"}
+        "Proxy assumptions were used to synthesize covariance for assets without reliable native history."]))))
 
 (defn- execution-audit
   [execution-assumptions]

@@ -104,6 +104,16 @@
     actions/set-portfolio-optimizer-history-assumption-max-weight-cap
     :clear-portfolio-optimizer-history-assumption
     actions/clear-portfolio-optimizer-history-assumption
+    :set-portfolio-optimizer-history-assumption-proxy-asset
+    actions/set-portfolio-optimizer-history-assumption-proxy-asset
+    :set-portfolio-optimizer-history-assumption-proxy-search
+    actions/set-portfolio-optimizer-history-assumption-proxy-search
+    :set-portfolio-optimizer-history-assumption-relationship-strength
+    actions/set-portfolio-optimizer-history-assumption-relationship-strength
+    :apply-portfolio-optimizer-history-assumption
+    actions/apply-portfolio-optimizer-history-assumption
+    :reset-portfolio-optimizer-history-assumption
+    actions/reset-portfolio-optimizer-history-assumption
     :set-portfolio-optimizer-universe-search-query
     actions/set-portfolio-optimizer-universe-search-query
     :set-portfolio-optimizer-draft-add-asset-open

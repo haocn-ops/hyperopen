@@ -106,13 +106,68 @@
         ;; worker payload and the frontend refresh) inherit it via execution-assumptions.
         (assoc :default-fee-bps (fee-bps-for-mode (:fee-mode assumptions*))))))
 
+(declare align-history universe-by-id)
+
+(defn- proxy-regression-series
+  "The short-overlap regression input for one proxy-mode asset: the asset's and
+  its proxies' return series aligned on THEIR common calendar (which is exactly
+  the asset's usable overlap window). Computed here because the engine history
+  deliberately excludes the asset (see `alignment-universe`), so the worker-side
+  synthesis cannot derive the overlap itself. Returns nil when the asset has no
+  usable overlap at all."
+  [instrument-id proxy-ids requested-universe align-inputs]
+  (let [by-id (universe-by-id requested-universe)
+        sub-universe (into []
+                           (keep by-id)
+                           (cons instrument-id proxy-ids))
+        sub-history (when (seq sub-universe)
+                      (align-history (assoc align-inputs :universe sub-universe)))
+        x-returns (get-in sub-history [:return-series-by-instrument instrument-id])]
+    (when (seq x-returns)
+      {:x-returns (vec x-returns)
+       :proxy-returns-by-id (into {}
+                                  (keep (fn [proxy-id]
+                                          (when-let [series (get-in sub-history
+                                                                    [:return-series-by-instrument
+                                                                     proxy-id])]
+                                            [proxy-id (vec series)])))
+                                  proxy-ids)
+       :observations (count x-returns)})))
+
+(defn- normalize-proxy-entry
+  "Flattens a draft proxy entry into the engine shape (proxy ids, prior weights,
+  relationship strength as top-level keys) and, when the entry is engine-backed,
+  attaches the short-overlap regression series."
+  [instrument-id entry engine-backed? requested-universe align-inputs]
+  (let [proxy-ids (history-assumptions/proxy-instrument-ids entry)]
+    (cond-> (-> entry
+                (dissoc :proxy :metadata)
+                (assoc :proxy-instrument-ids proxy-ids
+                       :proxy-prior-weights (history-assumptions/proxy-prior-weights entry)
+                       :relationship-strength (history-assumptions/relationship-strength entry)))
+      engine-backed?
+      (assoc :regression-series (proxy-regression-series instrument-id
+                                                         proxy-ids
+                                                         requested-universe
+                                                         align-inputs)))))
+
 (defn- normalize-history-assumptions
-  "Engine-shaped per-asset assumptions: the conservative draft entries are carried
-  through unchanged (the engine only consumes conservative entries; see
-  domain.history-assumptions)."
-  [assumptions]
+  "Engine-shaped per-asset assumptions: conservative draft entries are carried
+  through unchanged; proxy entries are flattened (and, when engine-backed, carry
+  their short-overlap regression series)."
+  [assumptions {:keys [proxy-engine-ids requested-universe align-inputs]}]
   (when (seq assumptions)
-    assumptions))
+    (reduce-kv (fn [acc id entry]
+                 (assoc acc id
+                        (if (history-assumptions/proxy? entry)
+                          (normalize-proxy-entry id
+                                                 entry
+                                                 (contains? proxy-engine-ids id)
+                                                 requested-universe
+                                                 align-inputs)
+                          entry)))
+               {}
+               assumptions)))
 
 (def ^:private finite-number? coercion/finite-number?)
 
@@ -154,10 +209,9 @@
   [universe]
   (set (keep :instrument-id universe)))
 
-(defn- engine-backed-assumption-ids
+(defn- conservative-engine-ids
   "Instrument-ids whose conservative assumption is complete enough to fold into the
-  optimization for this objective. Proxy assumptions are collected but not yet
-  engine-backed, so they are excluded."
+  optimization for this objective."
   [assumptions objective]
   (let [return-required? (history-assumptions/return-required-for-objective?
                           (:kind objective))]
@@ -168,10 +222,54 @@
                    id)))
          set)))
 
+(defn- structurally-complete-proxy-ids
+  "Proxy entries complete on their own terms (proxies selected, no self-proxy,
+  volatility, cap within the global max, expected return when the objective needs
+  one). These are pulled OUT of the alignment universe so their short native
+  series cannot shrink the shared estimation window; whether their proxies have
+  usable history is validated after alignment (see `validated-proxy-ids`)."
+  [assumptions objective constraints]
+  (let [return-required? (history-assumptions/return-required-for-objective?
+                          (:kind objective))
+        max-asset-weight (:max-asset-weight constraints)]
+    (->> assumptions
+         (keep (fn [[id entry]]
+                 (when (and (history-assumptions/proxy? entry)
+                            (history-assumptions/proxy-assumption-complete?
+                             entry
+                             {:self-id id
+                              :return-required? return-required?
+                              :max-asset-weight max-asset-weight}))
+                   id)))
+         set)))
+
+(defn usable-proxy-id-set
+  "Assets allowed to serve as proxies: their realized history reached the risk
+  model (aligned eligible) and they do not lean on a history assumption
+  themselves (a synthetic row cannot anchor another synthetic row)."
+  [eligible-universe assumptions]
+  (->> eligible-universe
+       (keep :instrument-id)
+       (remove #(some? (:behavior (get assumptions %))))
+       set))
+
+(defn- validated-proxy-ids
+  "The structurally complete proxy ids whose every selected proxy has usable
+  optimizer history. The rest stay out of the engine universe and readiness
+  blocks the run with per-asset guidance."
+  [candidate-ids assumptions usable-ids]
+  (->> candidate-ids
+       (filter (fn [id]
+                 (every? usable-ids
+                         (history-assumptions/proxy-instrument-ids
+                          (get assumptions id)))))
+       set))
+
 (defn- readmit-assumption-instruments
-  "Adds engine-backed conservative assets that alignment dropped (no history) back
-  into the engine universe so they reach the solver. Short-history assets are
-  already eligible and need no re-admission."
+  "Adds engine-backed assumption assets that the engine history does not cover
+  back into the engine universe so they reach the solver: conservative assets
+  that alignment dropped (no history), and proxy assets (always, since complete
+  proxy assets are excluded from alignment by design)."
   [eligible-universe requested-universe engine-backed-ids]
   (let [eligible-ids (instrument-id-set eligible-universe)
         requested-by-id (universe-by-id requested-universe)
@@ -182,8 +280,9 @@
     (into (vec eligible-universe) readmitted)))
 
 (defn- mirror-assumption-caps
-  "Mirrors each engine-backed conservative cap into the per-asset-overrides that the
-  constraint machinery already enforces, taking the tighter of any existing cap."
+  "Mirrors each engine-backed assumption cap (conservative or proxy) into the
+  per-asset-overrides that the constraint machinery already enforces, taking the
+  tighter of any existing cap."
   [constraints assumptions engine-backed-ids]
   (reduce (fn [acc id]
             (let [cap (get-in assumptions [id :max-weight])]
@@ -398,9 +497,11 @@
       :current-portfolio current-portfolio})))
 
 (def ^:private align-history-memo-capacity
-  ;; Each request aligns two universes (requested and currently held), so the
-  ;; memo must hold more than one entry to survive a single build.
-  4)
+  ;; Each request aligns the requested and currently-held universes PLUS one
+  ;; small sub-universe per engine-backed proxy assumption (the regression
+  ;; overlap), so the memo must comfortably hold a build's worth of alignments
+  ;; or constraint-drag renders would recompute them every frame.
+  16)
 
 (defonce ^:private align-history-memo
   (volatile! {}))
@@ -451,26 +552,69 @@
                     (coercion/finite-number? frontier-points-override)
                     (assoc :frontier-points frontier-points-override))
         constraints (normalize-constraints (:constraints draft*))
-        history (align-history
-                 {:universe requested-universe
-                  :history-data history-data
-                  :as-of-ms as-of-ms
-                  :stale-after-ms stale-after-ms
-                  :funding-periods-per-year funding-periods-per-year})
-        eligible-universe (:eligible-instruments history)
-        ;; Conservative history assumptions are folded into the optimization: their
-        ;; assets are re-admitted to the engine universe (no-history) or kept
-        ;; (short-history), their caps mirror into the constraint machinery, and the
-        ;; assumptions ride along for covariance synthesis in engine.context.
+        ;; History assumptions are folded into the optimization: their assets are
+        ;; re-admitted to the engine universe, their caps mirror into the constraint
+        ;; machinery, and the assumptions ride along for covariance synthesis in
+        ;; engine.context. A structurally complete PROXY asset is additionally pulled
+        ;; out of the alignment universe first: history alignment intersects every
+        ;; eligible asset's return calendar, so a 10-day asset would otherwise shrink
+        ;; the shared covariance-estimation window of the whole universe.
         draft-assumptions (:history-assumptions draft*)
-        assumption-engine-ids (engine-backed-assumption-ids draft-assumptions objective)
-        engine-universe (readmit-assumption-instruments eligible-universe
+        ;; Reference-only proxy instruments: catalog proxies picked for a thin
+        ;; asset that are NOT in the portfolio universe. Their history is aligned
+        ;; (so covariance synthesis can use them) but they are excluded from the
+        ;; allocatable engine universe below, so they never receive a weight.
+        reference-instruments (vec (:proxy-reference-instruments draft*))
+        reference-ids (set (keep :instrument-id reference-instruments))
+        ;; Metadata pool for resolving proxy instruments (universe + references),
+        ;; used by the regression sub-alignment.
+        proxy-universe (into requested-universe reference-instruments)
+        proxy-candidate-ids (structurally-complete-proxy-ids draft-assumptions
+                                                             objective
+                                                             (:constraints draft*))
+        conservative-ids (conservative-engine-ids draft-assumptions objective)
+        ;; Complete-assumption assets of EITHER behavior leave the alignment
+        ;; universe: their synthesized covariance row never uses the aligned
+        ;; series, and keeping a thin native series in the intersection would
+        ;; silently shrink every other asset's estimation window.
+        assumption-excluded-ids (into conservative-ids proxy-candidate-ids)
+        ;; Alignment = requested (minus assumption-excluded thin assets) PLUS the
+        ;; reference-only proxies, so their return series reach the risk result.
+        alignment-universe (into (if (seq assumption-excluded-ids)
+                                   (filterv #(not (contains? assumption-excluded-ids
+                                                             (:instrument-id %)))
+                                            requested-universe)
+                                   requested-universe)
+                                 reference-instruments)
+        align-inputs {:history-data history-data
+                      :as-of-ms as-of-ms
+                      :stale-after-ms stale-after-ms
+                      :funding-periods-per-year funding-periods-per-year}
+        history (align-history (assoc align-inputs :universe alignment-universe))
+        eligible-universe (:eligible-instruments history)
+        usable-proxy-ids (usable-proxy-id-set eligible-universe draft-assumptions)
+        proxy-engine-ids (validated-proxy-ids proxy-candidate-ids
+                                              draft-assumptions
+                                              usable-proxy-ids)
+        assumption-engine-ids (into conservative-ids proxy-engine-ids)
+        ;; Reference-only proxies aligned into eligible-universe, but they must
+        ;; NOT be allocatable - drop them before building the engine universe.
+        allocatable-eligible (if (seq reference-ids)
+                               (filterv #(not (contains? reference-ids
+                                                         (:instrument-id %)))
+                                        eligible-universe)
+                               eligible-universe)
+        engine-universe (readmit-assumption-instruments allocatable-eligible
                                                        requested-universe
                                                        assumption-engine-ids)
         constraints (mirror-assumption-caps constraints
                                             draft-assumptions
                                             assumption-engine-ids)
-        history-assumptions* (normalize-history-assumptions draft-assumptions)
+        history-assumptions* (normalize-history-assumptions
+                              draft-assumptions
+                              {:proxy-engine-ids proxy-engine-ids
+                               :requested-universe proxy-universe
+                               :align-inputs align-inputs})
         current-universe (current-portfolio-universe current-portfolio
                                                      requested-universe)
         current-history-data (current-history-source history-data

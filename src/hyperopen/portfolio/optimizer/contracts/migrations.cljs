@@ -91,17 +91,30 @@
   ;; Additive backfill: drafts persisted before history assumptions existed lack
   ;; the key, which the strengthened ::draft spec now requires. Default to an
   ;; empty map; no schema-version bump is needed for a purely additive key.
-  (update draft :history-assumptions #(or % {})))
+  (-> draft
+      (update :history-assumptions #(or % {}))
+      ;; Reference-only proxy instruments (catalog proxies outside the universe)
+      ;; are likewise additive: drafts written before they existed default to [].
+      (update :proxy-reference-instruments #(vec (or % [])))))
+
+(defn- legacy-proxy-entry?
+  ;; The ORIGINAL (removed) :proxy behavior mapped the asset to a single related
+  ;; asset (:proxy-instrument-id, :relationship, :implied-correlation) and was
+  ;; never engine-backed. The 2026-07 engine-backed proxy behavior stores a
+  ;; multi-proxy :proxy submap instead; only the legacy singular shape is
+  ;; rewritten to conservative.
+  [entry]
+  (and (= :proxy (:behavior entry))
+       (not (map? (:proxy entry)))))
 
 (defn- migrate-history-assumption-entry
   [entry]
-  ;; The :proxy history-assumption behavior was removed (it was collected but the
-  ;; engine never consumed it). Convert any legacy proxy entry to a conservative
-  ;; one - preserving the user's volatility/return, seeding the conservative
-  ;; correlation floor + cap, and dropping the proxy-only fields - so the
-  ;; conservative-only ::draft spec accepts it on load. Idempotent: a conservative
-  ;; entry passes through unchanged.
-  (if (= :proxy (:behavior entry))
+  ;; Convert a LEGACY proxy entry to a conservative one - preserving the user's
+  ;; volatility/return, seeding the conservative correlation floor + cap, and
+  ;; dropping the legacy proxy-only fields - so the ::draft spec accepts it on
+  ;; load. Idempotent: conservative entries and new-shape (engine-backed) proxy
+  ;; entries pass through unchanged.
+  (if (legacy-proxy-entry? entry)
     (-> entry
         (assoc :behavior :conservative
                :correlation-floor history-assumptions/conservative-correlation-floor)

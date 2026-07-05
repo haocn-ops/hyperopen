@@ -169,11 +169,19 @@
    :save-scenario-index! *save-scenario-index!*
    :dispatch! *dispatch!*})
 
+(declare ^:dynamic *refresh-account-open-orders!*)
+
 (defn- execution-env
   []
   {:now-ms *now-ms*
    :submit-order! *submit-order!*
    :dispatch! *dispatch!*
+   ;; Refreshes base + per-dex frontendOpenOrders after a run leaves orders resting:
+   ;; the streams never cover named-dex rows, so without this a resting HIP-3 order
+   ;; is invisible to the merged book (not amendable, no on-book reconcile signal).
+   ;; Captured by value (like :submit-order!) so test rebindings survive the async
+   ;; continuation that eventually invokes it.
+   :refresh-open-orders! *refresh-account-open-orders!*
    :load-scenario! *load-scenario!*
    :load-scenario-index! *load-scenario-index!*
    :save-scenario! *save-scenario!*

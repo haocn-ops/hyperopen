@@ -1,5 +1,6 @@
 (ns hyperopen.portfolio.optimizer.contracts.migrations
-  (:require [hyperopen.portfolio.optimizer.coercion :as coercion]
+  (:require [clojure.string :as str]
+            [hyperopen.portfolio.optimizer.coercion :as coercion]
             [hyperopen.portfolio.optimizer.domain.history-assumptions :as history-assumptions]))
 
 (def draft-schema-version 1)
@@ -40,10 +41,49 @@
                               :long)))
     instrument))
 
+(defn canonical-doubled-dex-id
+  "Collapses a doubled-dex instrument id (\"perp:xyz:xyz:ORCL\") to its canonical
+  form (\"perp:xyz:ORCL\"). The per-dex clearinghouse feed reports coins ALREADY
+  dex-namespaced, and the holdings snapshot used to re-prefix them — ids in that
+  doubled shape leaked into persisted drafts (universe entries, history-assumption
+  keys) and scenario configs, where they match neither the market catalog key nor
+  the live holdings id, so current-position joins silently miss. Any other value
+  passes through unchanged; idempotent."
+  [id]
+  (if (string? id)
+    (let [parts (str/split id #":")]
+      (if (and (<= 4 (count parts))
+               (contains? #{"perp" "spot"} (first parts))
+               (= (nth parts 1) (nth parts 2)))
+        (str/join ":" (into [(first parts) (second parts)] (drop 3 parts)))
+        id))
+    id))
+
+(defn- canonicalize-universe-instrument-ids
+  "Rewrites doubled-dex :instrument-id values on universe entries and drops the
+  duplicates a rewrite may create (first entry wins — when a canonical entry
+  already coexists with its doubled twin, the established one is kept)."
+  [universe]
+  (let [rewritten (mapv (fn [instrument]
+                          (if (map? instrument)
+                            (update instrument :instrument-id canonical-doubled-dex-id)
+                            instrument))
+                        universe)]
+    (:out (reduce (fn [{:keys [seen out] :as acc} instrument]
+                    (let [id (when (map? instrument) (:instrument-id instrument))]
+                      (if (and (string? id) (contains? seen id))
+                        acc
+                        {:seen (cond-> seen (string? id) (conj id))
+                         :out (conj out instrument)})))
+                  {:seen #{} :out []}
+                  rewritten))))
+
 (defn- migrate-draft-universe
   [draft]
   (if (vector? (:universe draft))
-    (update draft :universe #(mapv migrate-universe-instrument %))
+    (update draft :universe
+            #(canonicalize-universe-instrument-ids
+              (mapv migrate-universe-instrument %)))
     draft))
 
 (defn- migrate-draft-history-assumptions
@@ -82,6 +122,61 @@
                          by-id)))
     draft))
 
+(defn- canonicalize-id-vector
+  [ids]
+  (if (vector? ids)
+    (vec (distinct (map canonical-doubled-dex-id ids)))
+    ids))
+
+(defn- canonicalize-id-keyed-map
+  "Rewrites doubled-dex keys of an id-keyed map; when a rewrite collides with an
+  existing canonical key, the entry already under the canonical key wins."
+  [by-id]
+  (if (map? by-id)
+    (reduce-kv (fn [acc id entry]
+                 (let [id* (canonical-doubled-dex-id id)]
+                   (if (contains? acc id*)
+                     acc
+                     (assoc acc id* entry))))
+               {}
+               by-id)
+    by-id))
+
+(def ^:private constraints-id-vector-keys
+  [:allowlist :blocklist :held-locks :held-position-locks])
+
+(def ^:private constraints-id-map-keys
+  [:asset-overrides :per-asset-overrides :perp-leverage :per-perp-leverage-caps])
+
+(defn- migrate-draft-doubled-dex-ids
+  "Persisted drafts written while the holdings snapshot doubled the dex prefix
+  carry ids like \"perp:xyz:xyz:ORCL\" on every id-bearing draft surface —
+  universe entries (handled in migrate-draft-universe), history-assumption keys,
+  and the constraints' id vectors/maps (held-locks were seeded straight from the
+  doubled holdings ids). Canonicalize them all so the draft joins live holdings
+  and the market catalog again. Idempotent; no schema-version bump needed."
+  [draft]
+  (cond-> draft
+    (map? (:history-assumptions draft))
+    (update :history-assumptions canonicalize-id-keyed-map)
+
+    (map? (:constraints draft))
+    (update :constraints
+            (fn [constraints]
+              (as-> constraints c
+                (reduce (fn [acc k]
+                          (if (contains? acc k)
+                            (update acc k canonicalize-id-vector)
+                            acc))
+                        c
+                        constraints-id-vector-keys)
+                (reduce (fn [acc k]
+                          (if (contains? acc k)
+                            (update acc k canonicalize-id-keyed-map)
+                            acc))
+                        c
+                        constraints-id-map-keys))))))
+
 (defn migrate-draft
   [draft]
   (let [draft* (or draft {})
@@ -91,6 +186,7 @@
             migrate-draft-universe
             migrate-draft-history-assumptions
             migrate-draft-history-assumption-behaviors
+            migrate-draft-doubled-dex-ids
             (assoc :schema-version draft-schema-version))
       (throw (ex-info "Unsupported optimizer draft schema version."
                       {:contract :optimizer/draft

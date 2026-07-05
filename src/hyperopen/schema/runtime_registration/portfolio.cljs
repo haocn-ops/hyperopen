@@ -212,6 +212,7 @@
 	   [:actions/toggle-portfolio-optimizer-execution-row :toggle-portfolio-optimizer-execution-row]
 	   [:actions/set-portfolio-optimizer-execution-row-param :set-portfolio-optimizer-execution-row-param]
 	   [:actions/confirm-portfolio-optimizer-execution :confirm-portfolio-optimizer-execution]
+	   [:actions/amend-portfolio-optimizer-execution-order :amend-portfolio-optimizer-execution-order]
 	   [:actions/resume-portfolio-optimizer-execution :resume-portfolio-optimizer-execution]
 	   [:actions/revert-portfolio-optimizer-execution-filled :revert-portfolio-optimizer-execution-filled]
 	   [:actions/restage-portfolio-optimizer-execution-smaller :restage-portfolio-optimizer-execution-smaller]

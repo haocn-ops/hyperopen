@@ -225,6 +225,8 @@
             [hyperopen.portfolio.optimizer.application.engine-sparse-caps-test]
             [hyperopen.portfolio.optimizer.application.engine-test]
             [hyperopen.portfolio.optimizer.application.engine-warning-labels-test]
+            [hyperopen.portfolio.optimizer.application.execution-amend-test]
+            [hyperopen.portfolio.optimizer.application.execution-amend-view-model-test]
             [hyperopen.portfolio.optimizer.application.execution-carryover-test]
             [hyperopen.portfolio.optimizer.application.execution-cloid-test]
             [hyperopen.portfolio.optimizer.application.execution-order-type-test]
@@ -293,6 +295,7 @@
             [hyperopen.portfolio.optimizer.draft-model-actions-test]
             [hyperopen.portfolio.optimizer.draft-persistence-actions-test]
             [hyperopen.portfolio.optimizer.execution-actions-test]
+            [hyperopen.portfolio.optimizer.execution-amend-actions-test]
             [hyperopen.portfolio.optimizer.execution-carryover-actions-test]
             [hyperopen.portfolio.optimizer.execution-overlap-actions-test]
             [hyperopen.portfolio.optimizer.exposure-actions-test]
@@ -311,6 +314,7 @@
             [hyperopen.portfolio.optimizer.infrastructure.solver-adapter-parity-test]
             [hyperopen.portfolio.optimizer.infrastructure.solver-adapter-test]
             [hyperopen.portfolio.optimizer.infrastructure.wire-test]
+            [hyperopen.portfolio.optimizer.infrastructure.working-order-refresh-test]
             [hyperopen.portfolio.optimizer.instrument-keyed-codec-test]
             [hyperopen.portfolio.optimizer.query-state-test]
             [hyperopen.portfolio.optimizer.refinement-actions-test]
@@ -553,6 +557,7 @@
             [hyperopen.views.portfolio.montecarlo.chart-test]
             [hyperopen.views.portfolio.montecarlo.controls-test]
             [hyperopen.views.portfolio.optimize.black-litterman-preview-chart-test]
+            [hyperopen.views.portfolio.optimize.execution-amend-view-test]
             [hyperopen.views.portfolio.optimize.execution-order-table-test]
             [hyperopen.views.portfolio.optimize.execution-strategy-band-test]
             [hyperopen.views.portfolio.optimize.execution-tab-test]
@@ -992,6 +997,8 @@
              'hyperopen.portfolio.optimizer.application.engine-sparse-caps-test
              'hyperopen.portfolio.optimizer.application.engine-test
              'hyperopen.portfolio.optimizer.application.engine-warning-labels-test
+             'hyperopen.portfolio.optimizer.application.execution-amend-test
+             'hyperopen.portfolio.optimizer.application.execution-amend-view-model-test
              'hyperopen.portfolio.optimizer.application.execution-carryover-test
              'hyperopen.portfolio.optimizer.application.execution-cloid-test
              'hyperopen.portfolio.optimizer.application.execution-order-type-test
@@ -1060,6 +1067,7 @@
              'hyperopen.portfolio.optimizer.draft-model-actions-test
              'hyperopen.portfolio.optimizer.draft-persistence-actions-test
              'hyperopen.portfolio.optimizer.execution-actions-test
+             'hyperopen.portfolio.optimizer.execution-amend-actions-test
              'hyperopen.portfolio.optimizer.execution-carryover-actions-test
              'hyperopen.portfolio.optimizer.execution-overlap-actions-test
              'hyperopen.portfolio.optimizer.exposure-actions-test
@@ -1078,6 +1086,7 @@
              'hyperopen.portfolio.optimizer.infrastructure.solver-adapter-parity-test
              'hyperopen.portfolio.optimizer.infrastructure.solver-adapter-test
              'hyperopen.portfolio.optimizer.infrastructure.wire-test
+             'hyperopen.portfolio.optimizer.infrastructure.working-order-refresh-test
              'hyperopen.portfolio.optimizer.instrument-keyed-codec-test
              'hyperopen.portfolio.optimizer.query-state-test
              'hyperopen.portfolio.optimizer.refinement-actions-test
@@ -1320,6 +1329,7 @@
              'hyperopen.views.portfolio.montecarlo.chart-test
              'hyperopen.views.portfolio.montecarlo.controls-test
              'hyperopen.views.portfolio.optimize.black-litterman-preview-chart-test
+             'hyperopen.views.portfolio.optimize.execution-amend-view-test
              'hyperopen.views.portfolio.optimize.execution-order-table-test
              'hyperopen.views.portfolio.optimize.execution-strategy-band-test
              'hyperopen.views.portfolio.optimize.execution-tab-test

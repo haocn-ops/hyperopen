@@ -216,6 +216,9 @@
 (def confirm-portfolio-optimizer-execution
   execution/confirm-portfolio-optimizer-execution)
 
+(def amend-portfolio-optimizer-execution-order
+  execution/amend-portfolio-optimizer-execution-order)
+
 (def resume-portfolio-optimizer-execution
   execution/resume-portfolio-optimizer-execution)
 

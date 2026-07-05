@@ -343,15 +343,25 @@
       (str label ": source refresh failed; cached optimizer history may be stale.")
 
       :history-assumption-required
-      (str label " needs a history assumption. Add a conservative assumption, or remove the asset.")
+      (str label " needs a history assumption. Choose proxy behavior or a conservative assumption.")
 
       :history-assumption-incomplete
-      (str label
-           (case (:missing warning)
-             :volatility " needs an expected annual volatility."
-             :expected-return " needs an expected annual return for this objective."
-             :max-weight " needs a max weight cap."
-             " needs more history-assumption details."))
+      (case (:missing warning)
+        :volatility (str label " needs an expected annual volatility.")
+        :expected-return (str label " needs an expected annual return for this objective.")
+        :max-weight (str label " needs a max weight cap.")
+        :max-weight-exceeds-global
+        (str label " max weight cap cannot exceed the global max asset weight.")
+        :proxy-instruments
+        (str label " is set to proxy behavior but no proxy assets are selected.")
+        :self-proxy
+        (str label " cannot use itself as a proxy.")
+        :proxy-history
+        (let [proxy-labels (->> (:proxy-instrument-ids warning)
+                                (map #(warning-asset-label request {:instrument-id %}))
+                                (str/join ", "))]
+          (str label " proxy asset " proxy-labels " has no usable optimizer history."))
+        (str label " needs more history-assumption details."))
 
       (or (some-> (:code warning) name)
           "Optimizer warning."))))
@@ -363,31 +373,52 @@
         warnings))
 
 (defn- first-missing-assumption-field
-  [entry return-required?]
-  (cond
-    (not (positive-number? (:volatility entry)))
-    :volatility
+  [entry return-required? ctx]
+  (if (history-assumptions/proxy? entry)
+    (history-assumptions/first-missing-proxy-field
+     entry
+     (assoc ctx :return-required? return-required?))
+    (cond
+      (not (positive-number? (:volatility entry)))
+      :volatility
 
-    (and return-required? (not (coercion/finite-number? (:expected-return entry))))
-    :expected-return
+      (and return-required? (not (coercion/finite-number? (:expected-return entry))))
+      :expected-return
 
-    (not (positive-number? (:max-weight entry)))
-    :max-weight
+      (not (positive-number? (:max-weight entry)))
+      :max-weight
 
-    :else nil))
+      :else nil)))
 
 (defn- history-assumption-warning
-  [entry return-required? instrument-id]
-  ;; A conservative assumption is chosen but required fields are still missing.
-  {:code :history-assumption-incomplete
-   :instrument-id instrument-id
-   :behavior (:behavior entry)
-   :missing (first-missing-assumption-field entry return-required?)})
+  [entry return-required? instrument-id ctx]
+  ;; An assumption behavior is chosen but a required detail is still missing.
+  (let [missing (first-missing-assumption-field entry
+                                                return-required?
+                                                (assoc ctx :self-id instrument-id))]
+    (cond-> {:code :history-assumption-incomplete
+             :instrument-id instrument-id
+             :behavior (:behavior entry)
+             :missing missing}
+      (= :proxy-history missing)
+      (assoc :proxy-instrument-ids
+             (history-assumptions/unusable-proxy-ids entry
+                                                     (:usable-proxy-ids ctx))))))
+
+(defn- assumption-validation-ctx
+  "Validation context shared by the proxy completeness checks: which assets can
+  serve as proxies (aligned realized history, no assumption of their own) and the
+  global cap a proxy cap must not exceed."
+  [request draft]
+  {:usable-proxy-ids (request-builder/usable-proxy-id-set
+                      (get-in request [:history :eligible-instruments])
+                      (:history-assumptions draft))
+   :max-asset-weight (get-in request [:constraints :max-asset-weight])})
 
 (defn- history-assumption-warnings
   "Honest guidance for dropped assets the user has started configuring. Assets with
   no assumption draft are left to the existing incomplete-history path."
-  [requested-universe request draft]
+  [requested-universe request draft ctx]
   (let [aligned-ids (instrument-ids (:universe request))
         return-required? (history-assumptions/return-required-for-objective?
                           (get-in request [:objective :kind]))
@@ -399,8 +430,62 @@
                    (when (and id
                               (not (contains? aligned-ids id))
                               (some? (:behavior entry)))
-                     (history-assumption-warning entry return-required? id)))))
+                     (history-assumption-warning entry return-required? id ctx)))))
          vec)))
+
+(defn- native-observations-by-id
+  ;; Native price-row counts per instrument, from the aligned history's raw
+  ;; series (present for every asset whose history reached alignment).
+  [request]
+  (into {}
+        (map (fn [[id rows]] [id (count rows)]))
+        (get-in request [:history :raw-price-series-by-instrument])))
+
+(defn- short-history-assumption-warnings
+  "Assets whose native history is too thin to defensibly estimate covariance
+  (fewer than `assumption-required-max-observations` daily rows) block the run
+  until they carry a complete history assumption - but only when the universe
+  holds at least one asset with real (>= short-history threshold) history to
+  borrow from; in an all-young universe the long-standing thin-history behavior
+  stands. Complete assumptions (either behavior) silence the warning."
+  [requested-universe request draft ctx]
+  (let [obs-by-id (native-observations-by-id request)
+        max-obs (reduce max 0 (vals obs-by-id))
+        return-required? (history-assumptions/return-required-for-objective?
+                          (get-in request [:objective :kind]))
+        assumptions (:history-assumptions draft)]
+    (if (< max-obs history-assumptions/short-history-min-observations)
+      []
+      (->> requested-universe
+           (keep (fn [instrument]
+                   (let [id (:instrument-id instrument)
+                         obs (get obs-by-id id)
+                         entry (get assumptions id)]
+                     (when (and id
+                                obs
+                                (< obs history-assumptions/assumption-required-max-observations)
+                                (not (history-assumptions/assumption-complete?
+                                      entry
+                                      return-required?
+                                      (assoc ctx :self-id id))))
+                       (if (some? (:behavior entry))
+                         (history-assumption-warning entry return-required? id ctx)
+                         {:code :history-assumption-required
+                          :instrument-id id
+                          :observations obs})))))
+           vec))))
+
+(defn- assumption-readiness-warnings
+  "All assumption-driven blocking warnings, one per asset (the dropped-asset
+  guidance wins when an asset would qualify for both)."
+  [requested-universe request draft]
+  (let [ctx (assumption-validation-ctx request draft)
+        dropped (history-assumption-warnings requested-universe request draft ctx)
+        thin (short-history-assumption-warnings requested-universe request draft ctx)
+        seen (set (map :instrument-id dropped))]
+    (into dropped
+          (remove #(contains? seen (:instrument-id %)))
+          thin)))
 
 (defn- blocking-history-warnings
   [requested-universe request]
@@ -528,9 +613,9 @@
             request (cond-> request
                       (seq risk-blocking-warnings)
                       (update :warnings into risk-blocking-warnings))
-            assumption-warnings (history-assumption-warnings requested-universe
-                                                            request
-                                                            draft)
+            assumption-warnings (assumption-readiness-warnings requested-universe
+                                                              request
+                                                              draft)
             request (cond-> request
                       (seq assumption-warnings)
                       (update :warnings into assumption-warnings))

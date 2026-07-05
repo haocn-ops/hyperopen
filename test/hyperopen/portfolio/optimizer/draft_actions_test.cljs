@@ -660,15 +660,91 @@
          (actions/set-portfolio-optimizer-history-assumption-mode
           (ha-state {}) "perp:NEW" :conservative))
       "Choosing the conservative behavior on a fresh asset seeds editable anchors and saves the whole map.")
-  (is (= [] (actions/set-portfolio-optimizer-history-assumption-mode
-             (ha-state {}) "perp:NEW" :proxy))
-      "The removed :proxy behavior is a no-op.")
+  (is (= [[:effects/save-many
+           [[history-assumptions-path
+             {"perp:NEW" {:behavior :proxy
+                          :expected-return 0.0
+                          :volatility 0.8
+                          :max-weight 0.05
+                          :proxy {:instrument-ids []
+                                  :relationship-strength :medium
+                                  :prior-weights nil}}}]
+            [dirty-path true]]]]
+         (actions/set-portfolio-optimizer-history-assumption-mode
+          (ha-state {}) "perp:NEW" :proxy))
+      "Choosing proxy behavior seeds the multi-proxy defaults.")
   (is (= [] (actions/set-portfolio-optimizer-history-assumption-mode
              (ha-state {}) "perp:NEW" :bogus))
       "An unknown mode is a no-op.")
   (is (= [] (actions/set-portfolio-optimizer-history-assumption-mode
              (ha-state {}) " " :conservative))
       "A blank instrument-id is a no-op."))
+
+(def ^:private proxy-entry-fixture
+  {:behavior :proxy
+   :expected-return 0.0
+   :volatility 0.8
+   :max-weight 0.05
+   :proxy {:instrument-ids ["perp:BTC"]
+           :relationship-strength :medium
+           :prior-weights nil}})
+
+(deftest set-history-assumption-proxy-asset-toggles-membership-test
+  (let [with-proxy (ha-state {"perp:NEW" proxy-entry-fixture})]
+    (is (= ["perp:BTC" "perp:ETH"]
+           (get-in (actions/set-portfolio-optimizer-history-assumption-proxy-asset
+                    with-proxy "perp:NEW" "perp:ETH" true)
+                   [0 1 0 1 "perp:NEW" :proxy :instrument-ids]))
+        "Enabling adds the proxy id.")
+    (is (= []
+           (get-in (actions/set-portfolio-optimizer-history-assumption-proxy-asset
+                    with-proxy "perp:NEW" "perp:BTC" false)
+                   [0 1 0 1 "perp:NEW" :proxy :instrument-ids]))
+        "Disabling removes it.")
+    (is (= [] (actions/set-portfolio-optimizer-history-assumption-proxy-asset
+               with-proxy "perp:NEW" "perp:NEW" true))
+        "An asset can never proxy itself.")
+    (is (= [] (actions/set-portfolio-optimizer-history-assumption-proxy-asset
+               (ha-state {"perp:NEW" {:behavior :conservative
+                                      :correlation-floor 0.75}})
+               "perp:NEW" "perp:BTC" true))
+        "Proxy toggles only apply to proxy-mode entries.")))
+
+(deftest set-history-assumption-relationship-strength-test
+  (let [with-proxy (ha-state {"perp:NEW" proxy-entry-fixture})]
+    (is (= :high
+           (get-in (actions/set-portfolio-optimizer-history-assumption-relationship-strength
+                    with-proxy "perp:NEW" :high)
+                   [0 1 0 1 "perp:NEW" :proxy :relationship-strength])))
+    (is (= [] (actions/set-portfolio-optimizer-history-assumption-relationship-strength
+               with-proxy "perp:NEW" :extreme))
+        "Unknown strengths are a no-op.")))
+
+(deftest apply-and-reset-history-assumption-test
+  (let [with-proxy (ha-state {"perp:NEW" proxy-entry-fixture})
+        applied (actions/apply-portfolio-optimizer-history-assumption
+                 with-proxy "perp:NEW")]
+    (is (= {:source :user :acknowledged? true}
+           (get-in applied [0 1 0 1 "perp:NEW" :metadata]))
+        "Apply acknowledges the configuration (presentation only).")
+    (is (= [] (actions/apply-portfolio-optimizer-history-assumption
+               with-proxy "perp:GONE")))
+    (let [edited (ha-state {"perp:NEW" (assoc proxy-entry-fixture
+                                              :volatility 1.2
+                                              :metadata {:source :user
+                                                         :acknowledged? true})})
+          reset (actions/reset-portfolio-optimizer-history-assumption
+                 edited "perp:NEW")]
+      (is (= (assoc-in proxy-entry-fixture [:proxy :instrument-ids] [])
+             (get-in reset [0 1 0 1 "perp:NEW"]))
+          "Reset re-seeds the behavior's defaults (fresh proxy list, no ack)."))
+    (let [vol-edit (actions/set-portfolio-optimizer-history-assumption-expected-volatility
+                    (ha-state {"perp:NEW" (assoc proxy-entry-fixture
+                                                 :metadata {:source :user
+                                                            :acknowledged? true})})
+                    "perp:NEW" "90")]
+      (is (nil? (get-in vol-edit [0 1 0 1 "perp:NEW" :metadata :acknowledged?]))
+          "Editing a field reopens the acknowledgment."))))
 
 (deftest set-history-assumption-mode-reselect-is-a-no-op-test
   (let [filled (ha-state {"perp:NEW" {:behavior :conservative

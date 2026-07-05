@@ -285,6 +285,7 @@
             [hyperopen.portfolio.optimizer.domain.exposure-policy-test]
             [hyperopen.portfolio.optimizer.domain.frontier-overlays-test]
             [hyperopen.portfolio.optimizer.domain.frontier-test]
+            [hyperopen.portfolio.optimizer.domain.history-assumption-proxy-test]
             [hyperopen.portfolio.optimizer.domain.history-assumptions-test]
             [hyperopen.portfolio.optimizer.domain.objectives-test]
             [hyperopen.portfolio.optimizer.domain.rebalance-test]
@@ -1057,6 +1058,7 @@
              'hyperopen.portfolio.optimizer.domain.exposure-policy-test
              'hyperopen.portfolio.optimizer.domain.frontier-overlays-test
              'hyperopen.portfolio.optimizer.domain.frontier-test
+             'hyperopen.portfolio.optimizer.domain.history-assumption-proxy-test
              'hyperopen.portfolio.optimizer.domain.history-assumptions-test
              'hyperopen.portfolio.optimizer.domain.objectives-test
              'hyperopen.portfolio.optimizer.domain.rebalance-test

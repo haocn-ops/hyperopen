@@ -570,6 +570,193 @@
       (is (= :ready (:status supplied))
           "With the expected return supplied, the return-seeking run is allowed."))))
 
+;; --- Proxy history assumptions -------------------------------------------------
+
+(def ^:private complete-proxy-assumption
+  {:behavior :proxy
+   :expected-return 0.0
+   :volatility 0.8
+   :max-weight 0.05
+   :proxy {:instrument-ids ["perp:BTC"]
+           :relationship-strength :medium
+           :prior-weights nil}})
+
+(deftest readiness-allows-complete-proxy-history-assumption-test
+  (let [readiness (setup-readiness/build-readiness
+                   (assumptions-state complete-proxy-assumption
+                                      {:kind :minimum-variance}))
+        request (:request readiness)]
+    (is (= :ready (:status readiness)))
+    (is (true? (:runnable? readiness)))
+    (is (contains? (set (map :instrument-id (:universe request))) "perp:ETH")
+        "A complete proxy assumption re-admits the asset to the engine universe.")
+    (is (= ["perp:BTC"]
+           (get-in request [:history-assumptions "perp:ETH" :proxy-instrument-ids]))
+        "The engine request carries the flattened proxy assumption.")
+    (is (= 0.05
+           (get-in request [:constraints :per-asset-overrides "perp:ETH" :max-weight]))
+        "The proxy cap mirrors into the per-asset overrides.")))
+
+(defn- proxy-blocking-warning
+  [assumption objective]
+  (let [readiness (setup-readiness/build-readiness
+                   (assumptions-state assumption objective))]
+    {:readiness readiness
+     :warning (first (filter #(= "perp:ETH" (:instrument-id %))
+                             (:blocking-warnings readiness)))}))
+
+(deftest readiness-blocks-proxy-without-proxies-test
+  (let [{:keys [readiness warning]}
+        (proxy-blocking-warning (assoc-in complete-proxy-assumption
+                                          [:proxy :instrument-ids] [])
+                                {:kind :minimum-variance})]
+    (is (= :missing-history-assumptions (:reason readiness)))
+    (is (= :proxy-instruments (:missing warning)))
+    (is (= "ETH is set to proxy behavior but no proxy assets are selected."
+           (:message warning)))))
+
+(deftest readiness-blocks-proxy-self-reference-test
+  (let [{:keys [readiness warning]}
+        (proxy-blocking-warning (assoc-in complete-proxy-assumption
+                                          [:proxy :instrument-ids]
+                                          ["perp:BTC" "perp:ETH"])
+                                {:kind :minimum-variance})]
+    (is (= :blocked (:status readiness)))
+    (is (= :self-proxy (:missing warning)))
+    (is (= "ETH cannot use itself as a proxy." (:message warning)))))
+
+(deftest readiness-blocks-proxy-without-usable-history-test
+  (let [{:keys [readiness warning]}
+        (proxy-blocking-warning (assoc-in complete-proxy-assumption
+                                          [:proxy :instrument-ids]
+                                          ["perp:GONE"])
+                                {:kind :minimum-variance})]
+    (is (= :blocked (:status readiness)))
+    (is (= :proxy-history (:missing warning)))
+    (is (= ["perp:GONE"] (:proxy-instrument-ids warning)))
+    (is (= "ETH proxy asset perp:GONE has no usable optimizer history."
+           (:message warning)))))
+
+(deftest readiness-blocks-proxy-missing-volatility-test
+  (let [{:keys [readiness warning]}
+        (proxy-blocking-warning (assoc complete-proxy-assumption :volatility nil)
+                                {:kind :minimum-variance})]
+    (is (= :blocked (:status readiness)))
+    (is (= :volatility (:missing warning)))
+    (is (= "ETH needs an expected annual volatility." (:message warning)))))
+
+(deftest readiness-blocks-proxy-missing-cap-test
+  (let [{:keys [warning]}
+        (proxy-blocking-warning (assoc complete-proxy-assumption :max-weight nil)
+                                {:kind :minimum-variance})]
+    (is (= :max-weight (:missing warning)))
+    (is (= "ETH needs a max weight cap." (:message warning)))))
+
+(deftest readiness-blocks-proxy-cap-above-global-max-test
+  ;; The base fixture draft has no explicit :max-asset-weight, so give it one.
+  (let [readiness (setup-readiness/build-readiness
+                   (optimizer-state
+                    {:portfolio
+                     {:optimizer
+                      {:draft
+                       {:objective {:kind :minimum-variance}
+                        :constraints {:max-asset-weight 0.5}
+                        :history-assumptions
+                        {"perp:ETH" (assoc complete-proxy-assumption :max-weight 0.6)}}
+                       :history-data
+                       {:candle-history-by-coin
+                        {"BTC" [{:time 1000 :close "100"}
+                                {:time 2000 :close "110"}]}
+                        :funding-history-by-coin {}}}}}))
+        warning (first (filter #(= "perp:ETH" (:instrument-id %))
+                               (:blocking-warnings readiness)))]
+    (is (= :blocked (:status readiness)))
+    (is (= :max-weight-exceeds-global (:missing warning)))
+    (is (= "ETH max weight cap cannot exceed the global max asset weight."
+           (:message warning)))))
+
+(deftest readiness-requires-proxy-expected-return-only-for-return-seeking-test
+  (let [no-return (assoc complete-proxy-assumption :expected-return nil)
+        min-var (setup-readiness/build-readiness
+                 (assumptions-state no-return {:kind :minimum-variance}))
+        sharpe (proxy-blocking-warning no-return {:kind :max-sharpe})]
+    (is (= :ready (:status min-var))
+        "Minimum variance needs no expected return on a proxy assumption.")
+    (is (= :expected-return (:missing (:warning sharpe))))
+    (is (= "ETH needs an expected annual return for this objective."
+           (:message (:warning sharpe))))
+    (is (= :ready (:status (setup-readiness/build-readiness
+                            (assumptions-state complete-proxy-assumption
+                                               {:kind :max-sharpe}))))
+        "With the expected return present the return-seeking run is allowed.")))
+
+;; --- Short-history blocking (assumption-required threshold) ---------------------
+
+(def ^:private day-ms* (* 24 60 60 1000))
+
+(defn- daily-candles
+  [start-day count* base]
+  (mapv (fn [idx]
+          {:time (* (+ start-day idx) day-ms*)
+           :close (str (+ base idx))})
+        (range count*)))
+
+(defn- short-history-state
+  [{:keys [btc-days tokenx-days assumptions]}]
+  (optimizer-state
+   {:portfolio
+    {:optimizer
+     {:draft
+      {:universe [{:instrument-id "perp:BTC" :market-type :perp :coin "BTC"}
+                  {:instrument-id "perp:TOKENX" :market-type :perp :coin "TOKENX"}]
+       :objective {:kind :minimum-variance}
+       :history-assumptions (or assumptions {})}
+      :runtime {:as-of-ms (* (+ btc-days 1) day-ms*)
+                :stale-after-ms (* 10 day-ms*)
+                :funding-periods-per-year 8760}
+      :history-data
+      {:candle-history-by-coin
+       {"BTC" (daily-candles 0 btc-days 100)
+        ;; TOKENX's candles cover the LAST tokenx-days of BTC's window.
+        "TOKENX" (daily-candles (- btc-days tokenx-days) tokenx-days 10)}
+       :funding-history-by-coin {}}}}}))
+
+(deftest readiness-blocks-thin-asset-without-assumption-test
+  (let [readiness (setup-readiness/build-readiness
+                   (short-history-state {:btc-days 400 :tokenx-days 10}))
+        warning (first (filter #(= "perp:TOKENX" (:instrument-id %))
+                               (:blocking-warnings readiness)))]
+    (is (= :blocked (:status readiness)))
+    (is (= :missing-history-assumptions (:reason readiness)))
+    (is (= :history-assumption-required (:code warning)))
+    (is (= "TOKENX needs a history assumption. Choose proxy behavior or a conservative assumption."
+           (:message warning)))))
+
+(deftest readiness-keeps-all-young-universe-runnable-test
+  ;; With no long-history asset to borrow from, the long-standing thin-history
+  ;; behavior stands: the run is not blocked.
+  (let [readiness (setup-readiness/build-readiness
+                   (short-history-state {:btc-days 100 :tokenx-days 10}))]
+    (is (= :ready (:status readiness)))))
+
+(deftest readiness-unblocks-thin-asset-with-proxy-and-preserves-window-test
+  (let [readiness (setup-readiness/build-readiness
+                   (short-history-state
+                    {:btc-days 400
+                     :tokenx-days 10
+                     :assumptions {"perp:TOKENX" complete-proxy-assumption}}))
+        request (:request readiness)
+        series (get-in request [:history-assumptions "perp:TOKENX"
+                                :regression-series])]
+    (is (= :ready (:status readiness)))
+    (is (contains? (set (map :instrument-id (:universe request))) "perp:TOKENX"))
+    (is (= 399 (count (get-in request [:history :return-calendar])))
+        "BTC keeps its full estimation window - the 10-day asset no longer shrinks it.")
+    (is (= 9 (:observations series))
+        "The regression series carries the 10-day overlap (9 returns).")
+    (is (= 9 (count (:x-returns series))))
+    (is (= 9 (count (get-in series [:proxy-returns-by-id "perp:BTC"]))))))
+
 (deftest warning-code-summary-distinguishes-staleness-codes-test
   ;; Regression: both staleness codes rendered the identical "use stale cached
   ;; history" sentence, so the readiness panel showed two same-worded groups

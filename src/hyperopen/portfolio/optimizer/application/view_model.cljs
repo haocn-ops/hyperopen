@@ -112,6 +112,12 @@
   ([state draft readiness history-load-state formatters]
    (setup/history-assumption-cards state draft readiness history-load-state formatters)))
 
+(defn history-assumption-rail-model
+  ([state draft readiness history-load-state]
+   (setup/history-assumption-rail-model state draft readiness history-load-state))
+  ([state draft readiness history-load-state formatters]
+   (setup/history-assumption-rail-model state draft readiness history-load-state formatters)))
+
 (defn black-litterman-preview-model
   [readiness]
   (black-litterman/build-preview readiness))

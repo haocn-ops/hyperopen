@@ -599,6 +599,8 @@
   (common/save-draft-path-values
    [[contracts/draft-history-assumptions-path assumptions]]))
 
+(declare unacknowledged)
+
 (defn- update-history-assumption-field
   [state instrument-id field value*]
   (let [instrument-id* (common/non-blank-text instrument-id)
@@ -606,7 +608,9 @@
     (if (and instrument-id*
              (some? value*)
              (contains? assumptions instrument-id*))
-      (save-history-assumptions (assoc-in assumptions [instrument-id* field] value*))
+      (save-history-assumptions
+       (update assumptions instrument-id*
+               #(unacknowledged (assoc % field value*))))
       [])))
 
 (defn set-portfolio-optimizer-history-assumption-mode
@@ -653,4 +657,80 @@
     (if (and instrument-id*
              (contains? assumptions instrument-id*))
       (save-history-assumptions (dissoc assumptions instrument-id*))
+      [])))
+
+(defn- unacknowledged
+  ;; Editing any assumption detail withdraws the Apply acknowledgment: the
+  ;; acknowledgment refers to the values it was clicked on. Entries that never
+  ;; carried metadata stay key-for-key identical.
+  [entry]
+  (if (get-in entry [:metadata :acknowledged?])
+    (let [metadata (dissoc (:metadata entry) :acknowledged?)]
+      (if (seq metadata)
+        (assoc entry :metadata metadata)
+        (dissoc entry :metadata)))
+    entry))
+
+(defn set-portfolio-optimizer-history-assumption-proxy-asset
+  "Adds (enabled? true) or removes (enabled? false) one proxy asset on a
+  proxy-mode entry. The asset can never proxy itself."
+  [state instrument-id proxy-instrument-id enabled?]
+  (let [instrument-id* (common/non-blank-text instrument-id)
+        proxy-id* (common/non-blank-text proxy-instrument-id)
+        enabled?* (common/parse-boolean-value enabled?)
+        assumptions (history-assumptions-map state)
+        entry (get assumptions instrument-id*)]
+    (if (and instrument-id*
+             proxy-id*
+             (not= instrument-id* proxy-id*)
+             (some? enabled?*)
+             (history-assumptions/proxy? entry))
+      (save-history-assumptions
+       (assoc assumptions instrument-id*
+              (-> entry
+                  (update-in [:proxy :instrument-ids]
+                             #(common/set-membership (vec (or % []))
+                                                     proxy-id*
+                                                     enabled?*))
+                  unacknowledged)))
+      [])))
+
+(defn set-portfolio-optimizer-history-assumption-relationship-strength
+  [state instrument-id value]
+  (let [instrument-id* (common/non-blank-text instrument-id)
+        strength (common/normalize-keyword-like value)
+        assumptions (history-assumptions-map state)
+        entry (get assumptions instrument-id*)]
+    (if (and instrument-id*
+             (contains? history-assumptions/relationship-strengths strength)
+             (history-assumptions/proxy? entry))
+      (save-history-assumptions
+       (assoc assumptions instrument-id*
+              (-> entry
+                  (assoc-in [:proxy :relationship-strength] strength)
+                  unacknowledged)))
+      [])))
+
+(defn apply-portfolio-optimizer-history-assumption
+  "Acknowledges the configured assumption: collapses the card to its summary.
+  Purely presentational - run readiness never depends on acknowledgment."
+  [state instrument-id]
+  (let [instrument-id* (common/non-blank-text instrument-id)
+        assumptions (history-assumptions-map state)]
+    (if (and instrument-id*
+             (contains? assumptions instrument-id*))
+      (save-history-assumptions
+       (update assumptions instrument-id*
+               assoc :metadata {:source :user :acknowledged? true}))
+      [])))
+
+(defn reset-portfolio-optimizer-history-assumption
+  "Re-seeds the entry with its behavior's defaults, discarding edits."
+  [state instrument-id]
+  (let [instrument-id* (common/non-blank-text instrument-id)
+        assumptions (history-assumptions-map state)
+        behavior (get-in assumptions [instrument-id* :behavior])]
+    (if-let [entry (and instrument-id*
+                        (history-assumptions/default-assumption behavior))]
+      (save-history-assumptions (assoc assumptions instrument-id* entry))
       [])))

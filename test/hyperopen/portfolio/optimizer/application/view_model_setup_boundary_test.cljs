@@ -307,8 +307,9 @@
     (is (= :conservative (:mode card)))
     (is (= :incomplete (:status card)))
     (is (= "Needs assumptions" (:status-label card)))
-    (is (= [{:value :conservative :label "Use a conservative assumption"}]
-           (:mode-options card)))
+    (is (= [:proxy :conservative]
+           (mapv :value (:mode-options card)))
+        "Both behaviors are offered; proxy leads.")
     (is (= "3%" (get-in card [:max-weight :percent-label])))
     (is (nil? (get-in card [:volatility :value])))
     (is (= ["NEW needs an expected annual volatility."] (:errors card)))
@@ -317,6 +318,91 @@
            (get-in card [:actions :set-mode])))
     (is (= :actions/clear-portfolio-optimizer-history-assumption
            (get-in card [:actions :clear])))))
+
+(deftest history-assumption-cards-project-proxy-mode-test
+  (let [eth {:instrument-id "perp:ETH" :market-type :perp :coin "ETH"}
+        universe [btc-instrument eth new-perp-instrument]
+        draft {:universe universe
+               :objective {:kind :minimum-variance}
+               :constraints {:max-asset-weight 0.5}
+               :history-assumptions
+               {"perp:NEW" {:behavior :proxy
+                            :expected-return 0.0
+                            :volatility 0.8
+                            :max-weight 0.05
+                            :proxy {:instrument-ids ["perp:BTC" "perp:ETH"]
+                                    :relationship-strength :high
+                                    :prior-weights nil}}}}
+        readiness {:request {:requested-universe universe
+                             :universe [btc-instrument eth]
+                             :objective {:kind :minimum-variance}
+                             :history {:eligible-instruments [btc-instrument eth]}}
+                   :blocking-warnings []}
+        model (view-model/history-assumption-cards
+               {} draft readiness
+               {:status :succeeded
+                :request-signature {:universe universe}}
+               {:percent-label (fn [value] (str (js/Math.round (* 100 value)) "%"))})
+        card (first (:cards model))]
+    (is (= "perp:NEW" (:instrument-id card)))
+    (is (= :proxy (:mode card)))
+    (is (= :configured (:status card)) "Complete proxy entry reads Configured.")
+    (is (true? (:engine-applied? card)))
+    (is (false? (:configured? card)) "Not acknowledged yet - Apply is still offered.")
+    (is (= ["perp:BTC" "perp:ETH"] (:selected-proxy-ids card)))
+    (is (= ["perp:BTC" "perp:ETH"]
+           (mapv :instrument-id (:proxy-options card)))
+        "Options exclude the asset itself.")
+    (is (every? :usable? (:proxy-options card)))
+    (is (= :high (:relationship-strength card)))
+    (is (= [50.0 50.0] (mapv :weight-percent (:prior-basket card)))
+        "V1 prior basket is equal weight over the selected proxies.")
+    (is (= "Low" (-> (:diagnostics card) first :value))
+        "No native returns -> regression confidence previews Low.")
+    (is (some #(= "R² used for confidence, not weights" (:detail %))
+              (:diagnostics card)))
+    (is (= "Final model: proxy basket + shrinkage + specific risk + cap"
+           (:final-model-line card)))
+    (is (= :actions/set-portfolio-optimizer-history-assumption-proxy-asset
+           (get-in card [:actions :toggle-proxy-asset])))
+    (is (= :actions/apply-portfolio-optimizer-history-assumption
+           (get-in card [:actions :apply])))))
+
+(deftest history-assumption-rail-model-summarizes-configured-assets-test
+  (let [universe [btc-instrument new-perp-instrument]
+        draft {:universe universe
+               :objective {:kind :minimum-variance}
+               :history-assumptions
+               {"perp:NEW" {:behavior :proxy
+                            :expected-return 0.0
+                            :volatility 0.8
+                            :max-weight 0.05
+                            :proxy {:instrument-ids ["perp:BTC"]
+                                    :relationship-strength :medium
+                                    :prior-weights nil}}}}
+        readiness {:request {:requested-universe universe
+                             :universe [btc-instrument]
+                             :objective {:kind :minimum-variance}
+                             :history {:eligible-instruments [btc-instrument]}}
+                   :blocking-warnings []}
+        model (view-model/history-assumption-rail-model
+               {} draft readiness
+               {:status :succeeded
+                :request-signature {:universe universe}}
+               {:percent-label (fn [value] (str (js/Math.round (* 100 value)) "%"))})
+        row (first (:rows model))]
+    (is (true? (:applicable? model)))
+    (is (true? (:all-configured? model)))
+    (is (true? (:any-proxy? model)))
+    (is (= "All short-history assets have assumptions. Ready to run."
+           (:ready-message model)))
+    (is (= "Proxy assumptions are disclosed in results." (:disclosure-note model)))
+    (is (= "perp:NEW" (:instrument-id row)))
+    (is (true? (:configured? row)))
+    (is (some #(= ["Proxy assets" "BTC"] %) (:summary-pairs row)))
+    (is (some #(= ["Relationship strength" "Medium"] %) (:summary-pairs row)))
+    (is (some #(= ["Expected volatility" "80%"] %) (:summary-pairs row)))
+    (is (some #(= ["Max weight cap" "5%"] %) (:summary-pairs row)))))
 
 (deftest history-assumption-cards-hidden-while-history-still-loading-test
   ;; Regression: before history loads, readiness reports every asset as :missing
@@ -337,6 +423,39 @@
     (is (empty? (:cards loading)))
     (is (false? (:applicable? idle)))
     (is (empty? (:cards idle)))))
+
+(deftest history-assumption-cards-read-observations-from-aligned-history-test
+  ;; Production regression (live-session finding, 2026-07-05): real sessions load
+  ;; optimizer history through the api-v2 backend, so the state-side
+  ;; :candle-history-by-coin map is EMPTY and the old state-only observation
+  ;; count returned nil for every asset - thin-history detection never fired.
+  ;; The count must come from the aligned history's raw per-instrument series
+  ;; carried on the readiness request.
+  (let [soph {:instrument-id "perp:SOPH" :market-type :perp :coin "SOPH"}
+        universe [btc-instrument soph]
+        readiness {:request {:requested-universe universe
+                             :universe universe
+                             :objective {:kind :minimum-variance}
+                             :history {:eligible-instruments universe
+                                       :raw-price-series-by-instrument
+                                       {"perp:BTC" (vec (repeat 1079 {:close 1}))
+                                        "perp:SOPH" (vec (repeat 180 {:close 1}))}}}
+                   :blocking-warnings []}
+        model (view-model/history-assumption-cards
+               {} ;; NO state-side candles - the api-v2 production shape.
+               {:universe universe
+                :objective {:kind :minimum-variance}
+                :history-assumptions {}}
+               readiness
+               {:status :succeeded
+                :request-signature {:universe universe}}
+               {})
+        card (first (:cards model))]
+    (is (= ["perp:SOPH"] (mapv :instrument-id (:cards model)))
+        "The ~6-month asset is carded from the aligned history's row count alone.")
+    (is (= 180 (:observations card)))
+    (is (= [{:instrument-id "perp:BTC" :label "BTC"}] (:addable-assets model))
+        "The full-history asset remains manually addable; the carded one is not listed twice.")))
 
 (deftest history-assumption-cards-flag-short-but-present-history-test
   ;; An asset with thin-but-present history (e.g. SKR's ~75 daily candles) clears the

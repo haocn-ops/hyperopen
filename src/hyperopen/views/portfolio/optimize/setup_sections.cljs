@@ -9,6 +9,7 @@
             [hyperopen.views.portfolio.optimize.setup-model-controls :as model-controls]
             [hyperopen.views.portfolio.optimize.setup-objective-controls :as objective-controls]
             [hyperopen.views.portfolio.optimize.setup-actions :as setup-actions]
+            [hyperopen.views.portfolio.optimize.setup-history-assumptions :as setup-history-assumptions]
             [hyperopen.views.portfolio.optimize.setup-universe :as setup-universe]
             [hyperopen.views.portfolio.optimize.setup-use-my-views-workspace :as use-my-views-workspace]
             [hyperopen.views.portfolio.optimize.target-sigma :as target-sigma]))
@@ -46,8 +47,8 @@
   (2D exposure map + risk guards + rebalance behavior + advanced solver drawer), a collapsed
   views-blend explainer when the views-aware model is active, the collapsed 'why safe' note,
   and the Run bottom bar. Return views themselves are edited in the right rail."
-  [{:keys [state draft highlighted-controls readiness running? run-triggerable?
-           saving-scenario? solved-run? result-path]}]
+  [{:keys [state draft highlighted-controls readiness history-load-state running?
+           run-triggerable? saving-scenario? solved-run? result-path]}]
   (let [black-litterman? (= :black-litterman (get-in draft [:return-model :kind]))]
     (into
      [:main {:class ["optimizer-policy-pane" "space-y-4" "leading-4"]
@@ -68,6 +69,17 @@
                              (constraint-profiles/universe-key
                               (get-in state optimizer-contracts/draft-universe-path)))
         :exposure-zoom-level (get-in state optimizer-contracts/ui-exposure-zoom-level-path)})
+      ;; Proxy workflow sits right below Portfolio exposure: it gates the run, so
+      ;; it must be seen before the model/advanced sections. The slot wrapper
+      ;; ALWAYS renders (the section inside is conditional) so the later keyed
+      ;; disclosure siblings never shift position when cards appear/disappear.
+      [:div {:data-role "portfolio-optimizer-proxy-workflow-slot"
+             :replicant/key "proxy-workflow-slot"}
+       (setup-history-assumptions/history-assumptions-section
+        {:state state
+         :draft draft
+         :readiness readiness
+         :history-load-state history-load-state})]
       (model-controls/model-section draft)
       (controls/disclosure-panel
        "portfolio-optimizer-advanced-overrides-shell"

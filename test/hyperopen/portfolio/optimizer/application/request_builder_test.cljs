@@ -326,6 +326,130 @@
     (is (= 0.9 (get-in request [:history-assumptions "perp:NEW" :volatility])))
     (is (= 0.75 (get-in request [:history-assumptions "perp:NEW" :correlation-floor])))))
 
+(def ^:private proxy-day-ms
+  (* 24 60 60 1000))
+
+(defn- proxy-daily-candles
+  [start-day count* base]
+  (mapv (fn [idx]
+          {:time (* (+ start-day idx) proxy-day-ms)
+           :close (str (+ base idx))})
+        (range count*)))
+
+(defn- proxy-draft
+  [tokenx-assumption]
+  (-> (defaults/default-draft)
+      (assoc :id "draft-proxy-assumptions"
+             :universe [{:instrument-id "perp:BTC" :market-type :perp :coin "BTC"}
+                        {:instrument-id "perp:ETH" :market-type :perp :coin "ETH"}
+                        {:instrument-id "perp:TOKENX" :market-type :perp :coin "TOKENX"}]
+             :history-assumptions {"perp:TOKENX" tokenx-assumption})))
+
+(def ^:private complete-proxy-assumption
+  {:behavior :proxy
+   :expected-return 0.0
+   :volatility 0.8
+   :max-weight 0.05
+   :proxy {:instrument-ids ["perp:BTC" "perp:ETH"]
+           :relationship-strength :high
+           :prior-weights nil}})
+
+(defn- proxy-request
+  [tokenx-assumption]
+  (request-builder/build-engine-request
+   {:draft (proxy-draft tokenx-assumption)
+    :history-data {:candle-history-by-coin
+                   {"BTC" (proxy-daily-candles 0 400 100)
+                    "ETH" (proxy-daily-candles 0 400 2000)
+                    ;; TOKENX covers only the last 10 days of the window.
+                    "TOKENX" (proxy-daily-candles 390 10 10)}
+                   :funding-history-by-coin {}}
+    :market-cap-by-coin {}
+    :as-of-ms (* 401 proxy-day-ms)}))
+
+(deftest build-engine-request-engine-backs-complete-proxy-assumptions-test
+  (let [request (proxy-request complete-proxy-assumption)
+        entry (get-in request [:history-assumptions "perp:TOKENX"])]
+    (is (= ["perp:BTC" "perp:ETH" "perp:TOKENX"]
+           (mapv :instrument-id (:universe request)))
+        "The complete proxy asset is re-admitted to the engine universe.")
+    (is (= ["perp:BTC" "perp:ETH"]
+           (mapv :instrument-id (get-in request [:history :eligible-instruments])))
+        "The proxy asset is excluded from alignment so it cannot shrink the shared window.")
+    (is (= 399 (count (get-in request [:history :return-calendar])))
+        "The long-history assets keep their full estimation window.")
+    (is (= :proxy (:behavior entry)))
+    (is (= ["perp:BTC" "perp:ETH"] (:proxy-instrument-ids entry)))
+    (is (= :high (:relationship-strength entry)))
+    (is (nil? (:proxy-prior-weights entry)) "nil prior => equal weight downstream.")
+    (is (not (contains? entry :proxy)) "The nested draft submap is flattened away.")
+    (is (= 9 (get-in entry [:regression-series :observations]))
+        "The short-overlap regression series rides on the normalized entry.")
+    (is (= 9 (count (get-in entry [:regression-series :proxy-returns-by-id "perp:ETH"]))))
+    (is (= 0.05
+           (get-in request [:constraints :per-asset-overrides "perp:TOKENX" :max-weight]))
+        "The proxy cap mirrors into the constraint machinery.")))
+
+(deftest build-engine-request-keeps-tighter-existing-proxy-cap-test
+  (let [draft (-> (proxy-draft complete-proxy-assumption)
+                  (assoc-in [:constraints :asset-overrides]
+                            {"perp:TOKENX" {:max-weight 0.03}}))
+        request (request-builder/build-engine-request
+                 {:draft draft
+                  :history-data {:candle-history-by-coin
+                                 {"BTC" (proxy-daily-candles 0 400 100)
+                                  "ETH" (proxy-daily-candles 0 400 2000)
+                                  "TOKENX" (proxy-daily-candles 390 10 10)}
+                                 :funding-history-by-coin {}}
+                  :market-cap-by-coin {}
+                  :as-of-ms (* 401 proxy-day-ms)})]
+    (is (= 0.03
+           (get-in request [:constraints :per-asset-overrides "perp:TOKENX" :max-weight]))
+        "The tighter of the existing override and the proxy cap wins.")))
+
+(deftest build-engine-request-keeps-incomplete-proxy-assumptions-out-of-engine-test
+  ;; No proxies selected => not engine-backed. The thin asset stays in alignment
+  ;; like any thin asset (so the shared window shrinks to its overlap, exactly as
+  ;; before this feature) and readiness blocks the run until the entry completes.
+  (let [request (proxy-request (assoc-in complete-proxy-assumption
+                                         [:proxy :instrument-ids] []))]
+    (is (= ["perp:BTC" "perp:ETH" "perp:TOKENX"]
+           (mapv :instrument-id (get-in request [:history :eligible-instruments])))
+        "An incomplete proxy asset stays in alignment like any thin asset.")
+    (is (= 9 (count (get-in request [:history :return-calendar])))
+        "Without an engine-backed assumption the shared window still shrinks - the
+        readiness gate is what protects the run.")
+    (is (nil? (get-in request [:history-assumptions "perp:TOKENX" :regression-series]))
+        "No regression series is computed for an entry that is not engine-backed.")
+    (is (= [] (get-in request [:history-assumptions "perp:TOKENX" :proxy-instrument-ids]))
+        "The entry still normalizes to the flattened engine shape.")))
+
+(deftest build-engine-request-rejects-assumption-backed-assets-as-proxies-test
+  ;; ETH itself leans on a conservative assumption, so TOKENX cannot proxy to it:
+  ;; a synthetic row must never anchor another synthetic row.
+  (let [draft (-> (proxy-draft (assoc-in complete-proxy-assumption
+                                         [:proxy :instrument-ids] ["perp:ETH"]))
+                  (update :history-assumptions assoc
+                          "perp:ETH" {:behavior :conservative
+                                      :expected-return nil
+                                      :volatility 0.9
+                                      :max-weight 0.03
+                                      :correlation-floor 0.75}))
+        request (request-builder/build-engine-request
+                 {:draft draft
+                  :history-data {:candle-history-by-coin
+                                 {"BTC" (proxy-daily-candles 0 400 100)
+                                  "ETH" (proxy-daily-candles 0 400 2000)
+                                  "TOKENX" (proxy-daily-candles 390 10 10)}
+                                 :funding-history-by-coin {}}
+                  :market-cap-by-coin {}
+                  :as-of-ms (* 401 proxy-day-ms)})
+        universe-ids (set (map :instrument-id (:universe request)))]
+    (is (contains? universe-ids "perp:ETH")
+        "The conservative asset is engine-backed as usual.")
+    (is (not (contains? universe-ids "perp:TOKENX"))
+        "The proxy asset is not engine-backed while it points at an assumption-backed proxy.")))
+
 (deftest build-engine-request-treats-empty-allowlist-as-unbounded-test
   (let [draft (assoc (defaults/default-draft)
                      :id "draft-default-constraints"

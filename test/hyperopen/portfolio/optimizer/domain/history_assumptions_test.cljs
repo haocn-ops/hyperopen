@@ -63,6 +63,122 @@
     (is (not (contains? (:expected-returns-by-instrument augmented) "perp:NIL"))
         "An asset with no stated expected return is left to the engine's default.")))
 
+(deftest default-assumption-supports-both-behaviors-test
+  (let [conservative (history-assumptions/default-assumption :conservative)
+        proxy (history-assumptions/default-assumption :proxy)]
+    (is (= :conservative (:behavior conservative)))
+    (is (= :proxy (:behavior proxy)))
+    (is (= 0.8 (:volatility proxy)) "Both behaviors seed the risky-until-revised vol anchor.")
+    (is (= 0.05 (:max-weight proxy)))
+    (is (= [] (get-in proxy [:proxy :instrument-ids])))
+    (is (= :medium (get-in proxy [:proxy :relationship-strength])))
+    (is (nil? (get-in proxy [:proxy :prior-weights])) "Reserved: nil means equal weight.")
+    (is (nil? (history-assumptions/default-assumption :unknown)))))
+
+(def ^:private complete-proxy-entry
+  {:behavior :proxy
+   :expected-return 0.0
+   :volatility 0.8
+   :max-weight 0.05
+   :proxy {:instrument-ids ["perp:BTC" "perp:ETH"]
+           :relationship-strength :medium
+           :prior-weights nil}})
+
+(def ^:private proxy-ctx
+  {:self-id "perp:TOKENX"
+   :return-required? false
+   :usable-proxy-ids #{"perp:BTC" "perp:ETH" "perp:SOL"}
+   :max-asset-weight 0.5})
+
+(deftest proxy-completeness-classifier-test
+  (is (nil? (history-assumptions/first-missing-proxy-field complete-proxy-entry proxy-ctx)))
+  (is (history-assumptions/proxy-assumption-complete? complete-proxy-entry proxy-ctx))
+  (is (= :proxy-instruments
+         (history-assumptions/first-missing-proxy-field
+          (assoc-in complete-proxy-entry [:proxy :instrument-ids] [])
+          proxy-ctx)))
+  (is (= :self-proxy
+         (history-assumptions/first-missing-proxy-field
+          (assoc-in complete-proxy-entry [:proxy :instrument-ids]
+                    ["perp:BTC" "perp:TOKENX"])
+          proxy-ctx)))
+  (is (= :proxy-history
+         (history-assumptions/first-missing-proxy-field
+          (assoc-in complete-proxy-entry [:proxy :instrument-ids]
+                    ["perp:BTC" "perp:GONE"])
+          proxy-ctx)))
+  (is (= :volatility
+         (history-assumptions/first-missing-proxy-field
+          (assoc complete-proxy-entry :volatility nil)
+          proxy-ctx)))
+  (is (= :max-weight
+         (history-assumptions/first-missing-proxy-field
+          (assoc complete-proxy-entry :max-weight 0)
+          proxy-ctx)))
+  (is (= :max-weight-exceeds-global
+         (history-assumptions/first-missing-proxy-field
+          (assoc complete-proxy-entry :max-weight 0.6)
+          proxy-ctx)))
+  (testing "expected return is required only for return-seeking objectives"
+    (let [no-return (assoc complete-proxy-entry :expected-return nil)]
+      (is (nil? (history-assumptions/first-missing-proxy-field no-return proxy-ctx)))
+      (is (= :expected-return
+             (history-assumptions/first-missing-proxy-field
+              no-return
+              (assoc proxy-ctx :return-required? true))))))
+  (testing "unknown usable set skips the history check (view-model context)"
+    (is (nil? (history-assumptions/first-missing-proxy-field
+               (assoc-in complete-proxy-entry [:proxy :instrument-ids]
+                         ["perp:ANYTHING"])
+               (dissoc proxy-ctx :usable-proxy-ids))))))
+
+(deftest assumption-complete-dispatches-by-behavior-test
+  (is (history-assumptions/assumption-complete? complete-proxy-entry false proxy-ctx))
+  (is (not (history-assumptions/assumption-complete?
+            (assoc-in complete-proxy-entry [:proxy :instrument-ids] [])
+            false proxy-ctx)))
+  (is (not (history-assumptions/assumption-complete? {:behavior :unknown} false))))
+
+(deftest proxy-engine-inputs-flattens-universe-entries-test
+  (let [request {:universe [{:instrument-id "perp:BTC"}
+                            {:instrument-id "perp:TOKENX"}]
+                 :history-assumptions
+                 {"perp:TOKENX" {:behavior :proxy
+                                 :volatility 0.8
+                                 :max-weight 0.05
+                                 :expected-return 0.0
+                                 :proxy-instrument-ids ["perp:BTC"]
+                                 :proxy-prior-weights {"perp:BTC" 1}
+                                 :relationship-strength :high
+                                 :regression-series {:observations 10}}
+                  ;; conservative entries are not proxy inputs
+                  "perp:NEW" {:behavior :conservative :volatility 0.9
+                              :correlation-floor 0.75 :max-weight 0.03}
+                  ;; off-universe proxy entries are excluded
+                  "perp:GONE" {:behavior :proxy :volatility 0.8 :max-weight 0.05
+                               :proxy-instrument-ids ["perp:BTC"]}}}
+        inputs (history-assumptions/proxy-engine-inputs request)]
+    (is (= ["perp:TOKENX"] (keys inputs)))
+    (is (= {:behavior :proxy
+            :volatility 0.8
+            :max-weight 0.05
+            :expected-return 0.0
+            :proxy-instrument-ids ["perp:BTC"]
+            :proxy-prior-weights {"perp:BTC" 1}
+            :relationship-strength :high
+            :regression-series {:observations 10}}
+           (get inputs "perp:TOKENX")))
+    (is (= {:conservative (history-assumptions/conservative-engine-inputs request)
+            :proxy inputs}
+           (history-assumptions/history-assumption-engine-inputs request)))))
+
+(deftest augment-expected-returns-covers-proxy-assets-test
+  (let [augmented (history-assumptions/augment-expected-returns
+                   {:expected-returns-by-instrument {"perp:BTC" 0.1}}
+                   {"perp:TOKENX" {:volatility 0.8 :expected-return 0.12}})]
+    (is (= 0.12 (get-in augmented [:expected-returns-by-instrument "perp:TOKENX"]))
+        "The user's stated return is used - never a raw short-history mean.")))
+
 (deftest augment-risk-result-appends-no-history-asset-test
   (let [base {:model :diagonal-shrink
               :instrument-ids ["perp:BTC"]

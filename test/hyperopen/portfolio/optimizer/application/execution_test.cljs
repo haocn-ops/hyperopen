@@ -534,3 +534,4 @@
     (is (contains? ids "perp:BTC") "the filled leg is reversed")
     (is (not (contains? ids "perp:ETH")) "the resting (unfilled) leg is NOT reversed")
     (is (= 1 (count (:rows revert))))))
+

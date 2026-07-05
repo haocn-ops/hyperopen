@@ -123,7 +123,7 @@
     :apply-perp-dexs-error api-projections/apply-perp-dexs-error}
    opts))
 
-(defn- refresh-account-surfaces-after-order-mutation!
+(defn refresh-account-surfaces-after-order-mutation!
   [store address & [{:keys [refresh-spot?]}]]
   (account-surface-service/refresh-after-order-mutation!
    {:store store

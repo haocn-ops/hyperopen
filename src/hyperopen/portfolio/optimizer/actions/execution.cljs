@@ -2,6 +2,8 @@
   (:require [hyperopen.account.context :as account-context]
             [hyperopen.portfolio.optimizer.actions.common :as common]
             [hyperopen.portfolio.optimizer.application.execution :as execution]
+            [hyperopen.portfolio.optimizer.application.execution-carryover :as carryover]
+            [hyperopen.portfolio.optimizer.application.execution-cloid :as cloid]
             [hyperopen.portfolio.optimizer.application.rebalance-preview :as rebalance-preview]
             [hyperopen.portfolio.optimizer.application.run-identity :as run-identity]
             [hyperopen.portfolio.optimizer.application.setup-readiness :as setup-readiness]
@@ -89,6 +91,11 @@
    ;; Reset run-state so re-staging shows a clean staged surface rather than a stale
    ;; terminal status from a previous execution attempt.
    [:effects/save contracts/execution-path (optimizer-defaults/default-execution-state)]
+   ;; Refresh every open-order surface (base + per-dex frontendOpenOrders, the only
+   ;; cloid-bearing source — the generic openOrders stream never hydrates named-dex
+   ;; rows). By confirm time the run can then recognize and cancel its own resting
+   ;; orders from previous sessions, and surface untagged overlaps for review.
+   [:effects/refresh-portfolio-optimizer-open-orders]
    [:effects/save contracts/ui-results-tab-path :execution]
    [:effects/replace-shareable-route-query]])
 
@@ -138,6 +145,59 @@
   "Sets the order-list filter (:all / :working / :filled)."
   [_state order-filter]
   [[:effects/save order-filter-path (keyword order-filter)]])
+
+(def ^:private overlap-cancels-path
+  (conj contracts/execution-modal-path :overlap-cancels))
+
+(defn- dedup-by-oid
+  [entries]
+  (:out (reduce (fn [{:keys [seen out]} e]
+                  (let [k (str (:oid e))]
+                    (if (contains? seen k)
+                      {:seen seen :out out}
+                      {:seen (conj seen k) :out (conj out e)})))
+                {:seen #{} :out []}
+                entries)))
+
+(defn- attach-carryover-cancels
+  "Stamps every open order this run should cancel BEFORE releasing new orders onto the
+  plan as :cancel-orders. Three sources, deduped by oid (first wins):
+
+    1. In-memory carryover — resting orders from previous runs THIS session (they carry
+       a frozen wire asset index).
+    2. Live-book recognition — orders on the frontendOpenOrders snapshot bearing the
+       optimizer cloid tag, so a run AFTER A PAGE RELOAD still cleans up its own resting
+       orders automatically (no user action).
+    3. User-selected overlaps — untagged orders on a traded instrument the user ticked to
+       cancel on the decision surface (manual orders / pre-tag optimizer orders).
+
+  Read fresh at confirm time so anything that filled in between is not needlessly
+  cancelled. Without this a stale order fills on top of the new run and over-allocates."
+  [state plan]
+  (let [carryover (carryover/live-resting-carryover
+                   state
+                   (get-in state contracts/execution-resting-carryover-path))
+        snapshot (cloid/live-open-orders state)
+        ready-rows (filter #(= :ready (:status %)) (:rows plan))
+        {:keys [optimizer-owned untagged-overlap]} (cloid/classify-overlap snapshot ready-rows)
+        selections (get-in state overlap-cancels-path)
+        chosen-untagged (filter #(get selections (str (:oid %))) untagged-overlap)
+        merged (dedup-by-oid (concat carryover optimizer-owned chosen-untagged))]
+    (cond-> plan
+      (seq merged) (assoc :cancel-orders merged))))
+
+(defn set-portfolio-optimizer-execution-overlap-cancel
+  "Records the user's cancel/keep choice for one untagged overlapping open order (keyed
+  by oid string) on the decision surface. Checked oids are merged into :cancel-orders at
+  confirm by attach-carryover-cancels."
+  [state oid cancel?]
+  (let [selections (or (get-in state overlap-cancels-path) {})
+        oid-key (str oid)]
+    [[:effects/save
+      overlap-cancels-path
+      (if cancel?
+        (assoc selections oid-key true)
+        (dissoc selections oid-key))]]))
 
 (defn confirm-portfolio-optimizer-execution
   [state]
@@ -213,7 +273,7 @@
       :else
       [[:effects/save contracts/execution-modal-submitting-path true]
        [:effects/save contracts/execution-modal-error-path nil]
-       [:effects/execute-portfolio-optimizer-plan plan]])))
+       [:effects/execute-portfolio-optimizer-plan (attach-carryover-cancels state plan)]])))
 
 (defn resume-portfolio-optimizer-execution
   "Resumes a halted run by retrying ONLY the still-recoverable rows. Unlike a plain
@@ -251,7 +311,10 @@
             "No orders are eligible to resume."]]
           [[:effects/save contracts/execution-modal-submitting-path true]
            [:effects/save contracts/execution-modal-error-path nil]
-           [:effects/execute-portfolio-optimizer-plan resume-plan]])))))
+           ;; A halted run may have failed BEFORE its pre-run cancellation succeeded, so
+           ;; resume re-attaches the still-live carryover the same way confirm does.
+           [:effects/execute-portfolio-optimizer-plan
+            (attach-carryover-cancels state resume-plan)]])))))
 
 (defn revert-portfolio-optimizer-execution-filled
   "Unwinds the filled orders from the latest execution attempt by submitting reversing

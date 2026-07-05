@@ -166,7 +166,7 @@
   against the live order/fill feeds, which key on the coin token."
   [row]
   (or (non-blank-text (:coin row))
-      (let [instrument-id (non-blank-text (:instrument-id row))]
+      (when-let [instrument-id (non-blank-text (:instrument-id row))]
         (cond
           (str/starts-with? instrument-id "perp:")
           (subs instrument-id 5)
@@ -261,7 +261,7 @@
   (trading-domain/base-size-string {:market market} (coercion/parse-float-number size)))
 
 (defn- order-request-for-row
-  [{:keys [market-by-key orderbooks]} row]
+  [{:keys [market-by-key orderbooks cloid-fn]} row]
   (let [market (row-market market-by-key row)
         coin (coin-for-row row)
         asset-idx (market-asset-idx market)]
@@ -284,12 +284,18 @@
                              :market market
                              :orderbook book}
             form (order-form-for-row row bbo)
-            size-text (wire-size-string market (:size form))]
+            size-text (wire-size-string market (:size form))
+            ;; Stamp a recognizable client-order-id so this run's resting orders can be
+            ;; found on the live book by a LATER run (even after a page reload) and
+            ;; cancelled instead of stacked on top of. Injected so the pure build stays
+            ;; deterministic in tests.
+            cloid (when cloid-fn (cloid-fn))]
         (if-not (non-blank-text size-text)
           {:blocked-reason :quantity-below-lot}
           (let [request (order-commands/build-order-request
                          command-context
-                         (assoc form :size size-text))]
+                         (cond-> (assoc form :size size-text)
+                           (non-blank-text cloid) (assoc :cloid cloid)))]
             (if (map? request)
               {:request request}
               {:blocked-reason :request-unavailable})))))))
@@ -307,9 +313,10 @@
     row))
 
 (defn build-execution-attempt
-  [{:keys [plan market-by-key orderbooks]}]
+  [{:keys [plan market-by-key orderbooks cloid-fn]}]
   (let [rows (mapv #(attempt-row {:market-by-key (or market-by-key {})
-                                  :orderbooks (or orderbooks {})}
+                                  :orderbooks (or orderbooks {})
+                                  :cloid-fn cloid-fn}
                                  %)
                    (:rows plan))
         ready-count (count (filter #(= :ready (:status %)) rows))

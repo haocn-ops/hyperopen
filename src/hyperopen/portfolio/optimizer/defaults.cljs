@@ -156,7 +156,10 @@
    :overrides {}
    :params {}
    :open-row nil
-   :order-filter :all})
+   :order-filter :all
+   ;; Per-oid cancel/keep choices for untagged open orders that overlap the rebalance
+   ;; (the cross-session decision surface); {oid-string true} = user chose to cancel.
+   :overlap-cancels {}})
 
 (defn default-execution-state
   []

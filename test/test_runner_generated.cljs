@@ -225,6 +225,8 @@
             [hyperopen.portfolio.optimizer.application.engine-sparse-caps-test]
             [hyperopen.portfolio.optimizer.application.engine-test]
             [hyperopen.portfolio.optimizer.application.engine-warning-labels-test]
+            [hyperopen.portfolio.optimizer.application.execution-carryover-test]
+            [hyperopen.portfolio.optimizer.application.execution-cloid-test]
             [hyperopen.portfolio.optimizer.application.execution-order-type-test]
             [hyperopen.portfolio.optimizer.application.execution-test]
             [hyperopen.portfolio.optimizer.application.execution-workflow-test]
@@ -291,6 +293,8 @@
             [hyperopen.portfolio.optimizer.draft-model-actions-test]
             [hyperopen.portfolio.optimizer.draft-persistence-actions-test]
             [hyperopen.portfolio.optimizer.execution-actions-test]
+            [hyperopen.portfolio.optimizer.execution-carryover-actions-test]
+            [hyperopen.portfolio.optimizer.execution-overlap-actions-test]
             [hyperopen.portfolio.optimizer.exposure-actions-test]
             [hyperopen.portfolio.optimizer.fixtures-test]
             [hyperopen.portfolio.optimizer.frontier-actions-test]
@@ -348,6 +352,7 @@
             [hyperopen.runtime.effect-adapters.leaderboard-test]
             [hyperopen.runtime.effect-adapters.order-test]
             [hyperopen.runtime.effect-adapters.portfolio-optimizer-constraint-profiles-test]
+            [hyperopen.runtime.effect-adapters.portfolio-optimizer-execution-cancel-test]
             [hyperopen.runtime.effect-adapters.portfolio-optimizer-execution-test]
             [hyperopen.runtime.effect-adapters.portfolio-optimizer-history-facade-test]
             [hyperopen.runtime.effect-adapters.portfolio-optimizer-history-test]
@@ -987,6 +992,8 @@
              'hyperopen.portfolio.optimizer.application.engine-sparse-caps-test
              'hyperopen.portfolio.optimizer.application.engine-test
              'hyperopen.portfolio.optimizer.application.engine-warning-labels-test
+             'hyperopen.portfolio.optimizer.application.execution-carryover-test
+             'hyperopen.portfolio.optimizer.application.execution-cloid-test
              'hyperopen.portfolio.optimizer.application.execution-order-type-test
              'hyperopen.portfolio.optimizer.application.execution-test
              'hyperopen.portfolio.optimizer.application.execution-workflow-test
@@ -1053,6 +1060,8 @@
              'hyperopen.portfolio.optimizer.draft-model-actions-test
              'hyperopen.portfolio.optimizer.draft-persistence-actions-test
              'hyperopen.portfolio.optimizer.execution-actions-test
+             'hyperopen.portfolio.optimizer.execution-carryover-actions-test
+             'hyperopen.portfolio.optimizer.execution-overlap-actions-test
              'hyperopen.portfolio.optimizer.exposure-actions-test
              'hyperopen.portfolio.optimizer.fixtures-test
              'hyperopen.portfolio.optimizer.frontier-actions-test
@@ -1110,6 +1119,7 @@
              'hyperopen.runtime.effect-adapters.leaderboard-test
              'hyperopen.runtime.effect-adapters.order-test
              'hyperopen.runtime.effect-adapters.portfolio-optimizer-constraint-profiles-test
+             'hyperopen.runtime.effect-adapters.portfolio-optimizer-execution-cancel-test
              'hyperopen.runtime.effect-adapters.portfolio-optimizer-execution-test
              'hyperopen.runtime.effect-adapters.portfolio-optimizer-history-facade-test
              'hyperopen.runtime.effect-adapters.portfolio-optimizer-history-test

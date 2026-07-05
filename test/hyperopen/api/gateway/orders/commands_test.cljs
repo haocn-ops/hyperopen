@@ -449,3 +449,33 @@
                                          :twap {:hours 0
                                                 :minutes 15
                                                 :randomize true}}))))
+
+(deftest build-order-request-tags-optimizer-cloid-when-present-test
+  ;; The optimizer stamps a client-order-id so its resting orders are recognizable on the
+  ;; live book later. The wire :c must be LAST (a,b,p,s,r,t,c) because the L1 action is
+  ;; signed by msgpacking the map as-is, so field order is part of the signature.
+  (let [tagged (commands/build-order-request command-context
+                                             {:type :limit
+                                              :side :buy
+                                              :size "1"
+                                              :price "100"
+                                              :post-only true
+                                              :cloid "0x0770c0deaaaaaaaaaaaaaaaaaaaaaaaa"})
+        untagged (commands/build-order-request command-context
+                                               {:type :limit
+                                                :side :buy
+                                                :size "1"
+                                                :price "100"
+                                                :post-only true})]
+    (is (= "0x0770c0deaaaaaaaaaaaaaaaaaaaaaaaa" (get-in tagged [:orders 0 :c])))
+    (is (= [:a :b :p :s :r :t :c] (vec (keys (get-in tagged [:orders 0]))))
+        "cloid is the last wire field (canonical HL order struct order)")
+    (is (not (contains? (get-in untagged [:orders 0]) :c))
+        "no :cloid on the form => the wire order is unchanged (every non-optimizer caller)")
+    (is (= [:a :b :p :s :r :t] (vec (keys (get-in untagged [:orders 0])))))))
+
+(deftest build-order-request-ignores-blank-cloid-test
+  (let [req (commands/build-order-request command-context
+                                          {:type :market :side :buy :size "1" :price "100"
+                                           :cloid "   "})]
+    (is (not (contains? (get-in req [:orders 0]) :c)))))

@@ -88,6 +88,7 @@
 (def execution-run-attempt-path paths/execution-run-attempt-path)
 (def execution-abort-requested-path paths/execution-abort-requested-path)
 (def execution-persistence-error-path paths/execution-persistence-error-path)
+(def execution-resting-carryover-path paths/execution-resting-carryover-path)
 (def tracking-path paths/tracking-path)
 (def tracking-error-path paths/tracking-error-path)
 (def optimizer-ui-path paths/optimizer-ui-path)

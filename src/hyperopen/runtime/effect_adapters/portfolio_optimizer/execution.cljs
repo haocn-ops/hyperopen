@@ -258,7 +258,7 @@
    rows))
 
 (defn- refresh-after-execution!
-  [dispatch! store address ledger]
+  [{:keys [dispatch! refresh-open-orders!]} store address ledger]
   ;; A filled (:submitted) order changes positions; a resting one adds an open order. Either
   ;; way, pull fresh user data so the new state surfaces in the account panels.
   (when (and address
@@ -266,7 +266,14 @@
                  ;; A successful pre-run cancellation also changes the open-orders book.
                  (= :ok (get-in ledger [:cancellations :status]))))
     (dispatch! store nil [[:actions/load-user-data address]
-                          [:actions/refresh-order-history]])))
+                          [:actions/refresh-order-history]])
+    ;; Resting rows sit on the live book, but none of the streams cover named-dex
+    ;; (HIP-3) orders and load-user-data never hydrates the per-dex frontendOpenOrders
+    ;; snapshots — without this refresh a resting HIP-3 order is invisible to the
+    ;; merged open-orders view (never amendable, no on-book reconcile signal).
+    (when (and (fn? refresh-open-orders!)
+               (some #(= :resting (:status %)) (:rows ledger)))
+      (refresh-open-orders! store))))
 
 (defn- apply-persistence-result!
   [store result]
@@ -467,7 +474,10 @@
                        ;; toast region so it reaches screen readers and anyone who tab-switched.
                        (when-let [[kind message] (execution-outcome-toast ledger)]
                          (feedback-runtime/set-order-feedback-toast! store kind message))
-                       (refresh-after-execution! dispatch! store account-address ledger)
+                       (refresh-after-execution!
+                        {:dispatch! dispatch!
+                         :refresh-open-orders! (:refresh-open-orders! env)}
+                        store account-address ledger)
                        (persist-execution-ledger! persistence-env
                                                   store
                                                   account-address

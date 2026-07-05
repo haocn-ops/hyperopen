@@ -487,3 +487,58 @@
                        (done))))
             (.catch (async-support/unexpected-error done)))))))
 
+
+(deftest execute-portfolio-optimizer-plan-effect-refreshes-open-orders-when-resting-test
+  ;; A resting placement adds an open order the STREAMS never cover for named
+  ;; (HIP-3) dexes — only a forced per-dex frontendOpenOrders refresh makes the
+  ;; new order visible to the merged book (amendable + reconcilable). The effect
+  ;; must fire that refresh exactly when the ledger carries a :resting row, and
+  ;; must not fire it for a purely filled run (nothing new rests on the book).
+  (async done
+    (let [refreshes (atom 0)
+          address "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          ticks (atom [1000 1100 2000 2100])
+          base-store #(atom {:wallet {:address address :agent {:status :ready}}
+                             :asset-selector {:market-by-key
+                                              {"perp:BTC" {:coin "BTC"
+                                                           :market-type :perp
+                                                           :asset-id 0
+                                                           :szDecimals 4}}}
+                             :portfolio {:optimizer
+                                         {:active-scenario {:loaded-id "scn_submit"
+                                                            :status :saved}
+                                          :execution-modal {:open? true
+                                                            :submitting? true
+                                                            :plan ready-plan}}}})
+          resting-store (base-store)
+          filled-store (base-store)
+          execute-plan! (fn [store response]
+                          (with-redefs [portfolio-optimizer-adapters/*now-ms*
+                                        (fn []
+                                          (let [t (first @ticks)]
+                                            (swap! ticks rest)
+                                            t))
+                                        portfolio-optimizer-adapters/*submit-order!*
+                                        (fn [_store _address _action]
+                                          (js/Promise.resolve response))
+                                        portfolio-optimizer-adapters/*dispatch!*
+                                        (fn [_ _ _] nil)
+                                        portfolio-optimizer-adapters/*refresh-account-open-orders!*
+                                        (fn [_store] (swap! refreshes inc))]
+                            (portfolio-optimizer-adapters/execute-portfolio-optimizer-plan-effect
+                             nil store ready-plan)))]
+      (-> (execute-plan! resting-store
+                         {:status "ok"
+                          :response {:data {:statuses [{:resting {:oid 7}}]}}})
+          (.then (fn [_]
+                   (is (= 1 @refreshes) "a resting row forces the open-orders refresh")
+                   (execute-plan! filled-store
+                                  {:status "ok"
+                                   :response {:data {:statuses
+                                                     [{:filled {:avgPx "100"
+                                                                :totalSz "0.25"}}]}}})))
+          (.then (fn [_]
+                   (is (= 1 @refreshes)
+                       "a fully filled run rests nothing — no forced refresh")
+                   (done)))
+          (.catch (async-support/unexpected-error done))))))

@@ -2,7 +2,10 @@
   (:require [hyperopen.account.context :as account-context]
             [hyperopen.order.feedback-runtime :as feedback-runtime]
             [hyperopen.portfolio.optimizer.application.execution :as execution]
+            [hyperopen.portfolio.optimizer.application.execution-carryover :as carryover]
+            [hyperopen.portfolio.optimizer.application.execution-cloid :as cloid]
             [hyperopen.portfolio.optimizer.application.execution-workflow :as execution-workflow]
+            [hyperopen.api.trading.cancel-request :as cancel-request]
             [hyperopen.portfolio.optimizer.contracts :as contracts]))
 
 (defn- execution-outcome-toast
@@ -59,6 +62,97 @@
 (defn- failed-pre-action-response
   [responses]
   (some #(when-not (execution/response-ok? %) %) responses))
+
+(defn- random-optimizer-cloid
+  "A fresh magic-tagged cloid for one optimizer order. The 12-byte uniqueness suffix
+  comes from crypto.getRandomValues; falls back to a time+counter hex string in the
+  (test/headless) case where crypto is unavailable, since uniqueness — not
+  unpredictability — is all that matters here."
+  []
+  (let [hex (if (and (exists? js/crypto) (.-getRandomValues js/crypto))
+              (let [buf (js/Uint8Array. 12)]
+                (.getRandomValues js/crypto buf)
+                (->> (array-seq buf)
+                     (map #(.padStart (.toString % 16) 2 "0"))
+                     (apply str)))
+              (.toString (js/Math.floor (* (js/Date.now) 1000000)) 16))]
+    (cloid/make-cloid hex)))
+
+(defn- fail-ready-rows
+  [rows message]
+  (mapv #(if (= :ready (:status %))
+           (assoc % :status :failed :error {:message message})
+           %)
+        rows))
+
+(defn- cancel-failed-message
+  [n detail]
+  (str "Couldn't cancel " n " resting order" (when (not= 1 n) "s")
+       " from the previous run — no new orders were sent"
+       (when (seq detail) (str " (" detail ")"))
+       ". Cancel them from the trade ticket, then resume."))
+
+(defn- resolve-cancel-wires
+  "Turns each :cancel-orders entry into a wire cancel {:a <asset-idx> :o <oid>}, split
+  into {:cancels [...] :unresolved [...]}. Two entry shapes converge here: same-session
+  carryover entries carry a frozen :asset-id (used directly, robust even if the market
+  metadata later drops out of state); live-book-recognized entries carry only :coin +
+  :oid, so their asset index is resolved from state via the shared cancel-request builder
+  (the same resolver manual order cancellation uses). An entry that resolves to neither
+  halts the run — submitting new orders while a stale one may still fill is the bug."
+  [state entries]
+  (reduce (fn [acc entry]
+            (let [frozen (first (:cancels (carryover/carryover-cancels [entry])))
+                  resolved (or frozen
+                               (get-in (cancel-request/build-cancel-order-request state entry)
+                                       [:action :cancels 0]))]
+              (if resolved
+                (update acc :cancels conj resolved)
+                (update acc :unresolved conj entry))))
+          {:cancels [] :unresolved []}
+          (or entries [])))
+
+(defn- cancel-stale-orders!
+  "Cancels the plan's :cancel-orders — resting orders left on the book by PREVIOUS
+  optimizer runs — before any new order is released, so a stale order can't fill on top
+  of the new run and over-allocate the account. Resolves to
+  {:ok? <bool> :message <halt reason> :cancellations <audit entry for the ledger>}.
+
+  The exchange accepting the batch (top-level \"ok\") counts as success even when
+  individual cancels error (\"already canceled or filled\" means the order is off the
+  book either way). A transport-level failure, a thrown error, or an entry we cannot
+  build a wire cancel for (missing asset index / oid) halts the run: submitting anyway
+  would recreate exactly the bug this cancellation prevents."
+  [submit-order! store target plan]
+  (let [entries (:cancel-orders plan)]
+    (if-not (seq entries)
+      (js/Promise.resolve {:ok? true :cancellations nil})
+      (let [{:keys [cancels unresolved]} (resolve-cancel-wires @store entries)
+            oids (mapv :oid entries)
+            base {:requested (count entries) :oids oids}]
+        (if (seq unresolved)
+          (js/Promise.resolve
+           {:ok? false
+            :cancellations (assoc base :status :failed)
+            :message (cancel-failed-message (count entries)
+                                            "couldn't resolve their market ids")})
+          (-> (submit-action! submit-order! store target
+                              {:type "cancel" :cancels cancels})
+              (.then (fn [resp]
+                       (if (= "ok" (:status resp))
+                         {:ok? true
+                          :cancellations (assoc base :status :ok)}
+                         {:ok? false
+                          :cancellations (assoc base :status :failed)
+                          :message (cancel-failed-message
+                                    (count entries)
+                                    (execution-workflow/order-error-message resp))})))
+              (.catch (fn [err]
+                        {:ok? false
+                         :cancellations (assoc base :status :failed)
+                         :message (cancel-failed-message
+                                   (count entries)
+                                   (execution-workflow/error-message err))}))))))))
 
 (def ^:private post-only-reprice-attempts
   ;; A post-only order can be rejected for crossing if the book moved between when its price was
@@ -168,7 +262,9 @@
   ;; A filled (:submitted) order changes positions; a resting one adds an open order. Either
   ;; way, pull fresh user data so the new state surfaces in the account panels.
   (when (and address
-             (some #(contains? #{:submitted :resting} (:status %)) (:rows ledger)))
+             (or (some #(contains? #{:submitted :resting} (:status %)) (:rows ledger))
+                 ;; A successful pre-run cancellation also changes the open-orders book.
+                 (= :ok (get-in ledger [:cancellations :status]))))
     (dispatch! store nil [[:actions/load-user-data address]
                           [:actions/refresh-order-history]])))
 
@@ -324,7 +420,12 @@
         attempt (execution/build-execution-attempt
                  {:plan plan
                   :market-by-key (get-in state [:asset-selector :market-by-key])
-                  :orderbooks (:orderbooks state)})]
+                  :orderbooks (:orderbooks state)
+                  ;; Reverts unwind existing fills with reduce-only orders; tagging them
+                  ;; would make a revert order recognizable as a fresh optimizer order to
+                  ;; cancel later. Only tag forward rebalance/refine orders.
+                  :cloid-fn (when-not (= :revert (:kind plan))
+                              random-optimizer-cloid)})]
     (if-not owner-address
       (let [completed-at-ms (now-ms-fn)
             rows (mapv #(if (= :ready (:status %))
@@ -342,14 +443,25 @@
         (swap! store assoc-in
                contracts/execution-path
                (execution-workflow/begin-execution-state attempt started-at-ms))
-        (-> (submit-execution-rows! submit-order! store target (:rows attempt))
-            (.then (fn [rows]
+        (-> (cancel-stale-orders! submit-order! store target plan)
+            (.then (fn [{:keys [ok? message cancellations]}]
+                     (-> (if ok?
+                           (submit-execution-rows! submit-order! store target
+                                                   (:rows attempt))
+                           ;; Stale resting orders could not be cancelled: release
+                           ;; nothing (a stale fill on top of a new run over-allocates)
+                           ;; and settle every sendable row as failed with the reason.
+                           (js/Promise.resolve (fail-ready-rows (:rows attempt) message)))
+                         (.then (fn [rows] {:rows rows :cancellations cancellations})))))
+            (.then (fn [{:keys [rows cancellations]}]
                      (let [completed-at-ms (now-ms-fn)
-                           ledger (execution-workflow/execution-ledger
-                                   attempt
-                                   started-at-ms
-                                   completed-at-ms
-                                   rows)]
+                           ledger (cond-> (execution-workflow/execution-ledger
+                                           attempt
+                                           started-at-ms
+                                           completed-at-ms
+                                           rows)
+                                    (some? cancellations)
+                                    (assoc :cancellations cancellations))]
                        (swap! store execution-workflow/apply-execution-ledger ledger)
                        ;; Announce the outcome (success/resting/halted) via the global aria-live
                        ;; toast region so it reaches screen readers and anyone who tab-switched.

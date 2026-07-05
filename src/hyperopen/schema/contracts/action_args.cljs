@@ -129,6 +129,9 @@
   (s/tuple ::common/non-empty-string ::common/keyword-or-string))
 (s/def ::portfolio-optimizer-execution-row-param-args
   (s/tuple ::common/non-empty-string ::common/keyword-or-string any?))
+(s/def ::portfolio-optimizer-execution-overlap-cancel-args
+  ;; [oid cancel?] — oid is an exchange order id (number or string), cancel? a boolean.
+  (s/tuple (s/or :number number? :string ::common/non-empty-string) boolean?))
 (s/def ::portfolio-optimizer-universe-search-keydown-args
   (s/tuple ::common/non-empty-string
            (s/coll-of ::common/non-empty-string :kind vector?)))
@@ -370,6 +373,7 @@
 	   :actions/discard-portfolio-optimizer-execution ::common/no-args
 	   :actions/open-portfolio-optimizer-execution-in-ticket ::common/no-args
 	   :actions/set-portfolio-optimizer-execution-order-filter ::common/keyword-or-string-args
+	   :actions/set-portfolio-optimizer-execution-overlap-cancel ::portfolio-optimizer-execution-overlap-cancel-args
 	   :actions/refresh-portfolio-optimizer-tracking ::common/no-args
 	   :actions/enable-portfolio-optimizer-manual-tracking ::common/no-args
 	   :actions/auto-recompute-stale-portfolio-optimizer-scenario ::common/no-args

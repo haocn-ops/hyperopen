@@ -146,3 +146,34 @@
     (is (= :executed
            (get-in result [:state :portfolio :optimizer :active-scenario :status])))
     (is (= [] (:commands result)))))
+
+(deftest apply-execution-ledger-maintains-resting-carryover-test
+  ;; Applying a ledger must (1) record the run's resting orders at the dedicated
+  ;; carryover path — OUTSIDE execution-path, which staging/discard reset — so the NEXT
+  ;; run can cancel them, and (2) prune the oids a successful pre-run cancellation
+  ;; removed from the book.
+  (let [resting-row {:row-id "perp:ZETA"
+                     :instrument-id "perp:ZETA"
+                     :instrument-type :perp
+                     :coin "ZETA"
+                     :side :buy
+                     :quantity 681.7
+                     :status :resting
+                     :request {:action {:type "order" :orders [{:a 42 :b true}]}}
+                     :response {:status "ok"
+                                :response {:data {:statuses [{:resting {:oid 333}}]}}}}
+        state {:portfolio {:optimizer
+                           {:execution-resting-carryover [{:oid 111 :asset-id 7}]
+                            :execution {:history []}}}}
+        ledger {:attempt-id "exec_2"
+                :scenario-id "scn_submit"
+                :status :resting
+                :cancellations {:status :ok :oids [111]}
+                :rows [resting-row]}
+        next-state (workflow/apply-execution-ledger state ledger)
+        carryover (get-in next-state
+                          [:portfolio :optimizer :execution-resting-carryover])]
+    (is (= [333] (mapv :oid carryover))
+        "cancelled 111 pruned; this run's resting 333 recorded")
+    (is (= 42 (:asset-id (first carryover)))
+        "asset index captured from the frozen request for later cancellation")))

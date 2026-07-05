@@ -68,6 +68,11 @@
 (def execution-run-attempt-path (conj execution-path :run-attempt))
 (def execution-abort-requested-path (conj execution-path :abort-requested?))
 (def execution-persistence-error-path (conj execution-path :persistence-error))
+;; Resting orders left on the book by PREVIOUS optimizer execution runs. Lives OUTSIDE
+;; execution-path because that map is replaced wholesale on staging / discard / restage /
+;; ledger-apply — exactly the moments the carryover must survive so a new run can cancel
+;; the stale orders before submitting.
+(def execution-resting-carryover-path (conj optimizer-path :execution-resting-carryover))
 (def tracking-path (conj optimizer-path :tracking))
 (def tracking-error-path (conj tracking-path :error))
 (def optimizer-ui-path [:portfolio-ui :optimizer])
@@ -171,6 +176,7 @@
    :optimizer/execution-run-attempt execution-run-attempt-path
    :optimizer/execution-abort-requested execution-abort-requested-path
    :optimizer/execution-persistence-error execution-persistence-error-path
+   :optimizer/execution-resting-carryover execution-resting-carryover-path
    :optimizer/tracking tracking-path
    :optimizer/tracking-error tracking-error-path
    :optimizer-ui/root optimizer-ui-path

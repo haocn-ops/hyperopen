@@ -370,3 +370,40 @@
     (is (= :spot (:market-type spot)))
     (is (nil? (exposure-by-id snapshot "perp:XYZ")))
     (is (near? 20 (:signed-notional-usdc spot)))))
+
+(deftest dex-namespaced-position-coin-is-not-double-prefixed-test
+  ;; The per-dex (HIP-3) clearinghouse feed reports position coins ALREADY
+  ;; dex-namespaced ("xyz:ORCL" on dex "xyz"; verified live 2026-07-05).
+  ;; Re-prefixing built "perp:xyz:xyz:ORCL" — an id matching neither the market
+  ;; catalog key nor the universe id — so the rebalance treated the held
+  ;; position and its target as two unrelated assets and staged a full close
+  ;; PLUS a fresh open for the same market instead of one net order. The
+  ;; holding must take the canonical "perp:xyz:ORCL". A bare per-dex coin
+  ;; (older feed shape) still gets the dex prefix exactly once.
+  (let [state {:wallet {:address owner-address}
+               :router {:path "/portfolio"}
+               :webdata2 {:clearinghouseState
+                          {:marginSummary {:accountValue "100000"}
+                           :assetPositions []}}
+               :perp-dex-clearinghouse
+               {"xyz" {:assetPositions [{:position {:coin "xyz:ORCL"
+                                                    :szi "0.131"
+                                                    :markPx "143.75"}}]}
+                "dex-a" {:assetPositions [{:position {:coin "SOL"
+                                                      :szi "10"
+                                                      :markPx "100"}}]}}
+               :spot {:clearinghouse-state {:balances []}}
+               :asset-selector {:market-by-key
+                                {"perp:xyz:ORCL" {:key "perp:xyz:ORCL"
+                                                  :market-type :perp
+                                                  :coin "xyz:ORCL"
+                                                  :symbol "ORCL"
+                                                  :mark "143.75"}}}}
+        snapshot (current-portfolio/current-portfolio-snapshot state)
+        orcl (exposure-by-id snapshot "perp:xyz:ORCL")]
+    (is (some? orcl) "namespaced coin resolves to the canonical catalog id")
+    (is (nil? (exposure-by-id snapshot "perp:xyz:xyz:ORCL"))
+        "the doubled-prefix id must never be synthesized")
+    (is (near? (* 0.131 143.75) (:signed-notional-usdc orcl)))
+    (is (some? (exposure-by-id snapshot "perp:dex-a:SOL"))
+        "a bare per-dex coin still gets the dex prefix exactly once")))

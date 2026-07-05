@@ -167,6 +167,57 @@
       (is (= record (contracts/migrate-tracking-record record)))
       (is (s/valid? ::contracts/tracking-record record)))))
 
+(deftest migrate-draft-canonicalizes-doubled-dex-ids-test
+  ;; Drafts persisted while the holdings snapshot doubled the dex prefix carry
+  ;; "perp:xyz:xyz:ORCL"-shaped ids that match neither the market catalog key nor
+  ;; the (since-fixed) live holdings id — the current-position join silently missed
+  ;; and the draft page read a held position as current 0%. Loading such a draft
+  ;; must rewrite every id-bearing surface to the canonical single-prefix form.
+  (let [draft (assoc sample-draft
+                     :universe [{:instrument-id "perp:xyz:ORCL"
+                                 :market-type :perp
+                                 :coin "xyz:ORCL"}
+                                ;; doubled twin of an entry that already exists
+                                ;; canonically -> dropped, established entry wins
+                                {:instrument-id "perp:xyz:xyz:ORCL"
+                                 :market-type :perp
+                                 :coin "xyz:ORCL"}
+                                {:instrument-id "perp:xyz:xyz:AAPL"
+                                 :market-type :perp
+                                 :coin "xyz:AAPL"}
+                                {:instrument-id "perp:BTC"
+                                 :market-type :perp
+                                 :coin "BTC"}]
+                     :history-assumptions {"perp:xyz:xyz:AAPL" {:behavior :conservative}}
+                     :constraints {:long-only? false
+                                   :held-locks ["perp:xyz:xyz:AAPL" "perp:BTC"]
+                                   :per-perp-leverage-caps {"perp:xyz:xyz:AAPL" 3}})
+        migrated (contracts/migrate-draft draft)]
+    (is (= ["perp:xyz:ORCL" "perp:xyz:xyz:ORCL" "perp:xyz:xyz:AAPL" "perp:BTC"]
+           (mapv :instrument-id (:universe draft)))
+        "input draft is untouched")
+    (is (= ["perp:xyz:ORCL" "perp:xyz:AAPL" "perp:BTC"]
+           (mapv :instrument-id (:universe migrated)))
+        "doubled ids collapse; a doubled twin of an existing canonical entry is dropped")
+    (is (= {"perp:xyz:AAPL" {:behavior :conservative}}
+           (:history-assumptions migrated)))
+    (is (= ["perp:xyz:AAPL" "perp:BTC"]
+           (get-in migrated [:constraints :held-locks])))
+    (is (= {"perp:xyz:AAPL" 3}
+           (get-in migrated [:constraints :per-perp-leverage-caps])))
+    (is (= migrated (contracts/migrate-draft migrated)) "idempotent")))
+
+(deftest canonical-doubled-dex-id-shapes-test
+  (is (= "perp:xyz:ORCL" (migrations/canonical-doubled-dex-id "perp:xyz:xyz:ORCL")))
+  (is (= "perp:xyz:ORCL" (migrations/canonical-doubled-dex-id "perp:xyz:ORCL"))
+      "canonical ids pass through")
+  (is (= "perp:BTC" (migrations/canonical-doubled-dex-id "perp:BTC")))
+  (is (= "spot:PURR/USDC" (migrations/canonical-doubled-dex-id "spot:PURR/USDC")))
+  (is (= "hl:hip3:xyz:AAPL" (migrations/canonical-doubled-dex-id "hl:hip3:xyz:AAPL"))
+      "non perp:/spot: id families are never rewritten")
+  (is (= :perp (migrations/canonical-doubled-dex-id :perp)) "non-strings pass through")
+  (is (nil? (migrations/canonical-doubled-dex-id nil))))
+
 (deftest future-version-migrations-fail-until-format-changes-test
   (testing "current optimizer persisted contracts are still version 1"
     (is (= 1 contracts/draft-schema-version))

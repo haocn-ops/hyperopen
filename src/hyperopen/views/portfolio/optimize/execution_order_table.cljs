@@ -286,6 +286,102 @@
        ;; RIGHT — execution-cost equation across the remaining width
        (cost-breakdown-strip model row)]]]))
 
+(def ^:private amend-order-type-labels
+  ;; TWAP is not offered — slicing one live order over time is not an in-place amend.
+  [[:limit "Limit"] [:passive "Passive maker"] [:market "Market"]])
+
+(defn- amend-bps-presets
+  "Offset presets for repricing a working limit order, signed for the order's own side
+  (a buy rests below the mark). 0 = at the live mark — the usual reason to amend."
+  [buy?]
+  (let [sign (if buy? -1 1)
+        arrow (if buy? "−" "+")]
+    (into [["At mark" 0]]
+          (map (fn [n] [(str arrow n " bp") (* sign n)]) [2 5 10]))))
+
+(defn- format-price
+  [value]
+  (when (shared/finite value)
+    (opt-format/format-decimal value {:maximum-fraction-digits 6})))
+
+(defn- amend-editor-row
+  "Inline editor for a WORKING (resting/open) order: reprice it at a new offset from
+  the LIVE mark (or post-only at the touch), or convert it to a market order for the
+  remaining size. Committing cancels the resting order first and only then submits the
+  replacement (halt-on-cancel-failure), via the amend action."
+  [model row colspan]
+  (let [amend (:amend row)
+        t (:order-type amend)
+        bps (:limit-bps amend)
+        buy? (= :buy (:side row))
+        row-id (:row-id row)
+        remaining (:remaining-size amend)
+        facts (->> [(when-let [px (format-price (:limit-px amend))]
+                      (str "resting at " px))
+                    (when (shared/finite remaining)
+                      (str (opt-format/format-decimal remaining
+                                                      {:maximum-fraction-digits 4})
+                           " remaining"))
+                    (when-let [mark (format-price (:live-mark amend))]
+                      (str "live mark " mark))]
+                   (remove nil?)
+                   (str/join " · "))]
+    [:tr {:data-role (str "portfolio-optimizer-execution-order-amend-"
+                          (data-role-token (:instrument-id row)))}
+     [:td {:colspan colspan :class ["optimizer-exec-order-editor"]}
+      [:div {:class ["optimizer-exec-editor-controls"]}
+       [:div {:class ["flex" "flex-wrap" "items-center" "gap-3"]}
+        [:span {:class ["font-mono" "text-[0.6rem]" "uppercase" "tracking-[0.08em]"
+                        "text-trading-muted"]}
+         (str "Amend working order · " (:instrument-label row))]
+        [:div {:class ["optimizer-exec-toggle" "inline-flex"]}
+         (for [[ot label] amend-order-type-labels]
+           [:button {:type "button"
+                     :class (cond-> ["px-2.5" "py-1" "text-[0.65rem]" "font-medium"]
+                              (= t ot) (conj "is-on"))
+                     :data-active (str (= t ot))
+                     :on {:click [[:actions/set-portfolio-optimizer-execution-row-order-type
+                                   row-id ot]]}}
+            label])]
+        (when (seq facts)
+          [:span {:class ["font-mono" "text-[0.65rem]" "text-trading-muted/80"]
+                  :data-role "portfolio-optimizer-execution-amend-facts"}
+           facts])]
+       [:div {:class ["flex" "flex-wrap" "items-center" "gap-2" "text-xs"
+                      "text-trading-muted"]}
+        (case t
+          :limit
+          [:span {:class ["flex" "flex-wrap" "items-center" "gap-2"]}
+           [:span {:class ["font-mono" "text-[0.6rem]" "uppercase" "tracking-[0.06em]"
+                           "text-trading-muted/70"]}
+            "New price"]
+           (for [[label bp] (amend-bps-presets buy?)]
+             [:button {:type "button"
+                       :class (cond-> ["border" "border-base-300" "px-2" "py-0.5"
+                                       "text-[0.65rem]"]
+                                (= bps bp) (conj "optimizer-primary-action"
+                                                 "font-semibold"))
+                       :on {:click [[:actions/set-portfolio-optimizer-execution-row-param
+                                     row-id :limit-bps bp]]}}
+              label])
+           [:span {:class ["font-mono" "text-trading-muted/70"]}
+            (str "re-places " (if (zero? (or bps 0))
+                                "at the live mark"
+                                (str "off the live mark")) " · GTC")]]
+          :market
+          [:span "Cancels the resting order and crosses immediately for the remaining size."]
+          [:span "Cancels and re-posts post-only at the best price on your side — never crosses."])]
+       [:div {:class ["flex" "flex-wrap" "items-center" "gap-3"]}
+        [:button {:type "button"
+                  :class ["optimizer-primary-action" "px-3" "py-1" "text-[0.7rem]"
+                          "font-semibold"]
+                  :disabled (boolean (:submitting? model))
+                  :data-role "portfolio-optimizer-execution-amend-commit"
+                  :on {:click [[:actions/amend-portfolio-optimizer-execution-order row-id]]}}
+         "Update order"]
+        [:span {:class ["font-mono" "text-[0.62rem]" "text-trading-muted/70"]}
+         "Cancels the resting order first — if the cancel fails, nothing new is sent."]]]]]))
+
 (defn- slip-cell
   "Type-aware slippage display. After a fill the realized slippage (vs the same mark the
   estimate used) takes over. Pre-fill: resting orders (limit/passive) read \"rests\" rather
@@ -305,7 +401,9 @@
 (defn- order-row
   [{:keys [open-row] :as model} index row]
   (let [editable (editable? model)
-        open? (and editable (= open-row (:row-id row)))
+        amendable (boolean (get-in row [:amend :amendable?]))
+        clickable (or editable amendable)
+        open? (and clickable (= open-row (:row-id row)))
         display-state (row-display-state model row)
         t (shared/effective-type model row)
         overridden? (contains? (:overrides model) (:row-id row))
@@ -319,7 +417,7 @@
                        open? (conj "is-open"))
               :data-role (str "portfolio-optimizer-execution-order-row-" (data-role-token (:instrument-id row)))
               :data-exec-state (name display-state)
-              :on (when editable
+              :on (when clickable
                     {:click [[:actions/toggle-portfolio-optimizer-execution-row (:row-id row)]]})}
          [:td {:class ["optimizer-exec-glyph"] :data-state (name display-state)}
           (state-glyph display-state)]
@@ -338,7 +436,7 @@
            (when overridden? [:span {:class ["optimizer-exec-override-dot"]}])
            [:span {:class (cond-> ["optimizer-exec-type-chip"] overridden? (conj "is-overridden"))}
             (shared/order-type-labels t)]
-           (when editable [:span {:class ["text-[0.6rem]" "text-trading-muted/70"]} (if open? "▾" "▸")])]
+           (when clickable [:span {:class ["text-[0.6rem]" "text-trading-muted/70"]} (if open? "▾" "▸")])]
           (when-let [hint (route-hint model row t)]
             [:span {:class ["block" "mt-0.5" "font-mono" "text-[0.62rem]" "text-trading-muted/80"]
                     :data-role "portfolio-optimizer-execution-route-hint"}
@@ -353,7 +451,9 @@
           (slip-cell t (:status row) (get-in row [:cost :slippage-bps]) (get-in row [:realized :slippage-bps]))]
          [:td {:class ["text-[0.7rem]"]} (state-cell display-state row)]]]
     (if open?
-      [row-tr (order-editor-row model row 9)]
+      [row-tr (if amendable
+                (amend-editor-row model row 9)
+                (order-editor-row model row 9))]
       [row-tr])))
 
 (defn- row-visible?
@@ -454,8 +554,14 @@
        (order-filter-toggle active-filter)]
       [:p {:class ["mt-1" "text-xs" "text-trading-muted"]}
        (str (when venue (str venue " "))
-            (if (editable? model)
+            (cond
+              (editable? model)
               "Click any order to change its type. Blocked rows stay visible with their reason."
+
+              (some #(get-in % [:amend :amendable?]) rows)
+              "Click an open order to amend it — reprice it or convert it to market."
+
+              :else
               "Order types are locked once execution is armed."))]]
      (cond
        (not (seq rows))

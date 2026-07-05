@@ -176,7 +176,9 @@
 
           :else instrument-id))))
 
-(defn- row-market
+(defn row-market
+  "Catalog market entry for a row (instrument-id key, then coin fallback). Public for
+  the amend flow, which re-resolves szDecimals + the live native mark at amend time."
   [market-by-key row]
   (let [instrument-id (:instrument-id row)
         coin (coin-for-row row)]

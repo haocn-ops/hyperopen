@@ -2,6 +2,7 @@
   (:require [hyperopen.account.context :as account-context]
             [hyperopen.portfolio.optimizer.actions.common :as common]
             [hyperopen.portfolio.optimizer.application.execution :as execution]
+            [hyperopen.portfolio.optimizer.application.execution-amend :as execution-amend]
             [hyperopen.portfolio.optimizer.application.execution-carryover :as carryover]
             [hyperopen.portfolio.optimizer.application.execution-cloid :as cloid]
             [hyperopen.portfolio.optimizer.application.rebalance-preview :as rebalance-preview]
@@ -274,6 +275,100 @@
       [[:effects/save contracts/execution-modal-submitting-path true]
        [:effects/save contracts/execution-modal-error-path nil]
        [:effects/execute-portfolio-optimizer-plan (attach-carryover-cancels state plan)]])))
+
+(defn- amend-refusal-message
+  [error]
+  (case error
+    :not-amendable
+    "This order is no longer on the book — it filled or was cancelled."
+    :market-unavailable
+    "Market metadata is unavailable for this order — try again shortly."
+    :remaining-below-lot
+    "The unfilled remainder is below one lot — manage it from the trade ticket."
+    "This order can't be updated right now."))
+
+(defn amend-portfolio-optimizer-execution-order
+  "Replaces ONE working (resting/open) order from the latest execution attempt: cancel
+  it on the exchange, then submit a replacement priced off the LIVE mark — a new bps
+  offset (or post-only at the touch), or a market order that crosses immediately for
+  the REMAINING unfilled size. Reuses the execute effect, whose cancel-first /
+  halt-on-failure contract guarantees the replacement can never be live alongside the
+  original; the amend plan carries ONLY the amended order's cancel entry (attaching the
+  session carryover here would cancel the run's OTHER live orders).
+
+  Deliberately NOT gated on stale-recommendation? (mirrors Revert's reasoning): the
+  order is already live — repricing or crossing its remaining size never creates
+  exposure beyond what was already confirmed, and gating it would strand a working
+  order behind a re-run."
+  [state row-id]
+  (let [modal (get-in state contracts/execution-modal-path)
+        plan (:plan modal)
+        ledger (last (get-in state contracts/execution-history-path))
+        agent-status (get-in state [:wallet :agent :status])]
+    (cond
+      (not (map? plan))
+      []
+
+      (:submitting? modal)
+      []
+
+      (not (map? ledger))
+      []
+
+      (:execution-disabled? plan)
+      [[:effects/save
+        contracts/execution-modal-error-path
+        (or (:disabled-message plan)
+            "Execution is disabled for this scenario.")]]
+
+      :else
+      (let [row (some #(when (= row-id (:row-id %)) %) (:rows ledger))
+            target (when row
+                     (execution-amend/amend-target
+                      state
+                      (get-in state [:asset-selector :market-by-key])
+                      row))
+            {amend-plan :plan error :error}
+            (execution-amend/build-amend-plan
+             {:plan plan
+              :ledger ledger
+              :row-id row-id
+              :selections {:overrides (:overrides modal)
+                           :params (:params modal)}
+              :target target})]
+        (cond
+          (some? error)
+          [[:effects/save contracts/execution-modal-error-path
+            (amend-refusal-message error)]]
+
+          ;; Trading must be ready before the cancel+replace is sent — the same gate
+          ;; stack as confirm (see its comment for the emit-effects-only constraint).
+          ;; Checked AFTER amendability so a passkey prompt is never raised for an
+          ;; order that can no longer be amended; the unlock replays this action
+          ;; (with its row-id), which re-resolves the live target.
+          (= :locked agent-status)
+          [[:effects/save contracts/execution-modal-error-path nil]
+           [:effects/save-many [[[:wallet :agent :status] :unlocking]
+                                [[:wallet :agent :error] nil]]]
+           [:effects/unlock-agent-trading
+            {:after-success-actions
+             [[:actions/amend-portfolio-optimizer-execution-order row-id]]}]]
+
+          (= :unlocking agent-status)
+          [[:effects/save
+            contracts/execution-modal-error-path
+            "Awaiting passkey before updating the order."]]
+
+          (not= :ready agent-status)
+          [[:effects/save [:wallet :agent :recovery-modal-open?] true]
+           [:effects/save
+            contracts/execution-modal-error-path
+            "Enable trading before updating orders."]]
+
+          :else
+          [[:effects/save contracts/execution-modal-submitting-path true]
+           [:effects/save contracts/execution-modal-error-path nil]
+           [:effects/execute-portfolio-optimizer-plan amend-plan]])))))
 
 (defn resume-portfolio-optimizer-execution
   "Resumes a halted run by retrying ONLY the still-recoverable rows. Unlike a plain

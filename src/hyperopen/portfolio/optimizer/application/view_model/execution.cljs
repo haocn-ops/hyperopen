@@ -1,6 +1,7 @@
 (ns hyperopen.portfolio.optimizer.application.view-model.execution
   (:require [clojure.string :as str]
             [hyperopen.portfolio.optimizer.application.execution :as execution]
+            [hyperopen.portfolio.optimizer.application.execution-amend :as execution-amend]
             [hyperopen.portfolio.optimizer.application.execution-carryover :as carryover]
             [hyperopen.portfolio.optimizer.application.execution-cloid :as cloid]
             [hyperopen.portfolio.optimizer.application.setup-readiness :as setup-readiness]
@@ -109,6 +110,30 @@
      :disabled-message (or (:disabled-message plan)
                            "Order submission wiring is not enabled in this slice.")}))
 
+(defn- stamp-amend-affordances
+  "Stamps each still-working (reconciled :resting) row with its live amend context —
+  {:amendable? true :oid :remaining-size :limit-px :live-mark :order-type :limit-bps} —
+  so the order table can render the amend editor without touching state. A row whose
+  oid can no longer be seen live on the book gets no :amend (there is nothing safe to
+  cancel-and-replace); the selection keys come from the same `amend-selections` the
+  amend action resolves, so what the editor shows is what a commit would submit."
+  [state modal writable? rows]
+  (if-not writable?
+    rows
+    (let [market-by-key (get-in state [:asset-selector :market-by-key])
+          selections {:overrides (:overrides modal)
+                      :params (:params modal)}]
+      (mapv (fn [row]
+              (if-let [target (when (= :resting (:status row))
+                                (execution-amend/amend-target state market-by-key row))]
+                (assoc row :amend
+                       (merge (select-keys target
+                                           [:oid :remaining-size :limit-px :live-mark])
+                              {:amendable? true}
+                              (execution-amend/amend-selections selections row)))
+                row))
+            rows))))
+
 (def ^:private terminal-run-statuses
   #{:executed :resting :partially-executed :failed :blocked})
 
@@ -173,7 +198,11 @@
                            (:rows latest-attempt)
 
                            :else plan-rows))
-        display-rows (order-numbered-and-sorted reconciled-rows)
+        display-rows (stamp-amend-affordances
+                      state modal
+                      (and (not (:execution-disabled? plan))
+                           (not submitting?))
+                      (order-numbered-and-sorted reconciled-rows))
         ;; When the run settled as :resting, re-derive its status from the reconciled rows so the
         ;; phase advances :resting -> :done as the open orders fill on the book.
         reconciled-status (if (= :resting status)

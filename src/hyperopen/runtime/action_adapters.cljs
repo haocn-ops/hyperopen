@@ -348,6 +348,9 @@
 (def confirm-portfolio-optimizer-execution-action
   portfolio-optimizer-actions/confirm-portfolio-optimizer-execution)
 
+(def amend-portfolio-optimizer-execution-order-action
+  portfolio-optimizer-actions/amend-portfolio-optimizer-execution-order)
+
 (def resume-portfolio-optimizer-execution-action
   portfolio-optimizer-actions/resume-portfolio-optimizer-execution)
 

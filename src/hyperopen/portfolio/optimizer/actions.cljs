@@ -120,6 +120,18 @@
 (def clear-portfolio-optimizer-history-assumption
   draft/clear-portfolio-optimizer-history-assumption)
 
+(def set-portfolio-optimizer-history-assumption-proxy-asset
+  draft/set-portfolio-optimizer-history-assumption-proxy-asset)
+
+(def set-portfolio-optimizer-history-assumption-relationship-strength
+  draft/set-portfolio-optimizer-history-assumption-relationship-strength)
+
+(def apply-portfolio-optimizer-history-assumption
+  draft/apply-portfolio-optimizer-history-assumption)
+
+(def reset-portfolio-optimizer-history-assumption
+  draft/reset-portfolio-optimizer-history-assumption)
+
 (def set-portfolio-optimizer-universe-search-query
   universe/set-portfolio-optimizer-universe-search-query)
 

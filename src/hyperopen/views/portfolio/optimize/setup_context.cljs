@@ -69,6 +69,53 @@
                                   [:span value]]))
                           exposure-rows))]]))
 
+(defn- history-assumptions-rail-panel
+  "Compact modeling summary for every asset in the assumption workflow: mode,
+  proxies, and the caps the engine will honor, plus the aggregate readiness line
+  and the results-disclosure note."
+  [state draft readiness history-load-state]
+  (let [{:keys [applicable? rows all-configured? any-proxy?
+                ready-message disclosure-note]}
+        (optimizer-view-model/history-assumption-rail-model state
+                                                            draft
+                                                            readiness
+                                                            history-load-state
+                                                            {:labelize controls/labelize
+                                                             :percent-label controls/percent-label})]
+    (when applicable?
+      [:section {:class ["optimizer-setup-panel" "border" "border-base-300"
+                         "bg-base-100/90" "p-3"]
+                 :data-role "portfolio-optimizer-history-assumptions-rail"
+                 :replicant/key "history-assumptions-rail"}
+       [:p {:class eyebrow-class} "History assumptions"]
+       (into [:div {:class ["mt-2" "space-y-2"]}]
+             (map (fn [{:keys [instrument-id label configured? summary-pairs]}]
+                    [:div {:class ["border" "border-base-300" "bg-base-200/20" "p-2"]
+                           :data-role (str "portfolio-optimizer-history-assumptions-rail-row-"
+                                           instrument-id)}
+                     [:div {:class ["flex" "items-baseline" "justify-between" "gap-2"]}
+                      [:span {:class ["font-mono" "text-[0.75rem]" "font-semibold"]}
+                       label]
+                      [:span {:class ["font-mono" "text-[0.625rem]" "uppercase"
+                                      "tracking-[0.08em]"
+                                      (if configured? "text-success" "text-warning")]}
+                       (if configured? "Configured" "Needs input")]]
+                     (into [:div {:class ["mt-1.5" "space-y-0.5"]}]
+                           (map (fn [[pair-label pair-value]]
+                                  (contract-row pair-label pair-value)))
+                           summary-pairs)]))
+             rows)
+       (when all-configured?
+         [:p {:class ["mt-2" "border" "border-success/40" "bg-success/10" "p-2"
+                      "text-[0.75rem]" "font-medium" "text-success"]
+              :data-role "portfolio-optimizer-history-assumptions-ready"}
+          ready-message])
+       (when any-proxy?
+         [:p {:class ["mt-2" "flex" "items-center" "gap-1.5" "border" "border-warning/30"
+                      "bg-warning/5" "p-2" "text-[0.6875rem]" "text-trading-muted"]
+              :data-role "portfolio-optimizer-history-assumptions-disclosure-note"}
+          disclosure-note])])))
+
 (defn context-rail
   [{:keys [draft state readiness snapshot preview-snapshot run-state optimization-progress
            history-load-state last-successful-run current-result? result-path]}]
@@ -168,6 +215,7 @@
                                 [[:actions/set-portfolio-optimizer-return-model-kind
                                   :black-litterman]])}}
          (if min-variance? "Switch to Maximum Sharpe" "Use my views")]])
+     (history-assumptions-rail-panel state draft readiness history-load-state)
      (when status-visible?
        [:section {:class ["optimizer-setup-panel" "border-t" "border-base-300" "bg-base-100/90" "p-3"]
                   :data-role "portfolio-optimizer-trust-freshness-panel"

@@ -63,6 +63,7 @@
                           :draft draft
                           :highlighted-controls highlighted-controls
                           :readiness readiness
+                          :history-load-state history-load-state
                           :running? running?
                           :run-triggerable? run-triggerable?
                           :saving-scenario? saving-scenario?

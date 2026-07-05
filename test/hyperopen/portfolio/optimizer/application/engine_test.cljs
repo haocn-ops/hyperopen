@@ -542,3 +542,95 @@
           (.catch (fn [err]
                     (is false (str "explicit net-min regression failed: " err))
                     (done)))))))
+
+(def ^:private proxy-day-ms
+  (* 24 60 60 1000))
+
+(defn- proxy-daily-candles
+  [start-day count* base]
+  (mapv (fn [idx]
+          {:time-ms (* (+ start-day idx) proxy-day-ms)
+           :close (str (+ base idx))})
+        (range count*)))
+
+(deftest run-optimization-engine-backs-proxy-history-assumption-test
+  ;; TOKENX has 10 days of native history. With a complete proxy assumption
+  ;; (basket BTC+ETH, 80% vol, 5% cap) the minimum-variance run must include it,
+  ;; give it a covariance row synthesized FROM the proxies (never zero
+  ;; correlation), enforce the cap, keep regression confidence low for the tiny
+  ;; overlap, and use the stated expected return rather than a 10-day mean.
+  (let [request (fixtures/sample-engine-request
+                 {:draft (fixtures/sample-draft
+                          {:id "scenario-proxy"
+                           :universe [{:instrument-id "perp:BTC"
+                                       :market-type :perp
+                                       :coin "BTC"}
+                                      {:instrument-id "perp:ETH"
+                                       :market-type :perp
+                                       :coin "ETH"}
+                                      {:instrument-id "perp:TOKENX"
+                                       :market-type :perp
+                                       :coin "TOKENX"}]
+                           :return-model {:kind :historical-mean}
+                           :risk-model {:kind :sample-covariance}
+                           :objective {:kind :minimum-variance}
+                           :constraints {:long-only? true
+                                         :max-asset-weight 0.8
+                                         :rebalance-tolerance 0.001}
+                           :history-assumptions
+                           {"perp:TOKENX" {:behavior :proxy
+                                           :expected-return 0.0
+                                           :volatility 0.8
+                                           :max-weight 0.05
+                                           :proxy {:instrument-ids ["perp:BTC"
+                                                                    "perp:ETH"]
+                                                   :relationship-strength :medium
+                                                   :prior-weights nil}}}})
+                  :current-portfolio (fixtures/sample-current-portfolio
+                                      {:capital {:nav-usdc 10000}
+                                       :by-instrument {"perp:BTC" {:weight 0.6}
+                                                       "perp:ETH" {:weight 0.4}}})
+                  :history-data {:candle-history-by-coin
+                                 {"BTC" (proxy-daily-candles 0 400 100)
+                                  "ETH" (proxy-daily-candles 0 400 2000)
+                                  "TOKENX" (proxy-daily-candles 390 10 10)}
+                                 :funding-history-by-coin {}}
+                  :market-cap-by-coin {}
+                  :as-of-ms (* 401 proxy-day-ms)})
+        calls (atom [])
+        result (engine/run-optimization
+                request
+                {:solve-problem (fn [problem]
+                                  (swap! calls conj problem)
+                                  {:status :solved
+                                   :solver :fixture-solver
+                                   :weights [0.5 0.45 0.05]
+                                   :iterations 3
+                                   :elapsed-ms 1})})
+        problem (first @calls)
+        tokenx-idx (.indexOf (:instrument-ids problem) "perp:TOKENX")
+        quadratic (:quadratic problem)
+        diagnostics (get-in result [:risk-estimation :history-assumptions
+                                    "perp:TOKENX"])]
+    (is (= :solved (:status result)))
+    (is (= ["perp:BTC" "perp:ETH" "perp:TOKENX"] (:instrument-ids result))
+        "The proxy asset reaches the solve - it is not silently dropped.")
+    (is (= 2 tokenx-idx))
+    (is (pos? (get-in quadratic [tokenx-idx 0]))
+        "Cov(BTC, TOKENX) comes from the proxy basket, not zero correlation.")
+    (is (pos? (get-in quadratic [tokenx-idx 1])))
+    (is (near? (get-in quadratic [0 tokenx-idx])
+               (get-in quadratic [tokenx-idx 0]))
+        "The synthesized row/column is symmetric.")
+    (is (> (get-in quadratic [tokenx-idx tokenx-idx]) 0.5)
+        "Total variance honors the stated 80% volatility (specific risk added).")
+    (is (near? 0.05 (get-in problem [:upper-bounds tokenx-idx]))
+        "The 5% proxy cap is enforced through the constraint machinery.")
+    (is (some? diagnostics) "Result diagnostics disclose the proxy modeling.")
+    (is (= ["perp:BTC" "perp:ETH"] (:proxy-instrument-ids diagnostics)))
+    (is (< (:confidence-q diagnostics) 0.08)
+        "Ten days of overlap keeps regression confidence low even on a good fit.")
+    (is (pos? (:specific-variance diagnostics)))
+    (is (= 0.0 (get-in result [:expected-returns-by-instrument "perp:TOKENX"]))
+        "The assumption's expected return is used - never the raw 10-day mean.")
+    (is (= 0.05 (get-in result [:target-weights-by-instrument "perp:TOKENX"])))))

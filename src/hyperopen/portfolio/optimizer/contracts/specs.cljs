@@ -77,7 +77,10 @@
   #{:taker :maker})
 
 (def history-assumption-behaviors
-  #{:conservative})
+  #{:conservative :proxy})
+
+(def history-assumption-relationship-strengths
+  #{:low :medium :high})
 
 (defn- absent-or-allowed?
   [allowed value]
@@ -231,6 +234,18 @@
                 :fee-bps-by-id
                 :cost-contexts-by-id])))
 
+(defn- history-assumption-proxy-config?
+  ;; The nested :proxy submap of a proxy-mode entry. Instrument ids may be empty
+  ;; while the user is still picking chips (completeness is enforced by
+  ;; readiness, not the persistence spec); prior weights are nil (equal weight)
+  ;; or an id-keyed map reserved for explicit baskets.
+  [value]
+  (and (map? value)
+       (id-vector? (:instrument-ids value))
+       (optional? #(contains? history-assumption-relationship-strengths %)
+                  (:relationship-strength value))
+       (map-or-nil? (:prior-weights value))))
+
 (defn- history-assumption-entry?
   [value]
   (and (map? value)
@@ -238,12 +253,14 @@
        (finite-field? value :expected-return)
        (finite-field? value :volatility)
        (finite-field? value :max-weight)
-       ;; Conservative is the only behavior; correlation-floor is always seeded by
-       ;; defaults. expected-return / volatility stay nil-allowed (blank until the
-       ;; user fills them, completeness enforced by readiness). Legacy :proxy entries
-       ;; are converted to :conservative on load (see contracts.migrations).
-       (= :conservative (:behavior value))
-       (coercion/finite-number? (:correlation-floor value))))
+       ;; expected-return / volatility stay nil-allowed (blank until the user
+       ;; fills them, completeness enforced by readiness). Legacy single-proxy
+       ;; entries (:proxy-instrument-id, no :proxy submap) are converted to
+       ;; :conservative on load (see contracts.migrations).
+       (case (:behavior value)
+         :conservative (coercion/finite-number? (:correlation-floor value))
+         :proxy (history-assumption-proxy-config? (:proxy value))
+         false)))
 
 (defn- history-assumptions?
   [value]

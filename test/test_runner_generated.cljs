@@ -314,6 +314,7 @@
             [hyperopen.portfolio.optimizer.infrastructure.solver-adapter-parity-test]
             [hyperopen.portfolio.optimizer.infrastructure.solver-adapter-test]
             [hyperopen.portfolio.optimizer.infrastructure.wire-test]
+            [hyperopen.portfolio.optimizer.infrastructure.working-order-refresh-test]
             [hyperopen.portfolio.optimizer.instrument-keyed-codec-test]
             [hyperopen.portfolio.optimizer.query-state-test]
             [hyperopen.portfolio.optimizer.refinement-actions-test]
@@ -1085,6 +1086,7 @@
              'hyperopen.portfolio.optimizer.infrastructure.solver-adapter-parity-test
              'hyperopen.portfolio.optimizer.infrastructure.solver-adapter-test
              'hyperopen.portfolio.optimizer.infrastructure.wire-test
+             'hyperopen.portfolio.optimizer.infrastructure.working-order-refresh-test
              'hyperopen.portfolio.optimizer.instrument-keyed-codec-test
              'hyperopen.portfolio.optimizer.query-state-test
              'hyperopen.portfolio.optimizer.refinement-actions-test

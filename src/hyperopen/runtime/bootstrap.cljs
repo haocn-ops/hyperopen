@@ -87,6 +87,8 @@
            websocket-watchers-deps
            install-optimization-progress-ticker!
            optimization-progress-ticker-deps
+           install-working-order-refresh!
+           working-order-refresh-deps
            install-optimizer-draft-watchers!
            optimizer-draft-watchers-deps]}]
   (install-store-cache-watchers!
@@ -98,6 +100,8 @@
    websocket-watchers-deps)
   (when (fn? install-optimization-progress-ticker!)
     (install-optimization-progress-ticker! optimization-progress-ticker-deps))
+  (when (fn? install-working-order-refresh!)
+    (install-working-order-refresh! working-order-refresh-deps))
   (when (fn? install-optimizer-draft-watchers!)
     (install-optimizer-draft-watchers! optimizer-draft-watchers-deps)))
 

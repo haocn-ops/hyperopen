@@ -95,8 +95,14 @@
       ;; [:option ...] lands as a sibling child; targeting a bare vector-of-options
       ;; nests them as ONE child value, which Replicant renders as a stringified
       ;; literal instead of real <option> elements.
-      (into [:select {:class ["w-full" "border" "border-base-300" "bg-base-100/80" "px-2"
-                              "py-1.5" "font-mono" "text-[0.75rem]" "text-trading-muted"]
+      ;; py-0 + leading-none: optimizer surfaces pin every input/select to a
+      ;; fixed 26px border-box (optimizer/base.css) while @tailwindcss/forms
+      ;; applies 0.5rem vertical padding to every <select>. Left alone that
+      ;; padding leaves ~8px of content for a 12px line and clips the text, so
+      ;; py-0 overrides it and the line centers cleanly inside the 26px.
+      (into [:select {:class ["w-full" "border" "border-base-300" "bg-base-100/80"
+                              "py-0" "pl-2" "pr-7" "font-mono" "text-[0.75rem]" "leading-none"
+                              "text-trading-muted"]
                       :value ""
                       :data-role (str "portfolio-optimizer-history-assumption-proxy-add-" id)
                       :on {:change [[(get-in card [:actions :toggle-proxy-asset])
@@ -332,10 +338,13 @@
   [addable-assets]
   (when (seq addable-assets)
     ;; Full-width own row (see history-assumptions-section) so the placeholder
-    ;; "+ Model an asset with proxies…" is never clipped by a cramped header
-    ;; column; pr-7 leaves room for the native chevron.
+    ;; "+ Model an asset with proxies…" is never clipped horizontally. py-0 +
+    ;; leading-none: optimizer surfaces pin inputs/selects to a fixed 26px
+    ;; border-box (optimizer/base.css) while @tailwindcss/forms adds 0.5rem
+    ;; vertical padding to every <select> - left alone it clips the text, so
+    ;; py-0 overrides it; pr-7 leaves room for the native chevron.
     (into [:select {:class ["w-full" "border" "border-base-300" "bg-base-100/80"
-                            "py-1.5" "pl-2" "pr-7" "font-mono" "text-[0.75rem]"
+                            "py-0" "pl-2" "pr-7" "font-mono" "text-[0.75rem]" "leading-none"
                             "text-trading-muted"]
                     :value ""
                     :data-role "portfolio-optimizer-history-assumption-workflow-add"

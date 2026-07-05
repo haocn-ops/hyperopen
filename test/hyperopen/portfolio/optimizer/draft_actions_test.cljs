@@ -638,6 +638,9 @@
 (def ^:private history-assumptions-path
   [:portfolio :optimizer :draft :history-assumptions])
 
+(def ^:private history-reference-instruments-path
+  [:portfolio :optimizer :draft :proxy-reference-instruments])
+
 (def ^:private dirty-path
   [:portfolio :optimizer :draft :metadata :dirty?])
 
@@ -689,8 +692,18 @@
            :relationship-strength :medium
            :prior-weights nil}})
 
+(defn- ha-state-with-universe
+  [assumptions universe]
+  (assoc-in (ha-state assumptions)
+            [:portfolio :optimizer :draft :universe]
+            universe))
+
 (deftest set-history-assumption-proxy-asset-toggles-membership-test
-  (let [with-proxy (ha-state {"perp:NEW" proxy-entry-fixture})]
+  ;; perp:ETH is a universe member here, so no catalog resolution is needed.
+  (let [with-proxy (ha-state-with-universe {"perp:NEW" proxy-entry-fixture}
+                                           [{:instrument-id "perp:NEW"}
+                                            {:instrument-id "perp:BTC"}
+                                            {:instrument-id "perp:ETH"}])]
     (is (= ["perp:BTC" "perp:ETH"]
            (get-in (actions/set-portfolio-optimizer-history-assumption-proxy-asset
                     with-proxy "perp:NEW" "perp:ETH" true)
@@ -705,10 +718,45 @@
                with-proxy "perp:NEW" "perp:NEW" true))
         "An asset can never proxy itself.")
     (is (= [] (actions/set-portfolio-optimizer-history-assumption-proxy-asset
+               with-proxy "perp:NEW" "perp:ZZZ" true))
+        "An out-of-universe proxy the catalog can't resolve is a no-op.")
+    (is (= [] (actions/set-portfolio-optimizer-history-assumption-proxy-asset
                (ha-state {"perp:NEW" {:behavior :conservative
                                       :correlation-floor 0.75}})
                "perp:NEW" "perp:BTC" true))
         "Proxy toggles only apply to proxy-mode entries.")))
+
+(deftest set-history-assumption-proxy-asset-catalog-reference-only-test
+  ;; A proxy outside the universe is resolved from the market catalog, stored as
+  ;; a reference-only instrument, and its history is prefetched - so the engine
+  ;; can synthesize covariance from it without it ever becoming a holding.
+  (let [state (-> (ha-state {"perp:NEW" proxy-entry-fixture})
+                  (assoc-in [:asset-selector :market-by-key "perp:SOL"]
+                            {:key "perp:SOL" :market-type :perp :coin "SOL"
+                             :symbol "SOL-USDC"}))
+        effects (actions/set-portfolio-optimizer-history-assumption-proxy-asset
+                 state "perp:NEW" "perp:SOL" true)
+        path-values (get-in effects [0 1])
+        by-path (into {} (map (fn [[p v]] [p v])) path-values)
+        refs (get by-path history-reference-instruments-path)]
+    (is (= ["perp:BTC" "perp:SOL"]
+           (get-in effects [0 1 0 1 "perp:NEW" :proxy :instrument-ids]))
+        "The catalog proxy is added to the assumption.")
+    (is (= ["perp:SOL"] (mapv :instrument-id refs))
+        "It is stored as a reference-only proxy instrument (outside the universe).")
+    (is (= :perp (:market-type (first refs))) "Catalog metadata is resolved.")
+    (is (some (fn [effect]
+                (= [:portfolio :optimizer :history-prefetch] (first effect)))
+              path-values)
+        "Its history is enqueued for prefetch so covariance can use it.")
+    ;; perp:BTC is a universe member, so adding it never creates a reference.
+    (let [btc-effects (actions/set-portfolio-optimizer-history-assumption-proxy-asset
+                       (assoc-in state [:portfolio :optimizer :draft :universe]
+                                 [{:instrument-id "perp:NEW"} {:instrument-id "perp:SOL"}])
+                       "perp:NEW" "perp:SOL" true)]
+      (is (empty? (get (into {} (get-in btc-effects [0 1]))
+                       history-reference-instruments-path))
+          "An in-universe proxy is not duplicated into reference-instruments."))))
 
 (deftest set-history-assumption-relationship-strength-test
   (let [with-proxy (ha-state {"perp:NEW" proxy-entry-fixture})]

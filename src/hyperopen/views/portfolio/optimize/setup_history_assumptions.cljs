@@ -67,13 +67,18 @@
     (when (seq (:selected-proxies card))
       (into [:div {:class ["flex" "flex-wrap" "gap-1"]
                    :data-role (str "portfolio-optimizer-history-assumption-proxies-" id)}]
-            (map (fn [{:keys [instrument-id label usable?]}]
+            (map (fn [{:keys [instrument-id label loading?]}]
                    [:span {:class ["inline-flex" "items-center" "gap-1" "border"
-                                   "px-1.5" "py-0.5" "font-mono" "text-[0.6875rem]"
-                                   (if usable? "border-base-300" "border-warning/60")
-                                   (if usable? "text-trading-text" "text-warning")
-                                   "bg-base-200/40"]}
+                                   "border-base-300" "bg-base-200/40" "px-1.5" "py-0.5"
+                                   "font-mono" "text-[0.6875rem]" "text-trading-text"]
+                           :data-role (str "portfolio-optimizer-history-assumption-proxy-chip-"
+                                           id "-" instrument-id)}
                     label
+                    ;; A just-picked reference proxy is still fetching history.
+                    (when loading?
+                      [:span {:class ["text-[0.5625rem]" "uppercase" "tracking-[0.06em]"
+                                      "text-trading-muted"]}
+                       "loading"])
                     [:button {:type "button"
                               :class ["text-trading-muted" "hover:text-warning"]
                               :aria-label (str "Remove proxy " label)
@@ -84,33 +89,46 @@
                      "x"]]))
             (:selected-proxies card)))))
 
-(defn- proxy-add-select
+(defn- proxy-search
+  "Typeahead over the WHOLE asset catalog (not just the selected universe):
+  type a ticker/name, click a match, and it becomes a proxy chip. A picked proxy
+  outside the portfolio is modeled as reference-only (history loaded for
+  covariance, never allocated)."
   [card]
   (let [id (:instrument-id card)
-        available (->> (:proxy-options card)
-                       (remove :selected?)
-                       (filter :usable?))]
-    (when (seq available)
-      ;; `into` must target the [:select ...] hiccup vector itself so each
-      ;; [:option ...] lands as a sibling child; targeting a bare vector-of-options
-      ;; nests them as ONE child value, which Replicant renders as a stringified
-      ;; literal instead of real <option> elements.
-      ;; py-0 + leading-none: optimizer surfaces pin every input/select to a
-      ;; fixed 26px border-box (optimizer/base.css) while @tailwindcss/forms
-      ;; applies 0.5rem vertical padding to every <select>. Left alone that
-      ;; padding leaves ~8px of content for a 12px line and clips the text, so
-      ;; py-0 overrides it and the line centers cleanly inside the 26px.
-      (into [:select {:class ["w-full" "border" "border-base-300" "bg-base-100/80"
-                              "py-0" "pl-2" "pr-7" "font-mono" "text-[0.75rem]" "leading-none"
-                              "text-trading-muted"]
-                      :value ""
-                      :data-role (str "portfolio-optimizer-history-assumption-proxy-add-" id)
-                      :on {:change [[(get-in card [:actions :toggle-proxy-asset])
-                                     id [:event.target/value] true]]}}
-             [:option {:value ""} "+ add proxy asset"]]
-            (map (fn [{:keys [instrument-id label]}]
-                   [:option {:value instrument-id} label]))
-            available))))
+        results (:proxy-search-results card)]
+    [:div {:class ["relative"]}
+     [:input {:type "text"
+              :class ["w-full" "border" "border-base-300" "bg-base-100/80" "px-2" "py-1.5"
+                      "font-mono" "text-[0.75rem]" "text-trading-text"
+                      "outline-none" "focus:border-warning/70"]
+              :placeholder "Search any asset to add as a proxy…"
+              :data-role (str "portfolio-optimizer-history-assumption-proxy-search-" id)
+              :value (or (:proxy-search-query card) "")
+              :on {:input [[(get-in card [:actions :set-proxy-search]) id
+                            [:event.target/value]]]}}]
+     (when (seq results)
+       (into [:div {:class ["mt-1" "border" "border-base-300" "bg-base-200/80"
+                            "shadow-[0_12px_32px_rgba(0,0,0,0.45)]"]
+                    :role "listbox"
+                    :data-role (str "portfolio-optimizer-history-assumption-proxy-results-" id)}]
+             (map (fn [{:keys [instrument-id label]}]
+                    [:button {:type "button"
+                              :class ["flex" "w-full" "items-center" "justify-between" "gap-2"
+                                      "border-b" "border-base-300" "px-2" "py-1.5" "text-left"
+                                      "last:border-b-0" "hover:bg-base-200/60"]
+                              :role "option"
+                              :data-role (str "portfolio-optimizer-history-assumption-proxy-option-"
+                                              id "-" instrument-id)
+                              ;; Add the proxy, then clear the search buffer.
+                              :on {:click [[(get-in card [:actions :toggle-proxy-asset])
+                                            id instrument-id true]
+                                           [(get-in card [:actions :set-proxy-search]) id ""]]}}
+                     [:span {:class ["truncate" "font-mono" "text-[0.75rem]" "font-semibold"]}
+                      label]
+                     [:span {:class ["shrink-0" "font-mono" "text-[0.6875rem]" "text-warning"]}
+                      "+ add"]]))
+             results))]))
 
 (defn- relationship-selector
   [card]
@@ -197,10 +215,10 @@
      [:div
       [:span {:class controls/eyebrow-class} "Proxy assets"]
       [:p {:class ["mt-1" "text-[0.6875rem]" "text-trading-muted"]}
-       "Assets with usable history this asset behaves like"]
+       "Search any asset this one behaves like — it doesn't have to be in your portfolio"]
       [:div {:class ["mt-1.5" "space-y-1.5"]}
        (proxy-chips card)
-       (proxy-add-select card)]]
+       (proxy-search card)]]
      (relationship-selector card)
      [:div {:class ["grid" "gap-2" "sm:grid-cols-2"]}
       (percent-input

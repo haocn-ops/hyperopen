@@ -91,7 +91,11 @@
   ;; Additive backfill: drafts persisted before history assumptions existed lack
   ;; the key, which the strengthened ::draft spec now requires. Default to an
   ;; empty map; no schema-version bump is needed for a purely additive key.
-  (update draft :history-assumptions #(or % {})))
+  (-> draft
+      (update :history-assumptions #(or % {}))
+      ;; Reference-only proxy instruments (catalog proxies outside the universe)
+      ;; are likewise additive: drafts written before they existed default to [].
+      (update :proxy-reference-instruments #(vec (or % [])))))
 
 (defn- legacy-proxy-entry?
   ;; The ORIGINAL (removed) :proxy behavior mapped the asset to a single related

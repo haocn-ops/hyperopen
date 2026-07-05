@@ -3,8 +3,10 @@
             [hyperopen.portfolio.optimizer.application.request-builder :as request-builder]
             [hyperopen.portfolio.optimizer.application.return-views :as return-views]
             [hyperopen.portfolio.optimizer.application.setup-readiness :as setup-readiness]
+            [hyperopen.portfolio.optimizer.application.universe-candidates :as universe-candidates]
             [hyperopen.portfolio.optimizer.application.view-model.universe :as universe]
             [hyperopen.portfolio.optimizer.coercion :as coercion]
+            [hyperopen.portfolio.optimizer.contracts :as contracts]
             [hyperopen.portfolio.optimizer.domain.history-assumptions :as history-assumptions]))
 
 (defn- warning-code-label
@@ -493,6 +495,7 @@
    :set-expected-volatility :actions/set-portfolio-optimizer-history-assumption-expected-volatility
    :set-max-weight-cap :actions/set-portfolio-optimizer-history-assumption-max-weight-cap
    :toggle-proxy-asset :actions/set-portfolio-optimizer-history-assumption-proxy-asset
+   :set-proxy-search :actions/set-portfolio-optimizer-history-assumption-proxy-search
    :set-relationship-strength :actions/set-portfolio-optimizer-history-assumption-relationship-strength
    :apply :actions/apply-portfolio-optimizer-history-assumption
    :reset :actions/reset-portfolio-optimizer-history-assumption
@@ -586,25 +589,56 @@
     :value (observations-label observations)
     :detail nil}])
 
-(defn- proxy-option-rows
-  "Selectable proxy candidates for one card: every other selected-universe asset
-  that does not itself lean on an assumption, flagged unusable when its history
-  never reached the risk model."
-  [universe assumptions usable-ids self-id selected-ids]
-  (let [selected? (set selected-ids)]
-    (->> universe
-         (keep (fn [instrument]
-                 (let [id (:instrument-id instrument)]
-                   (when (and id
-                              (not= id self-id)
-                              (nil? (:behavior (get assumptions id))))
-                     {:instrument-id id
-                      :label (universe/instrument-primary-label instrument)
-                      :selected? (contains? selected? id)
-                      :usable? (if (nil? usable-ids)
-                                 true
-                                 (contains? usable-ids id))}))))
-         vec)))
+(def ^:private proxy-search-result-limit 8)
+
+(defn- proxy-label-resolver
+  "Resolve a proxy instrument-id to a display label: from the universe /
+  reference-instrument pool, else the live market catalog, else the raw id.
+  Reference-only proxies live outside the universe, so the catalog fallback is
+  what labels them."
+  [state universe reference-instruments]
+  (let [pool (reduce (fn [m instrument] (assoc m (:instrument-id instrument) instrument))
+                     {}
+                     (concat universe reference-instruments))]
+    (fn [id]
+      (or (when-let [instrument (get pool id)]
+            (universe/instrument-primary-label instrument))
+          (when-let [market (get-in state [:asset-selector :market-by-key id])]
+            (:label (universe-candidates/market-display market)))
+          id))))
+
+(defn- selected-proxy-rows
+  "The card's picked proxies as chips, label-resolved (works for reference-only
+  proxies outside the universe). `usable-ids` is the aligned set that reached the
+  risk model; a picked proxy not yet in it is still loading (:loading? true)."
+  [selected-ids resolve-label usable-ids]
+  (mapv (fn [id]
+          {:instrument-id id
+           :label (resolve-label id)
+           :loading? (boolean (and usable-ids (not (contains? usable-ids id))))})
+        selected-ids))
+
+(defn- proxy-search-results
+  "Full-catalog proxy candidates matching the card's search query, excluding the
+  thin asset itself and any already-selected proxy. Empty until the user types -
+  this is a typeahead over the whole asset catalog, not just the universe."
+  [state self-id selected-ids query]
+  (let [query* (when (string? query) (str/trim query))]
+    (if (str/blank? query*)
+      []
+      (let [exclusion (into [{:instrument-id self-id}]
+                            (map (fn [id] {:instrument-id id}))
+                            selected-ids)]
+        (->> (universe-candidates/candidate-markets state exclusion query*
+                                                    {:ranking :asset-query})
+             (keep (fn [market]
+                     (let [mid (:key market)]
+                       (when (and mid (not= mid self-id))
+                         {:instrument-id mid
+                          :label (:label (universe-candidates/market-display market))
+                          :market-type (:market-type market)}))))
+             (take proxy-search-result-limit)
+             vec)))))
 
 (defn- prior-basket-rows
   "V1 prior basket: equal weight across the selected proxies (explicit priors are
@@ -621,16 +655,15 @@
 
 (defn- history-assumption-card
   [{:keys [instrument label entry complete? errors note percent-label*
-           assumption-required? return-required? observations proxy-options]}]
+           assumption-required? return-required? observations
+           resolve-proxy-label usable-ids search-query state]}]
   (let [id (:instrument-id instrument)
         behavior (:behavior entry)
         proxy? (= :proxy behavior)
         status (card-status entry complete? assumption-required?)
         selected-ids (when proxy? (history-assumptions/proxy-instrument-ids entry))
-        selected-set (set selected-ids)
         selected-proxies (when proxy?
-                           (filterv #(contains? selected-set (:instrument-id %))
-                                    proxy-options))
+                           (selected-proxy-rows selected-ids resolve-proxy-label usable-ids))
         relationship (when proxy? (history-assumptions/relationship-strength entry))
         acknowledged? (boolean (get-in entry [:metadata :acknowledged?]))]
     (cond-> {:instrument-id id
@@ -655,9 +688,10 @@
                         (card-summary entry (mapv :label selected-proxies) percent-label*))
              :actions assumption-action-ids}
       proxy?
-      (assoc :proxy-options proxy-options
-             :selected-proxy-ids (vec selected-ids)
+      (assoc :selected-proxy-ids (vec selected-ids)
              :selected-proxies selected-proxies
+             :proxy-search-query (str (or search-query ""))
+             :proxy-search-results (proxy-search-results state id selected-ids search-query)
              :relationship-strength relationship
              :relationship-label (get relationship-labels relationship)
              :relationship-options relationship-options
@@ -687,6 +721,9 @@
          usable-ids (when-let [eligible (get-in readiness
                                                 [:request :history :eligible-instruments])]
                       (request-builder/usable-proxy-id-set eligible assumptions))
+         reference-instruments (get-in draft [:proxy-reference-instruments])
+         resolve-proxy-label (proxy-label-resolver state universe reference-instruments)
+         search-queries (get-in state contracts/ui-proxy-search-queries-path)
          cards (->> universe
                     (keep (fn [instrument]
                             (let [id (:instrument-id instrument)
@@ -724,12 +761,10 @@
                                     :return-required? return-required?
                                     :observations (universe/native-history-observations
                                                    state readiness instrument)
-                                    :proxy-options (proxy-option-rows universe
-                                                                      assumptions
-                                                                      usable-ids
-                                                                      id
-                                                                      (history-assumptions/proxy-instrument-ids
-                                                                       entry))}))))))
+                                    :state state
+                                    :usable-ids usable-ids
+                                    :resolve-proxy-label resolve-proxy-label
+                                    :search-query (get search-queries id)}))))))
                     vec)
          carded-ids (into #{} (map :instrument-id) cards)
          ;; Any selected asset can be brought into the workflow by hand - the user

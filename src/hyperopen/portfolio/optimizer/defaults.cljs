@@ -31,6 +31,7 @@
                            :fee-mode :taker
                            :manual-capital-usdc nil}
    :history-assumptions {}
+   :proxy-reference-instruments []
    :metadata {:created-at-ms nil
               :updated-at-ms nil
               :dirty? false}})
@@ -220,6 +221,7 @@
    :list-sort :updated-desc
    :universe-search-query ""
    :universe-search-active-index 0
+   :proxy-search-queries {}
    :objective-menu-open? false
    :objective-menu-selection nil
    :objective-menu-view-order []

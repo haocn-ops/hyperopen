@@ -3,6 +3,7 @@
             [hyperopen.portfolio.optimizer.actions.common :as common]
             [hyperopen.portfolio.optimizer.actions.draft-options :as draft-options]
             [hyperopen.portfolio.optimizer.application.black-litterman-editor-model :as bl-model]
+            [hyperopen.portfolio.optimizer.application.history-prefetch :as history-prefetch]
             [hyperopen.portfolio.optimizer.application.return-inputs :as return-inputs]
             [hyperopen.portfolio.optimizer.application.return-views :as return-views]
             [hyperopen.portfolio.optimizer.application.setup-readiness :as setup-readiness]
@@ -599,6 +600,78 @@
   (common/save-draft-path-values
    [[contracts/draft-history-assumptions-path assumptions]]))
 
+;; --- Reference-only proxy instruments ---------------------------------------
+;;
+;; A proxy can be ANY catalog asset, not just one already in the universe. A
+;; proxy that is NOT a universe member is a "reference-only" instrument: its
+;; history is loaded (so the engine can synthesize the thin asset's covariance
+;; from it) but it is never allocated. Its instrument metadata (coin,
+;; market-type) is stored in the draft's :proxy-reference-instruments so history
+;; loading and alignment can find it; the universe list stays untouched.
+
+(defn- universe-instrument-ids
+  [state]
+  (into #{} (keep :instrument-id) (get-in state contracts/draft-universe-path)))
+
+(defn- referenced-proxy-ids
+  "Every proxy id referenced by SOME proxy-behavior assumption."
+  [assumptions]
+  (into #{}
+        (mapcat (fn [[_ entry]]
+                  (when (history-assumptions/proxy? entry)
+                    (history-assumptions/proxy-instrument-ids entry))))
+        assumptions))
+
+(defn- resolve-catalog-instrument
+  "Resolve a proxy id (a live market-catalog key) to a universe-instrument map;
+  nil when the catalog doesn't know it."
+  [state proxy-id]
+  (when-let [market (get-in state [:asset-selector :market-by-key proxy-id])]
+    (common/market->universe-instrument market)))
+
+(defn- reconcile-reference-instruments
+  "Reference-only proxy instruments = every referenced proxy id that is NOT a
+  universe member, resolved from the known pool (existing reference-instruments
+  plus any freshly-resolved instrument). Deterministic (sorted by id), deduped;
+  drops instruments no assumption references anymore."
+  [state assumptions extra-instruments]
+  (let [universe-ids (universe-instrument-ids state)
+        known (reduce (fn [m i] (assoc m (:instrument-id i) i))
+                      {}
+                      (concat (get-in state contracts/draft-proxy-reference-instruments-path)
+                              extra-instruments))]
+    (->> (referenced-proxy-ids assumptions)
+         (remove universe-ids)
+         sort
+         (keep known)
+         vec)))
+
+(defn- save-assumptions+refs
+  "Persist updated assumptions and the reconciled reference-only proxy
+  instruments in one draft save. When a newly-referenced out-of-universe proxy
+  is supplied, also enqueue a history prefetch so its covariance history loads."
+  ([state assumptions*]
+   (save-assumptions+refs state assumptions* nil))
+  ([state assumptions* new-instrument]
+   (let [refs (reconcile-reference-instruments state
+                                               assumptions*
+                                               (when new-instrument [new-instrument]))
+         existing-refs (vec (get-in state contracts/draft-proxy-reference-instruments-path))
+         prefetch-plan (when new-instrument
+                         (history-prefetch/enqueue-missing-instruments state
+                                                                       [new-instrument]))
+         path-values (cond-> [[contracts/draft-history-assumptions-path assumptions*]]
+                       ;; Only rewrite the reference-instruments when they change,
+                       ;; so seeding a fresh assumption stays a pure assumptions save.
+                       (not= refs existing-refs)
+                       (conj [contracts/draft-proxy-reference-instruments-path refs])
+
+                       (:changed? prefetch-plan)
+                       (conj [contracts/history-prefetch-path (:state prefetch-plan)]))]
+     (cond-> (common/save-draft-path-values path-values)
+       (:start? prefetch-plan)
+       (conj history-prefetch/selection-prefetch-effect)))))
+
 (declare unacknowledged)
 
 (defn- update-history-assumption-field
@@ -632,7 +705,9 @@
 
                         (some? (:volatility existing))
                         (assoc :volatility (:volatility existing)))]
-            (save-history-assumptions (assoc assumptions instrument-id* entry)))))
+            ;; Switching away from proxy drops the entry's proxy ids, so
+            ;; reconcile the reference-only instruments (GC any now-unreferenced).
+            (save-assumptions+refs state (assoc assumptions instrument-id* entry)))))
       [])))
 
 (defn set-portfolio-optimizer-history-assumption-expected-return
@@ -656,7 +731,9 @@
         assumptions (history-assumptions-map state)]
     (if (and instrument-id*
              (contains? assumptions instrument-id*))
-      (save-history-assumptions (dissoc assumptions instrument-id*))
+      ;; Removing the entry drops its proxy ids, so reconcile the reference-only
+      ;; instruments too (GC any proxy no assumption references anymore).
+      (save-assumptions+refs state (dissoc assumptions instrument-id*))
       [])))
 
 (defn- unacknowledged
@@ -673,27 +750,48 @@
 
 (defn set-portfolio-optimizer-history-assumption-proxy-asset
   "Adds (enabled? true) or removes (enabled? false) one proxy asset on a
-  proxy-mode entry. The asset can never proxy itself."
+  proxy-mode entry. The proxy may be ANY catalog asset, not just a universe
+  member: enabling one that is not in the universe resolves its instrument from
+  the market catalog, stores it as a reference-only proxy (history loaded, never
+  allocated), and prefetches its history. An asset can never proxy itself, and an
+  unknown id the catalog can't resolve is a no-op."
   [state instrument-id proxy-instrument-id enabled?]
   (let [instrument-id* (common/non-blank-text instrument-id)
         proxy-id* (common/non-blank-text proxy-instrument-id)
         enabled?* (common/parse-boolean-value enabled?)
         assumptions (history-assumptions-map state)
-        entry (get assumptions instrument-id*)]
+        entry (get assumptions instrument-id*)
+        in-universe? (contains? (universe-instrument-ids state) proxy-id*)
+        ;; Only resolve/prefetch when ADDING an out-of-universe proxy.
+        resolved (when (and enabled?* proxy-id* (not in-universe?))
+                   (resolve-catalog-instrument state proxy-id*))]
     (if (and instrument-id*
              proxy-id*
              (not= instrument-id* proxy-id*)
              (some? enabled?*)
-             (history-assumptions/proxy? entry))
-      (save-history-assumptions
-       (assoc assumptions instrument-id*
-              (-> entry
-                  (update-in [:proxy :instrument-ids]
-                             #(common/set-membership (vec (or % []))
-                                                     proxy-id*
-                                                     enabled?*))
-                  unacknowledged)))
+             (history-assumptions/proxy? entry)
+             ;; Adding an out-of-universe proxy the catalog can't resolve is a no-op.
+             (or (not enabled?*) in-universe? (some? resolved)))
+      (let [assumptions* (assoc assumptions instrument-id*
+                                (-> entry
+                                    (update-in [:proxy :instrument-ids]
+                                               #(common/set-membership (vec (or % []))
+                                                                       proxy-id*
+                                                                       enabled?*))
+                                    unacknowledged))]
+        (save-assumptions+refs state assumptions* resolved))
       [])))
+
+(defn set-portfolio-optimizer-history-assumption-proxy-search
+  "Stores the per-card proxy catalog search query (UI-only; not part of the
+  draft, so it never marks the scenario dirty)."
+  [state instrument-id query]
+  (if-let [instrument-id* (common/non-blank-text instrument-id)]
+    (let [queries (or (get-in state contracts/ui-proxy-search-queries-path) {})]
+      [[:effects/save
+        contracts/ui-proxy-search-queries-path
+        (assoc queries instrument-id* (str (or query "")))]])
+    []))
 
 (defn set-portfolio-optimizer-history-assumption-relationship-strength
   [state instrument-id value]
@@ -732,5 +830,7 @@
         behavior (get-in assumptions [instrument-id* :behavior])]
     (if-let [entry (and instrument-id*
                         (history-assumptions/default-assumption behavior))]
-      (save-history-assumptions (assoc assumptions instrument-id* entry))
+      ;; Re-seeding clears the entry's proxy ids, so reconcile reference-only
+      ;; instruments (GC any now-unreferenced proxy).
+      (save-assumptions+refs state (assoc assumptions instrument-id* entry))
       [])))

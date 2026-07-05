@@ -331,8 +331,12 @@
   appears immediately below."
   [addable-assets]
   (when (seq addable-assets)
-    (into [:select {:class ["border" "border-base-300" "bg-base-100/80" "px-2" "py-1.5"
-                            "font-mono" "text-[0.6875rem]" "text-trading-muted"]
+    ;; Full-width own row (see history-assumptions-section) so the placeholder
+    ;; "+ Model an asset with proxies…" is never clipped by a cramped header
+    ;; column; pr-7 leaves room for the native chevron.
+    (into [:select {:class ["w-full" "border" "border-base-300" "bg-base-100/80"
+                            "py-1.5" "pl-2" "pr-7" "font-mono" "text-[0.75rem]"
+                            "text-trading-muted"]
                     :value ""
                     :data-role "portfolio-optimizer-history-assumption-workflow-add"
                     :on {:change [[:actions/set-portfolio-optimizer-history-assumption-mode
@@ -352,26 +356,23 @@
       (into [:section {:class ["optimizer-setup-panel" "border" "border-base-300"
                                "bg-base-100/90" "p-3" "space-y-3"]
                        :data-role "portfolio-optimizer-history-assumptions-section"}
-             [:div {:class ["flex" "items-start" "justify-between" "gap-2"]}
-              [:div
+             [:div {:class ["flex" "items-start" "justify-between" "gap-3"]}
+              [:div {:class ["min-w-0"]}
                [:p {:class controls/section-title-class}
-                "Proxy Workflow for Short-History Assets"
-                [:span {:class ["ml-2" "border" "border-primary/40" "bg-primary/10" "px-1"
-                                "py-px" "align-middle" "font-mono" "text-[0.5625rem]"
-                                "font-semibold" "uppercase" "tracking-[0.1em]" "text-primary"]}
-                 "Beta"]]
+                "Proxy Workflow for Short-History Assets"]
                [:p {:class ["mt-1" "text-[0.75rem]" "leading-[1.45]" "text-trading-muted"]}
                 "Define assumptions for assets whose return history you don't trust."]]
-              [:div {:class ["flex" "flex-col" "items-end" "gap-1.5"]}
-               (when (seq cards)
-                 [:span {:class ["whitespace-nowrap" "font-mono" "text-[0.6875rem]"
-                                 "text-trading-muted/70"]
-                         :data-role "portfolio-optimizer-history-assumptions-count"}
-                  (str (count cards)
-                       (if (= 1 (count cards))
-                         " asset in the workflow"
-                         " assets in the workflow"))])
-               (add-asset-select addable-assets)]]]
+              (when (seq cards)
+                [:span {:class ["shrink-0" "whitespace-nowrap" "font-mono" "text-[0.6875rem]"
+                                "text-trading-muted/70"]
+                        :data-role "portfolio-optimizer-history-assumptions-count"}
+                 (str (count cards)
+                      (if (= 1 (count cards))
+                        " asset in the workflow"
+                        " assets in the workflow"))])]
+             ;; The picker gets its OWN full-width row so the placeholder text is
+             ;; never clipped by the header's title/description competing for width.
+             (add-asset-select addable-assets)]
             (concat
              (map assumption-card cards)
              (when (empty? cards)

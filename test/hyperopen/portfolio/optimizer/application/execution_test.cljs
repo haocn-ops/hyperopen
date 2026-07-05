@@ -93,15 +93,51 @@
         row (first (:rows attempt))]
     (is (= :ready (:status attempt)))
     (is (= :ready (:status row)))
+    ;; Market = marketable IOC: with no live book the buy prices at mark padded UP by
+    ;; the default market slippage tolerance (100 × 1.05), so it still crosses a thin
+    ;; book whose ask sits above the mark instead of matching nothing and rejecting.
     (is (= {:type "order"
             :orders [{:a 0
                       :b true
-                      :p "100"
+                      :p "105"
                       :s "0.25"
                       :r false
                       :t {:limit {:tif "Ioc"}}}]
             :grouping "na"}
            (get-in row [:request :action])))))
+
+(deftest build-execution-attempt-market-order-prices-to-cross-test
+  ;; A bare-mark IOC on a thin (named-dex) book whose touch sits outside the mark
+  ;; matches nothing — Hyperliquid rejects it with "Order could not immediately match
+  ;; against any resting orders" (observed live on xyz:SILVER, sell at mark 62.856 with
+  ;; the best bid below it). The marketable price must start from the OPPOSITE-side
+  ;; touch when the book is known (buy -> ask, sell -> bid, mirroring the manual
+  ;; ticket's apply-market-price) and pad by the market slippage tolerance.
+  (let [market-by-key {"perp:THIN" {:coin "THIN" :market-type :perp :asset-id 7 :szDecimals 0}}
+        ;; mark 62.856 sits ABOVE the best bid: a bare-mark sell IOC cannot match.
+        book {"THIN" {:render {:best-bid {:px "62.1"}
+                               :best-ask {:px "62.5"}}
+                      :timestamp 0}}
+        order-for (fn [side]
+                    (-> (execution/build-execution-plan
+                         {:scenario-id "scn_mkt"
+                          :rebalance-preview
+                          {:rows [{:instrument-id "perp:THIN" :instrument-type :perp :coin "THIN"
+                                   :status :ready :side side :price 62.856
+                                   :quantity 5
+                                   :delta-notional-usd (if (= side :buy) 314 -314)}]}
+                          :execution-assumptions {:default-order-type :market}})
+                        (#(execution/build-execution-attempt
+                           {:plan % :market-by-key market-by-key :orderbooks book}))
+                        (get-in [:rows 0 :request :action :orders 0])))
+        buy (order-for :buy)
+        sell (order-for :sell)]
+    (is (= {:tif "Ioc"} (:limit (:t buy))))
+    ;; sell prices from the best BID padded down 5% (62.1 × 0.95) — strictly below the
+    ;; bid, guaranteed to cross even though the mark sits above the whole book.
+    (is (= 58.995 (js/parseFloat (:p sell))))
+    ;; buy prices from the best ASK padded up 5% (62.5 × 1.05).
+    (is (= 65.625 (js/parseFloat (:p buy))))))
 
 (deftest build-execution-attempt-floors-wire-size-to-sz-decimals-test
   ;; The optimizer derives quantity = |notional| / price as a raw float, so the wire :s

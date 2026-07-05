@@ -9,9 +9,12 @@
             [hyperopen.runtime.state :as runtime-state]
             [hyperopen.runtime.validation :as runtime-validation]
             [hyperopen.runtime.wiring :as runtime-wiring]
+            [hyperopen.account.context :as account-context]
+            [hyperopen.order.effects :as order-effects]
             [hyperopen.portfolio.optimizer.contracts :as optimizer-contracts]
             [hyperopen.portfolio.optimizer.infrastructure.draft-autosave :as optimizer-draft-autosave]
             [hyperopen.portfolio.optimizer.infrastructure.progress-ticker :as optimizer-progress-ticker]
+            [hyperopen.portfolio.optimizer.infrastructure.working-order-refresh :as optimizer-working-order-refresh]
             [hyperopen.platform :as platform]
             [hyperopen.telemetry :as telemetry]
             [hyperopen.startup.watchers :as startup-watchers]
@@ -72,6 +75,16 @@
      :optimization-progress-ticker-deps
      {:store store
       :progress-path optimizer-contracts/optimization-progress-path}
+     :install-working-order-refresh! optimizer-working-order-refresh/install-working-order-refresh!
+     :working-order-refresh-deps
+     {:store store
+      ;; Same surface refresh the optimizer staging effect uses (base + every named
+      ;; dex's frontendOpenOrders — the streams never cover named-dex open orders).
+      :refresh-open-orders!
+      (fn [store*]
+        (when-let [address (or (account-context/effective-account-address @store*)
+                               (get-in @store* [:wallet :address]))]
+          (order-effects/refresh-account-surfaces-after-order-mutation! store* address)))}
      :install-optimizer-draft-watchers! optimizer-draft-autosave/install-optimizer-draft-watchers!
      :optimizer-draft-watchers-deps
      {:store store}}

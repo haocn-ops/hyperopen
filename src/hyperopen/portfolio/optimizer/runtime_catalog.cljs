@@ -170,6 +170,8 @@
     actions/set-portfolio-optimizer-execution-row-param
     :confirm-portfolio-optimizer-execution
     actions/confirm-portfolio-optimizer-execution
+    :amend-portfolio-optimizer-execution-order
+    actions/amend-portfolio-optimizer-execution-order
     :resume-portfolio-optimizer-execution
     actions/resume-portfolio-optimizer-execution
     :revert-portfolio-optimizer-execution-filled

@@ -194,11 +194,18 @@
         market))))
 
 (defn- perps-instrument-id
+  ;; The per-dex clearinghouse feed reports coins ALREADY dex-namespaced
+  ;; ("xyz:ORCL" on dex "xyz"); re-prefixing built a doubled id
+  ;; ("perp:xyz:xyz:ORCL") that matches neither the market catalog key nor the
+  ;; universe id, so the rebalance saw the held position and its target as two
+  ;; unrelated assets and emitted a full close + a fresh open instead of one
+  ;; net order. Only prefix the dex when the coin does not already carry it.
   [dex coin]
   (let [coin* (normalize-coin coin)
         dex* (normalize-dex dex)]
     (when (seq coin*)
-      (if (seq dex*)
+      (if (and (seq dex*)
+               (not (str/starts-with? coin* (str dex* ":"))))
         (str "perp:" dex* ":" coin*)
         (str "perp:" coin*)))))
 

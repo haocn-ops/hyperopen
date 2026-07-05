@@ -366,6 +366,7 @@
 	   :actions/toggle-portfolio-optimizer-execution-row ::portfolio-optimizer-instrument-id-args
 	   :actions/set-portfolio-optimizer-execution-row-param ::portfolio-optimizer-execution-row-param-args
 	   :actions/confirm-portfolio-optimizer-execution ::common/no-args
+	   :actions/amend-portfolio-optimizer-execution-order ::portfolio-optimizer-instrument-id-args
 	   :actions/resume-portfolio-optimizer-execution ::common/no-args
 	   :actions/revert-portfolio-optimizer-execution-filled ::common/no-args
 	   :actions/restage-portfolio-optimizer-execution-smaller ::common/no-args

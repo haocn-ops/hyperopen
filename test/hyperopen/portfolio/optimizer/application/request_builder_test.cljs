@@ -450,6 +450,42 @@
     (is (not (contains? universe-ids "perp:TOKENX"))
         "The proxy asset is not engine-backed while it points at an assumption-backed proxy.")))
 
+(deftest build-engine-request-aligns-reference-only-proxy-but-excludes-from-allocation-test
+  ;; TOKENX (universe, thin history) proxies to SOL, which is NOT in the universe.
+  ;; SOL is a reference-only proxy: its history is aligned so covariance can use
+  ;; it, but it must never be allocatable.
+  (let [draft (-> (defaults/default-draft)
+                  (assoc :id "draft-reference-proxy"
+                         :universe [{:instrument-id "perp:BTC" :market-type :perp :coin "BTC"}
+                                    {:instrument-id "perp:TOKENX" :market-type :perp :coin "TOKENX"}]
+                         :history-assumptions
+                         {"perp:TOKENX" (assoc-in complete-proxy-assumption
+                                                  [:proxy :instrument-ids] ["perp:SOL"])}
+                         :proxy-reference-instruments
+                         [{:instrument-id "perp:SOL" :market-type :perp :coin "SOL"}]))
+        request (request-builder/build-engine-request
+                 {:draft draft
+                  :history-data {:candle-history-by-coin
+                                 {"BTC" (proxy-daily-candles 0 400 100)
+                                  "SOL" (proxy-daily-candles 0 400 150)
+                                  "TOKENX" (proxy-daily-candles 390 10 10)}
+                                 :funding-history-by-coin {}}
+                  :market-cap-by-coin {}
+                  :as-of-ms (* 401 proxy-day-ms)})
+        engine-ids (set (map :instrument-id (:universe request)))
+        eligible-ids (set (map :instrument-id (get-in request [:history :eligible-instruments])))
+        entry (get-in request [:history-assumptions "perp:TOKENX"])]
+    (is (contains? eligible-ids "perp:SOL")
+        "The reference-only proxy is aligned, so its covariance is available.")
+    (is (contains? engine-ids "perp:TOKENX")
+        "The thin asset is re-admitted to the allocatable universe.")
+    (is (not (contains? engine-ids "perp:SOL"))
+        "But the reference-only proxy is NOT allocatable.")
+    (is (= ["perp:SOL"] (:proxy-instrument-ids entry)))
+    (is (= 9 (get-in entry [:regression-series :observations]))
+        "The overlap regression series resolves the out-of-universe proxy's returns.")
+    (is (= 9 (count (get-in entry [:regression-series :proxy-returns-by-id "perp:SOL"]))))))
+
 (deftest build-engine-request-treats-empty-allowlist-as-unbounded-test
   (let [draft (assoc (defaults/default-draft)
                      :id "draft-default-constraints"

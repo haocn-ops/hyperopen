@@ -111,6 +111,7 @@
           :list-sort :updated-desc
           :universe-search-query ""
           :universe-search-active-index 0
+          :proxy-search-queries {}
           :objective-menu-open? false
           :objective-menu-selection nil
           :objective-menu-view-order []

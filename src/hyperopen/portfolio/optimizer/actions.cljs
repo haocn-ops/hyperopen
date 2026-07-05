@@ -123,6 +123,9 @@
 (def set-portfolio-optimizer-history-assumption-proxy-asset
   draft/set-portfolio-optimizer-history-assumption-proxy-asset)
 
+(def set-portfolio-optimizer-history-assumption-proxy-search
+  draft/set-portfolio-optimizer-history-assumption-proxy-search)
+
 (def set-portfolio-optimizer-history-assumption-relationship-strength
   draft/set-portfolio-optimizer-history-assumption-relationship-strength)
 

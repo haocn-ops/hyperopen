@@ -224,6 +224,19 @@ Run gating (setup readiness), new rules in plain language:
 
 ## Decision Log
 
+- 2026-07-05 (owner feedback) Proxies can be ANY catalog asset, not just
+  universe members — the picker is a full-catalog typeahead. A picked proxy
+  outside the portfolio is REFERENCE-ONLY: history loaded for covariance, never
+  allocated (owner chose this over auto-adding it to the universe). Mechanism:
+  a new draft key `:proxy-reference-instruments` holds the out-of-universe proxy
+  instruments; `history-request` + a per-add prefetch fetch their candles; the
+  request builder adds them to the ALIGNMENT universe (so `Cov(A,P)` / `Σ_PP`
+  exist) but not the ENGINE (allocatable) universe, so `filter-risk-result`
+  slices them out after synthesis. No new history pipeline — reuses the
+  universe-add `history-prefetch/enqueue-missing-instruments` seam and the
+  `universe-candidates/candidate-markets` catalog search.
+
+
 - 2026-07-05 Alignment exclusion for complete proxy assets (described above).
   The brief says "their synthetic proxy row should replace the native
   short-history row"; replacement alone would leave the 10-day intersection
@@ -429,6 +442,17 @@ short-circuiting) all PASS; namespace-size exceptions bumped where legitimate.
 - [x] Post-landing owner feedback: manual "Model an asset with proxies…"
       entry point + api-v2 observation sourcing + muted THIN HISTORY chip;
       verified against the owner's live session over nREPL; gates 34/34.
+- [x] Reference-only proxies (owner feedback 2026-07-05): the per-card proxy
+      picker is now a full-catalog typeahead (search any asset → chip), not a
+      universe-limited select. A proxy outside the portfolio is stored in a new
+      draft key `:proxy-reference-instruments`, its history is prefetched
+      (reusing the universe-add prefetch mechanism) and aligned so covariance is
+      synthesized from it, but it is excluded from the allocatable engine
+      universe so it is never given a weight (confirmed via the covariance-
+      timing seam: risk-result built over full aligned history, active filtering
+      slices proxies out after synthesis). Verified end-to-end in a static
+      preview: search → click → reference-only chip (with a loading tag while
+      its history prefetches). Gates 34/34.
 - [ ] Follow-up (not this pass): explicit prior-weight editor; results-rail
       run-derived confidence panel; negative/leveraged proxy exposures;
       "Excluded - needs assumption" card status label is wrong for

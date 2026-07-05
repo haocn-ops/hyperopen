@@ -351,9 +351,13 @@
     (is (false? (:configured? card)) "Not acknowledged yet - Apply is still offered.")
     (is (= ["perp:BTC" "perp:ETH"] (:selected-proxy-ids card)))
     (is (= ["perp:BTC" "perp:ETH"]
-           (mapv :instrument-id (:proxy-options card)))
-        "Options exclude the asset itself.")
-    (is (every? :usable? (:proxy-options card)))
+           (mapv :instrument-id (:selected-proxies card)))
+        "Selected proxies surface as chips.")
+    (is (= "" (:proxy-search-query card)) "Search starts empty.")
+    (is (= [] (:proxy-search-results card))
+        "No catalog results until the user types a query.")
+    (is (= :actions/set-portfolio-optimizer-history-assumption-proxy-search
+           (get-in card [:actions :set-proxy-search])))
     (is (= :high (:relationship-strength card)))
     (is (= [50.0 50.0] (mapv :weight-percent (:prior-basket card)))
         "V1 prior basket is equal weight over the selected proxies.")

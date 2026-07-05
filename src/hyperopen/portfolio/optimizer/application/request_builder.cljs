@@ -560,6 +560,15 @@
         ;; eligible asset's return calendar, so a 10-day asset would otherwise shrink
         ;; the shared covariance-estimation window of the whole universe.
         draft-assumptions (:history-assumptions draft*)
+        ;; Reference-only proxy instruments: catalog proxies picked for a thin
+        ;; asset that are NOT in the portfolio universe. Their history is aligned
+        ;; (so covariance synthesis can use them) but they are excluded from the
+        ;; allocatable engine universe below, so they never receive a weight.
+        reference-instruments (vec (:proxy-reference-instruments draft*))
+        reference-ids (set (keep :instrument-id reference-instruments))
+        ;; Metadata pool for resolving proxy instruments (universe + references),
+        ;; used by the regression sub-alignment.
+        proxy-universe (into requested-universe reference-instruments)
         proxy-candidate-ids (structurally-complete-proxy-ids draft-assumptions
                                                              objective
                                                              (:constraints draft*))
@@ -569,11 +578,14 @@
         ;; series, and keeping a thin native series in the intersection would
         ;; silently shrink every other asset's estimation window.
         assumption-excluded-ids (into conservative-ids proxy-candidate-ids)
-        alignment-universe (if (seq assumption-excluded-ids)
-                             (filterv #(not (contains? assumption-excluded-ids
-                                                       (:instrument-id %)))
-                                      requested-universe)
-                             requested-universe)
+        ;; Alignment = requested (minus assumption-excluded thin assets) PLUS the
+        ;; reference-only proxies, so their return series reach the risk result.
+        alignment-universe (into (if (seq assumption-excluded-ids)
+                                   (filterv #(not (contains? assumption-excluded-ids
+                                                             (:instrument-id %)))
+                                            requested-universe)
+                                   requested-universe)
+                                 reference-instruments)
         align-inputs {:history-data history-data
                       :as-of-ms as-of-ms
                       :stale-after-ms stale-after-ms
@@ -585,7 +597,14 @@
                                               draft-assumptions
                                               usable-proxy-ids)
         assumption-engine-ids (into conservative-ids proxy-engine-ids)
-        engine-universe (readmit-assumption-instruments eligible-universe
+        ;; Reference-only proxies aligned into eligible-universe, but they must
+        ;; NOT be allocatable - drop them before building the engine universe.
+        allocatable-eligible (if (seq reference-ids)
+                               (filterv #(not (contains? reference-ids
+                                                         (:instrument-id %)))
+                                        eligible-universe)
+                               eligible-universe)
+        engine-universe (readmit-assumption-instruments allocatable-eligible
                                                        requested-universe
                                                        assumption-engine-ids)
         constraints (mirror-assumption-caps constraints
@@ -594,7 +613,7 @@
         history-assumptions* (normalize-history-assumptions
                               draft-assumptions
                               {:proxy-engine-ids proxy-engine-ids
-                               :requested-universe requested-universe
+                               :requested-universe proxy-universe
                                :align-inputs align-inputs})
         current-universe (current-portfolio-universe current-portfolio
                                                      requested-universe)

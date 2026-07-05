@@ -106,6 +106,8 @@
     actions/clear-portfolio-optimizer-history-assumption
     :set-portfolio-optimizer-history-assumption-proxy-asset
     actions/set-portfolio-optimizer-history-assumption-proxy-asset
+    :set-portfolio-optimizer-history-assumption-proxy-search
+    actions/set-portfolio-optimizer-history-assumption-proxy-search
     :set-portfolio-optimizer-history-assumption-relationship-strength
     actions/set-portfolio-optimizer-history-assumption-relationship-strength
     :apply-portfolio-optimizer-history-assumption

@@ -102,7 +102,7 @@
 (deftest history-assumptions-section-proxy-card-renders-workflow-controls-test
   (let [node (proxy-section :minimum-variance)
         remove-chip (ts/node-by-role node "portfolio-optimizer-history-assumption-proxy-remove-perp:NEW-perp:BTC")
-        add-select (ts/node-by-role node "portfolio-optimizer-history-assumption-proxy-add-perp:NEW")
+        search-input (ts/node-by-role node "portfolio-optimizer-history-assumption-proxy-search-perp:NEW")
         relationship-high (ts/node-by-role node "portfolio-optimizer-history-assumption-relationship-perp:NEW-high")
         basket (ts/node-by-role node "portfolio-optimizer-history-assumption-prior-basket-perp:NEW")
         diagnostics (ts/node-by-role node "portfolio-optimizer-history-assumption-diagnostics-perp:NEW")
@@ -115,11 +115,11 @@
             "perp:NEW" "perp:BTC" false]
            (first (ts/click-actions remove-chip)))
         "Chip x removes the proxy.")
-    (is (some? add-select))
-    (is (= [:actions/set-portfolio-optimizer-history-assumption-proxy-asset
-            "perp:NEW" [:event.target/value] true]
-           (first (ts/change-actions add-select)))
-        "The add dropdown selects a proxy.")
+    (is (some? search-input) "The proxy picker is a catalog search input.")
+    (is (= [:actions/set-portfolio-optimizer-history-assumption-proxy-search
+            "perp:NEW" [:event.target/value]]
+           (first (ts/input-actions search-input)))
+        "Typing updates the per-card proxy search query.")
     (is (some? relationship-high))
     (is (= [:actions/set-portfolio-optimizer-history-assumption-relationship-strength
             "perp:NEW" :high]
@@ -136,23 +136,31 @@
     (is (some #{"Configured"} (ts/collect-strings status))
         "A complete proxy entry reads Configured.")))
 
-(deftest history-assumptions-section-proxy-add-select-renders-real-option-siblings-test
-  ;; Regression (caught only by live browser QA, not the hiccup-tree assertions
-  ;; above): `into` must target the [:select ...] hiccup vector itself so each
-  ;; [:option ...] lands as a direct sibling child. Targeting a bare
-  ;; vector-of-options nests them as ONE child value; `find-by-data-role` still
-  ;; locates the :select node either way (it walks arbitrarily nested
-  ;; structures), so that alone can't tell the shapes apart - a real Replicant
-  ;; DOM render turned the nested shape into one stringified literal instead of
-  ;; actual <option> elements. Assert the DIRECT children explicitly instead.
-  (let [node (proxy-section :minimum-variance)
-        select (ts/node-by-role node "portfolio-optimizer-history-assumption-proxy-add-perp:NEW")
-        children (subvec select 2)]
-    (is (= 2 (count children))
-        "The placeholder plus the one addable proxy (ETH; BTC is already selected) are direct children.")
-    (is (every? #(= :option (first %)) children)
-        "Each child is its own [:option ...] node, never a nested vector-of-options.")
-    (is (= ["" "perp:ETH"] (mapv #(get-in % [1 :value]) children)))))
+(deftest history-assumptions-section-proxy-search-results-click-adds-and-clears-test
+  ;; Full-catalog typeahead: a matching catalog asset (SOL, not in the universe)
+  ;; shows as a result; clicking it adds the proxy and clears the search buffer.
+  (let [sol {:key "perp:SOL" :market-type :perp :coin "SOL" :symbol "SOL-USDC" :volume24h 999}
+        node (setup-history-assumptions/history-assumptions-section
+              {:state {:asset-selector {:markets [sol]}
+                       :portfolio-ui {:optimizer {:proxy-search-queries {"perp:NEW" "SOL"}}}}
+               :draft {:universe [btc eth new-perp]
+                       :objective {:kind :minimum-variance}
+                       :constraints {:max-asset-weight 0.5}
+                       :history-assumptions {"perp:NEW" proxy-entry}}
+               :readiness {:request {:requested-universe [btc eth new-perp]
+                                     :universe [btc eth]
+                                     :objective {:kind :minimum-variance}
+                                     :history {:eligible-instruments [btc eth]}}
+                           :blocking-warnings []}
+               :history-load-state {:status :succeeded
+                                    :request-signature {:universe [btc eth new-perp]}}})
+        option (ts/node-by-role node "portfolio-optimizer-history-assumption-proxy-option-perp:NEW-perp:SOL")]
+    (is (some? option) "The out-of-universe catalog match (SOL) is a selectable result.")
+    (is (= [[:actions/set-portfolio-optimizer-history-assumption-proxy-asset
+             "perp:NEW" "perp:SOL" true]
+            [:actions/set-portfolio-optimizer-history-assumption-proxy-search "perp:NEW" ""]]
+           (ts/click-actions option))
+        "Clicking adds the proxy, then clears the search buffer.")))
 
 (deftest history-assumptions-section-proxy-return-input-only-for-return-seeking-test
   (is (nil? (ts/node-by-role (proxy-section :minimum-variance)

@@ -463,6 +463,20 @@
         "The engine-backed multi-proxy shape survives migration unchanged.")
     (is (s/valid? ::contracts/draft migrated))))
 
+(deftest migrate-draft-backfills-proxy-reference-instruments-test
+  ;; Additive key: drafts written before reference-only proxies existed lack it;
+  ;; migration backfills [] and the spec accepts both a present vector and nil.
+  (let [legacy (dissoc (contract-fixtures/valid-draft) :proxy-reference-instruments)
+        migrated (migrations/migrate-draft legacy)]
+    (is (= [] (:proxy-reference-instruments migrated))
+        "A pre-existing draft backfills an empty reference-instruments vector.")
+    (is (s/valid? ::contracts/draft migrated)))
+  (let [with-refs (assoc (contract-fixtures/valid-draft)
+                         :proxy-reference-instruments
+                         [{:instrument-id "perp:SOL" :market-type :perp :coin "SOL"}])]
+    (is (s/valid? ::contracts/draft with-refs)
+        "A populated reference-instruments vector is a valid draft.")))
+
 (deftest black-litterman-view-contract-accepts-supported-shapes-test
   (let [valid-views [["absolute instrument view"
                       {:kind :absolute

@@ -13,6 +13,8 @@
 (def draft-constraints-path (conj draft-path :constraints))
 (def draft-execution-assumptions-path (conj draft-path :execution-assumptions))
 (def draft-history-assumptions-path (conj draft-path :history-assumptions))
+(def draft-proxy-reference-instruments-path
+  (conj draft-path :proxy-reference-instruments))
 (def draft-metadata-path (conj draft-path :metadata))
 (def draft-dirty-path (conj draft-metadata-path :dirty?))
 (def draft-universe-source-path (conj draft-metadata-path :universe-source))
@@ -84,6 +86,10 @@
 (def ui-universe-search-query-path (conj optimizer-ui-path :universe-search-query))
 (def ui-universe-search-active-index-path
   (conj optimizer-ui-path :universe-search-active-index))
+;; Per-thin-asset proxy search query: {thin-instrument-id query-string}. Each
+;; proxy card's catalog typeahead reads/writes its own entry.
+(def ui-proxy-search-queries-path
+  (conj optimizer-ui-path :proxy-search-queries))
 (def ui-draft-add-asset-open-path
   (conj optimizer-ui-path :draft-add-asset-open?))
 (def ui-objective-menu-open-path
@@ -123,6 +129,7 @@
    :optimizer/draft-constraints draft-constraints-path
    :optimizer/draft-execution-assumptions draft-execution-assumptions-path
    :optimizer/draft-history-assumptions draft-history-assumptions-path
+   :optimizer/draft-proxy-reference-instruments draft-proxy-reference-instruments-path
    :optimizer/draft-metadata draft-metadata-path
    :optimizer/draft-dirty draft-dirty-path
    :optimizer/draft-universe-source draft-universe-source-path

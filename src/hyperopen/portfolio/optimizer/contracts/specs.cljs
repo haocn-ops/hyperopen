@@ -390,6 +390,12 @@
 	         #(constraints? (:constraints %))
 	         #(execution-assumptions? (:execution-assumptions %))
 	         #(history-assumptions? (:history-assumptions %))
+	         ;; Reference-only proxy assets: catalog instruments picked as proxies
+	         ;; that are NOT in the universe. Their history loads and feeds
+	         ;; covariance synthesis, but they are never allocated. Optional +
+	         ;; additive (older drafts lack the key; migration backfills []).
+	         #(or (nil? (:proxy-reference-instruments %))
+	              (instrument-vector? (:proxy-reference-instruments %)))
 	         #(draft-metadata? (:metadata %))))
 
 (s/def ::engine-request

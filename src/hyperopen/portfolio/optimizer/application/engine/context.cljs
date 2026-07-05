@@ -2,6 +2,7 @@
   (:require [hyperopen.portfolio.optimizer.application.display-frontier :as display-frontier]
             [hyperopen.portfolio.optimizer.domain.black-litterman :as black-litterman]
             [hyperopen.portfolio.optimizer.domain.constraints :as constraints]
+            [hyperopen.portfolio.optimizer.domain.history-assumption-proxy :as history-assumption-proxy]
             [hyperopen.portfolio.optimizer.domain.history-assumptions :as history-assumptions]
             [hyperopen.portfolio.optimizer.domain.objectives :as objectives]
             [hyperopen.portfolio.optimizer.domain.returns :as returns]
@@ -286,12 +287,17 @@
      :status :running
      :percent 25
      :detail "estimating covariance"})
-   (let [conservative-inputs (history-assumptions/conservative-engine-inputs request)
+   (let [{conservative-inputs :conservative
+          proxy-inputs :proxy} (history-assumptions/history-assumption-engine-inputs
+                                request)
          raw-risk-result (-> (risk/estimate-risk-model
                               {:risk-model (:risk-model request)
                                :periods-per-year (:periods-per-year request)
                                :history (:history request)})
-                             (risk/augment-risk-result-with-assumptions conservative-inputs))
+                             (risk/augment-risk-result-with-assumptions conservative-inputs)
+                             (history-assumption-proxy/augment-risk-result-with-proxy-assumptions
+                              proxy-inputs
+                              {:periods-per-year (:periods-per-year request)}))
          instrument-ids (active-instrument-ids request (:instrument-ids raw-risk-result))
          risk-result (filter-risk-result raw-risk-result instrument-ids)
          _ (report-progress!
@@ -309,7 +315,7 @@
              :detail "estimating expected returns"})
          return-result (history-assumptions/augment-expected-returns
                         (expected-return-result request risk-result)
-                        conservative-inputs)
+                        (merge conservative-inputs proxy-inputs))
          _ (report-progress!
             on-progress
             {:step :return-model

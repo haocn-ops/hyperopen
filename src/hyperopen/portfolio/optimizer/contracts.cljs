@@ -35,6 +35,8 @@
 (def draft-constraints-path paths/draft-constraints-path)
 (def draft-execution-assumptions-path paths/draft-execution-assumptions-path)
 (def draft-history-assumptions-path paths/draft-history-assumptions-path)
+(def draft-proxy-reference-instruments-path
+  paths/draft-proxy-reference-instruments-path)
 (def draft-metadata-path paths/draft-metadata-path)
 (def draft-dirty-path paths/draft-dirty-path)
 (def draft-universe-source-path paths/draft-universe-source-path)
@@ -99,6 +101,7 @@
 (def ui-diagnostics-tab-path paths/ui-diagnostics-tab-path)
 (def ui-universe-search-query-path paths/ui-universe-search-query-path)
 (def ui-universe-search-active-index-path paths/ui-universe-search-active-index-path)
+(def ui-proxy-search-queries-path paths/ui-proxy-search-queries-path)
 (def ui-draft-add-asset-open-path paths/ui-draft-add-asset-open-path)
 (def ui-objective-menu-open-path paths/ui-objective-menu-open-path)
 (def ui-objective-menu-selection-path paths/ui-objective-menu-selection-path)

@@ -1,6 +1,6 @@
 (ns hyperopen.views.portfolio.optimize.setup-universe
   (:require [hyperopen.portfolio.optimizer.application.view-model :as optimizer-view-model]
-            [hyperopen.views.portfolio.optimize.setup-history-assumptions :as setup-history-assumptions]))
+            [hyperopen.portfolio.optimizer.application.view-model.universe :as universe-vm]))
 
 (def ^:private eyebrow-class
   ["font-mono" "text-[0.6875rem]" "font-semibold" "uppercase" "tracking-[0.08em]" "text-trading-muted/70"])
@@ -94,12 +94,36 @@
        (when-let [market-type-label (some-> market-type name)]
          (str " " market-type-label))))
 
-;; Per-row history/assumption diagnostics (shared gap, short history,
-;; insufficient, …) are deliberately NOT painted on the row. They are
-;; solver-readiness signals, not asset-selection information, and they made the
-;; universe list read like an error log. The grouped Readiness panel and the
-;; assets-needing-assumptions section (both in the right rail) own that detail;
-;; each row still carries its computed status on :data-history-status for QA.
+;; Generic per-row history diagnostics (shared gap, short history, insufficient,
+;; …) are deliberately NOT painted on the row: they are solver-readiness
+;; signals, not asset-selection information, and they made the universe list
+;; read like an error log. The grouped Readiness panel owns that detail; each
+;; row still carries its computed status on :data-history-status for QA. The
+;; ASSUMPTION-WORKFLOW states are the exception (view-model
+;; workflow-assumption-badges): "Needs proxy" / "Needs assumptions" is the
+;; user's cue to open the proxy workflow card, and "Proxy behavior" /
+;; "Conservative" confirms the configuration took.
+
+(defn- assumption-workflow-chip
+  [{:keys [instrument-id assumption-badge assumption-badge-label]}]
+  (when (contains? universe-vm/workflow-assumption-badges assumption-badge)
+    (let [tone (cond
+                 (contains? #{:conservative :proxy-behavior} assumption-badge)
+                 ["border-success/50" "text-success" "bg-success/10"]
+
+                 ;; Thin history is an invitation, not an error: muted.
+                 (= :short-history assumption-badge)
+                 ["border-base-300" "text-trading-muted" "bg-base-200/40"]
+
+                 :else
+                 ["border-warning/50" "text-warning" "bg-warning/10"])]
+      [:span {:class (into ["mt-0.5" "inline-block" "border" "px-1" "py-px" "font-mono"
+                            "text-[0.5625rem]" "font-semibold" "uppercase"
+                            "tracking-[0.08em]"]
+                           tone)
+              :data-role (str "portfolio-optimizer-universe-assumption-badge-" instrument-id)
+              :data-badge (name assumption-badge)}
+       assumption-badge-label])))
 
 (defn- selected-row
   [{:keys [instrument-id
@@ -108,7 +132,8 @@
            secondary-label
            history-status
            position-side
-           short-selectable?]}]
+           short-selectable?]
+    :as row}]
     [:div {:class ["optimizer-universe-row"
                    "grid" "items-center" "gap-2" "border-b" "border-base-300"
                    "px-2" "py-1.5" "last:border-b-0" "hover:bg-base-200/30"]
@@ -121,7 +146,8 @@
       ;; Demoted a full tier below the symbol: the canonical id/name is context,
       ;; and must not compete with the tradable symbol the user scans for.
       [:span {:class ["block" "truncate" "text-[0.6875rem]" "text-trading-muted/80"]}
-       secondary-label]]
+       secondary-label]
+      (assumption-workflow-chip row)]
      [:span {:class ["flex" "justify-center"]} (market-type-tags market-type)]
      (side-control instrument-id position-side short-selectable?)
      [:span {:class ["text-right"]}
@@ -409,11 +435,6 @@
                :data-role "portfolio-optimizer-universe-search-results-empty"}
            "No matching unused instruments found."]))]
      (selected-table selected-rows universe holdings-loading? no-importable-holdings?)
-     (setup-history-assumptions/history-assumptions-section
-      {:state state
-       :draft draft
-       :readiness readiness
-       :history-load-state history-load-state})
      ;; Prose help, not log output: sans-serif — monospace stays reserved for
      ;; numbers and identifiers per the setup type ladder.
      [:div {:class ["mt-2" "text-[0.6875rem]" "leading-[1.5]"

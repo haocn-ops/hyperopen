@@ -327,6 +327,14 @@
    :actions/set-portfolio-optimizer-history-assumption-expected-volatility ::portfolio-optimizer-instrument-value-args
    :actions/set-portfolio-optimizer-history-assumption-max-weight-cap ::portfolio-optimizer-instrument-value-args
    :actions/clear-portfolio-optimizer-history-assumption ::portfolio-optimizer-instrument-id-args
+   :actions/set-portfolio-optimizer-history-assumption-proxy-asset
+   ::portfolio-optimizer-instrument-key-value-args
+   :actions/set-portfolio-optimizer-history-assumption-proxy-search
+   ::portfolio-optimizer-instrument-value-args
+   :actions/set-portfolio-optimizer-history-assumption-relationship-strength
+   ::portfolio-optimizer-instrument-value-args
+   :actions/apply-portfolio-optimizer-history-assumption ::portfolio-optimizer-instrument-id-args
+   :actions/reset-portfolio-optimizer-history-assumption ::portfolio-optimizer-instrument-id-args
    :actions/set-portfolio-optimizer-universe-search-query ::common/single-input-args
    :actions/set-portfolio-optimizer-draft-add-asset-open ::common/boolean-args
    :actions/handle-portfolio-optimizer-universe-search-keydown

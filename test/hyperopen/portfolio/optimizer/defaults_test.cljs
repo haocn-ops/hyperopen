@@ -43,8 +43,15 @@
             :max-weight 0.03
             :correlation-floor 0.75}
            conservative))
-    (is (nil? (defaults/default-history-assumption :proxy))
-        "The removed :proxy behavior has no default.")
+    (is (= {:behavior :proxy
+            :expected-return 0.0
+            :volatility 0.8
+            :max-weight 0.05
+            :proxy {:instrument-ids []
+                    :relationship-strength :medium
+                    :prior-weights nil}}
+           (defaults/default-history-assumption :proxy))
+        "The engine-backed :proxy behavior seeds multi-proxy defaults.")
     (is (nil? (defaults/default-history-assumption :unknown)))))
 
 (deftest default-optimizer-state-preserves-run-and-scenario-contract-test
@@ -104,6 +111,7 @@
           :list-sort :updated-desc
           :universe-search-query ""
           :universe-search-active-index 0
+          :proxy-search-queries {}
           :objective-menu-open? false
           :objective-menu-selection nil
           :objective-menu-view-order []

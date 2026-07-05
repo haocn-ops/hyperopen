@@ -202,36 +202,93 @@
 
 (declare selected-history-status)
 
-(def ^:private assumption-badge-labels
+(def assumption-badge-labels
   {:ready "Ready"
-   :short-history "Short history"
+   :short-history "Thin history"
    :no-history "No history"
+   :needs-proxy "Needs proxy"
    :needs-assumptions "Needs assumptions"
    :using-proxy "Using proxy"
-   :conservative "Conservative"})
+   :conservative "Conservative"
+   :proxy-behavior "Proxy behavior"})
 
-(defn- native-observation-count
-  [state instrument]
-  (let [rows (history-rows state instrument)]
-    (when (sequential? rows)
-      (count rows))))
+(def workflow-assumption-badges
+  "Badge states the universe rows actually PAINT: actionable gaps, configured
+  assumptions, and (muted) thin history - the cue that invites the proxy
+  workflow (user feedback 2026-07-05). Plain Ready stays data-role-only so the
+  list never reads like an error log (owner decision, 2026-07)."
+  #{:needs-proxy :no-history :needs-assumptions :conservative :proxy-behavior
+    :short-history})
+
+(defn native-history-observations
+  "Native history row count for an instrument. The readiness arity is the honest
+  production source: real sessions load optimizer history through the api-v2
+  backend, so the state-side candle map is EMPTY and only the aligned history's
+  raw per-instrument series (or, for an already-configured proxy asset that
+  alignment deliberately excludes, its regression-series overlap) carries the
+  count. The state-side candle count remains as the final fallback for
+  dev/test-fixture sessions that seed raw candles."
+  ([state instrument]
+   (let [rows (history-rows state instrument)]
+     (when (sequential? rows)
+       (count rows))))
+  ([state readiness instrument]
+   (let [instrument-id (:instrument-id instrument)]
+     (or (when-let [rows (seq (get-in readiness
+                                      [:request :history
+                                       :raw-price-series-by-instrument
+                                       instrument-id]))]
+           (count rows))
+         (get-in readiness [:request :history-assumptions instrument-id
+                            :regression-series :observations])
+         (native-history-observations state instrument)))))
+
+(def ^:private native-observation-count native-history-observations)
+
+(defn assumption-required-ids
+  "Ids whose native history is below the assumption-required threshold (their
+  covariance cannot be defensibly estimated AND their short calendar would
+  shrink the shared estimation window), in a universe that holds real history to
+  borrow from. Mirrors the readiness gate so the NEEDS PROXY badge and the run
+  block always agree."
+  ([state universe]
+   (assumption-required-ids state nil universe))
+  ([state readiness universe]
+   (let [obs-by-id (into {}
+                         (keep (fn [instrument]
+                                 (when-let [n (native-history-observations
+                                               state readiness instrument)]
+                                   [(:instrument-id instrument) n])))
+                         universe)
+         max-obs (reduce max 0 (vals obs-by-id))]
+     (if (< max-obs history-assumptions/short-history-min-observations)
+       #{}
+       (into #{}
+             (keep (fn [[id n]]
+                     (when (< n history-assumptions/assumption-required-max-observations)
+                       id)))
+             obs-by-id)))))
 
 (defn history-adequacy
   "Card/badge adequacy: layers the user-facing short-history threshold on top of the
   load-aware history status. The engine's own minimum is only 1-2 observations, so a
-  thin-but-present asset (e.g. 75 daily candles) reads as :sufficient there; here it
-  is reclassified :short when its native history is below the threshold."
-  [history-status state instrument]
-  (case history-status
-    (:missing :rejected) :none
-    (:insufficient :shared-gap) :short
-    (:queued :loading :pending) :pending
-    ;; :sufficient / :stale -> adequate unless the native history is below the bar.
-    (let [observations (native-observation-count state instrument)]
-      (if (and observations
-               (< observations history-assumptions/short-history-min-observations))
-        :short
-        :ok))))
+  thin-but-present asset (e.g. 75 daily rows) reads as :sufficient there; here it
+  is reclassified :short when its native history is below the threshold. Pass
+  readiness so the count comes from the aligned (api-v2-backed) history - the
+  state-side candle fallback only exists for fixture sessions."
+  ([history-status state instrument]
+   (history-adequacy history-status state nil instrument))
+  ([history-status state readiness instrument]
+   (case history-status
+     (:missing :rejected) :none
+     (:insufficient :shared-gap) :short
+     (:queued :loading :pending) :pending
+     ;; :sufficient / :stale -> adequate unless the native history is below the bar.
+     (let [observations (native-history-observations state readiness instrument)]
+       (if (and observations
+                (< observations history-assumptions/short-history-min-observations))
+         :short
+         :ok)))))
 
 (def ^:private adequacy-badges
   {:none :no-history
@@ -239,15 +296,19 @@
    :ok :ready})
 
 (defn- assumption-badge
-  [entry adequacy return-required?]
+  [entry adequacy assumption-required? return-required?]
   (cond
     (and entry
-         (history-assumptions/conservative? entry)
-         (history-assumptions/conservative-assumption-complete? entry return-required?))
-    :conservative
+         (history-assumptions/assumption-complete? entry return-required?))
+    (if (history-assumptions/proxy? entry) :proxy-behavior :conservative)
 
     (some? (:behavior entry))
     :needs-assumptions
+
+    ;; Below the assumption-required threshold the run is blocked until the user
+    ;; configures the asset, so the badge escalates from Thin history.
+    (and assumption-required? (not= :none adequacy))
+    :needs-proxy
 
     :else
     (get adequacy-badges adequacy)))
@@ -272,9 +333,11 @@
                                base-label)
                              name)
          entry (get (:assumptions assumption-context) instrument-id)
-         adequacy (history-adequacy history-status state instrument)
+         adequacy (history-adequacy history-status state readiness instrument)
          badge (assumption-badge entry
                                  adequacy
+                                 (contains? (:assumption-required-ids assumption-context)
+                                            instrument-id)
                                  (:return-required? assumption-context))]
      (cond-> {:instrument instrument
               :instrument-id instrument-id
@@ -428,6 +491,9 @@
                        (mapv :key markets)
                        [])
          assumption-context {:assumptions (or (:history-assumptions draft) {})
+                             :assumption-required-ids (assumption-required-ids state
+                                                                               readiness
+                                                                               universe)
                              :return-required?
                              (history-assumptions/return-required-for-objective?
                               (or (get-in readiness [:request :objective :kind])

@@ -86,7 +86,14 @@
         runtime (optimizer-runtime state)
         now-ms (or (:now-ms opts*)
                    (:as-of-ms runtime))
-        request (merge {:universe (get-in state contracts/draft-universe-path)
+        ;; Reference-only proxy instruments (catalog proxies outside the universe)
+        ;; must have their history fetched too, so a full reload keeps the
+        ;; covariance inputs the synthesis needs. They ride the same fetch as the
+        ;; universe but never become allocatable (the request builder excludes
+        ;; them from the engine universe).
+        universe (into (vec (get-in state contracts/draft-universe-path))
+                       (get-in state contracts/draft-proxy-reference-instruments-path))
+        request (merge {:universe universe
                         :current-portfolio-universe (current-portfolio-universe state)
                         :interval :1d
                         :bars request-plan/default-bars

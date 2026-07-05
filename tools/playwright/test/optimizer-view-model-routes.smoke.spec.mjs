@@ -1161,7 +1161,7 @@ test("portfolio optimizer draft objective menu changes objective and reruns fron
     ]);
     return result?.frontier?.length ?? 0;
   }).toBeGreaterThan(0);
-  await expect(trigger).toContainText("Minimum volatility");
+  await expect(trigger).toContainText("Minimum risk");
 });
 
 test("portfolio optimizer draft objective menu edits max sharpe return views immediately @smoke @regression", async ({ page }) => {
@@ -1423,7 +1423,7 @@ test("portfolio optimizer draft objective menu edits max sharpe return views imm
   await apply.click();
 
   await expect(menu).toHaveCount(0);
-  await expect(trigger).toContainText("Minimum volatility");
+  await expect(trigger).toContainText("Minimum risk");
   await expect.poll(async () => {
     const draft = await readOptimizerState(page, [
       "portfolio",

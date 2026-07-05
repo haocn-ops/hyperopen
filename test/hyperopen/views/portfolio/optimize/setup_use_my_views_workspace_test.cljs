@@ -47,6 +47,7 @@
     ;; not from a BL-owned workspace.
     (is (= ["portfolio-optimizer-objective-panel"
             "portfolio-optimizer-constraints-panel"
+            "portfolio-optimizer-proxy-workflow-slot"
             "portfolio-optimizer-return-risk-panel"
             "portfolio-optimizer-advanced-overrides-shell"
             "portfolio-optimizer-views-blend-shell"

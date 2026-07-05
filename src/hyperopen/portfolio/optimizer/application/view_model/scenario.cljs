@@ -1,6 +1,7 @@
 (ns hyperopen.portfolio.optimizer.application.view-model.scenario
   (:require [clojure.string :as str]
             [hyperopen.portfolio.optimizer.application.instrument-labels :as instrument-labels]
+            [hyperopen.portfolio.optimizer.domain.history-assumptions :as history-assumptions]
             [hyperopen.portfolio.optimizer.application.rebalance-preview :as rebalance-preview]
             [hyperopen.portfolio.optimizer.application.setup-readiness :as setup-readiness]
             [hyperopen.portfolio.optimizer.application.view-model.refinement :as refinement-vm]
@@ -206,16 +207,17 @@
                                                        (keep :instrument-id universe))]
     (->> (:history-assumptions draft)
          (map (fn [[instrument-id entry]]
-                (let [proxy-id (:proxy-instrument-id entry)]
+                (let [proxy-ids (history-assumptions/proxy-instrument-ids entry)]
                   {:instrument-id instrument-id
                    :label (get labels instrument-id instrument-id)
                    :mode (:behavior entry)
                    :expected-return (:expected-return entry)
                    :volatility (:volatility entry)
                    :max-weight (:max-weight entry)
-                   :proxy-instrument-id proxy-id
-                   :proxy-label (when proxy-id (get labels proxy-id proxy-id))
-                   :relationship (:relationship entry)
+                   :proxy-instrument-ids proxy-ids
+                   :proxy-labels (mapv #(get labels % %) proxy-ids)
+                   :relationship-strength (when (history-assumptions/proxy? entry)
+                                            (history-assumptions/relationship-strength entry))
                    :correlation-floor (:correlation-floor entry)})))
          (sort-by :label)
          vec)))

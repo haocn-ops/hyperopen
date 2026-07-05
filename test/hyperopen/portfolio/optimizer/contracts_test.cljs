@@ -387,17 +387,36 @@
                              :expected-return nil
                              :volatility nil
                              :max-weight 0.03
-                             :correlation-floor 0.75}}]]]
+                             :correlation-floor 0.75}}]
+               ["engine-backed proxy entry"
+                {"perp:NEW" {:behavior :proxy
+                             :expected-return 0.0
+                             :volatility 0.8
+                             :max-weight 0.05
+                             :proxy {:instrument-ids ["perp:BTC" "perp:ETH"]
+                                     :relationship-strength :medium
+                                     :prior-weights nil}
+                             :metadata {:source :user :acknowledged? true}}}]
+               ["proxy entry mid-configuration (no proxies picked yet)"
+                {"perp:NEW" {:behavior :proxy
+                             :expected-return 0.0
+                             :volatility 0.8
+                             :max-weight 0.05
+                             :proxy {:instrument-ids []
+                                     :relationship-strength :medium
+                                     :prior-weights nil}}}]]]
     (doseq [[label assumptions] valid]
       (is (s/valid? ::contracts/draft (assoc draft :history-assumptions assumptions))
           (str label ": "
                (s/explain-str ::contracts/draft
                               (assoc draft :history-assumptions assumptions)))))))
 
-(deftest history-assumptions-draft-contract-rejects-removed-proxy-behavior-test
-  ;; The :proxy history-assumption behavior was removed; the draft spec is now
-  ;; conservative-only. Legacy persisted proxy drafts are converted to conservative
-  ;; by contracts.migrations on load before validation runs.
+(deftest history-assumptions-draft-contract-rejects-legacy-proxy-shape-test
+  ;; The ORIGINAL single-proxy :proxy behavior (never engine-backed) stored a
+  ;; singular :proxy-instrument-id and no :proxy submap. That legacy shape is
+  ;; still rejected by the spec; contracts.migrations converts it to
+  ;; conservative on load before validation runs. The 2026-07 engine-backed
+  ;; multi-proxy shape (nested :proxy submap) is accepted.
   (let [draft (contract-fixtures/valid-draft)
         proxy-assumptions {"perp:NEW" {:behavior :proxy
                                        :expected-return 0.25
@@ -427,7 +446,36 @@
     (is (nil? (:proxy-instrument-id entry)) "Proxy-only fields are dropped.")
     (is (nil? (:relationship entry)))
     (is (s/valid? ::contracts/draft migrated)
-        "The migrated draft passes the conservative-only spec.")))
+        "The migrated draft passes the spec.")))
+
+(deftest migrate-draft-passes-engine-backed-proxy-assumptions-through-test
+  (let [assumptions {"perp:NEW" {:behavior :proxy
+                                 :expected-return 0.0
+                                 :volatility 0.8
+                                 :max-weight 0.05
+                                 :proxy {:instrument-ids ["perp:BTC"]
+                                         :relationship-strength :high
+                                         :prior-weights nil}}}
+        draft (assoc (contract-fixtures/valid-draft)
+                     :history-assumptions assumptions)
+        migrated (migrations/migrate-draft draft)]
+    (is (= assumptions (:history-assumptions migrated))
+        "The engine-backed multi-proxy shape survives migration unchanged.")
+    (is (s/valid? ::contracts/draft migrated))))
+
+(deftest migrate-draft-backfills-proxy-reference-instruments-test
+  ;; Additive key: drafts written before reference-only proxies existed lack it;
+  ;; migration backfills [] and the spec accepts both a present vector and nil.
+  (let [legacy (dissoc (contract-fixtures/valid-draft) :proxy-reference-instruments)
+        migrated (migrations/migrate-draft legacy)]
+    (is (= [] (:proxy-reference-instruments migrated))
+        "A pre-existing draft backfills an empty reference-instruments vector.")
+    (is (s/valid? ::contracts/draft migrated)))
+  (let [with-refs (assoc (contract-fixtures/valid-draft)
+                         :proxy-reference-instruments
+                         [{:instrument-id "perp:SOL" :market-type :perp :coin "SOL"}])]
+    (is (s/valid? ::contracts/draft with-refs)
+        "A populated reference-instruments vector is a valid draft.")))
 
 (deftest black-litterman-view-contract-accepts-supported-shapes-test
   (let [valid-views [["absolute instrument view"

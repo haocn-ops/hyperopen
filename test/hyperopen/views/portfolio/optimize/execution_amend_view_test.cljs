@@ -120,3 +120,15 @@
 (deftest header-copy-mentions-amend-when-working-orders-present-test
   (is (str/includes? (node-text (table {} [(working-row)]))
                                 "Click an open order to amend it")))
+
+(deftest rejected-row-surfaces-the-exchange-error-test
+  ;; A rejection without its reason reads as an arbitrary failure at the moment the
+  ;; trader decides whether to resume (observed live: an amend-to-market rejected with
+  ;; "Order could not immediately match…" and the row showed only "rejected").
+  (let [message "Order could not immediately match against any resting orders. asset=110026"
+        rendered (table {} [(-> (working-row nil)
+                                (assoc :status :failed
+                                       :error {:message message}))])
+        error-node (node-by-role rendered "portfolio-optimizer-execution-row-error")]
+    (is (some? error-node) "the exchange's own message renders on the failed row")
+    (is (str/includes? (node-text error-node) "could not immediately match"))))

@@ -109,13 +109,31 @@
     :already-resting "already resting on the book"
     (some-> reason opt-format/keyword-label)))
 
+(defn- truncate-text
+  [text limit]
+  (let [s (str text)]
+    (if (> (count s) limit)
+      (str (subs s 0 (max 0 (dec limit))) "…")
+      s)))
+
 (defn- state-cell
   [display-state row]
   (case display-state
     :filled [:span {:class ["text-trading-green"]} "filled"]
     :resting [:span {:class ["text-info"]} "open"]
-    :failed [:span {:class ["text-trading-red"]}
-             (str "rejected" (when (:reason row) (str " · " (opt-format/keyword-label (:reason row)))))]
+    ;; A rejection without its reason reads as an arbitrary failure at the exact
+    ;; moment the trader must decide whether to resume — surface the exchange's
+    ;; own message on the row (truncated; full text on hover).
+    :failed (let [message (get-in row [:error :message])]
+              [:span {:class ["text-trading-red"]
+                      :title (when message (str message))}
+               (str "rejected"
+                    (when (:reason row) (str " · " (opt-format/keyword-label (:reason row)))))
+               (when message
+                 [:span {:class ["block" "font-mono" "text-[0.62rem]"
+                                 "text-trading-red/80"]
+                         :data-role "portfolio-optimizer-execution-row-error"}
+                  (truncate-text message 72)])])
     :blocked [:span {:class ["text-trading-muted"]} (opt-format/keyword-label (:reason row))]
     :skipped [:span {:class ["text-trading-muted"]}
               (if-let [label (skip-reason-label row)]

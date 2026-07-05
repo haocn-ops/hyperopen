@@ -219,13 +219,34 @@
       touch
       (offset-price mark limit-bps))))
 
+(defn- marketable-price
+  "Aggressive IOC price that actually CROSSES the book: start from the OPPOSITE-side
+  touch when the live book is known (buy -> best ask, sell -> best bid — the manual
+  ticket's apply-market-price), else the mark, and pad by the default market slippage
+  tolerance. A bare-mark IOC on a thin named-dex book whose touch sits outside the
+  mark matches nothing and Hyperliquid rejects it ('Order could not immediately match
+  against any resting orders') — cancelling the row's original order for nothing when
+  the market order came from an amend."
+  [side mark best-bid best-ask]
+  (let [touch (case side
+                :buy best-ask
+                :sell best-bid
+                nil)
+        reference (if (finite-positive? touch) touch mark)
+        pad (/ trading-domain/default-market-slippage-pct 100)
+        adj (if (= :buy side) (+ 1 pad) (- 1 pad))]
+    (when (finite-positive? reference)
+      (* reference adj))))
+
 (defn- order-form-for-row
   "Translates a ready row's resolved :intent into the order-gateway form. The four UI
-  types map onto the gateway as: :market -> marketable IOC at mark; :limit -> resting
+  types map onto the gateway as: :market -> marketable IOC priced to cross (opposite-side
+  touch, or mark, padded by the market slippage tolerance); :limit -> resting
   GTC at mark +/- limit-bps; :passive -> post-only (ALO) limit priced to rest at the live
   book's own-side touch (so it never crosses); :twap -> twapOrder over twap-min minutes. Any
   unmapped type falls back to :market so it can never leak to build-order-request and become a
-  stray resting GTC limit. `bbo` carries the live {:best-bid :best-ask} for the passive price."
+  stray resting GTC limit. `bbo` carries the live {:best-bid :best-ask} for the passive and
+  marketable prices."
   [row bbo]
   (let [intent (:intent row)
         order-type (or (:order-type intent) :market)
@@ -249,7 +270,9 @@
                    :type :twap
                    :twap {:minutes (max 5 (or (:twap-min intent) 10))
                           :randomize true})
-      (assoc base :type :market :price mark))))
+      (assoc base :type :market
+             :price (marketable-price (:side intent) mark
+                                      (:best-bid bbo) (:best-ask bbo))))))
 
 (defn- wire-size-string
   "Floors the order quantity to the catalog market's szDecimals and formats it as a clean

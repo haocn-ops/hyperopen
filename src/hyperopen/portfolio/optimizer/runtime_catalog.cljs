@@ -114,6 +114,10 @@
     actions/apply-portfolio-optimizer-history-assumption
     :reset-portfolio-optimizer-history-assumption
     actions/reset-portfolio-optimizer-history-assumption
+    :set-portfolio-optimizer-history-assumption-card-collapsed
+    actions/set-portfolio-optimizer-history-assumption-card-collapsed
+    :hydrate-portfolio-optimizer-history-assumption-library
+    actions/hydrate-portfolio-optimizer-history-assumption-library
     :set-portfolio-optimizer-universe-search-query
     actions/set-portfolio-optimizer-universe-search-query
     :set-portfolio-optimizer-draft-add-asset-open
@@ -258,5 +262,9 @@
       effect-adapters/load-portfolio-optimizer-view-library-effect
       :sync-portfolio-optimizer-view-library
       effect-adapters/sync-portfolio-optimizer-view-library-effect
+      :load-portfolio-optimizer-assumption-library
+      effect-adapters/load-portfolio-optimizer-assumption-library-effect
+      :sync-portfolio-optimizer-assumption-library
+      effect-adapters/sync-portfolio-optimizer-assumption-library-effect
       :restore-portfolio-optimizer-draft
       effect-adapters/restore-portfolio-optimizer-draft-effect}}))

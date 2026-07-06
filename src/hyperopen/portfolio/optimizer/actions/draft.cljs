@@ -2,6 +2,7 @@
   (:require [clojure.string :as str]
             [hyperopen.portfolio.optimizer.actions.common :as common]
             [hyperopen.portfolio.optimizer.actions.draft-options :as draft-options]
+            [hyperopen.portfolio.optimizer.application.assumption-library :as assumption-library]
             [hyperopen.portfolio.optimizer.application.black-litterman-editor-model :as bl-model]
             [hyperopen.portfolio.optimizer.application.history-loader.api-v2 :as history-api-v2]
             [hyperopen.portfolio.optimizer.application.history-prefetch :as history-prefetch]
@@ -597,10 +598,32 @@
   [state]
   (or (get-in state contracts/draft-history-assumptions-path) {}))
 
+(defn- assumption-library-sync-effect
+  "Per-wallet assumption-library sync for ONE changed entry: upsert when the
+  entry is present (carrying the reference instruments it references, so a
+  later hydration can restore out-of-universe proxies), remove when absent
+  (explicit Clear — the only gesture that forgets an asset)."
+  [refs assumptions instrument-id]
+  (if-let [entry (get assumptions instrument-id)]
+    [:effects/sync-portfolio-optimizer-assumption-library
+     {:upserts [{:instrument-id instrument-id
+                 :assumption entry
+                 :reference-instruments (assumption-library/entry-reference-instruments
+                                         refs entry)}]}]
+    [:effects/sync-portfolio-optimizer-assumption-library
+     {:removes [instrument-id]}]))
+
 (defn- save-history-assumptions
-  [assumptions]
-  (common/save-draft-path-values
-   [[contracts/draft-history-assumptions-path assumptions]]))
+  "Persist the assumptions map to the draft AND mirror the changed entry into
+  the wallet's assumption library, so the authored assumption survives
+  universe edits and fresh drafts."
+  [state assumptions instrument-id]
+  (conj (common/save-draft-path-values
+         [[contracts/draft-history-assumptions-path assumptions]])
+        (assumption-library-sync-effect
+         (get-in state contracts/draft-proxy-reference-instruments-path)
+         assumptions
+         instrument-id)))
 
 ;; --- Reference-only proxy instruments ---------------------------------------
 ;;
@@ -656,11 +679,12 @@
 
 (defn- save-assumptions+refs
   "Persist updated assumptions and the reconciled reference-only proxy
-  instruments in one draft save. When a newly-referenced out-of-universe proxy
-  is supplied, also enqueue a history prefetch so its covariance history loads."
-  ([state assumptions*]
-   (save-assumptions+refs state assumptions* nil))
-  ([state assumptions* new-instrument]
+  instruments in one draft save, and mirror the changed entry into the wallet's
+  assumption library. When a newly-referenced out-of-universe proxy is
+  supplied, also enqueue a history prefetch so its covariance history loads."
+  ([state assumptions* instrument-id]
+   (save-assumptions+refs state assumptions* instrument-id nil))
+  ([state assumptions* instrument-id new-instrument]
    (let [refs (reconcile-reference-instruments state
                                                assumptions*
                                                (when new-instrument [new-instrument]))
@@ -675,12 +699,50 @@
                        (conj [contracts/draft-proxy-reference-instruments-path refs])
 
                        (:changed? prefetch-plan)
-                       (conj [contracts/history-prefetch-path (:state prefetch-plan)]))]
-     (cond-> (common/save-draft-path-values path-values)
+                       (conj [contracts/history-prefetch-path (:state prefetch-plan)]))
+         sync-effect (assumption-library-sync-effect refs assumptions* instrument-id)
+         draft-save (common/save-draft-path-values path-values)
+         ;; A library REMOVE (Clear) must hit the state mirror BEFORE the draft
+         ;; write: the hydrate watcher fires on the draft change, and a mirror
+         ;; that still holds the entry would gap-fill the just-cleared card
+         ;; right back. Upserts can never create a gap, so they follow the save.
+         effects (if (contains? assumptions* instrument-id)
+                   (conj draft-save sync-effect)
+                   (into [sync-effect] draft-save))]
+     (cond-> effects
        (:start? prefetch-plan)
        (conj history-prefetch/selection-prefetch-effect)))))
 
 (declare unacknowledged)
+
+(defn- conj-some
+  [effects effect]
+  (if (some? effect) (conj effects effect) effects))
+
+(defn- without-assumption-card-collapse-override
+  "Effect dropping any explicit collapse override for the card, so the
+  status-derived default (configured collapses, everything else expands)
+  takes over. Nil when no override exists — conj via conj-some."
+  [state instrument-id]
+  (let [overrides (get-in state contracts/ui-assumption-cards-collapsed-path)]
+    (when (contains? overrides instrument-id)
+      [:effects/save
+       contracts/ui-assumption-cards-collapsed-path
+       (dissoc overrides instrument-id)])))
+
+(defn set-portfolio-optimizer-history-assumption-card-collapsed
+  "Explicit user collapse/expand for one assumption card. Stored as a per-card
+  override; a card without an override follows the default (configured cards
+  collapse to their summary, unfinished ones stay open)."
+  [state instrument-id collapsed?]
+  (let [instrument-id* (common/non-blank-text instrument-id)
+        collapsed?* (common/parse-boolean-value collapsed?)]
+    (if (and instrument-id* (some? collapsed?*))
+      [[:effects/save
+        contracts/ui-assumption-cards-collapsed-path
+        (assoc (or (get-in state contracts/ui-assumption-cards-collapsed-path) {})
+               instrument-id* collapsed?*)]]
+      [])))
 
 (defn- update-history-assumption-field
   [state instrument-id field value*]
@@ -690,8 +752,10 @@
              (some? value*)
              (contains? assumptions instrument-id*))
       (save-history-assumptions
+       state
        (update assumptions instrument-id*
-               #(unacknowledged (assoc % field value*))))
+               #(unacknowledged (assoc % field value*)))
+       instrument-id*)
       [])))
 
 (defn set-portfolio-optimizer-history-assumption-mode
@@ -715,7 +779,11 @@
                         (assoc :volatility (:volatility existing)))]
             ;; Switching away from proxy drops the entry's proxy ids, so
             ;; reconcile the reference-only instruments (GC any now-unreferenced).
-            (save-assumptions+refs state (assoc assumptions instrument-id* entry)))))
+            ;; A (re)seeded card starts expanded: drop any stale collapse override.
+            (conj-some (save-assumptions+refs state
+                                              (assoc assumptions instrument-id* entry)
+                                              instrument-id*)
+                       (without-assumption-card-collapse-override state instrument-id*)))))
       [])))
 
 (defn set-portfolio-optimizer-history-assumption-expected-return
@@ -740,8 +808,13 @@
     (if (and instrument-id*
              (contains? assumptions instrument-id*))
       ;; Removing the entry drops its proxy ids, so reconcile the reference-only
-      ;; instruments too (GC any proxy no assumption references anymore).
-      (save-assumptions+refs state (dissoc assumptions instrument-id*))
+      ;; instruments too (GC any proxy no assumption references anymore). The
+      ;; library entry is removed as well — Clear is the explicit "forget this
+      ;; asset" gesture — and any collapse override goes with it.
+      (conj-some (save-assumptions+refs state
+                                        (dissoc assumptions instrument-id*)
+                                        instrument-id*)
+                 (without-assumption-card-collapse-override state instrument-id*))
       [])))
 
 (defn- unacknowledged
@@ -787,7 +860,7 @@
                                                                        proxy-id*
                                                                        enabled?*))
                                     unacknowledged))]
-        (save-assumptions+refs state assumptions* resolved))
+        (save-assumptions+refs state assumptions* instrument-id* resolved))
       [])))
 
 (defn set-portfolio-optimizer-history-assumption-proxy-search
@@ -811,24 +884,66 @@
              (contains? history-assumptions/relationship-strengths strength)
              (history-assumptions/proxy? entry))
       (save-history-assumptions
+       state
        (assoc assumptions instrument-id*
               (-> entry
                   (assoc-in [:proxy :relationship-strength] strength)
-                  unacknowledged)))
+                  unacknowledged))
+       instrument-id*)
       [])))
 
 (defn apply-portfolio-optimizer-history-assumption
   "Acknowledges the configured assumption: collapses the card to its summary.
-  Purely presentational - run readiness never depends on acknowledgment."
+  Purely presentational - run readiness never depends on acknowledgment. Any
+  explicit expand override is dropped so the acknowledged card actually
+  collapses."
   [state instrument-id]
   (let [instrument-id* (common/non-blank-text instrument-id)
         assumptions (history-assumptions-map state)]
     (if (and instrument-id*
              (contains? assumptions instrument-id*))
-      (save-history-assumptions
-       (update assumptions instrument-id*
-               assoc :metadata {:source :user :acknowledged? true}))
+      (conj-some (save-history-assumptions
+                  state
+                  (update assumptions instrument-id*
+                          assoc :metadata {:source :user :acknowledged? true})
+                  instrument-id*)
+                 (without-assumption-card-collapse-override state instrument-id*))
       [])))
+
+(defn hydrate-portfolio-optimizer-history-assumption-library
+  "Gap-fill remembered assumptions from the wallet's assumption library into
+  the draft: every universe instrument WITHOUT a draft entry takes its library
+  entry; existing draft entries are never touched, so this is idempotent and
+  can never clobber live edits. Restored reference-only proxies (out-of-
+  universe basket members) re-enter :proxy-reference-instruments and get a
+  history prefetch. Dispatched after the library mirror loads, after a draft
+  restore/preseed, and on universe adds. Deliberately does NOT mark the draft
+  dirty — applying remembered input is machine work, not a user edit."
+  [state]
+  (let [result (assumption-library/hydrate-assumptions
+                {:assumptions (get-in state contracts/draft-history-assumptions-path)
+                 :universe (get-in state contracts/draft-universe-path)
+                 :entries (get-in state contracts/assumption-library-path)
+                 :reference-instruments
+                 (get-in state contracts/draft-proxy-reference-instruments-path)})]
+    (if (nil? result)
+      []
+      (let [{:keys [assumptions reference-instruments new-reference-instruments]} result
+            existing-refs (vec (get-in state
+                                       contracts/draft-proxy-reference-instruments-path))
+            prefetch-plan (when (seq new-reference-instruments)
+                            (history-prefetch/enqueue-missing-instruments
+                             state new-reference-instruments))
+            path-values (cond-> [[contracts/draft-history-assumptions-path assumptions]]
+                          (not= reference-instruments existing-refs)
+                          (conj [contracts/draft-proxy-reference-instruments-path
+                                 reference-instruments])
+
+                          (:changed? prefetch-plan)
+                          (conj [contracts/history-prefetch-path (:state prefetch-plan)]))]
+        (cond-> [[:effects/save-many path-values]]
+          (:start? prefetch-plan)
+          (conj history-prefetch/selection-prefetch-effect))))))
 
 (defn reset-portfolio-optimizer-history-assumption
   "Re-seeds the entry with its behavior's defaults, discarding edits."
@@ -840,5 +955,5 @@
                         (history-assumptions/default-assumption behavior))]
       ;; Re-seeding clears the entry's proxy ids, so reconcile reference-only
       ;; instruments (GC any now-unreferenced proxy).
-      (save-assumptions+refs state (assoc assumptions instrument-id* entry))
+      (save-assumptions+refs state (assoc assumptions instrument-id* entry) instrument-id*)
       [])))

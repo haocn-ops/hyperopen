@@ -198,3 +198,42 @@
       (swap! store assoc-in [:wallet :address] address)
       (is (empty? @dispatches))
       (remove-watch store :hyperopen.portfolio.optimizer.infrastructure.draft-autosave/identity-restore))))
+
+(deftest assumption-library-gap-dispatches-hydrate-test
+  ;; One watcher covers every ordering that can open a gap (library mirror
+  ;; arriving, draft restore, universe add): whenever a universe instrument
+  ;; lacks a draft assumption the library remembers, hydrate is dispatched.
+  (let [dispatches (atom [])
+        store (atom {:wallet {:address address}
+                     :portfolio {:optimizer {:draft {:universe [btc-instrument]
+                                                     :history-assumptions {}}}}})]
+    (draft-autosave/install-assumption-library-hydrate-watcher!
+     {:store store
+      :dispatch! (fn [_store _e actions] (swap! dispatches conj actions))})
+    ;; The library mirror arrives with an entry for the universe member.
+    (swap! store assoc-in [:portfolio :optimizer :assumption-library]
+           {"perp:BTC" {:instrument-id "perp:BTC"
+                        :entry {:behavior :conservative}
+                        :reference-instruments []
+                        :updated-at-ms 1}})
+    (is (= [[[:actions/hydrate-portfolio-optimizer-history-assumption-library]]]
+           @dispatches)
+        "The mirror arriving over an uncovered universe member triggers hydrate.")
+    ;; The gap closes (hydrate filled the entry): further unrelated changes stay quiet.
+    (swap! store assoc-in [:portfolio :optimizer :draft :history-assumptions]
+           {"perp:BTC" {:behavior :conservative}})
+    (swap! store assoc :unrelated 1)
+    (is (= 1 (count @dispatches))
+        "No gap, no dispatch - including on unrelated state changes.")
+    ;; A remembered entry for an asset OUTSIDE the universe opens no gap...
+    (swap! store assoc-in [:portfolio :optimizer :assumption-library "perp:NEW"]
+           {:instrument-id "perp:NEW"
+            :entry {:behavior :proxy}
+            :reference-instruments []
+            :updated-at-ms 2})
+    (is (= 1 (count @dispatches)))
+    ;; ...until the asset is added to the universe.
+    (swap! store update-in [:portfolio :optimizer :draft :universe]
+           conj {:instrument-id "perp:NEW"})
+    (is (= 2 (count @dispatches))
+        "Adding a remembered asset to the universe reopens the gap and re-dispatches.")))

@@ -612,7 +612,7 @@
                                 {:kind :minimum-variance})]
     (is (= :missing-history-assumptions (:reason readiness)))
     (is (= :proxy-instruments (:missing warning)))
-    (is (= "ETH is set to proxy behavior but no proxy assets are selected."
+    (is (= "ETH is set to be modeled but no proxy assets are selected."
            (:message warning)))))
 
 (deftest readiness-blocks-proxy-self-reference-test
@@ -729,7 +729,7 @@
     (is (= :blocked (:status readiness)))
     (is (= :missing-history-assumptions (:reason readiness)))
     (is (= :history-assumption-required (:code warning)))
-    (is (= "TOKENX needs a history assumption. Choose proxy behavior or a conservative assumption."
+    (is (= "TOKENX needs a history assumption. Model it from similar assets or use a conservative assumption."
            (:message warning)))))
 
 (deftest readiness-keeps-all-young-universe-runnable-test

@@ -1,5 +1,6 @@
 (ns hyperopen.portfolio.optimizer.application.rebalance-preview
-  (:require [hyperopen.domain.trading.core :as trading-core]
+  (:require [clojure.string :as str]
+            [hyperopen.domain.trading.core :as trading-core]
             [hyperopen.portfolio.optimizer.coercion :as coercion]
             [hyperopen.portfolio.optimizer.domain.rebalance :as rebalance]
             [hyperopen.portfolio.optimizer.ids :as ids]))
@@ -151,6 +152,40 @@
       (get-in request [:current-portfolio :capital :account-value-usd])
       0))
 
+(defn- current-perp-gross-usdc
+  ;; Perp-only current notional — the numerator of the trade page's Unified
+  ;; Account Leverage lens, threaded to the margin model so execution views can
+  ;; bridge portfolio (gross) leverage to venue (margin-account) leverage.
+  [request]
+  (let [exposures (get-in request [:current-portfolio :exposures])
+        perp-notionals (keep #(when (= :perp (:market-type %))
+                                (:abs-notional-usdc %))
+                             exposures)]
+    (when (seq exposures)
+      (reduce + 0 perp-notionals))))
+
+(defn- stable-dollar-coin?
+  ;; Stable-dollar spot tokens the venue accepts as unified perp collateral
+  ;; (USDC/USDH/USDT/USDE...). Mirrors the trade page's collateral-token set.
+  [coin]
+  (boolean (some-> coin str str/trim str/upper-case
+                   (str/starts-with? "USD"))))
+
+(defn- venue-collateral-usd
+  ;; Venue-lens denominator, mode-split exactly like the trade page: unified
+  ;; accounts collateralize perps from the stable spot pool (cash + stable
+  ;; tokens, which the snapshot otherwise counts as exposures); classic
+  ;; accounts fall back to NAV (the trade page's classic denominator).
+  [request]
+  (let [portfolio (:current-portfolio request)]
+    (if (= :unified (get-in portfolio [:account :mode]))
+      (+ (or (get-in portfolio [:capital :cash-usdc]) 0)
+         (reduce + 0 (keep #(when (and (= :spot (:market-type %))
+                                       (stable-dollar-coin? (:coin %)))
+                              (:abs-notional-usdc %))
+                           (:exposures portfolio))))
+      (get-in portfolio [:capital :nav-usdc]))))
+
 (defn- leverage-by-id
   [request]
   (or (get-in request [:constraints :perp-leverage])
@@ -175,6 +210,8 @@
                                              [:current-portfolio
                                               :capital
                                               :gross-exposure-usdc])
+        :current-perp-gross-usdc (current-perp-gross-usdc request)
+        :venue-collateral-usd (venue-collateral-usd request)
         :rebalance-tolerance (get-in request [:constraints :rebalance-tolerance])
         :fallback-slippage-bps (get-in request
                                        [:execution-assumptions

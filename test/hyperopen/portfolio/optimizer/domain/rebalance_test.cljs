@@ -164,6 +164,8 @@
             :after-utilization 0.14
             :before-gross-leverage 0
             :after-gross-leverage 0.2
+            :before-venue-leverage nil ;; no venue inputs -> bridge stays nil
+            :after-venue-leverage nil
             :warning nil}
            (get-in preview [:summary :margin])))))
 
@@ -195,6 +197,28 @@
     ;; Leverage projection: 2.0x before, +0.3x from the opened position -> 2.3x after.
     (is (near? 2.0 (:before-gross-leverage margin)))
     (is (near? 2.3 (:after-gross-leverage margin)))))
+
+(deftest build-rebalance-preview-projects-venue-leverage-test
+  ;; Venue-lens bridge (trade page's Unified Account Leverage, perp notional ÷
+  ;; collateral). Before: 6000/5000 = 1.2x. After: only the perp row's +0.3 weight
+  ;; (3000 notional) counts, not the spot row's +0.1 -> 9000/5000 = 1.8x.
+  (let [preview (rebalance/build-rebalance-preview
+                 {:capital-usd 10000
+                  :current-gross-exposure-usdc 20000
+                  :current-margin-used-usdc 4000
+                  :current-perp-gross-usdc 6000
+                  :venue-collateral-usd 5000
+                  :rebalance-tolerance 0.0
+                  :fallback-slippage-bps 25
+                  :instrument-ids ["perp:BTC" "spot:HYPE"]
+                  :current-weights [0.0 0.1] :target-weights [0.3 0.2]
+                  :instruments-by-id {"perp:BTC" {:instrument-type :perp :coin "BTC"}
+                                      "spot:HYPE" {:instrument-type :spot :coin "HYPE"}}
+                  :prices-by-id {"perp:BTC" 100 "spot:HYPE" 10}})
+        margin (get-in preview [:summary :margin])]
+    (is (= :ready (:status preview)))
+    (is (near? 1.2 (:before-venue-leverage margin)))
+    (is (near? 1.8 (:after-venue-leverage margin)))))
 
 (deftest build-rebalance-preview-uses-signed-deltas-across-zero-test
   (let [preview (rebalance/build-rebalance-preview

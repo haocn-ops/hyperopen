@@ -284,6 +284,34 @@
                 (assoc :disabled true))
       (if (:configured? card) "Applied" "Apply assumptions")]]))
 
+(defn- collapsed-assumption-card
+  "One-line summary row for a collapsed card: label, status, the configured
+  summary (when complete), and an Edit control that expands it. Keeps a stack
+  of configured assets to a glance instead of a long scroll."
+  [card]
+  (let [id (:instrument-id card)]
+    [:section {:class ["border" "bg-base-100/70" "p-3"
+                       (if (= :configured (:status card))
+                         "border-success/40"
+                         "border-warning/40")]
+               :data-role (:role card)
+               :data-collapsed "true"
+               :replicant/key (str "history-assumption-card-" id)}
+     [:div {:class ["flex" "items-center" "justify-between" "gap-2"]}
+      [:div {:class ["min-w-0" "flex" "items-baseline" "gap-2"]}
+       [:p {:class controls/section-title-class} (:label card)]
+       [:p {:class ["truncate" "text-[0.75rem]" "text-trading-muted"]
+            :data-role (str "portfolio-optimizer-history-assumption-summary-" id)}
+        (or (:summary card) "Configuration unfinished")]]
+      [:div {:class ["flex" "shrink-0" "items-center" "gap-2"]}
+       (status-chip card)
+       [:button {:type "button"
+                 :class ["text-[0.6875rem]" "uppercase" "tracking-[0.08em]"
+                         "text-trading-muted" "hover:text-warning"]
+                 :data-role (str "portfolio-optimizer-history-assumption-expand-" id)
+                 :on {:click [[(get-in card [:actions :set-card-collapsed]) id false]]}}
+        "Edit"]]]]))
+
 (defn- assumption-card
   [card]
   (let [id (:instrument-id card)]
@@ -303,6 +331,13 @@
         card-subtext]]
       [:div {:class ["flex" "items-center" "gap-2"]}
        (status-chip card)
+       (when (:collapsible? card)
+         [:button {:type "button"
+                   :class ["text-[0.6875rem]" "uppercase" "tracking-[0.08em]"
+                           "text-trading-muted" "hover:text-warning"]
+                   :data-role (str "portfolio-optimizer-history-assumption-collapse-" id)
+                   :on {:click [[(get-in card [:actions :set-card-collapsed]) id true]]}}
+          "Collapse"])
        (when (:mode card)
          [:button {:type "button"
                    :class ["text-[0.6875rem]" "uppercase" "tracking-[0.08em]"
@@ -329,6 +364,12 @@
      (when (:mode card)
        (card-actions card))]))
 
+(defn- assumption-card-or-summary
+  [card]
+  (if (:collapsed? card)
+    (collapsed-assumption-card card)
+    (assumption-card card)))
+
 (defn- add-asset-select
   "Manual entry point: bring ANY selected asset into the proxy workflow. The
   thresholds only auto-flag egregious cases; the user may judge an asset
@@ -351,8 +392,11 @@
                     :on {:change [[:actions/set-portfolio-optimizer-history-assumption-mode
                                    [:event.target/value] :proxy]]}}
            [:option {:value ""} "+ Model an asset with proxies…"]]
-          (map (fn [{:keys [instrument-id label]}]
-                 [:option {:value instrument-id} label]))
+          ;; Options arrive sorted ascending by native return-day count with the
+          ;; count in the label, so the assets limiting the shared covariance
+          ;; window sit at the top of the list.
+          (map (fn [{:keys [instrument-id label option-label]}]
+                 [:option {:value instrument-id} (or option-label label)]))
           addable-assets)))
 
 (defn history-assumptions-section
@@ -383,7 +427,7 @@
              ;; never clipped by the header's title/description competing for width.
              (add-asset-select addable-assets)]
             (concat
-             (map assumption-card cards)
+             (map assumption-card-or-summary cards)
              (when (empty? cards)
                [[:p {:class ["text-[0.75rem]" "leading-[1.5]" "text-trading-muted"]
                      :data-role "portfolio-optimizer-history-assumptions-empty"}

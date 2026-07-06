@@ -209,6 +209,7 @@
             [hyperopen.portfolio.montecarlo.actions-test]
             [hyperopen.portfolio.montecarlo.engine-test]
             [hyperopen.portfolio.optimizer.actions-test]
+            [hyperopen.portfolio.optimizer.application.assumption-library-test]
             [hyperopen.portfolio.optimizer.application.black-litterman-calibration-test]
             [hyperopen.portfolio.optimizer.application.black-litterman-editor-model-test]
             [hyperopen.portfolio.optimizer.application.black-litterman-preview-test]
@@ -357,6 +358,7 @@
             [hyperopen.runtime.effect-adapters.funding-test]
             [hyperopen.runtime.effect-adapters.leaderboard-test]
             [hyperopen.runtime.effect-adapters.order-test]
+            [hyperopen.runtime.effect-adapters.portfolio-optimizer-assumption-library-test]
             [hyperopen.runtime.effect-adapters.portfolio-optimizer-constraint-profiles-test]
             [hyperopen.runtime.effect-adapters.portfolio-optimizer-execution-cancel-test]
             [hyperopen.runtime.effect-adapters.portfolio-optimizer-execution-test]
@@ -983,6 +985,7 @@
              'hyperopen.portfolio.montecarlo.actions-test
              'hyperopen.portfolio.montecarlo.engine-test
              'hyperopen.portfolio.optimizer.actions-test
+             'hyperopen.portfolio.optimizer.application.assumption-library-test
              'hyperopen.portfolio.optimizer.application.black-litterman-calibration-test
              'hyperopen.portfolio.optimizer.application.black-litterman-editor-model-test
              'hyperopen.portfolio.optimizer.application.black-litterman-preview-test
@@ -1131,6 +1134,7 @@
              'hyperopen.runtime.effect-adapters.funding-test
              'hyperopen.runtime.effect-adapters.leaderboard-test
              'hyperopen.runtime.effect-adapters.order-test
+             'hyperopen.runtime.effect-adapters.portfolio-optimizer-assumption-library-test
              'hyperopen.runtime.effect-adapters.portfolio-optimizer-constraint-profiles-test
              'hyperopen.runtime.effect-adapters.portfolio-optimizer-execution-cancel-test
              'hyperopen.runtime.effect-adapters.portfolio-optimizer-execution-test

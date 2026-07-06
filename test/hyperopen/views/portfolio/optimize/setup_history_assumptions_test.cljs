@@ -124,11 +124,23 @@
     (is (= [:actions/set-portfolio-optimizer-history-assumption-relationship-strength
             "perp:NEW" :high]
            (first (ts/click-actions relationship-high))))
-    (is (some? basket) "The system-created prior basket is previewed.")
+    (is (some? basket) "The prior basket panel is previewed.")
+    (is (some #{"Source: Equal-weight fallback"} (ts/collect-strings basket))
+        "The equal prior is labeled a fallback, never model output.")
+    (is (some? (ts/node-by-role node "portfolio-optimizer-history-assumption-regression-perp:NEW"))
+        "The regression estimate gets its own panel.")
+    (is (some #{"No return overlap with the proxies yet. Using the prior only."}
+              (ts/collect-strings node))
+        "Without overlap the regression panel says so instead of faking weights.")
+    (is (some? (ts/node-by-role node "portfolio-optimizer-history-assumption-final-basket-perp:NEW"))
+        "The final modeled basket is a separate, emphasized panel.")
+    (is (some #{"Confidence q 0% — controls how much the regression can move the prior"}
+              (ts/collect-strings node)))
     (is (some? diagnostics))
     (is (some #{"R² used for confidence, not weights"} (ts/collect-strings diagnostics)))
-    (is (some #{"Final model: proxy basket + shrinkage + specific risk + cap"}
-              (ts/collect-strings node)))
+    (is (some #{"Final model: BTC 100% + specific risk + 5% cap"}
+              (ts/collect-strings node))
+        "The summary strip names the final basket.")
     (is (= [:actions/apply-portfolio-optimizer-history-assumption "perp:NEW"]
            (first (ts/click-actions apply-button))))
     (is (= [:actions/reset-portfolio-optimizer-history-assumption "perp:NEW"]

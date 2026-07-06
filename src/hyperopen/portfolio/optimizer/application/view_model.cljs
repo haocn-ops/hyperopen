@@ -4,6 +4,8 @@
             [hyperopen.portfolio.optimizer.application.view-model.index :as index]
             [hyperopen.portfolio.optimizer.application.view-model.scenario :as scenario]
             [hyperopen.portfolio.optimizer.application.view-model.setup :as setup]
+            [hyperopen.portfolio.optimizer.application.view-model.setup-history-assumption-cards :as assumption-cards]
+            [hyperopen.portfolio.optimizer.application.view-model.setup-history-assumption-rail :as assumption-rail]
             [hyperopen.portfolio.optimizer.application.view-model.tracking :as tracking]
             [hyperopen.portfolio.optimizer.application.view-model.universe :as universe]
             [hyperopen.portfolio.optimizer.application.view-model.workspace :as workspace]))
@@ -108,15 +110,15 @@
 
 (defn history-assumption-cards
   ([state draft readiness history-load-state]
-   (setup/history-assumption-cards state draft readiness history-load-state))
+   (assumption-cards/history-assumption-cards state draft readiness history-load-state))
   ([state draft readiness history-load-state formatters]
-   (setup/history-assumption-cards state draft readiness history-load-state formatters)))
+   (assumption-cards/history-assumption-cards state draft readiness history-load-state formatters)))
 
 (defn history-assumption-rail-model
   ([state draft readiness history-load-state]
-   (setup/history-assumption-rail-model state draft readiness history-load-state))
+   (assumption-rail/history-assumption-rail-model state draft readiness history-load-state))
   ([state draft readiness history-load-state formatters]
-   (setup/history-assumption-rail-model state draft readiness history-load-state formatters)))
+   (assumption-rail/history-assumption-rail-model state draft readiness history-load-state formatters)))
 
 (defn black-litterman-preview-model
   [readiness]

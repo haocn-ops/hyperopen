@@ -250,6 +250,7 @@
             [hyperopen.portfolio.optimizer.application.request-builder-refinement-test]
             [hyperopen.portfolio.optimizer.application.request-builder-test]
             [hyperopen.portfolio.optimizer.application.return-inputs-test]
+            [hyperopen.portfolio.optimizer.application.return-views-io-test]
             [hyperopen.portfolio.optimizer.application.return-views-test]
             [hyperopen.portfolio.optimizer.application.run-bridge-boundary-test]
             [hyperopen.portfolio.optimizer.application.run-bridge-workflow-test]
@@ -322,6 +323,7 @@
             [hyperopen.portfolio.optimizer.query-state-test]
             [hyperopen.portfolio.optimizer.refinement-actions-test]
             [hyperopen.portfolio.optimizer.refinement-domain-test]
+            [hyperopen.portfolio.optimizer.return-views-io-actions-test]
             [hyperopen.portfolio.optimizer.runtime-catalog-test]
             [hyperopen.portfolio.optimizer.target-sigma-actions-test]
             [hyperopen.portfolio.optimizer.tracking-actions-test]
@@ -579,6 +581,7 @@
             [hyperopen.views.portfolio.optimize.results-diagnostics-rail-test]
             [hyperopen.views.portfolio.optimize.results-panel-hierarchy-test]
             [hyperopen.views.portfolio.optimize.results-panel-test]
+            [hyperopen.views.portfolio.optimize.return-views-io-panel-test]
             [hyperopen.views.portfolio.optimize.run-status-banner-test]
             [hyperopen.views.portfolio.optimize.scenario-detail-view-test]
             [hyperopen.views.portfolio.optimize.setup-actions-test]
@@ -1026,6 +1029,7 @@
              'hyperopen.portfolio.optimizer.application.request-builder-refinement-test
              'hyperopen.portfolio.optimizer.application.request-builder-test
              'hyperopen.portfolio.optimizer.application.return-inputs-test
+             'hyperopen.portfolio.optimizer.application.return-views-io-test
              'hyperopen.portfolio.optimizer.application.return-views-test
              'hyperopen.portfolio.optimizer.application.run-bridge-boundary-test
              'hyperopen.portfolio.optimizer.application.run-bridge-workflow-test
@@ -1098,6 +1102,7 @@
              'hyperopen.portfolio.optimizer.query-state-test
              'hyperopen.portfolio.optimizer.refinement-actions-test
              'hyperopen.portfolio.optimizer.refinement-domain-test
+             'hyperopen.portfolio.optimizer.return-views-io-actions-test
              'hyperopen.portfolio.optimizer.runtime-catalog-test
              'hyperopen.portfolio.optimizer.target-sigma-actions-test
              'hyperopen.portfolio.optimizer.tracking-actions-test
@@ -1355,6 +1360,7 @@
              'hyperopen.views.portfolio.optimize.results-diagnostics-rail-test
              'hyperopen.views.portfolio.optimize.results-panel-hierarchy-test
              'hyperopen.views.portfolio.optimize.results-panel-test
+             'hyperopen.views.portfolio.optimize.return-views-io-panel-test
              'hyperopen.views.portfolio.optimize.run-status-banner-test
              'hyperopen.views.portfolio.optimize.scenario-detail-view-test
              'hyperopen.views.portfolio.optimize.setup-actions-test

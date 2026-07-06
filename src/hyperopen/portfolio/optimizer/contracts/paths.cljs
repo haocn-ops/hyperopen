@@ -122,6 +122,7 @@
 (def ui-refinement-depth-path (conj optimizer-ui-path :refinement-depth))
 (def ui-exposure-zoom-level-path (conj optimizer-ui-path :exposure-zoom-level))
 (def ui-return-views-filter-path (conj optimizer-ui-path :return-views-filter))
+(def ui-return-views-io-note-path (conj optimizer-ui-path :return-views-io-note))
 
 (def path-catalog
   {:optimizer/root optimizer-path
@@ -217,6 +218,7 @@
    :optimizer-ui/refinement-depth ui-refinement-depth-path
    :optimizer-ui/exposure-zoom-level ui-exposure-zoom-level-path
    :optimizer-ui/return-views-filter ui-return-views-filter-path
+   :optimizer-ui/return-views-io-note ui-return-views-io-note-path
    :optimizer-ui/assumption-cards-collapsed ui-assumption-cards-collapsed-path})
 
 (defn optimizer-state-path

@@ -32,6 +32,14 @@
     actions/apply-portfolio-optimizer-objective-menu-selection-and-run
     :set-portfolio-optimizer-return-views-filter
     actions/set-portfolio-optimizer-return-views-filter
+    :export-portfolio-optimizer-return-views
+    actions/export-portfolio-optimizer-return-views
+    :import-portfolio-optimizer-return-views
+    actions/import-portfolio-optimizer-return-views
+    :apply-imported-portfolio-optimizer-return-views
+    actions/apply-imported-portfolio-optimizer-return-views
+    :dismiss-portfolio-optimizer-return-views-io-note
+    actions/dismiss-portfolio-optimizer-return-views-io-note
     :set-portfolio-optimizer-return-model-kind
     actions/set-portfolio-optimizer-return-model-kind
     :set-portfolio-optimizer-risk-model-kind
@@ -262,6 +270,10 @@
       effect-adapters/load-portfolio-optimizer-view-library-effect
       :sync-portfolio-optimizer-view-library
       effect-adapters/sync-portfolio-optimizer-view-library-effect
+      :download-portfolio-optimizer-return-views-file
+      effect-adapters/download-portfolio-optimizer-return-views-file-effect
+      :pick-portfolio-optimizer-return-views-file
+      effect-adapters/pick-portfolio-optimizer-return-views-file-effect
       :load-portfolio-optimizer-assumption-library
       effect-adapters/load-portfolio-optimizer-assumption-library-effect
       :sync-portfolio-optimizer-assumption-library

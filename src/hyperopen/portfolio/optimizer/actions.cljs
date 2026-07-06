@@ -4,6 +4,7 @@
             [hyperopen.portfolio.optimizer.actions.execution :as execution]
             [hyperopen.portfolio.optimizer.actions.exposure :as exposure]
             [hyperopen.portfolio.optimizer.actions.refinement :as refinement]
+            [hyperopen.portfolio.optimizer.actions.return-views-io :as return-views-io]
             [hyperopen.portfolio.optimizer.actions.run :as run]
             [hyperopen.portfolio.optimizer.actions.target-sigma :as target-sigma]
             [hyperopen.portfolio.optimizer.actions.tracking :as tracking]
@@ -290,3 +291,15 @@
 
 (def stop-portfolio-optimizer-refinement
   refinement/stop-portfolio-optimizer-refinement)
+
+(def export-portfolio-optimizer-return-views
+  return-views-io/export-portfolio-optimizer-return-views)
+
+(def import-portfolio-optimizer-return-views
+  return-views-io/import-portfolio-optimizer-return-views)
+
+(def apply-imported-portfolio-optimizer-return-views
+  return-views-io/apply-imported-portfolio-optimizer-return-views)
+
+(def dismiss-portfolio-optimizer-return-views-io-note
+  return-views-io/dismiss-portfolio-optimizer-return-views-io-note)

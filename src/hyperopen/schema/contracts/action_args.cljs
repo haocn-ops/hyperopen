@@ -72,6 +72,7 @@
   (s/or :none ::common/no-args
         :anchor-only (s/tuple any?)))
 (s/def ::apply-imported-spectate-watchlist-args (s/tuple any?))
+(s/def ::apply-imported-portfolio-optimizer-return-views-args (s/tuple any?))
 (s/def ::portfolio-volume-history-open-args
   (s/or :none ::common/no-args
         :anchor-only (s/tuple any?)))
@@ -291,6 +292,10 @@
    :actions/add-portfolio-optimizer-objective-menu-view ::common/no-args
    :actions/apply-portfolio-optimizer-objective-menu-selection-and-run ::common/no-args
    :actions/set-portfolio-optimizer-return-views-filter ::portfolio-optimizer-model-kind-args
+   :actions/export-portfolio-optimizer-return-views ::common/no-args
+   :actions/import-portfolio-optimizer-return-views ::common/no-args
+   :actions/apply-imported-portfolio-optimizer-return-views ::apply-imported-portfolio-optimizer-return-views-args
+   :actions/dismiss-portfolio-optimizer-return-views-io-note ::common/no-args
    :actions/set-portfolio-optimizer-return-model-kind ::portfolio-optimizer-model-kind-args
    :actions/set-portfolio-optimizer-risk-model-kind ::portfolio-optimizer-model-kind-args
    :actions/apply-portfolio-optimizer-setup-preset ::portfolio-optimizer-model-kind-args

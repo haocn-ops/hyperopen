@@ -414,6 +414,56 @@
       (-> (*save-view-library!* address (view-library/library-record address entries))
           (.catch (fn [_err] false))))))
 
+(defn download-portfolio-optimizer-return-views-file-effect
+  "Download the return-views export document as a JSON file (Blob + anchor,
+  mirroring the spectate watchlist download)."
+  [_ _ {:keys [filename] doc :document}]
+  (when (and (exists? js/document)
+             (exists? js/URL))
+    (let [json (js/JSON.stringify (clj->js doc) nil 2)
+          blob (js/Blob. #js [json] #js {:type "application/json;charset=utf-8"})
+          url (.createObjectURL js/URL blob)
+          link (.createElement js/document "a")]
+      (set! (.-href link) url)
+      (set! (.-download link) filename)
+      (.appendChild (.-body js/document) link)
+      (.click link)
+      (.removeChild (.-body js/document) link)
+      (.revokeObjectURL js/URL url))))
+
+(defn- read-return-views-file-as-json!
+  [file on-data]
+  (let [reader (js/FileReader.)]
+    (set! (.-onload reader)
+          (fn [_]
+            (let [text (.-result reader)
+                  data (try
+                         (js->clj (js/JSON.parse text))
+                         (catch :default _ ::invalid))]
+              (on-data (when (not= data ::invalid) data)))))
+    (set! (.-onerror reader)
+          (fn [_] (on-data nil)))
+    (.readAsText reader file)))
+
+(defn pick-portfolio-optimizer-return-views-file-effect
+  "Open a file picker for a return-views JSON file and hand the parsed data to
+  the apply action (nil data → the action reports an invalid-file note)."
+  [_ store]
+  (when (exists? js/document)
+    (let [input (.createElement js/document "input")]
+      (set! (.-type input) "file")
+      (set! (.-accept input) ".json,application/json")
+      (set! (.-onchange input)
+            (fn [_]
+              (when-let [file (some-> input .-files (aget 0))]
+                (read-return-views-file-as-json!
+                 file
+                 (fn [data]
+                   (nxr/dispatch store nil
+                                 [[:actions/apply-imported-portfolio-optimizer-return-views
+                                   data]]))))))
+      (.click input))))
+
 (defn load-portfolio-optimizer-assumption-library-effect
   "Load the wallet's remembered history assumptions into the state mirror. The
   hydrate watcher (draft-autosave ns) observes the mirror arriving and

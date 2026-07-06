@@ -62,3 +62,32 @@
         "The draft's view wins for perp:BTC; perp:ETH hydrates from the library; perp:DOGE stays out (not in universe).")
     (is (= [] (view-library/hydrate-views nil {} universe))
         "No views and no library is a valid empty state.")))
+
+(deftest hydration-gap-detects-uncovered-universe-members-test
+  (let [entries {"perp:BTC" {:instrument-id "perp:BTC" :return 0.2
+                             :confidence-level :high :updated-at-ms 1}}]
+    (is (true? (view-library/hydration-gap?
+                []
+                entries
+                [{:instrument-id "perp:BTC"}]))
+        "A universe member the library remembers with no authored view is a gap.")
+    (is (false? (view-library/hydration-gap?
+                 [{:kind :absolute :instrument-id "perp:BTC" :return 0.3}]
+                 entries
+                 [{:instrument-id "perp:BTC"}]))
+        "An authored absolute view covers the member — no gap.")
+    (is (false? (view-library/hydration-gap?
+                 []
+                 entries
+                 [{:instrument-id "perp:ETH"}]))
+        "A remembered entry for an out-of-universe asset opens no gap.")
+    (is (true? (view-library/hydration-gap?
+                [{:kind :relative :instrument-id "perp:BTC"
+                  :comparator-instrument-id "perp:ETH" :return 0.05}]
+                entries
+                [{:instrument-id "perp:BTC"}]))
+        "A relative view does not cover the member; the absolute gap remains.")
+    (is (false? (view-library/hydration-gap?
+                 []
+                 {}
+                 [{:instrument-id "perp:BTC"}])))))

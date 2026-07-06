@@ -257,11 +257,15 @@
 
         (str/blank? text)
         (if existing
-          (conj (common/save-draft-path-values
+          ;; The library REMOVE must hit the state mirror BEFORE the draft
+          ;; write: the view-library hydrate watcher fires on the draft change,
+          ;; and a mirror that still holds the entry would gap-fill the
+          ;; just-cleared view right back (same ordering as assumption clears).
+          (into [(view-library-sync-effect {:removes [instrument-id*]})]
+                (common/save-draft-path-values
                  [[contracts/draft-return-model-views-path
                    (remove-absolute-view views instrument-id*)]
-                  [ui-path text]])
-                (view-library-sync-effect {:removes [instrument-id*]}))
+                  [ui-path text]]))
           buffer-only)
 
         (some? parsed)
@@ -361,11 +365,13 @@
           existing (when (black-litterman-return-model? state)
                      (existing-absolute-view-by-instrument views instrument-id*))]
       (if existing
-        (conj (common/save-draft-path-values
+        ;; Library remove BEFORE the draft write — see the ordering note in
+        ;; set-portfolio-optimizer-objective-menu-view-return's blank branch.
+        (into [(view-library-sync-effect {:removes [instrument-id*]})]
+              (common/save-draft-path-values
                (into [[contracts/draft-return-model-views-path
                        (remove-absolute-view views instrument-id*)]]
-                     ui-path-values))
-              (view-library-sync-effect {:removes [instrument-id*]}))
+                     ui-path-values)))
         [[:effects/save-many ui-path-values]]))
     []))
 

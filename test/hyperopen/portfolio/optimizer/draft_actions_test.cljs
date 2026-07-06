@@ -290,16 +290,16 @@
                  views-model-state
                  "perp:BTC"
                  "")]
-    (is (= [[:effects/save-many
+    (is (= [[:effects/sync-portfolio-optimizer-view-library
+             {:upserts []
+              :removes ["perp:BTC"]}]
+            [:effects/save-many
              [[views-path []]
               [[:portfolio-ui :optimizer :objective-menu-view-drafts :perp:BTC :return-text]
                ""]
-              [dirty-path* true]]]
-            [:effects/sync-portfolio-optimizer-view-library
-             {:upserts []
-              :removes ["perp:BTC"]}]]
+              [dirty-path* true]]]]
            effects)
-        "Blank text clears the authored view and removes the library entry."))
+        "Blank text clears the authored view and removes the library entry (library remove FIRST, so the hydrate watcher can't resurrect it)."))
   (is (= [[:effects/save
            [:portfolio-ui :optimizer :objective-menu-view-drafts :perp:ETH :return-text]
            ""]]
@@ -396,14 +396,14 @@
         effects (actions/remove-portfolio-optimizer-objective-menu-view
                  state
                  "perp:BTC")]
-    (is (= [[:effects/save-many
+    (is (= [[:effects/sync-portfolio-optimizer-view-library
+             {:upserts []
+              :removes ["perp:BTC"]}]
+            [:effects/save-many
              [[views-path []]
               [[:portfolio-ui :optimizer :objective-menu-view-order] ["perp:ETH"]]
               [[:portfolio-ui :optimizer :objective-menu-view-drafts] {}]
-              [dirty-path* true]]]
-            [:effects/sync-portfolio-optimizer-view-library
-             {:upserts []
-              :removes ["perp:BTC"]}]]
+              [dirty-path* true]]]]
            effects)))
   ;; Removing a row that has no authored view stays a UI-only cleanup.
   (is (= [[:effects/save-many
@@ -437,7 +437,8 @@
                                                                    "perp:BTC" -1}}]}
                                                :metadata {:dirty? false}}}}}
         effects (actions/remove-portfolio-optimizer-objective-menu-view state "perp:ETH")
-        saved-views (get-in (vec effects) [0 1 0 1])]
+        ;; effects = [library-sync, save-many]; the saved views ride the save.
+        saved-views (get-in (vec effects) [1 1 0 1])]
     (is (= [{:id "rel-eth-btc"
              :kind :relative
              :instrument-id "perp:ETH"

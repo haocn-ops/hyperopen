@@ -331,6 +331,7 @@
             [hyperopen.portfolio.optimizer.universe-exclusion-actions-test]
             [hyperopen.portfolio.optimizer.universe-from-holdings-actions-test]
             [hyperopen.portfolio.optimizer.universe-keyboard-test]
+            [hyperopen.portfolio.optimizer.view-library-actions-test]
             [hyperopen.portfolio.optimizer.worker-test]
             [hyperopen.portfolio.query-state-test]
             [hyperopen.portfolio.route-runtime-module-test]
@@ -1110,6 +1111,7 @@
              'hyperopen.portfolio.optimizer.universe-exclusion-actions-test
              'hyperopen.portfolio.optimizer.universe-from-holdings-actions-test
              'hyperopen.portfolio.optimizer.universe-keyboard-test
+             'hyperopen.portfolio.optimizer.view-library-actions-test
              'hyperopen.portfolio.optimizer.worker-test
              'hyperopen.portfolio.query-state-test
              'hyperopen.portfolio.route-runtime-module-test

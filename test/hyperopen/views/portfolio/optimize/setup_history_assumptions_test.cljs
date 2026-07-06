@@ -30,7 +30,7 @@
                       [{:code :history-assumption-incomplete
                         :instrument-id "perp:NEW"
                         :missing :volatility
-                        :message "NEW needs an expected annual volatility."}])
+                        :message "NEW needs a modeled annual volatility."}])
         card (ts/node-by-role node "portfolio-optimizer-history-assumption-card-perp:NEW")
         volatility-input (ts/node-by-role node "portfolio-optimizer-history-assumption-volatility-perp:NEW")
         cap-input (ts/node-by-role node "portfolio-optimizer-history-assumption-max-weight-perp:NEW")
@@ -45,7 +45,7 @@
            (first (ts/input-actions cap-input))))
     (is (= [:actions/clear-portfolio-optimizer-history-assumption "perp:NEW"]
            (first (ts/click-actions clear-button))))
-    (is (some #{"NEW needs an expected annual volatility."}
+    (is (some #{"NEW needs a modeled annual volatility."}
               (ts/collect-strings card))
         "Field-level errors are surfaced on the card.")))
 
@@ -104,6 +104,9 @@
         remove-chip (ts/node-by-role node "portfolio-optimizer-history-assumption-proxy-remove-perp:NEW-perp:BTC")
         search-input (ts/node-by-role node "portfolio-optimizer-history-assumption-proxy-search-perp:NEW")
         relationship-high (ts/node-by-role node "portfolio-optimizer-history-assumption-relationship-perp:NEW-high")
+        guardrails (ts/node-by-role node "portfolio-optimizer-history-assumption-guardrails-perp:NEW")
+        volatility-input (ts/node-by-role node "portfolio-optimizer-history-assumption-volatility-perp:NEW")
+        cap-input (ts/node-by-role node "portfolio-optimizer-history-assumption-max-weight-perp:NEW")
         basket (ts/node-by-role node "portfolio-optimizer-history-assumption-prior-basket-perp:NEW")
         diagnostics (ts/node-by-role node "portfolio-optimizer-history-assumption-diagnostics-perp:NEW")
         apply-button (ts/node-by-role node "portfolio-optimizer-history-assumption-apply-perp:NEW")
@@ -124,6 +127,25 @@
     (is (= [:actions/set-portfolio-optimizer-history-assumption-relationship-strength
             "perp:NEW" :high]
            (first (ts/click-actions relationship-high))))
+    (is (some? guardrails) "Volatility + cap live in a risk-guardrails drawer.")
+    (is (= :details (first guardrails))
+        "The guardrails are a collapsed disclosure, not primary inputs.")
+    (is (nil? (ts/node-attr guardrails :open))
+        "The drawer starts collapsed and is never forced open from state.")
+    (is (some #{"80% vol · 5% max"} (ts/collect-strings guardrails))
+        "Collapsed, the drawer summarizes the auto-set values.")
+    (is (some #{"Auto-set"} (ts/collect-strings guardrails))
+        "Seed values are labeled auto-set.")
+    (is (some #{"Modeled annual volatility"} (ts/collect-strings guardrails))
+        "The volatility input names the model's use, not a user forecast.")
+    (is (some #{"Max allocation cap"} (ts/collect-strings guardrails)))
+    (is (= [:actions/set-portfolio-optimizer-history-assumption-expected-volatility
+            "perp:NEW" [:event.target/value]]
+           (first (ts/input-actions volatility-input)))
+        "The volatility input still commits edits from inside the drawer.")
+    (is (= [:actions/set-portfolio-optimizer-history-assumption-max-weight-cap
+            "perp:NEW" [:event.target/value]]
+           (first (ts/input-actions cap-input))))
     (is (some? basket) "The prior basket panel is previewed.")
     (is (some #{"Source: Equal-weight fallback"} (ts/collect-strings basket))
         "The equal prior is labeled a fallback, never model output.")

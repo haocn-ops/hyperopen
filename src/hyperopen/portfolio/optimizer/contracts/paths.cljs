@@ -57,6 +57,9 @@
 (def last-successful-run-result-path (conj last-successful-run-path :result))
 (def constraint-profiles-path (conj optimizer-path :constraint-profiles))
 (def view-library-path (conj optimizer-path :view-library))
+;; Per-wallet remembered history assumptions (state mirror of the
+;; assumption-library::<addr> IndexedDB record): {instrument-id library-entry}.
+(def assumption-library-path (conj optimizer-path :assumption-library))
 (def refinement-path (conj optimizer-path :refinement))
 (def refinement-active-path (conj refinement-path :active?))
 (def refinement-depth-path (conj refinement-path :depth))
@@ -90,6 +93,11 @@
 ;; proxy card's catalog typeahead reads/writes its own entry.
 (def ui-proxy-search-queries-path
   (conj optimizer-ui-path :proxy-search-queries))
+;; Explicit per-card collapse overrides: {instrument-id collapsed?}. Absent id
+;; means "use the default" (configured cards collapse, others expand), so the
+;; map stays empty until the user toggles a card by hand.
+(def ui-assumption-cards-collapsed-path
+  (conj optimizer-ui-path :assumption-cards-collapsed))
 (def ui-draft-add-asset-open-path
   (conj optimizer-ui-path :draft-add-asset-open?))
 (def ui-objective-menu-open-path
@@ -170,6 +178,7 @@
    :optimizer/last-successful-run-result last-successful-run-result-path
    :optimizer/constraint-profiles constraint-profiles-path
    :optimizer/view-library view-library-path
+   :optimizer/assumption-library assumption-library-path
    :optimizer/refinement refinement-path
    :optimizer/refinement-active refinement-active-path
    :optimizer/refinement-depth refinement-depth-path
@@ -207,7 +216,8 @@
    :optimizer-ui/stale-auto-recompute ui-stale-auto-recompute-path
    :optimizer-ui/refinement-depth ui-refinement-depth-path
    :optimizer-ui/exposure-zoom-level ui-exposure-zoom-level-path
-   :optimizer-ui/return-views-filter ui-return-views-filter-path})
+   :optimizer-ui/return-views-filter ui-return-views-filter-path
+   :optimizer-ui/assumption-cards-collapsed ui-assumption-cards-collapsed-path})
 
 (defn optimizer-state-path
   [& segments]

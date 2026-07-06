@@ -343,7 +343,7 @@
       (str label ": source refresh failed; cached optimizer history may be stale.")
 
       :history-assumption-required
-      (str label " needs a history assumption. Choose proxy behavior or a conservative assumption.")
+      (str label " needs a history assumption. Model it from similar assets or use a conservative assumption.")
 
       :history-assumption-incomplete
       (case (:missing warning)
@@ -353,7 +353,7 @@
         :max-weight-exceeds-global
         (str label " max allocation cap cannot exceed the global max asset weight.")
         :proxy-instruments
-        (str label " is set to proxy behavior but no proxy assets are selected.")
+        (str label " is set to be modeled but no proxy assets are selected.")
         :self-proxy
         (str label " cannot use itself as a proxy.")
         :proxy-history

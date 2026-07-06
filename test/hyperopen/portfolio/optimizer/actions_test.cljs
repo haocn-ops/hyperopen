@@ -391,7 +391,8 @@
   (is (= [[:effects/load-portfolio-optimizer-scenario-index]
           [:effects/load-portfolio-optimizer-history-discovery]
           [:effects/load-portfolio-optimizer-constraint-profiles]
-          [:effects/load-portfolio-optimizer-view-library]]
+          [:effects/load-portfolio-optimizer-view-library]
+          [:effects/load-portfolio-optimizer-assumption-library]]
          (actions/load-portfolio-optimizer-route
           {:asset-selector {:phase :full}
            :vaults {:merged-index-rows [{:vault-address "0xloaded"}]}}
@@ -399,14 +400,16 @@
   (is (= [[:effects/load-portfolio-optimizer-scenario "scn_01"]
           [:effects/load-portfolio-optimizer-history-discovery]
           [:effects/load-portfolio-optimizer-constraint-profiles]
-          [:effects/load-portfolio-optimizer-view-library]]
+          [:effects/load-portfolio-optimizer-view-library]
+          [:effects/load-portfolio-optimizer-assumption-library]]
          (actions/load-portfolio-optimizer-route
           {:asset-selector {:phase :full}
            :vaults {:merged-index-rows [{:vault-address "0xloaded"}]}}
           "/portfolio/optimize/scn_01")))
   (is (= [[:effects/load-portfolio-optimizer-history-discovery]
           [:effects/load-portfolio-optimizer-constraint-profiles]
-          [:effects/load-portfolio-optimizer-view-library]]
+          [:effects/load-portfolio-optimizer-view-library]
+          [:effects/load-portfolio-optimizer-assumption-library]]
          (actions/load-portfolio-optimizer-route
           {:asset-selector {:phase :full}
            :vaults {:merged-index-rows [{:vault-address "0xloaded"}]}}
@@ -421,7 +424,8 @@
           [:effects/api-fetch-vault-index-with-cache]
           [:effects/api-fetch-vault-summaries]
           [:effects/load-portfolio-optimizer-constraint-profiles]
-          [:effects/load-portfolio-optimizer-view-library]]
+          [:effects/load-portfolio-optimizer-view-library]
+          [:effects/load-portfolio-optimizer-assumption-library]]
          (actions/load-portfolio-optimizer-route
           {:asset-selector {:phase :full}}
           "/portfolio/optimize/new")))
@@ -430,7 +434,8 @@
           [:effects/api-fetch-vault-index-with-cache]
           [:effects/api-fetch-vault-summaries]
           [:effects/load-portfolio-optimizer-constraint-profiles]
-          [:effects/load-portfolio-optimizer-view-library]]
+          [:effects/load-portfolio-optimizer-view-library]
+          [:effects/load-portfolio-optimizer-assumption-library]]
          (actions/load-portfolio-optimizer-route
           {:asset-selector {:phase :full}
            :vaults {}}
@@ -440,14 +445,16 @@
           [:effects/api-fetch-vault-index-with-cache]
           [:effects/api-fetch-vault-summaries]
           [:effects/load-portfolio-optimizer-constraint-profiles]
-          [:effects/load-portfolio-optimizer-view-library]]
+          [:effects/load-portfolio-optimizer-view-library]
+          [:effects/load-portfolio-optimizer-assumption-library]]
          (actions/load-portfolio-optimizer-route
           {:asset-selector {:phase :full}
            :vaults {}}
           "/portfolio/optimize/scn_01")))
   (is (= [[:effects/load-portfolio-optimizer-history-discovery]
           [:effects/load-portfolio-optimizer-constraint-profiles]
-          [:effects/load-portfolio-optimizer-view-library]]
+          [:effects/load-portfolio-optimizer-view-library]
+          [:effects/load-portfolio-optimizer-assumption-library]]
          (actions/load-portfolio-optimizer-route
           {:asset-selector {:phase :full}
            :vaults {:merged-index-rows [{:vault-address "0xloaded"}]}}
@@ -457,7 +464,8 @@
   (is (= [[:effects/load-portfolio-optimizer-history-discovery]
           [:effects/fetch-asset-selector-markets {:phase :full}]
           [:effects/load-portfolio-optimizer-constraint-profiles]
-          [:effects/load-portfolio-optimizer-view-library]]
+          [:effects/load-portfolio-optimizer-view-library]
+          [:effects/load-portfolio-optimizer-assumption-library]]
          (actions/load-portfolio-optimizer-route
           {:asset-selector {:cache-hydrated? true
                             :phase :bootstrap

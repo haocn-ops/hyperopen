@@ -5,6 +5,7 @@
             [hyperopen.api.trading :as trading-api]
             [hyperopen.order.effects :as order-effects]
             [hyperopen.config :as app-config]
+            [hyperopen.portfolio.optimizer.application.assumption-library :as assumption-library]
             [hyperopen.portfolio.optimizer.application.constraint-profiles :as constraint-profiles]
             [hyperopen.portfolio.optimizer.application.view-library :as view-library]
             [hyperopen.portfolio.optimizer.application.rebalance-snapshot :as rebalance-snapshot]
@@ -49,6 +50,8 @@
 (def ^:dynamic *save-constraint-profiles!* persistence/save-constraint-profiles!)
 (def ^:dynamic *load-view-library!* persistence/load-view-library!)
 (def ^:dynamic *save-view-library!* persistence/save-view-library!)
+(def ^:dynamic *load-assumption-library!* persistence/load-assumption-library!)
+(def ^:dynamic *save-assumption-library!* persistence/save-assumption-library!)
 (def ^:dynamic *next-scenario-id* (fn [now-ms] (str "scn_" now-ms)))
 (def ^:dynamic *now-ms* #(.now js/Date))
 (def ^:dynamic *submit-order!* trading-api/submit-order!)
@@ -409,6 +412,41 @@
     (if-not (and address (account-context/mutations-allowed? state))
       (js/Promise.resolve false)
       (-> (*save-view-library!* address (view-library/library-record address entries))
+          (.catch (fn [_err] false))))))
+
+(defn load-portfolio-optimizer-assumption-library-effect
+  "Load the wallet's remembered history assumptions into the state mirror. The
+  hydrate watcher (draft-autosave ns) observes the mirror arriving and
+  gap-fills the draft, so ordering against the draft restore doesn't matter —
+  whichever lands last still triggers the fill."
+  [_ store]
+  (let [address (account-context/effective-account-address @store)]
+    (if-not address
+      (js/Promise.resolve nil)
+      (-> (*load-assumption-library!* address)
+          (.then (fn [record]
+                   (let [entries (assumption-library/record->entries record)]
+                     (swap! store assoc-in contracts/assumption-library-path entries)
+                     entries)))
+          (.catch (fn [_err] nil))))))
+
+(defn sync-portfolio-optimizer-assumption-library-effect
+  "Apply upserts/removes from the assumption-edit actions to the wallet's
+  remembered history assumptions. Timestamps are stamped here. State always
+  updates; the IndexedDB write is skipped for read-only/spectated accounts,
+  matching the view-library sync."
+  [_ store sync]
+  (let [state @store
+        address (account-context/effective-account-address state)
+        entries (assumption-library/apply-sync
+                 (get-in state contracts/assumption-library-path)
+                 (or sync {})
+                 (*now-ms*))]
+    (swap! store assoc-in contracts/assumption-library-path entries)
+    (if-not (and address (account-context/mutations-allowed? state))
+      (js/Promise.resolve false)
+      (-> (*save-assumption-library!* address
+                                      (assumption-library/library-record address entries))
           (.catch (fn [_err] false))))))
 
 (defn load-portfolio-optimizer-constraint-profiles-effect

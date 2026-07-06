@@ -25,6 +25,7 @@
 (def ^:private autosave-watch-key ::draft-autosave)
 (def ^:private preseed-watch-key ::holdings-preseed)
 (def ^:private identity-restore-watch-key ::identity-restore)
+(def ^:private assumption-hydrate-watch-key ::assumption-library-hydrate)
 
 (def default-debounce-ms
   "One draft edit rarely comes alone (drags, typed digits); a sub-second debounce
@@ -156,8 +157,54 @@
                                 (get-in new-state [:router :path])]])))))
   store)
 
+(defn- assumption-library-gap?
+  "True when some universe instrument has NO draft assumption entry but the
+  wallet's assumption library remembers one — the state the hydrate action
+  gap-fills."
+  [state]
+  (let [entries (get-in state contracts/assumption-library-path)]
+    (and (map? entries)
+         (seq entries)
+         (let [assumptions (or (get-in state contracts/draft-history-assumptions-path)
+                               {})]
+           (boolean (some (fn [instrument]
+                            (let [id (:instrument-id instrument)]
+                              (and id
+                                   (not (contains? assumptions id))
+                                   (contains? entries id))))
+                          (get-in state contracts/draft-universe-path)))))))
+
+(defn- assumption-hydrate-inputs
+  [state]
+  [(get-in state contracts/draft-universe-path)
+   (get-in state contracts/draft-history-assumptions-path)
+   (get-in state contracts/assumption-library-path)])
+
+(defn install-assumption-library-hydrate-watcher!
+  "Gap-fill remembered history assumptions whenever a universe instrument
+  lacks a draft entry the library remembers. One watcher covers every path
+  that can open a gap — universe add, draft restore, holdings preseed, the
+  library mirror arriving from IndexedDB — regardless of ordering. The
+  hydrate action is a pure gap-fill (existing draft entries always win), so
+  repeat dispatches are idempotent; each fill closes the gap, so the watcher
+  quiesces. Clear never resurrects: the library remove hits the state mirror
+  before the draft write (see the actions-side ordering note)."
+  [{:keys [store dispatch!]
+    :or {dispatch! nxr/dispatch}}]
+  (remove-watch store assumption-hydrate-watch-key)
+  (add-watch store assumption-hydrate-watch-key
+             (fn [_ _ old-state new-state]
+               (when (and (not= (assumption-hydrate-inputs old-state)
+                                (assumption-hydrate-inputs new-state))
+                          (assumption-library-gap? new-state))
+                 (dispatch! store
+                            nil
+                            [[:actions/hydrate-portfolio-optimizer-history-assumption-library]]))))
+  store)
+
 (defn install-optimizer-draft-watchers!
   [deps]
   (install-draft-autosave-watcher! deps)
   (install-holdings-preseed-watcher! deps)
-  (install-identity-restore-watcher! deps))
+  (install-identity-restore-watcher! deps)
+  (install-assumption-library-hydrate-watcher! deps))

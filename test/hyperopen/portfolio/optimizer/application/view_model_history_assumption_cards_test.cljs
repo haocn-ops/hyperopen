@@ -46,7 +46,7 @@
                    :blocking-warnings [{:code :history-assumption-incomplete
                                         :instrument-id "perp:NEW"
                                         :missing :volatility
-                                        :message "NEW needs an expected annual volatility."}]}
+                                        :message "NEW needs a modeled annual volatility."}]}
         model (view-model/history-assumption-cards
                {} draft readiness loaded-state-with-new
                {:percent-label (fn [value] (str (js/Math.round (* 100 value)) "%"))})
@@ -62,7 +62,13 @@
         "Both behaviors are offered; proxy leads.")
     (is (= "3%" (get-in card [:max-weight :percent-label])))
     (is (nil? (get-in card [:volatility :value])))
-    (is (= ["NEW needs an expected annual volatility."] (:errors card)))
+    (is (= ["NEW needs a modeled annual volatility."] (:errors card)))
+    (is (= {:auto? false
+            :source-label "Edited"
+            :summary "-- vol · 3% max"
+            :attention? true}
+           (:risk-guardrails card))
+        "A missing guardrail value reads as attention, never as auto-set.")
     (is (false? (:engine-applied? card)))
     (is (= :actions/set-portfolio-optimizer-history-assumption-mode
            (get-in card [:actions :set-mode])))
@@ -107,6 +113,12 @@
     (is (= "" (:proxy-search-query card)) "Search starts empty.")
     (is (= [] (:proxy-search-results card))
         "No catalog results until the user types a query.")
+    (is (= {:auto? true
+            :source-label "Auto-set"
+            :summary "80% vol · 5% max"
+            :attention? false}
+           (:risk-guardrails card))
+        "Seed values read as auto-set guardrails.")
     (is (= :actions/set-portfolio-optimizer-history-assumption-proxy-search
            (get-in card [:actions :set-proxy-search])))
     (is (= :high (:relationship-strength card)))
@@ -143,6 +155,34 @@
            (get-in card [:actions :toggle-proxy-asset])))
     (is (= :actions/apply-portfolio-optimizer-history-assumption
            (get-in card [:actions :apply])))))
+
+(deftest history-assumption-cards-guardrails-read-edited-off-seed-test
+  ;; Editing either guardrail away from its behavior seed (vol 0.8, proxy cap
+  ;; 0.05) flips the drawer's tag from Auto-set to Edited.
+  (let [universe [btc-instrument new-perp-instrument]
+        draft {:universe universe
+               :objective {:kind :minimum-variance}
+               :history-assumptions
+               {"perp:NEW" {:behavior :proxy
+                            :expected-return 0.0
+                            :volatility 0.6
+                            :max-weight 0.05
+                            :proxy {:instrument-ids ["perp:BTC"]
+                                    :relationship-strength :medium
+                                    :prior-weights nil}}}}
+        readiness {:request {:requested-universe universe
+                             :universe [btc-instrument]
+                             :objective {:kind :minimum-variance}
+                             :history {:eligible-instruments [btc-instrument]}}
+                   :blocking-warnings []}
+        model (view-model/history-assumption-cards
+               {} draft readiness loaded-state-with-new
+               {:percent-label (fn [value] (str (js/Math.round (* 100 value)) "%"))})]
+    (is (= {:auto? false
+            :source-label "Edited"
+            :summary "60% vol · 5% max"
+            :attention? false}
+           (:risk-guardrails (first (:cards model)))))))
 
 (defn- blended-overlap-series
   "Target = 70% ETH + 30% BTC + small deterministic noise, matching the shape
@@ -249,8 +289,8 @@
     (is (some #(= ["Final modeled basket" "BTC 100%"] %) (:summary-pairs row))
         "The rail reports the confidence-shrunk basket that drives covariance.")
     (is (some #(= ["Relationship strength" "Medium"] %) (:summary-pairs row)))
-    (is (some #(= ["Expected volatility" "80%"] %) (:summary-pairs row)))
-    (is (some #(= ["Max weight cap" "5%"] %) (:summary-pairs row)))
+    (is (some #(= ["Modeled volatility" "80%"] %) (:summary-pairs row)))
+    (is (some #(= ["Max allocation cap" "5%"] %) (:summary-pairs row)))
     (is (some #(= ["History used" "500 days of returns · via proxies"] %)
               (:summary-pairs row))
         "The rail reports the proxy-extended covariance window, not the asset's own overlap.")

@@ -69,6 +69,30 @@
    ;; editable percent text (decimal 0.25 -> "25"); the action parses it back.
    :input-text (when (some? value) (coercion/decimal->percent-text value))})
 
+(def ^:private guardrail-warning-fields
+  ;; :missing codes of :history-assumption-incomplete blocking warnings that
+  ;; point at a risk-guardrail field (hidden in a collapsed drawer on proxy
+  ;; cards, so the drawer needs a visible attention cue).
+  #{:volatility :max-weight :max-weight-exceeds-global})
+
+(defn- risk-guardrails-model
+  "Auto-vs-edited projection of the entry's volatility + cap guardrails. The
+  seeds come from history-assumptions/default-assumption, so :auto? simply
+  means both values still equal their behavior's seed. Nil until a behavior is
+  chosen (there are no guardrails to summarize on a mode-less card)."
+  [entry percent-label* warnings]
+  (when-let [behavior (:behavior entry)]
+    (let [vol (:volatility entry)
+          cap (:max-weight entry)
+          auto? (and (= vol history-assumptions/default-conservative-volatility)
+                     (= cap (history-assumptions/default-max-weight behavior)))]
+      {:auto? auto?
+       :source-label (if auto? "Auto-set" "Edited")
+       :summary (str (if (some? vol) (percent-label* vol) "--") " vol · "
+                     (if (some? cap) (percent-label* cap) "--") " max")
+       :attention? (boolean (some #(contains? guardrail-warning-fields (:missing %))
+                                  warnings))})))
+
 (defn- card-status
   [entry complete? assumption-required?]
   (cond
@@ -291,7 +315,7 @@
                      "Regression unavailable. Using the prior only.")})))
 
 (defn- history-assumption-card
-  [{:keys [instrument label entry complete? errors note percent-label*
+  [{:keys [instrument label entry complete? errors warnings note percent-label*
            assumption-required? return-required? observations
            covariance-observations readiness
            resolve-proxy-label usable-ids search-query state]}]
@@ -322,6 +346,7 @@
              :expected-return-required? (boolean return-required?)
              :volatility (percent-field percent-label* (:volatility entry))
              :max-weight (percent-field percent-label* (:max-weight entry))
+             :risk-guardrails (risk-guardrails-model entry percent-label* warnings)
              :observations observations
              :covariance-observations covariance-observations
              :errors (vec errors)
@@ -415,13 +440,15 @@
                                                        :usable-proxy-ids usable-ids
                                                        :max-asset-weight
                                                        (get-in draft [:constraints :max-asset-weight])}))
-                                      errors (keep :message (get warnings-by-id id))]
+                                      warnings (get warnings-by-id id)
+                                      errors (keep :message warnings)]
                                   (history-assumption-card
                                    {:instrument instrument
                                     :label (universe/instrument-primary-label instrument)
                                     :entry entry
                                     :complete? complete?
                                     :errors errors
+                                    :warnings warnings
                                     :note nil
                                     :percent-label* percent-label*
                                     :assumption-required? (contains? required-ids id)

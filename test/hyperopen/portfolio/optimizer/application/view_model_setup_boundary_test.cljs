@@ -291,7 +291,40 @@
                 :history-load-state {:status :idle}
                 :history-status-by-id {"perp:BTC" :aligned}})
         badge-by-id (into {} (map (juxt :instrument-id :assumption-badge-label))
-                          (:selected-rows model))]
+                          (:selected-rows model))
+        tooltip-by-id (into {} (map (juxt :instrument-id :assumption-badge-tooltip))
+                            (:selected-rows model))]
     (is (= "Ready" (get badge-by-id "perp:BTC")))
     (is (= "Conservative" (get badge-by-id "perp:NEW"))
-        "A complete conservative assumption shows the Conservative badge.")))
+        "A complete conservative assumption shows the Conservative badge.")
+    (is (str/starts-with? (get tooltip-by-id "perp:NEW") "Treated cautiously")
+        "The Conservative chip carries a hover explanation.")
+    (is (nil? (get tooltip-by-id "perp:BTC"))
+        "Plain Ready rows carry no tooltip.")))
+
+(deftest universe-row-modeled-badge-and-tooltip-test
+  ;; A complete proxy (basket-modeled) assumption reads "Modeled" — named for its
+  ;; result, not the "proxy" mechanism — so it never collides with the
+  ;; unconfigured "Needs proxy" cue, and its chip carries a hover explanation.
+  (let [draft {:universe [btc-instrument new-perp-instrument]
+               :objective {:kind :minimum-variance}
+               :history-assumptions
+               {"perp:NEW" {:behavior :proxy
+                            :expected-return 0.0
+                            :volatility 0.8
+                            :max-weight 0.05
+                            :proxy {:instrument-ids ["perp:BTC"]
+                                    :relationship-strength :medium
+                                    :prior-weights nil}}}}
+        model (view-model/universe-section-model
+               {}
+               draft
+               {:readiness {:request {:universe [btc-instrument]
+                                      :objective {:kind :minimum-variance}}}
+                :history-load-state {:status :idle}
+                :history-status-by-id {"perp:BTC" :aligned}})
+        row (some #(when (= "perp:NEW" (:instrument-id %)) %) (:selected-rows model))]
+    (is (= "Modeled" (:assumption-badge-label row))
+        "The configured basket-modeled stance reads 'Modeled', not 'Proxy behavior'.")
+    (is (str/includes? (:assumption-badge-tooltip row) "modeled from a basket of similar assets")
+        "Its chip hover explains that returns are modeled from similar assets.")))

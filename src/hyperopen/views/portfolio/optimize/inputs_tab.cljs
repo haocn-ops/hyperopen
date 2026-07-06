@@ -82,7 +82,7 @@
   [mode]
   (case mode
     :conservative "Conservative"
-    :proxy "Proxy behavior"
+    :proxy "Modeled"
     "--"))
 
 (defn- history-assumption-summary

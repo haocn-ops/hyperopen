@@ -73,12 +73,44 @@ same window extension honestly).
   - `view_model_setup_boundary_test.cljs`: proxy-card test asserts the
     "Covariance window" cell and `:covariance-observations`; rail test asserts
     the "History used … via proxies" + "Calibration overlap" pairs.
+- [x] Poisoned-calendar recovery (`history_loader/api_v2/alignment.cljs`) —
+  found live by the honest label, same day. The api-v2 fetch covers the FULL
+  draft universe (assumption assets + reference proxies included), so the
+  BACKEND's `common_calendar`/`return_calendar` are intersected over a superset
+  of the alignment universe; adopting them re-introduced exactly the truncation
+  the alignment exclusion exists to prevent (owner's live instance: 248
+  observations while the members' own series supported 331). Fix: when the
+  response covers instruments outside the alignment members AND the members'
+  own point-level intersection is longer than the backend return calendar, the
+  response calendars are poisoned — recompute both calendars client-side.
+  - Regression pins: `history_window_test` (poisoned superset response
+    re-intersected to the members' 9-observation window) and
+    `request_builder_test` end-to-end (production topology: main alignment
+    superset-poisoned recovers 399 observations while the regression
+    sub-alignment — no superset — keeps the backend overlap).
 - [ ] Deferred (owner call): optional "trust basket as-is" control that pins
   β to the prior weights (engine already supports q = 0 cleanly). Not started;
   revisit only if the owner asks for it after living with honest diagnostics.
 
 ## Surprises & Discoveries
 
+- The honest label immediately exposed a REAL engine-window bug on the owner's
+  live instance: both cells read 248 because the shared window itself was 248.
+  The client excluded the thin asset from alignment rows but adopted the
+  backend's response-level calendars, which the backend intersects over every
+  instrument in the fetch — the exclusion removed the asset's ROW but kept its
+  poisoned CALENDAR. The legacy/fixture path recomputes calendars client-side,
+  which is why every existing test showed the full window while production
+  truncated.
+- Live before/after (owner session, nREPL): covariance window 248 → 331
+  observations; the limiting instrument is now honestly attributed to the
+  youngest allocatable asset (`perp:VVV`, starts-later) rather than silently
+  bound by SOPH. Bonus: the regression sub-alignment also escaped the
+  weekday-poisoned backend calendar, so SOPH's calibration overlap rose from
+  248 to 373 all-days crypto observations.
+- The recovered window (331) is still bounded by weekday-only HIP-3 stock
+  proxies and the youngest allocatable asset — inherent to a single shared
+  estimation window, now visible via the limiting-instrument attribution.
 - The no-truncation property was already asserted in
   `build-engine-request-engine-backs-complete-proxy-assumptions-test`
   (399-observation window kept while the thin asset covers 10 days), but only
@@ -111,15 +143,36 @@ same window extension honestly).
   (owner's literal first framing): statistically dishonest next to the
   existing Stambaugh-style synthesis; documented in Purpose so it is not
   re-proposed later.
+- Poisoning detection is STRUCTURAL (response covers instruments outside the
+  alignment members) AND-ed with a strict improvement test (members' own
+  point-level intersection strictly longer), not a count heuristic alone: in
+  the normal no-assumption case the response equals the members, so behavior
+  is bit-identical and backend-aligned returns (validated, canonical) keep
+  precedence. Rejected the alternative of splitting the fetch into
+  alignment-members vs series-only requests: correct in principle but heavier
+  (chunk-merge calendar semantics, workflow/classifier plumbing, more
+  requests) for the same window.
+- The same rule self-selects correctly for the regression sub-alignment
+  ({thin asset ∪ proxies} against the same response): the response is a
+  superset there too, and the point-level overlap (all-days crypto) is longer
+  than the weekday-poisoned backend calendar, so calibration also improves.
 
 ## Outcomes & Retrospective
 
 - The proxy card now answers the owner's question directly: SOPH shows the
-  full shared covariance window as "Covariance window" with the 248-day
-  overlap demoted to a calibration detail, and the right rail mirrors it.
-- Engine behavior was already correct; this was a diagnostics-honesty fix
-  plus a stronger regression pin. No solver or request changes shipped.
-- Validation: `npm run gates` (34/34 PASS) after the change; see Validation.
+  real shared covariance window as "Covariance window" with the calibration
+  overlap demoted to a detail line, and the right rail mirrors it.
+- The honesty pass turned out to be load-bearing: it surfaced that the api-v2
+  aligned path really was truncating the shared window to the thin asset's
+  life (the exact failure the owner described), invisible until the UI
+  reported the true number. Diagnostics honesty found an engine bug the
+  green suite could not — the fixture path computed calendars client-side
+  and so never exercised the poisoned-adoption branch.
+- Live outcome on the owner's instance: covariance window 248 → 331
+  observations, SOPH calibration overlap 248 → 373, limiter attribution
+  moved to the true binding asset.
+- Validation: `npm run gates` (34/34 PASS) after each milestone; live
+  before/after verified over the owner's nREPL session.
 
 ## Validation
 

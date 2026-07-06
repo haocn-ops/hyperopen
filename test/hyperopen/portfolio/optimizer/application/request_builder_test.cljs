@@ -2,6 +2,7 @@
   (:require [cljs.test :refer-macros [deftest is]]
             [hyperopen.domain.trading.core :as trading-core]
             [hyperopen.portfolio.optimizer.defaults :as defaults]
+            [hyperopen.portfolio.optimizer.application.history-loader.api-v2 :as api-v2]
             [hyperopen.portfolio.optimizer.application.request-builder :as request-builder]))
 
 (defn- near?
@@ -417,6 +418,76 @@
         "The shared return calendar with the proxy-configured thin asset equals the calendar without the asset entirely.")
     (is (= 399 (get-in with-proxy [:history :history-window :return-observations]))
         "The card's Covariance window field reads this exact count.")))
+
+(defn- api-v2-points
+  [start-day count* base]
+  (mapv (fn [idx]
+          (let [n (+ start-day idx)]
+            {:time_ms (* n proxy-day-ms)
+             :close (+ base n)
+             :return (when (pos? idx) 0.001)}))
+        (range count*)))
+
+(defn- api-v2-series
+  [id points]
+  {:instrument_id id
+   :lineage_kind "native"
+   :series_kind "market_price"
+   :points points
+   :funding {:status "available" :annualized_carry 0}
+   :warnings []})
+
+(deftest build-engine-request-api-v2-poisoned-calendar-recovers-full-window-test
+  ;; Production topology (owner-reported): the api-v2 fetch covers the FULL
+  ;; draft universe, so the backend's aligned calendar is intersected over the
+  ;; thin proxy asset too — 9 observations here — even though the request
+  ;; builder excludes that asset from alignment. The main alignment must detect
+  ;; the poisoned superset response and re-intersect the members' own series
+  ;; (399 observations), while the regression sub-alignment (thin asset +
+  ;; proxies, no superset) still uses the backend overlap.
+  (let [decorate (fn [instrument]
+                   (assoc instrument :optimizer-history/instrument-id
+                          (str "hl:" (:instrument-id instrument))))
+        fetch-universe (mapv decorate (:universe (proxy-draft complete-proxy-assumption)))
+        return-days (mapv #(* % proxy-day-ms) (range 391 400))
+        normalized (api-v2/normalize-history-bundle
+                    {:universe fetch-universe}
+                    {:contract_version "optimizer-history-api-v2"
+                     :request_id "rid-poisoned"
+                     :dataset_version "dv-poisoned"
+                     :status "ok"
+                     :common_calendar (mapv #(* % proxy-day-ms) (range 390 400))
+                     :return_calendar return-days
+                     :aligned_returns_by_instrument
+                     {"hl:perp:BTC" {:instrument_id "hl:perp:BTC"
+                                     :returns (vec (repeat 9 0.001))}
+                      "hl:perp:ETH" {:instrument_id "hl:perp:ETH"
+                                     :returns (vec (repeat 9 0.001))}
+                      "hl:perp:TOKENX" {:instrument_id "hl:perp:TOKENX"
+                                        :returns (vec (repeat 9 0.002))}}
+                     :series_by_instrument
+                     {"hl:perp:BTC" (api-v2-series "hl:perp:BTC"
+                                                   (api-v2-points 0 400 100))
+                      "hl:perp:ETH" (api-v2-series "hl:perp:ETH"
+                                                   (api-v2-points 0 400 2000))
+                      "hl:perp:TOKENX" (api-v2-series "hl:perp:TOKENX"
+                                                      (api-v2-points 390 10 10))}
+                     :warnings []})
+        request (request-builder/build-engine-request
+                 {:draft (proxy-draft complete-proxy-assumption)
+                  :history-data {:api-v2-history normalized
+                                 :candle-history-by-coin {}
+                                 :funding-history-by-coin {}}
+                  :market-cap-by-coin {}
+                  :as-of-ms (* 401 proxy-day-ms)})]
+    (is (= ["perp:BTC" "perp:ETH"]
+           (mapv :instrument-id (get-in request [:history :eligible-instruments])))
+        "The thin proxy asset stays excluded from alignment.")
+    (is (= 399 (get-in request [:history :history-window :return-observations]))
+        "The poisoned backend calendar (9 obs) is re-intersected client-side over the members' own series.")
+    (is (= 9 (get-in request [:history-assumptions "perp:TOKENX"
+                              :regression-series :observations]))
+        "The regression sub-alignment (no superset) keeps the backend overlap.")))
 
 (deftest build-engine-request-keeps-tighter-existing-proxy-cap-test
   (let [draft (-> (proxy-draft complete-proxy-assumption)

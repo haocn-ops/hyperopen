@@ -574,8 +574,18 @@
     (str observations " days of returns")
     "No usable native returns"))
 
+(defn- covariance-window-detail
+  "Detail line under the covariance-window cell. Only rendered once the aligned
+  window is known: the proxies carry the asset's risk links across the FULL
+  shared window; the native overlap merely calibrates the basket weights."
+  [covariance-observations observations]
+  (when covariance-observations
+    (if (and observations (pos? observations))
+      (str "Extended via proxies · " observations "-day overlap calibrates weights")
+      "Extended via proxies · no native overlap (prior weights only)")))
+
 (defn- proxy-diagnostics
-  [{:keys [observations relationship-strength]}]
+  [{:keys [observations relationship-strength covariance-observations]}]
   [{:key :regression-confidence
     :label "Regression confidence"
     :value (confidence-tier-label observations)
@@ -584,10 +594,13 @@
     :label "Specific risk"
     :value (specific-risk-tier-label observations relationship-strength)
     :detail "Unique risk not explained by proxies"}
+   ;; The window the risk model actually estimates over. The asset's own short
+   ;; history never truncates it (complete proxy assets are excluded from
+   ;; alignment); showing the overlap here read as "the model only uses N days".
    {:key :history-window
-    :label "History window"
-    :value (observations-label observations)
-    :detail nil}])
+    :label "Covariance window"
+    :value (observations-label (or covariance-observations observations))
+    :detail (covariance-window-detail covariance-observations observations)}])
 
 (defn- proxy-label-resolver
   "Resolve a proxy instrument-id to a display label: from the universe /
@@ -653,6 +666,7 @@
 (defn- history-assumption-card
   [{:keys [instrument label entry complete? errors note percent-label*
            assumption-required? return-required? observations
+           covariance-observations
            resolve-proxy-label usable-ids search-query state]}]
   (let [id (:instrument-id instrument)
         behavior (:behavior entry)
@@ -676,6 +690,7 @@
              :volatility (percent-field percent-label* (:volatility entry))
              :max-weight (percent-field percent-label* (:max-weight entry))
              :observations observations
+             :covariance-observations covariance-observations
              :errors (vec errors)
              :note note
              :engine-applied? (boolean complete?)
@@ -694,7 +709,8 @@
              :relationship-options relationship-options
              :prior-basket (prior-basket-rows selected-proxies)
              :diagnostics (proxy-diagnostics {:observations observations
-                                              :relationship-strength relationship})
+                                              :relationship-strength relationship
+                                              :covariance-observations covariance-observations})
              :final-model-line final-model-line))))
 
 (defn history-assumption-cards
@@ -721,6 +737,13 @@
          reference-instruments (get-in draft [:proxy-reference-instruments])
          resolve-proxy-label (proxy-label-resolver state universe reference-instruments)
          search-queries (get-in state contracts/ui-proxy-search-queries-path)
+         ;; The shared covariance window (proxy-extended: complete proxy assets
+         ;; are excluded from alignment, so this is the window the risk model
+         ;; estimates over). One number for the whole universe.
+         covariance-observations (let [n (get-in readiness
+                                                 [:request :history :history-window
+                                                  :return-observations])]
+                                   (when (and (number? n) (pos? n)) n))
          cards (->> universe
                     (keep (fn [instrument]
                             (let [id (:instrument-id instrument)
@@ -758,6 +781,7 @@
                                     :return-required? return-required?
                                     :observations (universe/native-history-observations
                                                    state readiness instrument)
+                                    :covariance-observations covariance-observations
                                     :state state
                                     :usable-ids usable-ids
                                     :resolve-proxy-label resolve-proxy-label
@@ -800,7 +824,16 @@
           ["Max weight cap" (or (get-in card [:max-weight :percent-label]) "--")]
           (when proxy?
             ["Regression confidence" (:value (first (:diagnostics card)))])
-          ["History used" (observations-label (:observations card))]]
+          ;; Proxy cards report the window the risk model estimates over (the
+          ;; proxy-extended shared window), never the asset's own short overlap
+          ;; — that one reads as "the model only uses N days" and is demoted to
+          ;; its own calibration line.
+          (if (and proxy? (:covariance-observations card))
+            ["History used" (str (observations-label (:covariance-observations card))
+                                 " · via proxies")]
+            ["History used" (observations-label (:observations card))])
+          (when proxy?
+            ["Calibration overlap" (observations-label (:observations card))])]
          (keep identity)
          vec)))
 

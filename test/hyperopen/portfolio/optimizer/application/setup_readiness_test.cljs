@@ -549,7 +549,7 @@
     (is (= false (:runnable? readiness)))
     (is (= :history-assumption-incomplete (:code warning)))
     (is (= :volatility (:missing warning)))
-    (is (= "ETH needs an expected annual volatility." (:message warning)))))
+    (is (= "ETH needs a modeled annual volatility." (:message warning)))))
 
 (deftest readiness-requires-expected-return-only-for-return-seeking-objectives-test
   (let [conservative {:behavior :conservative
@@ -643,14 +643,14 @@
                                 {:kind :minimum-variance})]
     (is (= :blocked (:status readiness)))
     (is (= :volatility (:missing warning)))
-    (is (= "ETH needs an expected annual volatility." (:message warning)))))
+    (is (= "ETH needs a modeled annual volatility." (:message warning)))))
 
 (deftest readiness-blocks-proxy-missing-cap-test
   (let [{:keys [warning]}
         (proxy-blocking-warning (assoc complete-proxy-assumption :max-weight nil)
                                 {:kind :minimum-variance})]
     (is (= :max-weight (:missing warning)))
-    (is (= "ETH needs a max weight cap." (:message warning)))))
+    (is (= "ETH needs a max allocation cap." (:message warning)))))
 
 (deftest readiness-blocks-proxy-cap-above-global-max-test
   ;; The base fixture draft has no explicit :max-asset-weight, so give it one.
@@ -672,7 +672,7 @@
                                (:blocking-warnings readiness)))]
     (is (= :blocked (:status readiness)))
     (is (= :max-weight-exceeds-global (:missing warning)))
-    (is (= "ETH max weight cap cannot exceed the global max asset weight."
+    (is (= "ETH max allocation cap cannot exceed the global max asset weight."
            (:message warning)))))
 
 (deftest readiness-requires-proxy-expected-return-only-for-return-seeking-test

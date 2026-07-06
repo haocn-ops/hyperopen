@@ -26,8 +26,8 @@
             ["Final modeled basket" (assumption-cards/basket-summary-text final-rows " · ")])
           (when proxy?
             ["Relationship strength" (or (:relationship-label card) "--")])
-          ["Expected volatility" (or (get-in card [:volatility :percent-label]) "--")]
-          ["Max weight cap" (or (get-in card [:max-weight :percent-label]) "--")]
+          ["Modeled volatility" (or (get-in card [:volatility :percent-label]) "--")]
+          ["Max allocation cap" (or (get-in card [:max-weight :percent-label]) "--")]
           (when proxy?
             ["Regression confidence" (diagnostics-cell-value card :regression-confidence)])
           ;; Proxy cards report the window the risk model estimates over (the

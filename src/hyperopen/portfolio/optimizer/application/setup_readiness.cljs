@@ -347,11 +347,11 @@
 
       :history-assumption-incomplete
       (case (:missing warning)
-        :volatility (str label " needs an expected annual volatility.")
+        :volatility (str label " needs a modeled annual volatility.")
         :expected-return (str label " needs an expected annual return for this objective.")
-        :max-weight (str label " needs a max weight cap.")
+        :max-weight (str label " needs a max allocation cap.")
         :max-weight-exceeds-global
-        (str label " max weight cap cannot exceed the global max asset weight.")
+        (str label " max allocation cap cannot exceed the global max asset weight.")
         :proxy-instruments
         (str label " is set to proxy behavior but no proxy assets are selected.")
         :self-proxy

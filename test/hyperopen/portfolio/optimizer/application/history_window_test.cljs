@@ -77,6 +77,69 @@
     (is (= 7
            (get-in aligned [:history-window :limiting-source-return-observations])))))
 
+(deftest align-api-v2-poisoned-response-calendar-recomputed-client-side-test
+  ;; The history fetch includes assumption assets the alignment excludes, so the
+  ;; BACKEND's calendars are intersected over a SUPERSET of the alignment
+  ;; universe. When the response covers extra instruments and the members' own
+  ;; series support a longer shared window, the response calendars are poisoned
+  ;; and must be recomputed client-side (owner-reported: a 248-day thin asset
+  ;; truncated the whole universe's covariance window to 248 days).
+  (let [d0 (day-start-ms "2026-01-01")
+        day (fn [n] (+ d0 (* n day-ms)))
+        universe [{:instrument-id "perp:BTC"
+                   :market-type :perp
+                   :coin "BTC"
+                   :optimizer-history/instrument-id "hl:perp:BTC"}
+                  {:instrument-id "perp:ETH"
+                   :market-type :perp
+                   :coin "ETH"
+                   :optimizer-history/instrument-id "hl:perp:ETH"}]
+        long-points (fn [base]
+                      (mapv (fn [n]
+                              {:time_ms (day n)
+                               :close (+ base n)
+                               :return (when (pos? n) 0.001)})
+                            (range 10)))
+        ;; The thin excluded asset only covers days 8-9, so the backend's shared
+        ;; return calendar collapses to one observation.
+        thin-points (mapv (fn [n]
+                            {:time_ms (day n)
+                             :close (+ 10 n)
+                             :return (when (= n 9) 0.002)})
+                          [8 9])
+        series (fn [id points funding-status]
+                 {:instrument_id id
+                  :lineage_kind "native"
+                  :series_kind "market_price"
+                  :points points
+                  :funding {:status funding-status :annualized_carry 0}
+                  :warnings []})
+        normalized (api-v2/normalize-history-bundle
+                    {:universe universe}
+                    {:contract_version "optimizer-history-api-v2"
+                     :request_id "rid-poisoned"
+                     :dataset_version "dv-poisoned"
+                     :status "ok"
+                     :common_calendar (mapv day [8 9])
+                     :return_calendar (mapv day [9])
+                     :aligned_returns_by_instrument
+                     {"hl:perp:BTC" {:instrument_id "hl:perp:BTC" :returns [0.001]}
+                      "hl:perp:ETH" {:instrument_id "hl:perp:ETH" :returns [0.001]}
+                      "hl:perp:NEW" {:instrument_id "hl:perp:NEW" :returns [0.002]}}
+                     :series_by_instrument
+                     {"hl:perp:BTC" (series "hl:perp:BTC" (long-points 100) "available")
+                      "hl:perp:ETH" (series "hl:perp:ETH" (long-points 2000) "available")
+                      "hl:perp:NEW" (series "hl:perp:NEW" thin-points "available")}
+                     :warnings []})
+        aligned (api-v2/align-api-v2-history-inputs
+                 {:universe universe
+                  :api-v2-history normalized
+                  :min-observations 2})]
+    (is (= 9 (get-in aligned [:history-window :return-observations]))
+        "The shared window is re-intersected over the members' own series, not adopted from the backend's superset intersection.")
+    (is (= ["perp:BTC" "perp:ETH"]
+           (mapv :instrument-id (:eligible-instruments aligned))))))
+
 (deftest align-history-inputs-history-window-identifies-late-starting-limiter-test
   (let [day (fn [n] (* n day-ms))
         aligned (history-loader/align-history-inputs

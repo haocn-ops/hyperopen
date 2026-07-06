@@ -14,6 +14,7 @@
     :model
     :objective-kind
     :order-type
+    :prior-source
     :reason
     :regression-status
     :regression-skip-reason
@@ -42,6 +43,7 @@
     :prior-weights
     :proxy-returns-by-id
     :regression-beta
+    :regression-beta-raw
     :final-beta
     :per-asset-overrides
     :per-perp-leverage-caps

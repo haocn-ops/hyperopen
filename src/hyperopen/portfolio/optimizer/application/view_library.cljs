@@ -85,6 +85,23 @@
      :horizon :3m
      :weights {(:instrument-id entry*) 1}}))
 
+(defn hydration-gap?
+  "True when some universe instrument has NO authored absolute view but the
+  library remembers one — the state the hydrate watcher gap-fills. Mirrors
+  `hydrate-views` without building the merged vector."
+  [views entries universe]
+  (let [entries* (or entries {})
+        covered (set (keep (fn [view]
+                             (when (absolute-view? view)
+                               (:instrument-id view)))
+                           views))]
+    (boolean (some (fn [instrument]
+                     (let [id (:instrument-id instrument)]
+                       (and id
+                            (not (contains? covered id))
+                            (contains? entries* id))))
+                   universe))))
+
 (defn hydrate-views
   "Merge remembered views into a draft's view vector for the given universe:
   existing draft views always win (they are at least as fresh — every edit writes

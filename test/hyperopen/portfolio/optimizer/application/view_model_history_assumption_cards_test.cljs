@@ -467,3 +467,42 @@
     (is (= :actions/set-portfolio-optimizer-history-assumption-card-collapsed
            (get-in (card-for {} {"perp:NEW" acknowledged})
                    [:actions :set-card-collapsed])))))
+
+(deftest history-assumption-cards-unconfigured-sort-above-configured-test
+  ;; A card that still needs assumptions floats above a configured one even when
+  ;; the configured asset comes first in universe order, so the asset the user
+  ;; must act on is never buried beneath a finished one. Within each group the
+  ;; universe order is preserved (stable sort), so the ordering stays predictable.
+  (let [complete-entry {:behavior :conservative
+                        :expected-return 0.0
+                        :volatility 0.8
+                        :max-weight 0.03
+                        :correlation-floor 0.75}
+        incomplete-entry {:behavior :conservative
+                          :expected-return nil
+                          :volatility nil
+                          :max-weight 0.03
+                          :correlation-floor 0.75}
+        inst (fn [id] {:instrument-id id :market-type :perp :coin id})
+        ;; Universe interleaves configured (A, C) and unconfigured (B, D).
+        universe [(inst "perp:ACFG") (inst "perp:BNEED")
+                  (inst "perp:CCFG") (inst "perp:DNEED")]
+        draft {:universe universe
+               :objective {:kind :minimum-variance}
+               :history-assumptions {"perp:ACFG" complete-entry
+                                     "perp:BNEED" incomplete-entry
+                                     "perp:CCFG" complete-entry
+                                     "perp:DNEED" incomplete-entry}}
+        readiness {:request {:requested-universe universe
+                             :universe universe
+                             :objective {:kind :minimum-variance}}
+                   :blocking-warnings []}
+        cards (:cards (view-model/history-assumption-cards
+                       {} draft readiness
+                       {:status :succeeded :request-signature {:universe universe}}
+                       {}))]
+    (is (= ["perp:BNEED" "perp:DNEED" "perp:ACFG" "perp:CCFG"]
+           (mapv :instrument-id cards))
+        "Unconfigured cards float to the top; within each group universe order is preserved.")
+    (is (= [:incomplete :incomplete :configured :configured]
+           (mapv :status cards)))))

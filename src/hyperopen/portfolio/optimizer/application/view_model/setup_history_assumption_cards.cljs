@@ -109,6 +109,16 @@
    :incomplete "Needs assumptions"
    :configured "Configured"})
 
+(defn- card-attention-order
+  "Sort weight that floats cards still needing attention above configured
+  ones. `:configured` is the only status whose work is done (it carries the
+  green Configured chip and can collapse); every other status still asks the
+  user for something, so it belongs on top regardless of the asset's
+  alphabetical position. Cards with equal weight keep their incoming
+  (universe) order because the CLJS sort is stable."
+  [card]
+  (if (= :configured (:status card)) 1 0))
+
 (defn- card-summary
   [entry proxy-labels percent-label*]
   (let [vol (some-> (:volatility entry) percent-label*)
@@ -491,6 +501,11 @@
                                     :resolve-proxy-label resolve-proxy-label
                                     :search-query (get search-queries id)
                                     :collapse-overrides collapse-overrides}))))))
+                    ;; Stack unconfigured cards above configured ones so the
+                    ;; asset you still have to act on never hides beneath a
+                    ;; finished one; stable, so within each group the universe
+                    ;; order is untouched.
+                    (sort-by card-attention-order)
                     vec)
          carded-ids (into #{} (map :instrument-id) cards)
          ;; Any selected asset can be brought into the workflow by hand - the user

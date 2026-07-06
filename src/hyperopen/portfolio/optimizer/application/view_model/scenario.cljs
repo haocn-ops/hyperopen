@@ -200,11 +200,47 @@
          :comparator-label (draft-instrument-label draft
                                                    (audit-view-comparator-id view))))
 
+(defn- proxy-model-disclosure
+  "The exposure story the last solved run actually used for one proxy
+  assumption, straight from the run's synthesis diagnostics: source-labeled
+  prior, regression estimate, confidence q, the final modeled basket that drove
+  the covariance row, and the effective modeled volatility. Guarded per asset -
+  the diagnostics must describe the entry's CURRENT proxy selection, so a
+  post-run edit never presents a stale basket as if it were current."
+  [run-diagnostics entry labels instrument-id]
+  (let [diag (get run-diagnostics instrument-id)
+        selected (set (history-assumptions/proxy-instrument-ids entry))
+        diag-ids (vec (:proxy-instrument-ids diag))]
+    (when (and (history-assumptions/proxy? entry)
+               (= :proxy (:behavior diag))
+               (seq diag-ids)
+               (every? selected diag-ids))
+      (let [weight-rows (fn [weights]
+                          (->> diag-ids
+                               (keep (fn [proxy-id]
+                                       (when-let [weight (get weights proxy-id)]
+                                         {:instrument-id proxy-id
+                                          :label (get labels proxy-id proxy-id)
+                                          :weight weight})))
+                               vec))]
+        {:prior-source (:prior-source diag)
+         :prior-rows (weight-rows (:prior-weights diag))
+         :regression-rows (when (= :estimated (:regression-status diag))
+                            (weight-rows (:regression-beta diag)))
+         :r2 (:r2 diag)
+         :sample-count (:sample-count diag)
+         :confidence-q (:confidence-q diag)
+         :final-rows (weight-rows (:final-beta diag))
+         :effective-modeled-volatility (:effective-modeled-volatility diag)}))))
+
 (defn- history-assumption-audit-rows
-  [draft]
+  [draft run-diagnostics]
   (let [universe (vec (or (:universe draft) []))
-        labels (instrument-labels/labels-by-instrument universe
-                                                       (keep :instrument-id universe))]
+        ;; Reference-only proxies live outside the universe but still need
+        ;; display labels in the audit.
+        instruments (into universe (or (:proxy-reference-instruments draft) []))
+        labels (instrument-labels/labels-by-instrument instruments
+                                                       (keep :instrument-id instruments))]
     (->> (:history-assumptions draft)
          (map (fn [[instrument-id entry]]
                 (let [proxy-ids (history-assumptions/proxy-instrument-ids entry)]
@@ -218,16 +254,23 @@
                    :proxy-labels (mapv #(get labels % %) proxy-ids)
                    :relationship-strength (when (history-assumptions/proxy? entry)
                                             (history-assumptions/relationship-strength entry))
-                   :correlation-floor (:correlation-floor entry)})))
+                   :correlation-floor (:correlation-floor entry)
+                   :model (proxy-model-disclosure run-diagnostics
+                                                  entry
+                                                  labels
+                                                  instrument-id)})))
          (sort-by :label)
          vec)))
 
 (defn inputs-audit-model
   [state]
   (let [draft (workspace/optimizer-draft state)
-        views (vec (or (get-in draft [:return-model :views]) []))]
+        views (vec (or (get-in draft [:return-model :views]) []))
+        run-diagnostics (when (workspace/solved-result? state)
+                          (get-in (workspace/result state)
+                                  [:risk-estimation :history-assumptions]))]
     {:draft draft
-     :history-assumption-rows (history-assumption-audit-rows draft)
+     :history-assumption-rows (history-assumption-audit-rows draft run-diagnostics)
      :scenario-id (or (get-in state contracts/active-scenario-loaded-id-path)
                       (:id draft))
      :universe (vec (or (:universe draft) []))

@@ -98,6 +98,50 @@
                 (opt-format/format-pct max-weight) " cap")
     "--"))
 
+(defn- basket-text
+  [rows]
+  (str/join " / "
+            (map (fn [{:keys [label weight]}]
+                   (str label " "
+                        (opt-format/format-pct weight
+                                               {:minimum-fraction-digits 0
+                                                :maximum-fraction-digits 0})))
+                 rows)))
+
+(def ^:private prior-source-text
+  {:user "user-specified weights"
+   :equal "equal-weight fallback"})
+
+(defn- proxy-model-disclosure
+  "What the solved run modeled for this asset: prior (with source), regression
+  estimate when one ran, confidence, and the final basket that drove the
+  covariance row."
+  [row]
+  (when-let [model (:model row)]
+    [:div {:class ["mt-1" "space-y-0.5" "text-[0.6875rem]" "text-trading-muted"]
+           :data-role (str "portfolio-optimizer-inputs-proxy-model-"
+                           (:instrument-id row))}
+     [:p (str "Prior: " (basket-text (:prior-rows model))
+              (when-let [source (get prior-source-text (:prior-source model))]
+                (str " · " source)))]
+     (if (seq (:regression-rows model))
+       [:p (str "Regression estimate: " (basket-text (:regression-rows model))
+                " · R² " (opt-format/format-decimal (:r2 model)
+                                                    {:maximum-fraction-digits 2})
+                " · " (:sample-count model) " observations")]
+       [:p "Regression: not enough overlap — prior only."])
+     [:p {:class ["font-semibold" "text-trading-text"]}
+      (str "Final modeled basket: " (basket-text (:final-rows model))
+           " · confidence q "
+           (opt-format/format-pct (:confidence-q model)
+                                  {:minimum-fraction-digits 0
+                                   :maximum-fraction-digits 0}))]
+     (when (:effective-modeled-volatility model)
+       [:p (str "Effective modeled volatility: "
+                (opt-format/format-pct (:effective-modeled-volatility model)
+                                       {:minimum-fraction-digits 0
+                                        :maximum-fraction-digits 0}))])]))
+
 (defn- history-assumptions-audit
   [{:keys [history-assumption-rows]}]
   (when (seq history-assumption-rows)
@@ -114,12 +158,13 @@
                     (str (:label row) " — " (history-assumption-mode-label (:mode row)))]
                    [:p {:class ["mt-0.5" "text-trading-muted"]}
                     (str "Return " (opt-format/format-pct (:expected-return row))
-                         " · " (history-assumption-summary row))]])
+                         " · " (history-assumption-summary row))]
+                   (proxy-model-disclosure row)])
                 history-assumption-rows))
      (when (some #(= :proxy (:mode %)) history-assumption-rows)
        [:p {:class ["mt-2" "text-[0.6875rem]" "text-trading-muted"]
             :data-role "portfolio-optimizer-inputs-history-assumption-proxy-note"}
-        "Proxy assumptions were used to synthesize covariance for assets without reliable native history."]))))
+        "Proxy assumptions were used to synthesize covariance for assets without reliable native history. Proxy weights are regression-adjusted and confidence-shrunk — R² is never used as a direct weight."]))))
 
 (defn- execution-audit
   [execution-assumptions]

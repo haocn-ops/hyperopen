@@ -32,6 +32,10 @@
     :load-portfolio-optimizer-view-library]
    [:effects/sync-portfolio-optimizer-view-library
     :sync-portfolio-optimizer-view-library]
+   [:effects/download-portfolio-optimizer-return-views-file
+    :download-portfolio-optimizer-return-views-file]
+   [:effects/pick-portfolio-optimizer-return-views-file
+    :pick-portfolio-optimizer-return-views-file]
    [:effects/load-portfolio-optimizer-assumption-library
     :load-portfolio-optimizer-assumption-library]
    [:effects/sync-portfolio-optimizer-assumption-library
@@ -103,6 +107,14 @@
     :apply-portfolio-optimizer-objective-menu-selection-and-run]
    [:actions/set-portfolio-optimizer-return-views-filter
     :set-portfolio-optimizer-return-views-filter]
+   [:actions/export-portfolio-optimizer-return-views
+    :export-portfolio-optimizer-return-views]
+   [:actions/import-portfolio-optimizer-return-views
+    :import-portfolio-optimizer-return-views]
+   [:actions/apply-imported-portfolio-optimizer-return-views
+    :apply-imported-portfolio-optimizer-return-views]
+   [:actions/dismiss-portfolio-optimizer-return-views-io-note
+    :dismiss-portfolio-optimizer-return-views-io-note]
    [:actions/set-portfolio-optimizer-return-model-kind :set-portfolio-optimizer-return-model-kind]
    [:actions/set-portfolio-optimizer-risk-model-kind :set-portfolio-optimizer-risk-model-kind]
    [:actions/apply-portfolio-optimizer-setup-preset :apply-portfolio-optimizer-setup-preset]

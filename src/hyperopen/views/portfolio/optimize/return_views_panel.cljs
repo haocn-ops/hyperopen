@@ -279,6 +279,62 @@
                             filter-key]]}}
      (if count* (str label " " count*) label)]))
 
+(defn- io-toolbar
+  ;; Export/Import file workflow: download the universe's views as JSON, let a
+  ;; desktop tool (typically an AI agent running the user's own forecasting
+  ;; model) fill in returns, and import the file to author them in bulk.
+  [container-role summary]
+  (let [empty-universe? (zero? (or (:total summary) 0))]
+    [:div {:class ["mt-1.5" "flex" "flex-wrap" "items-center" "gap-1"]
+           :data-role (str container-role "-io")}
+     [:span {:class ["font-mono" "text-[0.6rem]" "uppercase" "tracking-[0.08em]"
+                     "text-trading-muted"]}
+      "File"]
+     [:button {:type "button"
+               :class ["optimizer-return-view-filter" "border" "border-base-300"
+                       "px-1.5" "py-0.5" "font-mono" "text-[0.6rem]" "font-semibold"
+                       "uppercase" "tracking-[0.08em]"
+                       "focus:outline-none" "focus:ring-0" "focus:ring-offset-0"]
+               :data-role (str container-role "-export")
+               :disabled empty-universe?
+               :title "Download every asset's return view as JSON — fill `return-percent` offline (e.g. with an AI agent running your own model) and import the file here"
+               :on (when-not empty-universe?
+                     {:click [[:actions/export-portfolio-optimizer-return-views]]})}
+      "Export JSON"]
+     [:button {:type "button"
+               :class ["optimizer-return-view-filter" "border" "border-base-300"
+                       "px-1.5" "py-0.5" "font-mono" "text-[0.6rem]" "font-semibold"
+                       "uppercase" "tracking-[0.08em]"
+                       "focus:outline-none" "focus:ring-0" "focus:ring-offset-0"]
+               :data-role (str container-role "-import")
+               :title "Import a filled return-views JSON file — each filled return becomes your view"
+               :on {:click [[:actions/import-portfolio-optimizer-return-views]]}}
+      "Import JSON"]]))
+
+(defn- io-note
+  ;; Outcome of the last export/import ("Applied 12 views · 1 unknown asset
+  ;; skipped"), dismissable, overwritten by the next file action.
+  [container-role {:keys [kind message]}]
+  (when (seq (str (or message "")))
+    [:div {:class (cond-> ["mb-2" "flex" "items-start" "justify-between" "gap-2"
+                           "border" "px-2" "py-1.5" "text-[0.6875rem]"
+                           "leading-[1.4]"]
+                    (= :error kind) (into ["border-error/50" "bg-error/10"
+                                           "text-error"])
+                    (not= :error kind) (into ["border-base-300" "bg-base-200/20"
+                                              "text-trading-muted"]))
+           :data-role (str container-role "-io-note")
+           :data-kind (name (or kind :success))}
+     [:span message]
+     [:button {:type "button"
+               :class ["border-0" "bg-transparent" "px-1" "py-0" "font-mono"
+                       "text-[0.6875rem]" "text-trading-muted"
+                       "focus:outline-none" "focus:ring-0" "focus:ring-offset-0"]
+               :data-role (str container-role "-io-note-dismiss")
+               :aria-label "Dismiss file import/export message"
+               :on {:click [[:actions/dismiss-portfolio-optimizer-return-views-io-note]]}}
+      "×"]]))
+
 (defn- views-off-note
   ;; The estimator is historical/EW: views are not consumed at all. Say so and
   ;; offer the one-click way back instead of rendering dead controls.
@@ -377,10 +433,14 @@
                      :data-role (str container-role "-summary")}
                  (return-views/summary-line summary)]
                 (into
-                 [:div {:class ["mt-1.5" "mb-2" "flex" "flex-wrap" "gap-1"]
+                 [:div {:class ["mt-1.5" "flex" "flex-wrap" "gap-1"]
                         :data-role (str container-role "-filters")}]
                  (map #(filter-chip container-role active-filter summary %)
                       return-views/filters))
+                (io-toolbar container-role summary)
+                [:div {:class ["mt-1.5" "mb-2"]}
+                 (io-note container-role
+                          (get-in state optimizer-contracts/ui-return-views-io-note-path))]
                 (into
                  [:div {:class ["optimizer-objective-view-rows" "min-h-0" "space-y-1.5"
                                 "overflow-x-hidden" "overflow-y-auto"]

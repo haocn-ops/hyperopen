@@ -65,6 +65,30 @@
         "instrument-id key is stringified and the :behavior value keywordized")
     (is (= :conservative (:behavior entry)))))
 
+(deftest normalize-worker-boundary-handles-proxy-exposure-diagnostics-test
+  ;; The proxy-assumption diagnostics ride the solved payload across the worker
+  ;; boundary: exposure maps are proxy-instrument-keyed and the prior source is
+  ;; an enum keyword.
+  (let [eth (keyword "perp:ETH")
+        btc (keyword "perp:BTC")
+        normalized (codec/normalize-worker-boundary
+                    {:payload {:risk-estimation
+                               {:history-assumptions
+                                {(keyword "perp:NEW")
+                                 {:behavior "proxy"
+                                  :prior-source "equal"
+                                  :prior-weights {eth 0.5 btc 0.5}
+                                  :regression-beta {eth 0.68 btc 0.32}
+                                  :regression-beta-raw {eth 0.71 btc 0.29}
+                                  :final-beta {eth 0.6 btc 0.4}}}}}})
+        diag (get-in normalized
+                     [:payload :risk-estimation :history-assumptions "perp:NEW"])]
+    (is (= :proxy (:behavior diag)))
+    (is (= :equal (:prior-source diag)))
+    (is (= {"perp:ETH" 0.5 "perp:BTC" 0.5} (:prior-weights diag)))
+    (is (= {"perp:ETH" 0.71 "perp:BTC" 0.29} (:regression-beta-raw diag)))
+    (is (= {"perp:ETH" 0.6 "perp:BTC" 0.4} (:final-beta diag)))))
+
 (deftest normalize-worker-boundary-preserves-unrelated-nested-map-keys-test
   (let [btc (keyword "perp:BTC")
         raw-weights {btc 1

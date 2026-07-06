@@ -9,31 +9,42 @@
    (and (number? actual)
         (< (js/Math.abs (- expected actual)) tolerance))))
 
-(deftest normalize-prior-weights-normalizes-valid-weights-test
-  (let [{:keys [weights fallback?]}
-        (proxy/normalize-prior-weights ["perp:BTC" "perp:ETH"]
-                                       {"perp:BTC" 2 "perp:ETH" 6})]
+(deftest build-proxy-prior-uses-valid-user-weights-test
+  (let [{:keys [weights source warnings]}
+        (proxy/build-proxy-prior ["perp:BTC" "perp:ETH"]
+                                 {"perp:BTC" 2 "perp:ETH" 6})]
     (is (near? 0.25 (get weights "perp:BTC")))
     (is (near? 0.75 (get weights "perp:ETH")))
-    (is (false? fallback?))))
+    (is (= :user source))
+    (is (empty? warnings))))
 
-(deftest normalize-prior-weights-falls-back-to-equal-weight-test
-  (testing "missing prior => equal weight, not flagged as a fallback"
-    (let [{:keys [weights fallback?]}
-          (proxy/normalize-prior-weights ["perp:BTC" "perp:ETH" "perp:SOL"] nil)]
+(deftest build-proxy-prior-falls-back-to-equal-weight-test
+  (testing "no user prior => equal weight, labeled :equal, no warning"
+    (let [{:keys [weights source warnings]}
+          (proxy/build-proxy-prior ["perp:BTC" "perp:ETH" "perp:SOL"] nil)]
       (is (every? #(near? (/ 1 3) %) (vals weights)))
-      (is (false? fallback?))))
-  (testing "invalid prior (negative / zero total / missing id) => equal weight + flag"
+      (is (= :equal source))
+      (is (empty? warnings))))
+  (testing "invalid user prior (negative / zero total / missing id) => equal weight + warning"
     (doseq [bad [{"perp:BTC" -1 "perp:ETH" 2}
                  {"perp:BTC" 0 "perp:ETH" 0}
                  {"perp:BTC" 1}]]
-      (let [{:keys [weights fallback?]}
-            (proxy/normalize-prior-weights ["perp:BTC" "perp:ETH"] bad)]
+      (let [{:keys [weights source warnings]}
+            (proxy/build-proxy-prior ["perp:BTC" "perp:ETH"] bad)]
         (is (near? 0.5 (get weights "perp:BTC")))
         (is (near? 0.5 (get weights "perp:ETH")))
-        (is (true? fallback?)))))
+        (is (= :equal source) "A rejected prior is labeled the equal fallback, never :user.")
+        (is (some #(= :proxy-prior-weights-invalid (:code %)) warnings)
+            "Rejected user weights warn - never a silent fallback."))))
   (testing "no proxies => nil"
-    (is (nil? (proxy/normalize-prior-weights [] {"perp:BTC" 1})))))
+    (is (nil? (proxy/build-proxy-prior [] {"perp:BTC" 1})))))
+
+(deftest min-regression-observations-floors-at-ten-test
+  (is (= 10 (proxy/min-regression-observations 1)))
+  (is (= 10 (proxy/min-regression-observations 2)))
+  (is (= 10 (proxy/min-regression-observations 7)))
+  (is (= 11 (proxy/min-regression-observations 8))
+      "Wide baskets need k + 3 observations."))
 
 (deftest confidence-q-stays-low-for-tiny-samples-test
   ;; 10 observations cap q at 10/130 even with a perfect fit.
@@ -96,7 +107,82 @@
          (:reason (proxy/estimate-regression
                    {:regression-series (regression-series 2)
                     :proxy-ids ["perp:BTC" "perp:ETH"]
-                    :prior-weights {"perp:BTC" 0.5 "perp:ETH" 0.5}})))))
+                    :prior-weights {"perp:BTC" 0.5 "perp:ETH" 0.5}}))))
+  (is (= :insufficient-overlap
+         (:reason (proxy/estimate-regression
+                   {:regression-series (regression-series 8)
+                    :proxy-ids ["perp:BTC" "perp:ETH"]
+                    :prior-weights {"perp:BTC" 0.5 "perp:ETH" 0.5}})))
+      "Eight observations sit under the ten-observation floor - never model evidence."))
+
+(defn- blended-regression-series
+  "Deterministic synthetic overlap: the target is 70% ETH + 30% BTC plus small
+  deterministic noise; ETH/BTC ride incommensurate cycles so they are far from
+  collinear."
+  [n]
+  (let [eth (mapv (fn [i] (* 0.02 (js/Math.sin (* 0.9 i)))) (range n))
+        btc (mapv (fn [i] (* 0.015 (js/Math.cos (* 0.7 i)))) (range n))
+        noise (mapv (fn [i] (* 0.004 (js/Math.sin (* 3.7 i)))) (range n))
+        y (mapv (fn [e b z] (+ (* 0.7 e) (* 0.3 b) z)) eth btc noise)]
+    {:x-returns y
+     :proxy-returns-by-id {"perp:ETH" eth
+                           "perp:BTC" btc}
+     :observations n}))
+
+(deftest model-exposure-recovers-the-true-split-with-enough-overlap-test
+  ;; The expert-brief acceptance example: equal prior, 70/30 truth, ~250 days of
+  ;; overlap => the final basket moves materially toward the truth but stays
+  ;; confidence-shrunk (never the raw regression, never the raw prior).
+  (let [result (proxy/model-exposure
+                {:proxy-ids ["perp:ETH" "perp:BTC"]
+                 :user-prior-weights nil
+                 :regression-series (blended-regression-series 248)})
+        final-eth (get-in result [:final-beta "perp:ETH"])]
+    (is (= :equal (:prior-source result)))
+    (is (near? 0.5 (get-in result [:prior-weights "perp:ETH"])))
+    (is (= :estimated (get-in result [:regression :status])))
+    (is (> (get-in result [:regression :r2]) 0.5))
+    (is (> (:confidence-q result) 0.4))
+    (is (< (:confidence-q result) 0.75)
+        "Even a strong fit on 248 days never earns full confidence.")
+    (is (> final-eth 0.53) "The final basket tilts toward the 70% driver...")
+    (is (< final-eth 0.72) "...but stays shrunk toward the prior.")
+    (is (not= (:final-beta result) (:prior-weights result)))
+    (is (near? 1.0 (reduce + (vals (:final-beta result))) 1e-9))))
+
+(deftest model-exposure-stays-prior-dominant-on-tiny-samples-test
+  (let [result (proxy/model-exposure
+                {:proxy-ids ["perp:ETH" "perp:BTC"]
+                 :user-prior-weights nil
+                 :regression-series (blended-regression-series 10)})
+        final-eth (get-in result [:final-beta "perp:ETH"])]
+    (is (= :estimated (get-in result [:regression :status]))
+        "Ten observations sit exactly at the floor.")
+    (is (< (:confidence-q result) 0.08)
+        "q stays low for 10 observations even when the in-sample fit looks great.")
+    (is (near? 0.5 final-eth 0.05)
+        "The final basket stays close to the prior on a tiny sample.")))
+
+(deftest model-exposure-returns-prior-exactly-without-overlap-test
+  (let [result (proxy/model-exposure
+                {:proxy-ids ["perp:BTC" "perp:ETH"]
+                 :user-prior-weights nil
+                 :regression-series nil})]
+    (is (= :skipped (get-in result [:regression :status])))
+    (is (= :no-overlap (get-in result [:regression :reason])))
+    (is (zero? (:confidence-q result)))
+    (is (= (:prior-weights result) (:final-beta result))
+        "q = 0 => the final basket IS the prior.")))
+
+(deftest model-exposure-honors-user-prior-weights-test
+  (let [result (proxy/model-exposure
+                {:proxy-ids ["perp:ETH" "perp:BTC"]
+                 :user-prior-weights {"perp:ETH" 3 "perp:BTC" 1}
+                 :regression-series nil})]
+    (is (= :user (:prior-source result)))
+    (is (near? 0.75 (get-in result [:prior-weights "perp:ETH"])))
+    (is (near? 0.75 (get-in result [:final-beta "perp:ETH"]))
+        "No overlap => the user's prior is the final basket.")))
 
 (deftest specific-variance-is-floored-and-positive-test
   (testing "user variance above systematic: the gap wins"
@@ -158,8 +244,13 @@
     (is (zero? (:confidence-q diag)))
     (is (nil? (:r2 diag)))
     (is (= {"perp:BTC" 0.5 "perp:ETH" 0.5} (:final-beta diag)))
+    (is (= :equal (:prior-source diag))
+        "No explicit prior => the equal fallback is labeled as such.")
     (is (near? 0.0475 (:systematic-variance diag) 1e-6))
-    (is (pos? (:specific-variance diag)))))
+    (is (pos? (:specific-variance diag)))
+    (is (near? 0.8 (:input-volatility diag)))
+    (is (near? 0.8 (:effective-modeled-volatility diag) 1e-6)
+        "Var(X) honors the stated volatility here, so effective vol == input vol.")))
 
 (deftest augment-replaces-row-when-asset-already-present-test
   (let [base {:model :sample-covariance
@@ -192,7 +283,55 @@
     (is (> (get-in diag [:final-beta "perp:BTC"]) (get-in diag [:final-beta "perp:ETH"])))
     (is (near? 1.0 (reduce + (vals (:final-beta diag))) 1e-6))
     (is (= 200 (:sample-count diag)))
-    (is (pos? (:specific-variance diag)))))
+    (is (pos? (:specific-variance diag)))
+    (is (map? (:regression-beta-raw diag))
+        "The unclamped regression coefficients are disclosed alongside the policy beta.")
+    (is (near? 0.8 (:effective-modeled-volatility diag) 1e-6))))
+
+(deftest covariance-row-follows-final-beta-not-prior-test
+  ;; The synthesized row must move when the confidence-shrunk basket moves -
+  ;; proof the FINAL basket, not the prior, drives covariance synthesis.
+  (let [prior-only (proxy/augment-risk-result-with-proxy-assumptions
+                    base-risk-result
+                    {"perp:TOKENX" tokenx-entry})
+        adjusted (proxy/augment-risk-result-with-proxy-assumptions
+                  base-risk-result
+                  {"perp:TOKENX" (assoc tokenx-entry
+                                        :regression-series (regression-series 200))}
+                  {:periods-per-year 365})
+        diag (get-in adjusted [:risk-estimation :history-assumptions "perp:TOKENX"])]
+    (is (not= (:final-beta diag) (:prior-weights diag)))
+    (is (> (get-in adjusted [:covariance 0 2])
+           (get-in prior-only [:covariance 0 2]))
+        "Tilting the basket toward BTC lifts Cov(BTC, X) above the prior-implied row.")))
+
+(deftest augment-labels-and-honors-user-prior-weights-test
+  (let [entry (assoc tokenx-entry
+                     :proxy-prior-weights {"perp:BTC" 3 "perp:ETH" 1})
+        augmented (proxy/augment-risk-result-with-proxy-assumptions
+                   base-risk-result
+                   {"perp:TOKENX" entry})
+        diag (get-in augmented [:risk-estimation :history-assumptions "perp:TOKENX"])]
+    (is (= :user (:prior-source diag)))
+    (is (near? 0.75 (get-in diag [:prior-weights "perp:BTC"])))
+    (is (= (:prior-weights diag) (:final-beta diag))
+        "No overlap => the user's prior is the final basket.")
+    ;; Cov(BTC, X) = 0.75*0.04 + 0.25*0.03
+    (is (near? 0.0375 (get-in augmented [:covariance 0 2]) 1e-6))))
+
+(deftest augment-warns-on-invalid-user-prior-weights-test
+  (let [entry (assoc tokenx-entry
+                     :proxy-prior-weights {"perp:BTC" -2 "perp:ETH" 1})
+        augmented (proxy/augment-risk-result-with-proxy-assumptions
+                   base-risk-result
+                   {"perp:TOKENX" entry})
+        diag (get-in augmented [:risk-estimation :history-assumptions "perp:TOKENX"])]
+    (is (= :equal (:prior-source diag)))
+    (is (= {"perp:BTC" 0.5 "perp:ETH" 0.5} (:final-beta diag)))
+    (is (some #(and (= :proxy-prior-weights-invalid (:code %))
+                    (= "perp:TOKENX" (:instrument-id %)))
+              (:warnings augmented))
+        "A rejected explicit prior is disclosed, never silently replaced.")))
 
 (deftest augment-result-is-psd-and-warns-when-basket-exceeds-target-test
   ;; Vol target far below what the basket implies: 10% target vs ~22% basket.

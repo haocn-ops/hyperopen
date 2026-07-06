@@ -11,9 +11,11 @@
   proxy weights - and a handful of observations must never dominate the prior.
 
   Everything here is deterministic and worker-safe: inputs arrive on the engine
-  request (proxy ids, normalized prior weights, relationship strength, and the
-  short-overlap return series the request builder aligned), outputs are a new
-  covariance row/column per assumed asset plus diagnostics."
+  request (proxy ids, the user's raw prior weights when given, relationship
+  strength, and the short-overlap return series the request builder aligned),
+  outputs are a new covariance row/column per assumed asset plus diagnostics.
+  `model-exposure` is the one pipeline seam - the setup-card preview calls it
+  with the same inputs, so the displayed basket is the engine's basket."
   (:require [hyperopen.portfolio.optimizer.domain.history-assumptions :as history-assumptions]
             [hyperopen.portfolio.optimizer.domain.linear-solve :as linear-solve]
             [hyperopen.portfolio.optimizer.domain.math :as math]
@@ -29,10 +31,12 @@
   "Fit quality that earns full R-squared-side confidence."
   0.5)
 
-(def min-regression-observations
-  "Overlap sample counts below this skip the regression entirely (q = 0): a
-  couple of return points cannot even weakly adjust the prior."
-  4)
+(defn min-regression-observations
+  "Overlap sample counts below this skip the regression entirely (q = 0) for a
+  basket of `proxy-count` proxies: max(10, k + 3). A handful of return points
+  must never read as model evidence, however good the in-sample fit looks."
+  [proxy-count]
+  (max 10 (+ proxy-count 3)))
 
 (def ^:private finite-number? math/finite-number?)
 
@@ -50,28 +54,45 @@
           (map (fn [id] [id (/ 1 n)]))
           proxy-ids)))
 
-(defn normalize-prior-weights
-  "Prior exposure over the selected proxies: keeps only entries for the given
-  ids, requires finite nonnegative weights with a positive total, and normalizes
-  to sum 1. Missing or invalid priors fall back to equal weight. Returns
-  {:weights {id w} :fallback? bool}; nil when there are no proxy ids at all."
-  [proxy-ids prior-weights]
+(defn build-proxy-prior
+  "Source-labeled prior basket over the selected proxies. Priority: valid
+  user-specified weights (:source :user), else equal weight (:source :equal).
+  User weights are valid when every proxy id carries a finite nonnegative weight
+  with a positive total; anything else falls back to equal weight WITH a warning,
+  never silently. A future metadata-informed prior (ecosystem/category similarity
+  scores) slots in here as a source between the two - do not fake one while the
+  app carries no such metadata.
+
+  Returns {:weights {id w} :source :user|:equal :warnings [...]} with weights
+  normalized to sum 1; nil when there are no proxy ids at all."
+  [proxy-ids user-weights]
   (when (seq proxy-ids)
-    (let [selected (select-keys (or prior-weights {}) proxy-ids)
+    (let [selected (select-keys (or user-weights {}) proxy-ids)
           valid? (and (= (count selected) (count proxy-ids))
                       (every? (fn [[_ w]]
                                 (and (finite-number? w)
                                      (not (neg? w))))
                               selected)
                       (pos? (reduce + 0 (vals selected))))]
-      (if valid?
+      (cond
+        valid?
         (let [total (reduce + 0 (vals selected))]
           {:weights (into {}
                           (map (fn [[id w]] [id (/ w total)]))
                           selected)
-           :fallback? false})
+           :source :user
+           :warnings []})
+
+        (some? user-weights)
         {:weights (equal-weights proxy-ids)
-         :fallback? (some? prior-weights)}))))
+         :source :equal
+         :warnings [{:code :proxy-prior-weights-invalid
+                     :message "Explicit proxy prior weights were invalid (missing, negative, or zero-total), so the equal-weight fallback was used instead."}]}
+
+        :else
+        {:weights (equal-weights proxy-ids)
+         :source :equal
+         :warnings []}))))
 
 ;; --- Regression ---------------------------------------------------------------
 
@@ -145,7 +166,7 @@
   [{:keys [regression-series proxy-ids prior-weights]}]
   (let [rows (regression-rows regression-series proxy-ids)
         n (count rows)]
-    (if (< n min-regression-observations)
+    (if (< n (min-regression-observations (count proxy-ids)))
       {:status :skipped
        :reason (if (pos? n) :insufficient-overlap :no-overlap)
        :sample-count n}
@@ -224,6 +245,35 @@
                prior-weights))
         prior-weights)))
 
+(defn model-exposure
+  "The full exposure pipeline for one proxy assumption, over the proxy ids that
+  actually reach the risk model: source-labeled prior -> ONE multi-proxy ridge
+  regression on the short overlap -> confidence q -> blended final basket. This
+  is the single seam both covariance synthesis and the setup-card preview call,
+  so the basket the user is shown is the basket the engine uses.
+
+  Returns nil without proxy ids; otherwise
+  {:prior-weights :prior-source :prior-warnings
+   :regression <estimate-regression result> :confidence-q :final-beta}."
+  [{:keys [proxy-ids user-prior-weights regression-series]}]
+  (when (seq proxy-ids)
+    (let [{prior :weights prior-source :source prior-warnings :warnings}
+          (build-proxy-prior proxy-ids user-prior-weights)
+          regression (estimate-regression {:regression-series regression-series
+                                           :proxy-ids proxy-ids
+                                           :prior-weights prior})
+          estimated? (= :estimated (:status regression))
+          q (confidence-q (or (:sample-count regression) 0)
+                          (when estimated? (:r2 regression)))]
+      {:prior-weights prior
+       :prior-source prior-source
+       :prior-warnings (vec prior-warnings)
+       :regression regression
+       :confidence-q q
+       :final-beta (blend-exposure prior
+                                   (when estimated? (:beta regression))
+                                   q)})))
+
 ;; --- Covariance synthesis -------------------------------------------------------
 
 (defn specific-variance
@@ -262,17 +312,18 @@
                    :instrument-id instrument-id
                    :proxy-instrument-ids requested-proxies
                    :message "No selected proxy asset reached the risk model, so the proxy assumption could not be synthesized."}]}
-      (let [{prior :weights prior-fallback? :fallback?}
-            (normalize-prior-weights present-proxies (:proxy-prior-weights entry))
-            regression (estimate-regression
-                        {:regression-series (:regression-series entry)
-                         :proxy-ids present-proxies
-                         :prior-weights prior})
+      (let [{prior :prior-weights
+             prior-source :prior-source
+             prior-warnings :prior-warnings
+             regression :regression
+             q :confidence-q
+             beta :final-beta}
+            (model-exposure {:proxy-ids present-proxies
+                             :user-prior-weights (:proxy-prior-weights entry)
+                             :regression-series (:regression-series entry)})
             estimated? (= :estimated (:status regression))
             sample-count (or (:sample-count regression) 0)
             r2 (when estimated? (:r2 regression))
-            q (confidence-q sample-count r2)
-            beta (blend-exposure prior (when estimated? (:beta regression)) q)
             residual-variance (when estimated?
                                 (* (or periods-per-year risk/default-periods-per-year)
                                    (:residual-variance regression)))
@@ -321,6 +372,7 @@
                               (range n*))
             warnings (vec
                       (concat
+                       (map #(assoc % :instrument-id instrument-id) prior-warnings)
                        (when (seq missing-proxies)
                          [{:code :proxy-asset-unavailable
                            :instrument-id instrument-id
@@ -337,8 +389,9 @@
          :diagnostics {:behavior :proxy
                        :proxy-instrument-ids present-proxies
                        :prior-weights prior
-                       :prior-fallback? (boolean prior-fallback?)
+                       :prior-source prior-source
                        :regression-beta (when estimated? (:beta regression))
+                       :regression-beta-raw (when estimated? (:raw-beta regression))
                        :final-beta beta
                        :sample-count sample-count
                        :r2 r2
@@ -349,7 +402,11 @@
                        :systematic-variance systematic-variance
                        :specific-variance specific
                        :residual-variance residual-variance
-                       :volatility volatility
+                       :input-volatility volatility
+                       ;; Total modeled vol can exceed the stated input when the
+                       ;; basket's systematic variance or the specific-risk floor
+                       ;; lifts total risk - disclose what the optimizer will see.
+                       :effective-modeled-volatility (js/Math.sqrt total-variance)
                        :max-weight (:max-weight entry)
                        :relationship-strength (:relationship-strength entry)}
          :warnings warnings}))))

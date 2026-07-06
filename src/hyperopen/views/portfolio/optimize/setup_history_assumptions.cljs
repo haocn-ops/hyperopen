@@ -9,9 +9,10 @@
   "Insufficient native history. Model behavior using proxies.")
 
 (def ^:private how-this-works-copy
-  ["Qualitative prior chooses the proxy."
-   "Quantitative regression adjusts it."
-   "Confidence governs shrinkage; specific risk and the cap keep it honest."])
+  ["Qualitative prior chooses the proxy set."
+   "Quantitative regression adjusts the split."
+   "Confidence governs how much the regression can move the prior."
+   "Specific risk and the cap keep the optimizer honest."])
 
 (defn- percent-input
   [{:keys [label field role action]}]
@@ -154,25 +155,88 @@
                      label])))
                 (:relationship-options card))]))
 
-(defn- prior-basket-preview
+(defn- basket-weight-rows
+  "One label/percent line per basket member. `role-prefix` disambiguates the
+  prior / regression / final panels for tests."
+  [card-id role-prefix rows emphasized?]
+  (into [:div {:class ["mt-2" "space-y-1"]}]
+        (map (fn [{:keys [instrument-id label weight-percent]}]
+               [:div {:class ["flex" "items-center" "justify-between" "gap-2"
+                              "font-mono" "text-[0.75rem]"]
+                      :data-role (str role-prefix card-id "-" instrument-id)}
+                [:span {:class [(when emphasized? "font-semibold")]} label]
+                [:span {:class [(if emphasized? "text-trading-text" "text-trading-muted")
+                                (when emphasized? "font-semibold")]}
+                 (str (.toFixed weight-percent 0) "%")]]))
+        rows))
+
+(defn- prior-basket-panel
+  "Panel A: the source-labeled prior. Never presented as the model's output -
+  the final modeled basket below is what drives covariance."
   [card]
   (let [id (:instrument-id card)]
     (when (seq (:prior-basket card))
       [:div {:class ["border" "border-base-300" "bg-base-200/20" "p-2"]
              :data-role (str "portfolio-optimizer-history-assumption-prior-basket-" id)}
-       [:span {:class controls/eyebrow-class} "System-created prior basket"]
+       [:span {:class controls/eyebrow-class} "Prior basket"]
+       (when (:prior-source-label card)
+         [:p {:class ["mt-1" "text-[0.6875rem]" "text-trading-muted"]
+              :data-role (str "portfolio-optimizer-history-assumption-prior-source-" id)}
+          (str "Source: " (:prior-source-label card))])
+       (basket-weight-rows id
+                           "portfolio-optimizer-history-assumption-prior-weight-"
+                           (:prior-basket card)
+                           false)])))
+
+(defn- regression-estimate-panel
+  "Panel B: the joint regression's own estimate over the available overlap, or
+  the reason it was skipped. Its weights never reach the optimizer directly -
+  confidence shrinkage blends them with the prior first."
+  [card]
+  (let [id (:instrument-id card)
+        estimate (:regression-estimate card)
+        estimated? (= :estimated (:status estimate))]
+    (when estimate
+      [:div {:class ["border" "border-base-300" "bg-base-200/20" "p-2"]
+             :data-role (str "portfolio-optimizer-history-assumption-regression-" id)
+             :data-status (some-> (:status estimate) name)}
+       [:span {:class controls/eyebrow-class} "Regression estimate"]
+       (when estimated?
+         [:p {:class ["mt-1" "text-[0.6875rem]" "text-trading-muted"]}
+          "Regression estimates exposure over the available overlap."])
+       (when estimated?
+         (basket-weight-rows id
+                             "portfolio-optimizer-history-assumption-regression-weight-"
+                             (:rows estimate)
+                             false))
+       (when estimated?
+         [:p {:class ["mt-1.5" "font-mono" "text-[0.6875rem]" "text-trading-muted"]}
+          (:summary estimate)])
+       (when-not estimated?
+         [:p {:class ["mt-1" "text-[0.6875rem]" "text-trading-muted"]}
+          (:message estimate)])])))
+
+(defn- final-basket-panel
+  "Panel C: the confidence-shrunk final basket - the split covariance synthesis
+  actually uses. Visually the loudest of the three."
+  [card]
+  (let [id (:instrument-id card)
+        final (:final-basket card)]
+    (when (seq (:rows final))
+      [:div {:class ["border" "border-warning/50" "bg-warning/10" "p-2"]
+             :data-role (str "portfolio-optimizer-history-assumption-final-basket-" id)}
+       [:span {:class controls/eyebrow-class} "Final modeled basket"]
        [:p {:class ["mt-1" "text-[0.6875rem]" "text-trading-muted"]}
-        "Initial qualitative weights (adjusted by model)"]
-       (into [:div {:class ["mt-2" "space-y-1"]}]
-             (map (fn [{:keys [instrument-id label weight-percent]}]
-                    [:div {:class ["flex" "items-center" "justify-between" "gap-2"
-                                   "font-mono" "text-[0.75rem]"]
-                           :data-role (str "portfolio-optimizer-history-assumption-prior-weight-"
-                                           id "-" instrument-id)}
-                     [:span label]
-                     [:span {:class ["text-trading-muted"]}
-                      (str (.toFixed weight-percent 0) "%")]]))
-             (:prior-basket card))])))
+        "Final modeled basket after confidence-weighted shrinkage."]
+       (basket-weight-rows id
+                           "portfolio-optimizer-history-assumption-final-weight-"
+                           (:rows final)
+                           true)
+       (when (:confidence-label final)
+         [:p {:class ["mt-1.5" "font-mono" "text-[0.6875rem]" "text-trading-muted"]
+              :data-role (str "portfolio-optimizer-history-assumption-confidence-" id)}
+          (str "Confidence q " (:confidence-label final)
+               " — controls how much the regression can move the prior")])])))
 
 (defn- diagnostics-strip
   [card]
@@ -240,7 +304,9 @@
          :role (str "portfolio-optimizer-history-assumption-return-" id)
          :action [(get-in card [:actions :set-expected-return]) id
                   [:event.target/value]]}))
-     (prior-basket-preview card)
+     (prior-basket-panel card)
+     (regression-estimate-panel card)
+     (final-basket-panel card)
      (how-this-works)
      (diagnostics-strip card)]))
 

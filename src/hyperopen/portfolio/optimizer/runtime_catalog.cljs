@@ -126,6 +126,8 @@
     actions/set-portfolio-optimizer-history-assumption-card-collapsed
     :hydrate-portfolio-optimizer-history-assumption-library
     actions/hydrate-portfolio-optimizer-history-assumption-library
+    :hydrate-portfolio-optimizer-view-library
+    actions/hydrate-portfolio-optimizer-view-library
     :set-portfolio-optimizer-universe-search-query
     actions/set-portfolio-optimizer-universe-search-query
     :set-portfolio-optimizer-draft-add-asset-open

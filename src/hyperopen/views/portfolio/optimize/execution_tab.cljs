@@ -542,8 +542,8 @@
            :value-class "text-trading-red"
            :sub (str (count sell-assets) " assets")})
      (kpi {:data-role "portfolio-optimizer-execution-kpi-margin"
-           :label "Account leverage after"
-           :info "Projected gross notional ÷ equity after the rebalance — the same leverage metric the account panels show. Red if margin headroom runs thin."
+           :label "Gross leverage after"
+           :info "Projected gross market exposure (perps + spot) ÷ account equity after the rebalance. This portfolio lens counts spot holdings as exposure, so it reads higher than the trade page's Unified Account Leverage, which measures perp notional against collateral only (shown here as \"venue\"). Red if margin headroom runs thin."
            :value (shared/leverage-after-label margin)
            :value-class (if margin-warn? "text-trading-red" "text-trading-text")
            :sub (shared/leverage-headroom-sub margin)})
@@ -655,7 +655,7 @@
                    :style {:width (str (* 100 pct) "%")}}]]
            (case phase :done "complete" :resting "resting" :halted "halted" :running "live" "staged")
            (case phase :halted "text-trading-red" :running "text-warning" :resting "text-info" nil))
-     (diag "Account leverage after"
+     (diag "Gross leverage after"
            (shared/leverage-after-label margin)
            (shared/leverage-headroom-sub margin true)
            (if margin-warn? "breach" "ok")

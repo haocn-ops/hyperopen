@@ -12,7 +12,7 @@
   "Represents the risk of portfolio liquidation. When the value is greater than 95%, your portfolio may be liquidated.")
 
 (def ^:private unified-account-leverage-tooltip
-  "Unified Account Leverage = Total Cross Positions Value / Total Collateral Balance.")
+  "Unified Account Leverage = Total Cross Positions Value / Total Collateral Balance. Perp positions only; spot holdings are not counted as exposure here.")
 
 
 (defn- classic-account-equity-view [{:keys [spot-equity

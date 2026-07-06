@@ -65,7 +65,9 @@
                                     :request-signature {:universe [btc new-perp]}}})
         proxy-mode (ts/node-by-role node "portfolio-optimizer-history-assumption-mode-perp:NEW-proxy")
         conservative-mode (ts/node-by-role node "portfolio-optimizer-history-assumption-mode-perp:NEW-conservative")]
-    (is (some? proxy-mode) "Proxy behavior is offered.")
+    (is (some? proxy-mode) "The model-from-similar-assets mode is offered.")
+    (is (some #{"Model from similar assets"} (ts/collect-strings proxy-mode))
+        "The proxy mode button names what it does, not 'proxy behavior'.")
     (is (= [:actions/set-portfolio-optimizer-history-assumption-mode "perp:NEW" :proxy]
            (first (ts/click-actions proxy-mode))))
     (is (some? conservative-mode))

@@ -105,7 +105,7 @@
 ;; "Conservative" confirms the configuration took.
 
 (defn- assumption-workflow-chip
-  [{:keys [instrument-id assumption-badge assumption-badge-label]}]
+  [{:keys [instrument-id assumption-badge assumption-badge-label assumption-badge-tooltip]}]
   (when (contains? universe-vm/workflow-assumption-badges assumption-badge)
     (let [tone (cond
                  (contains? #{:conservative :proxy-behavior} assumption-badge)
@@ -117,12 +117,19 @@
 
                  :else
                  ["border-warning/50" "text-warning" "bg-warning/10"])]
-      [:span {:class (into ["mt-0.5" "inline-block" "border" "px-1" "py-px" "font-mono"
-                            "text-[0.5625rem]" "font-semibold" "uppercase"
-                            "tracking-[0.08em]"]
-                           tone)
-              :data-role (str "portfolio-optimizer-universe-assumption-badge-" instrument-id)
-              :data-badge (name assumption-badge)}
+      ;; A native title (not a styled hover-card) carries the "Modeled" /
+      ;; "Conservative" explanation: the chip sits in a dense, truncating,
+      ;; scrollable universe list where an absolutely-positioned card would
+      ;; clip at the scroll boundary. `cursor-help` cues that a hover explains.
+      [:span (cond-> {:class (into ["mt-0.5" "inline-block" "border" "px-1" "py-px" "font-mono"
+                                    "text-[0.5625rem]" "font-semibold" "uppercase"
+                                    "tracking-[0.08em]"]
+                                   (cond-> tone
+                                     assumption-badge-tooltip (conj "cursor-help")))
+                      :data-role (str "portfolio-optimizer-universe-assumption-badge-" instrument-id)
+                      :data-badge (name assumption-badge)}
+               assumption-badge-tooltip
+               (assoc :title assumption-badge-tooltip))
        assumption-badge-label])))
 
 (defn- selected-row

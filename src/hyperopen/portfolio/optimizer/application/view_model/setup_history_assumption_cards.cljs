@@ -26,7 +26,7 @@
 
 (def ^:private mode-options
   [{:value :proxy
-    :label "Use proxy behavior"
+    :label "Model from similar assets"
     :description "Model this asset as a basket of assets it behaves like."}
    {:value :conservative
     :label "Use conservative assumption"
@@ -34,7 +34,7 @@
 
 (def ^:private mode-labels
   {:conservative "Conservative assumption"
-   :proxy "Proxy behavior"})
+   :proxy "Modeled"})
 
 (def ^:private relationship-options
   [{:value :low :label "Low"}
@@ -127,9 +127,9 @@
                   (when cap (str " - " cap " cap")))]
     (case (:behavior entry)
       :conservative (str "conservative" tail)
-      :proxy (str "proxy behavior"
+      :proxy (str "modeled"
                   (when (seq proxy-labels)
-                    (str " - " (str/join ", " proxy-labels)))
+                    (str " on " (str/join ", " proxy-labels)))
                   tail)
       nil)))
 

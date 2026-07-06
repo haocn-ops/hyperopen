@@ -210,7 +210,23 @@
    :needs-assumptions "Needs assumptions"
    :using-proxy "Using proxy"
    :conservative "Conservative"
-   :proxy-behavior "Proxy behavior"})
+   ;; The configured "return/risk modeled from a basket of similar assets"
+   ;; stance. Named for its RESULT ("Modeled") rather than its mechanism
+   ;; ("proxy") so it never collides with the unconfigured "Needs proxy" cue -
+   ;; a scanning trader can tell configured from unconfigured at a glance.
+   :proxy-behavior "Modeled"})
+
+(def assumption-badge-tooltips
+  "Hover copy for the two CONFIGURED assumption chips, expanding the single
+  word into what actually happened to the asset. The unconfigured cues
+  (Needs proxy / Needs assumptions / Thin history) are self-explanatory and
+  carry none."
+  {:proxy-behavior
+   (str "This asset's return and risk are modeled from a basket of similar "
+        "assets you picked, since its own history is too short.")
+   :conservative
+   (str "Treated cautiously: high assumed volatility, no diversification "
+        "credit, and a tight allocation cap.")})
 
 (def workflow-assumption-badges
   "Badge states the universe rows actually PAINT: actionable gaps, configured
@@ -354,7 +370,8 @@
               :history-tone (:tone history-chip))
        badge
        (assoc :assumption-badge badge
-              :assumption-badge-label (get assumption-badge-labels badge))))))
+              :assumption-badge-label (get assumption-badge-labels badge)
+              :assumption-badge-tooltip (get assumption-badge-tooltips badge))))))
 
 (defn candidate-row-model
   [market idx active-index]

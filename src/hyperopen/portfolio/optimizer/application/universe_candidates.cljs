@@ -256,6 +256,21 @@
             candidates)
       candidates)))
 
+(defn resolve-market
+  "Resolve a candidate market-key back to its market map: the live asset-selector
+  catalog first, then the vault index (vault candidates are synthesized, so they
+  never appear in market-by-key). This is the single resolution path for every
+  picker fed by candidate-markets (universe add, proxy picker)."
+  [state market-key]
+  (when-let [market-key* (normalized-text market-key)]
+    (or (get-in state [:asset-selector :market-by-key market-key*])
+        (when-let [vault-address (vault-address-from-instrument-id market-key*)]
+          (some (fn [row]
+                  (when (= vault-address
+                           (normalize-vault-address (:vault-address row)))
+                    (vault-row->candidate row)))
+                (get-in state [:vaults :merged-index-rows]))))))
+
 (defn candidate-markets
   ([state universe query]
    (candidate-markets state universe query nil))

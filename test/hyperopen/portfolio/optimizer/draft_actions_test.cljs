@@ -733,7 +733,9 @@
   (let [state (-> (ha-state {"perp:NEW" proxy-entry-fixture})
                   (assoc-in [:asset-selector :market-by-key "perp:SOL"]
                             {:key "perp:SOL" :market-type :perp :coin "SOL"
-                             :symbol "SOL-USDC"}))
+                             :symbol "SOL-USDC"})
+                  (assoc-in [:portfolio :optimizer :history-discovery]
+                            {:backend-id-by-local-id {"perp:SOL" "hl:perp:SOL"}}))
         effects (actions/set-portfolio-optimizer-history-assumption-proxy-asset
                  state "perp:NEW" "perp:SOL" true)
         path-values (get-in effects [0 1])
@@ -745,6 +747,8 @@
     (is (= ["perp:SOL"] (mapv :instrument-id refs))
         "It is stored as a reference-only proxy instrument (outside the universe).")
     (is (= :perp (:market-type (first refs))) "Catalog metadata is resolved.")
+    (is (= "hl:perp:SOL" (:optimizer-history/instrument-id (first refs)))
+        "Backend history identity is decorated on; without it alignment rejects the proxy as identity-ambiguous.")
     (is (some (fn [effect]
                 (= [:portfolio :optimizer :history-prefetch] (first effect)))
               path-values)

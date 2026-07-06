@@ -17,6 +17,7 @@
             [hyperopen.platform :as platform]
             [hyperopen.portfolio.optimizer.actions.draft-persistence :as draft-persistence]
             [hyperopen.portfolio.optimizer.application.current-portfolio :as current-portfolio]
+            [hyperopen.portfolio.optimizer.application.view-library :as view-library]
             [hyperopen.portfolio.optimizer.contracts :as contracts]
             [hyperopen.portfolio.optimizer.defaults :as optimizer-defaults]
             [hyperopen.portfolio.optimizer.infrastructure.persistence :as persistence]
@@ -26,6 +27,7 @@
 (def ^:private preseed-watch-key ::holdings-preseed)
 (def ^:private identity-restore-watch-key ::identity-restore)
 (def ^:private assumption-hydrate-watch-key ::assumption-library-hydrate)
+(def ^:private view-library-hydrate-watch-key ::view-library-hydrate)
 
 (def default-debounce-ms
   "One draft edit rarely comes alone (drags, typed digits); a sub-second debounce
@@ -202,9 +204,55 @@
                             [[:actions/hydrate-portfolio-optimizer-history-assumption-library]]))))
   store)
 
+(defn- view-library-gap?
+  "True when some universe instrument has NO authored absolute view but the
+  wallet's view library remembers one — the state the hydrate action
+  gap-fills. Only under the views-aware return model: other estimators ignore
+  views, and the preset/model-switch actions hydrate on entry."
+  [state]
+  (let [entries (get-in state contracts/view-library-path)]
+    (and (map? entries)
+         (seq entries)
+         (= :black-litterman
+            (get-in state (conj contracts/draft-return-model-path :kind)))
+         (view-library/hydration-gap?
+          (get-in state contracts/draft-return-model-views-path)
+          entries
+          (get-in state contracts/draft-universe-path)))))
+
+(defn- view-library-hydrate-inputs
+  [state]
+  [(get-in state contracts/draft-universe-path)
+   (get-in state contracts/draft-return-model-path)
+   (get-in state contracts/view-library-path)])
+
+(defn install-view-library-hydrate-watcher!
+  "Gap-fill remembered return views whenever a universe instrument lacks an
+  authored view the library remembers — universe add, draft restore, the
+  library mirror arriving from IndexedDB — regardless of ordering. The hydrate
+  action is a pure gap-fill (existing draft views always win), so repeat
+  dispatches are idempotent; each fill closes the gap, so the watcher
+  quiesces. Clearing a view never resurrects it: the library remove hits the
+  state mirror BEFORE the draft write (see the view-row actions' ordering
+  note), so by the time this watcher sees the view disappear the library
+  entry is already gone."
+  [{:keys [store dispatch!]
+    :or {dispatch! nxr/dispatch}}]
+  (remove-watch store view-library-hydrate-watch-key)
+  (add-watch store view-library-hydrate-watch-key
+             (fn [_ _ old-state new-state]
+               (when (and (not= (view-library-hydrate-inputs old-state)
+                                (view-library-hydrate-inputs new-state))
+                          (view-library-gap? new-state))
+                 (dispatch! store
+                            nil
+                            [[:actions/hydrate-portfolio-optimizer-view-library]]))))
+  store)
+
 (defn install-optimizer-draft-watchers!
   [deps]
   (install-draft-autosave-watcher! deps)
   (install-holdings-preseed-watcher! deps)
   (install-identity-restore-watcher! deps)
-  (install-assumption-library-hydrate-watcher! deps))
+  (install-assumption-library-hydrate-watcher! deps)
+  (install-view-library-hydrate-watcher! deps))

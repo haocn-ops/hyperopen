@@ -237,3 +237,50 @@
            conj {:instrument-id "perp:NEW"})
     (is (= 2 (count @dispatches))
         "Adding a remembered asset to the universe reopens the gap and re-dispatches.")))
+
+(deftest view-library-gap-dispatches-hydrate-test
+  ;; Removing an asset from the universe never deletes its library entry, so
+  ;; re-surfacing the asset (universe add, draft restore, the mirror arriving)
+  ;; must gap-fill the remembered view back into the draft.
+  (let [dispatches (atom [])
+        store (atom {:wallet {:address address}
+                     :portfolio {:optimizer
+                                 {:draft {:universe [btc-instrument]
+                                          :return-model {:kind :black-litterman
+                                                         :views []}}}}})]
+    (draft-autosave/install-view-library-hydrate-watcher!
+     {:store store
+      :dispatch! (fn [_store _e actions] (swap! dispatches conj actions))})
+    ;; The library mirror arrives with an entry for the universe member.
+    (swap! store assoc-in [:portfolio :optimizer :view-library]
+           {"perp:BTC" {:instrument-id "perp:BTC"
+                        :return 0.2
+                        :confidence-level :high
+                        :updated-at-ms 1}})
+    (is (= [[[:actions/hydrate-portfolio-optimizer-view-library]]]
+           @dispatches)
+        "The mirror arriving over an uncovered universe member triggers hydrate.")
+    ;; The gap closes (hydrate authored the view): further changes stay quiet.
+    (swap! store assoc-in [:portfolio :optimizer :draft :return-model :views]
+           [{:kind :absolute :instrument-id "perp:BTC" :return 0.2}])
+    (swap! store assoc :unrelated 1)
+    (is (= 1 (count @dispatches))
+        "No gap, no dispatch - including on unrelated state changes.")
+    ;; A remembered entry for an asset OUTSIDE the universe opens no gap...
+    (swap! store assoc-in [:portfolio :optimizer :view-library "perp:NEW"]
+           {:instrument-id "perp:NEW"
+            :return -0.1
+            :confidence-level :low
+            :updated-at-ms 2})
+    (is (= 1 (count @dispatches)))
+    ;; ...until the asset re-enters the universe.
+    (swap! store update-in [:portfolio :optimizer :draft :universe]
+           conj {:instrument-id "perp:NEW"})
+    (is (= 2 (count @dispatches))
+        "Re-adding a remembered asset reopens the gap and re-dispatches.")
+    ;; A non-views return model never hydrates (views would be ignored anyway).
+    (swap! store assoc-in [:portfolio :optimizer :draft :return-model]
+           {:kind :historical-mean})
+    (swap! store update-in [:portfolio :optimizer :draft :universe]
+           conj {:instrument-id "perp:BTC2"})
+    (is (= 2 (count @dispatches)))))

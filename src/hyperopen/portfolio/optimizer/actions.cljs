@@ -8,7 +8,8 @@
             [hyperopen.portfolio.optimizer.actions.run :as run]
             [hyperopen.portfolio.optimizer.actions.target-sigma :as target-sigma]
             [hyperopen.portfolio.optimizer.actions.tracking :as tracking]
-            [hyperopen.portfolio.optimizer.actions.universe :as universe]))
+            [hyperopen.portfolio.optimizer.actions.universe :as universe]
+            [hyperopen.portfolio.optimizer.actions.view-library :as view-library-actions]))
 
 (def set-portfolio-optimizer-objective-kind
   draft/set-portfolio-optimizer-objective-kind)
@@ -141,6 +142,9 @@
 
 (def hydrate-portfolio-optimizer-history-assumption-library
   draft/hydrate-portfolio-optimizer-history-assumption-library)
+
+(def hydrate-portfolio-optimizer-view-library
+  view-library-actions/hydrate-portfolio-optimizer-view-library)
 
 (def set-portfolio-optimizer-universe-search-query
   universe/set-portfolio-optimizer-universe-search-query)

@@ -5,7 +5,8 @@
   execution-strategy band (hyperopen.views.portfolio.optimize.execution-strategy-band).
   Kept in one place so no view file carries the others' bulk while all reuse identical
   formatting, order-type, cost-recompute, and chip helpers."
-  (:require [hyperopen.portfolio.optimizer.application.execution-order-type :as execution-order-type]
+  (:require [clojure.string :as str]
+            [hyperopen.portfolio.optimizer.application.execution-order-type :as execution-order-type]
             [hyperopen.views.portfolio.optimize.format :as opt-format]))
 
 (def order-type-labels
@@ -139,9 +140,11 @@
   (opt-format/format-multiple (:after-gross-leverage margin)))
 
 (defn leverage-headroom-sub
-  "Sub-line under the leverage figure: prior leverage + free-margin headroom, or a
-  thin-headroom caution when margin utilization is in warning range. `full?` appends
-  the equity base (for the wider health rail)."
+  "Sub-line under the leverage figure: prior leverage + free-margin headroom + the
+  venue-lens bridge (perp notional ÷ collateral — the trade page's Unified Account
+  Leverage formula, shown ≈ because collateral is approximated), or a thin-headroom
+  caution when margin utilization is in warning range. `full?` appends the equity
+  base (for the wider health rail)."
   ([margin] (leverage-headroom-sub margin false))
   ([margin full?]
    (if (margin-warn? margin)
@@ -149,14 +152,15 @@
      (let [before (:before-gross-leverage margin)
            free (:free-margin-usd margin)
            equity (:capital-usd margin)
+           venue (:after-venue-leverage margin)
            was (when (finite before) (str "was " (opt-format/format-multiple before)))
            head (when (finite free)
                   (str (format-compact-usd free) " free"
                        (when (and full? (finite equity))
-                         (str " of " (format-compact-usd equity) " equity"))))]
-       (cond
-         (and was head) (str was " · " head)
-         :else (or was head ""))))))
+                         (str " of " (format-compact-usd equity) " equity"))))
+           venue-part (when (finite venue)
+                        (str "venue ≈" (opt-format/format-multiple venue)))]
+       (str/join " · " (remove nil? [was head venue-part]))))))
 
 ;; ── shared bits ─────────────────────────────────────────────────────────
 

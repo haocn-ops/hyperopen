@@ -456,6 +456,14 @@
                      (* capital-usd (- (abs-num target-weight) (abs-num current-weight))))
                    ready-rows)))
 
+(defn- venue-leverage
+  ;; Venue lens (the trade page's Unified Account Leverage): perp-only notional ÷
+  ;; collateral, vs the portfolio lens above. nil when inputs are missing.
+  [perp-gross-usd collateral-usd]
+  (when (and (finite-number? perp-gross-usd)
+             (finite-positive? collateral-usd))
+    (/ (max 0 perp-gross-usd) collateral-usd)))
+
 (defn- margin-summary
   [opts ready-rows current-gross-usd]
   (let [capital-usd (:capital-usd opts)
@@ -464,7 +472,13 @@
         after-used (+ current-used impact)
         after-gross-usd (+ (or current-gross-usd 0)
                            (ready-gross-delta-usd capital-usd ready-rows))
-        after-utilization (utilization after-used capital-usd)]
+        after-utilization (utilization after-used capital-usd)
+        current-perp-gross-usd (:current-perp-gross-usdc opts)
+        venue-collateral-usd (:venue-collateral-usd opts)
+        perp-ready-rows (filter #(= :perp (:instrument-type %)) ready-rows)
+        after-perp-gross-usd (when (finite-number? current-perp-gross-usd)
+                               (+ current-perp-gross-usd
+                                  (ready-gross-delta-usd capital-usd perp-ready-rows)))]
     {:capital-usd capital-usd
      :current-used-usd current-used
      :estimated-impact-usd impact
@@ -474,6 +488,8 @@
      :after-utilization after-utilization
      :before-gross-leverage (gross-leverage current-gross-usd capital-usd)
      :after-gross-leverage (gross-leverage after-gross-usd capital-usd)
+     :before-venue-leverage (venue-leverage current-perp-gross-usd venue-collateral-usd)
+     :after-venue-leverage (venue-leverage after-perp-gross-usd venue-collateral-usd)
      :warning (margin-warning after-utilization)}))
 
 (defn build-rebalance-preview

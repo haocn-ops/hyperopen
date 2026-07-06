@@ -206,7 +206,7 @@
                                              :perp-dex-clearinghouse {}})]
     (is (some? (find-first-node view-node
                                 #(contains? (direct-texts %)
-                                            "Unified Account Leverage = Total Cross Positions Value / Total Collateral Balance."))))))
+                                            "Unified Account Leverage = Total Cross Positions Value / Total Collateral Balance. Perp positions only; spot holdings are not counted as exposure here."))))))
 
 (deftest classic-account-equity-renders-classic-account-value-label-test
   (let [view-node (view/account-equity-view {:account {:mode :classic}

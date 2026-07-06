@@ -98,7 +98,7 @@
    :summary {:ready-count 1 :blocked-count 1 :skipped-count 0
              :gross-ready-notional-usd 1000
              :estimated-fees-usd 10 :estimated-slippage-usd 5
-             :margin {:after-utilization 0.42 :after-gross-leverage 1.85 :before-gross-leverage 1.79 :free-margin-usd 8600 :capital-usd 10000 :warning :none}}
+             :margin {:after-utilization 0.42 :after-gross-leverage 1.85 :before-gross-leverage 1.79 :after-venue-leverage 1.4 :free-margin-usd 8600 :capital-usd 10000 :warning :none}}
    :rows [{:row-id "perp:BTC" :instrument-id "perp:BTC" :instrument-type :perp
            :status :ready :side :buy :quantity 0.25 :order-type :market
            :delta-notional-usd 1000
@@ -181,7 +181,9 @@
     (is (= [[:actions/set-portfolio-optimizer-execution-phase :armed]] (click-actions arm)))
     ;; cost-source + margin honesty signals + blocked reason are surfaced
     (is (some #(str/includes? % "snapshot") strings))
-    (is (contains? strings "Account leverage after"))
+    (is (contains? strings "Gross leverage after"))
+    ;; Venue-lens bridge (trade page's Unified Account Leverage) rides the sub-line.
+    (is (some #(str/includes? % "venue ≈1.40x") strings))
     (is (contains? strings "spot-submit-unsupported"))))
 
 (deftest execution-tab-stale-recommendation-disables-arm-test

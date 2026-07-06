@@ -231,9 +231,15 @@
       (assoc :active-instrument-id nil))))
 
 (defn current-universe-ids
+  "Instrument ids the prefetch state is allowed to track: the draft universe
+  plus the reference-only proxy instruments (their prefetch entries must survive
+  the post-completion cleanup or a queued reference proxy would be dropped
+  before its history ever loads)."
   [state]
-  (keep :instrument-id
-        (get-in state contracts/draft-universe-path)))
+  (concat (keep :instrument-id
+                (get-in state contracts/draft-universe-path))
+          (keep :instrument-id
+                (get-in state contracts/draft-proxy-reference-instruments-path))))
 
 (defn begin-selection-prefetch-state
   [state instrument-ids* signature started-at-ms]
@@ -280,7 +286,14 @@
       :else
       (let [prefetch-universe (if (get-in state (conj contracts/history-data-path
                                                        :api-v2-history))
-                                (vec (get-in state contracts/draft-universe-path))
+                                ;; The api-v2 alignment needs one request covering
+                                ;; everything, so refetch the whole draft universe
+                                ;; PLUS the reference-only proxies — the queued
+                                ;; instrument is usually one of those references,
+                                ;; and a universe-only request would silently skip
+                                ;; the very series the prefetch was enqueued for.
+                                (into (vec (get-in state contracts/draft-universe-path))
+                                      (get-in state contracts/draft-proxy-reference-instruments-path))
                                 queued)
             request (history-request state
                                      (assoc (request-opts opts)

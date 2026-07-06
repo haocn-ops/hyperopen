@@ -336,7 +336,8 @@
         readiness {:request {:requested-universe universe
                              :universe [btc-instrument eth]
                              :objective {:kind :minimum-variance}
-                             :history {:eligible-instruments [btc-instrument eth]}}
+                             :history {:eligible-instruments [btc-instrument eth]
+                                       :history-window {:return-observations 399}}}
                    :blocking-warnings []}
         model (view-model/history-assumption-cards
                {} draft readiness
@@ -365,6 +366,14 @@
         "No native returns -> regression confidence previews Low.")
     (is (some #(= "R² used for confidence, not weights" (:detail %))
               (:diagnostics card)))
+    (is (= 399 (:covariance-observations card))
+        "The shared aligned window rides on the card.")
+    (is (= {:key :history-window
+            :label "Covariance window"
+            :value "399 days of returns"
+            :detail "Extended via proxies · no native overlap (prior weights only)"}
+           (last (:diagnostics card)))
+        "The window cell reports the proxy-extended shared window, never the asset's own overlap.")
     (is (= "Final model: proxy basket + shrinkage + specific risk + cap"
            (:final-model-line card)))
     (is (= :actions/set-portfolio-optimizer-history-assumption-proxy-asset
@@ -387,7 +396,8 @@
         readiness {:request {:requested-universe universe
                              :universe [btc-instrument]
                              :objective {:kind :minimum-variance}
-                             :history {:eligible-instruments [btc-instrument]}}
+                             :history {:eligible-instruments [btc-instrument]
+                                       :history-window {:return-observations 500}}}
                    :blocking-warnings []}
         model (view-model/history-assumption-rail-model
                {} draft readiness
@@ -406,7 +416,12 @@
     (is (some #(= ["Proxy assets" "BTC"] %) (:summary-pairs row)))
     (is (some #(= ["Relationship strength" "Medium"] %) (:summary-pairs row)))
     (is (some #(= ["Expected volatility" "80%"] %) (:summary-pairs row)))
-    (is (some #(= ["Max weight cap" "5%"] %) (:summary-pairs row)))))
+    (is (some #(= ["Max weight cap" "5%"] %) (:summary-pairs row)))
+    (is (some #(= ["History used" "500 days of returns · via proxies"] %)
+              (:summary-pairs row))
+        "The rail reports the proxy-extended covariance window, not the asset's own overlap.")
+    (is (some #(= ["Calibration overlap" "No usable native returns"] %)
+              (:summary-pairs row)))))
 
 (deftest history-assumption-cards-hidden-while-history-still-loading-test
   ;; Regression: before history loads, readiness reports every asset as :missing

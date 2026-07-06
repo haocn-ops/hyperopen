@@ -390,6 +390,34 @@
            (get-in request [:constraints :per-asset-overrides "perp:TOKENX" :max-weight]))
         "The proxy cap mirrors into the constraint machinery.")))
 
+(deftest build-engine-request-proxy-asset-never-truncates-shared-window-test
+  ;; The owner-facing guarantee behind proxy assumptions: a thin asset with a
+  ;; complete proxy entry leaves the shared covariance window EXACTLY as it
+  ;; would be without the asset — the proxies extend the asset, the asset never
+  ;; truncates the window. Also pins :history-window :return-observations, the
+  ;; count the assumption card displays as "Covariance window".
+  (let [with-proxy (proxy-request complete-proxy-assumption)
+        without-thin (request-builder/build-engine-request
+                      {:draft (-> (defaults/default-draft)
+                                  (assoc :id "draft-no-thin-asset"
+                                         :universe [{:instrument-id "perp:BTC"
+                                                     :market-type :perp
+                                                     :coin "BTC"}
+                                                    {:instrument-id "perp:ETH"
+                                                     :market-type :perp
+                                                     :coin "ETH"}]))
+                       :history-data {:candle-history-by-coin
+                                      {"BTC" (proxy-daily-candles 0 400 100)
+                                       "ETH" (proxy-daily-candles 0 400 2000)}
+                                      :funding-history-by-coin {}}
+                       :market-cap-by-coin {}
+                       :as-of-ms (* 401 proxy-day-ms)})]
+    (is (= (get-in without-thin [:history :return-calendar])
+           (get-in with-proxy [:history :return-calendar]))
+        "The shared return calendar with the proxy-configured thin asset equals the calendar without the asset entirely.")
+    (is (= 399 (get-in with-proxy [:history :history-window :return-observations]))
+        "The card's Covariance window field reads this exact count.")))
+
 (deftest build-engine-request-keeps-tighter-existing-proxy-cap-test
   (let [draft (-> (proxy-draft complete-proxy-assumption)
                   (assoc-in [:constraints :asset-overrides]

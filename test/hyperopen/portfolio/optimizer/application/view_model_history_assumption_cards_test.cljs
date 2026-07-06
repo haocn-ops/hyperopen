@@ -347,8 +347,12 @@
     (is (= ["perp:SOPH"] (mapv :instrument-id (:cards model)))
         "The ~6-month asset is carded from the aligned history's row count alone.")
     (is (= 180 (:observations card)))
-    (is (= [{:instrument-id "perp:BTC" :label "BTC"}] (:addable-assets model))
-        "The full-history asset remains manually addable; the carded one is not listed twice.")))
+    (is (= [{:instrument-id "perp:BTC"
+             :label "BTC"
+             :observations 1079
+             :option-label "BTC (1079 days)"}]
+           (:addable-assets model))
+        "The full-history asset remains manually addable (with its aligned day count in the option label); the carded one is not listed twice.")))
 
 (deftest history-assumption-cards-flag-short-but-present-history-test
   ;; An asset with thin-but-present history (e.g. SKR's ~75 daily candles) clears the
@@ -377,3 +381,89 @@
         "Short-but-present history is flagged for assumptions.")
     (is (not (contains? carded-ids "perp:BTC"))
         "An asset with ample history is not flagged.")))
+
+(deftest history-assumption-cards-addable-assets-sort-by-day-count-test
+  ;; The manual entry dropdown ranks by native return-day count ASCENDING so the
+  ;; assets limiting the shared covariance window sit at the top - the user
+  ;; proxies out the most limiting asset first instead of guessing. Unknown
+  ;; counts (history still loading) sink to the bottom with a bare label.
+  (let [sol {:instrument-id "perp:SOL" :market-type :perp :coin "SOL"}
+        pending {:instrument-id "perp:PEND" :market-type :perp :coin "PEND"}
+        universe [btc-instrument sol pending]
+        readiness {:request {:requested-universe universe
+                             :universe universe
+                             :objective {:kind :minimum-variance}
+                             :history {:eligible-instruments universe
+                                       :raw-price-series-by-instrument
+                                       {"perp:BTC" (vec (repeat 1079 {:close 1}))
+                                        "perp:SOL" (vec (repeat 403 {:close 1}))}}}
+                   :blocking-warnings []}
+        model (view-model/history-assumption-cards
+               {}
+               {:universe universe
+                :objective {:kind :minimum-variance}
+                :history-assumptions {}}
+               readiness
+               {:status :succeeded
+                :request-signature {:universe universe}}
+               {})]
+    (is (= [{:instrument-id "perp:SOL"
+             :label "SOL"
+             :observations 403
+             :option-label "SOL (403 days)"}
+            {:instrument-id "perp:BTC"
+             :label "BTC"
+             :observations 1079
+             :option-label "BTC (1079 days)"}
+            {:instrument-id "perp:PEND"
+             :label "PEND"
+             :observations nil
+             :option-label "PEND"}]
+           (:addable-assets model))
+        "Fewest days first; unknown counts last with no claimed count.")))
+
+(deftest history-assumption-cards-collapse-defaults-and-overrides-test
+  ;; Configured (complete + acknowledged) cards rest collapsed; unfinished ones
+  ;; stay open; an explicit user override wins over either default; a mode-less
+  ;; card is never collapsible (it would hide required work).
+  (let [conservative {:behavior :conservative
+                      :expected-return 0.0
+                      :volatility 0.8
+                      :max-weight 0.03
+                      :correlation-floor 0.75}
+        acknowledged (assoc conservative
+                            :metadata {:source :user :acknowledged? true})
+        draft {:universe [btc-instrument new-perp-instrument]
+               :objective {:kind :minimum-variance}
+               :history-assumptions {"perp:NEW" acknowledged}}
+        readiness {:request {:requested-universe [btc-instrument new-perp-instrument]
+                             :universe [btc-instrument]
+                             :objective {:kind :minimum-variance}}
+                   :blocking-warnings []}
+        card-for (fn [state assumptions]
+                   (first (:cards (view-model/history-assumption-cards
+                                   state
+                                   (assoc draft :history-assumptions assumptions)
+                                   readiness loaded-state-with-new {}))))]
+    (let [card (card-for {} {"perp:NEW" acknowledged})]
+      (is (true? (:configured? card)))
+      (is (true? (:collapsible? card)))
+      (is (true? (:collapsed? card)) "Configured default: collapsed."))
+    (let [card (card-for {} {"perp:NEW" conservative})]
+      (is (false? (:collapsed? card)) "Unacknowledged default: expanded."))
+    (let [expanded-override {:portfolio-ui {:optimizer {:assumption-cards-collapsed
+                                                        {"perp:NEW" false}}}}
+          card (card-for expanded-override {"perp:NEW" acknowledged})]
+      (is (false? (:collapsed? card)) "An explicit expand wins over the configured default."))
+    (let [collapsed-override {:portfolio-ui {:optimizer {:assumption-cards-collapsed
+                                                         {"perp:NEW" true}}}}
+          card (card-for collapsed-override {"perp:NEW" conservative})]
+      (is (true? (:collapsed? card)) "An explicit collapse wins over the unfinished default."))
+    (let [card (card-for {:portfolio-ui {:optimizer {:assumption-cards-collapsed
+                                                     {"perp:NEW" true}}}}
+                         {})]
+      (is (false? (:collapsible? card)) "A mode-less card is not collapsible.")
+      (is (false? (:collapsed? card)) "...and never renders collapsed, override or not."))
+    (is (= :actions/set-portfolio-optimizer-history-assumption-card-collapsed
+           (get-in (card-for {} {"perp:NEW" acknowledged})
+                   [:actions :set-card-collapsed])))))

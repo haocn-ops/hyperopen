@@ -46,6 +46,14 @@
   (when-let [address* (address-token address)]
     (str "view-library::" address*)))
 
+(defn assumption-library-key
+  "One record per wallet holds the whole {instrument-id -> remembered history
+  assumption} map — the user's authored proxy/conservative assumptions, durable
+  across drafts and universe edits."
+  [address]
+  (when-let [address* (address-token address)]
+    (str "assumption-library::" address*)))
+
 (defn- get-record!
   [key]
   (if (seq key)
@@ -179,3 +187,11 @@
 (defn save-view-library!
   [address record]
   (put-encoded-record! (view-library-key address) record))
+
+(defn load-assumption-library!
+  [address]
+  (get-encoded-record! (assumption-library-key address)))
+
+(defn save-assumption-library!
+  [address record]
+  (put-encoded-record! (assumption-library-key address) record))

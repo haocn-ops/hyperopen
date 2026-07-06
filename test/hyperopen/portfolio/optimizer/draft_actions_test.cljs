@@ -659,10 +659,18 @@
                           :volatility 0.8
                           :max-weight 0.03
                           :correlation-floor 0.75}}]
-            [dirty-path true]]]]
+            [dirty-path true]]]
+          [:effects/sync-portfolio-optimizer-assumption-library
+           {:upserts [{:instrument-id "perp:NEW"
+                       :assumption {:behavior :conservative
+                                    :expected-return 0.0
+                                    :volatility 0.8
+                                    :max-weight 0.03
+                                    :correlation-floor 0.75}
+                       :reference-instruments []}]}]]
          (actions/set-portfolio-optimizer-history-assumption-mode
           (ha-state {}) "perp:NEW" :conservative))
-      "Choosing the conservative behavior on a fresh asset seeds editable anchors and saves the whole map.")
+      "Choosing the conservative behavior on a fresh asset seeds editable anchors, saves the whole map, and remembers the entry in the wallet library.")
   (is (= [[:effects/save-many
            [[history-assumptions-path
              {"perp:NEW" {:behavior :proxy
@@ -672,7 +680,17 @@
                           :proxy {:instrument-ids []
                                   :relationship-strength :medium
                                   :prior-weights nil}}}]
-            [dirty-path true]]]]
+            [dirty-path true]]]
+          [:effects/sync-portfolio-optimizer-assumption-library
+           {:upserts [{:instrument-id "perp:NEW"
+                       :assumption {:behavior :proxy
+                                    :expected-return 0.0
+                                    :volatility 0.8
+                                    :max-weight 0.05
+                                    :proxy {:instrument-ids []
+                                            :relationship-strength :medium
+                                            :prior-weights nil}}
+                       :reference-instruments []}]}]]
          (actions/set-portfolio-optimizer-history-assumption-mode
           (ha-state {}) "perp:NEW" :proxy))
       "Choosing proxy behavior seeds the multi-proxy defaults.")
@@ -821,10 +839,18 @@
                             :volatility nil
                             :max-weight 0.03
                             :correlation-floor 0.75}}]
-              [dirty-path true]]]]
+              [dirty-path true]]]
+            [:effects/sync-portfolio-optimizer-assumption-library
+             {:upserts [{:instrument-id "perp:NEW"
+                         :assumption {:behavior :conservative
+                                      :expected-return 0.25
+                                      :volatility nil
+                                      :max-weight 0.03
+                                      :correlation-floor 0.75}
+                         :reference-instruments []}]}]]
            (actions/set-portfolio-optimizer-history-assumption-expected-return
             conservative "perp:NEW" "25"))
-        "Percent text is stored as a decimal (25% => 0.25).")
+        "Percent text is stored as a decimal (25% => 0.25) and the edit is remembered in the wallet library.")
     (is (= 0.9
            (get-in (actions/set-portfolio-optimizer-history-assumption-expected-volatility
                     conservative "perp:NEW" "90")
@@ -850,7 +876,9 @@
                                        :volatility 0.5
                                        :max-weight 0.03
                                        :correlation-floor 0.75}})]
-    (is (= [[:effects/save-many
+    (is (= [[:effects/sync-portfolio-optimizer-assumption-library
+             {:removes ["perp:NEW"]}]
+            [:effects/save-many
              [[history-assumptions-path
                {"perp:OTHER" {:behavior :conservative
                               :expected-return nil
@@ -859,10 +887,104 @@
                               :correlation-floor 0.75}}]
               [dirty-path true]]]]
            (actions/clear-portfolio-optimizer-history-assumption proxy "perp:NEW"))
-        "Clearing removes only the target entry and preserves the rest.")
+        "Clearing removes only the target entry, preserves the rest, and forgets the entry in the wallet library BEFORE the draft write (so the hydrate watcher can't resurrect it).")
     (is (= [] (actions/clear-portfolio-optimizer-history-assumption
                (ha-state {}) "perp:NEW"))
         "Clearing an absent assumption is a no-op.")))
+
+(def ^:private cards-collapsed-path
+  [:portfolio-ui :optimizer :assumption-cards-collapsed])
+
+(deftest set-history-assumption-card-collapsed-writes-override-test
+  (is (= [[:effects/save cards-collapsed-path {"perp:NEW" true}]]
+         (actions/set-portfolio-optimizer-history-assumption-card-collapsed
+          (ha-state {}) "perp:NEW" true))
+      "Collapsing writes an explicit per-card override.")
+  (is (= [[:effects/save cards-collapsed-path {"perp:NEW" false "perp:OLD" true}]]
+         (actions/set-portfolio-optimizer-history-assumption-card-collapsed
+          (assoc-in (ha-state {}) cards-collapsed-path {"perp:OLD" true})
+          "perp:NEW" false))
+      "Expanding overrides just the one card and preserves the rest.")
+  (is (= [] (actions/set-portfolio-optimizer-history-assumption-card-collapsed
+             (ha-state {}) " " true))
+      "A blank instrument-id is a no-op."))
+
+(deftest apply-history-assumption-drops-collapse-override-test
+  ;; Apply acknowledges AND collapses: an explicit "expanded" override left
+  ;; behind would pin the card open against the acknowledgment's default.
+  (let [state (-> (ha-state {"perp:NEW" {:behavior :conservative
+                                         :expected-return 0.0
+                                         :volatility 0.8
+                                         :max-weight 0.03
+                                         :correlation-floor 0.75}})
+                  (assoc-in cards-collapsed-path {"perp:NEW" false}))
+        effects (actions/apply-portfolio-optimizer-history-assumption state "perp:NEW")]
+    (is (some #(= [:effects/save cards-collapsed-path {}] %) effects)
+        "The stale expand override is dropped so the default (collapsed) applies.")
+    (is (true? (get-in (vec effects) [0 1 0 1 "perp:NEW" :metadata :acknowledged?]))
+        "The entry is acknowledged in the same dispatch.")))
+
+(deftest hydrate-history-assumption-library-gap-fills-draft-test
+  (let [conservative {:behavior :conservative
+                      :expected-return 0.0
+                      :volatility 0.8
+                      :max-weight 0.03
+                      :correlation-floor 0.75}
+        state (-> (ha-state {})
+                  (assoc-in [:portfolio :optimizer :assumption-library]
+                            {"perp:NEW" {:instrument-id "perp:NEW"
+                                         :entry conservative
+                                         :reference-instruments []
+                                         :updated-at-ms 1}}))]
+    (is (= [[:effects/save-many
+             [[history-assumptions-path {"perp:NEW" conservative}]]]]
+           (actions/hydrate-portfolio-optimizer-history-assumption-library state))
+        "A remembered assumption gap-fills the universe member WITHOUT marking the draft dirty."))
+  (is (= [] (actions/hydrate-portfolio-optimizer-history-assumption-library (ha-state {})))
+      "An empty library hydrates nothing.")
+  (let [existing {:behavior :conservative
+                  :expected-return 0.1
+                  :volatility 1.2
+                  :max-weight 0.03
+                  :correlation-floor 0.75}
+        state (-> (ha-state {"perp:NEW" existing})
+                  (assoc-in [:portfolio :optimizer :assumption-library]
+                            {"perp:NEW" {:instrument-id "perp:NEW"
+                                         :entry {:behavior :conservative}
+                                         :reference-instruments []
+                                         :updated-at-ms 1}}))]
+    (is (= [] (actions/hydrate-portfolio-optimizer-history-assumption-library state))
+        "An existing draft entry always wins - hydration never clobbers edits.")))
+
+(deftest hydrate-history-assumption-library-restores-reference-proxies-test
+  ;; A remembered proxy basket may reference proxies outside the universe;
+  ;; hydration must restore them as reference-only instruments and prefetch
+  ;; their history, or the hydrated card would block on missing proxy history.
+  (let [sol {:instrument-id "perp:SOL" :market-type :perp :coin "SOL"}
+        proxy-entry {:behavior :proxy
+                     :expected-return 0.0
+                     :volatility 0.8
+                     :max-weight 0.05
+                     :proxy {:instrument-ids ["perp:BTC" "perp:SOL"]
+                             :relationship-strength :medium
+                             :prior-weights nil}}
+        state (-> (ha-state {})
+                  (assoc-in [:portfolio :optimizer :assumption-library]
+                            {"perp:NEW" {:instrument-id "perp:NEW"
+                                         :entry proxy-entry
+                                         :reference-instruments [sol]
+                                         :updated-at-ms 1}}))
+        effects (actions/hydrate-portfolio-optimizer-history-assumption-library state)
+        path-values (get-in (vec effects) [0 1])]
+    (is (some (fn [[path value]]
+                (and (= history-reference-instruments-path path)
+                     (= [sol] value)))
+              path-values)
+        "The out-of-universe proxy re-enters the reference instruments.")
+    (is (some (fn [effect]
+                (= :effects/load-portfolio-optimizer-history (first effect)))
+              effects)
+        "Its history is prefetched so covariance synthesis has data.")))
 
 (deftest remove-universe-instrument-clears-history-assumption-test
   (let [state {:portfolio {:optimizer {:draft {:universe [{:instrument-id "perp:NEW"}

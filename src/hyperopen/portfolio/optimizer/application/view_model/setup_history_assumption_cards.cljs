@@ -54,7 +54,8 @@
    :set-relationship-strength :actions/set-portfolio-optimizer-history-assumption-relationship-strength
    :apply :actions/apply-portfolio-optimizer-history-assumption
    :reset :actions/reset-portfolio-optimizer-history-assumption
-   :clear :actions/clear-portfolio-optimizer-history-assumption})
+   :clear :actions/clear-portfolio-optimizer-history-assumption
+   :set-card-collapsed :actions/set-portfolio-optimizer-history-assumption-card-collapsed})
 
 (def ^:private card-needing-adequacy
   ;; universe/history-adequacy values that warrant a card: no usable history, or
@@ -179,6 +180,24 @@
   (if (and observations (pos? observations))
     (str observations " days of returns")
     "No usable native returns"))
+
+(defn addable-option-label
+  "Dropdown option text for the manual entry point. The day count is the
+  asset's native return-day count — the number that limits the shared
+  covariance window — so the user can proxy out the most limiting assets
+  first instead of guessing. Nil observations (history still loading) leave
+  the bare label rather than claiming a count."
+  [label observations]
+  (if (some? observations)
+    (str label " (" observations (if (= 1 observations) " day)" " days)"))
+    label))
+
+(defn- addable-sort-key
+  "Ascending by day count so the most limiting assets lead; unknown counts
+  (history still loading) sink to the bottom; label breaks ties so the order
+  is stable."
+  [{:keys [observations label]}]
+  [(if (some? observations) 0 1) (or observations 0) (or label "")])
 
 (defn- covariance-window-detail
   "Detail line under the covariance-window cell. Only rendered once the aligned
@@ -318,7 +337,8 @@
   [{:keys [instrument label entry complete? errors warnings note percent-label*
            assumption-required? return-required? observations
            covariance-observations readiness
-           resolve-proxy-label usable-ids search-query state]}]
+           resolve-proxy-label usable-ids search-query state
+           collapse-overrides]}]
   (let [id (:instrument-id instrument)
         behavior (:behavior entry)
         proxy? (= :proxy behavior)
@@ -333,7 +353,11 @@
                      (basket-rows (:prior-weights preview) selected-ids resolve-proxy-label))
         final-rows (when preview
                      (basket-rows (:final-beta preview) selected-ids resolve-proxy-label))
-        acknowledged? (boolean (get-in entry [:metadata :acknowledged?]))]
+        acknowledged? (boolean (get-in entry [:metadata :acknowledged?]))
+        configured? (boolean (and complete? acknowledged?))
+        ;; Configured cards rest collapsed (Apply's acknowledgment IS the
+        ;; collapse); an explicit user toggle overrides the default either way.
+        collapsed? (boolean (get collapse-overrides id configured?))]
     (cond-> {:instrument-id id
              :label label
              :role (str "portfolio-optimizer-history-assumption-card-" id)
@@ -353,7 +377,11 @@
              :note note
              :engine-applied? (boolean complete?)
              :acknowledged? acknowledged?
-             :configured? (boolean (and complete? acknowledged?))
+             :configured? configured?
+             ;; Only a card with a chosen mode can collapse - a mode-less card
+             ;; has nothing to summarize and hides required work.
+             :collapsible? (some? behavior)
+             :collapsed? (boolean (and (some? behavior) collapsed?))
              :summary (when complete?
                         (card-summary entry (mapv :label selected-proxies) percent-label*))
              :actions assumption-action-ids}
@@ -409,6 +437,7 @@
          reference-instruments (get-in draft [:proxy-reference-instruments])
          resolve-proxy-label (proxy-label-resolver state universe reference-instruments)
          search-queries (get-in state contracts/ui-proxy-search-queries-path)
+         collapse-overrides (get-in state contracts/ui-assumption-cards-collapsed-path)
          ;; The shared covariance window (proxy-extended: complete proxy assets
          ;; are excluded from alignment, so this is the window the risk model
          ;; estimates over). One number for the whole universe.
@@ -460,7 +489,8 @@
                                     :state state
                                     :usable-ids usable-ids
                                     :resolve-proxy-label resolve-proxy-label
-                                    :search-query (get search-queries id)}))))))
+                                    :search-query (get search-queries id)
+                                    :collapse-overrides collapse-overrides}))))))
                     vec)
          carded-ids (into #{} (map :instrument-id) cards)
          ;; Any selected asset can be brought into the workflow by hand - the user
@@ -472,8 +502,15 @@
                       (keep (fn [instrument]
                               (let [id (:instrument-id instrument)]
                                 (when (and id (not (contains? carded-ids id)))
-                                  {:instrument-id id
-                                   :label (universe/instrument-primary-label instrument)}))))
+                                  (let [label (universe/instrument-primary-label instrument)
+                                        observations (universe/native-history-observations
+                                                      state readiness instrument)]
+                                    {:instrument-id id
+                                     :label label
+                                     :observations observations
+                                     :option-label (addable-option-label label
+                                                                         observations)})))))
+                      (sort-by addable-sort-key)
                       vec)]
      {:cards cards
       :addable-assets addable

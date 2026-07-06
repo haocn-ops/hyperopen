@@ -335,6 +335,9 @@
    ::portfolio-optimizer-instrument-value-args
    :actions/apply-portfolio-optimizer-history-assumption ::portfolio-optimizer-instrument-id-args
    :actions/reset-portfolio-optimizer-history-assumption ::portfolio-optimizer-instrument-id-args
+   :actions/set-portfolio-optimizer-history-assumption-card-collapsed
+   ::portfolio-optimizer-instrument-value-args
+   :actions/hydrate-portfolio-optimizer-history-assumption-library ::common/no-args
    :actions/set-portfolio-optimizer-universe-search-query ::common/single-input-args
    :actions/set-portfolio-optimizer-draft-add-asset-open ::common/boolean-args
    :actions/handle-portfolio-optimizer-universe-search-keydown

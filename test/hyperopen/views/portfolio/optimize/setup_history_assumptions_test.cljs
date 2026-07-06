@@ -239,3 +239,91 @@
     (is (= ["" "perp:BTC" "perp:ETH"]
            (mapv #(get-in % [1 :value]) (subvec add-select 2)))
         "perp:NEW already has a card, so only the remaining assets are addable.")))
+
+(deftest history-assumptions-section-add-dropdown-shows-day-counts-ascending-test
+  ;; The dropdown ranks assets by native return-day count ASCENDING with the
+  ;; count in the label, so the user can proxy out the most limiting assets
+  ;; (the ones capping the shared covariance window) first instead of blind.
+  (let [node (setup-history-assumptions/history-assumptions-section
+              {:state {}
+               :draft {:universe [btc eth]
+                       :objective {:kind :minimum-variance}
+                       :history-assumptions {}}
+               :readiness {:request {:requested-universe [btc eth]
+                                     :universe [btc eth]
+                                     :objective {:kind :minimum-variance}
+                                     :history {:eligible-instruments [btc eth]
+                                               :raw-price-series-by-instrument
+                                               {"perp:BTC" (vec (repeat 1079 {:close 1}))
+                                                "perp:ETH" (vec (repeat 403 {:close 1}))}}}
+                           :blocking-warnings []}
+               :history-load-state {:status :succeeded
+                                    :request-signature {:universe [btc eth]}}})
+        add-select (ts/node-by-role node "portfolio-optimizer-history-assumption-workflow-add")
+        options (subvec add-select 2)]
+    (is (= ["" "perp:ETH" "perp:BTC"]
+           (mapv #(get-in % [1 :value]) options))
+        "Fewest days of returns first (ETH 403 < BTC 1079), not universe order.")
+    (is (= ["ETH (403 days)" "BTC (1079 days)"]
+           (mapv #(nth % 2) (rest options)))
+        "Each option shows the asset's day count in parentheses.")))
+
+(def ^:private acknowledged-proxy-entry
+  (assoc proxy-entry :metadata {:source :user :acknowledged? true}))
+
+(defn- acknowledged-section
+  [state]
+  (setup-history-assumptions/history-assumptions-section
+   {:state state
+    :draft {:universe [btc eth new-perp]
+            :objective {:kind :minimum-variance}
+            :constraints {:max-asset-weight 0.5}
+            :history-assumptions {"perp:NEW" acknowledged-proxy-entry}}
+    :readiness {:request {:requested-universe [btc eth new-perp]
+                          :universe [btc eth]
+                          :objective {:kind :minimum-variance}
+                          :history {:eligible-instruments [btc eth]}}
+                :blocking-warnings []}
+    :history-load-state {:status :succeeded
+                         :request-signature {:universe [btc eth new-perp]}}}))
+
+(deftest history-assumptions-section-configured-card-collapses-to-summary-test
+  ;; A configured (complete + acknowledged) card rests as a one-line summary so
+  ;; several configured assets stay a glance, not a scroll. Editors are gone;
+  ;; label, status, summary, and an Edit control remain.
+  (let [node (acknowledged-section {})
+        card (ts/node-by-role node "portfolio-optimizer-history-assumption-card-perp:NEW")
+        expand (ts/node-by-role node "portfolio-optimizer-history-assumption-expand-perp:NEW")
+        status (ts/node-by-role node "portfolio-optimizer-history-assumption-status-perp:NEW")]
+    (is (some? card))
+    (is (= "true" (ts/node-attr card :data-collapsed)))
+    (is (nil? (ts/node-by-role node "portfolio-optimizer-history-assumption-volatility-perp:NEW"))
+        "Collapsed, the editors are not rendered.")
+    (is (nil? (ts/node-by-role node "portfolio-optimizer-history-assumption-apply-perp:NEW")))
+    (is (some #{"Configured"} (ts/collect-strings status)))
+    (is (some? (ts/node-by-role node "portfolio-optimizer-history-assumption-summary-perp:NEW"))
+        "The one-line summary stays visible.")
+    (is (= [:actions/set-portfolio-optimizer-history-assumption-card-collapsed
+            "perp:NEW" false]
+           (first (ts/click-actions expand)))
+        "Edit expands the card.")))
+
+(deftest history-assumptions-section-collapse-override-and-control-test
+  ;; An explicit expand override reopens a configured card (full editors back),
+  ;; and every mode-carrying card offers a Collapse control.
+  (let [expanded (acknowledged-section
+                  {:portfolio-ui {:optimizer {:assumption-cards-collapsed
+                                              {"perp:NEW" false}}}})
+        card (ts/node-by-role expanded "portfolio-optimizer-history-assumption-card-perp:NEW")
+        collapse (ts/node-by-role expanded "portfolio-optimizer-history-assumption-collapse-perp:NEW")]
+    (is (some? card))
+    (is (nil? (ts/node-attr card :data-collapsed)))
+    (is (some? (ts/node-by-role expanded "portfolio-optimizer-history-assumption-volatility-perp:NEW"))
+        "Expanded again, the editors are back.")
+    (is (= [:actions/set-portfolio-optimizer-history-assumption-card-collapsed
+            "perp:NEW" true]
+           (first (ts/click-actions collapse)))
+        "The Collapse control writes the explicit collapse override."))
+  (let [unfinished (proxy-section :minimum-variance)]
+    (is (some? (ts/node-by-role unfinished "portfolio-optimizer-history-assumption-collapse-perp:NEW"))
+        "An unacknowledged (expanded-by-default) card can still be collapsed by hand.")))

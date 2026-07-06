@@ -32,6 +32,10 @@
     :load-portfolio-optimizer-view-library]
    [:effects/sync-portfolio-optimizer-view-library
     :sync-portfolio-optimizer-view-library]
+   [:effects/load-portfolio-optimizer-assumption-library
+    :load-portfolio-optimizer-assumption-library]
+   [:effects/sync-portfolio-optimizer-assumption-library
+    :sync-portfolio-optimizer-assumption-library]
    [:effects/restore-portfolio-optimizer-draft
     :restore-portfolio-optimizer-draft]])
 
@@ -171,6 +175,10 @@
     :apply-portfolio-optimizer-history-assumption]
    [:actions/reset-portfolio-optimizer-history-assumption
     :reset-portfolio-optimizer-history-assumption]
+   [:actions/set-portfolio-optimizer-history-assumption-card-collapsed
+    :set-portfolio-optimizer-history-assumption-card-collapsed]
+   [:actions/hydrate-portfolio-optimizer-history-assumption-library
+    :hydrate-portfolio-optimizer-history-assumption-library]
    [:actions/set-portfolio-optimizer-universe-search-query
     :set-portfolio-optimizer-universe-search-query]
    [:actions/set-portfolio-optimizer-draft-add-asset-open

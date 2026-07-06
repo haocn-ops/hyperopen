@@ -204,12 +204,14 @@
                      (into (asset-selector-market-fetch-effects state)
                            (action-common/vault-list-metadata-fetch-effects state)))
                []))
-      ;; Hydrate the wallet's remembered constraint profiles and return-view
-      ;; library (and, if the draft is pristine, seed the draft from the default
-      ;; for this universe), so the trader stops re-entering them.
+      ;; Hydrate the wallet's remembered constraint profiles, return-view
+      ;; library, and history-assumption library (and, if the draft is
+      ;; pristine, seed the draft from the default for this universe), so the
+      ;; trader stops re-entering them.
       optimizer-route?
       (conj [:effects/load-portfolio-optimizer-constraint-profiles]
-            [:effects/load-portfolio-optimizer-view-library]))))
+            [:effects/load-portfolio-optimizer-view-library]
+            [:effects/load-portfolio-optimizer-assumption-library]))))
 
 (defn archive-portfolio-optimizer-scenario
   [_state scenario-id]

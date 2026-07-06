@@ -104,6 +104,21 @@
 ;; user's cue to open the proxy workflow card, and "Proxy behavior" /
 ;; "Conservative" confirms the configuration took.
 
+(def ^:private assumption-chip-tooltip-class
+  ;; Instant hover-card for the configured chips: the same look as the constraint
+  ;; tooltip (opacity toggled by group-hover / group-focus-within) but WITHOUT its
+  ;; transition-opacity delay, so it appears the moment the cursor lands. Safe as an
+  ;; absolute card here because the universe list has no overflow-clipping ancestor
+  ;; (verified) - the reason a native `title` was tried first, then dropped because
+  ;; its show-delay is browser-controlled and felt sluggish.
+  ["pointer-events-none" "absolute" "left-0" "top-[calc(100%+6px)]"
+   "z-30" "w-[min(22rem,calc(100vw-2rem))]" "border"
+   "border-base-300" "bg-base-100" "px-2" "py-1.5"
+   "font-sans" "text-[0.75rem]" "font-normal"
+   "normal-case" "leading-[1.45]" "tracking-normal"
+   "text-trading-muted" "opacity-0" "shadow-[0_12px_32px_rgba(0,0,0,0.45)]"
+   "group-hover:opacity-100" "group-focus-within:opacity-100"])
+
 (defn- assumption-workflow-chip
   [{:keys [instrument-id assumption-badge assumption-badge-label assumption-badge-tooltip]}]
   (when (contains? universe-vm/workflow-assumption-badges assumption-badge)
@@ -116,21 +131,32 @@
                  ["border-base-300" "text-trading-muted" "bg-base-200/40"]
 
                  :else
-                 ["border-warning/50" "text-warning" "bg-warning/10"])]
-      ;; A native title (not a styled hover-card) carries the "Modeled" /
-      ;; "Conservative" explanation: the chip sits in a dense, truncating,
-      ;; scrollable universe list where an absolutely-positioned card would
-      ;; clip at the scroll boundary. `cursor-help` cues that a hover explains.
-      [:span (cond-> {:class (into ["mt-0.5" "inline-block" "border" "px-1" "py-px" "font-mono"
-                                    "text-[0.5625rem]" "font-semibold" "uppercase"
-                                    "tracking-[0.08em]"]
-                                   (cond-> tone
-                                     assumption-badge-tooltip (conj "cursor-help")))
-                      :data-role (str "portfolio-optimizer-universe-assumption-badge-" instrument-id)
-                      :data-badge (name assumption-badge)}
-               assumption-badge-tooltip
-               (assoc :title assumption-badge-tooltip))
-       assumption-badge-label])))
+                 ["border-warning/50" "text-warning" "bg-warning/10"])
+          chip-class (into ["inline-block" "border" "px-1" "py-px" "font-mono"
+                            "text-[0.5625rem]" "font-semibold" "uppercase"
+                            "tracking-[0.08em]"]
+                           tone)
+          badge-role (str "portfolio-optimizer-universe-assumption-badge-" instrument-id)]
+      (if-not assumption-badge-tooltip
+        ;; Unconfigured cues (Needs proxy / Thin history / …) are self-explanatory.
+        [:span {:class (into ["mt-0.5"] chip-class)
+                :data-role badge-role
+                :data-badge (name assumption-badge)}
+         assumption-badge-label]
+        ;; Configured stance (Modeled / Conservative): chip + instant hover-card.
+        (let [tooltip-id (str "portfolio-optimizer-universe-assumption-tooltip-" instrument-id)]
+          [:span {:class ["group" "relative" "mt-0.5" "inline-block"]}
+           [:span {:class (conj chip-class "cursor-help")
+                   :data-role badge-role
+                   :data-badge (name assumption-badge)
+                   :tabindex 0
+                   :aria-describedby tooltip-id}
+            assumption-badge-label]
+           [:span {:class assumption-chip-tooltip-class
+                   :id tooltip-id
+                   :role "tooltip"
+                   :data-role tooltip-id}
+            assumption-badge-tooltip]])))))
 
 (defn- selected-row
   [{:keys [instrument-id

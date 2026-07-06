@@ -173,7 +173,13 @@
   (first (:queue (prefetch-state state))))
 
 (defn instrument-selected?
+  "True when the instrument's history matters to the current draft: a universe
+  member or a reference-only proxy instrument. Both must merge their fetched
+  bundle into history data (a reference proxy that fetched but never merged
+  would stay invisible to alignment forever)."
   [state instrument-id*]
   (boolean
-   (some #(= instrument-id* (:instrument-id %))
-         (get-in state contracts/draft-universe-path))))
+   (or (some #(= instrument-id* (:instrument-id %))
+             (get-in state contracts/draft-universe-path))
+       (some #(= instrument-id* (:instrument-id %))
+             (get-in state contracts/draft-proxy-reference-instruments-path)))))

@@ -589,8 +589,6 @@
     :value (observations-label observations)
     :detail nil}])
 
-(def ^:private proxy-search-result-limit 8)
-
 (defn- proxy-label-resolver
   "Resolve a proxy instrument-id to a display label: from the universe /
   reference-instrument pool, else the live market catalog, else the raw id.
@@ -619,9 +617,10 @@
         selected-ids))
 
 (defn- proxy-search-results
-  "Full-catalog proxy candidates matching the card's search query, excluding the
-  thin asset itself and any already-selected proxy. Empty until the user types -
-  this is a typeahead over the whole asset catalog, not just the universe."
+  "Proxy candidates matching the card's search query, excluding the thin asset
+  itself and any already-selected proxy. Empty until the user types. Candidates
+  come from the exact same source, ranking, and limit as the universe asset
+  selector, so the proxy picker offers precisely what the left selector would."
   [state self-id selected-ids query]
   (let [query* (when (string? query) (str/trim query))]
     (if (str/blank? query*)
@@ -629,15 +628,13 @@
       (let [exclusion (into [{:instrument-id self-id}]
                             (map (fn [id] {:instrument-id id}))
                             selected-ids)]
-        (->> (universe-candidates/candidate-markets state exclusion query*
-                                                    {:ranking :asset-query})
+        (->> (universe-candidates/candidate-markets state exclusion query*)
              (keep (fn [market]
                      (let [mid (:key market)]
                        (when (and mid (not= mid self-id))
                          {:instrument-id mid
                           :label (:label (universe-candidates/market-display market))
                           :market-type (:market-type market)}))))
-             (take proxy-search-result-limit)
              vec)))))
 
 (defn- prior-basket-rows

@@ -3,7 +3,9 @@
             [hyperopen.portfolio.optimizer.actions.common :as common]
             [hyperopen.portfolio.optimizer.actions.draft-options :as draft-options]
             [hyperopen.portfolio.optimizer.application.black-litterman-editor-model :as bl-model]
+            [hyperopen.portfolio.optimizer.application.history-loader.api-v2 :as history-api-v2]
             [hyperopen.portfolio.optimizer.application.history-prefetch :as history-prefetch]
+            [hyperopen.portfolio.optimizer.application.universe-candidates :as universe-candidates]
             [hyperopen.portfolio.optimizer.application.return-inputs :as return-inputs]
             [hyperopen.portfolio.optimizer.application.return-views :as return-views]
             [hyperopen.portfolio.optimizer.application.setup-readiness :as setup-readiness]
@@ -623,11 +625,17 @@
         assumptions))
 
 (defn- resolve-catalog-instrument
-  "Resolve a proxy id (a live market-catalog key) to a universe-instrument map;
-  nil when the catalog doesn't know it."
+  "Resolve a proxy id (a candidate market-key) to a universe-instrument map the
+  same way the universe add does: the shared catalog resolver (markets + vaults)
+  plus backend history-identity decoration from discovery. Without the discovery
+  metadata, alignment cannot map the stored instrument to its backend series and
+  rejects it as identity-ambiguous. Nil when the catalog doesn't know the id."
   [state proxy-id]
-  (when-let [market (get-in state [:asset-selector :market-by-key proxy-id])]
-    (common/market->universe-instrument market)))
+  (when-let [market (universe-candidates/resolve-market state proxy-id)]
+    (common/market->universe-instrument
+     (history-api-v2/with-discovery-metadata
+      market
+      (get-in state contracts/history-discovery-path)))))
 
 (defn- reconcile-reference-instruments
   "Reference-only proxy instruments = every referenced proxy id that is NOT a

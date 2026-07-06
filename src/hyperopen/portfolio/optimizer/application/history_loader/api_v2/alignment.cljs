@@ -275,10 +275,38 @@
                                                         instrument-id))
                                         (not= :rejected (:lineage-kind series))))
                                  rows)
-        use-aligned? (all-selected-aligned-returns-usable?
-                      api-v2-history
-                      (mapv :instrument-id base-candidates)
-                      min-return-observations)
+        ;; The response's calendars are the BACKEND's intersection over every
+        ;; instrument in the fetch — which can be a superset of this alignment's
+        ;; universe (history-assumption assets ride the same fetch but are
+        ;; excluded from alignment precisely so they cannot truncate the shared
+        ;; window). When the response covers extra instruments AND the members'
+        ;; own series support a longer shared window than the backend calendar,
+        ;; the backend calendar is poisoned by the excluded instruments: fall
+        ;; back to the client-side point-level intersection.
+        candidate-series-by-id (into {}
+                                     (map (juxt :instrument-id :series))
+                                     base-candidates)
+        response-superset? (let [member? (set (keys candidate-series-by-id))]
+                             (boolean
+                              (some #(not (member? %))
+                                    (concat (keys (or (:aligned-returns-by-instrument
+                                                       api-v2-history)
+                                                      {}))
+                                            (keys (or (:series-by-instrument
+                                                       api-v2-history)
+                                                      {}))))))
+        calendar-poisoned? (and response-superset?
+                                (> (count (point-level-return-calendar
+                                           candidate-series-by-id
+                                           (calendar/common-calendar
+                                            (map :points
+                                                 (vals candidate-series-by-id)))))
+                                   (count (:return-calendar api-v2-history))))
+        use-aligned? (and (not calendar-poisoned?)
+                          (all-selected-aligned-returns-usable?
+                           api-v2-history
+                           (mapv :instrument-id base-candidates)
+                           min-return-observations))
         prepared (mapv (fn [{:keys [instrument instrument-id backend-id series]
                              :as row}]
                          (let [hard-warning (get hard-warning-by-local-id
@@ -338,8 +366,11 @@
                                         [instrument-id series]))
                                  eligible)
         legacy-fallback-used? (seq fallback-local-ids)
+        ;; A poisoned response taints the price calendar too — recompute it from
+        ;; the eligible members' own series instead of adopting the backend's.
         effective-calendar (if (and (seq (:common-calendar api-v2-history))
-                                    (not legacy-fallback-used?))
+                                    (not legacy-fallback-used?)
+                                    (not calendar-poisoned?))
                              (vec (:common-calendar api-v2-history))
                              (if use-aligned?
                                (vec (:return-calendar api-v2-history))

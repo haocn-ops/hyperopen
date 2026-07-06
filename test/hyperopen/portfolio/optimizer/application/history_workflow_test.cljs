@@ -378,6 +378,79 @@
                               [:api-v2-history
                                :aligned-returns-by-instrument])))))))
 
+(def sol-reference-instrument
+  {:instrument-id "perp:SOL"
+   :market-type :perp
+   :coin "SOL"
+   :optimizer-history/instrument-id "hl:perp:SOL"})
+
+(defn- reference-proxy-prefetch-state
+  "A queued reference-only proxy (perp:SOL) outside the draft universe, with the
+  api-v2 cache already populated — the state right after picking a catalog proxy."
+  []
+  (-> (prefetch-state)
+      (assoc-in [:portfolio :optimizer :draft :proxy-reference-instruments]
+                [sol-reference-instrument])
+      (assoc-in [:portfolio :optimizer :history-data :api-v2-history]
+                {:status :partial
+                 :series-by-instrument {"perp:BTC" {:instrument-id "hl:perp:BTC"}}
+                 :aligned-returns-by-instrument {}})
+      (assoc-in [:portfolio :optimizer :history-prefetch :queue]
+                [sol-reference-instrument])
+      (assoc-in [:portfolio :optimizer :history-prefetch :by-instrument-id]
+                {"perp:SOL" queued-status})))
+
+(deftest begin-selection-prefetch-includes-reference-proxy-instruments-test
+  ;; A reference-only proxy is not a universe member, so the post-cache refetch
+  ;; must add it explicitly or the request would skip the very series the
+  ;; prefetch was enqueued for.
+  (let [result (workflow/begin-selection-prefetch
+                {:state (reference-proxy-prefetch-state)
+                 :opts {:source :selection-prefetch :queue? true :merge? true}
+                 :now-ms 2000})]
+    (is (= ["perp:BTC" "perp:ETH" "perp:SOL"]
+           (mapv :instrument-id
+                 (get-in result [:commands 0 :request :universe]))))))
+
+(deftest complete-selection-prefetch-merges-reference-proxy-series-test
+  ;; The fetched bundle for a reference-only proxy must merge into history data
+  ;; (it is "selected" even though it is outside the universe) and its prefetch
+  ;; status must survive the cleanup-to-universe pass.
+  (let [started (workflow/begin-selection-prefetch
+                 {:state (reference-proxy-prefetch-state)
+                  :opts {:source :selection-prefetch :queue? true :merge? true}
+                  :now-ms 2000})
+        signature (get-in started
+                          [:state :portfolio :optimizer :history-load-state
+                           :request-signature])
+        result (workflow/complete-selection-prefetch
+                {:state (:state started)
+                 :instrument-id "perp:SOL"
+                 :request-signature signature
+                 :completed-at-ms 2100
+                 :bundle {:api-v2-history
+                          {:status :ok
+                           :series-by-instrument
+                           {"perp:SOL" {:local-instrument-id "perp:SOL"
+                                        :instrument-id "hl:perp:SOL"
+                                        :lineage-kind :native
+                                        :points [{:time-ms 2000
+                                                  :close 22
+                                                  :return 0.1}]}}
+                           :warnings []}
+                          :warnings []}
+                 :opts {:source :selection-prefetch :queue? true :merge? true}})]
+    (is (= "hl:perp:SOL"
+           (get-in result
+                   [:state :portfolio :optimizer :history-data :api-v2-history
+                    :series-by-instrument "perp:SOL" :instrument-id]))
+        "The reference proxy's fetched series merges into history data.")
+    (is (= :succeeded
+           (get-in result
+                   [:state :portfolio :optimizer :history-prefetch
+                    :by-instrument-id "perp:SOL" :status]))
+        "Its prefetch status survives the cleanup-to-universe pass.")))
+
 (deftest begin-selection-prefetch-requests-current-universe-after-api-v2-cache-test
   (let [state (-> (prefetch-state)
                   (assoc-in [:portfolio

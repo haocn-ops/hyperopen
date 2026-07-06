@@ -188,15 +188,7 @@
   [state market-key]
   (let [market-key* (common/non-blank-text market-key)
         universe (common/draft-universe state)
-        market (or (get-in state [:asset-selector :market-by-key market-key*])
-                   (when-let [vault-address (ids/vault-address-from-instrument-id
-                                             market-key*)]
-                     (some (fn [row]
-                             (when (= vault-address
-                                      (ids/normalize-vault-address
-                                       (:vault-address row)))
-                               (universe-candidates/vault-row->candidate row)))
-                           (get-in state [:vaults :merged-index-rows]))))
+        market (universe-candidates/resolve-market state market-key*)
         instrument (common/market->universe-instrument
                     (with-history-discovery state market))
         instrument-id (:instrument-id instrument)]

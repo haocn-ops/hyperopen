@@ -2,6 +2,8 @@
   (:require [clojure.set :as set]
             [clojure.string :as str]
             [hyperopen.portfolio.optimizer.application.current-portfolio :as current-portfolio]
+            [hyperopen.portfolio.optimizer.application.draft-enrichment :as draft-enrichment]
+            [hyperopen.portfolio.optimizer.application.history-warning-policy :as warning-policy]
             [hyperopen.portfolio.optimizer.application.orderbook-loader :as orderbook-loader]
             [hyperopen.portfolio.optimizer.application.request-builder :as request-builder]
             [hyperopen.portfolio.optimizer.contracts :as contracts]
@@ -11,53 +13,16 @@
             [hyperopen.portfolio.optimizer.ids :as ids]))
 
 (def ^:private history-blocking-warning-codes
-  #{:missing-history-coin
-    :missing-candle-history
-    :missing-return-history
-    :insufficient-candle-history
-    :insufficient-return-history
-    :missing-vault-address
-    :missing-vault-history
-    :insufficient-vault-history
-    :insufficient-common-history
-    :missing-native-risk-history
-    :identity-ambiguous
-    :instrument-kind-mismatch
-    :proxy-mapping-unapproved
-    :proxy-validation-failed
-    :validation-failed
-    :history-assumption-required
-    :history-assumption-incomplete})
+  warning-policy/history-blocking-warning-codes)
 
 (def ^:private history-assumption-warning-codes
-  #{:history-assumption-required
-    :history-assumption-incomplete})
-
-(def ^:private missing-history-warning-codes
-  #{:missing-history-coin
-    :missing-candle-history
-    :missing-return-history
-    :missing-vault-address
-    :missing-vault-history
-    :missing-native-risk-history
-    :identity-ambiguous})
+  warning-policy/history-assumption-warning-codes)
 
 (def ^:private insufficient-history-warning-codes
-  #{:insufficient-candle-history
-    :insufficient-return-history
-    :insufficient-vault-history
-    :insufficient-common-history})
+  warning-policy/insufficient-history-warning-codes)
 
 (def ^:private stale-history-warning-codes
-  #{:stale-history
-    :source-fetch-failed})
-
-(def ^:private rejected-history-warning-codes
-  #{:instrument-kind-mismatch
-    :proxy-mapping-unapproved
-    :proxy-validation-failed
-    :rejected
-    :validation-failed})
+  warning-policy/stale-history-warning-codes)
 
 (def ^:private fallback-as-of-bucket-ms
   ;; Quantize the wall-clock fallback so request building can memoize across
@@ -102,7 +67,8 @@
   ;; expensive to redo on every streaming render. The snapshot is memoized on
   ;; its own inputs, so comparing these resolved inputs by value stays cheap.
   [state draft]
-  (let [inputs {:draft draft
+  (let [draft (draft-enrichment/enrich-draft-instruments state draft)
+        inputs {:draft draft
                 :current-portfolio (with-manual-capital
                                      (current-portfolio/current-portfolio-snapshot state)
                                      draft)
@@ -510,24 +476,6 @@
                                         (:code warning))))))
          (with-warning-messages request))))
 
-(defn- warning-history-status
-  [warning]
-  (cond
-    (contains? missing-history-warning-codes (:code warning))
-    :missing
-
-    (contains? insufficient-history-warning-codes (:code warning))
-    :insufficient
-
-    (contains? stale-history-warning-codes (:code warning))
-    :stale
-
-    (contains? rejected-history-warning-codes (:code warning))
-    :rejected
-
-    :else
-    nil))
-
 (defn history-status-by-instrument
   [readiness]
   (let [request (:request readiness)
@@ -537,12 +485,8 @@
                               (or (:warnings readiness) [])))
         common-gap? (boolean (some #(= :insufficient-common-history (:code %))
                                    warnings))
-        warning-status-by-id (into {}
-                                   (keep (fn [warning]
-                                           (when-let [instrument-id (:instrument-id warning)]
-                                             (when-let [status (warning-history-status warning)]
-                                               [instrument-id status]))))
-                                   warnings)]
+        warning-status-by-id (warning-policy/strongest-warning-status-by-id
+                              warnings)]
     (into {}
           (map (fn [instrument-id]
                  [instrument-id

@@ -1,6 +1,8 @@
 (ns hyperopen.portfolio.optimizer.application.scenario-workflow
-  (:require [hyperopen.portfolio.optimizer.application.scenario-records :as scenario-records]
+  (:require [hyperopen.portfolio.optimizer.application.run-identity :as run-identity]
+            [hyperopen.portfolio.optimizer.application.scenario-records :as scenario-records]
             [hyperopen.portfolio.optimizer.application.scenario-state :as state]
+            [hyperopen.portfolio.optimizer.application.setup-readiness :as setup-readiness]
             [hyperopen.portfolio.optimizer.contracts :as contracts]
             [hyperopen.portfolio.optimizer.defaults :as optimizer-defaults]))
 
@@ -156,10 +158,11 @@
    :commands []})
 
 (defn begin-save
+  ;; A save no longer requires a solved run: naming and keeping a configured
+  ;; setup is valid at any point, and the results snapshot attaches only when
+  ;; it is honest (see attachable-saved-run).
   [{:keys [state address scenario-id started-at-ms]}]
-  (if (and address
-           scenario-id
-           (solved-run? (get-in state contracts/last-successful-run-path)))
+  (if (and address scenario-id)
     {:state (assoc-in state
                       contracts/scenario-save-state-path
                       (begin-scenario-save-state scenario-id started-at-ms))
@@ -173,15 +176,32 @@
                        scenario-id
                        started-at-ms
                        started-at-ms
-                       {:message "Cannot save scenario without an address and solved run."}))
+                       {:message "Cannot save scenario without a connected wallet."}))
      :commands []}))
+
+(defn- attachable-saved-run
+  "The results snapshot is stored on the scenario only when it is honest: a
+  solved run whose inputs still match the draft being saved. A missing or
+  stale run saves a setup-only scenario instead of freezing outdated numbers."
+  [state draft]
+  (let [last-successful-run (get-in state contracts/last-successful-run-path)
+        running? (or (= :running (get-in state contracts/run-state-status-path))
+                     (= :running (get-in state contracts/optimization-progress-status-path)))]
+    (when (run-identity/current-solved-run?
+           {:draft draft
+            :readiness (setup-readiness/build-readiness state)
+            :run-state (get-in state contracts/run-state-path)
+            :running? running?
+            :last-successful-run last-successful-run})
+      last-successful-run)))
 
 (defn continue-save-after-index
   [{:keys [state address scenario-id scenario-name started-at-ms loaded-index]}]
-  (let [draft (cond-> (or (get-in state contracts/draft-path)
-                          (optimizer-defaults/default-draft))
+  (let [base-draft (or (get-in state contracts/draft-path)
+                       (optimizer-defaults/default-draft))
+        draft (cond-> base-draft
                 scenario-name (assoc :name scenario-name))
-        last-successful-run (get-in state contracts/last-successful-run-path)
+        last-successful-run (attachable-saved-run state base-draft)
         existing-index (or (get-in state contracts/scenario-index-path)
                            (default-scenario-index))
         scenario-record (scenario-records/build-saved-scenario-record
@@ -384,6 +404,32 @@
                                           completed-at-ms
                                           error)
    :commands []})
+
+(defn reset-workspace-state
+  "Fresh-start projection for the New-scenario action: default draft, no active
+  scenario, no retained run or save/load context, no autosave note. The
+  wallet's libraries (return views, history assumptions, constraint profiles)
+  and the saved-scenario index survive — forgetting remembered inputs is each
+  library's own Clear affordance, not New's."
+  [state]
+  (-> state
+      (assoc-in contracts/draft-path (optimizer-defaults/default-draft))
+      (assoc-in contracts/active-scenario-path
+                {:loaded-id nil
+                 :status :idle
+                 :read-only? false})
+      (assoc-in contracts/last-successful-run-path nil)
+      (assoc-in contracts/run-state-path (optimizer-defaults/default-run-state))
+      (assoc-in contracts/optimization-progress-path
+                (optimizer-defaults/default-optimization-progress-state))
+      (assoc-in contracts/scenario-save-state-path
+                (optimizer-defaults/default-scenario-save-state))
+      (assoc-in contracts/scenario-save-modal-path
+                (optimizer-defaults/default-scenario-save-modal-state))
+      (assoc-in contracts/scenario-load-state-path
+                (optimizer-defaults/default-scenario-load-state))
+      (assoc-in contracts/tracking-path (optimizer-defaults/default-tracking-state))
+      (assoc-in contracts/draft-persist-path nil)))
 
 (defn begin-manual-tracking
   [{:keys [state address scenario-id started-at-ms]}]

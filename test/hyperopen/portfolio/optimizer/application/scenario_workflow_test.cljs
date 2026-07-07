@@ -63,6 +63,61 @@
 	                    [(get-in result [:commands 0 :scenario-id])
 	                     (get-in result [:commands 1 :address])]))))
 
+(deftest begin-save-allows-setup-only-save-without-solved-run-test
+  ;; Naming and keeping a configured setup is valid before any optimization
+  ;; runs — only a wallet address and scenario id gate the save.
+  (let [state (update-in (save-state)
+                         [:portfolio :optimizer]
+                         dissoc :last-successful-run)
+        result (workflow/begin-save {:state state
+                                     :address address
+                                     :scenario-id "scn_01"
+                                     :started-at-ms 3000})]
+    (is (= :saving
+           (get-in result [:state :portfolio :optimizer :scenario-save-state :status])))
+    (is (= [:optimizer.workflow/load-scenario-index]
+           (mapv :command/type (:commands result))))))
+
+(deftest begin-save-still-requires-an-address-test
+  (let [result (workflow/begin-save {:state (save-state)
+                                     :address nil
+                                     :scenario-id "scn_01"
+                                     :started-at-ms 3000})]
+    (is (= :failed
+           (get-in result [:state :portfolio :optimizer :scenario-save-state :status])))
+    (is (= [] (:commands result)))))
+
+(deftest continue-save-after-index-omits-stale-run-snapshot-test
+  ;; The save-state fixture's draft is dirty, so its last-successful-run no
+  ;; longer describes the draft being saved: the record must persist setup-only
+  ;; instead of freezing outdated numbers.
+  (let [result (workflow/continue-save-after-index
+                {:state (save-state)
+                 :address address
+                 :scenario-id "scn_01"
+                 :started-at-ms 3000
+                 :loaded-index {:ordered-ids [] :by-id {}}})]
+    (is (nil? (:saved-run (:scenario-record result))))))
+
+(deftest continue-save-after-index-attaches-current-run-snapshot-test
+  (let [run (fixtures/sample-last-successful-run
+             {:request-signature {:scenario-id "scn_01"
+                                  :input-signature "sig-1"}})
+        state (-> (save-state)
+                  (assoc-in [:portfolio :optimizer :draft :metadata :dirty?] false)
+                  (assoc-in [:portfolio :optimizer :last-successful-run] run)
+                  (assoc-in [:portfolio :optimizer :run-state]
+                            {:status :succeeded
+                             :request-signature {:scenario-id "scn_01"
+                                                 :input-signature "sig-1"}}))
+        result (workflow/continue-save-after-index
+                {:state state
+                 :address address
+                 :scenario-id "scn_01"
+                 :started-at-ms 3000
+                 :loaded-index {:ordered-ids [] :by-id {}}})]
+    (is (= run (:saved-run (:scenario-record result))))))
+
 (deftest command-result-advancement-removes-completed-command-test
   (let [result {:state {:portfolio {:optimizer {}}}
                 :commands [{:command/type :optimizer.workflow/save-scenario

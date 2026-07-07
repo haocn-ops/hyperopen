@@ -41,7 +41,9 @@
    [:effects/sync-portfolio-optimizer-assumption-library
     :sync-portfolio-optimizer-assumption-library]
    [:effects/restore-portfolio-optimizer-draft
-    :restore-portfolio-optimizer-draft]])
+    :restore-portfolio-optimizer-draft]
+   [:effects/reset-portfolio-optimizer-draft
+    :reset-portfolio-optimizer-draft]])
 
 (def effect-order-policy-required-action-ids
   #{:actions/select-portfolio-summary-time-range
@@ -234,6 +236,14 @@
     :set-portfolio-optimizer-scenario-save-name]
    [:actions/confirm-portfolio-optimizer-scenario-save
     :confirm-portfolio-optimizer-scenario-save]
+   [:actions/toggle-portfolio-optimizer-scenario-menu
+    :toggle-portfolio-optimizer-scenario-menu]
+   [:actions/close-portfolio-optimizer-scenario-menu
+    :close-portfolio-optimizer-scenario-menu]
+   [:actions/handle-portfolio-optimizer-scenario-menu-keydown
+    :handle-portfolio-optimizer-scenario-menu-keydown]
+   [:actions/new-portfolio-optimizer-scenario
+    :new-portfolio-optimizer-scenario]
    [:actions/load-portfolio-optimizer-route :load-portfolio-optimizer-route]
    [:actions/archive-portfolio-optimizer-scenario :archive-portfolio-optimizer-scenario]
    [:actions/duplicate-portfolio-optimizer-scenario :duplicate-portfolio-optimizer-scenario]

@@ -43,7 +43,7 @@
         portfolio-kind (:kind (portfolio-routes/parse-portfolio-route path*))
         vault-kind (:kind (vault-routes/parse-vault-route path*))]
     (cond
-      (contains? #{:optimize-index :optimize-new :optimize-scenario} portfolio-kind)
+      (contains? #{:optimize-new :optimize-scenario} portfolio-kind)
       :portfolio-optimizer
 
       (contains? #{:page :trader} portfolio-kind)

@@ -1452,20 +1452,21 @@ test("portfolio route exposes deterministic interaction states @regression", asy
     .not.toHaveAttribute("aria-pressed", "true");
 });
 
-test("portfolio optimizer scenario board renders the local scenario surface @regression", async ({ page }) => {
+test("portfolio optimizer route lands on the setup workspace with a scenario library @regression", async ({ page }) => {
   await visitRoute(page, "/portfolio/optimize");
 
-  await expect(page.locator("[data-role='portfolio-optimizer-index']")).toBeVisible();
-  await expect(page.locator("[data-role='portfolio-optimizer-scenario-filters']"))
-    .toContainText("Scenario Filters");
-  await expect(page.locator("[data-role='portfolio-optimizer-empty-scenarios']"))
-    .toContainText("No local optimizer scenarios are loaded yet.");
-
-  await page.locator("a[href='/portfolio/optimize/new']").click();
+  // The bare path IS the workspace — the scenario-index board was removed.
   await expect(page.locator("[data-role='portfolio-optimizer-setup-route-surface']")).toBeVisible();
+  await expect(page.locator("[data-role='portfolio-optimizer-index']")).toHaveCount(0);
+
+  // The header hosts the scenario library: menu trigger + always-available Save.
+  await expect(page.locator("[data-role='portfolio-optimizer-header-save-scenario']")).toBeEnabled();
+  await page.locator("[data-role='portfolio-optimizer-scenario-menu-trigger']").click();
+  await expect(page.locator("[data-role='portfolio-optimizer-scenario-menu-new']"))
+    .toContainText("New scenario");
 });
 
-test("portfolio optimizer scenario board recovers saved scenarios when the address index is missing @regression", async ({ page }) => {
+test("portfolio optimizer scenario menu recovers saved scenarios when the address index is missing @regression", async ({ page }) => {
   await visitRoute(page, "/portfolio/optimize");
   await putOptimizerRecord(
     page,
@@ -1473,23 +1474,20 @@ test("portfolio optimizer scenario board recovers saved scenarios when the addre
     OPTIMIZER_RELOAD_SCENARIO_EDN
   );
   await seedPortfolioWalletAddress(page, "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
-
-  await dispatch(page, [
-    ":actions/navigate",
-    "/portfolio/optimize",
-    { "replace?": true }
-  ]);
   await waitForIdle(page, { quietMs: 300, timeoutMs: 8_000, pollMs: 50 });
 
+  // Opening the menu reloads the index; the loader falls back to a full-store
+  // scan when the per-address index record is missing.
+  await page.locator("[data-role='portfolio-optimizer-scenario-menu-trigger']").click();
   const savedRow = page.locator(
     `[data-role='portfolio-optimizer-scenario-row-${OPTIMIZER_RELOAD_SCENARIO_ID}']`
   );
   await expect(savedRow).toContainText("QA Tracking Reload");
-  await expect(page.locator("[data-role='portfolio-optimizer-empty-scenarios']"))
+  await expect(page.locator("[data-role='portfolio-optimizer-scenario-menu-empty']"))
     .toHaveCount(0);
 });
 
-test("portfolio optimizer scenario board recovers saved scenarios when the address index is incomplete @regression", async ({ page }) => {
+test("portfolio optimizer scenario menu recovers saved scenarios when the address index is incomplete @regression", async ({ page }) => {
   await visitRoute(page, "/portfolio/optimize");
   await putOptimizerRecord(
     page,
@@ -1502,19 +1500,14 @@ test("portfolio optimizer scenario board recovers saved scenarios when the addre
     `{:ordered-ids ["${OPTIMIZER_RELOAD_SCENARIO_ID}"] :by-id {}}`
   );
   await seedPortfolioWalletAddress(page, "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
-
-  await dispatch(page, [
-    ":actions/navigate",
-    "/portfolio/optimize",
-    { "replace?": true }
-  ]);
   await waitForIdle(page, { quietMs: 300, timeoutMs: 8_000, pollMs: 50 });
 
+  await page.locator("[data-role='portfolio-optimizer-scenario-menu-trigger']").click();
   const savedRow = page.locator(
     `[data-role='portfolio-optimizer-scenario-row-${OPTIMIZER_RELOAD_SCENARIO_ID}']`
   );
   await expect(savedRow).toContainText("QA Tracking Reload");
-  await expect(page.locator("[data-role='portfolio-optimizer-empty-scenarios']"))
+  await expect(page.locator("[data-role='portfolio-optimizer-scenario-menu-empty']"))
     .toHaveCount(0);
 });
 
@@ -1523,7 +1516,7 @@ test("portfolio optimizer setup puts policy controls in the center pane @regress
 
   await expect(page.locator("[data-role='portfolio-optimizer-setup-route-surface']")).toBeVisible();
   await expect(page.locator("[data-role='portfolio-optimizer-objective-panel']"))
-    .toContainText("Objective");
+    .toContainText("Optimization goal");
   await expect(page.locator("[data-role='portfolio-optimizer-return-risk-panel']"))
     .toContainText(/Return \/ Risk Model/);
   // LEFT rail is universe-only now; the editable policy controls moved to the wide center pane.
@@ -1537,6 +1530,7 @@ test("portfolio optimizer setup puts policy controls in the center pane @regress
     .toEqual([
       "portfolio-optimizer-objective-panel",
       "portfolio-optimizer-constraints-panel",
+      "portfolio-optimizer-proxy-workflow-slot",
       "portfolio-optimizer-return-risk-panel",
       "portfolio-optimizer-advanced-overrides-shell",
       "portfolio-optimizer-why-safe-note",
@@ -1790,6 +1784,9 @@ test("portfolio optimizer setup exposes separate model layers @regression", asyn
   await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
   await expect(maxAssetWeight).toHaveValue("0.3");
 
+  // The advanced targets live behind the collapsed "More goals" drawer since
+  // the goal consolidation; open it before selecting one.
+  await page.locator("[data-role='portfolio-optimizer-more-goals'] summary").click();
   await targetVolatilityObjective.click();
   await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
   await expect(targetVolatility).toHaveValue("20");
@@ -2751,6 +2748,8 @@ test("portfolio optimizer saves draft scenarios under durable ids and reloads th
   ]);
   await waitForIdle(page, { quietMs: 300, timeoutMs: 8_000, pollMs: 50 });
 
+  // Saved scenarios list inside the workspace-header Scenarios menu now.
+  await page.locator("[data-role='portfolio-optimizer-scenario-menu-trigger']").click();
   const savedRow = page.locator(`[data-role='portfolio-optimizer-scenario-row-${savedScenarioId}']`);
   await expect(savedRow).toContainText("May Rotation");
 
@@ -2827,7 +2826,9 @@ test("portfolio optimizer execution remains read-only in Spectate Mode @regressi
   await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
 
   const tab = page.locator("[data-role='portfolio-optimizer-execution-tab']");
-  await expect(tab).toContainText("Account leverage after");
+  // Renamed from "Account leverage after" by the gross/venue leverage-lens
+  // reconciliation (2026-07-06).
+  await expect(tab).toContainText("Gross leverage after");
   await expect(tab).toContainText(
     "Spectate Mode is read-only. Stop Spectate Mode to place trades or move funds."
   );

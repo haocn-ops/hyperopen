@@ -150,11 +150,11 @@
                        "scroll-mb-12"
                        "disabled:cursor-not-allowed" "disabled:text-trading-muted"]
                :data-role "portfolio-optimizer-save-scenario"
-               :disabled (or (not solved-run?) saving-scenario?)
+               :disabled saving-scenario?
                :on {:click [[:actions/open-portfolio-optimizer-scenario-save-modal]]}}
-      ;; Honest label: this snapshots a NAMED scenario (modal + own URL) after a
-      ;; solved run. The draft itself autosaves per wallet on every edit — see the
-      ;; "Saved <time>" note in the setup header.
+      ;; Save works at ANY point: it snapshots a NAMED scenario (results attach
+      ;; only when a current solved run exists). The draft itself autosaves per
+      ;; wallet on every edit — see the "Saved <time>" note in the setup header.
       (if saving-scenario? "Saving" "Save scenario")]
      (when (and solved-run? result-path)
        (result-nav-button {:result-path result-path

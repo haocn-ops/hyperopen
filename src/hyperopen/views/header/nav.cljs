@@ -31,7 +31,7 @@
                      (not (portfolio-routes/portfolio-optimize-route? %)))}
    {:id :optimize
     :label "Optimize"
-    :route (portfolio-routes/portfolio-optimize-index-path)
+    :route (portfolio-routes/portfolio-optimize-path)
     :placements #{:desktop :mobile-secondary}
     :active-fn portfolio-routes/portfolio-optimize-route?}
    {:id :funding

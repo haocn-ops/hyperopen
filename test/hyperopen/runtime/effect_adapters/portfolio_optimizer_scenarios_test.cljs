@@ -8,8 +8,13 @@
   (async done
     (let [calls (atom [])
           address "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          ;; The results snapshot attaches only when the run is CURRENT for the
+          ;; draft being saved: clean draft + succeeded run-state with a
+          ;; matching input signature.
           solved-run (fixtures/sample-last-successful-run
-                      {:result {:expected-return 0.18
+                      {:request-signature {:scenario-id "scn_3000"
+                                           :input-signature "sig-current"}
+                       :result {:expected-return 0.18
                                 :volatility 0.42}
                        :computed-at-ms 2000})
           store (atom {:wallet {:address address}
@@ -18,7 +23,11 @@
                                             :objective {:kind :max-sharpe}
                                             :return-model {:kind :historical-mean}
                                             :risk-model {:kind :diagonal-shrink}
-                                            :metadata {:dirty? true}}
+                                            :metadata {:dirty? false}}
+                                    :run-state {:status :succeeded
+                                                :request-signature
+                                                {:scenario-id "scn_3000"
+                                                 :input-signature "sig-current"}}
                                     :scenario-index {:ordered-ids []
                                                      :by-id {}}
                                     :last-successful-run solved-run}}})]
@@ -99,7 +108,12 @@
                      (done)))
             (.catch (async-support/unexpected-error done)))))))
 
-(deftest save-portfolio-optimizer-scenario-effect-creates-new-id-on-new-route-test
+(deftest save-portfolio-optimizer-scenario-effect-updates-open-scenario-on-workspace-route-test
+  ;; /portfolio/optimize is the working page: saving with a loaded scenario
+  ;; updates THAT scenario in place instead of forking a copy. Fresh identity
+  ;; comes from the explicit "New scenario" action, which clears the active
+  ;; scenario before any save. Setup-only honesty: the fixture's run is stale
+  ;; (dirty draft), so the record persists without a saved-run snapshot.
   (async done
     (let [calls (atom [])
           address "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
@@ -107,7 +121,7 @@
                       {:result {:expected-return 0.12
                                 :volatility 0.3}
                        :computed-at-ms 2500})
-          store (atom {:router {:path "/portfolio/optimize/new"}
+          store (atom {:router {:path "/portfolio/optimize"}
                        :wallet {:address address}
                        :portfolio {:optimizer
                                    {:active-scenario {:loaded-id "scn_old"
@@ -124,7 +138,10 @@
                                                                         :status :saved}}}
                                     :last-successful-run solved-run}}})]
       (with-redefs [portfolio-optimizer-adapters/*now-ms* (fn [] 3500)
-                    portfolio-optimizer-adapters/*next-scenario-id* (fn [_now-ms] "scn_new")
+                    portfolio-optimizer-adapters/*next-scenario-id*
+                    (fn [now-ms]
+                      (swap! calls conj [:next-id now-ms])
+                      "scn_new")
                     portfolio-optimizer-adapters/*load-scenario-index!*
                     (fn [addr]
                       (swap! calls conj [:load-index addr])
@@ -137,19 +154,26 @@
                     portfolio-optimizer-adapters/*save-scenario-index!*
                     (fn [addr index]
                       (swap! calls conj [:save-index addr index])
-                      (js/Promise.resolve true))]
+                      (js/Promise.resolve true))
+                    portfolio-optimizer-adapters/*dispatch!*
+                    (fn [store* ctx effects]
+                      (swap! calls conj [:dispatch store* ctx effects]))]
         (-> (portfolio-optimizer-adapters/save-portfolio-optimizer-scenario-effect nil store)
             (.then (fn [record]
-                     (is (= "scn_new" (:id record)))
-                     (is (= "scn_new"
+                     (is (= "scn_old" (:id record)))
+                     (is (nil? (:saved-run record)))
+                     (is (not-any? #(= :next-id (first %)) @calls))
+                     (is (= "scn_old"
                             (second (first (filter #(= :save-scenario (first %))
                                                    @calls)))))
-                     (is (= #{"scn_old" "scn_new"}
-                            (set (get-in @store
-                                         [:portfolio :optimizer :scenario-index :ordered-ids]))))
-                     (is (= "scn_new"
+                     (is (= ["scn_old"]
+                            (get-in @store
+                                    [:portfolio :optimizer :scenario-index :ordered-ids])))
+                     (is (= "scn_old"
                             (get-in @store
                                     [:portfolio :optimizer :active-scenario :loaded-id])))
+                     ;; Saving from the workspace never navigates away.
+                     (is (not-any? #(= :dispatch (first %)) @calls))
                      (done)))
             (.catch (async-support/unexpected-error done)))))))
 
@@ -557,5 +581,43 @@
                              [:save-index address
                               (get-in @store [:portfolio :optimizer :scenario-index])]]
                             @calls))
+                     (done)))
+            (.catch (async-support/unexpected-error done)))))))
+
+(deftest reset-portfolio-optimizer-draft-effect-deletes-record-resets-state-and-preseeds-test
+  (async done
+    (let [calls (atom [])
+          address "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          store (atom {:router {:path "/portfolio/optimize"}
+                       :wallet {:address address}
+                       :portfolio {:optimizer
+                                   {:active-scenario {:loaded-id "scn_old"
+                                                      :status :saved}
+                                    :draft {:id "scn_old"
+                                            :name "Old Mix"
+                                            :universe [{:instrument-id "perp:BTC"}]
+                                            :metadata {:dirty? true}}
+                                    :draft-persist {:status :saved :at-ms 1000}
+                                    :last-successful-run {:result {:status :solved}}}}})]
+      (with-redefs [portfolio-optimizer-adapters/*delete-draft!*
+                    (fn [addr]
+                      (swap! calls conj [:delete-draft addr])
+                      (js/Promise.resolve true))
+                    portfolio-optimizer-adapters/*dispatch!*
+                    (fn [_store* _ctx effects]
+                      (swap! calls conj [:dispatch effects]))]
+        (-> (portfolio-optimizer-adapters/reset-portfolio-optimizer-draft-effect nil store)
+            (.then (fn [_]
+                     ;; The IndexedDB record dies FIRST so the restore watchers
+                     ;; cannot resurrect the old draft into the fresh workspace.
+                     (is (= [:delete-draft address] (first @calls)))
+                     (is (= "Untitled Optimization"
+                            (get-in @store [:portfolio :optimizer :draft :name])))
+                     (is (= [] (get-in @store [:portfolio :optimizer :draft :universe])))
+                     (is (nil? (get-in @store [:portfolio :optimizer :active-scenario :loaded-id])))
+                     (is (nil? (get-in @store [:portfolio :optimizer :last-successful-run])))
+                     (is (nil? (get-in @store [:portfolio :optimizer :draft-persist])))
+                     (is (= [:dispatch [[:actions/set-portfolio-optimizer-universe-from-current]]]
+                            (last @calls)))
                      (done)))
             (.catch (async-support/unexpected-error done)))))))

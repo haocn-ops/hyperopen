@@ -6,6 +6,7 @@
             [hyperopen.portfolio.optimizer.actions.refinement :as refinement]
             [hyperopen.portfolio.optimizer.actions.return-views-io :as return-views-io]
             [hyperopen.portfolio.optimizer.actions.run :as run]
+            [hyperopen.portfolio.optimizer.actions.scenario-library :as scenario-library]
             [hyperopen.portfolio.optimizer.actions.target-sigma :as target-sigma]
             [hyperopen.portfolio.optimizer.actions.tracking :as tracking]
             [hyperopen.portfolio.optimizer.actions.universe :as universe]
@@ -220,6 +221,18 @@
 
 (def confirm-portfolio-optimizer-scenario-save
   run/confirm-portfolio-optimizer-scenario-save)
+
+(def toggle-portfolio-optimizer-scenario-menu
+  scenario-library/toggle-portfolio-optimizer-scenario-menu)
+
+(def close-portfolio-optimizer-scenario-menu
+  scenario-library/close-portfolio-optimizer-scenario-menu)
+
+(def handle-portfolio-optimizer-scenario-menu-keydown
+  scenario-library/handle-portfolio-optimizer-scenario-menu-keydown)
+
+(def new-portfolio-optimizer-scenario
+  scenario-library/new-portfolio-optimizer-scenario)
 
 (def open-portfolio-optimizer-execution
   execution/open-portfolio-optimizer-execution)

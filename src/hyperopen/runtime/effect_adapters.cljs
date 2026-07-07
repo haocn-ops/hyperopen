@@ -267,6 +267,8 @@
   portfolio-optimizer-adapters/refresh-portfolio-optimizer-rebalance-slippage-snapshots-effect)
 (def enable-portfolio-optimizer-manual-tracking-effect
   portfolio-optimizer-adapters/enable-portfolio-optimizer-manual-tracking-effect)
+(def reset-portfolio-optimizer-draft-effect
+  portfolio-optimizer-adapters/reset-portfolio-optimizer-draft-effect)
 
 (def restore-dialog-focus-effect
   funding-adapters/restore-dialog-focus-effect)

@@ -73,6 +73,10 @@
         :anchor-only (s/tuple any?)))
 (s/def ::apply-imported-spectate-watchlist-args (s/tuple any?))
 (s/def ::apply-imported-portfolio-optimizer-return-views-args (s/tuple any?))
+(s/def ::apply-imported-portfolio-optimizer-history-assumptions-args (s/tuple any?))
+(s/def ::export-portfolio-optimizer-history-assumptions-args
+  (s/or :none ::common/no-args
+        :scope (s/tuple any?)))
 (s/def ::portfolio-volume-history-open-args
   (s/or :none ::common/no-args
         :anchor-only (s/tuple any?)))
@@ -296,6 +300,10 @@
    :actions/import-portfolio-optimizer-return-views ::common/no-args
    :actions/apply-imported-portfolio-optimizer-return-views ::apply-imported-portfolio-optimizer-return-views-args
    :actions/dismiss-portfolio-optimizer-return-views-io-note ::common/no-args
+   :actions/export-portfolio-optimizer-history-assumptions ::export-portfolio-optimizer-history-assumptions-args
+   :actions/import-portfolio-optimizer-history-assumptions ::common/no-args
+   :actions/apply-imported-portfolio-optimizer-history-assumptions ::apply-imported-portfolio-optimizer-history-assumptions-args
+   :actions/dismiss-portfolio-optimizer-history-assumptions-io-note ::common/no-args
    :actions/set-portfolio-optimizer-return-model-kind ::portfolio-optimizer-model-kind-args
    :actions/set-portfolio-optimizer-risk-model-kind ::portfolio-optimizer-model-kind-args
    :actions/apply-portfolio-optimizer-setup-preset ::portfolio-optimizer-model-kind-args

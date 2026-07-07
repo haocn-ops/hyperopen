@@ -106,6 +106,7 @@
 (def ui-assumption-cards-collapsed-path paths/ui-assumption-cards-collapsed-path)
 (def ui-draft-add-asset-open-path paths/ui-draft-add-asset-open-path)
 (def ui-objective-menu-open-path paths/ui-objective-menu-open-path)
+(def ui-scenario-menu-open-path paths/ui-scenario-menu-open-path)
 (def ui-objective-menu-selection-path paths/ui-objective-menu-selection-path)
 (def ui-objective-menu-view-order-path paths/ui-objective-menu-view-order-path)
 (def ui-objective-menu-view-drafts-path paths/ui-objective-menu-view-drafts-path)

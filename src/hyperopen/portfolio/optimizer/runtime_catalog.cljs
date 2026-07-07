@@ -174,6 +174,14 @@
     actions/set-portfolio-optimizer-scenario-save-name
     :confirm-portfolio-optimizer-scenario-save
     actions/confirm-portfolio-optimizer-scenario-save
+    :toggle-portfolio-optimizer-scenario-menu
+    actions/toggle-portfolio-optimizer-scenario-menu
+    :close-portfolio-optimizer-scenario-menu
+    actions/close-portfolio-optimizer-scenario-menu
+    :handle-portfolio-optimizer-scenario-menu-keydown
+    actions/handle-portfolio-optimizer-scenario-menu-keydown
+    :new-portfolio-optimizer-scenario
+    actions/new-portfolio-optimizer-scenario
     :load-portfolio-optimizer-route
     actions/load-portfolio-optimizer-route
     :archive-portfolio-optimizer-scenario
@@ -281,4 +289,6 @@
       :sync-portfolio-optimizer-assumption-library
       effect-adapters/sync-portfolio-optimizer-assumption-library-effect
       :restore-portfolio-optimizer-draft
-      effect-adapters/restore-portfolio-optimizer-draft-effect}}))
+      effect-adapters/restore-portfolio-optimizer-draft-effect
+      :reset-portfolio-optimizer-draft
+      effect-adapters/reset-portfolio-optimizer-draft-effect}}))

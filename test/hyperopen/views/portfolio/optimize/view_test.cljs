@@ -4,13 +4,16 @@
             [hyperopen.views.portfolio.optimize.test-support
              :refer [collect-strings node-by-role]]))
 
-(deftest portfolio-view-delegates-optimizer-index-route-test
+(deftest portfolio-view-lands-optimizer-root-on-workspace-test
+  ;; /portfolio/optimize opens the setup workspace directly — the scenario
+  ;; index board was removed, so there is no "Optimization Scenarios" page.
   (let [view-node (portfolio-view/portfolio-view
                    {:router {:path "/portfolio/optimize"}})]
-    (is (some? (node-by-role view-node "portfolio-optimizer-index")))
+    (is (some? (node-by-role view-node "portfolio-optimizer-setup-route-surface")))
+    (is (nil? (node-by-role view-node "portfolio-optimizer-index")))
     (is (nil? (node-by-role view-node "portfolio-account-table")))
-    (is (contains? (set (collect-strings view-node))
-                   "Optimization Scenarios"))))
+    (is (not (contains? (set (collect-strings view-node))
+                        "Optimization Scenarios")))))
 
 (deftest portfolio-optimizer-route-content-has-stable-element-root-test
   (let [view-node (portfolio-view/portfolio-view

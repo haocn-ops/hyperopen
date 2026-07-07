@@ -30,15 +30,12 @@
                        "space-y-3" "pb-16" "leading-4" "text-trading-text"]
                :data-role "portfolio-optimizer-setup-route-surface"
                :data-scenario-id scenario-id}
-     (setup-header/setup-header {:draft draft
+     (setup-header/setup-header {:state state
+                                 :draft draft
                                  :route route
                                  :draft-persist (get-in state
                                                         optimizer-contracts/draft-persist-path)
-                                 :running? running?
-                                 :run-triggerable? run-triggerable?
-                                 :saving-scenario? saving-scenario?
-                                 :solved-run? current-result?
-                                 :result-path result-path})
+                                 :saving-scenario? saving-scenario?})
      ;; Layer 1 run feedback: a sticky, full-width banner that keeps the live run
      ;; state in the user's main field of attention regardless of scroll position
      ;; or how long the right rail grows under Maximum Sharpe. It sits directly

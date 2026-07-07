@@ -151,27 +151,20 @@
 
 (defn save-portfolio-optimizer-scenario-from-current
   [state]
-  (if (current-solved-run? state)
-    [(open-scenario-save-modal-effect state)]
-    []))
+  [(open-scenario-save-modal-effect state)])
 
 (defn confirm-portfolio-optimizer-scenario-save
+  ;; Saving needs a name, nothing else: a scenario without a current solved run
+  ;; persists as a setup-only snapshot (the workflow attaches the results
+  ;; snapshot only when it still matches the draft).
   [state]
   (let [scenario-name (non-blank-text
                        (get-in state
                                (conj contracts/scenario-save-modal-path :name)))]
-    (cond
-      (nil? scenario-name)
+    (if (nil? scenario-name)
       [[:effects/save
         contracts/scenario-save-modal-error-path
         "Enter a scenario name before saving."]]
-
-      (not (current-solved-run? state))
-      [[:effects/save
-        contracts/scenario-save-modal-error-path
-        "Rerun this scenario before saving."]]
-
-      :else
       [[:effects/save contracts/scenario-save-modal-error-path nil]
        [:effects/save-portfolio-optimizer-scenario {:name scenario-name}]])))
 
@@ -183,7 +176,7 @@
 
 (defn- history-discovery-effects
   [route]
-  (if (contains? #{:optimize-index :optimize-new :optimize-scenario}
+  (if (contains? #{:optimize-new :optimize-scenario}
                  (:kind route))
     [[:effects/load-portfolio-optimizer-history-discovery]]
     []))
@@ -191,11 +184,13 @@
 (defn load-portfolio-optimizer-route
   [state path]
   (let [route (portfolio-routes/parse-portfolio-route path)
-        optimizer-route? (contains? #{:optimize-index :optimize-new :optimize-scenario}
+        optimizer-route? (contains? #{:optimize-new :optimize-scenario}
                                     (:kind route))]
     (cond-> (into
              (case (:kind route)
-               :optimize-index [[:effects/load-portfolio-optimizer-scenario-index]]
+               ;; The workspace hosts the Scenarios menu, so arriving there loads
+               ;; the wallet's saved-scenario index alongside the draft machinery.
+               :optimize-new [[:effects/load-portfolio-optimizer-scenario-index]]
                :optimize-scenario [[:effects/load-portfolio-optimizer-scenario
                                     (:scenario-id route)]]
                [])

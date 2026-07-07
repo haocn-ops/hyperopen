@@ -3,7 +3,9 @@
             [hyperopen.portfolio.routes :as routes]))
 
 (deftest parse-portfolio-route-recognizes-optimizer-family-test
-  (is (= {:kind :optimize-index
+  ;; The bare path IS the workspace: no scenario-index page exists, and the
+  ;; /new suffix survives only as a legacy alias for old links.
+  (is (= {:kind :optimize-new
           :path "/portfolio/optimize"}
          (routes/parse-portfolio-route "/portfolio/optimize")))
   (is (= {:kind :optimize-new
@@ -23,8 +25,9 @@
   (is (false? (routes/portfolio-optimize-route? "/portfolio/trader/0x1234567890abcdef1234567890abcdef12345678")))
   (is (= "scn_01HS6PQ"
          (routes/portfolio-optimize-scenario-id "/portfolio/optimize/scn_01HS6PQ")))
+  (is (= "/portfolio/optimize" (routes/portfolio-optimize-path)))
   (is (= "/portfolio/optimize" (routes/portfolio-optimize-index-path)))
-  (is (= "/portfolio/optimize/new" (routes/portfolio-optimize-new-path)))
+  (is (= "/portfolio/optimize" (routes/portfolio-optimize-new-path)))
   (is (= "/portfolio/optimize/scn_01HS6PQ"
          (routes/portfolio-optimize-scenario-path " scn_01HS6PQ "))))
 

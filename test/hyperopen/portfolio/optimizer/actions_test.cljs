@@ -299,7 +299,10 @@
          (actions/load-portfolio-optimizer-history-from-draft
           {:portfolio {:optimizer {:draft {:universe []}}}}))))
 
-(deftest save-portfolio-optimizer-scenario-from-current-requires-solved-run-test
+(deftest save-portfolio-optimizer-scenario-from-current-always-opens-the-save-modal-test
+  ;; Saving no longer requires a solved run: the modal opens at any point, and
+  ;; the workflow decides whether the results snapshot is honest to attach
+  ;; (stale or missing runs persist setup-only records).
   (let [state (ready-optimizer-state {:kind :historical-mean})]
     (is (= [[:effects/save
               scenario-save-modal-path
@@ -310,37 +313,13 @@
             (assoc-in state
                       [:portfolio :optimizer :last-successful-run]
                       (solved-run-for-state state))))))
-  (let [state (ready-optimizer-state {:kind :historical-mean})]
-    (is (= []
-           (actions/save-portfolio-optimizer-scenario-from-current
-            (assoc-in state
-                      [:portfolio :optimizer :last-successful-run]
-                      (fixtures/sample-last-successful-run
-                       {:request-signature (request-signature-for-state state)
-                        :result {:status :infeasible}}))))))
-  (is (= []
+  (is (= [[:effects/save
+            scenario-save-modal-path
+            {:open? true
+             :name "Untitled Optimization"
+             :error nil}]]
          (actions/save-portfolio-optimizer-scenario-from-current
           {:portfolio {:optimizer {}}}))))
-
-(deftest save-portfolio-optimizer-scenario-from-current-rejects-stale-solved-run-test
-  (let [black-litterman-state
-        (ready-optimizer-state
-         {:kind :black-litterman
-          :views [{:kind :absolute
-                   :instrument-id "perp:BTC"
-                   :return 0.2
-                   :confidence 0.75
-                   :weights {"perp:BTC" 1}}]})
-        historical-state
-        (assoc-in black-litterman-state
-                  [:portfolio :optimizer :draft :return-model]
-                  {:kind :historical-mean})]
-    (is (= []
-           (actions/save-portfolio-optimizer-scenario-from-current
-            (assoc-in black-litterman-state
-                      [:portfolio :optimizer :last-successful-run]
-                      (solved-run-for-state historical-state))))
-        "A solved historical/max-sharpe result must not be saved as the active Black-Litterman scenario.")))
 
 (deftest save-portfolio-optimizer-scenario-from-current-allows-completed-run-after-snapshot-drift-test
   (let [state (ready-optimizer-state {:kind :historical-mean})
@@ -387,6 +366,21 @@
              {:name "May Rotation"}]]
            (actions/confirm-portfolio-optimizer-scenario-save state*)))))
 
+(deftest confirm-portfolio-optimizer-scenario-save-works-without-solved-run-test
+  ;; A named setup with no optimization run yet still saves (as a setup-only
+  ;; scenario); the modal no longer demands a rerun.
+  (is (= [[:effects/save
+           (conj scenario-save-modal-path :error)
+           nil]
+          [:effects/save-portfolio-optimizer-scenario
+           {:name "Pre-run Setup"}]]
+         (actions/confirm-portfolio-optimizer-scenario-save
+          (assoc-in (ready-optimizer-state {:kind :historical-mean})
+                    scenario-save-modal-path
+                    {:open? true
+                     :name "Pre-run Setup"
+                     :error nil})))))
+
 (deftest load-portfolio-optimizer-route-emits-scenario-read-effects-test
   (is (= [[:effects/load-portfolio-optimizer-scenario-index]
           [:effects/load-portfolio-optimizer-history-discovery]
@@ -406,7 +400,10 @@
           {:asset-selector {:phase :full}
            :vaults {:merged-index-rows [{:vault-address "0xloaded"}]}}
           "/portfolio/optimize/scn_01")))
-  (is (= [[:effects/load-portfolio-optimizer-history-discovery]
+  ;; The legacy /new alias parses to the same workspace kind, so it loads the
+  ;; scenario index for the Scenarios menu exactly like the bare path.
+  (is (= [[:effects/load-portfolio-optimizer-scenario-index]
+          [:effects/load-portfolio-optimizer-history-discovery]
           [:effects/load-portfolio-optimizer-constraint-profiles]
           [:effects/load-portfolio-optimizer-view-library]
           [:effects/load-portfolio-optimizer-assumption-library]]
@@ -420,7 +417,8 @@
           "/trade"))))
 
 (deftest load-portfolio-optimizer-route-fetches-vault-metadata-for-universe-search-test
-  (is (= [[:effects/load-portfolio-optimizer-history-discovery]
+  (is (= [[:effects/load-portfolio-optimizer-scenario-index]
+          [:effects/load-portfolio-optimizer-history-discovery]
           [:effects/api-fetch-vault-index-with-cache]
           [:effects/api-fetch-vault-summaries]
           [:effects/load-portfolio-optimizer-constraint-profiles]
@@ -451,7 +449,8 @@
           {:asset-selector {:phase :full}
            :vaults {}}
           "/portfolio/optimize/scn_01")))
-  (is (= [[:effects/load-portfolio-optimizer-history-discovery]
+  (is (= [[:effects/load-portfolio-optimizer-scenario-index]
+          [:effects/load-portfolio-optimizer-history-discovery]
           [:effects/load-portfolio-optimizer-constraint-profiles]
           [:effects/load-portfolio-optimizer-view-library]
           [:effects/load-portfolio-optimizer-assumption-library]]
@@ -461,7 +460,8 @@
           "/portfolio/optimize/new"))))
 
 (deftest load-portfolio-optimizer-route-refreshes-cache-only-selector-markets-test
-  (is (= [[:effects/load-portfolio-optimizer-history-discovery]
+  (is (= [[:effects/load-portfolio-optimizer-scenario-index]
+          [:effects/load-portfolio-optimizer-history-discovery]
           [:effects/fetch-asset-selector-markets {:phase :full}]
           [:effects/load-portfolio-optimizer-constraint-profiles]
           [:effects/load-portfolio-optimizer-view-library]

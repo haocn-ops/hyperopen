@@ -1,8 +1,8 @@
 (ns hyperopen.portfolio.optimizer.application.view-model
   (:require [hyperopen.portfolio.optimizer.application.view-model.black-litterman :as black-litterman]
             [hyperopen.portfolio.optimizer.application.view-model.execution :as execution]
-            [hyperopen.portfolio.optimizer.application.view-model.index :as index]
             [hyperopen.portfolio.optimizer.application.view-model.scenario :as scenario]
+            [hyperopen.portfolio.optimizer.application.view-model.scenario-library :as scenario-library]
             [hyperopen.portfolio.optimizer.application.view-model.setup :as setup]
             [hyperopen.portfolio.optimizer.application.view-model.setup-history-assumption-cards :as assumption-cards]
             [hyperopen.portfolio.optimizer.application.view-model.setup-history-assumption-rail :as assumption-rail]
@@ -10,9 +10,9 @@
             [hyperopen.portfolio.optimizer.application.view-model.universe :as universe]
             [hyperopen.portfolio.optimizer.application.view-model.workspace :as workspace]))
 
-(defn index-model
+(defn scenario-library-model
   [state]
-  (index/index-model state))
+  (scenario-library/library-model state))
 
 (defn route-mismatched?
   [state scenario-id]

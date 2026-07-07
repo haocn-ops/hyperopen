@@ -42,9 +42,12 @@
     (is (= true
            (get-in (node-by-role view-node "portfolio-optimizer-run-draft")
                    [1 :disabled])))
-    (is (= true
-           (get-in (node-by-role view-node "portfolio-optimizer-save-scenario")
-                   [1 :disabled])))
+    ;; Save is available at any point — a pre-run save persists a setup-only
+    ;; named scenario, so an empty fresh workspace still offers it.
+    (is (= false
+           (boolean
+            (get-in (node-by-role view-node "portfolio-optimizer-save-scenario")
+                    [1 :disabled]))))
     (is (nil? (node-by-role view-node "portfolio-optimizer-load-history")))
     (is (some? (node-by-role view-node "portfolio-optimizer-universe-panel")))
     (is (= [[:actions/set-portfolio-optimizer-universe-from-current]]

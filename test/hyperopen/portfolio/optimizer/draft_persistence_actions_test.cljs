@@ -35,16 +35,19 @@
   (is (= [[:effects/restore-portfolio-optimizer-draft]]
          (actions/restore-or-preseed-portfolio-optimizer-draft
           {:portfolio {:optimizer {:draft (optimizer-defaults/default-draft)}}}
-          "/portfolio/optimize/new"))))
+          "/portfolio/optimize/new")))
+  ;; The bare path IS the workspace now (the index page is gone), so landing on
+  ;; it restores/preseeds exactly like the legacy /new alias.
+  (is (= [[:effects/restore-portfolio-optimizer-draft]]
+         (actions/restore-or-preseed-portfolio-optimizer-draft
+          {:portfolio {:optimizer {:draft nil}}}
+          "/portfolio/optimize"))))
 
 (deftest restore-or-preseed-never-fires-on-touched-draft-or-other-routes-test
   (let [touched {:portfolio {:optimizer {:draft {:universe [btc-instrument]}}}}]
     (is (= [] (actions/restore-or-preseed-portfolio-optimizer-draft
                touched
                "/portfolio/optimize/new")))
-    (is (= [] (actions/restore-or-preseed-portfolio-optimizer-draft
-               {:portfolio {:optimizer {:draft nil}}}
-               "/portfolio/optimize")))
     (is (= [] (actions/restore-or-preseed-portfolio-optimizer-draft
                {:portfolio {:optimizer {:draft nil}}}
                "/portfolio/optimize/some-scenario")))))

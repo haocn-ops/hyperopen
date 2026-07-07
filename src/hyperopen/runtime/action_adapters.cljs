@@ -318,6 +318,18 @@
 (def confirm-portfolio-optimizer-scenario-save-action
   portfolio-optimizer-actions/confirm-portfolio-optimizer-scenario-save)
 
+(def toggle-portfolio-optimizer-scenario-menu-action
+  portfolio-optimizer-actions/toggle-portfolio-optimizer-scenario-menu)
+
+(def close-portfolio-optimizer-scenario-menu-action
+  portfolio-optimizer-actions/close-portfolio-optimizer-scenario-menu)
+
+(def handle-portfolio-optimizer-scenario-menu-keydown-action
+  portfolio-optimizer-actions/handle-portfolio-optimizer-scenario-menu-keydown)
+
+(def new-portfolio-optimizer-scenario-action
+  portfolio-optimizer-actions/new-portfolio-optimizer-scenario)
+
 (def load-portfolio-optimizer-route-action
   portfolio-optimizer-actions/load-portfolio-optimizer-route)
 

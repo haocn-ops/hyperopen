@@ -161,23 +161,32 @@
          (solved-run-commands {:path "/portfolio/optimize/draft"
                                :run-scenario-id nil}))))
 
-(deftest handle-worker-message-on-new-route-reveals-save-bound-scenario-test
-  ;; After "Save scenario" the workspace draft carries the saved scenario id, so a
-  ;; run started from /optimize/new belongs to that scenario. Reveal ITS surface —
-  ;; the unsaved-draft alias can only render unsaved runs, so navigating there
-  ;; would show a masked shell while the toast claims the result is ready (the
-  ;; post-save draft-route wedge).
+(deftest handle-worker-message-on-new-route-reveals-save-bound-run-on-draft-alias-test
+  ;; After "Save scenario" the workspace draft carries the saved scenario id, and
+  ;; the draft alias renders the CURRENT workspace run whatever its id is — so a
+  ;; save-bound run reveals on /optimize/draft too. Revealing on /scn-1 would
+  ;; re-trigger the scenario route load, which replaces the fresh in-memory run
+  ;; with the record's saved-run snapshot (nil for a setup-only save), wiping the
+  ;; result the user just watched finish.
   (is (= [refresh-command
           {:command/type :optimizer.workflow/reveal-results
-           :path "/portfolio/optimize/scn-1"}]
+           :path "/portfolio/optimize/draft"}]
          (solved-run-commands {:path "/portfolio/optimize/new"
                                :run-scenario-id "scn-1"
-                               :loaded-id "scn-1"}))))
+                               :loaded-id "scn-1"})))
+  ;; Same when the saved id arrived via the per-wallet draft restore in a FRESH
+  ;; session (no scenario loaded before the run) — the regression this pins was
+  ;; the draft alias masking that run to an idle N/A shell.
+  (is (= [refresh-command
+          {:command/type :optimizer.workflow/reveal-results
+           :path "/portfolio/optimize/draft"}]
+         (solved-run-commands {:path "/portfolio/optimize/new"
+                               :run-scenario-id "scn-1"
+                               :loaded-id nil}))))
 
 (deftest handle-worker-message-unsaved-synthetic-draft-id-still-reveals-draft-alias-test
   ;; An UNSAVED draft may carry a synthetic id (e.g. "draft-current") with no
-  ;; loaded scenario: that run is not scenario-bound and must keep revealing on
-  ;; the draft alias.
+  ;; loaded scenario: that run keeps revealing on the draft alias.
   (is (= [refresh-command
           {:command/type :optimizer.workflow/reveal-results
            :path "/portfolio/optimize/draft"}]
@@ -185,13 +194,11 @@
                                :run-scenario-id "draft-current"
                                :loaded-id nil}))))
 
-(deftest handle-worker-message-on-draft-alias-reveals-save-bound-scenario-test
+(deftest handle-worker-message-on-draft-alias-stays-for-save-bound-run-test
   ;; Watching from /optimize/draft while the workspace is save-bound: the draft
-  ;; alias can never render a scenario-bound run, so announcing "complete" would
-  ;; point at a page that will never show it. Reveal the run's own surface.
-  (is (= [refresh-command
-          {:command/type :optimizer.workflow/reveal-results
-           :path "/portfolio/optimize/scn-1"}]
+  ;; alias renders the current workspace run in place, so no navigation and no
+  ;; toast — exactly like a rerun watched from a scenario's own surface.
+  (is (= [refresh-command]
          (solved-run-commands {:path "/portfolio/optimize/draft"
                                :run-scenario-id "scn-1"
                                :loaded-id "scn-1"}))))

@@ -385,6 +385,9 @@
              :covariance-observations covariance-observations
              :errors (vec errors)
              :note note
+             ;; Agent-supplied reason from a file import (metadata rides the
+             ;; entry; any edit strips the acknowledgment but keeps the text).
+             :rationale (coercion/non-blank-text (get-in entry [:metadata :rationale]))
              :engine-applied? (boolean complete?)
              :acknowledged? acknowledged?
              :configured? configured?

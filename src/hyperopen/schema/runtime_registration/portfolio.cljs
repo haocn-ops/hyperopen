@@ -36,6 +36,10 @@
     :download-portfolio-optimizer-return-views-file]
    [:effects/pick-portfolio-optimizer-return-views-file
     :pick-portfolio-optimizer-return-views-file]
+   [:effects/download-portfolio-optimizer-history-assumptions-file
+    :download-portfolio-optimizer-history-assumptions-file]
+   [:effects/pick-portfolio-optimizer-history-assumptions-file
+    :pick-portfolio-optimizer-history-assumptions-file]
    [:effects/load-portfolio-optimizer-assumption-library
     :load-portfolio-optimizer-assumption-library]
    [:effects/sync-portfolio-optimizer-assumption-library
@@ -117,6 +121,14 @@
     :apply-imported-portfolio-optimizer-return-views]
    [:actions/dismiss-portfolio-optimizer-return-views-io-note
     :dismiss-portfolio-optimizer-return-views-io-note]
+   [:actions/export-portfolio-optimizer-history-assumptions
+    :export-portfolio-optimizer-history-assumptions]
+   [:actions/import-portfolio-optimizer-history-assumptions
+    :import-portfolio-optimizer-history-assumptions]
+   [:actions/apply-imported-portfolio-optimizer-history-assumptions
+    :apply-imported-portfolio-optimizer-history-assumptions]
+   [:actions/dismiss-portfolio-optimizer-history-assumptions-io-note
+    :dismiss-portfolio-optimizer-history-assumptions-io-note]
    [:actions/set-portfolio-optimizer-return-model-kind :set-portfolio-optimizer-return-model-kind]
    [:actions/set-portfolio-optimizer-risk-model-kind :set-portfolio-optimizer-risk-model-kind]
    [:actions/apply-portfolio-optimizer-setup-preset :apply-portfolio-optimizer-setup-preset]

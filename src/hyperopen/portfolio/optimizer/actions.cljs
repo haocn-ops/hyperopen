@@ -3,6 +3,7 @@
             [hyperopen.portfolio.optimizer.actions.draft-persistence :as draft-persistence]
             [hyperopen.portfolio.optimizer.actions.execution :as execution]
             [hyperopen.portfolio.optimizer.actions.exposure :as exposure]
+            [hyperopen.portfolio.optimizer.actions.history-assumptions-io :as history-assumptions-io]
             [hyperopen.portfolio.optimizer.actions.refinement :as refinement]
             [hyperopen.portfolio.optimizer.actions.return-views-io :as return-views-io]
             [hyperopen.portfolio.optimizer.actions.run :as run]
@@ -320,3 +321,15 @@
 
 (def dismiss-portfolio-optimizer-return-views-io-note
   return-views-io/dismiss-portfolio-optimizer-return-views-io-note)
+
+(def export-portfolio-optimizer-history-assumptions
+  history-assumptions-io/export-portfolio-optimizer-history-assumptions)
+
+(def import-portfolio-optimizer-history-assumptions
+  history-assumptions-io/import-portfolio-optimizer-history-assumptions)
+
+(def apply-imported-portfolio-optimizer-history-assumptions
+  history-assumptions-io/apply-imported-portfolio-optimizer-history-assumptions)
+
+(def dismiss-portfolio-optimizer-history-assumptions-io-note
+  history-assumptions-io/dismiss-portfolio-optimizer-history-assumptions-io-note)

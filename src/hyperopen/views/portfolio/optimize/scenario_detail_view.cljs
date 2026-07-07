@@ -51,8 +51,10 @@
                      (= :running (:status run-state)))
         save-state (:status scenario-save-state)
         saving? (= :saving save-state)
-        save-disabled? (or saving?
-                           (not current-result?))
+        ;; Save is available whenever a save isn't already in flight — a stale
+        ;; or missing result saves a setup-only snapshot (the workflow attaches
+        ;; results only when they still match the draft).
+        save-disabled? saving?
         can-refine? (boolean (:can-refine? refinement))
         solved? (= :solved (:status result))
         no-trades? (and solved?
@@ -93,6 +95,23 @@
                 :data-role "portfolio-optimizer-scenario-status-tag"}
          (opt-format/keyword-label status)]]]
       [:div {:class ["flex" "flex-wrap" "items-center" "gap-2"]}
+       ;; Back to the workspace: the scenario load already hydrated the draft
+       ;; with this scenario's config, so the setup page opens editing it and
+       ;; Save updates the same record.
+       [:button {:type "button"
+                 :class ["rounded-lg"
+                         "border"
+                         "border-base-300"
+                         "bg-base-200/40"
+                         "px-2.5"
+                         "py-1"
+                         "text-[0.65625rem]"
+                         "font-semibold"
+                         "text-trading-text"]
+                 :data-role "portfolio-optimizer-scenario-edit-setup"
+                 :on {:click [[:actions/navigate
+                               (portfolio-routes/portfolio-optimize-path)]]}}
+        "Edit setup"]
        [:button {:type "button"
                  :class ["optimizer-refine-action"
                          "rounded-lg"

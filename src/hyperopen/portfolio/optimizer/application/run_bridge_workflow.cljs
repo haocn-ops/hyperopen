@@ -160,42 +160,30 @@
   ;;
   ;; Only :solved results reach this fn — infeasible/failed/error runs keep the
   ;; user on the setup page with the banner + readiness rail focused on the fix.
-  [state state*]
+  [_state state*]
   (let [route (portfolio-routes/parse-portfolio-route (get-in state* [:router :path]))
         run-scenario-id (:scenario-id (run-state state*))
-        ;; A run is SCENARIO-BOUND only when its id was ALREADY the loaded saved
-        ;; scenario before this result arrived (the post-save workspace) —
-        ;; judged on the PRE-message state because apply-worker-result stamps
-        ;; loaded-id with the run's id on every success. A draft's own synthetic
-        ;; id (nil, "draft-current", …) with no previously loaded scenario is
-        ;; still an unsaved run and reveals on the "draft" alias exactly as
-        ;; before.
-        scenario-bound? (and (some? run-scenario-id)
-                             (= run-scenario-id (active-scenario-id state)))
         refresh {:command/type
                  :optimizer.workflow/refresh-portfolio-optimizer-rebalance-slippage-snapshots}
-        ;; The "draft" alias route only ever renders UNSAVED runs — revealing a
-        ;; scenario-bound run there shows a masked shell (the post-save draft-route
-        ;; wedge), so bound runs reveal on their own scenario surface.
+        ;; Workspace runs — saved-scenario ids included — always reveal on the
+        ;; "draft" alias: it renders the CURRENT workspace run (apply-worker-result
+        ;; stamps loaded-id with the run's id, which matches the workspace draft).
+        ;; Revealing a saved run on its own /scn_X surface would re-trigger the
+        ;; route load, which replaces the fresh in-memory run with the record's
+        ;; saved-run snapshot — nil for a setup-only save, wiping the result the
+        ;; user just watched finish.
         reveal {:command/type :optimizer.workflow/reveal-results
-                :path (portfolio-routes/portfolio-optimize-scenario-path
-                       (if scenario-bound? run-scenario-id "draft"))}]
+                :path (portfolio-routes/portfolio-optimize-scenario-path "draft")}]
     (case (:kind route)
       :optimize-new
       [refresh reveal]
 
       :optimize-scenario
-      (cond
-        (= (or run-scenario-id "draft") (:scenario-id route))
+      (if (contains? #{(or run-scenario-id "draft") "draft"}
+                     (:scenario-id route))
+        ;; The run's own scenario surface AND the draft alias both live-update
+        ;; in place — the alias shows the workspace run whatever its id is.
         [refresh]
-
-        ;; Watching from the draft alias while the workspace is save-bound: this
-        ;; page can never show the finished run, so announcing "complete" would
-        ;; point nowhere. Reveal the run's own surface instead.
-        (and scenario-bound? (= "draft" (:scenario-id route)))
-        [refresh reveal]
-
-        :else
         [refresh {:command/type :optimizer.workflow/announce-run-complete}])
 
       [refresh {:command/type :optimizer.workflow/announce-run-complete}])))

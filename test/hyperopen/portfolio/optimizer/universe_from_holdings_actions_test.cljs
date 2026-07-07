@@ -160,11 +160,13 @@
     (is (= [] (actions/auto-preseed-portfolio-optimizer-universe-from-current
                state "/portfolio/optimize/new")))))
 
-(deftest auto-preseed-only-fires-on-the-optimize-new-route-test
+(deftest auto-preseed-only-fires-on-the-workspace-route-test
   (let [state (assoc-in (holdings-state-with-spot true)
                         [:portfolio :optimizer :draft] nil)]
-    (is (= [] (actions/auto-preseed-portfolio-optimizer-universe-from-current
-               state "/portfolio/optimize")))
+    ;; The bare path IS the workspace (index page removed), so it preseeds like
+    ;; the legacy /new alias; loaded-scenario routes never preseed.
+    (is (seq (actions/auto-preseed-portfolio-optimizer-universe-from-current
+              state "/portfolio/optimize")))
     (is (= [] (actions/auto-preseed-portfolio-optimizer-universe-from-current
                state "/portfolio/optimize/some-scenario-id")))))
 

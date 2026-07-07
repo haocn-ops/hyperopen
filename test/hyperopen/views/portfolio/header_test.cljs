@@ -17,7 +17,7 @@
         deposit (hiccup/find-by-data-role view "portfolio-action-deposit")]
     (is (contains? (set (hiccup/collect-strings view)) "Portfolio"))
     (is (= 5 (count action-buttons)))
-    (is (= [[:actions/navigate "/portfolio/optimize/new"]]
+    (is (= [[:actions/navigate "/portfolio/optimize"]]
            (get-in optimize [1 :on :click])))
     (is (= [[:actions/navigate "/staking"]]
            (get-in link-staking [1 :on :click])))

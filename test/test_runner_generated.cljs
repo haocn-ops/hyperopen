@@ -267,9 +267,9 @@
             [hyperopen.portfolio.optimizer.application.view-model-facade-test]
             [hyperopen.portfolio.optimizer.application.view-model-frontier-test]
             [hyperopen.portfolio.optimizer.application.view-model-history-assumption-cards-test]
-            [hyperopen.portfolio.optimizer.application.view-model-index-test]
             [hyperopen.portfolio.optimizer.application.view-model-rebalance-test]
             [hyperopen.portfolio.optimizer.application.view-model-results-test]
+            [hyperopen.portfolio.optimizer.application.view-model-scenario-library-test]
             [hyperopen.portfolio.optimizer.application.view-model-setup-boundary-test]
             [hyperopen.portfolio.optimizer.application.view-model-test]
             [hyperopen.portfolio.optimizer.application.view-model.execution-reconcile-test]
@@ -325,6 +325,7 @@
             [hyperopen.portfolio.optimizer.refinement-domain-test]
             [hyperopen.portfolio.optimizer.return-views-io-actions-test]
             [hyperopen.portfolio.optimizer.runtime-catalog-test]
+            [hyperopen.portfolio.optimizer.scenario-library-actions-test]
             [hyperopen.portfolio.optimizer.target-sigma-actions-test]
             [hyperopen.portfolio.optimizer.tracking-actions-test]
             [hyperopen.portfolio.optimizer.universe-actions-test]
@@ -574,7 +575,6 @@
             [hyperopen.views.portfolio.optimize.frontier-chart-model-test]
             [hyperopen.views.portfolio.optimize.frontier-chart-toolbar-test]
             [hyperopen.views.portfolio.optimize.frontier-overlay-markers-test]
-            [hyperopen.views.portfolio.optimize.index-view-test]
             [hyperopen.views.portfolio.optimize.inputs-tab-test]
             [hyperopen.views.portfolio.optimize.optimization-progress-panel-test]
             [hyperopen.views.portfolio.optimize.refinement-status-card-test]
@@ -585,6 +585,7 @@
             [hyperopen.views.portfolio.optimize.return-views-io-panel-test]
             [hyperopen.views.portfolio.optimize.run-status-banner-test]
             [hyperopen.views.portfolio.optimize.scenario-detail-view-test]
+            [hyperopen.views.portfolio.optimize.scenario-picker-test]
             [hyperopen.views.portfolio.optimize.setup-actions-test]
             [hyperopen.views.portfolio.optimize.setup-history-assumptions-test]
             [hyperopen.views.portfolio.optimize.setup-layout-test]
@@ -1047,9 +1048,9 @@
              'hyperopen.portfolio.optimizer.application.view-model-facade-test
              'hyperopen.portfolio.optimizer.application.view-model-frontier-test
              'hyperopen.portfolio.optimizer.application.view-model-history-assumption-cards-test
-             'hyperopen.portfolio.optimizer.application.view-model-index-test
              'hyperopen.portfolio.optimizer.application.view-model-rebalance-test
              'hyperopen.portfolio.optimizer.application.view-model-results-test
+             'hyperopen.portfolio.optimizer.application.view-model-scenario-library-test
              'hyperopen.portfolio.optimizer.application.view-model-setup-boundary-test
              'hyperopen.portfolio.optimizer.application.view-model-test
              'hyperopen.portfolio.optimizer.application.view-model.execution-reconcile-test
@@ -1105,6 +1106,7 @@
              'hyperopen.portfolio.optimizer.refinement-domain-test
              'hyperopen.portfolio.optimizer.return-views-io-actions-test
              'hyperopen.portfolio.optimizer.runtime-catalog-test
+             'hyperopen.portfolio.optimizer.scenario-library-actions-test
              'hyperopen.portfolio.optimizer.target-sigma-actions-test
              'hyperopen.portfolio.optimizer.tracking-actions-test
              'hyperopen.portfolio.optimizer.universe-actions-test
@@ -1354,7 +1356,6 @@
              'hyperopen.views.portfolio.optimize.frontier-chart-model-test
              'hyperopen.views.portfolio.optimize.frontier-chart-toolbar-test
              'hyperopen.views.portfolio.optimize.frontier-overlay-markers-test
-             'hyperopen.views.portfolio.optimize.index-view-test
              'hyperopen.views.portfolio.optimize.inputs-tab-test
              'hyperopen.views.portfolio.optimize.optimization-progress-panel-test
              'hyperopen.views.portfolio.optimize.refinement-status-card-test
@@ -1365,6 +1366,7 @@
              'hyperopen.views.portfolio.optimize.return-views-io-panel-test
              'hyperopen.views.portfolio.optimize.run-status-banner-test
              'hyperopen.views.portfolio.optimize.scenario-detail-view-test
+             'hyperopen.views.portfolio.optimize.scenario-picker-test
              'hyperopen.views.portfolio.optimize.setup-actions-test
              'hyperopen.views.portfolio.optimize.setup-history-assumptions-test
              'hyperopen.views.portfolio.optimize.setup-layout-test

@@ -223,6 +223,7 @@
    :universe-search-active-index 0
    :proxy-search-queries {}
    :objective-menu-open? false
+   :scenario-menu-open? false
    :objective-menu-selection nil
    :objective-menu-view-order []
    :objective-menu-view-drafts {}

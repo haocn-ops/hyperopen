@@ -42,6 +42,7 @@
 (def ^:dynamic *load-scenario-index!* persistence/load-scenario-index!)
 (def ^:dynamic *load-scenario!* persistence/load-scenario!)
 (def ^:dynamic *load-draft!* persistence/load-draft!)
+(def ^:dynamic *delete-draft!* persistence/delete-draft!)
 (def ^:dynamic *save-scenario!* persistence/save-scenario!)
 (def ^:dynamic *save-scenario-index!* persistence/save-scenario-index!)
 (def ^:dynamic *load-tracking!* persistence/load-tracking!)
@@ -653,3 +654,14 @@
      :note-restored! draft-autosave/note-persisted!}
     store
     path)))
+
+(defn reset-portfolio-optimizer-draft-effect
+  ([_ store]
+   (scenario-effects/reset-portfolio-optimizer-draft-effect
+    {:delete-draft! *delete-draft!*
+     :dispatch! *dispatch!*
+     ;; Forget the "already persisted" marker: the IndexedDB record is gone, so
+     ;; a future draft identical to the old one must still be written.
+     :note-reset! #(draft-autosave/note-persisted! nil)}
+    store
+    nil)))

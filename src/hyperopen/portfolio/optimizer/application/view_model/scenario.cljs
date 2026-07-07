@@ -30,13 +30,18 @@
     (and (= scenario-id (:scenario-id load-state))
          (= :loading (:status load-state)))))
 
-(defn- retained-unsaved-run?
+(defn- retained-workspace-run?
+  ;; The draft alias renders the CURRENT WORKSPACE run. Since saving keeps the
+  ;; user on the workspace (2026-07-06 scenario-library landing), the workspace
+  ;; draft may itself be a saved scenario being edited in place — so the run
+  ;; belongs here whenever it was produced for the draft in the workspace
+  ;; (loaded-id stamped by the run matches the draft's id), regardless of the
+  ;; draft's saved/unsaved status. Gating on an UNSAVED status masked the run a
+  ;; user just watched finish (idle N/A shell, no frontier).
   [state]
   (let [loaded-id (get-in state contracts/active-scenario-loaded-id-path)
-        draft-id (get-in state contracts/draft-id-path)
-        draft-status (get-in state contracts/draft-status-path)]
+        draft-id (get-in state contracts/draft-id-path)]
     (and (some? (get-in state contracts/last-successful-run-path))
-         (contains? #{nil :draft} draft-status)
          (or (nil? loaded-id)
              (= loaded-id draft-id)))))
 
@@ -44,26 +49,25 @@
   [scenario-id]
   (= "draft" scenario-id))
 
-(defn- retained-unsaved-route?
+(defn- retained-workspace-route?
   [state scenario-id]
-  (and (retained-unsaved-run? state)
+  (and (retained-workspace-run? state)
        (draft-alias? scenario-id)))
 
 (defn route-mismatched?
   [state scenario-id]
   (let [loaded-id (get-in state contracts/active-scenario-loaded-id-path)]
-    (and (not (retained-unsaved-route? state scenario-id))
+    (and (not (retained-workspace-route? state scenario-id))
          (or (and (some? loaded-id)
                   (not= loaded-id scenario-id))
              (and (nil? loaded-id)
                   (or (pending-route-load? state scenario-id)
-                      (retained-unsaved-run? state)))))))
+                      (retained-workspace-run? state)))))))
 
 (defn route-loading?
   "True when the routed scenario is masked AND a load can actually resolve it.
-  The \"draft\" alias has no loader — once a save binds the workspace to a real
-  scenario id there is simply no unsaved run to show, which is an idle state,
-  never a loading one."
+  The \"draft\" alias has no loader — with no retained workspace run to show it
+  is an idle state, never a loading one."
   [state scenario-id]
   (and (route-mismatched? state scenario-id)
        (not (draft-alias? scenario-id))))
@@ -94,7 +98,7 @@
   (or (when (loaded-scenario-matches-route? state scenario-id)
         (or (get-in state contracts/active-scenario-name-path)
             (get-in state contracts/draft-name-path)))
-      (when (retained-unsaved-route? state scenario-id)
+      (when (retained-workspace-route? state scenario-id)
         (or (get-in state contracts/draft-name-path)
             "Unsaved Optimization"))
       (when (= scenario-id (get-in state contracts/draft-id-path))

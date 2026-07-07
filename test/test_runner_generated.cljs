@@ -233,6 +233,7 @@
             [hyperopen.portfolio.optimizer.application.execution-order-type-test]
             [hyperopen.portfolio.optimizer.application.execution-test]
             [hyperopen.portfolio.optimizer.application.execution-workflow-test]
+            [hyperopen.portfolio.optimizer.application.history-assumptions-io-test]
             [hyperopen.portfolio.optimizer.application.history-loader-api-v2-legacy-fallback-test]
             [hyperopen.portfolio.optimizer.application.history-loader-api-v2-split-test]
             [hyperopen.portfolio.optimizer.application.history-loader-api-v2-test]
@@ -307,6 +308,7 @@
             [hyperopen.portfolio.optimizer.exposure-actions-test]
             [hyperopen.portfolio.optimizer.fixtures-test]
             [hyperopen.portfolio.optimizer.frontier-actions-test]
+            [hyperopen.portfolio.optimizer.history-assumptions-io-actions-test]
             [hyperopen.portfolio.optimizer.ids-test]
             [hyperopen.portfolio.optimizer.infrastructure.draft-autosave-test]
             [hyperopen.portfolio.optimizer.infrastructure.history-api-v2-client-test]
@@ -589,6 +591,7 @@
             [hyperopen.views.portfolio.optimize.scenario-detail-view-test]
             [hyperopen.views.portfolio.optimize.scenario-picker-test]
             [hyperopen.views.portfolio.optimize.setup-actions-test]
+            [hyperopen.views.portfolio.optimize.setup-history-assumptions-io-panel-test]
             [hyperopen.views.portfolio.optimize.setup-history-assumptions-test]
             [hyperopen.views.portfolio.optimize.setup-layout-test]
             [hyperopen.views.portfolio.optimize.setup-readiness-panel-test]
@@ -1016,6 +1019,7 @@
              'hyperopen.portfolio.optimizer.application.execution-order-type-test
              'hyperopen.portfolio.optimizer.application.execution-test
              'hyperopen.portfolio.optimizer.application.execution-workflow-test
+             'hyperopen.portfolio.optimizer.application.history-assumptions-io-test
              'hyperopen.portfolio.optimizer.application.history-loader-api-v2-legacy-fallback-test
              'hyperopen.portfolio.optimizer.application.history-loader-api-v2-split-test
              'hyperopen.portfolio.optimizer.application.history-loader-api-v2-test
@@ -1090,6 +1094,7 @@
              'hyperopen.portfolio.optimizer.exposure-actions-test
              'hyperopen.portfolio.optimizer.fixtures-test
              'hyperopen.portfolio.optimizer.frontier-actions-test
+             'hyperopen.portfolio.optimizer.history-assumptions-io-actions-test
              'hyperopen.portfolio.optimizer.ids-test
              'hyperopen.portfolio.optimizer.infrastructure.draft-autosave-test
              'hyperopen.portfolio.optimizer.infrastructure.history-api-v2-client-test
@@ -1372,6 +1377,7 @@
              'hyperopen.views.portfolio.optimize.scenario-detail-view-test
              'hyperopen.views.portfolio.optimize.scenario-picker-test
              'hyperopen.views.portfolio.optimize.setup-actions-test
+             'hyperopen.views.portfolio.optimize.setup-history-assumptions-io-panel-test
              'hyperopen.views.portfolio.optimize.setup-history-assumptions-test
              'hyperopen.views.portfolio.optimize.setup-layout-test
              'hyperopen.views.portfolio.optimize.setup-readiness-panel-test

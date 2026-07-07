@@ -3,8 +3,10 @@
   the view-model cards and dispatch the carried action ids only - no history
   math, no raw payload branching."
   (:require [hyperopen.portfolio.optimizer.application.view-model :as optimizer-view-model]
+            [hyperopen.portfolio.optimizer.contracts :as contracts]
             [hyperopen.views.portfolio.optimize.setup-controls :as controls]
-            [hyperopen.views.portfolio.optimize.setup-history-assumption-panels :as panels]))
+            [hyperopen.views.portfolio.optimize.setup-history-assumption-panels :as panels]
+            [hyperopen.views.portfolio.optimize.setup-history-assumptions-io :as assumptions-io]))
 
 (def ^:private card-subtext
   "Insufficient native history. Model behavior using proxies.")
@@ -346,6 +348,13 @@
                    :on {:click [[(get-in card [:actions :clear]) id]]}}
           "Clear"])]]
      (mode-tabs card)
+     ;; The agent's stated reason for an imported configuration — the trust
+     ;; artifact that lets the user audit a file-authored basket at a glance.
+     (when (:rationale card)
+       [:p {:class ["border" "border-base-300" "bg-base-200/20" "p-2"
+                    "text-[0.75rem]" "leading-[1.45]" "text-trading-muted"]
+            :data-role (str "portfolio-optimizer-history-assumption-rationale-" id)}
+       (str "Agent rationale: " (:rationale card))])
      (case (:mode card)
        :proxy (proxy-fields card)
        :conservative (conservative-fields card)
@@ -423,6 +432,11 @@
                       (if (= 1 (count cards))
                         " asset in the workflow"
                         " assets in the workflow"))])]
+             (assumptions-io/io-toolbar
+              {:asset-count (count cards)
+               :universe-count (+ (count cards) (count addable-assets))})
+             (assumptions-io/io-note
+              (get-in state contracts/ui-history-assumptions-io-note-path))
              ;; The picker gets its OWN full-width row so the placeholder text is
              ;; never clipped by the header's title/description competing for width.
              (add-asset-select addable-assets)]

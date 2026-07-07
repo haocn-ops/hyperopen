@@ -2,7 +2,8 @@
   (:require [hyperopen.portfolio.optimizer.actions :as actions]
             [hyperopen.portfolio.optimizer.black-litterman-actions :as bl-actions]
             [hyperopen.portfolio.optimizer.frontier-actions :as frontier-actions]
-            [hyperopen.runtime.effect-adapters.portfolio-optimizer :as effect-adapters]))
+            [hyperopen.runtime.effect-adapters.portfolio-optimizer :as effect-adapters]
+            [hyperopen.runtime.effect-adapters.portfolio-optimizer-io :as effect-adapters-io]))
 
 (defn action-deps
   []
@@ -40,6 +41,14 @@
     actions/apply-imported-portfolio-optimizer-return-views
     :dismiss-portfolio-optimizer-return-views-io-note
     actions/dismiss-portfolio-optimizer-return-views-io-note
+    :export-portfolio-optimizer-history-assumptions
+    actions/export-portfolio-optimizer-history-assumptions
+    :import-portfolio-optimizer-history-assumptions
+    actions/import-portfolio-optimizer-history-assumptions
+    :apply-imported-portfolio-optimizer-history-assumptions
+    actions/apply-imported-portfolio-optimizer-history-assumptions
+    :dismiss-portfolio-optimizer-history-assumptions-io-note
+    actions/dismiss-portfolio-optimizer-history-assumptions-io-note
     :set-portfolio-optimizer-return-model-kind
     actions/set-portfolio-optimizer-return-model-kind
     :set-portfolio-optimizer-risk-model-kind
@@ -284,6 +293,10 @@
       effect-adapters/download-portfolio-optimizer-return-views-file-effect
       :pick-portfolio-optimizer-return-views-file
       effect-adapters/pick-portfolio-optimizer-return-views-file-effect
+      :download-portfolio-optimizer-history-assumptions-file
+      effect-adapters-io/download-portfolio-optimizer-history-assumptions-file-effect
+      :pick-portfolio-optimizer-history-assumptions-file
+      effect-adapters-io/pick-portfolio-optimizer-history-assumptions-file-effect
       :load-portfolio-optimizer-assumption-library
       effect-adapters/load-portfolio-optimizer-assumption-library-effect
       :sync-portfolio-optimizer-assumption-library

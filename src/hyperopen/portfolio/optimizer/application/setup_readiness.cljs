@@ -2,6 +2,7 @@
   (:require [clojure.set :as set]
             [clojure.string :as str]
             [hyperopen.portfolio.optimizer.application.current-portfolio :as current-portfolio]
+            [hyperopen.portfolio.optimizer.application.draft-enrichment :as draft-enrichment]
             [hyperopen.portfolio.optimizer.application.orderbook-loader :as orderbook-loader]
             [hyperopen.portfolio.optimizer.application.request-builder :as request-builder]
             [hyperopen.portfolio.optimizer.contracts :as contracts]
@@ -102,7 +103,8 @@
   ;; expensive to redo on every streaming render. The snapshot is memoized on
   ;; its own inputs, so comparing these resolved inputs by value stays cheap.
   [state draft]
-  (let [inputs {:draft draft
+  (let [draft (draft-enrichment/enrich-draft-instruments state draft)
+        inputs {:draft draft
                 :current-portfolio (with-manual-capital
                                      (current-portfolio/current-portfolio-snapshot state)
                                      draft)

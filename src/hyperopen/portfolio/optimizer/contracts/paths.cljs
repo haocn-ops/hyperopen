@@ -102,6 +102,9 @@
   (conj optimizer-ui-path :draft-add-asset-open?))
 (def ui-objective-menu-open-path
   (conj optimizer-ui-path :objective-menu-open?))
+;; Workspace-header "Scenarios" popover (the saved-scenario library menu).
+(def ui-scenario-menu-open-path
+  (conj optimizer-ui-path :scenario-menu-open?))
 (def ui-objective-menu-selection-path
   (conj optimizer-ui-path :objective-menu-selection))
 (def ui-objective-menu-view-order-path
@@ -206,6 +209,7 @@
    :optimizer-ui/universe-search-active-index ui-universe-search-active-index-path
    :optimizer-ui/draft-add-asset-open ui-draft-add-asset-open-path
    :optimizer-ui/objective-menu-open ui-objective-menu-open-path
+   :optimizer-ui/scenario-menu-open ui-scenario-menu-open-path
    :optimizer-ui/objective-menu-selection ui-objective-menu-selection-path
    :optimizer-ui/objective-menu-view-order ui-objective-menu-view-order-path
    :optimizer-ui/objective-menu-view-drafts ui-objective-menu-view-drafts-path

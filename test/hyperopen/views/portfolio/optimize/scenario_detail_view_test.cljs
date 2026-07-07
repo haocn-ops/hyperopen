@@ -414,12 +414,15 @@
               (node-by-role view-node "portfolio-optimizer-scenario-stale-banner")
               :replicant/on-render)))
     (is (nil? (node-by-role view-node "portfolio-optimizer-scenario-rerun-stale")))
-    (is (= true
-           (get-in (node-by-role view-node "portfolio-optimizer-scenario-save")
-                   [1 :disabled])))
-    (is (nil?
-         (click-actions
-          (node-by-role view-node "portfolio-optimizer-scenario-save"))))
+    ;; Save stays available while stale: the workflow persists a setup-only
+    ;; snapshot instead of freezing the outdated result.
+    (is (= false
+           (boolean
+            (get-in (node-by-role view-node "portfolio-optimizer-scenario-save")
+                    [1 :disabled]))))
+    (is (= [[:actions/open-portfolio-optimizer-scenario-save-modal]]
+           (click-actions
+            (node-by-role view-node "portfolio-optimizer-scenario-save"))))
     (is (= [[:actions/run-portfolio-optimizer-from-draft]]
            (click-actions
             (node-by-role view-node "portfolio-optimizer-scenario-rerun"))))
@@ -598,9 +601,9 @@
         save-button (node-by-role view-node "portfolio-optimizer-scenario-save")]
     (is (some? (node-by-role view-node "portfolio-optimizer-scenario-stale-banner"))
         "A clean draft is still stale when the retained solved run was produced from different optimizer inputs.")
-    (is (= true (get-in save-button [1 :disabled]))
-        "Mismatched solved runs must not be saveable as the active scenario.")
-    (is (nil?
+    (is (= false (boolean (get-in save-button [1 :disabled])))
+        "Save stays available while stale — the workflow refuses to attach the mismatched run and persists setup-only.")
+    (is (= [[:actions/open-portfolio-optimizer-scenario-save-modal]]
            (click-actions save-button)))
     (is (nil? (node-by-role view-node
                              "portfolio-optimizer-recommendation-stale-blocked"))

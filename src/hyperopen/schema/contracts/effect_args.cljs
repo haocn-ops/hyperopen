@@ -372,4 +372,5 @@
 	   :effects/pick-portfolio-optimizer-return-views-file ::common/no-args
 	   :effects/load-portfolio-optimizer-assumption-library ::common/no-args
 	   :effects/sync-portfolio-optimizer-assumption-library ::portfolio-optimizer-assumption-library-sync-args
-	   :effects/restore-portfolio-optimizer-draft ::common/no-args})
+	   :effects/restore-portfolio-optimizer-draft ::common/no-args
+	   :effects/reset-portfolio-optimizer-draft ::common/no-args})

@@ -1,6 +1,5 @@
 (ns hyperopen.views.portfolio.optimize.view
   (:require [hyperopen.portfolio.routes :as portfolio-routes]
-            [hyperopen.views.portfolio.optimize.index-view :as index-view]
             [hyperopen.views.portfolio.optimize.scenario-detail-view :as scenario-detail-view]
             [hyperopen.views.portfolio.optimize.scenario-save-modal :as scenario-save-modal]
             [hyperopen.views.portfolio.optimize.setup-view :as setup-view]))
@@ -12,8 +11,6 @@
     [:div {:class ["contents"]
            :data-role "portfolio-optimizer-route-content"}
      (case (:kind route)
-       :optimize-index (index-view/index-view state)
-       :optimize-new (setup-view/setup-view state route)
        :optimize-scenario (scenario-detail-view/scenario-detail-view state route)
-       (index-view/index-view state))
+       (setup-view/setup-view state route))
      (scenario-save-modal/scenario-save-modal state)]))

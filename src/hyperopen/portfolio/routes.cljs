@@ -52,8 +52,12 @@
       {:kind :page
        :path path*}
 
+      ;; The workspace IS the landing page: /portfolio/optimize opens the setup
+      ;; surface directly (the scenario-board index page was removed 2026-07-06).
+      ;; /portfolio/optimize/new remains a legacy alias for old links; in-app
+      ;; links emit the canonical bare path.
       (= path* optimize-route-prefix)
-      {:kind :optimize-index
+      {:kind :optimize-new
        :path path*}
 
       (= path* (str optimize-route-prefix "/new"))
@@ -80,25 +84,34 @@
 
 (defn portfolio-route?
   [path]
-  (contains? #{:page :trader :other :optimize-index :optimize-new :optimize-scenario}
+  (contains? #{:page :trader :other :optimize-new :optimize-scenario}
              (:kind (parse-portfolio-route path))))
 
 (defn portfolio-optimize-route?
   [path]
-  (contains? #{:optimize-index :optimize-new :optimize-scenario}
+  (contains? #{:optimize-new :optimize-scenario}
              (:kind (parse-portfolio-route path))))
 
 (defn portfolio-optimize-scenario-id
   [path]
   (:scenario-id (parse-portfolio-route path)))
 
+(defn portfolio-optimize-path
+  "Canonical optimizer path: /portfolio/optimize opens the setup workspace
+  directly (there is no scenario-index page)."
+  []
+  optimize-route-prefix)
+
 (defn portfolio-optimize-index-path
+  "Deprecated alias for portfolio-optimize-path — the index page is gone."
   []
   optimize-route-prefix)
 
 (defn portfolio-optimize-new-path
+  "Deprecated alias for portfolio-optimize-path — the workspace is the landing
+  page, so there is no separate /new URL to emit (the /new path still parses)."
   []
-  (str optimize-route-prefix "/new"))
+  optimize-route-prefix)
 
 (defn portfolio-optimize-scenario-path
   [scenario-id]

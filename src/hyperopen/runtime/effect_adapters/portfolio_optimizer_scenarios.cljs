@@ -41,18 +41,17 @@
    (get-in state (conj contracts/active-scenario-path :address))))
 
 (defn- current-scenario-id
+  ;; The workspace route is no longer forced to mint a fresh id: with
+  ;; /portfolio/optimize as the working page, "Save" on an open scenario must
+  ;; update that scenario in place. Fresh identity is an explicit choice now —
+  ;; the "New scenario" action clears the active scenario and draft id.
   [env state opts now-ms]
-  (let [route-kind (:kind (portfolio-routes/parse-portfolio-route
-                           (get-in state [:router :path])))
-        new-route? (= :optimize-new route-kind)]
-    (or (saved-scenario-id (:scenario-id opts))
-        (when-not new-route?
-          (saved-scenario-id
-           (get-in state contracts/active-scenario-loaded-id-path)))
-        (when-not new-route?
-          (saved-scenario-id
-           (get-in state contracts/draft-id-path)))
-        ((env-fn env :next-scenario-id) now-ms))))
+  (or (saved-scenario-id (:scenario-id opts))
+      (saved-scenario-id
+       (get-in state contracts/active-scenario-loaded-id-path))
+      (saved-scenario-id
+       (get-in state contracts/draft-id-path))
+      ((env-fn env :next-scenario-id) now-ms)))
 
 (defn- apply-result!
   [store result]
@@ -87,14 +86,21 @@
   (scenario-operations/complete operation state completed-at-ms))
 
 (defn- dispatch-saved-scenario-route!
+  ;; Saving from the workspace stays on the workspace (feedback lives in the
+  ;; header scenario strip); only a save issued from a scenario surface — the
+  ;; /portfolio/optimize/draft alias after a run — re-canonicalizes its URL to
+  ;; the saved scenario's own route.
   [env store scenario-record]
   (when-let [scenario-id (saved-scenario-id (:id scenario-record))]
     (let [path (portfolio-routes/portfolio-optimize-scenario-path scenario-id)
           current-path (get-in @store [:router :path])
+          route-kind (:kind (portfolio-routes/parse-portfolio-route
+                             (or current-path "")))
           dispatch! (env-fn env :dispatch!)]
       (when (and path
                  current-path
                  dispatch!
+                 (= :optimize-scenario route-kind)
                  (not= current-path path))
         (dispatch! store nil [[:actions/navigate path {:replace? true}]])))))
 
@@ -335,6 +341,31 @@
        :address address
        :scenario-id scenario-id
        :started-at-ms started-at-ms}))))
+
+(defn reset-portfolio-optimizer-draft-effect
+  "The explicit New-scenario fresh start. Deletes the per-wallet autosaved
+  draft record FIRST — a reset draft is untouched again, so a surviving
+  `draft::<addr>` record would be restored right back by the arrival watchers —
+  then resets the workspace state and re-runs the holdings preseed so the page
+  behaves like a first visit."
+  [env store _opts]
+  (let [address (account-context/effective-account-address @store)
+        delete-draft! (env-fn env :delete-draft!)
+        dispatch! (env-fn env :dispatch!)
+        note-reset! (or (env-fn env :note-reset!) (fn []))
+        reset! (fn []
+                 (swap! store scenario-workflow/reset-workspace-state)
+                 (note-reset!)
+                 (when dispatch!
+                   (dispatch! store
+                              nil
+                              [[:actions/set-portfolio-optimizer-universe-from-current]]))
+                 nil)]
+    (if (and address delete-draft!)
+      (-> (delete-draft! address)
+          (.then (fn [_persisted?] (reset!)))
+          (.catch (fn [_err] (reset!))))
+      (js/Promise.resolve (reset!)))))
 
 (defn restore-portfolio-optimizer-draft-effect
   "Restore the per-wallet persisted draft into an untouched /optimize/new draft,

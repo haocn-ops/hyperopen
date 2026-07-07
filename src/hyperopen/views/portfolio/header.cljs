@@ -7,7 +7,7 @@
 (def ^:private action-items
   [{:label "Optimize"
     :data-role "portfolio-action-optimize"
-    :action [:actions/navigate (portfolio-routes/portfolio-optimize-new-path)]}
+    :action [:actions/navigate (portfolio-routes/portfolio-optimize-path)]}
    {:label "Link Staking"
     :mobile-label "Staking"
     :data-role "portfolio-action-link-staking"

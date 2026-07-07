@@ -208,7 +208,9 @@
         results-link (node-by-role view-node "portfolio-optimizer-results-link")]
     (is (nil? (node-by-role view-node "portfolio-optimizer-view-weights"))
         "The setup action bar should not require a second click after optimization succeeds.")
-    (is (= [[:actions/navigate "/portfolio/optimize/draft-current"]]
+    ;; Workspace CTAs target the draft alias — it renders the current run in
+    ;; place, while a scenario route would re-load and clobber it.
+    (is (= [[:actions/navigate "/portfolio/optimize/draft"]]
            (click-actions results-link)))))
 
 (deftest portfolio-optimizer-workspace-keeps-completed-run-link-after-snapshot-drift-test
@@ -226,7 +228,7 @@
         view-node (portfolio-view/portfolio-view state*)
         results-link (node-by-role view-node "portfolio-optimizer-results-link")]
     (is (nil? (node-by-role view-node "portfolio-optimizer-view-weights")))
-    (is (= [[:actions/navigate "/portfolio/optimize/draft-current"]]
+    (is (= [[:actions/navigate "/portfolio/optimize/draft"]]
            (click-actions results-link)))))
 
 (deftest portfolio-optimizer-workspace-hides-clean-mismatched-result-test

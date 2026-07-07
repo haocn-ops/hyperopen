@@ -121,7 +121,10 @@
     (is (= :saving (get-in model [:scenario-save-state :status])))
     (is (= :idle (get-in model [:history-load-state :status])))
     (is (= {:selected-kind :absolute} (:editor-state model)))
-    (is (= "/portfolio/optimize/scn_current" (:result-path model)))
+    ;; Workspace CTAs target the draft alias even when a saved scenario is
+    ;; open: the alias renders the current run in place, while /scn_current
+    ;; would re-load the record and clobber the fresh in-memory run.
+    (is (= "/portfolio/optimize/draft" (:result-path model)))
     (is (false? (:running? model)))
     (is (true? (:run-triggerable? model)))
     (is (true? (:saving-scenario? model)))

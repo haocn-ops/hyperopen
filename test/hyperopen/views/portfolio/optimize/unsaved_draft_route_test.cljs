@@ -220,25 +220,29 @@
     (is (not (contains? strings
                         "Run or load a scenario to stage its rebalance here for review and execution.")))))
 
-(deftest draft-route-after-save-renders-idle-not-loading-test
-  ;; Post-save wedge regression: saving stamps the workspace draft with the saved
-  ;; scenario id/status and points active-scenario at it, so the /draft alias no
-  ;; longer has a retained unsaved run to show. It must render the honest idle
-  ;; empty state — never the "is loading" shell (nothing is loading and no loader
-  ;; exists for the id "draft"), and never a read-only claim about the user's own
-  ;; workspace.
+(deftest draft-route-renders-workspace-run-of-a-saved-scenario-test
+  ;; Save keeps the user on the workspace (2026-07-06 scenario-library landing),
+  ;; so the workspace draft may BE a saved scenario being edited in place — a
+  ;; run of that draft must render on the /draft alias like any workspace run.
+  ;; Regression pinned: this exact state (saved-status draft whose id matches
+  ;; the stamped loaded-id, current solved run retained) rendered as a masked
+  ;; idle N/A shell with no frontier after running from the workspace in a
+  ;; session where the draft was restored from the per-wallet autosave.
   (let [state (with-current-solved-run
                 {:router {:path "/portfolio/optimize/draft"}
                  :portfolio {:optimizer
                              {:active-scenario {:loaded-id "scn-1"
-                                                :status :saved
+                                                :status :computed
                                                 :read-only? false}
                               :draft {:id "scn-1"
                                       :status :saved
                                       :name "Saved scenario"
                                       :universe [{:instrument-id "perp:BTC"
                                                   :market-type :perp
-                                                  :coin "BTC"}]
+                                                  :coin "BTC"}
+                                                 {:instrument-id "perp:ETH"
+                                                  :market-type :perp
+                                                  :coin "ETH"}]
                                       :objective {:kind :minimum-variance}
                                       :return-model {:kind :historical-mean}
                                       :risk-model {:kind :diagonal-shrink}
@@ -247,14 +251,44 @@
                 solved-result)
         view-node (portfolio-view/portfolio-view state)
         strings (set (collect-strings view-node))]
-    (is (some? (node-by-role view-node "portfolio-optimizer-recommendation-empty"))
-        "renders the idle empty tab, not the masked result")
+    (is (some? (node-by-role view-node "portfolio-optimizer-results-surface"))
+        "the workspace run renders — no masked idle shell")
+    (is (some? (node-by-role view-node "portfolio-optimizer-target-exposure-table")))
+    (is (nil? (node-by-role view-node "portfolio-optimizer-recommendation-empty")))
+    (is (contains? strings "Saved scenario")
+        "the surface carries the saved scenario's name, not a masked default")
     (is (nil? (node-by-role view-node "portfolio-optimizer-scenario-loading-state"))
         "never claims a load is in progress for the draft alias")
     (is (not-any? #(re-find #"is loading" %) strings)
         "no loading copy anywhere on the surface")
     (is (not-any? #(re-find #"read-only" %) strings)
         "no read-only claim about the user's own draft workspace")))
+
+(deftest draft-route-without-a-run-for-a-saved-draft-renders-idle-test
+  ;; No retained run at all: the alias still shows the honest idle empty state
+  ;; (nothing is loading and no loader exists for the id "draft").
+  (let [state {:router {:path "/portfolio/optimize/draft"}
+               :portfolio {:optimizer
+                           {:active-scenario {:loaded-id "scn-1"
+                                              :status :saved
+                                              :read-only? false}
+                            :draft {:id "scn-1"
+                                    :status :saved
+                                    :name "Saved scenario"
+                                    :universe [{:instrument-id "perp:BTC"
+                                                :market-type :perp
+                                                :coin "BTC"}]
+                                    :objective {:kind :minimum-variance}
+                                    :return-model {:kind :historical-mean}
+                                    :risk-model {:kind :diagonal-shrink}
+                                    :constraints {:max-asset-weight 0.4
+                                                  :gross-max 1.5}}}}}
+        view-node (portfolio-view/portfolio-view state)
+        strings (set (collect-strings view-node))]
+    (is (some? (node-by-role view-node "portfolio-optimizer-recommendation-empty")))
+    (is (nil? (node-by-role view-node "portfolio-optimizer-scenario-loading-state")))
+    (is (not-any? #(re-find #"is loading" %) strings))
+    (is (not-any? #(re-find #"read-only" %) strings))))
 
 (deftest draft-route-with-empty-draft-disables-rerun-with-reason-test
   ;; Rerun dispatches against the real draft; with an empty universe the run

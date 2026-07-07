@@ -354,7 +354,7 @@
        [:p {:class ["border" "border-base-300" "bg-base-200/20" "p-2"
                     "text-[0.75rem]" "leading-[1.45]" "text-trading-muted"]
             :data-role (str "portfolio-optimizer-history-assumption-rationale-" id)}
-        (str "Agent rationale: " (:rationale card))])
+       (str "Agent rationale: " (:rationale card))])
      (case (:mode card)
        :proxy (proxy-fields card)
        :conservative (conservative-fields card)

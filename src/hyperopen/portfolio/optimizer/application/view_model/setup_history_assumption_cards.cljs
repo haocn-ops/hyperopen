@@ -536,4 +536,3 @@
       ;; the while-loading suppression key off it); the section itself also
       ;; renders in a compact form when only the manual entry point applies.
       :applicable? (boolean (seq cards))})))
-

@@ -260,6 +260,7 @@
             [hyperopen.portfolio.optimizer.application.setup-readiness-current-history-test]
             [hyperopen.portfolio.optimizer.application.setup-readiness-enrichment-test]
             [hyperopen.portfolio.optimizer.application.setup-readiness-test]
+            [hyperopen.portfolio.optimizer.application.setup-readiness-warning-policy-test]
             [hyperopen.portfolio.optimizer.application.tracking-test]
             [hyperopen.portfolio.optimizer.application.universe-candidates-cache-test]
             [hyperopen.portfolio.optimizer.application.universe-candidates-test]
@@ -1042,6 +1043,7 @@
              'hyperopen.portfolio.optimizer.application.setup-readiness-current-history-test
              'hyperopen.portfolio.optimizer.application.setup-readiness-enrichment-test
              'hyperopen.portfolio.optimizer.application.setup-readiness-test
+             'hyperopen.portfolio.optimizer.application.setup-readiness-warning-policy-test
              'hyperopen.portfolio.optimizer.application.tracking-test
              'hyperopen.portfolio.optimizer.application.universe-candidates-cache-test
              'hyperopen.portfolio.optimizer.application.universe-candidates-test

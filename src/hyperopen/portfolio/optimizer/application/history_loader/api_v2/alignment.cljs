@@ -150,6 +150,34 @@
   [warning]
   (contains? api-v2-display-data-warning-codes (:code warning)))
 
+(def ^:private proxy-extension-warning-codes
+  ;; Codes about the backend's OPTIONAL catalog-proxy lookback extension. When
+  ;; that extension fails validation the backend falls back to serving the
+  ;; asset's own native series, so the warning documents a shorter lookback -
+  ;; it must not reject the served series itself (live 2026-07-07: STRK's
+  ;; Tiingo extension failed quality checks while 870 usable native daily
+  ;; points were served, and the hard exclusion discarded all of them).
+  #{:proxy-mapping-unapproved
+    :proxy-validation-failed})
+
+(def ^:private own-history-lineage-kinds
+  ;; Lineages that are the asset's OWN realized history - the only series a
+  ;; failed-proxy warning may be forgiven against. A proxy-derived or unknown
+  ;; lineage stays hard-excluded when its proxy failed validation.
+  #{:native :vault-derived})
+
+(defn- own-usable-series?
+  [series]
+  (and (usable-series? series)
+       (contains? own-history-lineage-kinds (:lineage-kind series))
+       (not (contains? #{:failed :rejected}
+                       (get-in series [:quality :status])))))
+
+(defn- forgiven-proxy-warning?
+  [warning series]
+  (and (contains? proxy-extension-warning-codes (:code warning))
+       (own-usable-series? series)))
+
 (defn- warning-id-map
   [rows]
   (into {}
@@ -178,10 +206,11 @@
              (:instrument-id warning)))
 
 (defn- hard-warning-for-instrument?
-  [api-v2-history local-id backend-id]
+  [api-v2-history local-id backend-id series]
   (boolean
    (some (fn [warning]
            (and (legacy-fallback/hard-warning? warning)
+                (not (forgiven-proxy-warning? warning series))
                 (warning-targets-instrument? local-id backend-id warning)))
          (:warnings api-v2-history))))
 
@@ -224,7 +253,8 @@
                            hard-api-warning? (hard-warning-for-instrument?
                                               api-v2-history
                                               local-id
-                                              backend-id)
+                                              backend-id
+                                              api-series)
                            legacy-series* (legacy-fallback/series
                                            instrument
                                            candle-history-by-coin
@@ -262,11 +292,21 @@
                                     (warning-local-id id-map %)
                                     %))
                           vec)
+        series-by-local-id (into {}
+                                 (map (juxt :instrument-id :series))
+                                 rows)
         hard-warning-by-local-id (into {}
                                        (keep (fn [warning]
-                                               (when (api-v2-blocking-warning? warning)
-                                                 [(warning-local-id id-map warning)
-                                                  warning])))
+                                               (let [local-id (warning-local-id
+                                                               id-map
+                                                               warning)]
+                                                 (when (and (api-v2-blocking-warning?
+                                                             warning)
+                                                            (not (forgiven-proxy-warning?
+                                                                  warning
+                                                                  (get series-by-local-id
+                                                                       local-id))))
+                                                   [local-id warning]))))
                                        api-warnings)
         base-candidates (filterv (fn [{:keys [instrument-id backend-id series]}]
                                    (and instrument-id

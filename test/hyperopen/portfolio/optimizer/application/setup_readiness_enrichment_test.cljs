@@ -76,9 +76,13 @@
                                                 :return 0.1}]
                                       :funding {:status :available
                                                 :annualized-carry 0}}
+                          ;; Stitched lineage: the hard warning indicts the served
+                          ;; series itself, so it is NOT forgiven the way a failed
+                          ;; lookback-extension over a native series is (see
+                          ;; setup-readiness-warning-policy-test).
                           "perp:BAD" {:local-instrument-id "perp:BAD"
                                       :instrument-id "hl:perp:BAD"
-                                      :lineage-kind :native
+                                      :lineage-kind :stitched-native-proxy
                                       :points [{:time-ms 1000
                                                 :close 50
                                                 :return nil}

@@ -160,6 +160,25 @@
                                             {"symbol" "SOL"}]}]})]
     (is (nil? (get-in result [:assumptions "perp:WLFI" :proxy :prior-weights])))))
 
+(deftest import-resolves-agent-written-id-forms-test
+  ;; A real agent-completed file put instrument-ids in the `symbol` field
+  ;; ({"symbol": "perp:AAVE"}) and every proxy dropped. Resolution must accept
+  ;; either form in either field, case-insensitively, plus a namespaced value
+  ;; whose tail is a known symbol.
+  (let [result (plan {"assets" [{"instrument-id" "perp:WLFI"
+                                 "approach" "proxy"
+                                 "proxies" [{"symbol" "perp:DOGE" "weight" 0.5}
+                                            {"symbol" "PERP:AVAX" "weight" 0.25}
+                                            {"instrument-id" "NEAR" "weight" 0.125}
+                                            {"symbol" "spot:SOL" "weight" 0.125}]}]})
+        entry (get-in result [:assumptions "perp:WLFI"])]
+    (is (= 1 (:applied result)))
+    (is (= 0 (:skipped-proxies result)))
+    (is (= ["perp:DOGE" "perp:AVAX" "perp:NEAR" "perp:SOL"]
+           (get-in entry [:proxy :instrument-ids])))
+    (is (= {"perp:DOGE" 0.5 "perp:AVAX" 0.25 "perp:NEAR" 0.125 "perp:SOL" 0.125}
+           (get-in entry [:proxy :prior-weights])))))
+
 (deftest import-drops-self-unknown-and-duplicate-proxies-test
   (let [result (plan {"assets" [{"instrument-id" "perp:WLFI"
                                  "approach" "proxy"
@@ -238,9 +257,13 @@
            (get-in result [:assumptions "perp:PUMP" :metadata :rationale])))))
 
 (deftest import-message-formats-test
-  (testing "nothing applied"
-    (is (= "No assumptions applied — every `approach` was null or already matched. 2 unknown assets skipped."
-           (io/import-success-message {:applied 0 :unknown 2}))))
+  (testing "nothing applied says why, including dropped proxies"
+    (is (= "No assumptions applied · 2 unknown assets skipped"
+           (io/import-success-message {:applied 0 :unknown 2})))
+    (is (= (str "No assumptions applied"
+                " · 3 entries skipped — invalid approach or no resolvable proxies"
+                " · 12 unrecognized proxies dropped")
+           (io/import-success-message {:applied 0 :invalid 3 :skipped-proxies 12}))))
   (testing "applied with counts"
     (is (= "Configured 2 assets · 1 left as-is · 1 unknown asset skipped · 3 unknown proxies dropped — history validation continues on the cards below."
            (io/import-success-message {:applied 2 :unchanged 1 :unknown 1

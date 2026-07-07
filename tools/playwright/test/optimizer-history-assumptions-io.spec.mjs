@@ -126,13 +126,14 @@ test("portfolio optimizer history assumptions export/import round-trips an agent
   // markdown fence, which the import path must tolerate.
   const completed = structuredClone(document);
   completed.assets[0].approach = "proxy";
-  // The agent proposes proxies from its own knowledge; instrument-ids are the
-  // safest form (bare symbols can turn ambiguous once the live catalog streams
-  // in). perp:SOL is out-of-universe — import resolution is catalog-tolerant
-  // (same reach as the in-app proxy typeahead) and stores it reference-only.
+  // The agent proposes proxies from its own knowledge. The SOL ref uses the
+  // exact malformed shape a real agent produced (the instrument-id written
+  // into the `symbol` field) — resolution must accept it. perp:SOL is also
+  // out-of-universe: import resolution is catalog-tolerant (same reach as the
+  // in-app proxy typeahead) and stores it reference-only.
   completed.assets[0].proxies = [
     { "instrument-id": "perp:BTC", weight: 0.7 },
-    { "instrument-id": "perp:SOL", weight: 0.3 }
+    { symbol: "perp:SOL", weight: 0.3 }
   ];
   completed.assets[0]["relationship-strength"] = "high";
   completed.assets[0].rationale = "Anchor plus Solana ecosystem beta.";

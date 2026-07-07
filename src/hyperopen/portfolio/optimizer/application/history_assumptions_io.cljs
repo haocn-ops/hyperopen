@@ -72,7 +72,7 @@
    "- If you cannot name at least 2 defensible proxies, choose \"conservative\". That is a correct answer, not a failure."
    "# Fields to fill, per asset"
    "- `approach`: \"proxy\" or \"conservative\". Leave null to skip — the asset stays excluded."
-   "- `proxies` (proxy only): 1-4 entries like {\"symbol\": \"SOL\", \"weight\": 0.5} naming Hyperliquid-listed assets (an exact `instrument-id` such as \"perp:SOL\" is also accepted and safest). Symbols the app can't resolve are skipped on import and reported."
+   "- `proxies` (proxy only): 1-4 entries, each {\"instrument-id\": \"perp:SOL\", \"weight\": 0.5} or {\"symbol\": \"SOL\", \"weight\": 0.5}. Hyperliquid perp ids are \"perp:\" plus the ticker; either field accepts either form and matching is case-insensitive. Proxies the app can't resolve to a listed asset are dropped on import and reported to the user."
    "- `relationship-strength` (proxy only): \"low\" | \"medium\" | \"high\" (default \"medium\")."
    "- `expected-return-percent`: annualized, in percent (e.g. 12.5). Check `optimization-objective` and `objective-uses-returns` — minimum-variance ignores returns entirely; leave null unless the objective uses returns and you hold a real view (default 0 = no edge)."
    "- `rationale`: 1-3 sentences the user will read: why this basket (or why conservative), plus any notable rejection — e.g. a perfect sector match skipped for short history."
@@ -223,30 +223,39 @@
                     [symbol* (second (first matches))])))
           grouped)))
 
-(defn- resolve-target-id
-  [ids by-symbol entry]
-  (let [entry-id (coercion/non-blank-text (entry-field entry :instrument-id))
-        entry-symbol (coercion/non-blank-text (entry-field entry :symbol))]
-    (or (when (contains? ids entry-id) entry-id)
-        (when entry-symbol (get by-symbol (str/upper-case entry-symbol))))))
+(defn- resolution-index
+  "Lenient lookup index over an instrument pool: exact ids, case-insensitive
+  ids, and case-insensitive symbols (ambiguous symbols dropped)."
+  [instruments]
+  (let [ids (instrument-ids instruments)]
+    {:ids ids
+     :id-by-upper (into {} (map (fn [id] [(str/upper-case id) id])) ids)
+     :by-symbol (instrument-id-by-symbol instruments)}))
 
-(defn- resolve-proxy-ref
-  "One imported basket member -> instrument-id: a map ({\"symbol\" …} /
-  {\"instrument-id\" …}) or a bare symbol string, resolved against the proxy
-  pool. Nil when the pool doesn't know it."
-  [pool-ids by-symbol ref]
+(defn- resolve-instrument-text
+  "One agent-written reference -> instrument-id, leniently: exact id, then
+  case-insensitive id, then symbol, then the text after a namespace colon as a
+  symbol. Agents routinely write ids like \"perp:AAVE\" into the `symbol`
+  field (a real import failed exactly this way, 2026-07-07), so every field
+  accepts every form."
+  [{:keys [ids id-by-upper by-symbol]} text]
+  (when-let [text* (coercion/non-blank-text text)]
+    (let [upper (str/upper-case text*)]
+      (or (when (contains? ids text*) text*)
+          (get id-by-upper upper)
+          (get by-symbol upper)
+          (when (str/includes? text* ":")
+            (get by-symbol (str/upper-case (last (str/split text* #":")))))))))
+
+(defn- resolve-ref
+  "One imported reference -> instrument-id: a map carrying `instrument-id`
+  and/or `symbol` (either field, either form), or a bare string. Nil when the
+  pool doesn't know it."
+  [index ref]
   (cond
-    (map? ref)
-    (let [ref-id (coercion/non-blank-text (entry-field ref :instrument-id))
-          ref-symbol (coercion/non-blank-text (entry-field ref :symbol))]
-      (or (when (contains? pool-ids ref-id) ref-id)
-          (when ref-symbol (get by-symbol (str/upper-case ref-symbol)))))
-
-    (string? ref)
-    (when-let [text (coercion/non-blank-text ref)]
-      (or (when (contains? pool-ids text) text)
-          (get by-symbol (str/upper-case text))))
-
+    (map? ref) (or (resolve-instrument-text index (entry-field ref :instrument-id))
+                   (resolve-instrument-text index (entry-field ref :symbol)))
+    (string? ref) (resolve-instrument-text index ref)
     :else nil))
 
 (defn- resolve-basket
@@ -255,10 +264,10 @@
   clamped to max-basket-size. Weights apply all-or-nothing: every kept member
   carries a finite >= 0 weight with a positive total -> normalized to sum 1;
   anything else -> nil (equal weight), mirroring the engine's prior fallback."
-  [pool-ids by-symbol self-id refs]
+  [pool-index self-id refs]
   (let [refs* (if (sequential? refs) (vec refs) [])
         resolved (reduce (fn [acc ref]
-                           (let [proxy-id (resolve-proxy-ref pool-ids by-symbol ref)]
+                           (let [proxy-id (resolve-ref pool-index ref)]
                              (if (and proxy-id
                                       (not= proxy-id self-id)
                                       (not (contains? (:seen acc) proxy-id)))
@@ -351,14 +360,13 @@
   (if-let [entries (extract-entries data)]
     (if (empty? entries)
       {:status :error :reason :empty}
-      (let [ids (instrument-ids universe)
-            by-symbol (instrument-id-by-symbol universe)
-            pool (concat universe proxy-pool)
-            pool-ids (instrument-ids pool)
-            pool-by-symbol (instrument-id-by-symbol pool)]
+      (let [universe-index (resolution-index universe)
+            pool-index (resolution-index (concat universe proxy-pool))]
         (reduce
          (fn [acc entry]
-           (let [instrument-id (resolve-target-id ids by-symbol entry)
+           ;; targets resolve against the universe only (an assumption on a
+           ;; non-universe asset is meaningless); proxies against the full pool.
+           (let [instrument-id (resolve-ref universe-index entry)
                  approach (coercion/normalize-keyword-like
                            (entry-field entry :approach))]
              (cond
@@ -381,7 +389,7 @@
                                        str
                                        coercion/non-blank-text)
                      basket (when (= :proxy approach)
-                              (resolve-basket pool-ids pool-by-symbol instrument-id
+                              (resolve-basket pool-index instrument-id
                                               (entry-field entry :proxies)))
                      strength (when (= :proxy approach)
                                 (let [value (coercion/normalize-keyword-like
@@ -447,13 +455,24 @@
 (defn import-success-message
   [{:keys [applied unchanged unknown invalid skipped-proxies]}]
   (if (zero? (or applied 0))
-    (str "No assumptions applied — every `approach` was null or already matched."
-         (when (pos? (or unknown 0))
-           (str " " unknown " unknown "
-                (if (= 1 unknown) "asset" "assets") " skipped."))
-         (when (pos? (or invalid 0))
-           (str " " invalid " invalid "
-                (if (= 1 invalid) "entry" "entries") " skipped.")))
+    ;; Say WHY nothing landed — a real import failed silently-ish when the
+    ;; note hid the dropped-proxy count behind a generic "invalid entries".
+    (str/join " · "
+              (keep identity
+                    ["No assumptions applied"
+                     (when (pos? (or unchanged 0))
+                       (str unchanged " left as-is (approach null or already matching)"))
+                     (when (pos? (or unknown 0))
+                       (str unknown " unknown "
+                            (if (= 1 unknown) "asset" "assets") " skipped"))
+                     (when (pos? (or invalid 0))
+                       (str invalid
+                            (if (= 1 invalid) " entry" " entries")
+                            " skipped — invalid approach or no resolvable proxies"))
+                     (when (pos? (or skipped-proxies 0))
+                       (str skipped-proxies " unrecognized "
+                            (if (= 1 skipped-proxies) "proxy" "proxies")
+                            " dropped"))]))
     (str (str/join " · "
                    (keep identity
                          [(str "Configured " (pluralize-assets applied))

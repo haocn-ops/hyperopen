@@ -1,10 +1,11 @@
 (ns hyperopen.portfolio.optimizer.contracts.specs
   (:require [clojure.spec.alpha :as s]
             [hyperopen.portfolio.optimizer.coercion :as coercion]
+            [hyperopen.portfolio.optimizer.contracts.constants :as constants]
             [hyperopen.portfolio.optimizer.contracts.migrations :as migrations]
             [hyperopen.portfolio.optimizer.contracts.signatures :as signatures]))
 
-(def result-payload-schema-version 1)
+(def result-payload-schema-version constants/result-payload-schema-version)
 
 (defn- contains-keys?
   [value ks]
@@ -39,30 +40,19 @@
   [allowed value]
   (contains? allowed value))
 
-(def draft-statuses
-  #{:draft :saved :archived :tracking})
+(def draft-statuses constants/draft-statuses)
 
-(def scenario-record-statuses
-  #{:saved :archived :executed :partially-executed :tracking :failed})
+(def scenario-record-statuses constants/scenario-record-statuses)
 
-(def tracking-snapshot-statuses
-  #{:tracked :not-trackable})
+(def tracking-snapshot-statuses constants/tracking-snapshot-statuses)
 
-(def result-payload-statuses
-  #{:solved :infeasible :error :failed})
+(def result-payload-statuses constants/result-payload-statuses)
 
-(def objective-kinds
-  #{:minimum-variance :max-sharpe :target-return :target-volatility})
+(def objective-kinds constants/objective-kinds)
 
-(def return-model-kinds
-  #{:historical-mean :ew-mean :black-litterman})
+(def return-model-kinds constants/return-model-kinds)
 
-(def risk-model-kinds
-  #{:diagonal-shrink
-    :ledoit-wolf
-    :ledoit-wolf-dense
-    :sample-covariance
-    :mixed-frequency})
+(def risk-model-kinds constants/risk-model-kinds)
 
 (def black-litterman-view-kinds
   #{:absolute :relative})
@@ -76,8 +66,7 @@
 (def fee-modes
   #{:taker :maker})
 
-(def history-assumption-behaviors
-  #{:conservative :proxy})
+(def history-assumption-behaviors constants/history-assumption-behaviors)
 
 (def history-assumption-relationship-strengths
   #{:low :medium :high})

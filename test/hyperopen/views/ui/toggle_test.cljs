@@ -1,6 +1,5 @@
 (ns hyperopen.views.ui.toggle-test
-  (:require [cljs.spec.alpha :as s]
-            [cljs.test :refer-macros [deftest is]]
+  (:require [cljs.test :refer-macros [deftest is]]
             [hyperopen.views.ui.toggle :as toggle]))
 
 (deftest toggle-renders-shared-switch-contract-test
@@ -9,10 +8,10 @@
                              :data-role "surface-freshness-toggle"
                              :on-change [[:actions/toggle-show-surface-freshness-cues]]})
         attrs (second view)]
-    (is (s/valid? ::toggle/props {:on? true
-                                  :aria-label "Show freshness labels"
-                                  :data-role "surface-freshness-toggle"
-                                  :on-change [[:actions/toggle-show-surface-freshness-cues]]}))
+    (is (toggle/props? {:on? true
+                        :aria-label "Show freshness labels"
+                        :data-role "surface-freshness-toggle"
+                        :on-change [[:actions/toggle-show-surface-freshness-cues]]}))
     (is (= :button (first view)))
     (is (= "switch" (:role attrs)))
     (is (= "true" (:aria-checked attrs)))

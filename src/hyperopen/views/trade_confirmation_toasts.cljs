@@ -1,37 +1,31 @@
 (ns hyperopen.views.trade-confirmation-toasts
-  (:require [cljs.spec.alpha :as s]
-            [clojure.string :as str]
+  (:require [clojure.string :as str]
             [hyperopen.utils.formatting :as fmt]))
 
-(s/def :hyperopen.views.trade-confirmation-toasts/id some?)
-(s/def :hyperopen.views.trade-confirmation-toasts/side #{:buy :sell})
-(s/def :hyperopen.views.trade-confirmation-toasts/symbol (s/and string? seq))
-(s/def :hyperopen.views.trade-confirmation-toasts/price number?)
-(s/def :hyperopen.views.trade-confirmation-toasts/qty number?)
-(s/def :hyperopen.views.trade-confirmation-toasts/orderType (s/and string? seq))
-(s/def :hyperopen.views.trade-confirmation-toasts/ts number?)
-(s/def :hyperopen.views.trade-confirmation-toasts/slippagePct (s/nilable number?))
-(s/def :hyperopen.views.trade-confirmation-toasts/trade
-  (s/keys :req-un [:hyperopen.views.trade-confirmation-toasts/id
-                   :hyperopen.views.trade-confirmation-toasts/side
-                   :hyperopen.views.trade-confirmation-toasts/symbol
-                   :hyperopen.views.trade-confirmation-toasts/price
-                   :hyperopen.views.trade-confirmation-toasts/qty
-                   :hyperopen.views.trade-confirmation-toasts/orderType
-                   :hyperopen.views.trade-confirmation-toasts/ts]
-          :opt-un [:hyperopen.views.trade-confirmation-toasts/slippagePct]))
-(s/def :hyperopen.views.trade-confirmation-toasts/fills
-  (s/coll-of :hyperopen.views.trade-confirmation-toasts/trade
-             :kind vector?
-             :min-count 1))
+(defn- non-empty-string?
+  [value]
+  (and (string? value)
+       (seq value)))
 
 (defn trade-props?
   [trade]
-  (s/valid? :hyperopen.views.trade-confirmation-toasts/trade trade))
+  (and (map? trade)
+       (some? (:id trade))
+       (contains? #{:buy :sell} (:side trade))
+       (non-empty-string? (:symbol trade))
+       (number? (:price trade))
+       (number? (:qty trade))
+       (non-empty-string? (:orderType trade))
+       (number? (:ts trade))
+       (or (not (contains? trade :slippagePct))
+           (nil? (:slippagePct trade))
+           (number? (:slippagePct trade)))))
 
 (defn fills-props?
   [fills]
-  (s/valid? :hyperopen.views.trade-confirmation-toasts/fills fills))
+  (and (vector? fills)
+       (seq fills)
+       (every? trade-props? fills)))
 
 (defn- finite-number
   [value]

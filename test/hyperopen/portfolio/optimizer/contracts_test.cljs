@@ -4,6 +4,7 @@
             [hyperopen.portfolio.optimizer.contract-fixtures :as contract-fixtures]
             [hyperopen.portfolio.optimizer.contracts :as contracts]
             [hyperopen.portfolio.optimizer.contracts.migrations :as migrations]
+            [hyperopen.portfolio.optimizer.contracts.spec-registry]
             [hyperopen.portfolio.optimizer.fixtures :as optimizer-fixtures]))
 
 (def sample-request

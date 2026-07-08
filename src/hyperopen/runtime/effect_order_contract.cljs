@@ -1,15 +1,12 @@
 (ns hyperopen.runtime.effect-order-contract
-  (:require [hyperopen.runtime.effect-order.policy-registration :as policy-registration]))
+  (:require [hyperopen.runtime.effect-order.policy-registration :as policy-registration]
+            [hyperopen.runtime.validation :as validation]))
 (declare effect-phase assert-action-effect-order!)
 
-(def ^:private projection-effect-ids
-  #{:effects/save
-    :effects/save-many})
+(def ^:private projection-effect-ids #{:effects/save :effects/save-many})
 (def ^:private persistence-effect-ids
-  #{:effects/local-storage-set
-    :effects/local-storage-set-json
-    :effects/persist-leaderboard-preferences
-    :effects/replace-shareable-route-query})
+  #{:effects/local-storage-set :effects/local-storage-set-json
+    :effects/persist-leaderboard-preferences :effects/replace-shareable-route-query})
 (def ^:private effect-order-policy-by-action-id
   {:actions/select-asset
    {:required-phase-order [:projection :persistence :heavy-io]
@@ -678,3 +675,6 @@
                    heavy-seen-at-index*))
           effects)))
     effects))
+
+(validation/install-effect-order-contract-impl! {:effect-order-summary effect-order-summary
+                                                 :assert-action-effect-order! assert-action-effect-order!})

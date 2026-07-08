@@ -1,25 +1,15 @@
 (ns hyperopen.portfolio.optimizer.contracts
-  (:require [clojure.spec.alpha :as s]
+  (:require [hyperopen.portfolio.optimizer.contracts.constants :as constants]
             [hyperopen.portfolio.optimizer.contracts.migrations :as migrations]
             [hyperopen.portfolio.optimizer.contracts.paths :as paths]
             [hyperopen.portfolio.optimizer.contracts.signatures :as signatures]
-            [hyperopen.portfolio.optimizer.contracts.specs :as specs]
             [hyperopen.portfolio.optimizer.contracts.worker-wire :as worker-wire]))
-
-(s/def ::draft ::specs/draft)
-(s/def ::engine-request ::specs/engine-request)
-(s/def ::request-signature ::specs/request-signature)
-(s/def ::scenario-record ::specs/scenario-record)
-(s/def ::tracking-snapshot ::specs/tracking-snapshot)
-(s/def ::tracking-record ::specs/tracking-record)
-(s/def ::result-payload ::specs/result-payload)
-(s/def ::worker-envelope ::specs/worker-envelope)
 
 (def draft-schema-version migrations/draft-schema-version)
 (def scenario-record-schema-version migrations/scenario-record-schema-version)
 (def tracking-record-schema-version migrations/tracking-record-schema-version)
 (def request-signature-schema-version signatures/request-signature-schema-version)
-(def result-payload-schema-version specs/result-payload-schema-version)
+(def result-payload-schema-version constants/result-payload-schema-version)
 (def worker-wire-schema-version worker-wire/worker-wire-schema-version)
 
 (def optimizer-path paths/optimizer-path)
@@ -126,10 +116,14 @@
 (def optimizer-ui-state-path paths/optimizer-ui-state-path)
 (def contract-path paths/contract-path)
 
-(def draft-statuses specs/draft-statuses)
-(def scenario-record-statuses specs/scenario-record-statuses)
-(def tracking-snapshot-statuses specs/tracking-snapshot-statuses)
-(def result-payload-statuses specs/result-payload-statuses)
+(def draft-statuses constants/draft-statuses)
+(def scenario-record-statuses constants/scenario-record-statuses)
+(def tracking-snapshot-statuses constants/tracking-snapshot-statuses)
+(def result-payload-statuses constants/result-payload-statuses)
+(def objective-kinds constants/objective-kinds)
+(def return-model-kinds constants/return-model-kinds)
+(def risk-model-kinds constants/risk-model-kinds)
+(def history-assumption-behaviors constants/history-assumption-behaviors)
 
 (def contract-specs
   {:optimizer/draft ::draft

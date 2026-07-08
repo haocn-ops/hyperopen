@@ -1,19 +1,17 @@
-(ns hyperopen.views.ui.toggle
-  (:require [cljs.spec.alpha :as s]))
+(ns hyperopen.views.ui.toggle)
 
-(s/def :hyperopen.views.ui.toggle/on? boolean?)
-(s/def :hyperopen.views.ui.toggle/aria-label string?)
-(s/def :hyperopen.views.ui.toggle/aria-describedby string?)
-(s/def :hyperopen.views.ui.toggle/data-role string?)
-(s/def :hyperopen.views.ui.toggle/on-change some?)
-(s/def :hyperopen.views.ui.toggle/disabled? (s/nilable boolean?))
-(s/def :hyperopen.views.ui.toggle/props
-  (s/keys :req-un [:hyperopen.views.ui.toggle/on?
-                   :hyperopen.views.ui.toggle/aria-label
-                   :hyperopen.views.ui.toggle/on-change]
-          :opt-un [:hyperopen.views.ui.toggle/aria-describedby
-                   :hyperopen.views.ui.toggle/data-role
-                   :hyperopen.views.ui.toggle/disabled?]))
+(defn props?
+  [props]
+  (and (map? props)
+       (boolean? (:on? props))
+       (string? (:aria-label props))
+       (some? (:on-change props))
+       (or (nil? (:aria-describedby props))
+           (string? (:aria-describedby props)))
+       (or (nil? (:data-role props))
+           (string? (:data-role props)))
+       (or (nil? (:disabled? props))
+           (boolean? (:disabled? props)))))
 
 (defn toggle
   [{:keys [aria-describedby aria-label data-role disabled? on-change on?]}]

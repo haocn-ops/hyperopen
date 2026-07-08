@@ -1,78 +1,7 @@
 (ns hyperopen.views.header.settings
-  (:require [cljs.spec.alpha :as s]
-            [hyperopen.views.header.dom :as dom]
+  (:require [hyperopen.views.header.dom :as dom]
             [hyperopen.views.header.icons :as icons]
             [hyperopen.views.ui.toggle :as toggle]))
-
-(s/def :hyperopen.views.header.settings/id keyword?)
-(s/def :hyperopen.views.header.settings/title string?)
-(s/def :hyperopen.views.header.settings/hint string?)
-(s/def :hyperopen.views.header.settings/data-role string?)
-(s/def :hyperopen.views.header.settings/checked? boolean?)
-(s/def :hyperopen.views.header.settings/disabled? boolean?)
-(s/def :hyperopen.views.header.settings/icon-kind keyword?)
-(s/def :hyperopen.views.header.settings/on-change some?)
-(s/def :hyperopen.views.header.settings/toggle-row
-  (s/keys :req-un [:hyperopen.views.header.settings/id
-                   :hyperopen.views.header.settings/title
-                   :hyperopen.views.header.settings/hint
-                   :hyperopen.views.header.settings/data-role
-                   :hyperopen.views.header.settings/checked?
-                   :hyperopen.views.header.settings/icon-kind
-                   :hyperopen.views.header.settings/on-change]
-          :opt-un [:hyperopen.views.header.settings/disabled?]))
-(s/def :hyperopen.views.header.settings/kind #{:choice})
-(s/def :hyperopen.views.header.settings/value string?)
-(s/def :hyperopen.views.header.settings/label string?)
-(s/def :hyperopen.views.header.settings/active? boolean?)
-(s/def :hyperopen.views.header.settings/action some?)
-(s/def :hyperopen.views.header.settings/tooltip string?)
-(s/def :hyperopen.views.header.settings/option
-  (s/keys :req-un [:hyperopen.views.header.settings/value
-                   :hyperopen.views.header.settings/label
-                   :hyperopen.views.header.settings/active?
-                   :hyperopen.views.header.settings/action]
-          :opt-un [:hyperopen.views.header.settings/tooltip]))
-(s/def :hyperopen.views.header.settings/options
-  (s/coll-of :hyperopen.views.header.settings/option
-             :kind vector?
-             :min-count 2))
-(s/def :hyperopen.views.header.settings/choice-row
-  (s/keys :req-un [:hyperopen.views.header.settings/id
-                   :hyperopen.views.header.settings/kind
-                   :hyperopen.views.header.settings/title
-                   :hyperopen.views.header.settings/hint
-                   :hyperopen.views.header.settings/data-role
-                   :hyperopen.views.header.settings/icon-kind
-                   :hyperopen.views.header.settings/options]))
-(s/def :hyperopen.views.header.settings/row
-  (s/or :toggle :hyperopen.views.header.settings/toggle-row
-        :choice :hyperopen.views.header.settings/choice-row))
-(s/def :hyperopen.views.header.settings/rows
-  (s/coll-of :hyperopen.views.header.settings/row :kind vector?))
-(s/def :hyperopen.views.header.settings/section
-  (s/keys :req-un [:hyperopen.views.header.settings/id
-                   :hyperopen.views.header.settings/title
-                   :hyperopen.views.header.settings/hint
-                   :hyperopen.views.header.settings/data-role
-                   :hyperopen.views.header.settings/rows]))
-(s/def :hyperopen.views.header.settings/sections
-  (s/coll-of :hyperopen.views.header.settings/section :kind vector?))
-(s/def :hyperopen.views.header.settings/open? boolean?)
-(s/def :hyperopen.views.header.settings/return-focus? boolean?)
-(s/def :hyperopen.views.header.settings/trigger-action some?)
-(s/def :hyperopen.views.header.settings/trigger-key string?)
-(s/def :hyperopen.views.header.settings/close-actions some?)
-(s/def :hyperopen.views.header.settings/footer-note string?)
-(s/def :hyperopen.views.header.settings/settings
-  (s/keys :req-un [:hyperopen.views.header.settings/open?
-                   :hyperopen.views.header.settings/return-focus?
-                   :hyperopen.views.header.settings/trigger-action
-                   :hyperopen.views.header.settings/trigger-key
-                   :hyperopen.views.header.settings/title
-                   :hyperopen.views.header.settings/close-actions
-                   :hyperopen.views.header.settings/footer-note
-                   :hyperopen.views.header.settings/sections]))
 
 (defn- confirmation-strip
   [{:keys [body cancel-action confirm-action confirm-label title]}]

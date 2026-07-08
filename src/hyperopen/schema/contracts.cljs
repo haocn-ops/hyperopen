@@ -5,6 +5,7 @@
             [hyperopen.schema.contracts.common :as common]
             [hyperopen.schema.contracts.effect-args :as effect-args]
             [hyperopen.schema.runtime-registration-catalog :as runtime-registration-catalog]
+            [hyperopen.runtime.effect-order-contract]
             [hyperopen.runtime.validation :as validation]))
 
 (let [contracted-ids (set (keys action-args/action-args-spec-by-id))

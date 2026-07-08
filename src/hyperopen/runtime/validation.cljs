@@ -1,6 +1,5 @@
 (ns hyperopen.runtime.validation
-  (:require [goog.object :as gobj]
-            [hyperopen.runtime.effect-order-contract :as effect-order-contract]))
+  (:require [goog.object :as gobj]))
 
 ;; The cljs.spec contract tree (hyperopen.schema.contracts.*) registers hundreds
 ;; of specs at namespace load and is only consulted when validation is enabled,
@@ -12,9 +11,17 @@
 (defonce ^:private contracts-impl
   (atom nil))
 
+(defonce ^:private effect-order-contract-impl
+  (atom nil))
+
 (defn install-contracts-impl!
   [impl]
   (reset! contracts-impl impl)
+  impl)
+
+(defn install-effect-order-contract-impl!
+  [impl]
+  (reset! effect-order-contract-impl impl)
   impl)
 
 (defn validation-enabled?
@@ -27,6 +34,10 @@
   [impl-key]
   (or (get @contracts-impl impl-key)
       (fn [& _] nil)))
+
+(defn- effect-order-contract-fn
+  [impl-key]
+  (get @effect-order-contract-impl impl-key))
 
 (defn assert-action-args!
   [action-id args context]
@@ -77,17 +88,18 @@
 (defn- record-debug-action-effect-trace!
   [action-id args effects]
   (when ^boolean goog.DEBUG
-    (let [summary (assoc (effect-order-contract/effect-order-summary action-id effects)
-                         :captured-at-ms (.now js/Date)
-                         :arg-count (count args)
-                         :args (vec args))]
-      (swap! debug-action-effect-traces
-             (fn [entries]
-               (let [next-entries (conj (vec entries) summary)
-                     overflow (- (count next-entries) max-debug-action-effect-traces)]
-                 (if (pos? overflow)
-                   (subvec next-entries overflow)
-                   next-entries)))))))
+    (when-let [effect-order-summary (effect-order-contract-fn :effect-order-summary)]
+      (let [summary (assoc (effect-order-summary action-id effects)
+                           :captured-at-ms (.now js/Date)
+                           :arg-count (count args)
+                           :args (vec args))]
+        (swap! debug-action-effect-traces
+               (fn [entries]
+                 (let [next-entries (conj (vec entries) summary)
+                       overflow (- (count next-entries) max-debug-action-effect-traces)]
+                   (if (pos? overflow)
+                     (subvec next-entries overflow)
+                     next-entries))))))))
 
 (defn- parse-fixed-arity-key
   [k]
@@ -163,11 +175,13 @@
            effects
            {:phase :action-emission
             :action-id action-id})
-          (effect-order-contract/assert-action-effect-order!
-           action-id
-           effects
-           {:phase :action-emission
-            :action-id action-id}))
+          (when-let [assert-action-effect-order!
+                     (effect-order-contract-fn :assert-action-effect-order!)]
+            (assert-action-effect-order!
+             action-id
+             effects
+             {:phase :action-emission
+              :action-id action-id})))
         (record-debug-action-effect-trace! action-id args effects)
         effects))))
 

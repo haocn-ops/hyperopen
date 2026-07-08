@@ -1,5 +1,6 @@
 (ns hyperopen.runtime.validation-test
   (:require [cljs.test :refer-macros [deftest is]]
+            [hyperopen.runtime.effect-order-contract]
             [hyperopen.runtime.validation :as validation]
             [hyperopen.system :as system]))
 

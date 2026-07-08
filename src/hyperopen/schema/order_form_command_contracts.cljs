@@ -1,5 +1,4 @@
-(ns hyperopen.schema.order-form-command-contracts
-  (:require [cljs.spec.alpha :as s]))
+(ns hyperopen.schema.order-form-command-contracts)
 
 (def ^:private required-command-keys
   #{:command-id :args})
@@ -9,21 +8,22 @@
     :order-form.event/target-checked
     :order-form.event/key})
 
-(s/def ::command-id keyword?)
-(s/def ::args vector?)
-(s/def ::command-base
-  (s/keys :req-un [::command-id ::args]))
-
 (defn- unknown-placeholder-token?
   [arg]
   (and (keyword? arg)
        (= "order-form.event" (namespace arg))
        (not (contains? known-placeholder-tokens arg))))
 
+(defn- command-base?
+  [command]
+  (and (map? command)
+       (= required-command-keys (set (keys command)))
+       (keyword? (:command-id command))
+       (vector? (:args command))))
+
 (defn order-form-command-valid?
   [command allowed-command-ids]
-  (and (s/valid? ::command-base command)
-       (= required-command-keys (set (keys command)))
+  (and (command-base? command)
        (contains? allowed-command-ids (:command-id command))
        (every? #(not (unknown-placeholder-token? %)) (:args command))))
 
@@ -51,8 +51,7 @@
             (str "order-form command contract validation failed. "
                  "context=" (pr-str context)
                  " command=" (pr-str command)
-                 " allowed-command-ids=" (pr-str (vec (sort allowed-command-ids)))
-                 " explain=" (pr-str (s/explain-data ::command-base command))))))
+                 " allowed-command-ids=" (pr-str (vec (sort allowed-command-ids)))))))
   command)
 
 (defn assert-runtime-actions!

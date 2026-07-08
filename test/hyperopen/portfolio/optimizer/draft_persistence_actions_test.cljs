@@ -84,7 +84,17 @@
     ;; A draft that fails the ::draft contract (missing required keys) is ignored.
     (is (= [] (actions/hydrate-portfolio-optimizer-draft
                untouched
-               (draft-record {:draft {:universe [btc-instrument]}}))))))
+               (draft-record {:draft {:universe [btc-instrument]}}))))
+    (is (= [] (actions/hydrate-portfolio-optimizer-draft
+               untouched
+               (draft-record {:draft (assoc-in (persisted-draft)
+                                                [:objective :kind]
+                                                :unknown)}))))
+    (is (= [] (actions/hydrate-portfolio-optimizer-draft
+               untouched
+               (draft-record {:draft (assoc (persisted-draft)
+                                            :history-assumptions
+                                            {" " {:behavior :conservative}})}))))))
 
 (deftest hydrate-skips-history-load-for-an-empty-universe-test
   ;; A persisted deliberately-cleared universe restores as-is (the remembered

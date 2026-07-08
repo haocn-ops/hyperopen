@@ -234,6 +234,8 @@
             [hyperopen.portfolio.optimizer.application.execution-test]
             [hyperopen.portfolio.optimizer.application.execution-workflow-test]
             [hyperopen.portfolio.optimizer.application.history-assumptions-io-test]
+            [hyperopen.portfolio.optimizer.application.history-cache-roundtrip-test]
+            [hyperopen.portfolio.optimizer.application.history-cache-test]
             [hyperopen.portfolio.optimizer.application.history-loader-api-v2-legacy-fallback-test]
             [hyperopen.portfolio.optimizer.application.history-loader-api-v2-split-test]
             [hyperopen.portfolio.optimizer.application.history-loader-api-v2-test]
@@ -373,6 +375,7 @@
             [hyperopen.runtime.effect-adapters.portfolio-optimizer-constraint-profiles-test]
             [hyperopen.runtime.effect-adapters.portfolio-optimizer-execution-cancel-test]
             [hyperopen.runtime.effect-adapters.portfolio-optimizer-execution-test]
+            [hyperopen.runtime.effect-adapters.portfolio-optimizer-history-cache-restore-test]
             [hyperopen.runtime.effect-adapters.portfolio-optimizer-history-facade-test]
             [hyperopen.runtime.effect-adapters.portfolio-optimizer-history-test]
             [hyperopen.runtime.effect-adapters.portfolio-optimizer-pipeline-progress-test]
@@ -1023,6 +1026,8 @@
              'hyperopen.portfolio.optimizer.application.execution-test
              'hyperopen.portfolio.optimizer.application.execution-workflow-test
              'hyperopen.portfolio.optimizer.application.history-assumptions-io-test
+             'hyperopen.portfolio.optimizer.application.history-cache-roundtrip-test
+             'hyperopen.portfolio.optimizer.application.history-cache-test
              'hyperopen.portfolio.optimizer.application.history-loader-api-v2-legacy-fallback-test
              'hyperopen.portfolio.optimizer.application.history-loader-api-v2-split-test
              'hyperopen.portfolio.optimizer.application.history-loader-api-v2-test
@@ -1162,6 +1167,7 @@
              'hyperopen.runtime.effect-adapters.portfolio-optimizer-constraint-profiles-test
              'hyperopen.runtime.effect-adapters.portfolio-optimizer-execution-cancel-test
              'hyperopen.runtime.effect-adapters.portfolio-optimizer-execution-test
+             'hyperopen.runtime.effect-adapters.portfolio-optimizer-history-cache-restore-test
              'hyperopen.runtime.effect-adapters.portfolio-optimizer-history-facade-test
              'hyperopen.runtime.effect-adapters.portfolio-optimizer-history-test
              'hyperopen.runtime.effect-adapters.portfolio-optimizer-pipeline-progress-test

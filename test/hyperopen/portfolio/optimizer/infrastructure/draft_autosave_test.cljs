@@ -284,3 +284,67 @@
     (swap! store update-in [:portfolio :optimizer :draft :universe]
            conj {:instrument-id "perp:BTC2"})
     (is (= 2 (count @dispatches)))))
+
+(def ^:private loaded-history-data
+  {:api-v2-history {:status :ok
+                    :series-by-instrument
+                    {"perp:BTC" {:instrument-id "hl:perp:BTC"
+                                 :points [{:time-ms 1000 :close 100}]}}}
+   :warnings []
+   :loaded-at-ms 5000})
+
+(defn- install-history-cache!
+  [store timers saves]
+  (draft-autosave/install-history-cache-watcher!
+   {:store store
+    :save-history-cache! (fn [addr record]
+                           (swap! saves conj [addr record])
+                           (js/Promise.resolve true))
+    :now-ms-fn (constantly 1700000000000)
+    :set-timeout-fn (:set-timeout-fn timers)
+    :clear-timeout-fn (:clear-timeout-fn timers)}))
+
+(deftest history-cache-watcher-persists-loaded-bundle-per-wallet-test
+  (async done
+    (let [store (atom {:wallet {:address address}})
+          timers (fake-timers)
+          saves (atom [])]
+      (install-history-cache! store timers saves)
+      (swap! store assoc-in [:portfolio :optimizer :history-data]
+             loaded-history-data)
+      (is ((:scheduled? timers)) "a load completion schedules a debounced write")
+      ((:flush! timers))
+      (-> (js/Promise.resolve)
+          (.then (fn []
+                   (is (= 1 (count @saves)))
+                   (let [[addr record] (first @saves)]
+                     (is (= address addr))
+                     (is (= 1 (:version record)))
+                     (is (= 1700000000000 (:saved-at-ms record)))
+                     (is (= #{"perp:BTC"}
+                            (set (keys (get-in record
+                                               [:history-data
+                                                :api-v2-history
+                                                :series-by-instrument]))))))
+                   (remove-watch store :hyperopen.portfolio.optimizer.infrastructure.draft-autosave/history-cache-autosave)
+                   (done)))))))
+
+(deftest history-cache-watcher-skips-hydrated-and-no-wallet-states-test
+  (let [store (atom {:wallet {:address address}})
+        timers (fake-timers)
+        saves (atom [])]
+    (install-history-cache! store timers saves)
+    ;; Cache-hydrated data is the record we just read - never write it back.
+    (swap! store assoc-in [:portfolio :optimizer :history-data]
+           (assoc loaded-history-data :restored-from-cache? true))
+    ((:flush! timers))
+    (is (empty? @saves))
+    (remove-watch store :hyperopen.portfolio.optimizer.infrastructure.draft-autosave/history-cache-autosave)
+    ;; No effective wallet: the transition schedules, but the flush declines.
+    (let [anonymous (atom {})]
+      (install-history-cache! anonymous timers saves)
+      (swap! anonymous assoc-in [:portfolio :optimizer :history-data]
+             loaded-history-data)
+      ((:flush! timers))
+      (is (empty? @saves))
+      (remove-watch anonymous :hyperopen.portfolio.optimizer.infrastructure.draft-autosave/history-cache-autosave))))

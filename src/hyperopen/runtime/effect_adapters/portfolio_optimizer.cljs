@@ -42,6 +42,7 @@
 (def ^:dynamic *load-scenario-index!* persistence/load-scenario-index!)
 (def ^:dynamic *load-scenario!* persistence/load-scenario!)
 (def ^:dynamic *load-draft!* persistence/load-draft!)
+(def ^:dynamic *load-history-cache!* persistence/load-history-cache!)
 (def ^:dynamic *delete-draft!* persistence/delete-draft!)
 (def ^:dynamic *save-scenario!* persistence/save-scenario!)
 (def ^:dynamic *save-scenario-index!* persistence/save-scenario-index!)
@@ -650,6 +651,8 @@
   ([_ store path]
    (scenario-effects/restore-portfolio-optimizer-draft-effect
     {:load-draft! *load-draft!*
+     :load-history-cache! *load-history-cache!*
+     :now-ms *now-ms*
      :dispatch! *dispatch!*
      :note-restored! draft-autosave/note-persisted!}
     store

@@ -17,6 +17,7 @@
             [hyperopen.platform :as platform]
             [hyperopen.portfolio.optimizer.actions.draft-persistence :as draft-persistence]
             [hyperopen.portfolio.optimizer.application.current-portfolio :as current-portfolio]
+            [hyperopen.portfolio.optimizer.application.history-cache :as history-cache]
             [hyperopen.portfolio.optimizer.application.view-library :as view-library]
             [hyperopen.portfolio.optimizer.contracts :as contracts]
             [hyperopen.portfolio.optimizer.defaults :as optimizer-defaults]
@@ -24,6 +25,7 @@
             [hyperopen.portfolio.routes :as portfolio-routes]))
 
 (def ^:private autosave-watch-key ::draft-autosave)
+(def ^:private history-cache-watch-key ::history-cache-autosave)
 (def ^:private preseed-watch-key ::holdings-preseed)
 (def ^:private identity-restore-watch-key ::identity-restore)
 (def ^:private assumption-hydrate-watch-key ::assumption-library-hydrate)
@@ -104,6 +106,63 @@
                               (not= new-draft @last-persisted-draft))
                      (when-let [address (account-context/effective-account-address new-state)]
                        (schedule! address))))))
+    store))
+
+(def history-cache-debounce-ms
+  "A load completion can be followed by a prefetch-merge moments later (the
+  delta path); a short debounce folds the burst into one multi-MB IndexedDB
+  write."
+  1500)
+
+(defn install-history-cache-watcher!
+  "Persist the last successful history bundle per wallet
+  (`history-bundle::<address>`) so the restore funnel can hydrate it on the
+  next visit (stale-while-revalidate — see application.history-cache). Watches
+  only the bundle's :loaded-at-ms transition, so the comparison stays O(1) on
+  every store swap; the record itself is built at flush time from current
+  state."
+  [{:keys [store save-history-cache! now-ms-fn set-timeout-fn clear-timeout-fn
+           history-cache-debounce-ms*]
+    :or {save-history-cache! persistence/save-history-cache!
+         now-ms-fn platform/now-ms
+         set-timeout-fn platform/set-timeout!
+         clear-timeout-fn platform/clear-timeout!
+         history-cache-debounce-ms* history-cache-debounce-ms}}]
+  (let [pending (atom nil)
+        last-persisted-at (atom nil)
+        flush! (fn []
+                 (let [state @store
+                       address (account-context/effective-account-address state)
+                       history-data (get-in state contracts/history-data-path)
+                       loaded-at-ms (:loaded-at-ms history-data)]
+                   (when (and address
+                              loaded-at-ms
+                              ;; Cache-hydrated data is the record we just
+                              ;; read - never write it straight back.
+                              (not (:restored-from-cache? history-data))
+                              (not= loaded-at-ms @last-persisted-at))
+                     (when-let [record (history-cache/history-cache-record
+                                        state address (now-ms-fn))]
+                       (reset! last-persisted-at loaded-at-ms)
+                       (-> (save-history-cache! address record)
+                           (.catch (fn [_err] nil)))))))
+        schedule! (fn []
+                    (when-let [timer @pending]
+                      (clear-timeout-fn timer))
+                    (reset! pending
+                            (set-timeout-fn
+                             (fn []
+                               (reset! pending nil)
+                               (flush!))
+                             history-cache-debounce-ms*)))]
+    (remove-watch store history-cache-watch-key)
+    (add-watch store history-cache-watch-key
+               (fn [_ _ old-state new-state]
+                 (let [path (conj contracts/history-data-path :loaded-at-ms)
+                       old-loaded (get-in old-state path)
+                       new-loaded (get-in new-state path)]
+                   (when (and new-loaded (not= old-loaded new-loaded))
+                     (schedule!)))))
     store))
 
 (defn install-holdings-preseed-watcher!
@@ -252,6 +311,7 @@
 (defn install-optimizer-draft-watchers!
   [deps]
   (install-draft-autosave-watcher! deps)
+  (install-history-cache-watcher! deps)
   (install-holdings-preseed-watcher! deps)
   (install-identity-restore-watcher! deps)
   (install-assumption-library-hydrate-watcher! deps)

@@ -1,6 +1,7 @@
 (ns hyperopen.runtime.wiring-test
   (:require [clojure.set :as set]
             [cljs.test :refer-macros [deftest is]]
+            [hyperopen.portfolio.optimizer.actions :as portfolio-optimizer-actions]
             [hyperopen.route-modules :as route-modules]
             [hyperopen.runtime.action-adapters :as action-adapters]
             [hyperopen.runtime.effect-adapters :as effect-adapters]
@@ -64,7 +65,15 @@
         (is (identical? vault-effect-handler
                         (get-in effect-deps [:api :api-fetch-vault-index])))
         (is (fn? (get-in action-deps [:portfolio-optimizer :load-portfolio-optimizer-route])))
+        (is (identical?
+             portfolio-optimizer-actions/restore-or-preseed-portfolio-optimizer-draft
+             (get-in action-deps
+                     [:portfolio-optimizer
+                      :restore-or-preseed-portfolio-optimizer-draft])))
         (is (fn? (get-in action-deps [:vaults :load-vault-route])))
+        (is (not (some #(contains? (nth % 2)
+                                   :restore-or-preseed-portfolio-optimizer-draft)
+                       @action-calls)))
         (is (seq @action-calls)))
       (is (seq @effect-calls)))))
 

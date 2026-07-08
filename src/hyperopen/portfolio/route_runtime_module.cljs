@@ -2,7 +2,8 @@
   (:require [hyperopen.portfolio.optimizer.runtime-catalog :as optimizer-runtime-catalog]))
 
 (def ^:private eager-action-keys
-  #{:load-portfolio-optimizer-route})
+  #{:load-portfolio-optimizer-route
+    :restore-or-preseed-portfolio-optimizer-draft})
 
 (defn ^:export action-deps
   []

@@ -18,8 +18,11 @@
     (is (fn? action-deps-fn))
     (is (fn? effect-deps-fn))
     (is (not (contains? exported-action-deps :load-portfolio-optimizer-route)))
+    (is (not (contains? exported-action-deps
+                        :restore-or-preseed-portfolio-optimizer-draft)))
     (is (= (disj (set (keys base-action-deps))
-                 :load-portfolio-optimizer-route)
+                 :load-portfolio-optimizer-route
+                 :restore-or-preseed-portfolio-optimizer-draft)
            (set (keys exported-action-deps))))
     (is (identical? (:run-portfolio-optimizer base-action-deps)
                     (:run-portfolio-optimizer exported-action-deps)))

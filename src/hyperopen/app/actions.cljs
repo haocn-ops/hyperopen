@@ -16,6 +16,10 @@
     :load-vaults
     :load-vault-detail})
 
+(def ^:private eager-portfolio-optimizer-action-keys
+  #{:load-portfolio-optimizer-route
+    :restore-or-preseed-portfolio-optimizer-draft})
+
 (defn- optimizer-handler-key?
   [handler-key]
   (str/includes? (name handler-key) "portfolio-optimizer"))
@@ -24,7 +28,7 @@
   (->> portfolio-registration/action-binding-rows
        (map second)
        (filter optimizer-handler-key?)
-       (remove #{:load-portfolio-optimizer-route})
+       (remove eager-portfolio-optimizer-action-keys)
        vec))
 
 (def ^:private lazy-vault-action-keys
@@ -129,7 +133,9 @@
               :set-funding-modal action-adapters/set-funding-modal}
      :portfolio-optimizer
      (merge {:load-portfolio-optimizer-route
-             portfolio-optimizer-actions/load-portfolio-optimizer-route}
+             portfolio-optimizer-actions/load-portfolio-optimizer-route
+             :restore-or-preseed-portfolio-optimizer-draft
+             portfolio-optimizer-actions/restore-or-preseed-portfolio-optimizer-draft}
             lazy-portfolio-optimizer-action-deps)}))
 
 (defn runtime-action-deps

@@ -110,3 +110,40 @@
   (let [arm (h/find-by-data-role (view nil) "portfolio-optimizer-execution-arm")]
     (is (some? arm))
     (is (str/includes? (h/node-text arm) "Arm 2 orders"))))
+
+(def ^:private read-only-plan
+  ;; Spectate / read-only: the plan is commit-blocked (:read-only), but the tab is still a cost
+  ;; simulator — the strategy tiles must stay interactive.
+  (assoc plan
+         :execution-disabled? true
+         :disabled-reason :read-only
+         :disabled-message "Spectate Mode is read-only."))
+
+(deftest read-only-view-keeps-strategy-tiles-interactive-test
+  ;; The motivating fix: a spectator can compare Market/Passive/TWAP to see their cost impact.
+  ;; Each tile carries its click action and is not :disabled; the notice explains that only
+  ;; arming/sending is blocked; Arm itself stays disabled (the commit gate is intact).
+  (let [node (view {:plan read-only-plan})
+        band (h/find-by-data-role node "portfolio-optimizer-execution-control-band")
+        market (h/find-by-data-role band "portfolio-optimizer-execution-mode-market")
+        notice (h/find-by-data-role band "portfolio-optimizer-execution-readonly")
+        arm (h/find-by-data-role node "portfolio-optimizer-execution-arm")]
+    (is (= [[:actions/set-portfolio-optimizer-execution-default-order-type :market]]
+           (get-in market [1 :on :click]))
+        "the tile dispatches a strategy change")
+    (is (nil? (get-in market [1 :disabled]))
+        "the tile is not disabled in a read-only view")
+    (is (some? notice))
+    (is (str/includes? (h/node-text notice) "Spectate Mode is read-only."))
+    (is (str/includes? (h/node-text notice) "still model execution strategies"))
+    (is (true? (get-in arm [1 :disabled]))
+        "Arm stays blocked — nothing can be sent from a read-only view")))
+
+(deftest read-only-view-keeps-high-cost-passive-fix-clickable-test
+  ;; The one-click "rest passively" shortcut only rewrites overrides so the KPI strip re-projects
+  ;; — it sends nothing, so it stays available in read-only views under a bulk Market default.
+  (let [node (view {:plan read-only-plan :default-order-type :market})
+        fix (h/find-by-data-role node "portfolio-optimizer-execution-rest-high-cost")]
+    (is (some? fix))
+    (is (= [[:actions/set-portfolio-optimizer-execution-row-order-type "perp:EWZ" :passive]]
+           (get-in fix [1 :on :click])))))

@@ -100,3 +100,19 @@
   (let [node (view {:overrides {"perp:EWZ" :twap}})
         ewz (h/find-by-data-role node "portfolio-optimizer-execution-order-row-perp-EWZ")]
     (is (nil? (h/find-by-data-role ewz "portfolio-optimizer-execution-route-hint")))))
+
+(deftest read-only-view-keeps-order-rows-editable-test
+  ;; Spectate / read-only: a staged order row still opens its per-order type/param editor (a pure
+  ;; cost simulation — it only writes modal state). The row carries the toggle action and the list
+  ;; header invites the edit, even though the plan itself can't be armed or sent.
+  (let [read-only-plan (assoc plan
+                              :execution-disabled? true
+                              :disabled-reason :read-only
+                              :disabled-message "Spectate Mode is read-only.")
+        node (view {:plan read-only-plan})
+        order-list (h/find-by-data-role node "portfolio-optimizer-execution-order-list")
+        ewz (h/find-by-data-role node "portfolio-optimizer-execution-order-row-perp-EWZ")]
+    (is (= [[:actions/toggle-portfolio-optimizer-execution-row "perp:EWZ"]]
+           (get-in ewz [1 :on :click]))
+        "the row is clickable to open its type editor")
+    (is (str/includes? (h/node-text order-list) "Click any order to change its type"))))

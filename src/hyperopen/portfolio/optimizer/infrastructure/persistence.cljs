@@ -46,6 +46,15 @@
   (when-let [address* (address-token address)]
     (str "view-library::" address*)))
 
+(defn history-cache-key
+  "One record per wallet holds the last successful normalized history bundle —
+  the stale-while-revalidate cache the restore funnel hydrates so a repeat
+  visit does not wait ~5-10s of backend fetch before the assumption cards and
+  readiness can settle."
+  [address]
+  (when-let [address* (address-token address)]
+    (str "history-bundle::" address*)))
+
 (defn assumption-library-key
   "One record per wallet holds the whole {instrument-id -> remembered history
   assumption} map — the user's authored proxy/conservative assumptions, durable
@@ -187,6 +196,18 @@
 (defn save-view-library!
   [address record]
   (put-encoded-record! (view-library-key address) record))
+
+(defn load-history-cache!
+  [address]
+  (get-encoded-record! (history-cache-key address)))
+
+(defn save-history-cache!
+  [address record]
+  (put-encoded-record! (history-cache-key address) record))
+
+(defn delete-history-cache!
+  [address]
+  (delete-record! (history-cache-key address)))
 
 (defn load-assumption-library!
   [address]

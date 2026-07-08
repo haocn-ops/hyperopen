@@ -1,6 +1,8 @@
 (ns hyperopen.runtime.effect-adapters.portfolio-optimizer-scenarios
   (:require [clojure.string :as str]
             [hyperopen.account.context :as account-context]
+            [hyperopen.platform :as platform]
+            [hyperopen.portfolio.optimizer.application.history-cache :as history-cache]
             [hyperopen.portfolio.optimizer.application.scenario-operations :as scenario-operations]
             [hyperopen.portfolio.optimizer.application.scenario-workflow :as scenario-workflow]
             [hyperopen.portfolio.optimizer.contracts :as contracts]
@@ -367,11 +369,36 @@
           (.catch (fn [_err] (reset!))))
       (js/Promise.resolve (reset!)))))
 
+(defn- hydrate-history-cache!
+  "Read the wallet's persisted history bundle in PARALLEL with the draft
+  restore and hydrate it while the in-memory history data is still empty —
+  the stale-while-revalidate half that lets assumption cards and readiness
+  settle from the last session's data seconds before the background reload
+  (the load effect the draft/preseed hydration already appends) lands and
+  replaces it. All the guards (address, version, age cap, never-clobber) live
+  in the pure history-cache policy."
+  [env store address]
+  (let [load-history-cache! (env-fn env :load-history-cache!)
+        now-ms-fn (or (env-fn env :now-ms) platform/now-ms)]
+    (if (and address load-history-cache!)
+      (-> (load-history-cache! address)
+          (.then (fn [record]
+                   (when record
+                     (swap! store
+                            (fn [state]
+                              (or (history-cache/hydrate-history-cache
+                                   state record address (now-ms-fn))
+                                  state))))
+                   nil))
+          (.catch (fn [_err] nil)))
+      (js/Promise.resolve nil))))
+
 (defn restore-portfolio-optimizer-draft-effect
   "Restore the per-wallet persisted draft into an untouched /optimize/new draft,
   or fall back to the holdings preseed when nothing was persisted. The persisted
   draft always wins over the machine preseed, so this effect is the single funnel
-  both the route loader and the holdings-arrival watcher dispatch through."
+  both the route loader and the holdings-arrival watcher dispatch through. The
+  wallet's cached history bundle hydrates in parallel (either branch benefits)."
   [env store _path]
   (let [address (account-context/effective-account-address @store)
         load-draft! (env-fn env :load-draft!)
@@ -385,19 +412,23 @@
                      (dispatch! store
                                 nil
                                 [[:actions/set-portfolio-optimizer-universe-from-current]]))
-                   nil)]
-    (if (and address load-draft! dispatch!)
-      (-> (load-draft! address)
-          (.then (fn [record]
-                   (if (and (map? record)
-                            (map? (:draft record))
-                            (untouched?))
-                     (do (note-restored! (:draft record))
-                         (dispatch! store
-                                    nil
-                                    [[:actions/hydrate-portfolio-optimizer-draft record]]))
-                     (preseed!))
-                   nil))
-          (.catch (fn [_err]
-                    (preseed!))))
-      (js/Promise.resolve (preseed!)))))
+                   nil)
+        history-hydration (hydrate-history-cache! env store address)
+        draft-restore
+        (if (and address load-draft! dispatch!)
+          (-> (load-draft! address)
+              (.then (fn [record]
+                       (if (and (map? record)
+                                (map? (:draft record))
+                                (untouched?))
+                         (do (note-restored! (:draft record))
+                             (dispatch! store
+                                        nil
+                                        [[:actions/hydrate-portfolio-optimizer-draft record]]))
+                         (preseed!))
+                       nil))
+              (.catch (fn [_err]
+                        (preseed!))))
+          (js/Promise.resolve (preseed!)))]
+    (-> (js/Promise.all #js [history-hydration draft-restore])
+        (.then (fn [_] nil)))))

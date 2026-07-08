@@ -12,10 +12,10 @@
             [hyperopen.portfolio.optimizer.application.request-builder :as request-builder]
             [hyperopen.portfolio.optimizer.application.setup-readiness :as setup-readiness]
             [hyperopen.portfolio.optimizer.application.universe-candidates :as universe-candidates]
+            [hyperopen.portfolio.optimizer.application.view-model.setup-history-assumption-exposure :as exposure]
             [hyperopen.portfolio.optimizer.application.view-model.universe :as universe]
             [hyperopen.portfolio.optimizer.coercion :as coercion]
             [hyperopen.portfolio.optimizer.contracts :as contracts]
-            [hyperopen.portfolio.optimizer.domain.history-assumption-proxy :as history-assumption-proxy]
             [hyperopen.portfolio.optimizer.domain.history-assumptions :as history-assumptions]))
 
 (defn apply-percent-label
@@ -133,64 +133,6 @@
                   tail)
       nil)))
 
-(defn- confidence-tier
-  "Low/Medium/High tier for a [0,1] confidence fraction."
-  [fraction]
-  (cond
-    (nil? fraction) "Low"
-    (< fraction 0.33) "Low"
-    (< fraction 0.66) "Medium"
-    :else "High"))
-
-(defn- confidence-tier-label
-  "Regression-confidence tier. When the preview ran the actual regression, the
-  tier comes from the realized q (sample count AND fit quality). Until then it
-  falls back to the sample-count upper bound n/(n+n0) - q can never exceed it,
-  so the pre-data preview stays an honest ceiling."
-  [preview observations]
-  (if (= :estimated (get-in preview [:regression :status]))
-    (confidence-tier (:confidence-q preview))
-    (confidence-tier
-     (when (and observations (pos? observations))
-       (/ observations
-          (+ observations history-assumption-proxy/confidence-observation-scale))))))
-
-(defn- specific-risk-tier-label
-  [observations relationship-strength]
-  (if (< (or observations 0) 60)
-    "High"
-    (case relationship-strength
-      :low "High"
-      :high "Moderate"
-      "Medium")))
-
-(defn basket-summary-text
-  "\"ETH 60% / BTC 40%\"-style rendering of basket rows."
-  ([rows] (basket-summary-text rows " / "))
-  ([rows separator]
-   (str/join separator
-             (map (fn [{:keys [label weight-percent]}]
-                    (str label " " (js/Math.round weight-percent) "%"))
-                  rows))))
-
-(defn- final-model-line
-  "Summary strip under the diagnostics cells. Once a final basket exists it IS
-  the summary - never the prior dressed up as the model."
-  [final-rows cap-percent-label]
-  (if (seq final-rows)
-    (str "Final model: " (basket-summary-text final-rows)
-         " + specific risk"
-         (if cap-percent-label
-           (str " + " cap-percent-label " cap")
-           " + cap"))
-    "Final model: proxy basket + shrinkage + specific risk + cap"))
-
-(defn observations-label
-  [observations]
-  (if (and observations (pos? observations))
-    (str observations " days of returns")
-    "No usable native returns"))
-
 (defn addable-option-label
   "Dropdown option text for the manual entry point. The day count is the
   asset's native return-day count — the number that limits the shared
@@ -209,34 +151,6 @@
   [{:keys [observations label]}]
   [(if (some? observations) 0 1) (or observations 0) (or label "")])
 
-(defn- covariance-window-detail
-  "Detail line under the covariance-window cell. Only rendered once the aligned
-  window is known: the proxies carry the asset's risk links across the FULL
-  shared window; the native overlap merely calibrates the basket weights."
-  [covariance-observations observations]
-  (when covariance-observations
-    (if (and observations (pos? observations))
-      (str "Extended via proxies · " observations "-day overlap calibrates weights")
-      "Extended via proxies · no native overlap (prior weights only)")))
-
-(defn- proxy-diagnostics
-  [{:keys [observations relationship-strength covariance-observations preview]}]
-  [{:key :regression-confidence
-    :label "Regression confidence"
-    :value (confidence-tier-label preview observations)
-    :detail "R² used for confidence, not weights"}
-   {:key :specific-risk
-    :label "Specific risk"
-    :value (specific-risk-tier-label observations relationship-strength)
-    :detail "Unique risk not explained by proxies"}
-   ;; The window the risk model actually estimates over. The asset's own short
-   ;; history never truncates it (complete proxy assets are excluded from
-   ;; alignment); showing the overlap here read as "the model only uses N days".
-   {:key :history-window
-    :label "Covariance window"
-    :value (observations-label (or covariance-observations observations))
-    :detail (covariance-window-detail covariance-observations observations)}])
-
 (defn- proxy-label-resolver
   "Resolve a proxy instrument-id to a display label: from the universe /
   reference-instrument pool, else the live market catalog, else the raw id.
@@ -252,17 +166,6 @@
           (when-let [market (get-in state [:asset-selector :market-by-key id])]
             (:label (universe-candidates/market-display market)))
           id))))
-
-(defn- selected-proxy-rows
-  "The card's picked proxies as chips, label-resolved (works for reference-only
-  proxies outside the universe). `usable-ids` is the aligned set that reached the
-  risk model; a picked proxy not yet in it is still loading (:loading? true)."
-  [selected-ids resolve-label usable-ids]
-  (mapv (fn [id]
-          {:instrument-id id
-           :label (resolve-label id)
-           :loading? (boolean (and usable-ids (not (contains? usable-ids id))))})
-        selected-ids))
 
 (defn- proxy-search-results
   "Proxy candidates matching the card's search query, excluding the thin asset
@@ -285,69 +188,15 @@
                           :market-type (:market-type market)}))))
              vec)))))
 
-(defn- exposure-preview
-  "Pre-run exposure story for a proxy card, computed by the SAME domain pipeline
-  the engine runs (`history-assumption-proxy/model-exposure`) over the same
-  inputs the request builder hands the engine: the readiness request's flattened
-  assumption entry, which carries the short-overlap regression series. While
-  history/readiness are still assembling (or the entry is incomplete) there is
-  no series yet, so the regression reports itself skipped and the final basket
-  equals the prior - honest, and exactly what the engine would use."
-  [readiness draft-entry id selected-ids]
-  (when (seq selected-ids)
-    (let [request-entry (get-in readiness [:request :history-assumptions id])]
-      (history-assumption-proxy/model-exposure
-       {:proxy-ids (vec selected-ids)
-        :user-prior-weights (or (:proxy-prior-weights request-entry)
-                                (history-assumptions/proxy-prior-weights draft-entry))
-        :regression-series (:regression-series request-entry)}))))
-
-(defn- basket-rows
-  "Weights map -> display rows in the user's selection order (deterministic and
-  stable as chips come and go)."
-  [weights-by-id ordered-ids resolve-label]
-  (->> ordered-ids
-       (keep (fn [id]
-               (when-let [weight (get weights-by-id id)]
-                 {:instrument-id id
-                  :label (resolve-label id)
-                  :weight weight
-                  :weight-percent (* 100 weight)})))
-       vec))
-
 (def ^:private prior-source-labels
   {:user "User-specified weights"
    :equal "Equal-weight fallback"})
-
-(def ^:private regression-skip-messages
-  {:no-overlap "No return overlap with the proxies yet. Using the prior only."
-   :insufficient-overlap "Not enough overlap to estimate. Using the prior only."
-   :singular-regression "The overlap can't identify exposures. Using the prior only."
-   :degenerate-overlap "The overlap can't identify exposures. Using the prior only."})
-
-(defn- regression-estimate-model
-  "Panel B of the exposure story: the joint regression's own estimate (before
-  confidence shrinkage), or why it was skipped."
-  [preview ordered-ids resolve-label]
-  (when-let [regression (:regression preview)]
-    (if (= :estimated (:status regression))
-      {:status :estimated
-       :rows (basket-rows (:beta regression) ordered-ids resolve-label)
-       :r2 (:r2 regression)
-       :sample-count (:sample-count regression)
-       :summary (str "R² " (.toFixed (:r2 regression) 2)
-                     " · " (:sample-count regression) " observations")}
-      {:status :skipped
-       :reason (:reason regression)
-       :sample-count (:sample-count regression)
-       :message (get regression-skip-messages (:reason regression)
-                     "Regression unavailable. Using the prior only.")})))
 
 (defn- history-assumption-card
   [{:keys [instrument label entry complete? errors warnings note percent-label*
            assumption-required? return-required? observations
            covariance-observations readiness
-           resolve-proxy-label usable-ids search-query state
+           resolve-proxy-label usable-ids proxy-in-flight? search-query state
            collapse-overrides]}]
   (let [id (:instrument-id instrument)
         behavior (:behavior entry)
@@ -355,14 +204,18 @@
         status (card-status entry complete? assumption-required?)
         selected-ids (when proxy? (history-assumptions/proxy-instrument-ids entry))
         selected-proxies (when proxy?
-                           (selected-proxy-rows selected-ids resolve-proxy-label usable-ids))
+                           (exposure/selected-proxy-rows selected-ids resolve-proxy-label
+                                                usable-ids proxy-in-flight?))
+        ;; Background history work is still running for this card's basket -
+        ;; every "no data" verdict below is provisional while this is true.
+        history-loading? (boolean (some :loading? selected-proxies))
         relationship (when proxy? (history-assumptions/relationship-strength entry))
         preview (when proxy?
-                  (exposure-preview readiness entry id selected-ids))
+                  (exposure/exposure-preview readiness entry id selected-ids))
         prior-rows (when preview
-                     (basket-rows (:prior-weights preview) selected-ids resolve-proxy-label))
+                     (exposure/basket-rows (:prior-weights preview) selected-ids resolve-proxy-label))
         final-rows (when preview
-                     (basket-rows (:final-beta preview) selected-ids resolve-proxy-label))
+                     (exposure/basket-rows (:final-beta preview) selected-ids resolve-proxy-label))
         acknowledged? (boolean (get-in entry [:metadata :acknowledged?]))
         configured? (boolean (and complete? acknowledged?))
         ;; Configured cards rest collapsed (Apply's acknowledgment IS the
@@ -373,6 +226,7 @@
              :role (str "portfolio-optimizer-history-assumption-card-" id)
              :status status
              :status-label (get card-status-labels status "Needs assumptions")
+             :history-loading? history-loading?
              :mode behavior
              :mode-label (get mode-labels behavior)
              :mode-options mode-options
@@ -409,20 +263,22 @@
              :prior-basket prior-rows
              :prior-source (:prior-source preview)
              :prior-source-label (get prior-source-labels (:prior-source preview))
-             :regression-estimate (regression-estimate-model preview
+             :regression-estimate (exposure/regression-estimate-model preview
                                                              selected-ids
-                                                             resolve-proxy-label)
+                                                             resolve-proxy-label
+                                                             history-loading?)
              :final-basket (when (seq final-rows)
                              {:rows final-rows
                               :confidence-q (:confidence-q preview)
                               :confidence-label (some-> (:confidence-q preview)
                                                         percent-label*)
-                              :confidence-tier (confidence-tier (:confidence-q preview))})
-             :diagnostics (proxy-diagnostics {:observations observations
+                              :confidence-tier (exposure/confidence-tier (:confidence-q preview))})
+             :diagnostics (exposure/proxy-diagnostics {:observations observations
                                               :relationship-strength relationship
                                               :covariance-observations covariance-observations
-                                              :preview preview})
-             :final-model-line (final-model-line final-rows
+                                              :preview preview
+                                              :history-loading? history-loading?})
+             :final-model-line (exposure/final-model-line final-rows
                                                  (some-> (:max-weight entry)
                                                          percent-label*))))))
 
@@ -449,6 +305,8 @@
                       (request-builder/usable-proxy-id-set eligible assumptions))
          reference-instruments (get-in draft [:proxy-reference-instruments])
          resolve-proxy-label (proxy-label-resolver state universe reference-instruments)
+         load-in-progress? (exposure/history-load-in-progress? state load-state)
+         proxy-in-flight? (exposure/proxy-in-flight-fn state load-in-progress?)
          search-queries (get-in state contracts/ui-proxy-search-queries-path)
          collapse-overrides (get-in state contracts/ui-assumption-cards-collapsed-path)
          ;; The shared covariance window (proxy-extended: complete proxy assets
@@ -501,6 +359,7 @@
                                     :readiness readiness
                                     :state state
                                     :usable-ids usable-ids
+                                    :proxy-in-flight? proxy-in-flight?
                                     :resolve-proxy-label resolve-proxy-label
                                     :search-query (get search-queries id)
                                     :collapse-overrides collapse-overrides}))))))
@@ -532,6 +391,9 @@
                       vec)]
      {:cards cards
       :addable-assets addable
+      ;; Cards whose proxy history is still fetching - the section-level
+      ;; "background work in progress" banner keys off this.
+      :history-loading-count (count (filter :history-loading? cards))
       ;; :applicable? keeps meaning "cards exist" (the right-rail summary and
       ;; the while-loading suppression key off it); the section itself also
       ;; renders in a compact form when only the manual entry point applies.

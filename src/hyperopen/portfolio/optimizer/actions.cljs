@@ -321,6 +321,7 @@
 
 (def dismiss-portfolio-optimizer-return-views-io-note
   return-views-io/dismiss-portfolio-optimizer-return-views-io-note)
+
 (def export-portfolio-optimizer-history-assumptions
   history-assumptions-io/export-portfolio-optimizer-history-assumptions)
 

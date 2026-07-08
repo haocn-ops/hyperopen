@@ -25,17 +25,30 @@
     [:span {:class ["font-mono" "text-[0.8125rem]" "text-trading-muted"]} "%"]]])
 
 (defn- status-chip
+  "Status pill. While this card's proxy history is still fetching, ANY status
+  verdict is provisional (completeness judged against a not-yet-loaded usable
+  set can even read Configured), so the chip reads a pulsing \"Loading
+  history…\" until the fetch settles."
   [card]
   (let [id (:instrument-id card)
-        configured? (= :configured (:status card))]
-    [:span {:class ["border" "px-1.5" "py-0.5" "font-mono" "text-[0.625rem]"
-                    "font-semibold" "uppercase" "tracking-[0.1em]"
-                    (if configured? "border-success/50" "border-warning/50")
-                    (if configured? "text-success" "text-warning")
-                    (if configured? "bg-success/10" "bg-warning/10")]
-            :data-role (str "portfolio-optimizer-history-assumption-status-" id)
-            :data-status (some-> (:status card) name)}
-     (:status-label card)]))
+        configured? (= :configured (:status card))
+        loading? (boolean (:history-loading? card))]
+    [:span (cond-> {:class ["border" "px-1.5" "py-0.5" "font-mono" "text-[0.625rem]"
+                            "font-semibold" "uppercase" "tracking-[0.1em]"
+                            (cond loading? "border-base-300"
+                                  configured? "border-success/50"
+                                  :else "border-warning/50")
+                            (cond loading? "text-trading-muted"
+                                  configured? "text-success"
+                                  :else "text-warning")
+                            (cond loading? "bg-base-200/40"
+                                  configured? "bg-success/10"
+                                  :else "bg-warning/10")
+                            (when loading? "animate-pulse")]
+                    :data-role (str "portfolio-optimizer-history-assumption-status-" id)
+                    :data-status (some-> (:status card) name)}
+             loading? (assoc :data-loading "true"))
+     (if loading? "Loading history…" (:status-label card))]))
 
 (defn- mode-tabs
   "Two-way behavior selector. Selecting a mode seeds that mode's editable
@@ -72,10 +85,10 @@
                            :data-role (str "portfolio-optimizer-history-assumption-proxy-chip-"
                                            id "-" instrument-id)}
                     label
-                    ;; A just-picked reference proxy is still fetching history.
+                    ;; This proxy's history fetch is still in flight.
                     (when loading?
-                      [:span {:class ["text-[0.5625rem]" "uppercase" "tracking-[0.06em]"
-                                      "text-trading-muted"]}
+                      [:span {:class ["animate-pulse" "text-[0.5625rem]" "uppercase"
+                                      "tracking-[0.06em]" "text-trading-muted"]}
                        "loading"])
                     [:button {:type "button"
                               :class ["text-trading-muted" "hover:text-warning"]
@@ -266,9 +279,17 @@
   Configured status). Run readiness never waits on Apply - a complete assumption
   is engine-backed as soon as its fields are valid."
   [card]
-  (let [id (:instrument-id card)]
+  (let [id (:instrument-id card)
+        loading? (boolean (:history-loading? card))]
     [:div {:class ["flex" "items-center" "justify-end" "gap-2" "border-t"
                    "border-base-300" "pt-2"]}
+     ;; Hold Apply while history is fetching: completeness judged against a
+     ;; not-yet-loaded proxy set flips on its own moments later, and the copy
+     ;; makes the disabled button read as "wait", not "broken".
+     (when loading?
+       [:p {:class ["mr-auto" "animate-pulse" "text-[0.6875rem]" "text-trading-muted"]
+            :data-role (str "portfolio-optimizer-history-assumption-apply-loading-" id)}
+        "Waiting for proxy history to load…"])
      [:button {:type "button"
                :class ["border" "border-base-300" "px-3" "py-1.5" "text-[0.75rem]"
                        "font-semibold" "text-trading-muted" "hover:text-trading-text"]
@@ -282,7 +303,7 @@
                                "disabled:cursor-not-allowed" "disabled:opacity-40"]
                        :data-role (str "portfolio-optimizer-history-assumption-apply-" id)
                        :on {:click [[(get-in card [:actions :apply]) id]]}}
-                (not (:engine-applied? card))
+                (or (not (:engine-applied? card)) loading?)
                 (assoc :disabled true))
       (if (:configured? card) "Applied" "Apply assumptions")]]))
 
@@ -354,7 +375,7 @@
        [:p {:class ["border" "border-base-300" "bg-base-200/20" "p-2"
                     "text-[0.75rem]" "leading-[1.45]" "text-trading-muted"]
             :data-role (str "portfolio-optimizer-history-assumption-rationale-" id)}
-       (str "Agent rationale: " (:rationale card))])
+        (str "Agent rationale: " (:rationale card))])
      (case (:mode card)
        :proxy (proxy-fields card)
        :conservative (conservative-fields card)
@@ -408,9 +429,26 @@
                  [:option {:value instrument-id} (or option-label label)]))
           addable-assets)))
 
+(defn- loading-banner
+  "Aggregate \"background work in progress\" strip: while any card's proxy
+  history is still fetching, tell the user the cards below will fill in on
+  their own so they don't start re-editing provisional state."
+  [loading-count]
+  (when (pos? loading-count)
+    [:div {:class ["flex" "items-center" "gap-2" "border" "border-base-300"
+                   "bg-base-200/40" "px-2" "py-1.5"]
+           :data-role "portfolio-optimizer-history-assumptions-loading-banner"}
+     [:span {:class ["h-1.5" "w-1.5" "shrink-0" "animate-pulse" "rounded-full"
+                     "bg-warning"]
+             :aria-hidden "true"}]
+     [:span {:class ["font-mono" "text-[0.6875rem]" "text-trading-muted"]}
+      (str "Loading proxy history for " loading-count
+           (if (= 1 loading-count) " asset" " assets")
+           " — cards update automatically when it finishes.")]]))
+
 (defn history-assumptions-section
   [{:keys [state draft readiness history-load-state]}]
-  (let [{:keys [cards addable-assets applicable?]}
+  (let [{:keys [cards addable-assets applicable? history-loading-count]}
         (optimizer-view-model/history-assumption-cards
          state draft readiness history-load-state
          {:percent-label controls/percent-label})]
@@ -432,6 +470,7 @@
                       (if (= 1 (count cards))
                         " asset in the workflow"
                         " assets in the workflow"))])]
+             (loading-banner (or history-loading-count 0))
              (assumptions-io/io-toolbar
               {:asset-count (count cards)
                :universe-count (+ (count cards) (count addable-assets))})

@@ -50,8 +50,12 @@
       nil)))
 
 (defn- editable?
-  [{:keys [phase read-only?]}]
-  (and (contains? #{:staged :armed} phase) (not read-only?)))
+  ;; Pre-commit (:staged/:armed) the per-order type/param editor is open — including in read-only
+  ;; views (spectate). Toggling a row's type only re-projects its estimated cost; it dispatches
+  ;; nothing but modal-state writes. The commit gate is on Arm/Confirm, and live-order amend has
+  ;; its own `amendable?` guard, so nothing here can send an order.
+  [{:keys [phase]}]
+  (contains? #{:staged :armed} phase))
 
 (def ^:private state-glyph
   {:filled "✓"

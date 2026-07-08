@@ -44,16 +44,17 @@
     :sub "Work every order over time"}])
 
 (defn- mode-tile
-  [{:keys [id title sub consequence active? read-only?]}]
+  ;; Always interactive: this band renders only in the pre-commit :staged phase, and picking a
+  ;; strategy only re-projects estimated costs (nothing is sent). A read-only viewer (spectate)
+  ;; compares strategies here; the commit gate lives on Arm/Confirm, not on these tiles.
+  [{:keys [id title sub consequence active?]}]
   [:button {:type "button"
             :class (cond-> ["optimizer-exec-mode-tile" "flex" "flex-col" "gap-0.5" "px-3" "py-2"
                             "border-l" "border-base-300" "text-left"]
                      active? (conj "is-active"))
             :data-role (str "portfolio-optimizer-execution-mode-" (name id))
             :data-active (str (boolean active?))
-            :disabled (boolean read-only?)
-            :on (when-not read-only?
-                  {:click [[:actions/set-portfolio-optimizer-execution-default-order-type id]]})}
+            :on {:click [[:actions/set-portfolio-optimizer-execution-default-order-type id]]}}
    [:span {:class ["flex" "items-center" "gap-2"]}
     [:span {:class ["optimizer-exec-mode-dot"]}]
     [:span {:class ["text-xs" "font-medium" "text-trading-text"]} title]]
@@ -96,7 +97,7 @@
         rows))
 
 (defn- high-cost-warning
-  [{:keys [read-only?] :as model} rows]
+  [model rows]
   (let [flagged (high-cost-crossing-rows model rows)]
     (when (seq flagged)
       (let [sendable (ready-rows rows)
@@ -133,27 +134,31 @@
                 (opt-format/format-usdc current) " to " (opt-format/format-usdc fixed)
                 (if (= 1 (count flagged)) " — but it may not fill." " — but they may not fill."))]]
          [:span {:class ["flex-1"]}]
-         (when-not read-only?
-           [:button {:type "button"
-                     :class ["border" "border-warning/60" "px-3" "py-1.5" "text-xs"
-                             "font-semibold" "text-warning" "shrink-0"]
-                     :data-role "portfolio-optimizer-execution-rest-high-cost"
-                     :on {:click (rest-passively-actions flagged)}}
-            (str "Rest " (if (= 1 (count flagged)) "it" "these") " passively")])]))))
+         ;; A cost-simulation shortcut — overrides the flagged rows to passive so the KPI strip
+         ;; re-projects. Available in read-only views too (it sends nothing); the commit gate is
+         ;; on Arm/Confirm.
+         [:button {:type "button"
+                   :class ["border" "border-warning/60" "px-3" "py-1.5" "text-xs"
+                           "font-semibold" "text-warning" "shrink-0"]
+                   :data-role "portfolio-optimizer-execution-rest-high-cost"
+                   :on {:click (rest-passively-actions flagged)}}
+          (str "Rest " (if (= 1 (count flagged)) "it" "these") " passively")]]))))
 
 ;; ── the staged band ────────────────────────────────────────────────────────
 
 (defn staged-band
-  [{:keys [default-order-type read-only? disabled-message stale? stale-message] :as model} rows]
+  [{:keys [default-order-type commit-blocked? commit-blocked-message stale? stale-message] :as model} rows]
   (let [sendable (ready-rows rows)]
     [:div {:class ["border-b" "border-base-300"]
            :data-role "portfolio-optimizer-execution-control-band"
            :data-phase "staged"}
-     (when read-only?
+     ;; Read-only / stale notice. The tiles below stay interactive — this only explains that
+     ;; arming and sending are disabled (the message itself says simulation is still allowed).
+     (when commit-blocked?
        [:p {:class ["optimizer-exec-readonly" "border-b" "border-base-300" "px-5" "py-2"
                     "text-xs" "font-semibold" "text-warning"]
             :data-role "portfolio-optimizer-execution-readonly"}
-        disabled-message])
+        commit-blocked-message])
      ;; A stale plan can't be armed (the action gate refuses it); say why and point to the re-run.
      (when stale?
        [:p {:class ["optimizer-exec-readonly" "border-b" "border-base-300" "px-5" "py-2"
@@ -172,8 +177,7 @@
                           :title title
                           :sub sub
                           :consequence (tile-consequence model id sendable)
-                          :active? (= id default-order-type)
-                          :read-only? read-only?})))]
+                          :active? (= id default-order-type)})))]
      (or (high-cost-warning model rows)
          [:p {:class ["border-t" "border-base-300" "bg-base-200/30" "px-5" "py-1.5"
                       "font-mono" "text-[0.65rem]" "text-trading-muted"]}

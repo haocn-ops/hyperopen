@@ -329,3 +329,46 @@
   (let [unfinished (proxy-section :minimum-variance)]
     (is (some? (ts/node-by-role unfinished "portfolio-optimizer-history-assumption-collapse-perp:NEW"))
         "An unacknowledged (expanded-by-default) card can still be collapsed by hand.")))
+
+(defn- loading-proxy-section
+  "Same proxy card, but rendered while the proxy's history fetch is still in
+  flight (aggregate load :loading + a non-idle prefetch queue)."
+  []
+  (setup-history-assumptions/history-assumptions-section
+   {:state {:optimizer {:history-prefetch
+                        {:queue []
+                         :active-instrument-id "perp:BTC"
+                         :by-instrument-id {"perp:BTC" {:status :loading}}}}}
+    :draft {:universe [btc eth new-perp]
+            :objective {:kind :minimum-variance}
+            :constraints {:max-asset-weight 0.5}
+            :history-assumptions {"perp:NEW" proxy-entry}}
+    :readiness {:request {:requested-universe [btc eth new-perp]
+                          :universe []
+                          :objective {:kind :minimum-variance}}
+                :blocking-warnings []}
+    :history-load-state {:status :loading}}))
+
+(deftest history-assumptions-section-surfaces-in-flight-history-loading-test
+  (let [node (loading-proxy-section)
+        banner (ts/node-by-role node "portfolio-optimizer-history-assumptions-loading-banner")
+        status (ts/node-by-role node "portfolio-optimizer-history-assumption-status-perp:NEW")
+        apply-button (ts/node-by-role node "portfolio-optimizer-history-assumption-apply-perp:NEW")
+        apply-note (ts/node-by-role node "portfolio-optimizer-history-assumption-apply-loading-perp:NEW")]
+    (is (some? banner) "The section carries an aggregate loading banner.")
+    (is (some #(and (string? %) (re-find #"Loading proxy history for 1 asset" %))
+              (ts/collect-strings banner)))
+    (is (= "true" (ts/node-attr status :data-loading)))
+    (is (some #{"Loading history…"} (ts/collect-strings status))
+        "The status chip says loading instead of a mid-flight verdict.")
+    (is (true? (ts/node-attr apply-button :disabled))
+        "Apply is held while history is fetching.")
+    (is (some? apply-note) "The hold explains itself as waiting, not broken.")))
+
+(deftest history-assumptions-section-settled-load-shows-no-loading-ui-test
+  (let [node (proxy-section :minimum-variance)]
+    (is (nil? (ts/node-by-role node "portfolio-optimizer-history-assumptions-loading-banner")))
+    (is (nil? (ts/node-attr
+               (ts/node-by-role node "portfolio-optimizer-history-assumption-status-perp:NEW")
+               :data-loading)))
+    (is (nil? (ts/node-by-role node "portfolio-optimizer-history-assumption-apply-loading-perp:NEW")))))

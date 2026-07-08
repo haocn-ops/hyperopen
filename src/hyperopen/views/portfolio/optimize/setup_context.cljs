@@ -89,17 +89,29 @@
                  :replicant/key "history-assumptions-rail"}
        [:p {:class eyebrow-class} "History assumptions"]
        (into [:div {:class ["mt-2" "space-y-2"]}]
-             (map (fn [{:keys [instrument-id label configured? summary-pairs]}]
+             (map (fn [{:keys [instrument-id label configured? history-loading?
+                               summary-pairs]}]
                     [:div {:class ["border" "border-base-300" "bg-base-200/20" "p-2"]
                            :data-role (str "portfolio-optimizer-history-assumptions-rail-row-"
                                            instrument-id)}
                      [:div {:class ["flex" "items-baseline" "justify-between" "gap-2"]}
                       [:span {:class ["font-mono" "text-[0.75rem]" "font-semibold"]}
                        label]
-                      [:span {:class ["font-mono" "text-[0.625rem]" "uppercase"
-                                      "tracking-[0.08em]"
-                                      (if configured? "text-success" "text-warning")]}
-                       (if configured? "Configured" "Needs input")]]
+                      ;; While this asset's proxy history is still fetching,
+                      ;; both "Configured" and "Needs input" are provisional
+                      ;; verdicts - say loading until the fetch settles.
+                      [:span (cond-> {:class ["font-mono" "text-[0.625rem]" "uppercase"
+                                              "tracking-[0.08em]"
+                                              (when history-loading? "animate-pulse")
+                                              (cond history-loading? "text-trading-muted"
+                                                    configured? "text-success"
+                                                    :else "text-warning")]
+                                      :data-role (str "portfolio-optimizer-history-assumptions-rail-status-"
+                                                      instrument-id)}
+                               history-loading? (assoc :data-loading "true"))
+                       (cond history-loading? "Loading history…"
+                             configured? "Configured"
+                             :else "Needs input")]]
                      (into [:div {:class ["mt-1.5" "space-y-0.5"]}]
                            (map (fn [[pair-label pair-value]]
                                   (contract-row pair-label pair-value)))

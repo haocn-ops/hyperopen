@@ -506,3 +506,4 @@
         "Unconfigured cards float to the top; within each group universe order is preserved.")
     (is (= [:incomplete :incomplete :configured :configured]
            (mapv :status cards)))))
+

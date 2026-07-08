@@ -112,3 +112,22 @@
             :age-ms 1000
             :stale? false}
            (history-calendar/freshness [1000 2000 3000] 4000 10000)))))
+
+(deftest api-v2-codec-key-normalization-is-cached-and-stable-test
+  ;; The key/enum conversions are memoized (bundle payloads repeat a tiny key
+  ;; vocabulary across ~50k point maps); the cache must be behavior-invisible:
+  ;; repeated conversions of the same and mixed-shape inputs stay identical.
+  (let [payload {"time_ms" 1 :closePrice 2 "indexValue" {"innerKey" 3} 4 "raw"}
+        expected {:time-ms 1 :close-price 2 :index-value {:inner-key 3} 4 "raw"}]
+    (is (= expected (api-v2-codec/normalize-api-map payload)))
+    (is (= expected (api-v2-codec/normalize-api-map payload))
+        "A second pass over cached keys yields the identical structure.")
+    (is (= (api-v2-codec/normalize-api-map {:time_ms 1})
+           (api-v2-codec/normalize-api-map {"time_ms" 1}))
+        "Keyword and string spellings of a key share one normalized form.")
+    (is (= :not-applicable
+           (api-v2-codec/keyword-like "not_applicable")
+           (api-v2-codec/keyword-like "not_applicable"))
+        "keyword-like stays stable across cached repeats.")
+    (is (nil? (api-v2-codec/keyword-like nil))
+        "Non-string inputs keep the uncached coercion behavior.")))

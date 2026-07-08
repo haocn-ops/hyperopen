@@ -138,7 +138,7 @@ test("optimizer history API v2 loads rows without legacy history fanout @regress
   await expect(page.locator("[data-role='portfolio-optimizer-universe-selected-row-perp:ETH']"))
     .toHaveAttribute("data-history-status", "sufficient", { timeout: 10_000 });
   await expect(page.locator("[data-role='portfolio-optimizer-readiness-panel']"))
-    .toContainText("approved proxy history", { timeout: 10_000 });
+    .toContainText("approved substitute history", { timeout: 10_000 });
 
   expect(v2Requests.some((entry) => entry.type === "instruments")).toBe(true);
   const historyRequest = v2Requests.find((entry) => entry.type === "history-bundle");

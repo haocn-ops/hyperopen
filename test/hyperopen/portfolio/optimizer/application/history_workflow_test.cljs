@@ -343,41 +343,6 @@
     (is (= []
            (:commands result)))))
 
-(deftest merge-history-bundle-preserves-existing-api-v2-instrument-maps-test
-  (let [merged (workflow/merge-history-bundle
-                {:api-v2-history
-                 {:status :partial
-                  :common-calendar [1000 2000 3000 4000]
-                  :return-calendar [2000 3000 4000]
-                  :series-by-instrument
-                  {"perp:BTC" {:instrument-id "hl:perp:BTC"
-                               :points []}}
-                  :aligned-returns-by-instrument
-                  {"perp:BTC" {:instrument-id "hl:perp:BTC"
-                               :returns [0.01 -0.02 0.03]}}
-                  :warnings []}}
-                {:api-v2-history
-                 {:status :partial
-                  :common-calendar [1000 2000 3000]
-                  :return-calendar [2000 3000]
-                  :series-by-instrument
-                  {"perp:ETH" {:instrument-id "hl:perp:ETH"
-                               :points []}}
-                  :aligned-returns-by-instrument
-                  {"perp:ETH" {:instrument-id "hl:perp:ETH"
-                               :returns [0.02 0.03]}}
-                  :warnings []}
-                 :warnings []}
-                5000)]
-    (is (= #{"perp:BTC" "perp:ETH"}
-           (set (keys (get-in merged
-                              [:api-v2-history
-                               :series-by-instrument])))))
-    (is (= #{"perp:BTC" "perp:ETH"}
-           (set (keys (get-in merged
-                              [:api-v2-history
-                               :aligned-returns-by-instrument])))))))
-
 (def sol-reference-instrument
   {:instrument-id "perp:SOL"
    :market-type :perp
@@ -401,14 +366,15 @@
                 {"perp:SOL" queued-status})))
 
 (deftest begin-selection-prefetch-includes-reference-proxy-instruments-test
-  ;; A reference-only proxy is not a universe member, so the post-cache refetch
-  ;; must add it explicitly or the request would skip the very series the
-  ;; prefetch was enqueued for.
+  ;; A queued reference-only proxy with the api-v2 cache already populated (and
+  ;; no aligned-only member pinning the backend alignment) fetches as a DELTA:
+  ;; just the queued reference, not a full-universe backend round trip. Its
+  ;; series then merges into history data (next test).
   (let [result (workflow/begin-selection-prefetch
                 {:state (reference-proxy-prefetch-state)
                  :opts {:source :selection-prefetch :queue? true :merge? true}
                  :now-ms 2000})]
-    (is (= ["perp:BTC" "perp:ETH" "perp:SOL"]
+    (is (= ["perp:SOL"]
            (mapv :instrument-id
                  (get-in result [:commands 0 :request :universe]))))))
 
@@ -451,31 +417,39 @@
                     :by-instrument-id "perp:SOL" :status]))
         "Its prefetch status survives the cleanup-to-universe pass.")))
 
+(defn- cached-prefetch-state
+  "Api-v2 cache populated for perp:BTC, perp:ETH queued. `btc-series` shapes
+  whether BTC counts as aligned-only (empty points) or point-backed."
+  [btc-series]
+  (-> (prefetch-state)
+      (assoc-in [:portfolio
+                 :optimizer
+                 :history-data
+                 :api-v2-history]
+                {:status :partial
+                 :series-by-instrument {"perp:BTC" btc-series}
+                 :aligned-returns-by-instrument
+                 {"perp:BTC" {:instrument-id "hl:perp:BTC"
+                              :returns [0.01]}}})
+      (assoc-in [:portfolio
+                 :optimizer
+                 :history-prefetch
+                 :queue]
+                [eth-instrument])
+      (assoc-in [:portfolio
+                 :optimizer
+                 :history-prefetch
+                 :by-instrument-id]
+                {"perp:BTC" {:status :succeeded}
+                 "perp:ETH" queued-status})))
+
 (deftest begin-selection-prefetch-requests-current-universe-after-api-v2-cache-test
-  (let [state (-> (prefetch-state)
-                  (assoc-in [:portfolio
-                             :optimizer
-                             :history-data
-                             :api-v2-history]
-                            {:status :partial
-                             :series-by-instrument
-                             {"perp:BTC" {:instrument-id "hl:perp:BTC"}}
-                             :aligned-returns-by-instrument
-                             {"perp:BTC" {:instrument-id "hl:perp:BTC"
-                                          :returns [0.01]}}})
-                  (assoc-in [:portfolio
-                             :optimizer
-                             :history-prefetch
-                             :queue]
-                            [eth-instrument])
-                  (assoc-in [:portfolio
-                             :optimizer
-                             :history-prefetch
-                             :by-instrument-id]
-                            {"perp:BTC" {:status :succeeded}
-                             "perp:ETH" queued-status}))
-        result (workflow/begin-selection-prefetch
-                {:state state
+  ;; BTC has aligned returns but NO point-level returns (aligned-only): merging
+  ;; a delta would force the all-or-nothing alignment into point-level mode and
+  ;; silently drop BTC — so this member's presence keeps the full-universe
+  ;; refetch whose single response stays aligned-consistent.
+  (let [result (workflow/begin-selection-prefetch
+                {:state (cached-prefetch-state {:instrument-id "hl:perp:BTC"})
                  :opts {:source :selection-prefetch
                         :queue? true
                         :merge? true}
@@ -483,3 +457,24 @@
     (is (= ["perp:BTC" "perp:ETH"]
            (mapv :instrument-id
                  (get-in result [:commands 0 :request :universe]))))))
+
+(deftest begin-selection-prefetch-fetches-only-queued-delta-after-api-v2-cache-test
+  ;; BTC's cached series carries point-level returns, so nothing pins the
+  ;; backend's aligned mode: the queued instrument fetches as a DELTA instead
+  ;; of refetching the whole universe (the double-fetch the 2026-07-08 trace
+  ;; paid ~6.8s for).
+  (let [result (workflow/begin-selection-prefetch
+                {:state (cached-prefetch-state
+                         {:instrument-id "hl:perp:BTC"
+                          :lineage-kind :native
+                          :points [{:time-ms 1000 :close 100 :return nil}
+                                   {:time-ms 2000 :close 101 :return 0.01}]})
+                 :opts {:source :selection-prefetch
+                        :queue? true
+                        :merge? true}
+                 :now-ms 2000})]
+    (is (= ["perp:ETH"]
+           (mapv :instrument-id
+                 (get-in result [:commands 0 :request :universe]))))
+    (is (= ["perp:ETH"]
+           (get-in result [:commands 0 :instrument-ids])))))

@@ -1,5 +1,6 @@
 (ns hyperopen.runtime.effect-adapters.portfolio-optimizer.history
-  (:require [hyperopen.portfolio.optimizer.application.history-workflow :as workflow]
+  (:require [clojure.set :as set]
+            [hyperopen.portfolio.optimizer.application.history-workflow :as workflow]
             [hyperopen.portfolio.optimizer.contracts :as contracts]))
 
 (defn- request-candle-snapshot!
@@ -23,11 +24,17 @@
   (set (keep :instrument-id universe)))
 
 (defn- current-history-needed?
+  "Fetch a separate current-portfolio bundle ONLY when holdings contain
+  instruments the selected fetch does not cover. This mirrors the consumer
+  (`request-builder/history-data-for-current-portfolio`), which reads the MAIN
+  bundle whenever current ⊆ selected — the default holdings-seeded flow, where
+  the old any-difference check paid a second full-universe backend fetch
+  (~6.8s in the 2026-07-08 trace) that was then provably never read."
   [selected-universe current-universe]
   (let [selected-ids (instrument-id-set selected-universe)
         current-ids (instrument-id-set current-universe)]
     (and (seq current-ids)
-         (not= selected-ids current-ids))))
+         (not (set/subset? current-ids selected-ids)))))
 
 (defn- current-history-error-bundle
   [err]

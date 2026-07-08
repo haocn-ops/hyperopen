@@ -239,6 +239,7 @@
             [hyperopen.portfolio.optimizer.application.history-loader-api-v2-test]
             [hyperopen.portfolio.optimizer.application.history-loader-test]
             [hyperopen.portfolio.optimizer.application.history-loader-vaults-test]
+            [hyperopen.portfolio.optimizer.application.history-merge-test]
             [hyperopen.portfolio.optimizer.application.history-window-test]
             [hyperopen.portfolio.optimizer.application.history-workflow-test]
             [hyperopen.portfolio.optimizer.application.instrument-labels-test]
@@ -1027,6 +1028,7 @@
              'hyperopen.portfolio.optimizer.application.history-loader-api-v2-test
              'hyperopen.portfolio.optimizer.application.history-loader-test
              'hyperopen.portfolio.optimizer.application.history-loader-vaults-test
+             'hyperopen.portfolio.optimizer.application.history-merge-test
              'hyperopen.portfolio.optimizer.application.history-window-test
              'hyperopen.portfolio.optimizer.application.history-workflow-test
              'hyperopen.portfolio.optimizer.application.instrument-labels-test

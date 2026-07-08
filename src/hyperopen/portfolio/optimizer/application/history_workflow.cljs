@@ -2,6 +2,7 @@
   (:require [hyperopen.portfolio.optimizer.application.current-portfolio :as current-portfolio]
             [hyperopen.portfolio.optimizer.application.history-loader.api-v2 :as history-api-v2]
             [hyperopen.portfolio.optimizer.application.history-loader.request-plan :as request-plan]
+            [hyperopen.portfolio.optimizer.application.history-merge :as history-merge]
             [hyperopen.portfolio.optimizer.application.history-prefetch :as history-prefetch]
             [hyperopen.portfolio.optimizer.coercion :as coercion]
             [hyperopen.portfolio.optimizer.contracts :as contracts]))
@@ -156,42 +157,10 @@
   (and (= :selection-prefetch (:source opts))
        (:queue? opts)))
 
-(defn merge-history-bundle
-  [history-data bundle completed-at-ms]
-  (-> (or history-data {})
-      (update :candle-history-by-coin
-              merge
-              (or (:candle-history-by-coin bundle) {}))
-      (update :funding-history-by-coin
-              merge
-              (or (:funding-history-by-coin bundle) {}))
-      (update :vault-details-by-address
-              merge
-              (or (:vault-details-by-address bundle) {}))
-      (update :api-v2-history
-              (fn [existing]
-                (if-let [api-v2-history (:api-v2-history bundle)]
-                  (let [existing* (or existing {})]
-                    (-> (merge existing* api-v2-history)
-                        (assoc :series-by-instrument
-                               (merge (or (:series-by-instrument existing*) {})
-                                      (or (:series-by-instrument api-v2-history)
-                                          {})))
-                        (assoc :aligned-returns-by-instrument
-                               (merge (or (:aligned-returns-by-instrument
-                                           existing*)
-                                          {})
-                                      (or (:aligned-returns-by-instrument
-                                           api-v2-history)
-                                          {})))
-                        (update :warnings
-                                #(vec (concat (or (:warnings existing) [])
-                                              (or (:warnings api-v2-history)
-                                                  []))))))
-                  existing)))
-      (update :warnings
-              #(vec (concat (or % []) (or (:warnings bundle) []))))
-      (assoc :loaded-at-ms completed-at-ms)))
+(def merge-history-bundle
+  "See application.history-merge (split 2026-07-08); re-exposed here because
+  the workflow is this bundle-fold's only production caller."
+  history-merge/merge-history-bundle)
 
 (defn- queued-instruments
   [prefetch-state]
@@ -267,6 +236,28 @@
     (seq instrument-ids)
     (assoc :instrument-ids (vec instrument-ids))))
 
+(defn- point-returns-present?
+  [series]
+  (boolean (some #(coercion/finite-number? (:return %))
+                 (:points series))))
+
+(defn- aligned-only-member?
+  "True when some current universe/reference member's usable returns exist
+  ONLY in the backend's aligned-returns (no point-level returns in its
+  series). Merging a delta bundle forces the all-or-nothing alignment into
+  client-side point-level mode, which would silently drop such a member from
+  runs — their presence demands the full-universe refetch that keeps one
+  consistent aligned response."
+  [state]
+  (let [api-v2 (get-in state (conj contracts/history-data-path :api-v2-history))
+        series-by-id (:series-by-instrument api-v2)
+        aligned-by-id (:aligned-returns-by-instrument api-v2)]
+    (boolean
+     (some (fn [id]
+             (and (seq (:returns (get aligned-by-id id)))
+                  (not (point-returns-present? (get series-by-id id)))))
+           (current-universe-ids state)))))
+
 (defn begin-selection-prefetch
   [{:keys [state opts now-ms started-at-ms]}]
   (let [prefetch-state (history-prefetch/prefetch-state state)
@@ -284,14 +275,19 @@
        :commands []}
 
       :else
-      (let [prefetch-universe (if (get-in state (conj contracts/history-data-path
-                                                       :api-v2-history))
-                                ;; The api-v2 alignment needs one request covering
-                                ;; everything, so refetch the whole draft universe
-                                ;; PLUS the reference-only proxies — the queued
-                                ;; instrument is usually one of those references,
-                                ;; and a universe-only request would silently skip
-                                ;; the very series the prefetch was enqueued for.
+      (let [prefetch-universe (if (and (get-in state (conj contracts/history-data-path
+                                                           :api-v2-history))
+                                       (aligned-only-member? state))
+                                ;; An aligned-only member pins the alignment to
+                                ;; the backend's aligned-returns, which are only
+                                ;; consistent within ONE response — refetch the
+                                ;; whole draft universe PLUS the reference-only
+                                ;; proxies. Otherwise fetch just the queued
+                                ;; instruments: merge-history-bundle folds their
+                                ;; series in and the client-side point-level
+                                ;; alignment (the calendar-poisoning fallback)
+                                ;; realigns the merged set, at delta cost instead
+                                ;; of a ~full-universe backend round trip.
                                 (into (vec (get-in state contracts/draft-universe-path))
                                       (get-in state contracts/draft-proxy-reference-instruments-path))
                                 queued)

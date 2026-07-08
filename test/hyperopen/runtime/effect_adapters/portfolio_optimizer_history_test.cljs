@@ -440,3 +440,54 @@
                               (get-in @store [:portfolio :optimizer :history-load-state :error :message])))
                        (done)))
               (.catch (async-support/unexpected-error done))))))))
+
+(deftest load-portfolio-optimizer-history-effect-skips-current-portfolio-subset-fetch-test
+  ;; When every holdings instrument is already in the selected fetch (the
+  ;; default holdings-seeded flow, where the draft universe = holdings plus
+  ;; reference proxies), the request builder reads the MAIN bundle — so the
+  ;; adapter must not pay a second full backend round trip for a
+  ;; current-portfolio bundle nothing will read (the ~6.8s double fetch in the
+  ;; 2026-07-08 trace).
+  (async done
+    (let [calls (atom [])
+          selected-bundle {:api-v2-history
+                           {:status :ok
+                            :series-by-instrument
+                            {"perp:BTC" {:instrument-id "hl:perp:BTC"}
+                             "perp:HYPE" {:instrument-id "hl:perp:HYPE"}}}
+                           :warnings []}
+          store (atom {:portfolio {:optimizer
+                                    {:draft {:universe [{:instrument-id "perp:BTC"
+                                                         :market-type :perp
+                                                         :coin "BTC"}
+                                                        {:instrument-id "perp:HYPE"
+                                                         :market-type :perp
+                                                         :coin "HYPE"}]}
+                                     :runtime {:as-of-ms 3000}}}})]
+      (with-redefs [portfolio-optimizer-adapters/*request-history-bundle!*
+                    (fn [_deps request]
+                      (swap! calls conj request)
+                      (js/Promise.resolve selected-bundle))
+                    portfolio-optimizer-adapters/*now-ms* (fn [] 12345)]
+        (-> (portfolio-optimizer-adapters/load-portfolio-optimizer-history-effect
+             nil
+             store
+             ;; Holdings are a strict subset of the selected universe.
+             {:current-portfolio-universe [{:instrument-id "perp:HYPE"
+                                            :market-type :perp
+                                            :coin "HYPE"}]})
+            (.then
+             (fn [result]
+               (is (= 1 (count @calls))
+                   "One backend request covers holdings and universe alike.")
+               (is (= ["perp:BTC" "perp:HYPE"]
+                      (mapv :instrument-id (:universe (first @calls)))))
+               (is (nil? (:current-portfolio-history-data result))
+                   "No separate current-portfolio bundle is fetched or attached.")
+               (is (nil? (get-in @store
+                                 [:portfolio
+                                  :optimizer
+                                  :history-data
+                                  :current-portfolio-history-data])))
+               (done)))
+            (.catch (async-support/unexpected-error done)))))))

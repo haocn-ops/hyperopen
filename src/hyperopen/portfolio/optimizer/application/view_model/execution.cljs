@@ -15,6 +15,14 @@
 (def ^:private stale-recommendation-message
   "Inputs changed since this recommendation was computed — re-run the optimizer before executing.")
 
+;; Appended to the read-only (spectate / trader-portfolio / unavailable-subaccount) commit-block
+;; banner. Changing a strategy or an order's type only re-projects estimated costs (the same pure
+;; recompute the KPI strip uses) — nothing is sent — so a spectator can model execution here even
+;; though arming/sending stays disabled. Not appended to the stale-recommendation block, whose only
+;; honest resolution is a re-run.
+(def ^:private simulation-allowed-note
+  "You can still model execution strategies and per-order types here to compare costs — arming and sending stay disabled.")
+
 (defn- labels-by-instrument
   [state]
   (or (get-in state (conj contracts/last-successful-run-result-path
@@ -224,6 +232,14 @@
         disabled-message (when execution-disabled?
                            (or (:disabled-message plan)
                                "Execution is disabled for this scenario."))
+        ;; Why sending is blocked: :read-only (spectate / trader-portfolio / unavailable
+        ;; subaccount) or :stale-recommendation. Only the former is a *simulate-anyway* context;
+        ;; the banner tells a spectator they can model execution even though sending is disabled.
+        commit-blocked-reason (when execution-disabled? (:disabled-reason plan))
+        commit-blocked-message (when execution-disabled?
+                                 (if (= :read-only commit-blocked-reason)
+                                   (str disabled-message " " simulation-allowed-note)
+                                   disabled-message))
         confirm-disabled? (or submitting?
                               execution-disabled?
                               scenario-stale?
@@ -282,7 +298,12 @@
      :submitting? submitting?
      :error (:error modal)
      :ready? ready?
-     :read-only? execution-disabled?
+     ;; Commit gate — cannot Arm / Confirm / send (spectate, trader-portfolio, unavailable
+     ;; subaccount, or stale). Distinct from simulation editability: the strategy tiles and
+     ;; per-order type/param editors stay live so a read-only viewer can compare execution costs.
+     :commit-blocked? execution-disabled?
+     :commit-blocked-reason commit-blocked-reason
+     :commit-blocked-message commit-blocked-message
      :stale? stale-notice?
      :stale-message (when stale-notice? stale-recommendation-message)
      ;; Arming is blocked by either a read-only/disabled plan (spectate or stale-at-entry) or

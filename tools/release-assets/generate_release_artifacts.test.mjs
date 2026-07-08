@@ -26,6 +26,15 @@ function extractInlineScriptBodies(documentHtml) {
     (match) => match[1]
   );
 }
+
+function extractCspDirective(policy, directiveName) {
+  const directive = policy
+    .split(";")
+    .map((entry) => entry.trim())
+    .find((entry) => entry.startsWith(`${directiveName} `));
+
+  return directive ? directive.split(/\s+/).slice(1) : [];
+}
 import {
   collectReleaseJavaScriptFiles,
   fingerprintFileName,
@@ -96,6 +105,14 @@ const SAMPLE_SCRIPT_TAG_MAIN_RELEASE_BUNDLE = [
   "boot();",
   "",
 ].join("\n");
+
+test("release CSP permits the optimizer history API origin", () => {
+  assert.ok(
+    extractCspDirective(buildContentSecurityPolicy(), "connect-src").includes(
+      "https://price-history.hyperopen.xyz"
+    )
+  );
+});
 
 function buildSampleIndexHtml() {
   return `<!DOCTYPE html>

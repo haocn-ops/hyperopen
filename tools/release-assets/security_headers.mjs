@@ -38,6 +38,7 @@ export const DOCUMENT_REFERRER_POLICY = "strict-origin-when-cross-origin";
 const DOCUMENT_CONNECT_SRC = [
   "'self'",
   "https://cloudflareinsights.com",
+  "https://price-history.hyperopen.xyz",
   "https://api.hyperliquid.xyz",
   "wss://api.hyperliquid.xyz",
   "https://stats-data.hyperliquid.xyz",

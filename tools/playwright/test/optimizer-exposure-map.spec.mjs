@@ -287,4 +287,65 @@ test.describe("optimizer exposure-map drag under Maximum Sharpe", () => {
     expect(riskModelCalls).toBeLessThanOrEqual(2);
   });
 
+  test("switching Minimum risk to Maximum Sharpe estimates the risk model at most once", async ({
+    page
+  }) => {
+    // Regression (owner trace 2026-07-08 18:59): the goal-card switch paid the
+    // multi-second Ledoit-Wolf estimate repeatedly - once per UI helper (the
+    // two return-input memos each estimated independently) and again on every
+    // 5s as-of bucket roll, because the memo keys included the history's
+    // wall-clock :freshness stamp. One covariance estimate is shared and the
+    // keys drop :freshness, so the switch estimates at most once and later
+    // draft edits across a bucket boundary estimate zero times.
+    await visitRoute(page, "/portfolio/optimize/new");
+    await seedOptimizerState(page, [
+      seedPatch(optimizerPath("draft", "universe"), [
+        { "instrument-id": "perp:BTC", "market-type": keyword("perp"), coin: "BTC" },
+        { "instrument-id": "perp:ETH", "market-type": keyword("perp"), coin: "ETH" },
+        { "instrument-id": "perp:SOL", "market-type": keyword("perp"), coin: "SOL" },
+        { "instrument-id": "perp:HYPE", "market-type": keyword("perp"), coin: "HYPE" }
+      ])
+    ]);
+    await waitForIdle(page);
+    // Default objective is Minimum risk; the Max-Sharpe surfaces are unmounted.
+    await expect(
+      page.locator("[data-role='portfolio-optimizer-setup-use-my-views-editor']")
+    ).toHaveCount(0);
+
+    await page.evaluate(() => {
+      const risk = globalThis.hyperopen.portfolio.optimizer.domain.risk;
+      const original = risk.estimate_risk_model;
+      globalThis.__optimizerRiskModelCalls = 0;
+      risk.estimate_risk_model = function (...args) {
+        globalThis.__optimizerRiskModelCalls += 1;
+        return original.apply(this, args);
+      };
+    });
+
+    await page.locator("text=Maximum Sharpe").first().click();
+    await waitForIdle(page);
+    await expect(
+      page.locator("[data-role='portfolio-optimizer-setup-use-my-views-editor']")
+    ).toHaveCount(1);
+    const callsAfterSwitch = await page.evaluate(
+      () => globalThis.__optimizerRiskModelCalls
+    );
+    // One shared estimate for both return-input helpers (an async history
+    // transition landing mid-switch may legitimately add one more).
+    expect(callsAfterSwitch).toBeLessThanOrEqual(2);
+
+    // Cross a 5s as-of bucket boundary, then force a request rebuild with a
+    // draft edit. The history data is unchanged, so no re-estimation.
+    await page.waitForTimeout(5500);
+    const slider = page.locator("[data-role='portfolio-optimizer-exposure-net-band']");
+    await slider.evaluate((el) => {
+      el.value = "0.25";
+      el.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await waitForIdle(page);
+    const callsAfterBucketRoll = await page.evaluate(
+      () => globalThis.__optimizerRiskModelCalls
+    );
+    expect(callsAfterBucketRoll).toBe(callsAfterSwitch);
+  });
 });

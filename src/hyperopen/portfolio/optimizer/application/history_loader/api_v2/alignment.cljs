@@ -255,15 +255,21 @@
                                               local-id
                                               backend-id
                                               api-series)
-                           legacy-series* (legacy-fallback/series
-                                           instrument
-                                           candle-history-by-coin
-                                           funding-history-by-coin
-                                           vault-details-by-address
-                                           funding-periods-per-year*)
-                           legacy-fallback? (and (not hard-api-warning?)
+                           ;; The legacy series is only consulted when the api
+                           ;; series can't be used, and building it (candle +
+                           ;; funding normalization) dominates alignment cost —
+                           ;; never compute it for an instrument the api serves.
+                           fallback-wanted? (and (not hard-api-warning?)
                                                  (legacy-fallback/series-fallback-needed?
-                                                  api-series)
+                                                  api-series))
+                           legacy-series* (when fallback-wanted?
+                                            (legacy-fallback/series
+                                             instrument
+                                             candle-history-by-coin
+                                             funding-history-by-coin
+                                             vault-details-by-address
+                                             funding-periods-per-year*))
+                           legacy-fallback? (and fallback-wanted?
                                                  (usable-series? legacy-series*))
                            series (if legacy-fallback?
                                     legacy-series*

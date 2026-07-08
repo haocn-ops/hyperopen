@@ -251,6 +251,7 @@
             [hyperopen.portfolio.optimizer.application.rebalance-preview-test]
             [hyperopen.portfolio.optimizer.application.rebalance-snapshot-test]
             [hyperopen.portfolio.optimizer.application.refinement-view-model-test]
+            [hyperopen.portfolio.optimizer.application.request-builder-align-memo-test]
             [hyperopen.portfolio.optimizer.application.request-builder-refinement-test]
             [hyperopen.portfolio.optimizer.application.request-builder-test]
             [hyperopen.portfolio.optimizer.application.return-inputs-test]
@@ -1043,6 +1044,7 @@
              'hyperopen.portfolio.optimizer.application.rebalance-preview-test
              'hyperopen.portfolio.optimizer.application.rebalance-snapshot-test
              'hyperopen.portfolio.optimizer.application.refinement-view-model-test
+             'hyperopen.portfolio.optimizer.application.request-builder-align-memo-test
              'hyperopen.portfolio.optimizer.application.request-builder-refinement-test
              'hyperopen.portfolio.optimizer.application.request-builder-test
              'hyperopen.portfolio.optimizer.application.return-inputs-test

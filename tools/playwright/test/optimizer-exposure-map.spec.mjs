@@ -15,9 +15,7 @@ async function expectPortfolioExposureOpen(page) {
   await expect(panel).toHaveCount(1);
   await expect.poll(async () => panel.evaluate((el) => el.open)).toBe(true);
   await expect(panel.locator("> summary")).toContainText("Portfolio exposure");
-  await expect(panel).toContainText(
-    "Set how levered and net long/short the target portfolio can be."
-  );
+  await expect(panel).toContainText("Set target leverage and net long/short bias.");
 }
 
 test.describe("optimizer exposure-map Positioning control", () => {
@@ -34,7 +32,7 @@ test.describe("optimizer exposure-map Positioning control", () => {
       "Sent to solver"
     );
     await expect(page.locator("[data-role='portfolio-optimizer-exposure-caption']"))
-      .toContainText("The dot shows the target gross leverage and net long/short bias.");
+      .toContainText("Drag the dot to set target exposure.");
     await expect(
       page.locator("[data-role='portfolio-optimizer-exposure-gross-band']")
     ).toBeVisible();
@@ -182,6 +180,45 @@ test.describe("optimizer exposure-map Positioning control", () => {
       page.locator("[data-role='portfolio-optimizer-constraint-net-min-input']")
     ).toBeVisible();
   });
+
+  test("band sliders visibly expand the allowed region at any zoom via full-length stripes", async ({
+    page
+  }) => {
+    // Regression: at a wide axis the band box around the dot is smaller than the
+    // drag handle itself, so slider drags looked like they did nothing. The
+    // full-width gross stripe / full-height net stripe are the always-visible
+    // rendering of the band, at every zoom level.
+    const grossStripe = page.locator(
+      "[data-role='portfolio-optimizer-exposure-gross-stripe']"
+    );
+    const netStripe = page.locator(
+      "[data-role='portfolio-optimizer-exposure-net-stripe']"
+    );
+    const grossSlider = page.locator(
+      "[data-role='portfolio-optimizer-exposure-gross-band']"
+    );
+    await expect(grossStripe).toHaveCount(1);
+    await expect(netStripe).toHaveCount(1);
+    // Stripes span the full pad on their fixed axis.
+    await expect(grossStripe).toHaveAttribute("width", "100");
+    await expect(netStripe).toHaveAttribute("height", "100");
+    const heightBefore = Number(await grossStripe.getAttribute("height"));
+    // Drag the gross band slider to its maximum.
+    const box = await grossSlider.boundingBox();
+    await page.mouse.click(box.x + box.width - 2, box.y + box.height / 2);
+    await waitForIdle(page);
+    await expect(
+      page.locator("[data-role='portfolio-optimizer-exposure-gross-band-value']")
+    ).toHaveText("± 0.50×");
+    const heightAfter = Number(await grossStripe.getAttribute("height"));
+    expect(heightAfter).toBeGreaterThan(heightBefore);
+    // The stripe mirrors the band box's gross extent exactly (same y/height).
+    const bandBox = page.locator("[data-role='portfolio-optimizer-exposure-band-box']");
+    expect(await grossStripe.getAttribute("y")).toBe(await bandBox.getAttribute("y"));
+    expect(await grossStripe.getAttribute("height")).toBe(
+      await bandBox.getAttribute("height")
+    );
+  });
 });
 
 test.describe("optimizer exposure-map drag under Maximum Sharpe", () => {
@@ -249,4 +286,5 @@ test.describe("optimizer exposure-map drag under Maximum Sharpe", () => {
     // change); the unmemoized bug produced one-plus call per pointermove.
     expect(riskModelCalls).toBeLessThanOrEqual(2);
   });
+
 });

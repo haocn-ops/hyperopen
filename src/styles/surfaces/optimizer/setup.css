@@ -617,6 +617,10 @@
     stroke: var(--optimizer-border-strong);
   }
 
+  .portfolio-optimizer .optimizer-exposure-map__band-stripe {
+    fill: color-mix(in srgb, var(--optimizer-accent) 8%, transparent);
+  }
+
   .portfolio-optimizer .optimizer-exposure-map__band {
     fill: color-mix(in srgb, var(--optimizer-accent) 18%, transparent);
     stroke: color-mix(in srgb, var(--optimizer-accent) 55%, transparent);

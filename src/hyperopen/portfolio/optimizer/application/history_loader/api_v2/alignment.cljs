@@ -76,34 +76,27 @@
   (let [by-time (calendar/row-by-time points)]
     (mapv #(get by-time %) calendar)))
 
-(defn- point-return-map
-  [series]
+(defn- points-by-local-id
+  ;; The calendar helpers consume id -> point rows; alignment carries id -> series.
+  [series-by-local-id]
   (into {}
-        (keep (fn [{:keys [time-ms return]}]
-                (when (and (number? time-ms)
-                           (codec/finite-number? return))
-                  [time-ms return])))
-        (:points series)))
+        (map (fn [[local-id series]]
+               [local-id (:points series)]))
+        series-by-local-id))
 
 (defn- point-level-return-calendar
   [series-by-local-id calendar]
-  (let [return-maps (map point-return-map (vals series-by-local-id))]
-    (->> calendar
-         (filter (fn [time-ms]
-                   (every? #(codec/finite-number? (get % time-ms)) return-maps)))
-         vec)))
+  (calendar/point-level-return-calendar (points-by-local-id series-by-local-id)
+                                        calendar))
 
 (defn- returns-from-point-level
   [series-by-local-id return-calendar]
-  (into {}
-        (map (fn [[local-id series]]
-               (let [returns (point-return-map series)]
-                 [local-id (mapv #(get returns %) return-calendar)])))
-        series-by-local-id))
+  (calendar/returns-from-point-level (points-by-local-id series-by-local-id)
+                                     return-calendar))
 
 (defn- point-return-count
   [series]
-  (count (point-return-map series)))
+  (count (calendar/point-return-map (:points series))))
 
 (def ^:private api-v2-hard-warning-codes
   #{:identity-ambiguous
@@ -280,6 +273,16 @@
                         :legacy-fallback? legacy-fallback?
                         :series series}))
                    (or universe []))
+        ;; Pre-eligibility depth of each member's OWN served series. Readiness
+        ;; and the universe badges consume this so a degraded alignment (e.g. a
+        ;; collapsed shared calendar) can never blind them to how much history
+        ;; an excluded asset actually has.
+        served-observations-by-instrument
+        (into {}
+              (keep (fn [{:keys [instrument-id series]}]
+                      (when (and instrument-id (seq (:points series)))
+                        [instrument-id (count (:points series))])))
+              rows)
         id-map (warning-id-map rows)
         fallback-local-ids (set (keep (fn [{:keys [instrument-id
                                                    legacy-fallback?]}]
@@ -439,6 +442,54 @@
                                                                 effective-return-calendar))
         common-gap? (< (count effective-return-calendar)
                        min-return-observations)
+        ;; A collapsed shared calendar used to exclude EVERY member behind one
+        ;; anonymous universe-level warning (live 2026-07-08: a 6-day listing
+        ;; disjoint from a stale-ended series nuked a 79-asset universe, and the
+        ;; UI blamed the healthy assets). Peel the poisoning members instead:
+        ;; each is excluded individually with its own warning, the rest align.
+        peel (when (and common-gap? (> (count eligible) 1))
+               (calendar/peel-poisoning-members
+                (points-by-local-id series-by-local-id)
+                min-return-observations))
+        peel-warning-by-id (into {}
+                                 (map (fn [{:keys [instrument-id observations]}]
+                                        [instrument-id
+                                         {:code :insufficient-common-history
+                                          :instrument-id instrument-id
+                                          :observations observations
+                                          :required min-return-observations}]))
+                                 (:peeled peel))
+        prepared (if peel
+                   (mapv (fn [row]
+                           (if-let [warning (get peel-warning-by-id
+                                                 (:instrument-id row))]
+                             (assoc row :excluded? true :warning warning)
+                             row))
+                         prepared)
+                   prepared)
+        eligible (if peel
+                   (filterv (complement :excluded?) prepared)
+                   eligible)
+        eligible-local-ids (if peel (mapv :instrument-id eligible) eligible-local-ids)
+        series-by-local-id (if peel
+                             (into {} (map (juxt :instrument-id :series)) eligible)
+                             series-by-local-id)
+        use-aligned? (if peel false use-aligned?)
+        effective-calendar (if peel
+                             (calendar/common-calendar
+                              (map :points (vals series-by-local-id)))
+                             effective-calendar)
+        effective-return-calendar (if peel
+                                    (point-level-return-calendar series-by-local-id
+                                                                 effective-calendar)
+                                    effective-return-calendar)
+        return-series-by-instrument (if peel
+                                      (returns-from-point-level series-by-local-id
+                                                                effective-return-calendar)
+                                      return-series-by-instrument)
+        common-gap? (if peel
+                      (< (count effective-return-calendar) min-return-observations)
+                      common-gap?)
         history-warning (when (and (seq eligible)
                                    common-gap?)
                           {:code :insufficient-common-history
@@ -504,6 +555,7 @@
      :return-intervals return-intervals
      :history-window history-window
      :raw-price-series-by-instrument (:raw-price-series-by-instrument native-history)
+     :served-observations-by-instrument served-observations-by-instrument
      :cadence-by-instrument (:cadence-by-instrument native-history)
      :expected-return-series-by-instrument (:expected-return-series-by-instrument native-history)
      :expected-return-intervals-by-instrument (:expected-return-intervals-by-instrument native-history)

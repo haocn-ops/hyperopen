@@ -257,6 +257,10 @@
            (count rows))
          (get-in readiness [:request :history-assumptions instrument-id
                             :regression-series :observations])
+         ;; Excluded from alignment != no history: the pre-alignment served
+         ;; count keeps a full-history asset from ever badging "thin".
+         (get-in readiness [:request :history
+                            :served-observations-by-instrument instrument-id])
          (native-history-observations state instrument)))))
 
 (def ^:private native-observation-count native-history-observations)

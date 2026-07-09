@@ -88,7 +88,15 @@
                  :data-role "portfolio-optimizer-history-assumptions-rail"
                  :replicant/key "history-assumptions-rail"}
        [:p {:class eyebrow-class} "History assumptions"]
-       (into [:div {:class ["mt-2" "space-y-2"]}]
+       ;; Height-capped and internally scrollable, same idiom as the Return
+       ;; views editor's optimizer-objective-view-rows: a universe with many
+       ;; thin-history assets otherwise grows this list without bound, which
+       ;; stretches the whole 3-column setup grid row (default CSS Grid
+       ;; align-items: stretch) and leaves the shorter columns trailing acres
+       ;; of empty panel background below their actual content.
+       (into [:div {:class ["optimizer-history-assumptions-rows" "min-h-0" "mt-2" "space-y-2"
+                            "overflow-x-hidden" "overflow-y-auto"]
+                    :data-role "portfolio-optimizer-history-assumptions-rail-rows"}]
              (map (fn [{:keys [instrument-id label configured? history-loading?
                                summary-pairs]}]
                     [:div {:class ["border" "border-base-300" "bg-base-200/20" "p-2"]

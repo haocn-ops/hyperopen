@@ -51,6 +51,19 @@
     (is (contains? strings "Why this preset is safe"))
     (is (not (contains? strings "Execution Assumptions")))))
 
+(deftest setup-surface-grid-sizes-columns-independently-test
+  ;; Regression guard: CSS Grid's default align-items: stretch would make the
+  ;; left universe rail and right context rail stretch to match the CENTER
+  ;; policy pane whenever it grows much taller (e.g. many thin-history assets
+  ;; each rendering a full assumption card) — the shorter rails then render
+  ;; thousands of pixels of blank panel background below their real content
+  ;; (2026-07-08: "the background seems unusually large"). items-start makes
+  ;; every column exactly as tall as its own content instead.
+  (let [view-node (portfolio-view/portfolio-view
+                   {:router {:path "/portfolio/optimize/new"}})
+        surface (node-by-role view-node "portfolio-optimizer-setup-surface")]
+    (is (contains? (class-token-set surface) "items-start"))))
+
 (deftest setup-holdings-loading-window-mirrors-across-rail-and-run-bar-test
   ;; Cold load with a connected account and no clearinghouse data yet: the wait
   ;; must be visible everywhere the user checks readiness — the scenario

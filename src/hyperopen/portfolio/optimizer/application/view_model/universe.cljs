@@ -30,6 +30,7 @@
    :shared-gap "shared gap"
    :sufficient "sufficient"
    :stale "stale"
+   :stale-critical "stale"
    :insufficient "insufficient"
    :rejected "rejected"
    :missing "missing"
@@ -425,6 +426,12 @@
 
       (= :stale readiness-status)
       :stale
+
+      ;; A >= 7-day serve-time staleness is a refresh-pipeline incident, not the
+      ;; immaterial 1-2 day tail: it escapes the all-clear set and paints a
+      ;; visible amber "stale" chip.
+      (= :stale-critical readiness-status)
+      :stale-critical
 
       (= :aligned readiness-status)
       :sufficient

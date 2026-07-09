@@ -3,6 +3,7 @@
   summary. The history-assumption card and rail projections live in
   view-model.setup-history-assumption-cards / -rail (split 2026-07-05)."
   (:require [clojure.string :as str]
+            [hyperopen.portfolio.optimizer.application.history-warning-policy :as warning-policy]
             [hyperopen.portfolio.optimizer.application.return-views :as return-views]
             [hyperopen.portfolio.optimizer.application.setup-readiness :as setup-readiness]
             [hyperopen.portfolio.optimizer.application.view-model.universe :as universe]))
@@ -56,6 +57,9 @@
   ;; (:source-fetch-failed) is worth the user's attention.
   ;; :insufficient-common-history is likewise not user-fixable here (the
   ;; provider window is what it is), so it must not read as an action item.
+  ;; :excluded-from-alignment is a disclosure that an asset was left out of the
+  ;; shared estimate; the ACTIONABLE follow-up (configure a proxy/conservative
+  ;; assumption) already surfaces as its own caution, so this stays a note.
   #{:proxy-history-used
     :vault-derived-history-used
     :funding-history-missing
@@ -63,14 +67,21 @@
     :missing-market-cap-prior
     :missing-current-portfolio-prior
     :stale-history
-    :insufficient-common-history})
+    :insufficient-common-history
+    :excluded-from-alignment})
 
 (defn- warning-severity
   "Rank a warning group so the panel can render blocking issues, cautions, and
   informational notes distinctly instead of one undifferentiated amber wall."
-  [blocking? code]
+  [blocking? code group]
   (cond
     blocking? :blocking
+    ;; Serve-time staleness is normally an immaterial note, but once it escalates
+    ;; to an incident (>= 7 days, or the backend tagged it severity error) it
+    ;; signals a failing refresh pipeline and earns the user's attention.
+    (and (contains? warning-policy/stale-history-warning-codes code)
+         (some warning-policy/stale-incident? group))
+    :caution
     (contains? info-warning-codes code) :info
     :else :caution))
 
@@ -129,7 +140,7 @@
                    (cond-> {:code code
                             :code-label (some-> code name)
                             :count cnt
-                            :severity (warning-severity blocking? code)
+                            :severity (warning-severity blocking? code group)
                             :message (warning-group-message readiness code group cnt)
                             :assets (mapv (fn [warning]
                                             {:instrument-id (:instrument-id warning)

@@ -308,3 +308,59 @@
                     (is (= "bad request" (.-message err)))
                     (is (= "rid-400" (.-requestId err)))
                     (done)))))))
+
+(deftest request-history-bundle-error-status-wins-over-partial-across-chunks-test
+  ;; A common-window-empty (status "error") chunk must not be masked by a
+  ;; :partial sibling chunk, and its per-instrument series stay served (an error
+  ;; bundle is usable data plus a loud warning, never an empty response).
+  (async done
+    (let [universe (mapv (fn [i]
+                           {:instrument-id (str "perp:A" i)
+                            :market-type :perp
+                            :optimizer-history/instrument-id (str "hl:perp:A" i)})
+                         (range 105))
+          calls (atom [])
+          partial-payload {:contract_version "optimizer-history-api-v2"
+                           :request_id "rid-partial"
+                           :dataset_version "dv"
+                           :status "partial"
+                           :common_calendar [1000 2000]
+                           :return_calendar [2000]
+                           :series_by_instrument
+                           {"perp:A0" {:points [{:time_ms 1000 :close 1 :return nil}]}}
+                           :warnings []}
+          error-payload {:contract_version "optimizer-history-api-v2"
+                         :request_id "rid-error"
+                         :dataset_version "dv"
+                         :status "error"
+                         :common_calendar []
+                         :return_calendar []
+                         :series_by_instrument
+                         {"perp:A104" {:points [{:time_ms 1000 :close 1 :return nil}]}}
+                         :warnings [{:code "common_window_empty"
+                                     :severity "error"
+                                     :details {:instrument_ids ["hl:perp:A104"]}}]}
+          fetch-fn (fn [url init]
+                     (swap! calls conj [url (js->clj init)])
+                     (js/Promise.resolve
+                      (json-response
+                       200
+                       (if (= 1 (count @calls)) partial-payload error-payload))))]
+      (-> (client/request-history-bundle!
+           {:fetch-fn fetch-fn
+            :base-url "https://history.test"
+            :request-id (fn [] "rid")
+            :proxy-policy :approved-proxy-allowed
+            :include-aligned-returns? true}
+           {:bars 365
+            :interval :1d
+            :universe universe})
+          (.then
+           (fn [body]
+             (is (= :error (:status body))
+                 "A single error chunk wins over a partial one.")
+             (is (= #{"perp:A0" "perp:A104"}
+                    (set (keys (:series-by-instrument body))))
+                 "Per-instrument series stay served in an error bundle.")
+             (done)))
+          (.catch (async-support/unexpected-error done))))))

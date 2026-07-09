@@ -156,8 +156,13 @@
 
 (defn- merged-status
   [statuses]
-  (or (some #(when (not= :ok %) %) statuses)
-      :ok))
+  ;; A single :error chunk (common-window-empty) must win over a :partial one,
+  ;; so the merged bundle honestly reports the degenerate shared calendar rather
+  ;; than masking it behind the first non-:ok chunk.
+  (cond
+    (some #(= :error %) statuses) :error
+    (some #(not= :ok %) statuses) (some #(when (not= :ok %) %) statuses)
+    :else :ok))
 
 (defn- merge-history-bodies
   [bodies]

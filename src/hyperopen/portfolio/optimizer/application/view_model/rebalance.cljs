@@ -141,8 +141,21 @@
         :short
         :long)))
 
+(defn- binding-kind-for
+  "A binding bound of 0 pins the target at zero — usually a side setting
+  blocking the direction the solver wanted — which reads very differently
+  from sitting on a max-weight cap, so the badge must not conflate them."
+  [entries]
+  (when (seq entries)
+    (if (some (fn [{:keys [bound]}]
+                (and (number? bound)
+                     (<= (js/Math.abs bound) 1e-10)))
+              entries)
+      :floored
+      :capped)))
+
 (defn- row-model
-  [idx labels-by-instrument binding-instrument-ids excluded-ids draft-by-id capital-usd
+  [idx labels-by-instrument binding-by-instrument excluded-ids draft-by-id capital-usd
    [instrument-id current-weight target-weight]]
   (let [current-weight* (or current-weight 0)
         excluded? (or (contains? excluded-ids instrument-id)
@@ -154,7 +167,8 @@
         current-notional (* (or capital-usd 0) current-weight*)
         target-notional (* (or capital-usd 0) target-weight*)
         delta (- target-weight* current-weight*)
-        binding? (contains? binding-instrument-ids instrument-id)
+        binding-entries (get binding-by-instrument instrument-id)
+        binding? (boolean (seq binding-entries))
         draft-instrument (get draft-by-id instrument-id)]
     {:idx idx
      :asset (instrument-group-key labels-by-instrument instrument-id)
@@ -166,6 +180,7 @@
      :delta delta
      :delta-notional (- target-notional current-notional)
      :binding? binding?
+     :binding-kind (binding-kind-for binding-entries)
      :excluded? excluded?
      :status-label (when excluded? "sell to 0")
      :current-sign (signed-label current-weight*)
@@ -202,6 +217,9 @@
         target-weight (reduce + 0 (map :target-weight rows))
         delta (- target-weight current-weight)
         binding? (boolean (some :binding? rows))
+        binding-kind (cond
+                       (some #(= :capped (:binding-kind %)) rows) :capped
+                       (some #(= :floored (:binding-kind %)) rows) :floored)
         excluded? (boolean (some :excluded? rows))
         expandable? (> (count rows) 1)
         rows* (mapv #(assoc % :hidden? (not expandable?)) rows)]
@@ -218,6 +236,7 @@
       :delta delta
       :delta-notional (reduce + 0 (map :delta-notional rows))
       :binding? binding?
+      :binding-kind binding-kind
       :excluded? excluded?
       :status-label (when excluded? "sell to 0")
       :expandable? expandable?
@@ -248,12 +267,14 @@
                                draft-universe)
         row-ids (vec (distinct (concat instrument-ids
                                        excluded-row-ids)))
-        binding-instrument-ids (set (keep :instrument-id
-                                          (get-in result [:diagnostics :binding-constraints])))
+        binding-by-instrument (dissoc (group-by :instrument-id
+                                                (get-in result [:diagnostics :binding-constraints]))
+                                      nil)
+        binding-instrument-ids (set (keys binding-by-instrument))
         rows (mapv (fn [idx row]
                      (row-model idx
                                 labels-by-instrument
-                                binding-instrument-ids
+                                binding-by-instrument
                                 excluded-ids
                                 draft-by-id
                                 capital-usd

@@ -49,19 +49,27 @@
                   current
                   target))))
 
+(def ^:private binding-tolerance
+  ;; Must be looser than the QP solver's convergence noise: live runs land
+  ;; ~3e-10 off a bound (sometimes slightly OUTSIDE it), so a 1e-10 epsilon
+  ;; made the capped/floored flags flicker run-to-run. 1e-6 of portfolio
+  ;; weight is far below both display precision (0.1%) and the dust
+  ;; threshold (5e-4), so it cannot mislabel a genuinely interior weight.
+  1e-6)
+
 (defn- binding-constraints
   [{:keys [instrument-ids target-weights lower-bounds upper-bounds]}]
   (->> (map vector instrument-ids target-weights lower-bounds upper-bounds)
        (mapcat (fn [[id weight lower upper]]
                  (concat
                   (when (and (number? lower)
-                             (<= (abs-num (- weight lower)) 1e-10))
+                             (<= (abs-num (- weight lower)) binding-tolerance))
                     [{:instrument-id id
                       :constraint :lower-bound
                       :weight weight
                       :bound lower}])
                   (when (and (number? upper)
-                             (<= (abs-num (- weight upper)) 1e-10))
+                             (<= (abs-num (- weight upper)) binding-tolerance))
                     [{:instrument-id id
                       :constraint :upper-bound
                       :weight weight

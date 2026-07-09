@@ -184,7 +184,7 @@
     [:span {:class ["optimizer-target-exposure-delta-bar-fill"]}]]])
 
 (defn- exposure-row
-  [max-delta {:keys [idx binding? hidden? current-sign target-sign leg-label current-weight
+  [max-delta {:keys [idx binding? binding-kind hidden? current-sign target-sign leg-label current-weight
                      target-weight delta excluded? status-label instrument-id]
               :as row}]
   (let [role-token (data-role-token (or instrument-id (str "row-" idx)))]
@@ -194,6 +194,7 @@
                   hidden? (conj "hidden"))
           :data-role (str "portfolio-optimizer-target-exposure-row-" idx)
           :data-binding (when binding? "true")
+          :data-binding-kind (when binding? (name (or binding-kind :capped)))
           :data-excluded (when excluded? "true")
           :data-current-sign current-sign
           :data-target-sign target-sign}
@@ -221,7 +222,7 @@
      (delta-bar-cell role-token delta max-delta)]))
 
 (defn- exposure-group-row
-  [max-delta {:keys [asset current-weight target-weight delta binding?
+  [max-delta {:keys [asset current-weight target-weight delta binding? binding-kind
                      expandable? target-sign excluded? status-label instrument-id]
               :as group}]
   (let [asset-token (data-role-token asset)
@@ -259,10 +260,17 @@
        [:span {:class ["optimizer-target-exposure-excluded-tag"]}
         "excluded"])]
     (when binding?
-      [:span {:class ["ml-2" "border" "border-warning/50" "px-1.5" "py-0.5"
-                      "font-mono" "text-[0.5rem]" "font-semibold" "uppercase"
-                      "tracking-[0.08em]" "text-warning"]}
-       "capped"])
+      ;; A floor-at-zero binding must not read as "capped at max weight" —
+      ;; that ambiguity made a side-locked 0% target look like a solver bug.
+      (let [floored? (= :floored binding-kind)]
+        [:span {:class ["ml-2" "border" "border-warning/50" "px-1.5" "py-0.5"
+                        "font-mono" "text-[0.5rem]" "font-semibold" "uppercase"
+                        "tracking-[0.08em]" "text-warning"]
+                :title (if floored?
+                         "Held at 0% — the optimizer would have taken this asset past zero, but the side setting blocks that direction."
+                         "The target sits on this asset's weight cap.")
+                :data-binding-kind (name (or binding-kind :capped))}
+         (if floored? "floored" "capped")]))
     (when excluded?
       [:span {:class ["optimizer-target-exposure-status" "ml-2"]}
        status-label])]

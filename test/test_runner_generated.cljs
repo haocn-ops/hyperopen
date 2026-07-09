@@ -267,6 +267,7 @@
             [hyperopen.portfolio.optimizer.application.scenario-workflow-test]
             [hyperopen.portfolio.optimizer.application.setup-readiness-current-history-test]
             [hyperopen.portfolio.optimizer.application.setup-readiness-enrichment-test]
+            [hyperopen.portfolio.optimizer.application.setup-readiness-freshness-test]
             [hyperopen.portfolio.optimizer.application.setup-readiness-served-observations-test]
             [hyperopen.portfolio.optimizer.application.setup-readiness-test]
             [hyperopen.portfolio.optimizer.application.setup-readiness-warning-policy-test]
@@ -1067,6 +1068,7 @@
              'hyperopen.portfolio.optimizer.application.scenario-workflow-test
              'hyperopen.portfolio.optimizer.application.setup-readiness-current-history-test
              'hyperopen.portfolio.optimizer.application.setup-readiness-enrichment-test
+             'hyperopen.portfolio.optimizer.application.setup-readiness-freshness-test
              'hyperopen.portfolio.optimizer.application.setup-readiness-served-observations-test
              'hyperopen.portfolio.optimizer.application.setup-readiness-test
              'hyperopen.portfolio.optimizer.application.setup-readiness-warning-policy-test

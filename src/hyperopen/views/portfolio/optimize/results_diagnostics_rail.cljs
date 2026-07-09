@@ -267,12 +267,18 @@
       :else
       "Loaded history")))
 
-(defn- history-window-status
+(defn history-window-status
   [history-summary]
   (let [observations (:return-observations history-summary)]
-    (if (and (opt-format/finite-number? observations)
-             (< observations 30))
+    (cond
+      (:stale? history-summary)
       :caution
+
+      (and (opt-format/finite-number? observations)
+           (< observations 30))
+      :caution
+
+      :else
       :ok)))
 
 (defn- limiter-reason-copy
@@ -283,23 +289,37 @@
     :fewest-return-observations "has the fewest usable return observations"
     "sets the shared return window"))
 
-(defn- history-window-subtext
+(defn- stale-window-copy
+  [history-summary]
+  (let [age-ms (:age-ms history-summary)
+        age-days (when (opt-format/finite-number? age-ms)
+                   (js/Math.round (/ age-ms 86400000)))]
+    (if age-days
+      (str "Shared window ends " age-days " "
+           (if (= 1 age-days) "day" "days")
+           " before the run date — refresh history.")
+      "Shared window ends well before the run date — refresh history.")))
+
+(defn history-window-subtext
   [result history-summary]
   (let [instrument-id (:limiting-instrument-id history-summary)
-        reason (:limiting-reason history-summary)]
-    (cond
-      instrument-id
-      (str (results-model/instrument-label (:labels-by-instrument result)
-                                           instrument-id)
-           " "
-           (limiter-reason-copy reason)
-           ".")
+        reason (:limiting-reason history-summary)
+        base (cond
+               instrument-id
+               (str (display-asset-label (:labels-by-instrument result)
+                                         instrument-id)
+                    " "
+                    (limiter-reason-copy reason)
+                    ".")
 
-      (= :source-coverage-unavailable reason)
-      "Limiter unavailable from aligned returns."
+               (= :source-coverage-unavailable reason)
+               "Limiter unavailable from aligned returns."
 
-      :else
-      "Shared return calendar from aligned optimizer history.")))
+               :else
+               "Shared return calendar from aligned optimizer history.")]
+    (if (:stale? history-summary)
+      (str (stale-window-copy history-summary) " " base)
+      base)))
 
 (defn- trust-row
   [{:keys [label status value subtext]}]

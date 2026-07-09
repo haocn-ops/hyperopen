@@ -289,6 +289,9 @@
                                         (when legacy-fallback?
                                           instrument-id))
                                       rows))
+        series-by-local-id (into {}
+                                 (map (juxt :instrument-id :series))
+                                 rows)
         api-warnings (->> (concat (:warnings api-v2-history)
                                   (mapcat (fn [{:keys [series
                                                        legacy-fallback?]}]
@@ -300,10 +303,21 @@
                                     fallback-local-ids
                                     (warning-local-id id-map %)
                                     %))
+                          ;; A failed OPTIONAL proxy lookback-extension on an
+                          ;; asset whose served series is its own usable native
+                          ;; history stays visible as information, but must not
+                          ;; read as a rejection anywhere downstream: pre-tag it
+                          ;; so status projection and run blocking skip it (live
+                          ;; 2026-07-08: POL aligned on 658 native days yet
+                          ;; badged "No history" off its forgiven warning).
+                          (mapv (fn [warning]
+                                  (cond-> warning
+                                    (forgiven-proxy-warning?
+                                     warning
+                                     (get series-by-local-id
+                                          (warning-local-id id-map warning)))
+                                    (assoc :forgiven? true))))
                           vec)
-        series-by-local-id (into {}
-                                 (map (juxt :instrument-id :series))
-                                 rows)
         hard-warning-by-local-id (into {}
                                        (keep (fn [warning]
                                                (let [local-id (warning-local-id
@@ -311,10 +325,7 @@
                                                                warning)]
                                                  (when (and (api-v2-blocking-warning?
                                                              warning)
-                                                            (not (forgiven-proxy-warning?
-                                                                  warning
-                                                                  (get series-by-local-id
-                                                                       local-id))))
+                                                            (not (:forgiven? warning)))
                                                    [local-id warning]))))
                                        api-warnings)
         base-candidates (filterv (fn [{:keys [instrument-id backend-id series]}]

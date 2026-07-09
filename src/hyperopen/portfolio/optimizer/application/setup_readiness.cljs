@@ -462,9 +462,10 @@
   (let [missing-ids (set/difference (instrument-ids requested-universe)
                                     (instrument-ids (:universe request)))
         warnings (filter (fn [warning]
-                           (or (contains? missing-ids (:instrument-id warning))
-                               (contains? history-blocking-warning-codes
-                                          (:code warning))))
+                           (and (not (:forgiven? warning))
+                                (or (contains? missing-ids (:instrument-id warning))
+                                    (contains? history-blocking-warning-codes
+                                               (:code warning)))))
                          (:warnings request))
         ;; Prefer actionable assumption guidance over the lower-level raw history
         ;; warnings for the same asset.

@@ -59,6 +59,52 @@
     (is (= :vault (:icon-kind vault-group)))
     (is (= true (:hidden? (first (:rows vault-group)))))))
 
+(deftest target-exposure-table-model-distinguishes-weight-cap-from-zero-floor-test
+  ;; Live incident: a side-locked long the solver wanted short landed on its
+  ;; lower bound of 0 and wore the same "capped" badge as an asset sitting on
+  ;; the 50% max-weight cap, so a 48.5%→0% min-variance move read as a solver
+  ;; bug. A binding bound of 0 is :floored; any non-zero bound is :capped.
+  (let [result {:instrument-ids ["perp:MU" "perp:AAPL" "perp:SAND"]
+                :current-weights [0.485 0.115 -0.2]
+                :target-weights [0 0.5 -0.5]
+                :labels-by-instrument {"perp:MU" "MU"
+                                       "perp:AAPL" "AAPL"
+                                       "perp:SAND" "SAND"}
+                :diagnostics {:binding-constraints
+                              [{:instrument-id "perp:MU"
+                                :constraint :lower-bound
+                                :weight 3.15e-11
+                                :bound 0}
+                               {:instrument-id "perp:AAPL"
+                                :constraint :upper-bound
+                                :weight 0.5
+                                :bound 0.5}
+                               {:instrument-id "perp:SAND"
+                                :constraint :lower-bound
+                                :weight -0.5
+                                :bound -0.5}]}
+                :rebalance-preview {:capital-usd 10000}}
+        model (rebalance/target-exposure-table-model result)
+        by-asset (into {} (map (juxt :asset identity)) (:groups model))]
+    (is (= {:binding? true :binding-kind :floored}
+           (select-keys (get by-asset "MU") [:binding? :binding-kind]))
+        "bound 0 pins the target at zero — floored, not capped")
+    (is (= {:binding? true :binding-kind :capped}
+           (select-keys (get by-asset "AAPL") [:binding? :binding-kind]))
+        "max-weight cap binding stays capped")
+    (is (= {:binding? true :binding-kind :capped}
+           (select-keys (get by-asset "SAND") [:binding? :binding-kind]))
+        "a binding short cap is a cap, not a floor")
+    (is (= :floored (:binding-kind (first (:rows (get by-asset "MU")))))
+        "leg rows carry the kind for row-level styling")))
+
+(deftest target-exposure-table-model-binding-entries-without-bounds-stay-capped-test
+  ;; Older persisted results carry binding entries without :bound; they must
+  ;; keep the historical "capped" reading rather than turning into floors.
+  (let [model (rebalance/target-exposure-table-model sample-result)
+        btc-group (first (:groups model))]
+    (is (= :capped (:binding-kind btc-group)))))
+
 (deftest target-exposure-table-model-matches-excluded-backend-id-to-local-row-test
   (let [draft {:universe [{:instrument-id "hl:perp:BTC"
                            :market-type :perp

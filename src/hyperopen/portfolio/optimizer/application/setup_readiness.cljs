@@ -3,6 +3,7 @@
             [clojure.string :as str]
             [hyperopen.portfolio.optimizer.application.current-portfolio :as current-portfolio]
             [hyperopen.portfolio.optimizer.application.draft-enrichment :as draft-enrichment]
+            [hyperopen.portfolio.optimizer.application.history-loader.calendar :as calendar]
             [hyperopen.portfolio.optimizer.application.history-warning-policy :as warning-policy]
             [hyperopen.portfolio.optimizer.application.orderbook-loader :as orderbook-loader]
             [hyperopen.portfolio.optimizer.application.request-builder :as request-builder]
@@ -75,7 +76,8 @@
                 :history-data (get-in state contracts/history-data-path)
                 :market-cap-by-coin (get-in state contracts/market-cap-by-coin-path)
                 :as-of-ms (current-as-of-ms state)
-                :stale-after-ms (get-in state contracts/runtime-stale-after-ms-path)
+                :stale-after-ms (or (get-in state contracts/runtime-stale-after-ms-path)
+                                    calendar/default-stale-after-ms)
                 :funding-periods-per-year
                 (get-in state contracts/runtime-funding-periods-per-year-path)
                 ;; A user-triggered refinement re-runs at a higher frontier density. The

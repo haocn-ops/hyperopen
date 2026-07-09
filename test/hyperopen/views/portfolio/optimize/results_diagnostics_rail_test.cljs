@@ -53,3 +53,32 @@
       (is (not (str/includes? stale-text "perp:")) "no raw namespaced ids")
       ;; The identical per-asset message appears once, not twice.
       (is (= 1 (count (re-seq #"Cached history is stale\." stale-text)))))))
+
+(deftest history-window-flags-stale-shared-calendar-test
+  ;; A live min-variance run silently optimized on a covariance window ending
+  ;; 22 days before the run date while the History Used card said OK — the
+  ;; status only counted observations. Staleness must escalate the card and
+  ;; the subtext must say how far behind the shared window ends.
+  (is (= :ok (rail/history-window-status {:return-observations 350
+                                          :stale? false})))
+  (is (= :caution (rail/history-window-status {:return-observations 350
+                                               :stale? true})))
+  (is (= :caution (rail/history-window-status {:return-observations 12
+                                               :stale? false}))
+      "thin-observation caution is unchanged")
+  (let [subtext (rail/history-window-subtext
+                 {:labels-by-instrument {"perp:IMX" "IMX"}}
+                 {:stale? true
+                  :age-ms (* 22 86400000)
+                  :limiting-instrument-id "perp:IMX"
+                  :limiting-reason :ends-earlier})]
+    (is (str/includes? subtext "22 days before the run date"))
+    (is (str/includes? subtext "IMX ends earlier than the rest.")
+        "the limiter sentence still follows the stale note"))
+  (is (= "IMX ends earlier than the rest."
+         (rail/history-window-subtext
+          {:labels-by-instrument {"perp:IMX" "IMX"}}
+          {:stale? false
+           :limiting-instrument-id "perp:IMX"
+           :limiting-reason :ends-earlier}))
+      "fresh windows keep the plain limiter subtext"))

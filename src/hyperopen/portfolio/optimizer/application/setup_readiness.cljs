@@ -400,12 +400,16 @@
          vec)))
 
 (defn- native-observations-by-id
-  ;; Native price-row counts per instrument, from the aligned history's raw
-  ;; series (present for every asset whose history reached alignment).
+  ;; Native price-row counts per instrument: the aligned history's raw series
+  ;; where the asset survived alignment, else the pre-alignment served count.
+  ;; The raw map covers ELIGIBLE assets only, so counting it alone blinded this
+  ;; gate exactly when a poisoned shared calendar excluded everyone (live
+  ;; 2026-07-08) - the served fallback keeps the gate honest for excluded assets.
   [request]
-  (into {}
-        (map (fn [[id rows]] [id (count rows)]))
-        (get-in request [:history :raw-price-series-by-instrument])))
+  (merge (get-in request [:history :served-observations-by-instrument])
+         (into {}
+               (map (fn [[id rows]] [id (count rows)]))
+               (get-in request [:history :raw-price-series-by-instrument]))))
 
 (defn- short-history-assumption-warnings
   "Assets whose native history is too thin to defensibly estimate covariance
@@ -458,9 +462,10 @@
   (let [missing-ids (set/difference (instrument-ids requested-universe)
                                     (instrument-ids (:universe request)))
         warnings (filter (fn [warning]
-                           (or (contains? missing-ids (:instrument-id warning))
-                               (contains? history-blocking-warning-codes
-                                          (:code warning))))
+                           (and (not (:forgiven? warning))
+                                (or (contains? missing-ids (:instrument-id warning))
+                                    (contains? history-blocking-warning-codes
+                                               (:code warning)))))
                          (:warnings request))
         ;; Prefer actionable assumption guidance over the lower-level raw history
         ;; warnings for the same asset.

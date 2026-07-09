@@ -94,7 +94,32 @@
         "The asset stays eligible on its own native history.")
     (is (contains? (set (map :code (:warnings readiness)))
                    :proxy-validation-failed)
-        "The proxy failure stays visible as information.")))
+        "The proxy failure stays visible as information.")
+    (is (->> (:warnings readiness)
+             (filter #(= :proxy-validation-failed (:code %)))
+             (every? :forgiven?))
+        "The forgiven warning is tagged so no downstream surface reads it as a rejection.")
+    ;; Regression (live 2026-07-08): POL aligned on 658 native days yet badged
+    ;; "No history" - the forgiven warning still drove the per-asset status to
+    ;; :rejected. The status must come from what actually happened (aligned,
+    ;; stale note), never from a forgiven diagnostic.
+    (is (not= :rejected
+              (get (setup-readiness/history-status-by-instrument readiness)
+                   "perp:STRK")))))
+
+(deftest forgiven-warning-never-drives-history-status-test
+  (is (= {}
+         (warning-policy/strongest-warning-status-by-id
+          [{:code :proxy-validation-failed
+            :instrument-id "perp:A"
+            :forgiven? true}])))
+  (is (= {"perp:A" :stale}
+         (warning-policy/strongest-warning-status-by-id
+          [{:code :proxy-validation-failed
+            :instrument-id "perp:A"
+            :forgiven? true}
+           {:code :stale-history :instrument-id "perp:A"}]))
+      "Other warnings on the same asset still project normally."))
 
 (deftest proxy-validation-failure-still-excludes-unusable-series-test
   ;; Forgiveness requires the served series to be the asset's OWN usable

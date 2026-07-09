@@ -55,6 +55,12 @@
 (defn warning-history-status
   [warning]
   (cond
+    ;; A forgiven warning (e.g. a failed OPTIONAL proxy lookback-extension on an
+    ;; asset that aligned on its own usable native series) is information, not a
+    ;; verdict about the asset's history - it must never drive a status.
+    (:forgiven? warning)
+    nil
+
     (contains? missing-history-warning-codes (:code warning))
     :missing
 

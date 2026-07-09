@@ -263,6 +263,15 @@
                                (not vault?) (assoc :coin coin)))))
                        (or universe []))
         eligible (filterv (complement :excluded?) prepared)
+        ;; Pre-eligibility depth of each member's own normalized history, for
+        ;; parity with the api-v2 path's :served-observations-by-instrument
+        ;; (readiness and badges fall back to it for excluded assets).
+        served-observations-by-instrument
+        (into {}
+              (keep (fn [{:keys [instrument-id history]}]
+                      (when (and instrument-id (seq history))
+                        [instrument-id (count history)])))
+              prepared)
         alignment (resolve-history-alignment eligible min-observations*)
         effective-calendar (:calendar alignment)
         effective-eligible (:eligible alignment)
@@ -329,6 +338,7 @@
      :return-intervals return-intervals
      :history-window history-window
      :raw-price-series-by-instrument (:raw-price-series-by-instrument native-history)
+     :served-observations-by-instrument served-observations-by-instrument
      :cadence-by-instrument (:cadence-by-instrument native-history)
      :expected-return-series-by-instrument
      (:expected-return-series-by-instrument native-history)

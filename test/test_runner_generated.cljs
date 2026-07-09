@@ -236,9 +236,11 @@
             [hyperopen.portfolio.optimizer.application.history-assumptions-io-test]
             [hyperopen.portfolio.optimizer.application.history-cache-roundtrip-test]
             [hyperopen.portfolio.optimizer.application.history-cache-test]
+            [hyperopen.portfolio.optimizer.application.history-loader-api-v2-calendar-poisoning-test]
             [hyperopen.portfolio.optimizer.application.history-loader-api-v2-legacy-fallback-test]
             [hyperopen.portfolio.optimizer.application.history-loader-api-v2-split-test]
             [hyperopen.portfolio.optimizer.application.history-loader-api-v2-test]
+            [hyperopen.portfolio.optimizer.application.history-loader-calendar-peel-test]
             [hyperopen.portfolio.optimizer.application.history-loader-test]
             [hyperopen.portfolio.optimizer.application.history-loader-vaults-test]
             [hyperopen.portfolio.optimizer.application.history-merge-test]
@@ -264,6 +266,7 @@
             [hyperopen.portfolio.optimizer.application.scenario-workflow-test]
             [hyperopen.portfolio.optimizer.application.setup-readiness-current-history-test]
             [hyperopen.portfolio.optimizer.application.setup-readiness-enrichment-test]
+            [hyperopen.portfolio.optimizer.application.setup-readiness-served-observations-test]
             [hyperopen.portfolio.optimizer.application.setup-readiness-test]
             [hyperopen.portfolio.optimizer.application.setup-readiness-warning-policy-test]
             [hyperopen.portfolio.optimizer.application.tracking-test]
@@ -1031,9 +1034,11 @@
              'hyperopen.portfolio.optimizer.application.history-assumptions-io-test
              'hyperopen.portfolio.optimizer.application.history-cache-roundtrip-test
              'hyperopen.portfolio.optimizer.application.history-cache-test
+             'hyperopen.portfolio.optimizer.application.history-loader-api-v2-calendar-poisoning-test
              'hyperopen.portfolio.optimizer.application.history-loader-api-v2-legacy-fallback-test
              'hyperopen.portfolio.optimizer.application.history-loader-api-v2-split-test
              'hyperopen.portfolio.optimizer.application.history-loader-api-v2-test
+             'hyperopen.portfolio.optimizer.application.history-loader-calendar-peel-test
              'hyperopen.portfolio.optimizer.application.history-loader-test
              'hyperopen.portfolio.optimizer.application.history-loader-vaults-test
              'hyperopen.portfolio.optimizer.application.history-merge-test
@@ -1059,6 +1064,7 @@
              'hyperopen.portfolio.optimizer.application.scenario-workflow-test
              'hyperopen.portfolio.optimizer.application.setup-readiness-current-history-test
              'hyperopen.portfolio.optimizer.application.setup-readiness-enrichment-test
+             'hyperopen.portfolio.optimizer.application.setup-readiness-served-observations-test
              'hyperopen.portfolio.optimizer.application.setup-readiness-test
              'hyperopen.portfolio.optimizer.application.setup-readiness-warning-policy-test
              'hyperopen.portfolio.optimizer.application.tracking-test

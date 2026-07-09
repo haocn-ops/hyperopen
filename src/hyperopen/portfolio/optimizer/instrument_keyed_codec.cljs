@@ -30,6 +30,7 @@
     :return-series-by-instrument
     :price-series-by-instrument
     :raw-price-series-by-instrument
+    :served-observations-by-instrument
     :cadence-by-instrument
     :expected-return-series-by-instrument
     :expected-return-intervals-by-instrument
@@ -70,6 +71,7 @@
    [:history :return-series-by-instrument]
    [:history :price-series-by-instrument]
    [:history :raw-price-series-by-instrument]
+   [:history :served-observations-by-instrument]
    [:history :cadence-by-instrument]
    [:history :expected-return-series-by-instrument]
    [:history :expected-return-intervals-by-instrument]

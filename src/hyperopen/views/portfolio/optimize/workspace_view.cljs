@@ -48,6 +48,7 @@
      [:section {:class ["optimizer-setup-surface"
                         "grid"
                         "grid-cols-1"
+                        "items-start"
                         "gap-5"
                         "xl:gap-6"
                         "xl:grid-cols-[minmax(300px,5fr)_minmax(0,12fr)_minmax(360px,7fr)]"]

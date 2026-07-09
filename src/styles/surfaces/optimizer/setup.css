@@ -40,18 +40,53 @@
     border-left: 1px solid var(--optimizer-border);
   }
 
-  /* The open-by-default Return views editor (Maximum Sharpe) shows as many
-     rows as the viewport allows — the rail otherwise trails into empty space
-     while the editor scrolls at a fixed height — but still caps the list so a
-     large universe cannot push Data health and the run context out of reach. */
-  .portfolio-optimizer .optimizer-context-rail .optimizer-objective-view-rows {
+  /* Desktop 3-column workbench: the CENTER policy pane is the tall primary
+     scroll surface (exposure map + every policy panel + the full assumption
+     cards). The two side rails — universe selection (left) and the scenario
+     contract / readiness (right) — are much shorter, so page-scrolling down to
+     the center's height stranded them at the top and left large empty voids
+     below (2026-07-08 "very janky … I scroll to the bottom and it's cut off").
+     Pin each rail to the top of the viewport so it stays in view while the
+     center scrolls, and let a rail scroll internally when its own content is
+     taller than the viewport (e.g. a long custom universe). Scoped to the
+     setup grid only via `.optimizer-setup-surface >`, so the results and
+     execution tabs keep normal document flow. The 3-column track only exists at
+     xl (1280px); below that the grid is a single stacked column that must keep
+     natural page scroll, so this is gated to the same breakpoint. */
+  @media (min-width: 1280px) {
+    .portfolio-optimizer .optimizer-setup-surface > .optimizer-control-rail,
+    .portfolio-optimizer .optimizer-setup-surface > .optimizer-context-rail {
+      position: sticky;
+      top: 0;
+      align-self: start;
+      /* Matches the route frame's own `calc(100vh - 3.5rem)` height budget so a
+         pinned rail rests just above the fixed footer instead of behind it. */
+      max-height: calc(100vh - 3.5rem);
+      overflow-y: auto;
+      scrollbar-width: thin;
+    }
+  }
+
+  /* Any rail row-list that can grow with the universe (the open-by-default
+     Return views editor under Maximum Sharpe, and the History assumptions
+     list of thin-history assets) shows as many rows as the viewport allows —
+     the rail otherwise trails into empty space while the list scrolls at a
+     fixed height — but still caps the list so a large universe cannot push
+     Data health and the run context out of reach, or stretch the whole
+     3-column setup grid row (default CSS Grid align-items: stretch) taller
+     than the other columns' actual content. */
+  .portfolio-optimizer
+    .optimizer-context-rail
+    :is(.optimizer-objective-view-rows, .optimizer-history-assumptions-rows) {
     max-height: clamp(24rem, 62vh, 48rem);
   }
 
-  /* The rail editor's scrollbar must be OBVIOUS: it is the cue that more
-     assets exist below the fold. An accent-tinted, always-visible thumb on a
-     faint track — not the near-invisible default. */
-  .portfolio-optimizer .optimizer-context-rail .optimizer-objective-view-rows {
+  /* The rail list's scrollbar must be OBVIOUS: it is the cue that more assets
+     exist below the fold. An accent-tinted, always-visible thumb on a faint
+     track — not the near-invisible default. */
+  .portfolio-optimizer
+    .optimizer-context-rail
+    :is(.optimizer-objective-view-rows, .optimizer-history-assumptions-rows) {
     scrollbar-width: thin;
     scrollbar-color: color-mix(in srgb, var(--optimizer-accent) 55%, transparent)
       color-mix(in srgb, var(--optimizer-border-strong) 45%, transparent);
@@ -60,26 +95,26 @@
 
   .portfolio-optimizer
     .optimizer-context-rail
-    .optimizer-objective-view-rows::-webkit-scrollbar {
+    :is(.optimizer-objective-view-rows, .optimizer-history-assumptions-rows)::-webkit-scrollbar {
     width: 10px;
   }
 
   .portfolio-optimizer
     .optimizer-context-rail
-    .optimizer-objective-view-rows::-webkit-scrollbar-track {
+    :is(.optimizer-objective-view-rows, .optimizer-history-assumptions-rows)::-webkit-scrollbar-track {
     background-color: color-mix(in srgb, var(--optimizer-border-strong) 45%, transparent);
   }
 
   .portfolio-optimizer
     .optimizer-context-rail
-    .optimizer-objective-view-rows::-webkit-scrollbar-thumb {
+    :is(.optimizer-objective-view-rows, .optimizer-history-assumptions-rows)::-webkit-scrollbar-thumb {
     background-color: color-mix(in srgb, var(--optimizer-accent) 55%, transparent);
     border-radius: 5px;
   }
 
   .portfolio-optimizer
     .optimizer-context-rail
-    .optimizer-objective-view-rows::-webkit-scrollbar-thumb:hover {
+    :is(.optimizer-objective-view-rows, .optimizer-history-assumptions-rows)::-webkit-scrollbar-thumb:hover {
     background-color: color-mix(in srgb, var(--optimizer-accent) 75%, transparent);
   }
 

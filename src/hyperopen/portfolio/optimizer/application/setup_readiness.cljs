@@ -215,6 +215,9 @@
       (contains? insufficient-history-warning-codes code)
       (str assets (if (= 1 n) " has" " have") " insufficient common history")
 
+      (= :excluded-from-alignment code)
+      (str assets (if (= 1 n) " is" " are") " left out of the shared history estimate")
+
       :else
       (str assets " · " (str/replace (name code) "-" " ")))))
 
@@ -303,7 +306,21 @@
       "No current-portfolio baseline — equal weights seed the implied returns."
 
       :stale-history
-      (str label ": optimizer history may be stale.")
+      (if-let [age (warning-policy/serve-age-days warning)]
+        (str label ": optimizer history is " age (if (= 1 age) " day" " days")
+             " stale" (when (warning-policy/stale-incident? warning)
+                        " — the refresh pipeline may be failing") ".")
+        (str label ": optimizer history may be stale."))
+
+      :excluded-from-alignment
+      (case (get-in warning [:details :reason])
+        :empty-series
+        (str label ": no history was returned, so it is left out of the shared estimate.")
+        (str label ": history window does not overlap the rest of the universe, "
+             "so it is left out of the shared estimate."))
+
+      :common-window-empty
+      "No shared history window could be computed across the selected assets."
 
       :source-fetch-failed
       (str label ": source refresh failed; cached optimizer history may be stale.")

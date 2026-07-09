@@ -237,6 +237,7 @@
             [hyperopen.portfolio.optimizer.application.history-cache-roundtrip-test]
             [hyperopen.portfolio.optimizer.application.history-cache-test]
             [hyperopen.portfolio.optimizer.application.history-loader-api-v2-calendar-poisoning-test]
+            [hyperopen.portfolio.optimizer.application.history-loader-api-v2-error-contract-test]
             [hyperopen.portfolio.optimizer.application.history-loader-api-v2-legacy-fallback-test]
             [hyperopen.portfolio.optimizer.application.history-loader-api-v2-split-test]
             [hyperopen.portfolio.optimizer.application.history-loader-api-v2-test]
@@ -274,6 +275,7 @@
             [hyperopen.portfolio.optimizer.application.universe-candidates-test]
             [hyperopen.portfolio.optimizer.application.universe-candidates-vault-ordering-test]
             [hyperopen.portfolio.optimizer.application.view-library-test]
+            [hyperopen.portfolio.optimizer.application.view-model-error-contract-test]
             [hyperopen.portfolio.optimizer.application.view-model-facade-test]
             [hyperopen.portfolio.optimizer.application.view-model-frontier-test]
             [hyperopen.portfolio.optimizer.application.view-model-history-assumption-cards-test]
@@ -1035,6 +1037,7 @@
              'hyperopen.portfolio.optimizer.application.history-cache-roundtrip-test
              'hyperopen.portfolio.optimizer.application.history-cache-test
              'hyperopen.portfolio.optimizer.application.history-loader-api-v2-calendar-poisoning-test
+             'hyperopen.portfolio.optimizer.application.history-loader-api-v2-error-contract-test
              'hyperopen.portfolio.optimizer.application.history-loader-api-v2-legacy-fallback-test
              'hyperopen.portfolio.optimizer.application.history-loader-api-v2-split-test
              'hyperopen.portfolio.optimizer.application.history-loader-api-v2-test
@@ -1072,6 +1075,7 @@
              'hyperopen.portfolio.optimizer.application.universe-candidates-test
              'hyperopen.portfolio.optimizer.application.universe-candidates-vault-ordering-test
              'hyperopen.portfolio.optimizer.application.view-library-test
+             'hyperopen.portfolio.optimizer.application.view-model-error-contract-test
              'hyperopen.portfolio.optimizer.application.view-model-facade-test
              'hyperopen.portfolio.optimizer.application.view-model-frontier-test
              'hyperopen.portfolio.optimizer.application.view-model-history-assumption-cards-test

@@ -166,3 +166,63 @@
           [{:code :stale-history :instrument-id "perp:A"}
            {:code :insufficient-candle-history :instrument-id "perp:A"}
            {:code :stale-history :instrument-id "perp:B"}]))))
+
+(deftest excluded-from-alignment-maps-to-loaded-but-misaligned-test
+  ;; The backend excludes an asset from the shared calendars when its served
+  ;; window can't overlap the majority window, but still serves the asset's own
+  ;; per-instrument series. That is "loaded but misaligned" (the by-exception
+  ;; shared-gap chip), never "missing".
+  (is (= :loaded-but-misaligned
+         (warning-policy/warning-history-status
+          {:code :excluded-from-alignment
+           :instrument-id "perp:X"
+           :details {:reason :window-disjoint-from-majority}})))
+  (is (= {"perp:X" :loaded-but-misaligned}
+         (warning-policy/strongest-warning-status-by-id
+          [{:code :excluded-from-alignment :instrument-id "perp:X"}]))))
+
+(deftest excluded-from-alignment-yields-to-stronger-client-verdict-test
+  ;; The backend exclusion is only a FLOOR: when the client peel produced a
+  ;; stronger, more-specific verdict for the same asset, that wins so per-asset
+  ;; labels still derive from what alignment actually did.
+  (is (= {"perp:X" :insufficient}
+         (warning-policy/strongest-warning-status-by-id
+          [{:code :excluded-from-alignment :instrument-id "perp:X"}
+           {:code :insufficient-common-history :instrument-id "perp:X"}])))
+  (is (= {"perp:X" :rejected}
+         (warning-policy/strongest-warning-status-by-id
+          [{:code :excluded-from-alignment :instrument-id "perp:X"}
+           {:code :validation-failed :instrument-id "perp:X"}]))))
+
+(deftest stale-history-escalates-to-incident-at-seven-days-test
+  (is (= :stale
+         (warning-policy/warning-history-status
+          {:code :stale-history :instrument-id "perp:X" :details {:serve-age-days 2}})))
+  (is (= :stale-critical
+         (warning-policy/warning-history-status
+          {:code :stale-history :instrument-id "perp:X" :details {:serve-age-days 7}})))
+  (is (= :stale-critical
+         (warning-policy/warning-history-status
+          {:code :stale-history :instrument-id "perp:X" :severity "error"}))
+      "The backend severity escalation is honored even without a serve-age.")
+  (is (= 9 (warning-policy/serve-age-days
+            {:code :stale-history :details {:serve-age-days 9}})))
+  (is (nil? (warning-policy/serve-age-days {:code :stale-history})))
+  (is (true? (warning-policy/stale-incident?
+              {:code :source-fetch-failed :severity "error"})))
+  (is (false? (warning-policy/stale-incident?
+               {:code :stale-history :details {:serve-age-days 6}})))
+  (is (false? (warning-policy/stale-incident?
+               {:code :insufficient-candle-history :severity "error"}))
+      "Only stale-family codes can be a staleness incident."))
+
+(deftest stale-critical-outranks-routine-stale-but-not-exclusion-test
+  (is (= {"perp:X" :stale-critical}
+         (warning-policy/strongest-warning-status-by-id
+          [{:code :stale-history :instrument-id "perp:X" :details {:serve-age-days 2}}
+           {:code :stale-history :instrument-id "perp:X" :details {:serve-age-days 9}}])))
+  (is (= {"perp:X" :loaded-but-misaligned}
+         (warning-policy/strongest-warning-status-by-id
+          [{:code :stale-history :instrument-id "perp:X" :details {:serve-age-days 9}}
+           {:code :excluded-from-alignment :instrument-id "perp:X"}]))
+      "Being excluded from the solve outranks a staleness incident."))

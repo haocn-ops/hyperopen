@@ -95,11 +95,29 @@
           normalized))
     (coercion/normalize-keyword-like value)))
 
+(defn- attribute-excluded-from-alignment
+  "The excluded-from-alignment diagnostic (per-instrument AND top-level)
+  keywordizes its reason and, when it arrives top-level with no instrument_id,
+  is attributed to its asset via the row key it carries in
+  details.client_instrument_id — so per-asset surfaces treat it like every other
+  warning instead of losing it."
+  [warning]
+  (cond-> warning
+    (get-in warning [:details :reason])
+    (update-in [:details :reason] keyword-like)
+
+    (and (not (non-blank-text (:instrument-id warning)))
+         (non-blank-text (get-in warning [:details :client-instrument-id])))
+    (assoc :instrument-id (get-in warning [:details :client-instrument-id]))))
+
 (defn normalize-warning
   [warning]
-  (let [warning* (normalize-api-map warning)]
+  (let [warning* (normalize-api-map warning)
+        warning* (cond-> warning*
+                   (:code warning*) (update :code keyword-like))]
     (cond-> warning*
-      (:code warning*) (update :code keyword-like))))
+      (= :excluded-from-alignment (:code warning*))
+      attribute-excluded-from-alignment)))
 
 (defn normalize-warnings
   [warnings]

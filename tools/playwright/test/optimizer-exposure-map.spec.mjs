@@ -15,9 +15,7 @@ async function expectPortfolioExposureOpen(page) {
   await expect(panel).toHaveCount(1);
   await expect.poll(async () => panel.evaluate((el) => el.open)).toBe(true);
   await expect(panel.locator("> summary")).toContainText("Portfolio exposure");
-  await expect(panel).toContainText(
-    "Set how levered and net long/short the target portfolio can be."
-  );
+  await expect(panel).toContainText("Set target leverage and net long/short bias.");
 }
 
 test.describe("optimizer exposure-map Positioning control", () => {
@@ -34,7 +32,7 @@ test.describe("optimizer exposure-map Positioning control", () => {
       "Sent to solver"
     );
     await expect(page.locator("[data-role='portfolio-optimizer-exposure-caption']"))
-      .toContainText("The dot shows the target gross leverage and net long/short bias.");
+      .toContainText("Drag the dot to set target exposure.");
     await expect(
       page.locator("[data-role='portfolio-optimizer-exposure-gross-band']")
     ).toBeVisible();
@@ -182,6 +180,45 @@ test.describe("optimizer exposure-map Positioning control", () => {
       page.locator("[data-role='portfolio-optimizer-constraint-net-min-input']")
     ).toBeVisible();
   });
+
+  test("band sliders visibly expand the allowed region at any zoom via full-length stripes", async ({
+    page
+  }) => {
+    // Regression: at a wide axis the band box around the dot is smaller than the
+    // drag handle itself, so slider drags looked like they did nothing. The
+    // full-width gross stripe / full-height net stripe are the always-visible
+    // rendering of the band, at every zoom level.
+    const grossStripe = page.locator(
+      "[data-role='portfolio-optimizer-exposure-gross-stripe']"
+    );
+    const netStripe = page.locator(
+      "[data-role='portfolio-optimizer-exposure-net-stripe']"
+    );
+    const grossSlider = page.locator(
+      "[data-role='portfolio-optimizer-exposure-gross-band']"
+    );
+    await expect(grossStripe).toHaveCount(1);
+    await expect(netStripe).toHaveCount(1);
+    // Stripes span the full pad on their fixed axis.
+    await expect(grossStripe).toHaveAttribute("width", "100");
+    await expect(netStripe).toHaveAttribute("height", "100");
+    const heightBefore = Number(await grossStripe.getAttribute("height"));
+    // Drag the gross band slider to its maximum.
+    const box = await grossSlider.boundingBox();
+    await page.mouse.click(box.x + box.width - 2, box.y + box.height / 2);
+    await waitForIdle(page);
+    await expect(
+      page.locator("[data-role='portfolio-optimizer-exposure-gross-band-value']")
+    ).toHaveText("± 0.50×");
+    const heightAfter = Number(await grossStripe.getAttribute("height"));
+    expect(heightAfter).toBeGreaterThan(heightBefore);
+    // The stripe mirrors the band box's gross extent exactly (same y/height).
+    const bandBox = page.locator("[data-role='portfolio-optimizer-exposure-band-box']");
+    expect(await grossStripe.getAttribute("y")).toBe(await bandBox.getAttribute("y"));
+    expect(await grossStripe.getAttribute("height")).toBe(
+      await bandBox.getAttribute("height")
+    );
+  });
 });
 
 test.describe("optimizer exposure-map drag under Maximum Sharpe", () => {
@@ -248,5 +285,67 @@ test.describe("optimizer exposure-map drag under Maximum Sharpe", () => {
     // async history-load transition landing mid-drag (a legitimate input
     // change); the unmemoized bug produced one-plus call per pointermove.
     expect(riskModelCalls).toBeLessThanOrEqual(2);
+  });
+
+  test("switching Minimum risk to Maximum Sharpe estimates the risk model at most once", async ({
+    page
+  }) => {
+    // Regression (owner trace 2026-07-08 18:59): the goal-card switch paid the
+    // multi-second Ledoit-Wolf estimate repeatedly - once per UI helper (the
+    // two return-input memos each estimated independently) and again on every
+    // 5s as-of bucket roll, because the memo keys included the history's
+    // wall-clock :freshness stamp. One covariance estimate is shared and the
+    // keys drop :freshness, so the switch estimates at most once and later
+    // draft edits across a bucket boundary estimate zero times.
+    await visitRoute(page, "/portfolio/optimize/new");
+    await seedOptimizerState(page, [
+      seedPatch(optimizerPath("draft", "universe"), [
+        { "instrument-id": "perp:BTC", "market-type": keyword("perp"), coin: "BTC" },
+        { "instrument-id": "perp:ETH", "market-type": keyword("perp"), coin: "ETH" },
+        { "instrument-id": "perp:SOL", "market-type": keyword("perp"), coin: "SOL" },
+        { "instrument-id": "perp:HYPE", "market-type": keyword("perp"), coin: "HYPE" }
+      ])
+    ]);
+    await waitForIdle(page);
+    // Default objective is Minimum risk; the Max-Sharpe surfaces are unmounted.
+    await expect(
+      page.locator("[data-role='portfolio-optimizer-setup-use-my-views-editor']")
+    ).toHaveCount(0);
+
+    await page.evaluate(() => {
+      const risk = globalThis.hyperopen.portfolio.optimizer.domain.risk;
+      const original = risk.estimate_risk_model;
+      globalThis.__optimizerRiskModelCalls = 0;
+      risk.estimate_risk_model = function (...args) {
+        globalThis.__optimizerRiskModelCalls += 1;
+        return original.apply(this, args);
+      };
+    });
+
+    await page.locator("text=Maximum Sharpe").first().click();
+    await waitForIdle(page);
+    await expect(
+      page.locator("[data-role='portfolio-optimizer-setup-use-my-views-editor']")
+    ).toHaveCount(1);
+    const callsAfterSwitch = await page.evaluate(
+      () => globalThis.__optimizerRiskModelCalls
+    );
+    // One shared estimate for both return-input helpers (an async history
+    // transition landing mid-switch may legitimately add one more).
+    expect(callsAfterSwitch).toBeLessThanOrEqual(2);
+
+    // Cross a 5s as-of bucket boundary, then force a request rebuild with a
+    // draft edit. The history data is unchanged, so no re-estimation.
+    await page.waitForTimeout(5500);
+    const slider = page.locator("[data-role='portfolio-optimizer-exposure-net-band']");
+    await slider.evaluate((el) => {
+      el.value = "0.25";
+      el.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await waitForIdle(page);
+    const callsAfterBucketRoll = await page.evaluate(
+      () => globalThis.__optimizerRiskModelCalls
+    );
+    expect(callsAfterBucketRoll).toBe(callsAfterSwitch);
   });
 });

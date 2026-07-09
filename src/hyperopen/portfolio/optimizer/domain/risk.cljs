@@ -245,17 +245,20 @@
           (assoc :shrinkage {:kind :diagonal
                              :shrinkage shrinkage})))
       (let [series (series-by-id history instrument-ids)
-            sample (covariance-matrix series periods-per-year*)
+            ;; The pairwise sample covariance re-derives per-pair means over the
+            ;; full series, so it is expensive at scale - and the Ledoit-Wolf
+            ;; branch never reads it. Deferred so :ledoit-wolf-dense skips it.
+            sample (delay (covariance-matrix series periods-per-year*))
             shrinkage (or (:shrinkage risk-model*) default-shrinkage)
             ledoit-wolf-result (when (= :ledoit-wolf-dense model-kind)
                                  (risk-ledoit-wolf/estimate
                                   {:series series
                                    :periods-per-year periods-per-year*}))
             covariance (case model-kind
-                         :diagonal-shrink (diagonal-shrink sample shrinkage)
+                         :diagonal-shrink (diagonal-shrink @sample shrinkage)
                          :ledoit-wolf-dense (:covariance ledoit-wolf-result)
-                         :sample-covariance sample
-                         sample)]
+                         :sample-covariance @sample
+                         @sample)]
         (cond-> {:model model-kind
                  :instrument-ids instrument-ids
                  :covariance covariance

@@ -1,0 +1,148 @@
+(ns hyperopen.portfolio.optimizer.domain.risk-ledoit-wolf-test
+  "Bit-exact parity between the loop-based Ledoit-Wolf estimator and the
+  original persistent-vector implementation it replaced. The rewrite claims
+  identical arithmetic ORDER (not just numerical closeness), so these tests
+  assert exact = on the full result, reference implementation included inline."
+  (:require [cljs.test :refer-macros [deftest is]]
+            [hyperopen.portfolio.optimizer.domain.math :as math]
+            [hyperopen.portfolio.optimizer.domain.risk-ledoit-wolf :as ledoit-wolf]))
+
+;; --- reference: the original persistent-vector implementation, verbatim ----
+
+(defn- zero-matrix
+  [size]
+  (vec (repeat size (vec (repeat size 0)))))
+
+(defn- rectangular-series?
+  [series]
+  (or (empty? series)
+      (let [sample-count (count (first series))]
+        (every? #(= sample-count (count %)) series))))
+
+(defn- centered-observations
+  [series]
+  (let [means (mapv #(or (math/mean %) 0) series)]
+    (mapv (fn [row]
+            (mapv - row means))
+          (apply mapv vector series))))
+
+(defn- sample-covariance
+  [centered]
+  (let [sample-count (count centered)
+        feature-count (count (first centered))]
+    (if (pos? sample-count)
+      (math/scalar-matrix (/ 1 sample-count)
+                          (math/mat-mul (math/transpose centered)
+                                        centered))
+      (zero-matrix feature-count))))
+
+(defn- scaled-identity-target
+  [sample]
+  (let [feature-count (count sample)
+        trace (reduce + 0 (math/diagonal sample))
+        mu (if (pos? feature-count)
+             (/ trace feature-count)
+             0)]
+    (math/scalar-matrix mu
+                        (math/identity-matrix feature-count))))
+
+(defn- outer-product
+  [values]
+  (mapv (fn [left]
+          (mapv (fn [right]
+                  (* left right))
+                values))
+        values))
+
+(defn- frobenius-squared
+  [matrix]
+  (reduce + 0
+          (mapcat (fn [row]
+                    (map #(* % %) row))
+                  matrix)))
+
+(defn- matrix-difference
+  [left right]
+  (math/matrix-add left
+                   (math/scalar-matrix -1 right)))
+
+(defn- reference-estimate
+  [{:keys [series periods-per-year]}]
+  (let [feature-count (count series)
+        sample-count (if (seq series)
+                       (count (first series))
+                       0)
+        periods-per-year* (or periods-per-year 1)]
+    (if (and (pos? feature-count)
+             (pos? sample-count)
+             (rectangular-series? series))
+      (let [centered (centered-observations series)
+            sample (sample-covariance centered)
+            target (scaled-identity-target sample)
+            beta-sample (mapv #(frobenius-squared
+                                (matrix-difference (outer-product %)
+                                                   sample))
+                              centered)
+            beta-hat (/ (or (math/mean beta-sample) 0)
+                        sample-count)
+            delta-hat (frobenius-squared
+                       (matrix-difference sample target))
+            shrinkage (if (pos? delta-hat)
+                        (-> (/ beta-hat delta-hat)
+                            (max 0)
+                            (min 1))
+                        0)
+            covariance (math/matrix-add
+                        (math/scalar-matrix shrinkage target)
+                        (math/scalar-matrix (- 1 shrinkage) sample))]
+        {:covariance (math/scalar-matrix periods-per-year* covariance)
+         :shrinkage {:kind :ledoit-wolf
+                     :target :scaled-identity
+                     :shrinkage shrinkage}
+         :sample-count sample-count
+         :feature-count feature-count})
+      {:covariance (zero-matrix feature-count)
+       :shrinkage {:kind :ledoit-wolf
+                   :target :scaled-identity
+                   :shrinkage 0}
+       :sample-count sample-count
+       :feature-count feature-count})))
+
+;; --- deterministic fixture data --------------------------------------------
+
+(defn- synthetic-series
+  "n instruments x t observations of deterministic, irrational-ish returns."
+  [n t]
+  (mapv (fn [i]
+          (mapv (fn [k]
+                  (+ (* 0.01 (js/Math.sin (+ (* 0.7 i) (* 0.13 k))))
+                     (* 0.002 (js/Math.cos (* (inc i) (+ 0.31 k))))))
+                (range t)))
+        (range n)))
+
+(deftest loop-estimator-is-bit-identical-to-reference-on-small-universe-test
+  (let [series (synthetic-series 5 17)]
+    (is (= (reference-estimate {:series series :periods-per-year 365})
+           (ledoit-wolf/estimate {:series series :periods-per-year 365})))))
+
+(deftest loop-estimator-is-bit-identical-to-reference-on-mid-universe-test
+  (let [series (synthetic-series 12 60)]
+    (is (= (reference-estimate {:series series :periods-per-year 365})
+           (ledoit-wolf/estimate {:series series :periods-per-year 365})))))
+
+(deftest loop-estimator-is-bit-identical-with-default-periods-test
+  (let [series (synthetic-series 3 9)]
+    (is (= (reference-estimate {:series series})
+           (ledoit-wolf/estimate {:series series})))))
+
+(deftest loop-estimator-preserves-degenerate-fallbacks-test
+  (is (= (reference-estimate {:series [] :periods-per-year 365})
+         (ledoit-wolf/estimate {:series [] :periods-per-year 365})))
+  ;; ragged series fall back to the zero matrix
+  (let [ragged [[0.01 0.02 0.03] [0.01 0.02]]]
+    (is (= (reference-estimate {:series ragged :periods-per-year 365})
+           (ledoit-wolf/estimate {:series ragged :periods-per-year 365}))))
+  ;; single observation, single instrument
+  (let [tiny [[0.01]]]
+    (is (= (reference-estimate {:series tiny :periods-per-year 12})
+           (ledoit-wolf/estimate {:series tiny :periods-per-year 12})))))

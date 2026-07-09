@@ -108,7 +108,18 @@
      [:line {:class ["optimizer-exposure-map__grid" "optimizer-exposure-map__grid--mid"]
              :x1 0 :y1 50 :x2 100 :y2 50}]
      [:line {:class ["optimizer-exposure-map__grid"] :x1 0 :y1 75 :x2 100 :y2 75}]
-     ;; the allowed-region band box (visible when both bands are positive)
+     ;; full-length band stripes: the gross range as a full-width horizontal
+     ;; stripe, the net range as a full-height vertical stripe. At a wide axis
+     ;; (e.g. a 15x book forcing the 0-20x frame) the band box around the dot is
+     ;; smaller than the drag handle itself, so the stripes are what make a band
+     ;; slider drag visibly expand/contract the allowed region at ANY zoom.
+     [:rect {:class ["optimizer-exposure-map__band-stripe"]
+             :data-role "portfolio-optimizer-exposure-gross-stripe"
+             :x 0 :y y-top :width 100 :height (max 0 (- y-bot y-top))}]
+     [:rect {:class ["optimizer-exposure-map__band-stripe"]
+             :data-role "portfolio-optimizer-exposure-net-stripe"
+             :x x0 :y 0 :width (max 0 (- x1 x0)) :height 100}]
+     ;; the allowed-region band box (the stripes' intersection, emphasized)
      [:rect {:class ["optimizer-exposure-map__band"]
              :data-role "portfolio-optimizer-exposure-band-box"
              :x x0 :y y-top :width (max 0 (- x1 x0)) :height (max 0 (- y-bot y-top))}]

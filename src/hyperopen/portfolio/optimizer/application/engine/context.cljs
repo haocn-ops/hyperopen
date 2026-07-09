@@ -190,6 +190,15 @@
 ;; history, which is far too expensive per frame, so both memoize on the exact
 ;; request sub-values they consume. A drag rebuilds the request but only its
 ;; :constraints differ, so these keys stay value-equal and the cache hits.
+;;
+;; Every memo key drops the history's :freshness stamp: it is re-stamped from
+;; the wall clock on each request rebuild and influences nothing here, but
+;; keying on it re-ran the multi-second covariance estimate every as-of bucket
+;; roll while a Max-Sharpe panel was visible.
+(defn- history-sans-freshness
+  [request]
+  (dissoc (:history request) :freshness))
+
 (defn- return-inputs-memo-lookup
   [memo key compute]
   (let [cached @memo]
@@ -199,6 +208,24 @@
         (vreset! memo {:key key :value value})
         value))))
 
+(defonce ^:private ui-risk-result-memo (volatile! nil))
+
+(defn- ui-risk-result
+  ;; One covariance estimate shared by both UI helpers below: they were each
+  ;; estimating it independently, so a single objective switch paid the full
+  ;; Ledoit-Wolf cost twice in one render.
+  [request]
+  (return-inputs-memo-lookup
+   ui-risk-result-memo
+   {:risk-model (:risk-model request)
+    :periods-per-year (:periods-per-year request)
+    :history (history-sans-freshness request)}
+   (fn []
+     (risk/estimate-risk-model
+      {:risk-model (:risk-model request)
+       :periods-per-year (:periods-per-year request)
+       :history (:history request)}))))
+
 (defonce ^:private expected-return-inputs-memo (volatile! nil))
 
 (defn expected-return-inputs-by-instrument
@@ -206,13 +233,11 @@
   [request]
   (return-inputs-memo-lookup
    expected-return-inputs-memo
-   (select-keys request [:risk-model :periods-per-year :history
-                         :return-model :black-litterman-prior])
+   (-> (select-keys request [:risk-model :periods-per-year :history
+                             :return-model :black-litterman-prior])
+       (assoc :history (history-sans-freshness request)))
    (fn []
-     (let [risk-result (risk/estimate-risk-model
-                        {:risk-model (:risk-model request)
-                         :periods-per-year (:periods-per-year request)
-                         :history (:history request)})
+     (let [risk-result (ui-risk-result request)
            instrument-ids (:instrument-ids risk-result)
            return-result (expected-return-result request risk-result)
            expected-returns (expected-return-vector return-result instrument-ids)]
@@ -225,12 +250,10 @@
   [request]
   (return-inputs-memo-lookup
    baseline-return-inputs-memo
-   (select-keys request [:risk-model :periods-per-year :history :return-model])
+   (-> (select-keys request [:risk-model :periods-per-year :history :return-model])
+       (assoc :history (history-sans-freshness request)))
    (fn []
-     (let [risk-result (risk/estimate-risk-model
-                        {:risk-model (:risk-model request)
-                         :periods-per-year (:periods-per-year request)
-                         :history (:history request)})
+     (let [risk-result (ui-risk-result request)
            instrument-ids (:instrument-ids risk-result)
            return-result (base-return-estimate request)
            expected-returns (expected-return-vector return-result instrument-ids)]

@@ -251,6 +251,7 @@
             [hyperopen.portfolio.optimizer.application.rebalance-preview-test]
             [hyperopen.portfolio.optimizer.application.rebalance-snapshot-test]
             [hyperopen.portfolio.optimizer.application.refinement-view-model-test]
+            [hyperopen.portfolio.optimizer.application.request-builder-align-memo-test]
             [hyperopen.portfolio.optimizer.application.request-builder-refinement-test]
             [hyperopen.portfolio.optimizer.application.request-builder-test]
             [hyperopen.portfolio.optimizer.application.return-inputs-test]
@@ -301,6 +302,7 @@
             [hyperopen.portfolio.optimizer.domain.objectives-test]
             [hyperopen.portfolio.optimizer.domain.rebalance-test]
             [hyperopen.portfolio.optimizer.domain.returns-test]
+            [hyperopen.portfolio.optimizer.domain.risk-ledoit-wolf-test]
             [hyperopen.portfolio.optimizer.domain.risk-test]
             [hyperopen.portfolio.optimizer.domain.weight-cleaning-test]
             [hyperopen.portfolio.optimizer.draft-actions-test]
@@ -1043,6 +1045,7 @@
              'hyperopen.portfolio.optimizer.application.rebalance-preview-test
              'hyperopen.portfolio.optimizer.application.rebalance-snapshot-test
              'hyperopen.portfolio.optimizer.application.refinement-view-model-test
+             'hyperopen.portfolio.optimizer.application.request-builder-align-memo-test
              'hyperopen.portfolio.optimizer.application.request-builder-refinement-test
              'hyperopen.portfolio.optimizer.application.request-builder-test
              'hyperopen.portfolio.optimizer.application.return-inputs-test
@@ -1093,6 +1096,7 @@
              'hyperopen.portfolio.optimizer.domain.objectives-test
              'hyperopen.portfolio.optimizer.domain.rebalance-test
              'hyperopen.portfolio.optimizer.domain.returns-test
+             'hyperopen.portfolio.optimizer.domain.risk-ledoit-wolf-test
              'hyperopen.portfolio.optimizer.domain.risk-test
              'hyperopen.portfolio.optimizer.domain.weight-cleaning-test
              'hyperopen.portfolio.optimizer.draft-actions-test

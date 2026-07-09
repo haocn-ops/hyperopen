@@ -2,6 +2,7 @@
   (:require [clojure.set :as set]
             [hyperopen.domain.trading.core :as trading-core]
             [hyperopen.portfolio.optimizer.application.history-loader :as history-loader]
+            [hyperopen.portfolio.optimizer.application.history-loader.calendar :as calendar]
             [hyperopen.portfolio.optimizer.contracts :as contracts]
             [hyperopen.portfolio.optimizer.coercion :as coercion]
             [hyperopen.portfolio.optimizer.domain.constraints :as domain-constraints]
@@ -497,20 +498,23 @@
       :current-portfolio current-portfolio})))
 
 (def ^:private align-history-memo-capacity
-  ;; Each request aligns the requested and currently-held universes PLUS one
-  ;; small sub-universe per engine-backed proxy assumption (the regression
-  ;; overlap), so the memo must comfortably hold a build's worth of alignments
-  ;; or constraint-drag renders would recompute them every frame.
-  16)
+  ;; Eviction is a wholesale reset, so the capacity must exceed the largest
+  ;; realistic build: requested + currently-held universes PLUS one sub-universe
+  ;; per engine-backed proxy assumption (30+ with dozens of assumptions; the old
+  ;; capacity of 16 reset MID-BUILD and nothing survived to the next render).
+  64)
 
 (defonce ^:private align-history-memo
   (volatile! {}))
 
 (defn- align-history
   ;; Alignment walks every candle series and dominates request building, but
-  ;; its inputs only change when the universe, loaded history, or as-of move -
-  ;; not when draft constraints are edited. Unchanged state subtrees keep the
-  ;; memo lookup cheap because equality short-circuits on identity.
+  ;; its inputs only change when the universe or loaded history move - not
+  ;; when draft constraints are edited. The memo key deliberately EXCLUDES
+  ;; :as-of-ms / :stale-after-ms: those fall back to a wall-clock bucket, and
+  ;; keying on them re-ran the full alignment every bucket roll (multi-second
+  ;; render stalls on a fixed cadence). INVARIANT: alignment may consume the
+  ;; as-of ONLY for the O(1) :freshness stamp, re-stamped here on every call.
   [{:keys [universe
            history-data
            as-of-ms
@@ -521,16 +525,20 @@
                 :candle-history-by-coin (:candle-history-by-coin history-data)
                 :funding-history-by-coin (:funding-history-by-coin history-data)
                 :vault-details-by-address (:vault-details-by-address history-data)
-                :as-of-ms as-of-ms
-                :stale-after-ms stale-after-ms
                 :funding-periods-per-year funding-periods-per-year}
-        memo @align-history-memo]
-    (if-let [entry (find memo inputs)]
-      (val entry)
-      (let [value (history-loader/align-history-inputs inputs)
-            memo* (if (>= (count memo) align-history-memo-capacity) {} memo)]
-        (vreset! align-history-memo (assoc memo* inputs value))
-        value))))
+        memo @align-history-memo
+        aligned (if-let [entry (find memo inputs)]
+                  (val entry)
+                  (let [value (history-loader/align-history-inputs inputs)
+                        memo* (if (>= (count memo) align-history-memo-capacity)
+                                {}
+                                memo)]
+                    (vreset! align-history-memo (assoc memo* inputs value))
+                    value))]
+    (assoc aligned
+           :freshness (calendar/freshness (:calendar aligned)
+                                          as-of-ms
+                                          stale-after-ms))))
 
 (defn build-engine-request
   [{:keys [draft

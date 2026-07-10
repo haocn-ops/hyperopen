@@ -91,8 +91,13 @@
         ;; must have their history fetched too, so a full reload keeps the
         ;; covariance inputs the synthesis needs. They ride the same fetch as the
         ;; universe but never become allocatable (the request builder excludes
-        ;; them from the engine universe).
-        universe (into (vec (get-in state contracts/draft-universe-path))
+        ;; them from the engine universe). A stored reference that has since
+        ;; joined the universe is skipped - appending it would spend a second
+        ;; slot in the capped fetch batch on an instrument already covered.
+        universe-instruments (vec (get-in state contracts/draft-universe-path))
+        universe-ids (into #{} (keep :instrument-id) universe-instruments)
+        universe (into universe-instruments
+                       (remove #(contains? universe-ids (:instrument-id %)))
                        (get-in state contracts/draft-proxy-reference-instruments-path))
         request (merge {:universe universe
                         :current-portfolio-universe (current-portfolio-universe state)

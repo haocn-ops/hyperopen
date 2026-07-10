@@ -572,7 +572,16 @@
         ;; asset that are NOT in the portfolio universe. Their history is aligned
         ;; (so covariance synthesis can use them) but they are excluded from the
         ;; allocatable engine universe below, so they never receive a weight.
-        reference-instruments (vec (:proxy-reference-instruments draft*))
+        ;; A stored reference that IS a universe member is not reference-only -
+        ;; the user allocates it by right - so it must neither be evicted from
+        ;; the engine universe nor ride the alignment universe a second time
+        ;; (live 2026-07-09: an emptied proxy basket left BTC/ETH in the stored
+        ;; refs and silently evicted both from an 88-asset universe).
+        requested-ids (instrument-id-set requested-universe)
+        reference-instruments (into []
+                                    (remove #(contains? requested-ids
+                                                        (:instrument-id %)))
+                                    (:proxy-reference-instruments draft*))
         reference-ids (set (keep :instrument-id reference-instruments))
         ;; Metadata pool for resolving proxy instruments (universe + references),
         ;; used by the regression sub-alignment.

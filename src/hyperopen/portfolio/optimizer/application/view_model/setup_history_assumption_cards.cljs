@@ -9,6 +9,8 @@
   the SAME domain pipeline the engine runs, over the readiness request's own
   inputs, so the card always shows the basket the engine would use."
   (:require [clojure.string :as str]
+            [hyperopen.portfolio.optimizer.application.default-assumptions :as default-assumptions]
+            [hyperopen.portfolio.optimizer.application.history-loader.api-v2 :as history-api-v2]
             [hyperopen.portfolio.optimizer.application.request-builder :as request-builder]
             [hyperopen.portfolio.optimizer.application.setup-readiness :as setup-readiness]
             [hyperopen.portfolio.optimizer.application.universe-candidates :as universe-candidates]
@@ -192,10 +194,60 @@
   {:user "User-specified weights"
    :equal "Equal-weight fallback"})
 
+(def ^:private recommendation-approach-labels
+  {:proxy "Model from similar assets"
+   :conservative "Use conservative assumption"})
+
+(def ^:private recommended-action-ids
+  {:apply-one :actions/apply-portfolio-optimizer-recommended-history-assumption
+   :apply-all :actions/apply-portfolio-optimizer-recommended-history-assumptions})
+
+(defn- recommendation-member-row
+  [resolve-proxy-label available? {:keys [instrument-id label role]}]
+  {:instrument-id instrument-id
+   ;; Prefer the richer catalog/universe label; fall back to the discovery
+   ;; display symbol (external members never resolve from the catalog).
+   :label (let [resolved (resolve-proxy-label instrument-id)]
+            (if (= resolved instrument-id)
+              (or label resolved)
+              resolved))
+   :role role
+   :available? available?})
+
+(defn- card-recommendation
+  "Backend default-assumption recommendation for a mode-less card: what the
+  server suggests (approach, members, relationship, rationale) and whether a
+  one-click apply is possible today. Members whose history the backend cannot
+  serve yet render dimmed and are held back on apply. Nil once the user has
+  chosen a mode — an authored entry always wins."
+  [state instrument entry resolve-proxy-label]
+  (when (nil? entry)
+    (let [discovery (get-in state contracts/history-discovery-path)
+          backend-id (:optimizer-history/instrument-id
+                      (history-api-v2/with-discovery-metadata instrument discovery))
+          rec (default-assumptions/recommendation discovery backend-id)]
+      (when rec
+        (let [{:keys [usable held]} (default-assumptions/member-availability
+                                     discovery
+                                     (:instrument-id instrument)
+                                     (:members rec))]
+          {:approach (:approach rec)
+           :approach-label (get recommendation-approach-labels (:approach rec))
+           :members (into (mapv #(recommendation-member-row resolve-proxy-label true %)
+                                usable)
+                          (mapv #(recommendation-member-row resolve-proxy-label false %)
+                                held))
+           :held-count (count held)
+           :relationship-label (get relationship-labels (:relationship-strength rec))
+           :rationale (:rationale rec)
+           :applicable? (boolean (or (= :conservative (:approach rec))
+                                     (seq usable)))
+           :actions recommended-action-ids})))))
+
 (defn- history-assumption-card
   [{:keys [instrument label entry complete? errors warnings note percent-label*
            assumption-required? return-required? observations
-           covariance-observations readiness
+           covariance-observations readiness recommendation
            resolve-proxy-label usable-ids proxy-in-flight? search-query state
            collapse-overrides]}]
   (let [id (:instrument-id instrument)
@@ -252,6 +304,9 @@
              :summary (when complete?
                         (card-summary entry (mapv :label selected-proxies) percent-label*))
              :actions assumption-action-ids}
+      (some? recommendation)
+      (assoc :recommendation recommendation)
+
       proxy?
       (assoc :selected-proxy-ids (vec selected-ids)
              :selected-proxies selected-proxies
@@ -346,6 +401,9 @@
                                    {:instrument instrument
                                     :label (universe/instrument-primary-label instrument)
                                     :entry entry
+                                    :recommendation (card-recommendation
+                                                     state instrument entry
+                                                     resolve-proxy-label)
                                     :complete? complete?
                                     :errors errors
                                     :warnings warnings
@@ -391,6 +449,11 @@
                       vec)]
      {:cards cards
       :addable-assets addable
+      ;; Cards whose backend recommendation can apply with one click - the
+      ;; section-level "Apply all recommended" banner keys off this.
+      :recommended-count (count (filter #(get-in % [:recommendation :applicable?])
+                                        cards))
+      :recommended-actions recommended-action-ids
       ;; Cards whose proxy history is still fetching - the section-level
       ;; "background work in progress" banner keys off this.
       :history-loading-count (count (filter :history-loading? cards))

@@ -215,6 +215,7 @@
             [hyperopen.portfolio.optimizer.application.black-litterman-preview-test]
             [hyperopen.portfolio.optimizer.application.constraint-profiles-test]
             [hyperopen.portfolio.optimizer.application.current-portfolio-test]
+            [hyperopen.portfolio.optimizer.application.default-assumptions-test]
             [hyperopen.portfolio.optimizer.application.display-frontier-test]
             [hyperopen.portfolio.optimizer.application.engine-blocklist-test]
             [hyperopen.portfolio.optimizer.application.engine-current-portfolio-test]
@@ -281,6 +282,7 @@
             [hyperopen.portfolio.optimizer.application.view-model-frontier-test]
             [hyperopen.portfolio.optimizer.application.view-model-history-assumption-cards-test]
             [hyperopen.portfolio.optimizer.application.view-model-history-assumption-loading-test]
+            [hyperopen.portfolio.optimizer.application.view-model-history-assumption-recommendation-test]
             [hyperopen.portfolio.optimizer.application.view-model-rebalance-test]
             [hyperopen.portfolio.optimizer.application.view-model-results-test]
             [hyperopen.portfolio.optimizer.application.view-model-scenario-library-test]
@@ -338,6 +340,7 @@
             [hyperopen.portfolio.optimizer.infrastructure.working-order-refresh-test]
             [hyperopen.portfolio.optimizer.instrument-keyed-codec-test]
             [hyperopen.portfolio.optimizer.query-state-test]
+            [hyperopen.portfolio.optimizer.recommended-assumptions-actions-test]
             [hyperopen.portfolio.optimizer.refinement-actions-test]
             [hyperopen.portfolio.optimizer.refinement-domain-test]
             [hyperopen.portfolio.optimizer.return-views-io-actions-test]
@@ -1016,6 +1019,7 @@
              'hyperopen.portfolio.optimizer.application.black-litterman-preview-test
              'hyperopen.portfolio.optimizer.application.constraint-profiles-test
              'hyperopen.portfolio.optimizer.application.current-portfolio-test
+             'hyperopen.portfolio.optimizer.application.default-assumptions-test
              'hyperopen.portfolio.optimizer.application.display-frontier-test
              'hyperopen.portfolio.optimizer.application.engine-blocklist-test
              'hyperopen.portfolio.optimizer.application.engine-current-portfolio-test
@@ -1082,6 +1086,7 @@
              'hyperopen.portfolio.optimizer.application.view-model-frontier-test
              'hyperopen.portfolio.optimizer.application.view-model-history-assumption-cards-test
              'hyperopen.portfolio.optimizer.application.view-model-history-assumption-loading-test
+             'hyperopen.portfolio.optimizer.application.view-model-history-assumption-recommendation-test
              'hyperopen.portfolio.optimizer.application.view-model-rebalance-test
              'hyperopen.portfolio.optimizer.application.view-model-results-test
              'hyperopen.portfolio.optimizer.application.view-model-scenario-library-test
@@ -1139,6 +1144,7 @@
              'hyperopen.portfolio.optimizer.infrastructure.working-order-refresh-test
              'hyperopen.portfolio.optimizer.instrument-keyed-codec-test
              'hyperopen.portfolio.optimizer.query-state-test
+             'hyperopen.portfolio.optimizer.recommended-assumptions-actions-test
              'hyperopen.portfolio.optimizer.refinement-actions-test
              'hyperopen.portfolio.optimizer.refinement-domain-test
              'hyperopen.portfolio.optimizer.return-views-io-actions-test

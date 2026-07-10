@@ -49,6 +49,10 @@
     actions/apply-imported-portfolio-optimizer-history-assumptions
     :dismiss-portfolio-optimizer-history-assumptions-io-note
     actions/dismiss-portfolio-optimizer-history-assumptions-io-note
+    :apply-portfolio-optimizer-recommended-history-assumption
+    actions/apply-portfolio-optimizer-recommended-history-assumption
+    :apply-portfolio-optimizer-recommended-history-assumptions
+    actions/apply-portfolio-optimizer-recommended-history-assumptions
     :set-portfolio-optimizer-return-model-kind
     actions/set-portfolio-optimizer-return-model-kind
     :set-portfolio-optimizer-risk-model-kind

@@ -420,14 +420,19 @@
     (is (contains? strings "Custom"))
     (is (contains? strings "Portfolio exposure"))
     (is (contains? strings "Set target leverage and net long/short bias."))
-    ;; The drag hint is short, actionable, and rendered BEFORE the pad it explains
-    ;; (the old post-chart paragraph is gone).
-    (is (contains? strings "Drag the dot to set target exposure."))
+    ;; The simplified default view (2026-07-10): no drag caption, no
+    ;; "Positioning" eyebrow, no preset chips — pad + stacked readout + the two
+    ;; read-only cards ("Risk guards" / "Rebalancing") with the editable
+    ;; controls behind their Edit disclosures, and the band sliders behind
+    ;; "Fine-tune exposure".
+    (is (not (contains? strings "Drag the dot to set target exposure.")))
     (is (not (some #(str/includes? % "The dot shows the target gross leverage")
                    strings)))
-    (is (contains? strings "Positioning"))
+    (is (not (contains? strings "Positioning")))
+    (is (not (contains? strings "Exposure presets")))
     (is (contains? strings "Risk guards"))
-    (is (contains? strings "Rebalance behavior"))
+    (is (contains? strings "Rebalancing"))
+    (is (contains? strings "Fine-tune exposure"))
     ;; The exact solver echo is an audit detail: it lives inside the Advanced
     ;; solver limits drawer, not in the primary controls column.
     (is (contains? strings "Sent to solver"))

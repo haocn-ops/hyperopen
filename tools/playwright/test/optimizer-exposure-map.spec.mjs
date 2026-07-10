@@ -18,28 +18,50 @@ async function expectPortfolioExposureOpen(page) {
   await expect(panel).toContainText("Set target leverage and net long/short bias.");
 }
 
+// The band sliders, current-portfolio line, and memory row live behind the
+// "Fine-tune exposure" disclosure (2026-07-10 simplified default view).
+async function openFineTune(page) {
+  const drawer = page.locator("[data-role='portfolio-optimizer-exposure-fine-tune']");
+  if (!(await drawer.evaluate((el) => el.open))) {
+    await drawer.locator("> summary").click();
+  }
+}
+
 test.describe("optimizer exposure-map Positioning control", () => {
   test.beforeEach(async ({ page }) => {
     await visitRoute(page, "/portfolio/optimize/new");
     await expectPortfolioExposureOpen(page);
   });
 
-  test("renders the 2D pad, echo, presets, and profile row", async ({ page }) => {
+  test("renders the quiet default view; bands and memory sit behind Fine-tune", async ({ page }) => {
     await expect(page.locator("[data-role='portfolio-optimizer-exposure-map']")).toBeVisible();
     await expect(page.locator("[data-role='portfolio-optimizer-exposure-pad']")).toBeVisible();
     await expect(page.locator("[data-role='portfolio-optimizer-exposure-handle']")).toBeVisible();
     await expect(page.locator("[data-role='portfolio-optimizer-exposure-echo']")).toContainText(
       "Sent to solver"
     );
-    await expect(page.locator("[data-role='portfolio-optimizer-exposure-caption']"))
-      .toContainText("Drag the dot to set target exposure.");
+    // The drag caption and preset chips are gone (2026-07-10 simplified view).
+    await expect(page.locator("[data-role='portfolio-optimizer-exposure-caption']")).toHaveCount(0);
+    await expect(
+      page.locator("[data-role='portfolio-optimizer-exposure-preset-balanced']")
+    ).toHaveCount(0);
+    // Bands + memory rest hidden behind the Fine-tune drawer…
+    await expect(
+      page.locator("[data-role='portfolio-optimizer-exposure-gross-band']")
+    ).not.toBeVisible();
+    await expect(
+      page.locator("[data-role='portfolio-optimizer-exposure-profile']")
+    ).not.toBeVisible();
+    await openFineTune(page);
     await expect(
       page.locator("[data-role='portfolio-optimizer-exposure-gross-band']")
     ).toBeVisible();
     await expect(
       page.locator("[data-role='portfolio-optimizer-exposure-profile']")
     ).toBeVisible();
-    // A fresh draft is the Balanced preset; its echo caps gross at 2x with no floor.
+    // (No exposure-preview assertion: the CURRENT line only exists once a
+    // connected/spectated book supplies a current exposure.)
+    // A fresh draft is the Balanced policy; its echo caps gross at 2x with no floor.
     await expect(page.locator("[data-role='portfolio-optimizer-exposure-echo']")).toContainText(
       "gross ≤ 2.00×"
     );
@@ -122,36 +144,25 @@ test.describe("optimizer exposure-map Positioning control", () => {
     await expect(zoomIn).toBeEnabled();
   });
 
-  test("clicking a preset round-trips through the runtime into the draft constraints", async ({
-    page
-  }) => {
+  test("the read-only cards expose the editable controls behind Edit", async ({ page }) => {
+    // Resting view: current values as text, controls behind the card's Edit toggle.
     await expect(
-      page.locator("[data-role='portfolio-optimizer-exposure-preset-balanced']")
-    ).toHaveAttribute("aria-pressed", "true");
-
-    await page.locator("[data-role='portfolio-optimizer-exposure-preset-conservative']").click();
-    await waitForIdle(page);
-
-    expect(await readOptimizerState(page, optimizerPath("draft", "constraints", "gross-max"))).toBe(
-      1
-    );
-    expect(
-      await readOptimizerState(page, optimizerPath("draft", "constraints", "max-asset-weight"))
-    ).toBe(0.25);
-    // No gross floor for a ceiling-only preset.
-    expect(
-      await readOptimizerState(page, optimizerPath("draft", "constraints", "gross-min"))
-    ).toBeNull();
-
+      page.locator("[data-role='portfolio-optimizer-risk-guards-cap-value']")
+    ).toHaveText("50%");
     await expect(
-      page.locator("[data-role='portfolio-optimizer-exposure-preset-conservative']")
-    ).toHaveAttribute("aria-pressed", "true");
-    await expect(page.locator("[data-role='portfolio-optimizer-exposure-echo']")).toContainText(
-      "gross ≤ 1.00×"
+      page.locator("[data-role='portfolio-optimizer-rebalancing-turnover-value']")
+    ).toHaveText("1.00×");
+    const maxWeight = page.locator(
+      "[data-role='portfolio-optimizer-constraint-max-asset-weight-input']"
     );
+    await expect(maxWeight).not.toBeVisible();
+    const guards = page.locator("[data-role='portfolio-optimizer-risk-guards-card']");
+    await guards.locator("> summary").click();
+    await expect(maxWeight).toBeVisible();
   });
 
   test("widening the net band updates the net range sent to the solver", async ({ page }) => {
+    await openFineTune(page);
     const slider = page.locator("[data-role='portfolio-optimizer-exposure-net-band']");
     await slider.evaluate((el) => {
       el.value = "0.25";
@@ -194,6 +205,7 @@ test.describe("optimizer exposure-map Positioning control", () => {
     const netStripe = page.locator(
       "[data-role='portfolio-optimizer-exposure-net-stripe']"
     );
+    await openFineTune(page);
     const grossSlider = page.locator(
       "[data-role='portfolio-optimizer-exposure-gross-band']"
     );

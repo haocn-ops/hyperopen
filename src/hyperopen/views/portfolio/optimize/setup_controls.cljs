@@ -156,6 +156,29 @@
         (str pct)))
     ""))
 
+(defn- lucide-node->hiccup
+  [node]
+  (let [tag-name (aget node 0)
+        attrs (js->clj (aget node 1) :keywordize-keys true)]
+    [(keyword tag-name) attrs]))
+
+(defn lucide-icon
+  "Render a lucide icon-node array (from a direct
+  [\"lucide/dist/esm/icons/<name>.js\" :default node] require at the call
+  site) as an inline 14px stroke icon."
+  [node extra-class]
+  (into [:svg {:viewBox "0 0 24 24"
+               :width 14
+               :height 14
+               :fill "none"
+               :stroke "currentColor"
+               :stroke-width 1.75
+               :stroke-linecap "round"
+               :stroke-linejoin "round"
+               :aria-hidden "true"
+               :class (into ["shrink-0"] (or extra-class []))}]
+        (map lucide-node->hiccup (array-seq node))))
+
 (defn percent-input
   "Percent-entry numeric input: the user types a percent (15 = 15%); it commits on
   blur/Enter (:change, never per keystroke — an eager parse rewrites a controlled input

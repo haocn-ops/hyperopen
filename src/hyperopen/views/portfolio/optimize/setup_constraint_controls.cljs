@@ -1,5 +1,8 @@
 (ns hyperopen.views.portfolio.optimize.setup-constraint-controls
-  (:require [hyperopen.portfolio.optimizer.application.view-model :as optimizer-view-model]
+  (:require ["lucide/dist/esm/icons/chevron-down.js" :default lucide-chevron-down]
+            ["lucide/dist/esm/icons/refresh-cw.js" :default lucide-refresh-cw]
+            ["lucide/dist/esm/icons/shield.js" :default lucide-shield]
+            [hyperopen.portfolio.optimizer.application.view-model :as optimizer-view-model]
             [hyperopen.portfolio.optimizer.application.view-model.exposure :as exposure-vm]
             [hyperopen.portfolio.optimizer.domain.exposure-policy :as exposure-policy]
             [hyperopen.views.portfolio.optimize.setup-controls :as controls]
@@ -177,18 +180,93 @@
                                    :include-spot?
                                    (not enabled?)]]})]]))
 
-(defn- group-block
-  "A labelled sub-group inside the Portfolio exposure panel. `eyebrow` is the small uppercase label,
-  `hint` an optional plain-English caption, `body` the controls."
-  [eyebrow hint body]
-  [:div {:class ["optimizer-constraint-group"]}
-   [:div {:class ["flex" "items-baseline" "justify-between" "gap-2"]}
-    [:span {:class controls/eyebrow-class} eyebrow]
-    (when hint
-      [:span {:class ["font-mono" "text-[0.625rem]" "normal-case"
-                      "tracking-normal" "text-trading-muted/70"]}
-       hint])]
-   [:div {:class ["mt-2"]} body]])
+;; --- read-only-at-rest cards + fine-tune drawer (designer mock, 2026-07-10) ---
+
+(defn- card-value-row
+  [label value role]
+  [:div {:class ["flex" "items-baseline" "justify-between" "gap-2" "py-0.5"]}
+   [:span {:class ["text-[0.75rem]" "text-trading-muted"]} label]
+   [:span {:class ["text-right" "font-mono" "text-[0.75rem]" "font-medium"
+                   "text-trading-text"]
+           :data-role role}
+    value]])
+
+(defn- pct-value
+  [w]
+  (if (number? w) (str (js/Math.round (* 100 w)) "%") "--"))
+
+(defn- on-off
+  [b]
+  (if b "On" "Off"))
+
+(defn- turnover-value
+  [constraints]
+  (if-let [cap (:max-turnover constraints)]
+    (str (.toFixed cap 2) "×")
+    "No turnover cap"))
+
+(defn- tolerance-value
+  [constraints]
+  (let [v (:rebalance-tolerance constraints)]
+    (if (number? v) (str (.toFixed (* 100 v) 1) " pp") "--")))
+
+(defn- dust-value
+  [constraints]
+  (let [v (:dust-usdc constraints)]
+    (if (number? v) (str "$" v) "--")))
+
+(defn- constraint-card
+  "Read-only-at-rest constraint card: the summary carries the icon, title, an
+  Edit affordance (flipping to Done while open via optimizer-section-open-only)
+  and the current values (hidden while open via optimizer-section-trailing —
+  the editable inputs then show the same numbers); the body is the EXISTING
+  editable controls, roles and dispatches untouched. Never :open from state."
+  [{:keys [icon title role rows body]}]
+  [:details {:class ["border" "border-base-300" "bg-base-200/20"]
+             :data-role role
+             :replicant/key role}
+   [:summary {:class ["optimizer-plain-summary" "cursor-pointer" "select-none" "p-2.5"
+                      "focus:outline-none" "focus:text-warning"]}
+    [:div {:class ["flex" "items-center" "gap-2"]}
+     (controls/lucide-icon icon ["text-trading-muted/70"])
+     [:span {:class ["text-[0.8125rem]" "font-semibold" "text-trading-text"]}
+      title]
+     [:span {:class ["optimizer-section-trailing" "ml-auto" "text-[0.75rem]"
+                     "font-semibold" "text-info"]}
+      "Edit"]
+     [:span {:class ["optimizer-section-open-only" "ml-auto" "text-[0.75rem]"
+                     "font-semibold" "text-info"]}
+      "Done"]]
+    (into [:div {:class ["optimizer-section-trailing" "mt-1.5" "space-y-0.5"]}]
+          rows)]
+   (into [:div {:class ["space-y-2" "border-t" "border-base-300" "p-2.5"]}]
+         body)])
+
+(defn- fine-tune-drawer
+  "Everything that shapes the envelope beyond dragging the dot: the band
+  sliders, the current-portfolio line with its quiet verdict, and the
+  remembered-profile (save-as-default) row. Collapsed by default — the
+  resting section is pad + readout + cards only."
+  [exposure-model]
+  [:details {:class ["w-full"]
+             :data-role "portfolio-optimizer-exposure-fine-tune"
+             :replicant/key "exposure-fine-tune"}
+   [:summary {:class ["optimizer-plain-summary" "flex" "cursor-pointer" "select-none"
+                      "justify-end" "focus:outline-none"]}
+    [:span {:class ["inline-flex" "items-center" "gap-1.5" "border"
+                    "border-base-300" "bg-base-200/30" "px-3" "py-1.5"
+                    "text-[0.75rem]" "font-medium" "text-trading-text"
+                    "hover:border-warning/50"]}
+     "Fine-tune exposure"
+     [:span {:class ["optimizer-section-trailing" "inline-flex"]}
+      (controls/lucide-icon lucide-chevron-down ["text-trading-muted"])]
+     [:span {:class ["optimizer-section-open-only" "inline-flex"]}
+      (controls/lucide-icon lucide-chevron-down ["rotate-180" "text-trading-muted"])]]]
+   [:div {:class ["mt-3" "space-y-3" "border" "border-base-300"
+                  "bg-base-200/10" "p-3"]}
+    (exposure-map/bands-block exposure-model)
+    (exposure-map/preview-block (:preview exposure-model))
+    (exposure-map/profile-row (:profile exposure-model))]])
 
 (defn- advanced-drawer
   "The raw gross/net min/max fields the exposure pad abstracts, kept for experts, plus the exact
@@ -274,31 +352,58 @@
            "Custom from holdings"]
           [:span {:class ["text-[0.6875rem]" "text-trading-muted"]}
            "Review before running"]])
-       (group-block "Positioning" "gross leverage + net bias"
-                    (exposure-map/exposure-map exposure-model))
-       ;; Risk guards / Rebalance behavior keep each canonical control exactly once (original
-       ;; data-roles), just grouped by what the trader is deciding rather than listed flat.
-       ;; The two groups sit side by side on wide screens so the open panel stays compact.
-       [:div {:class ["optimizer-constraint-group-row"
-                      "grid" "grid-cols-1" "gap-4" "md:grid-cols-2"]}
-        (group-block "Risk guards" nil
-                     [:div {:class ["grid" "grid-cols-1" "gap-2"]}
-                      (constraint-row "Per-asset cap" "Max Asset Weight"
-                                      :max-asset-weight (:max-asset-weight constraints)
-                                      "portfolio-optimizer-constraint-max-asset-weight-input"
-                                      (contains? highlighted-controls :max-asset-weight)
-                                      :weight)
-                      (long-only-row constraints)
-                      (include-spot-row constraints)])
-        (group-block "Rebalance behavior" "fewer trades ↔ tighter tracking"
-                     [:div {:class ["grid" "grid-cols-1" "gap-2"]}
-                      (constraint-row "Rebalance tolerance" "Rebalance Tolerance"
-                                      :rebalance-tolerance (:rebalance-tolerance constraints)
-                                      "portfolio-optimizer-constraint-rebalance-tolerance-input" false
-                                      :pts)
-                      (turnover-cap-row constraints
-                                        (contains? highlighted-controls :max-turnover))
-                      (constraint-row "Dust threshold" :dust-usdc (:dust-usdc constraints)
-                                      "portfolio-optimizer-constraint-dust-usdc-input" false
-                                      :usd)])]
+       (fine-tune-drawer exposure-model)
+       ;; The resting view (designer mock, 2026-07-10): the pad with its large
+       ;; stacked readout beside it, and the two read-only constraint cards.
+       ;; Every canonical control keeps its single data-role — the cards' Edit
+       ;; state renders the exact rows the flat groups used to.
+       [:div {:class ["grid" "grid-cols-1" "gap-3"
+                      "lg:grid-cols-[minmax(0,1.15fr)_minmax(15rem,1fr)]"]}
+        [:div {:class ["flex" "min-w-0" "items-stretch" "gap-4"]}
+         (exposure-map/pad-frame exposure-model)
+         (exposure-map/readout exposure-model)]
+        [:div {:class ["flex" "flex-col" "gap-3"]}
+         (constraint-card
+          {:icon lucide-shield
+           :title "Risk guards"
+           :role "portfolio-optimizer-risk-guards-card"
+           :rows [(card-value-row "Per-asset cap"
+                                  (pct-value (:max-asset-weight constraints))
+                                  "portfolio-optimizer-risk-guards-cap-value")
+                  (card-value-row "Long-only"
+                                  (on-off (true? (:long-only? constraints)))
+                                  "portfolio-optimizer-risk-guards-long-only-value")
+                  (card-value-row "Include spot"
+                                  (on-off (true? (:include-spot? constraints)))
+                                  "portfolio-optimizer-risk-guards-include-spot-value")]
+           :body [(constraint-row "Per-asset cap" "Max Asset Weight"
+                                  :max-asset-weight (:max-asset-weight constraints)
+                                  "portfolio-optimizer-constraint-max-asset-weight-input"
+                                  (contains? highlighted-controls :max-asset-weight)
+                                  :weight)
+                  (long-only-row constraints)
+                  (include-spot-row constraints)]})
+         (constraint-card
+          {:icon lucide-refresh-cw
+           :title "Rebalancing"
+           :role "portfolio-optimizer-rebalancing-card"
+           :rows [(card-value-row "Turnover cap"
+                                  (turnover-value constraints)
+                                  "portfolio-optimizer-rebalancing-turnover-value")
+                  (card-value-row "Rebalance tolerance"
+                                  (tolerance-value constraints)
+                                  "portfolio-optimizer-rebalancing-tolerance-value")
+                  (card-value-row "Dust threshold"
+                                  (dust-value constraints)
+                                  "portfolio-optimizer-rebalancing-dust-value")]
+           :body [(constraint-row "Rebalance tolerance" "Rebalance Tolerance"
+                                  :rebalance-tolerance (:rebalance-tolerance constraints)
+                                  "portfolio-optimizer-constraint-rebalance-tolerance-input" false
+                                  :pts)
+                  (turnover-cap-row constraints
+                                    (contains? highlighted-controls :max-turnover))
+                  (constraint-row "Dust threshold" :dust-usdc (:dust-usdc constraints)
+                                  "portfolio-optimizer-constraint-dust-usdc-input" false
+                                  :usd)]})]]
+       (exposure-map/policy-warning (:preview exposure-model))
        (advanced-drawer constraints highlighted-controls (:echo exposure-model))]))))

@@ -1555,6 +1555,12 @@ test("portfolio optimizer setup turnover cap switch disables and restores cap @r
 
   await expect.poll(async () => constraintsPanel.evaluate((element) => element.open)).toBe(true);
   await expect(constraintsPanel.locator("> summary")).toContainText("Portfolio exposure");
+  // The turnover controls live behind the Rebalancing card's Edit disclosure
+  // (2026-07-10 simplified default view).
+  const rebalancingCard = page.locator("[data-role='portfolio-optimizer-rebalancing-card']");
+  if (!(await rebalancingCard.evaluate((element) => element.open))) {
+    await rebalancingCard.locator("> summary").click();
+  }
   await expect(turnoverToggle).toHaveAttribute("role", "switch");
   await expect(turnoverToggle).toHaveAttribute("aria-checked", "true");
   await expect(turnoverInput).toBeEnabled();

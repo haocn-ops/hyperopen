@@ -96,10 +96,9 @@
                                  :constraints constraints*})
      :active-preset active
      :profile {:has-default? (boolean has-saved-default?)}
-     :presets (mapv (fn [k]
-                      {:key k
-                       :label (get policy/preset-labels k)
-                       :active? (= k active)})
-                    policy/preset-keys)
+     ;; No :presets chip vector since 2026-07-10: the preset BUTTONS left the UI
+     ;; (owner request). :active-preset stays — the panel header labels the
+     ;; recognized policy ("Conservative" / "Custom · from holdings"), and the
+     ;; preset action + domain presets remain for programmatic use.
      :highlighted {:gross (gross-highlighted? highlighted-controls)
                    :net (net-highlighted? highlighted-controls)}}))

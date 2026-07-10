@@ -139,6 +139,22 @@
     display: none;
   }
 
+  /* Counterpart of optimizer-section-trailing: content that shows ONLY while
+     the owning disclosure is open (e.g. an Edit label flipping to Done). */
+  .portfolio-optimizer details:not([open]) > summary .optimizer-section-open-only {
+    display: none;
+  }
+
+  /* Summaries whose affordance is their own control (Edit label, chevron
+     button): no native disclosure marker. */
+  .portfolio-optimizer summary.optimizer-plain-summary {
+    list-style: none;
+  }
+
+  .portfolio-optimizer summary.optimizer-plain-summary::-webkit-details-marker {
+    display: none;
+  }
+
   @media (max-width: 639px) and (hover: hover) and (pointer: fine) {
     .portfolio-optimizer.optimizer-setup-route-surface,
     .portfolio-optimizer .optimizer-setup-route-surface {

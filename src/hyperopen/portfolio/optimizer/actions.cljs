@@ -1,5 +1,6 @@
 (ns hyperopen.portfolio.optimizer.actions
-  (:require [hyperopen.portfolio.optimizer.actions.draft :as draft]
+  (:require [hyperopen.portfolio.optimizer.actions.default-assumptions :as default-assumptions]
+            [hyperopen.portfolio.optimizer.actions.draft :as draft]
             [hyperopen.portfolio.optimizer.actions.draft-persistence :as draft-persistence]
             [hyperopen.portfolio.optimizer.actions.execution :as execution]
             [hyperopen.portfolio.optimizer.actions.exposure :as exposure]
@@ -333,3 +334,9 @@
 
 (def dismiss-portfolio-optimizer-history-assumptions-io-note
   history-assumptions-io/dismiss-portfolio-optimizer-history-assumptions-io-note)
+
+(def apply-portfolio-optimizer-recommended-history-assumption
+  default-assumptions/apply-portfolio-optimizer-recommended-history-assumption)
+
+(def apply-portfolio-optimizer-recommended-history-assumptions
+  default-assumptions/apply-portfolio-optimizer-recommended-history-assumptions)

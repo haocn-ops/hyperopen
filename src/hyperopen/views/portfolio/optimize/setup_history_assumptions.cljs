@@ -6,6 +6,7 @@
             [hyperopen.portfolio.optimizer.contracts :as contracts]
             [hyperopen.views.portfolio.optimize.setup-controls :as controls]
             [hyperopen.views.portfolio.optimize.setup-history-assumption-panels :as panels]
+            [hyperopen.views.portfolio.optimize.setup-history-assumption-recommendations :as recommendations]
             [hyperopen.views.portfolio.optimize.setup-history-assumptions-io :as assumptions-io]))
 
 (def ^:private card-subtext
@@ -368,6 +369,10 @@
                    :data-role (str "portfolio-optimizer-history-assumption-clear-" id)
                    :on {:click [[(get-in card [:actions :clear]) id]]}}
           "Clear"])]]
+     ;; The backend's recommendation leads while no mode is chosen: one click
+     ;; beats hand-picking, and choosing a mode by hand dismisses it.
+     (when (and (nil? (:mode card)) (:recommendation card))
+       (recommendations/recommendation-panel card))
      (mode-tabs card)
      ;; The agent's stated reason for an imported configuration — the trust
      ;; artifact that lets the user audit a file-authored basket at a glance.
@@ -448,7 +453,8 @@
 
 (defn history-assumptions-section
   [{:keys [state draft readiness history-load-state]}]
-  (let [{:keys [cards addable-assets applicable? history-loading-count]}
+  (let [{:keys [cards addable-assets applicable? history-loading-count]
+         :as cards-model}
         (optimizer-view-model/history-assumption-cards
          state draft readiness history-load-state
          {:percent-label controls/percent-label})]
@@ -471,6 +477,7 @@
                         " asset in the workflow"
                         " assets in the workflow"))])]
              (loading-banner (or history-loading-count 0))
+             (recommendations/recommended-banner cards-model)
              (assumptions-io/io-toolbar
               {:asset-count (count cards)
                :universe-count (+ (count cards) (count addable-assets))})

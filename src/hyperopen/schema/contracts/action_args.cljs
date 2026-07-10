@@ -304,6 +304,8 @@
    :actions/import-portfolio-optimizer-history-assumptions ::common/no-args
    :actions/apply-imported-portfolio-optimizer-history-assumptions ::apply-imported-portfolio-optimizer-history-assumptions-args
    :actions/dismiss-portfolio-optimizer-history-assumptions-io-note ::common/no-args
+   :actions/apply-portfolio-optimizer-recommended-history-assumption ::portfolio-optimizer-instrument-id-args
+   :actions/apply-portfolio-optimizer-recommended-history-assumptions ::common/no-args
    :actions/set-portfolio-optimizer-return-model-kind ::portfolio-optimizer-model-kind-args
    :actions/set-portfolio-optimizer-risk-model-kind ::portfolio-optimizer-model-kind-args
    :actions/apply-portfolio-optimizer-setup-preset ::portfolio-optimizer-model-kind-args

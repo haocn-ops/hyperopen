@@ -31,10 +31,12 @@
     (is (nil? (node-by-role
                view-node
                "portfolio-optimizer-setup-use-my-views-editor-conservative-note")))
-    ;; The scenario contract states the goal and that the forecast is not used,
-    ;; instead of the misleading "Returns: Historical mean" under Minimum Variance.
-    (is (contains? strings "Return forecast"))
-    (is (contains? strings "Not used"))
+    ;; The Run summary is the designer's icon-row card (2026-07-10): no
+    ;; "Return forecast" row — the inactive Return-views one-liner (asserted
+    ;; above) carries the not-used fact — and a Status row shares the footer's
+    ;; run-verdict.
+    (is (not (contains? strings "Return forecast")))
+    (is (contains? strings "Status"))
     (is (not (contains? strings "Trust & Freshness")))
     (is (nil? (node-by-role view-node "portfolio-optimizer-left-rail")))
     (is (contains? strings "Portfolio Optimizer"))

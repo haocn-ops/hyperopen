@@ -1,5 +1,15 @@
 (ns hyperopen.views.portfolio.optimize.setup-context
-  (:require [hyperopen.portfolio.optimizer.application.current-portfolio :as current-portfolio]
+  (:require ["lucide/dist/esm/icons/asterisk.js" :default lucide-asterisk]
+            ["lucide/dist/esm/icons/circle-alert.js" :default lucide-circle-alert]
+            ["lucide/dist/esm/icons/circle-check.js" :default lucide-circle-check]
+            ["lucide/dist/esm/icons/clock.js" :default lucide-clock]
+            ["lucide/dist/esm/icons/history.js" :default lucide-history]
+            ["lucide/dist/esm/icons/loader-circle.js" :default lucide-loader-circle]
+            ["lucide/dist/esm/icons/scaling.js" :default lucide-scaling]
+            ["lucide/dist/esm/icons/target.js" :default lucide-target]
+            ["lucide/dist/esm/icons/triangle-alert.js" :default lucide-triangle-alert]
+            ["lucide/dist/esm/icons/waypoints.js" :default lucide-waypoints]
+            [hyperopen.portfolio.optimizer.application.current-portfolio :as current-portfolio]
             [hyperopen.portfolio.optimizer.application.view-model :as optimizer-view-model]
             [hyperopen.portfolio.optimizer.application.view-model.exposure :as exposure-vm]
             [hyperopen.portfolio.routes :as portfolio-routes]
@@ -25,6 +35,27 @@
                    "text-trading-text"]}
     value]])
 
+(defn- lucide-node->hiccup
+  [node]
+  (let [tag-name (aget node 0)
+        attrs (js->clj (aget node 1) :keywordize-keys true)]
+    [(keyword tag-name) attrs]))
+
+(defn- lucide-icon
+  "Render a lucide icon-node array as an inline 14px stroke icon."
+  [node extra-class]
+  (into [:svg {:viewBox "0 0 24 24"
+               :width 14
+               :height 14
+               :fill "none"
+               :stroke "currentColor"
+               :stroke-width 1.75
+               :stroke-linecap "round"
+               :stroke-linejoin "round"
+               :aria-hidden "true"
+               :class (into ["shrink-0"] (or extra-class []))}]
+        (map lucide-node->hiccup (array-seq node))))
+
 (defn- exposure-policy-warning
   "Amber card naming the side of the exposure policy the CURRENT portfolio
   violates, with a plain fragment anchor to the exposure section (the
@@ -33,93 +64,101 @@
   which warning and where to act on it."
   [{:keys [on-policy? gross-ok? net-ok?] :as preview}]
   (when (and preview (false? on-policy?))
-    [:div {:class ["mt-2" "border" "border-warning/40" "bg-warning/10" "p-2"]
+    [:div {:class ["mt-3" "border" "border-warning/40" "bg-warning/10" "p-2.5"]
            :data-role "portfolio-optimizer-exposure-policy-warning"}
-     [:p {:class ["text-[0.75rem]" "leading-[1.45]" "font-medium" "text-warning"]}
-      (cond
-        (and (not gross-ok?) (not net-ok?))
-        "Current gross and net exposure are outside the selected policy."
-        (not gross-ok?)
-        "Current gross exposure is outside the selected policy."
-        :else
-        "Current net exposure is outside the selected policy.")]
-     [:a {:href "#portfolio-optimizer-constraints-panel"
-          :class ["mt-1" "inline-block" "text-[0.6875rem]" "font-semibold"
-                  "text-warning" "underline" "underline-offset-2"]
-          :data-role "portfolio-optimizer-exposure-policy-warning-review"}
-      "Review exposure →"]]))
+     [:div {:class ["flex" "items-start" "gap-2"]}
+      (lucide-icon lucide-triangle-alert ["mt-0.5" "text-warning"])
+      [:p {:class ["min-w-0" "text-[0.75rem]" "leading-[1.5]" "text-warning"]}
+       (cond
+         (and (not gross-ok?) (not net-ok?))
+         "Current gross and net exposure are outside the selected policy."
+         (not gross-ok?)
+         "Current gross exposure is outside the selected policy."
+         :else
+         "Current net exposure is outside the selected policy.")]]
+     [:div {:class ["mt-1" "text-right"]}
+      [:a {:href "#portfolio-optimizer-constraints-panel"
+           :class ["text-[0.75rem]" "font-semibold" "text-warning" "hover:underline"]
+           :data-role "portfolio-optimizer-exposure-policy-warning-review"}
+       "Review warning →"]]]))
 
 (defn- verdict-value
-  "Colored Status value for the Run summary: the same run-verdict the footer
-  pill renders, so the rail and the run bar can never disagree about \"ready\"."
+  "Status value for the Run summary: the same run-verdict the footer pill
+  renders, so the rail and the run bar can never disagree about \"ready\".
+  Runnable states carry a green check and plain text (the warning card below
+  owns the amber); blocked gets the red alert, loading a spinner."
   [{:keys [level label]}]
-  [:span {:class ["font-semibold"
-                  (case level
-                    :blocked "text-error"
-                    :caution "text-warning"
-                    :ready "text-success"
-                    "text-trading-muted")]
+  [:span {:class ["inline-flex" "min-w-0" "items-center" "justify-end" "gap-1.5"]
           :data-role "portfolio-optimizer-run-summary-status"
           :data-verdict (some-> level name)}
-   label])
+   (case level
+     :blocked (lucide-icon lucide-circle-alert ["text-error"])
+     :loading (lucide-icon lucide-loader-circle ["animate-spin" "text-trading-muted"])
+     (lucide-icon lucide-circle-check ["text-success"]))
+   [:span {:class ["truncate"]} label]])
+
+(defn- exposure-target-value
+  "One-line target-exposure echo (\"19.50× gross · +10.48× net long\") with the
+  net side tinted by direction, matching the exposure pad's readout."
+  [{:keys [gross-label net-label direction]}]
+  [:span {:class ["font-mono"]}
+   (or gross-label "--")
+   [:span {:class ["text-trading-muted"]} " gross"]
+   [:span {:class ["text-trading-muted/60"]} " · "]
+   [:span {:class [(case direction
+                     :long "text-success"
+                     :short "text-error"
+                     "text-trading-text")]}
+    (or net-label "--")]
+   [:span {:class ["text-trading-muted"]}
+    (case direction
+      :long " net long"
+      :short " net short"
+      " net")]])
+
+(defn- summary-row
+  "Run-summary line: muted icon + label on the left, right-aligned value."
+  [icon-node label value]
+  [:div {:class ["flex" "min-h-[1.75rem]" "items-center" "gap-2.5"]}
+   (lucide-icon icon-node ["text-trading-muted/60"])
+   [:span {:class ["shrink-0" "text-[0.75rem]" "text-trading-muted"]} label]
+   [:span {:class ["ml-auto" "min-w-0" "text-right" "text-[0.75rem]" "font-medium"
+                   "leading-[1.4]" "text-trading-text"]}
+    value]])
 
 (defn- summary-card
-  "The Run summary: the exact universe/objective/model/constraint policy the
-  solver will receive plus the global verdict, as a labeled stack the user can
-  verify at a glance instead of inferring it from scattered controls. Derived
-  output, not primary input. While the holdings auto-seed is pending the
-  Universe row says so — the rail is where the user looks to confirm readiness,
-  so it must reflect the wait."
+  "The Run summary: what the solver will receive plus the global verdict, as an
+  icon-labeled stack (designer parity, 2026-07-10) the user can verify at a
+  glance instead of inferring it from scattered controls. Derived output, not
+  primary input. While the holdings auto-seed is pending the Universe row says
+  so — the rail is where the user looks to confirm readiness, so it must
+  reflect the wait. The exposure line reads the policy TARGET; the band
+  numbers live in the exposure section itself."
   [draft readiness {:keys [history-data-label verdict exposure-preview]}]
-  (let [{:keys [preset-label asset-count universe-source-kind objective-label
-                return-forecast-label risk-label exposure-rows]}
+  (let [{:keys [asset-count objective-label risk-label exposure-target]}
         (optimizer-view-model/setup-summary-card-model draft {:labelize controls/labelize})
         holdings-loading? (= :holdings-loading (:reason readiness))]
     [:section {:class ["optimizer-setup-panel" "border" "border-base-300" "bg-base-100/90" "p-3"]
                :data-role "portfolio-optimizer-setup-summary-card"}
-     [:div {:class ["flex" "items-baseline" "justify-between" "gap-2"]}
-      [:p {:class eyebrow-class} "Run summary"]
-      [:span {:class ["font-mono" "text-[0.6875rem]" "uppercase" "tracking-[0.1em]"
-                      "text-trading-muted/70"]}
-       preset-label]]
-     [:div {:class ["mt-2" "space-y-1"]}
-      (contract-row "Universe"
-                    (if holdings-loading?
-                      "Loading holdings…"
-                      (str asset-count " assets"
-                           (case universe-source-kind
-                             :holdings " · from holdings"
-                             :custom " · custom"
-                             nil))))
-      (contract-row "Goal" objective-label)
-      ;; Under Minimum Variance the forecast does not drive the result, and the
-      ;; contract says "Not used" instead of implying the estimator matters.
-      ;; Otherwise it is a SOURCE line ("2 your views · 12 implied"), not a
-      ;; model name.
-      (contract-row "Return forecast" return-forecast-label)
-      (contract-row "Risk model" risk-label)
-      ;; One compact provenance line ("70 native · 8 via assumptions") instead
-      ;; of restating each assumption — the assumptions panel below carries the
+     [:p {:class ["text-[0.875rem]" "font-semibold" "text-trading-text"]}
+      "Run summary"]
+     [:div {:class ["mt-1.5" "space-y-0.5"]}
+      (summary-row lucide-waypoints "Universe"
+                   (if holdings-loading?
+                     "Loading holdings…"
+                     (str asset-count " assets")))
+      (summary-row lucide-target "Goal" objective-label)
+      (summary-row lucide-scaling "Exposure" (exposure-target-value exposure-target))
+      ;; One compact provenance line ("70 native · 8 modeled") instead of
+      ;; restating each assumption — the assumptions panel below carries the
       ;; per-asset detail.
       (when history-data-label
-        (contract-row "History data"
-                      [:span {:data-role "portfolio-optimizer-run-summary-history-data"}
-                       history-data-label]))
-      ;; Stacked exposure rows: four numbers the user must verify, one per
-      ;; line, instead of a single wrapping compressed string. These are the
-      ;; run's RECEIPT (what the solver is sent) — the current target readout
-      ;; lives in the center panel and is deliberately not repeated here.
-      (contract-row "Exposure policy"
-                    (into [:span {:class ["block" "font-mono" "text-[0.75rem]"
-                                          "text-trading-muted"]
-                                  :data-role "portfolio-optimizer-exposure-policy-rows"}]
-                          (map (fn [[label value]]
-                                 [:span {:class ["flex" "justify-between" "gap-2"]}
-                                  [:span {:class ["text-trading-muted/70"]} label]
-                                  [:span value]]))
-                          exposure-rows))
+        (summary-row lucide-history "History data"
+                     [:span {:data-role "portfolio-optimizer-run-summary-history-data"}
+                      history-data-label]))
+      (summary-row lucide-asterisk "Risk model" risk-label)
       (when verdict
-        (contract-row "Status" (verdict-value verdict)))]
+        (summary-row lucide-clock "Status" (verdict-value verdict)))]
      (exposure-policy-warning exposure-preview)]))
 
 (defn- rail-assumption-row
@@ -240,7 +279,7 @@
         assumption-count (count (:rows rail-model))
         history-data-label (when (pos? assumption-count)
                              (str (max 0 (- (count (:universe draft)) assumption-count))
-                                  " native · " assumption-count " via assumptions"))
+                                  " native · " assumption-count " modeled"))
         exposure-preview (exposure-vm/exposure-preview
                           {:current-exposure (exposure-vm/snapshot->current-exposure
                                               (current-portfolio/current-portfolio-snapshot state))

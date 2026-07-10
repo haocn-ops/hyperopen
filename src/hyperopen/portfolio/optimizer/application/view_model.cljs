@@ -6,6 +6,7 @@
             [hyperopen.portfolio.optimizer.application.view-model.setup :as setup]
             [hyperopen.portfolio.optimizer.application.view-model.setup-history-assumption-cards :as assumption-cards]
             [hyperopen.portfolio.optimizer.application.view-model.setup-history-assumption-rail :as assumption-rail]
+            [hyperopen.portfolio.optimizer.application.view-model.setup-summary :as setup-summary]
             [hyperopen.portfolio.optimizer.application.view-model.tracking :as tracking]
             [hyperopen.portfolio.optimizer.application.view-model.universe :as universe]
             [hyperopen.portfolio.optimizer.application.view-model.workspace :as workspace]))
@@ -94,23 +95,23 @@
 
 (defn setup-summary-model
   ([draft]
-   (setup/setup-summary-model draft))
+   (setup-summary/setup-summary-model draft))
   ([draft formatters]
-   (setup/setup-summary-model draft formatters)))
+   (setup-summary/setup-summary-model draft formatters)))
 
 (defn setup-summary-card-model
   ([draft]
-   (setup/setup-summary-card-model draft))
+   (setup-summary/setup-summary-card-model draft))
   ([draft formatters]
-   (setup/setup-summary-card-model draft formatters)))
+   (setup-summary/setup-summary-card-model draft formatters)))
 
 (defn constraints-summary-line
   [constraints]
-  (setup/constraints-summary-line constraints))
+  (setup-summary/constraints-summary-line constraints))
 
-(def return-model-display-names setup/return-model-display-names)
+(def return-model-display-names setup-summary/return-model-display-names)
 
-(def risk-model-display-names setup/risk-model-display-names)
+(def risk-model-display-names setup-summary/risk-model-display-names)
 
 (defn history-assumption-cards
   ([state draft readiness history-load-state]

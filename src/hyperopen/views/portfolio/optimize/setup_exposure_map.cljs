@@ -160,19 +160,13 @@
   (let [g-max (:gross-max axis)
         n-ext (:net-extent axis)]
     [:div {:class ["optimizer-exposure-map__frame"]}
-     ;; Header row: the Y-axis title left (gross exposure IS leverage — :gross-max renames to
-     ;; :gross-leverage for the solver), the X-axis title + the explicit zoom control right.
-     ;; The scale NEVER changes from dragging; − widens the visible range, + tightens it back
-     ;; down to the policy's fit (the current view range reads off the axis ticks themselves).
+     ;; Header row: just the explicit zoom control (the axis titles live ON
+     ;; their axes — gross rotated along the y ticks, net centered under the
+     ;; x ticks). The scale NEVER changes from dragging; − widens the visible
+     ;; range, + tightens it back down to the policy's fit.
      [:div {:class ["optimizer-exposure-map__axis-header"]}
-      [:span {:class ["optimizer-exposure-map__axis-title"]
-              :data-role "portfolio-optimizer-exposure-y-title"}
-       "Gross leverage (×)"]
       [:span {:class ["optimizer-exposure-map__zoom"]
               :data-role "portfolio-optimizer-exposure-zoom"}
-       [:span {:class ["optimizer-exposure-map__axis-title"]
-               :data-role "portfolio-optimizer-exposure-x-title"}
-        "Net bias (×)"]
        (zoom-button {:label "−"
                      :level (:zoom-out-level zoom)
                      :role "portfolio-optimizer-exposure-zoom-out"
@@ -181,6 +175,12 @@
                      :level (:zoom-in-level zoom)
                      :role "portfolio-optimizer-exposure-zoom-in"
                      :aria-label "Zoom in to a tighter leverage range"})]]
+     ;; Gross exposure IS leverage — :gross-max renames to :gross-leverage for
+     ;; the solver.
+     [:span {:class ["optimizer-exposure-map__y-axis-label"
+                     "optimizer-exposure-map__axis-title"]
+             :data-role "portfolio-optimizer-exposure-y-title"}
+      "Gross leverage (×)"]
      [:div {:class ["optimizer-exposure-map__yticks"]}
       [:span {:data-role "portfolio-optimizer-exposure-y-max"} (fmt-axis g-max)]
       [:span (fmt-axis (/ g-max 2))]
@@ -193,8 +193,9 @@
                       "optimizer-exposure-map__axis-end--short"]}
        (str "−" (fmt-axis n-ext))]
       [:span {:class ["optimizer-exposure-map__axis-title"
-                      "optimizer-exposure-map__axis-title--x"]}
-       "0×"]
+                      "optimizer-exposure-map__axis-title--x"]
+              :data-role "portfolio-optimizer-exposure-x-title"}
+       "Net bias (×)"]
       [:span {:class ["optimizer-exposure-map__axis-end"
                       "optimizer-exposure-map__axis-end--long"]}
        (str "+" (fmt-axis n-ext))]]]))

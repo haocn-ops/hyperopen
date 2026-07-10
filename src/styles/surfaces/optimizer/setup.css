@@ -533,14 +533,26 @@
   .portfolio-optimizer .optimizer-exposure-map__frame {
     position: relative;
     display: grid;
-    grid-template-columns: auto 1fr;
+    /* columns: rotated y-axis title | y ticks | pad */
+    grid-template-columns: auto auto 1fr;
     grid-template-rows: auto 1fr auto;
     gap: 0.3rem 0.45rem;
     min-width: 0;
   }
 
+  /* The gross-leverage title reads bottom-up along the y axis, left of the
+     tick labels, so each axis is labeled ON its axis. */
+  .portfolio-optimizer .optimizer-exposure-map__y-axis-label {
+    grid-column: 1;
+    grid-row: 2;
+    align-self: center;
+    justify-self: center;
+    writing-mode: vertical-rl;
+    transform: rotate(180deg);
+  }
+
   .portfolio-optimizer .optimizer-exposure-map__pad {
-    grid-column: 2;
+    grid-column: 3;
     grid-row: 2;
     width: 100%;
     aspect-ratio: 1 / 1;
@@ -567,13 +579,14 @@
     white-space: nowrap;
   }
 
-  /* Header row: Y-axis title on the left, the explicit zoom control on the right. */
+  /* Header row: just the explicit zoom control, right-aligned (the axis
+     titles live on their axes). */
   .portfolio-optimizer .optimizer-exposure-map__axis-header {
     grid-column: 1 / -1;
     grid-row: 1;
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    justify-content: flex-end;
     gap: 0.5rem;
     min-width: 0;
   }
@@ -614,7 +627,7 @@
   }
 
   .portfolio-optimizer .optimizer-exposure-map__yticks {
-    grid-column: 1;
+    grid-column: 2;
     grid-row: 2;
     display: flex;
     flex-direction: column;
@@ -627,7 +640,7 @@
   }
 
   .portfolio-optimizer .optimizer-exposure-map__xaxis {
-    grid-column: 2;
+    grid-column: 3;
     grid-row: 3;
     display: flex;
     align-items: baseline;

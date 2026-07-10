@@ -619,18 +619,6 @@
     [:effects/sync-portfolio-optimizer-assumption-library
      {:removes [instrument-id]}]))
 
-(defn- save-history-assumptions
-  "Persist the assumptions map to the draft AND mirror the changed entry into
-  the wallet's assumption library, so the authored assumption survives
-  universe edits and fresh drafts."
-  [state assumptions instrument-id]
-  (conj (common/save-draft-path-values
-         [[contracts/draft-history-assumptions-path assumptions]])
-        (assumption-library-sync-effect
-         (get-in state contracts/draft-proxy-reference-instruments-path)
-         assumptions
-         instrument-id)))
-
 ;; --- Reference-only proxy instruments ---------------------------------------
 ;;
 ;; A proxy can be ANY catalog asset, not just one already in the universe. A
@@ -757,7 +745,10 @@
     (if (and instrument-id*
              (some? value*)
              (contains? assumptions instrument-id*))
-      (save-history-assumptions
+      ;; Every assumption save reconciles the reference-only proxies, so a
+      ;; stale stored reference (live 2026-07-09: an emptied basket left
+      ;; BTC/ETH behind) self-heals on the next edit of any card.
+      (save-assumptions+refs
        state
        (update assumptions instrument-id*
                #(unacknowledged (assoc % field value*)))
@@ -889,7 +880,7 @@
     (if (and instrument-id*
              (contains? history-assumptions/relationship-strengths strength)
              (history-assumptions/proxy? entry))
-      (save-history-assumptions
+      (save-assumptions+refs
        state
        (assoc assumptions instrument-id*
               (-> entry
@@ -908,7 +899,7 @@
         assumptions (history-assumptions-map state)]
     (if (and instrument-id*
              (contains? assumptions instrument-id*))
-      (conj-some (save-history-assumptions
+      (conj-some (save-assumptions+refs
                   state
                   (update assumptions instrument-id*
                           assoc :metadata {:source :user :acknowledged? true})

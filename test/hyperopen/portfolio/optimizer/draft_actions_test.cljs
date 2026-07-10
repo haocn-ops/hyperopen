@@ -866,6 +866,22 @@
     (is (= [] (actions/set-portfolio-optimizer-history-assumption-expected-return
                conservative "perp:NEW" "")))))
 
+(deftest history-assumption-field-edit-prunes-stale-reference-instruments-test
+  ;; Live 2026-07-09: BTC lingered in :proxy-reference-instruments after it
+  ;; joined the universe, and the field-edit save path skipped reconciliation,
+  ;; so nothing ever cleaned it up (the request builder then evicted the real
+  ;; portfolio asset as "reference-only"). Every assumption save reconciles.
+  (let [state (assoc-in (ha-state {"perp:NEW" proxy-entry-fixture})
+                        history-reference-instruments-path
+                        [{:instrument-id "perp:BTC"}])
+        effects (actions/set-portfolio-optimizer-history-assumption-expected-volatility
+                 state "perp:NEW" "90")
+        path-values (get-in effects [0 1])]
+    (is (= [history-reference-instruments-path []]
+           (some #(when (= history-reference-instruments-path (first %)) %)
+                 path-values))
+        "An ordinary field edit prunes the stale in-universe reference.")))
+
 (deftest clear-history-assumption-removes-entry-test
   (let [proxy (ha-state {"perp:NEW" {:behavior :conservative
                                      :expected-return 0.25

@@ -378,6 +378,19 @@
            (mapv :instrument-id
                  (get-in result [:commands 0 :request :universe]))))))
 
+(deftest history-request-skips-references-already-in-universe-test
+  ;; Live 2026-07-09: BTC lingered in :proxy-reference-instruments after it
+  ;; joined the universe; appending it again would spend a second slot in the
+  ;; capped fetch batch on an instrument already covered. Only genuinely
+  ;; out-of-universe references ride the fetch.
+  (let [state (assoc-in (prefetch-state)
+                        [:portfolio :optimizer :draft :proxy-reference-instruments]
+                        [btc-instrument sol-reference-instrument])
+        request (workflow/history-request state {})]
+    (is (= ["perp:BTC" "perp:ETH" "perp:SOL"]
+           (mapv :instrument-id (:universe request)))
+        "The in-universe reference is not fetched twice; the true reference rides along.")))
+
 (deftest complete-selection-prefetch-merges-reference-proxy-series-test
   ;; The fetched bundle for a reference-only proxy must merge into history data
   ;; (it is "selected" even though it is outside the universe) and its prefetch

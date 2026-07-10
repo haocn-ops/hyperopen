@@ -88,7 +88,10 @@
   Reference instruments stored on a hydrated entry are re-admitted only when
   the proxy is still outside the hydrating draft's universe and not already a
   reference instrument; the result vector keeps the reconcile convention
-  (sorted by instrument-id, deduped)."
+  (sorted by instrument-id, deduped). Carried-over references get the same
+  universe check: an instrument that has since joined the universe is no
+  longer reference-only (it is allocatable by right), so hydration prunes it
+  instead of carrying the stale reference forward."
   [{:keys [assumptions universe entries reference-instruments]}]
   (let [assumptions* (or assumptions {})
         universe-ids (into #{} (keep :instrument-id) universe)
@@ -100,7 +103,10 @@
                                   (get entries id)))))
                       vec)]
     (when (seq hydrated)
-      (let [existing-refs (vec (or reference-instruments []))
+      (let [existing-refs (into []
+                                (remove #(contains? universe-ids
+                                                    (:instrument-id %)))
+                                (or reference-instruments []))
             existing-ref-ids (into #{} (keep :instrument-id) existing-refs)
             new-refs (->> hydrated
                           (mapcat :reference-instruments)

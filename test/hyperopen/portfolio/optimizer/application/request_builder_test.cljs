@@ -585,6 +585,44 @@
         "The overlap regression series resolves the out-of-universe proxy's returns.")
     (is (= 9 (count (get-in entry [:regression-series :proxy-returns-by-id "perp:SOL"]))))))
 
+(deftest build-engine-request-keeps-universe-member-listed-as-reference-allocatable-test
+  ;; Live 2026-07-09: an emptied proxy basket left BTC/ETH behind in the
+  ;; draft's :proxy-reference-instruments, and the reference-drop silently
+  ;; evicted both REAL portfolio assets from the engine universe (the UI then
+  ;; badged them "Excluded - needs assumption" on 1094 days of history). A
+  ;; stored reference that is also a universe member is not reference-only:
+  ;; it stays allocatable and is not aligned a second time. A genuine
+  ;; out-of-universe reference (SOL) keeps the reference-only treatment.
+  (let [draft (-> (defaults/default-draft)
+                  (assoc :id "draft-stale-reference"
+                         :universe [{:instrument-id "perp:BTC" :market-type :perp :coin "BTC"}
+                                    {:instrument-id "perp:ETH" :market-type :perp :coin "ETH"}
+                                    {:instrument-id "perp:TOKENX" :market-type :perp :coin "TOKENX"}]
+                         :history-assumptions
+                         {"perp:TOKENX" (assoc-in complete-proxy-assumption
+                                                  [:proxy :instrument-ids] ["perp:SOL"])}
+                         ;; BTC/ETH are stale leftovers; SOL is genuinely reference-only.
+                         :proxy-reference-instruments
+                         [{:instrument-id "perp:BTC" :market-type :perp :coin "BTC"}
+                          {:instrument-id "perp:ETH" :market-type :perp :coin "ETH"}
+                          {:instrument-id "perp:SOL" :market-type :perp :coin "SOL"}]))
+        request (request-builder/build-engine-request
+                 {:draft draft
+                  :history-data {:candle-history-by-coin
+                                 {"BTC" (proxy-daily-candles 0 400 100)
+                                  "ETH" (proxy-daily-candles 0 400 2000)
+                                  "SOL" (proxy-daily-candles 0 400 150)
+                                  "TOKENX" (proxy-daily-candles 390 10 10)}
+                                 :funding-history-by-coin {}}
+                  :market-cap-by-coin {}
+                  :as-of-ms (* 401 proxy-day-ms)})
+        engine-ids (mapv :instrument-id (:universe request))
+        eligible-ids (mapv :instrument-id (get-in request [:history :eligible-instruments]))]
+    (is (= ["perp:BTC" "perp:ETH" "perp:TOKENX"] engine-ids)
+        "Universe members listed as stale references stay allocatable exactly once; the true reference stays out.")
+    (is (= ["perp:BTC" "perp:ETH" "perp:SOL"] eligible-ids)
+        "Alignment covers each member once plus the genuine reference-only proxy.")))
+
 (deftest build-engine-request-treats-empty-allowlist-as-unbounded-test
   (let [draft (assoc (defaults/default-draft)
                      :id "draft-default-constraints"

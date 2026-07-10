@@ -39,9 +39,13 @@
         children))
 
 (defn disclosure-panel
+  ;; :id mirrors the data-role (roles are unique per page) so plain fragment
+  ;; anchors — e.g. the rail's exposure-policy warning link — can scroll to a
+  ;; panel without any dispatch machinery.
   [role & children]
   (into [:details {:class ["optimizer-setup-panel" "border" "border-base-300" "bg-base-100/90" "p-3"]
-                   :data-role role}]
+                   :data-role role
+                   :id role}]
         children))
 
 (defn disclosure-panel-open
@@ -51,6 +55,7 @@
   [role & children]
   (into [:details {:class ["optimizer-setup-panel" "border" "border-base-300" "bg-base-100/90" "p-3"]
                    :data-role role
+                   :id role
                    :open true}]
         children))
 

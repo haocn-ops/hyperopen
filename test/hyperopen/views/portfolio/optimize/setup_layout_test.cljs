@@ -46,7 +46,10 @@
     (is (contains? strings "My holdings"))
     (is (contains? strings "Custom"))
     (is (not (contains? strings "Index")))
-    (is (contains? strings "Scenario contract"))
+    ;; Renamed from "Scenario contract" (2026-07-10): the card now also carries
+    ;; the History-data line and the global Status verdict.
+    (is (contains? strings "Run summary"))
+    (is (not (contains? strings "Scenario contract")))
     (is (not (contains? strings "What this scenario will solve for")))
     (is (contains? strings "Why this preset is safe"))
     (is (not (contains? strings "Execution Assumptions")))))

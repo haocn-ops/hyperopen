@@ -1,6 +1,7 @@
 (ns hyperopen.views.portfolio.optimize.setup-sections
   (:require [hyperopen.portfolio.optimizer.application.constraint-profiles :as constraint-profiles]
             [hyperopen.portfolio.optimizer.application.current-portfolio :as current-portfolio]
+            [hyperopen.portfolio.optimizer.application.view-model :as optimizer-view-model]
             [hyperopen.portfolio.optimizer.application.view-model.exposure :as exposure-vm]
             [hyperopen.portfolio.optimizer.contracts :as optimizer-contracts]
             [hyperopen.views.portfolio.optimize.instrument-overrides-panel :as instrument-overrides-panel]
@@ -49,7 +50,18 @@
   and the Run bottom bar. Return views themselves are edited in the right rail."
   [{:keys [state draft highlighted-controls readiness history-load-state running?
            run-triggerable? saving-scenario? solved-run? result-path]}]
-  (let [black-litterman? (= :black-litterman (get-in draft [:return-model :kind]))]
+  (let [black-litterman? (= :black-litterman (get-in draft [:return-model :kind]))
+        current-exposure (exposure-vm/snapshot->current-exposure
+                          (current-portfolio/current-portfolio-snapshot state))
+        ;; One global verdict for the footer pill (the rail computes the same
+        ;; one from the same inputs): readiness + exposure-policy compliance.
+        exposure-preview (exposure-vm/exposure-preview
+                          {:current-exposure current-exposure
+                           :constraints (:constraints draft)})
+        verdict (optimizer-view-model/run-verdict
+                 readiness history-load-state
+                 {:off-policy? (and exposure-preview
+                                    (false? (:on-policy? exposure-preview)))})]
     (into
      [:main {:class ["optimizer-policy-pane" "space-y-4" "leading-4"]
              :data-role "portfolio-optimizer-setup-policy-pane"}
@@ -62,8 +74,7 @@
         (get-in state optimizer-contracts/last-successful-run-result-path)))
       (constraint-controls/constraints-section
        draft highlighted-controls
-       {:current-exposure (exposure-vm/snapshot->current-exposure
-                           (current-portfolio/current-portfolio-snapshot state))
+       {:current-exposure current-exposure
         :has-saved-default? (constraint-profiles/has-default?
                              (get-in state optimizer-contracts/constraint-profiles-path)
                              (constraint-profiles/universe-key
@@ -112,4 +123,5 @@
                                             :run-triggerable? run-triggerable?
                                             :saving-scenario? saving-scenario?
                                             :solved-run? solved-run?
-                                            :result-path result-path})]))))
+                                            :result-path result-path
+                                            :verdict verdict})]))))

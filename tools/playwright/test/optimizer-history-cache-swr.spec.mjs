@@ -231,8 +231,10 @@ test("portfolio optimizer hydrates history assumptions from the cached bundle be
   await expect(chip).not.toHaveAttribute("data-loading", "true");
   await expect(page.locator("[data-role='portfolio-optimizer-history-assumptions-loading-banner']"))
     .toHaveCount(0);
+  // Configured is the glyph chip (aria-label "Configured") since 2026-07-10.
   const railStatus = page.locator("[data-role='portfolio-optimizer-history-assumptions-rail-status-perp:WLFI']");
-  await expect(railStatus).toContainText("Configured");
+  await expect(railStatus).toContainText("✓");
+  await expect(railStatus).toHaveAttribute("aria-label", "Configured");
 
   // Every phase-2 bundle response is held, so Configured above can only have
   // come from the cache; the background revalidate still fires on its own.

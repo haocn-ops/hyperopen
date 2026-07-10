@@ -1,29 +1,17 @@
 (ns hyperopen.views.portfolio.optimize.setup-history-assumptions
   "Proxy workflow cards for assets that lack optimizer-safe history. Views render
   the view-model cards and dispatch the carried action ids only - no history
-  math, no raw payload branching."
+  math, no raw payload branching. The per-card editable field controls live in
+  setup-history-assumption-fields (namespace-size split, 2026-07-10)."
   (:require [hyperopen.portfolio.optimizer.application.view-model :as optimizer-view-model]
             [hyperopen.portfolio.optimizer.contracts :as contracts]
             [hyperopen.views.portfolio.optimize.setup-controls :as controls]
-            [hyperopen.views.portfolio.optimize.setup-history-assumption-panels :as panels]
+            [hyperopen.views.portfolio.optimize.setup-history-assumption-fields :as fields]
             [hyperopen.views.portfolio.optimize.setup-history-assumption-recommendations :as recommendations]
             [hyperopen.views.portfolio.optimize.setup-history-assumptions-io :as assumptions-io]))
 
 (def ^:private card-subtext
   "Insufficient native history. Model behavior using proxies.")
-
-(defn- percent-input
-  [{:keys [label field role action]}]
-  [:label {:class ["block" "border" "border-base-300" "bg-base-200/20" "p-2"]}
-   [:span {:class controls/eyebrow-class} label]
-   [:div {:class ["mt-2" "flex" "items-center" "gap-1"]}
-    [:input {:type "text"
-             :inputmode "decimal"
-             :class controls/input-class
-             :data-role role
-             :value (or (:input-text field) "")
-             :on {:input [action]}}]
-    [:span {:class ["font-mono" "text-[0.8125rem]" "text-trading-muted"]} "%"]]])
 
 (defn- status-chip
   "Status pill. While this card's proxy history is still fetching, ANY status
@@ -50,222 +38,6 @@
                     :data-status (some-> (:status card) name)}
              loading? (assoc :data-loading "true"))
      (if loading? "Loading history…" (:status-label card))]))
-
-(defn- mode-tabs
-  "Two-way behavior selector. Selecting a mode seeds that mode's editable
-  defaults; switching preserves the user's return/volatility."
-  [card]
-  (let [id (:instrument-id card)
-        active (:mode card)]
-    (into [:div {:class ["grid" "grid-cols-2" "gap-1"]
-                 :data-role (str "portfolio-optimizer-history-assumption-modes-" id)}]
-          (map (fn [{:keys [value label]}]
-                 (let [active? (= value active)]
-                   [:button {:type "button"
-                             :class ["border" "px-2" "py-1.5" "text-[0.75rem]" "font-semibold"
-                                     (if active? "border-warning/70" "border-base-300")
-                                     (if active? "bg-warning/15" "bg-base-200/30")
-                                     (if active? "text-warning" "text-trading-muted")]
-                             :aria-pressed (if active? "true" "false")
-                             :data-role (str "portfolio-optimizer-history-assumption-mode-"
-                                             id "-" (name value))
-                             :on {:click [[(get-in card [:actions :set-mode]) id value]]}}
-                    label])))
-          (:mode-options card))))
-
-(defn- proxy-chips
-  [card]
-  (let [id (:instrument-id card)]
-    (when (seq (:selected-proxies card))
-      (into [:div {:class ["flex" "flex-wrap" "gap-1"]
-                   :data-role (str "portfolio-optimizer-history-assumption-proxies-" id)}]
-            (map (fn [{:keys [instrument-id label loading?]}]
-                   [:span {:class ["inline-flex" "items-center" "gap-1" "border"
-                                   "border-base-300" "bg-base-200/40" "px-1.5" "py-0.5"
-                                   "font-mono" "text-[0.6875rem]" "text-trading-text"]
-                           :data-role (str "portfolio-optimizer-history-assumption-proxy-chip-"
-                                           id "-" instrument-id)}
-                    label
-                    ;; This proxy's history fetch is still in flight.
-                    (when loading?
-                      [:span {:class ["animate-pulse" "text-[0.5625rem]" "uppercase"
-                                      "tracking-[0.06em]" "text-trading-muted"]}
-                       "loading"])
-                    [:button {:type "button"
-                              :class ["text-trading-muted" "hover:text-warning"]
-                              :aria-label (str "Remove proxy " label)
-                              :data-role (str "portfolio-optimizer-history-assumption-proxy-remove-"
-                                              id "-" instrument-id)
-                              :on {:click [[(get-in card [:actions :toggle-proxy-asset])
-                                            id instrument-id false]]}}
-                     "x"]]))
-            (:selected-proxies card)))))
-
-(defn- proxy-search
-  "Typeahead over the WHOLE asset catalog (not just the selected universe):
-  type a ticker/name, click a match, and it becomes a proxy chip. A picked proxy
-  outside the portfolio is modeled as reference-only (history loaded for
-  covariance, never allocated)."
-  [card]
-  (let [id (:instrument-id card)
-        results (:proxy-search-results card)]
-    [:div {:class ["relative"]}
-     [:input {:type "text"
-              :class ["w-full" "border" "border-base-300" "bg-base-100/80" "px-2" "py-1.5"
-                      "font-mono" "text-[0.75rem]" "text-trading-text"
-                      "outline-none" "focus:border-warning/70"]
-              :placeholder "Search any asset to add as a proxy…"
-              :data-role (str "portfolio-optimizer-history-assumption-proxy-search-" id)
-              :value (or (:proxy-search-query card) "")
-              :on {:input [[(get-in card [:actions :set-proxy-search]) id
-                            [:event.target/value]]]}}]
-     (when (seq results)
-       (into [:div {:class ["mt-1" "border" "border-base-300" "bg-base-200/80"
-                            "shadow-[0_12px_32px_rgba(0,0,0,0.45)]"]
-                    :role "listbox"
-                    :data-role (str "portfolio-optimizer-history-assumption-proxy-results-" id)}]
-             (map (fn [{:keys [instrument-id label]}]
-                    [:button {:type "button"
-                              :class ["flex" "w-full" "items-center" "justify-between" "gap-2"
-                                      "border-b" "border-base-300" "px-2" "py-1.5" "text-left"
-                                      "last:border-b-0" "hover:bg-base-200/60"]
-                              :role "option"
-                              :data-role (str "portfolio-optimizer-history-assumption-proxy-option-"
-                                              id "-" instrument-id)
-                              ;; Add the proxy, then clear the search buffer.
-                              :on {:click [[(get-in card [:actions :toggle-proxy-asset])
-                                            id instrument-id true]
-                                           [(get-in card [:actions :set-proxy-search]) id ""]]}}
-                     [:span {:class ["truncate" "font-mono" "text-[0.75rem]" "font-semibold"]}
-                      label]
-                     [:span {:class ["shrink-0" "font-mono" "text-[0.6875rem]" "text-warning"]}
-                      "+ add"]]))
-             results))]))
-
-(defn- relationship-selector
-  [card]
-  (let [id (:instrument-id card)
-        active (:relationship-strength card)]
-    [:div
-     [:span {:class controls/eyebrow-class} "Relationship strength"]
-     [:p {:class ["mt-1" "text-[0.6875rem]" "text-trading-muted"]}
-      "How similar this asset is to the chosen proxies"]
-     (into [:div {:class ["mt-1.5" "grid" "grid-cols-3" "gap-1"]}]
-           (map (fn [{:keys [value label]}]
-                  (let [active? (= value active)]
-                    [:button {:type "button"
-                              :class ["border" "px-2" "py-1" "text-[0.75rem]" "font-semibold"
-                                      (if active? "border-warning/70" "border-base-300")
-                                      (if active? "bg-warning/15" "bg-base-200/30")
-                                      (if active? "text-warning" "text-trading-muted")]
-                              :aria-pressed (if active? "true" "false")
-                              :data-role (str "portfolio-optimizer-history-assumption-relationship-"
-                                              id "-" (name value))
-                              :on {:click [[(get-in card [:actions :set-relationship-strength])
-                                            id value]]}}
-                     label])))
-                (:relationship-options card))]))
-
-(defn- risk-guardrails-drawer
-  "Volatility + cap, auto-set and collapsed: the proxy card's visible asks stay
-  behavioral (what does this asset behave like) while the model's required risk
-  inputs sit one click away. Collapsed, the summary row reads the current
-  values; `optimizer-section-trailing` hides that line while the drawer is open
-  (setup.css) because the inputs then show the same numbers. Never :open from
-  state — a computed open re-asserts itself against the user's own toggle."
-  [card]
-  (let [id (:instrument-id card)
-        guardrails (:risk-guardrails card)
-        attention? (:attention? guardrails)]
-    [:details {:class ["border" "bg-base-200/20"
-                       (if attention? "border-warning/60" "border-base-300")]
-               :data-role (str "portfolio-optimizer-history-assumption-guardrails-" id)
-               :replicant/key (str "history-assumption-guardrails-" id)}
-     [:summary {:class ["cursor-pointer" "select-none" "p-2"
-                        "focus:outline-none" "focus:text-warning"]}
-      [:span {:class ["inline-flex" "w-[calc(100%-1.25rem)]" "items-center"
-                      "justify-between" "gap-2" "align-middle"]}
-       [:span {:class controls/eyebrow-class} "Risk guardrails"]
-       [:span {:class ["optimizer-section-trailing" "inline-flex" "items-center" "gap-2"]}
-        [:span {:class ["font-mono" "text-[0.75rem]"
-                        (if attention? "text-warning" "text-trading-text")]
-                :data-role (str "portfolio-optimizer-history-assumption-guardrails-summary-" id)}
-         (:summary guardrails)]
-        [:span {:class ["border" "border-base-300" "bg-base-200/40" "px-1.5" "py-0.5"
-                        "font-mono" "text-[0.625rem]" "font-semibold" "uppercase"
-                        "tracking-[0.08em]" "text-trading-muted"]
-                :data-role (str "portfolio-optimizer-history-assumption-guardrails-source-" id)}
-         (:source-label guardrails)]
-        [:span {:class ["text-[0.6875rem]" "uppercase" "tracking-[0.08em]"
-                        "text-trading-muted" "hover:text-warning"]}
-         "Edit"]]]]
-     [:div {:class ["space-y-2" "border-t" "border-base-300" "p-2"]}
-      [:p {:class ["text-[0.6875rem]" "leading-[1.5]" "text-trading-muted"]}
-       "Auto-set so you don't have to estimate them. Volatility sets this asset's total modeled risk — the basket only sets how it co-moves. The cap limits how much the optimizer can allocate to a proxy-based estimate."]
-      [:div {:class ["grid" "gap-2" "sm:grid-cols-2"]}
-       (percent-input
-        {:label "Modeled annual volatility"
-         :field (:volatility card)
-         :role (str "portfolio-optimizer-history-assumption-volatility-" id)
-         :action [(get-in card [:actions :set-expected-volatility]) id
-                  [:event.target/value]]})
-       (percent-input
-        {:label "Max allocation cap"
-         :field (:max-weight card)
-         :role (str "portfolio-optimizer-history-assumption-max-weight-" id)
-         :action [(get-in card [:actions :set-max-weight-cap]) id
-                  [:event.target/value]]})]]]))
-
-(defn- proxy-fields
-  [card]
-  (let [id (:instrument-id card)]
-    [:div {:class ["space-y-2"]}
-     [:div
-      [:span {:class controls/eyebrow-class} "Proxy assets"]
-      [:p {:class ["mt-1" "text-[0.6875rem]" "text-trading-muted"]}
-       "Search any asset this one behaves like — it doesn't have to be in your portfolio"]
-      [:div {:class ["mt-1.5" "space-y-1.5"]}
-       (proxy-chips card)
-       (proxy-search card)]]
-     (relationship-selector card)
-     (risk-guardrails-drawer card)
-     (when (:expected-return-required? card)
-       (percent-input
-        {:label "Expected annual return"
-         :field (:expected-return card)
-         :role (str "portfolio-optimizer-history-assumption-return-" id)
-         :action [(get-in card [:actions :set-expected-return]) id
-                  [:event.target/value]]}))
-     (panels/prior-basket-panel card)
-     (panels/regression-estimate-panel card)
-     (panels/final-basket-panel card)
-     (panels/how-this-works)
-     (panels/diagnostics-strip card)]))
-
-(defn- conservative-fields
-  [card]
-  (let [id (:instrument-id card)]
-    [:div {:class ["space-y-2"]}
-     [:p {:class ["text-[0.6875rem]" "leading-[1.5]" "text-trading-muted"]}
-      "A high volatility with no diversification credit, pre-filled and editable."]
-     (percent-input
-      {:label "Expected annual return"
-       :field (:expected-return card)
-       :role (str "portfolio-optimizer-history-assumption-return-" id)
-       :action [(get-in card [:actions :set-expected-return]) id
-                [:event.target/value]]})
-     (percent-input
-      {:label "Modeled annual volatility"
-       :field (:volatility card)
-       :role (str "portfolio-optimizer-history-assumption-volatility-" id)
-       :action [(get-in card [:actions :set-expected-volatility]) id
-                [:event.target/value]]})
-     (percent-input
-      {:label "Max allocation cap"
-       :field (:max-weight card)
-       :role (str "portfolio-optimizer-history-assumption-max-weight-" id)
-       :action [(get-in card [:actions :set-max-weight-cap]) id
-                [:event.target/value]]})]))
 
 (defn- card-errors
   [card]
@@ -373,7 +145,7 @@
      ;; beats hand-picking, and choosing a mode by hand dismisses it.
      (when (and (nil? (:mode card)) (:recommendation card))
        (recommendations/recommendation-panel card))
-     (mode-tabs card)
+     (fields/mode-tabs card)
      ;; The agent's stated reason for an imported configuration — the trust
      ;; artifact that lets the user audit a file-authored basket at a glance.
      (when (:rationale card)
@@ -382,8 +154,8 @@
             :data-role (str "portfolio-optimizer-history-assumption-rationale-" id)}
         (str "Agent rationale: " (:rationale card))])
      (case (:mode card)
-       :proxy (proxy-fields card)
-       :conservative (conservative-fields card)
+       :proxy (fields/proxy-fields card)
+       :conservative (fields/conservative-fields card)
        [:p {:class ["text-[0.75rem]" "leading-[1.5]" "text-trading-muted"]}
         "Choose an approach. Until configured, this asset stays excluded from the run."])
      (when (:note card)
@@ -451,44 +223,93 @@
            (if (= 1 loading-count) " asset" " assets")
            " — cards update automatically when it finishes.")]]))
 
+(defn- section-trailing-status
+  "Collapsed-header status for the section: the one line that must carry the
+  whole story while the disclosure rests closed. Wrapped in
+  `optimizer-section-trailing` by the caller so it hides while open (the body
+  then shows the same facts in full)."
+  [{:keys [card-count configured-count loading-count]}]
+  (cond
+    (pos? loading-count)
+    {:label (str "Loading proxy history for " loading-count
+                 (if (= 1 loading-count) " asset…" " assets…"))
+     :tone "text-trading-muted"}
+
+    (zero? card-count)
+    {:label "None needed"
+     :tone "text-trading-muted/70"}
+
+    (= configured-count card-count)
+    {:label (str configured-count " of " card-count " configured")
+     :tone "text-success"}
+
+    :else
+    {:label (str (- card-count configured-count)
+                 (if (= 1 (- card-count configured-count))
+                   " asset needs setup"
+                   " assets need setup"))
+     :tone "text-warning"}))
+
 (defn history-assumptions-section
+  "Collapsed-by-exception disclosure panel. When every workflow asset is
+  configured the section rests as one summary line (\"History assumptions —
+  N of N configured\"); it forces itself :open whenever anything needs the
+  user (unconfigured cards, card errors, proxy history still loading) — a
+  machine condition, so re-asserting :open against the user's toggle is the
+  point, same shape as the More-goals drawer. Everything inside (agent IO
+  toolbar, picker, cards) is demoted with the body, never removed."
   [{:keys [state draft readiness history-load-state]}]
   (let [{:keys [cards addable-assets applicable? history-loading-count]
          :as cards-model}
         (optimizer-view-model/history-assumption-cards
          state draft readiness history-load-state
-         {:percent-label controls/percent-label})]
+         {:percent-label controls/percent-label})
+        card-count (count cards)
+        configured-count (count (filter #(= :configured (:status %)) cards))
+        loading-count (or history-loading-count 0)
+        needs-attention? (boolean (or (pos? loading-count)
+                                      (some #(not= :configured (:status %)) cards)
+                                      (some #(seq (:errors %)) cards)))
+        trailing (section-trailing-status {:card-count card-count
+                                           :configured-count configured-count
+                                           :loading-count loading-count})]
     (when (or applicable? (seq addable-assets))
-      (into [:section {:class ["optimizer-setup-panel" "border" "border-base-300"
-                               "bg-base-100/90" "p-3" "space-y-3"]
-                       :data-role "portfolio-optimizer-history-assumptions-section"}
-             [:div {:class ["flex" "items-start" "justify-between" "gap-3"]}
-              [:div {:class ["min-w-0"]}
-               [:p {:class controls/section-title-class}
-                "Proxy Workflow for Short-History Assets"]
-               [:p {:class ["mt-1" "text-[0.75rem]" "leading-[1.45]" "text-trading-muted"]}
-                "Define assumptions for assets whose return history you don't trust."]]
-              (when (seq cards)
-                [:span {:class ["shrink-0" "whitespace-nowrap" "font-mono" "text-[0.6875rem]"
-                                "text-trading-muted/70"]
-                        :data-role "portfolio-optimizer-history-assumptions-count"}
-                 (str (count cards)
-                      (if (= 1 (count cards))
-                        " asset in the workflow"
-                        " assets in the workflow"))])]
-             (loading-banner (or history-loading-count 0))
-             (recommendations/recommended-banner cards-model)
-             (assumptions-io/io-toolbar
-              {:asset-count (count cards)
-               :universe-count (+ (count cards) (count addable-assets))})
-             (assumptions-io/io-note
-              (get-in state contracts/ui-history-assumptions-io-note-path))
-             ;; The picker gets its OWN full-width row so the placeholder text is
-             ;; never clipped by the header's title/description competing for width.
-             (add-asset-select addable-assets)]
-            (concat
-             (map assumption-card-or-summary cards)
-             (when (empty? cards)
-               [[:p {:class ["text-[0.75rem]" "leading-[1.5]" "text-trading-muted"]
-                     :data-role "portfolio-optimizer-history-assumptions-empty"}
-                 "Nothing needs assumptions right now. Pick an asset above to model it as a basket of assets it behaves like - its returns are then driven by the basket plus specific risk instead of its own short history."]]))))))
+      [:details (cond-> {:class ["optimizer-setup-panel" "border" "border-base-300"
+                                 "bg-base-100/90" "p-3"]
+                         :data-role "portfolio-optimizer-history-assumptions-section"
+                         :id "portfolio-optimizer-history-assumptions-section"
+                         :replicant/key "history-assumptions-section"}
+                  needs-attention? (assoc :open true))
+       [:summary {:class ["cursor-pointer" "select-none" "focus:outline-none"
+                          "focus:text-warning"]}
+        [:div {:class ["flex" "items-center" "justify-between" "gap-3"]}
+         ;; Result vocabulary in the title ("History assumptions" — same concept
+         ;; the rail panel summarizes); the mechanism word "proxy" stays in the
+         ;; body (subtitle, "Proxy assets" field, picker).
+         [:p {:class controls/section-title-class} "History assumptions"]
+         ;; The count role only exists while assets are in the workflow (pinned
+         ;; contract); the zero-card resting label stays role-less.
+         [:span (cond-> {:class ["optimizer-section-trailing" "shrink-0" "whitespace-nowrap"
+                                 "font-mono" "text-[0.6875rem]" (:tone trailing)]}
+                  (pos? card-count)
+                  (assoc :data-role "portfolio-optimizer-history-assumptions-count"))
+          (:label trailing)]]]
+       (into [:div {:class ["mt-3" "space-y-3"]}
+              [:p {:class ["text-[0.75rem]" "leading-[1.45]" "text-trading-muted"]}
+               "Define assumptions for assets whose return history you don't trust."]
+              (loading-banner loading-count)
+              (recommendations/recommended-banner cards-model)
+              (assumptions-io/io-toolbar
+               {:asset-count card-count
+                :universe-count (+ card-count (count addable-assets))})
+              (assumptions-io/io-note
+               (get-in state contracts/ui-history-assumptions-io-note-path))
+              ;; The picker gets its OWN full-width row so the placeholder text is
+              ;; never clipped by the header's title/description competing for width.
+              (add-asset-select addable-assets)]
+             (concat
+              (map assumption-card-or-summary cards)
+              (when (empty? cards)
+                [[:p {:class ["text-[0.75rem]" "leading-[1.5]" "text-trading-muted"]
+                      :data-role "portfolio-optimizer-history-assumptions-empty"}
+                  "Nothing needs assumptions right now. Pick an asset above to model it as a basket of assets it behaves like - its returns are then driven by the basket plus specific risk instead of its own short history."]])))])))

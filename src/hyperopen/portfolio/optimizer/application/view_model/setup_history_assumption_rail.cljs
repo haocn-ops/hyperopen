@@ -1,7 +1,7 @@
 (ns hyperopen.portfolio.optimizer.application.view-model.setup-history-assumption-rail
-  "Right-rail summary projection over the history-assumption cards: compact
-  per-asset facts (final modeled basket first among the proxy facts), the
-  aggregate readiness line, and the results-disclosure note."
+  "Right-rail summary projection over the history-assumption cards: a one-line
+  summary per asset plus compact per-asset facts (final modeled basket first
+  among the proxy facts) for the expanded state."
   (:require [clojure.string :as str]
             [hyperopen.portfolio.optimizer.application.view-model.setup-history-assumption-cards :as assumption-cards]
             [hyperopen.portfolio.optimizer.application.view-model.setup-history-assumption-exposure :as exposure]))
@@ -22,13 +22,13 @@
     (exposure/observations-label observations)))
 
 (defn- rail-summary-pairs
+  ;; No "Status" pair: the row's own status chip already carries it, and a
+  ;; second textual restatement per asset was pure duplication (2026-07-10
+  ;; comprehension pass).
   [card]
   (let [proxy? (= :proxy (:mode card))
         final-rows (get-in card [:final-basket :rows])]
-    (->> [["Status" (if (:history-loading? card)
-                      "Loading history…"
-                      (:status-label card))]
-          ["Assumption mode" (or (:mode-label card) "Not chosen")]
+    (->> [["Assumption mode" (or (:mode-label card) "Not chosen")]
           (when proxy?
             ["Proxy assets" (if (seq (:selected-proxies card))
                               (str/join ", " (map :label (:selected-proxies card)))
@@ -57,9 +57,12 @@
          vec)))
 
 (defn history-assumption-rail-model
-  "Right-rail summary of every asset in the assumption workflow: compact
-  per-asset facts once configured, plus the aggregate readiness line and the
-  results-disclosure note."
+  "Right-rail summary of every asset in the assumption workflow: a one-line
+  summary per asset (the same line the center's collapsed card shows) with the
+  full compact facts behind it. No aggregate ready banner and no disclosure
+  note (2026-07-10): \"ready\" belongs to the run verdict + Data health, and
+  the results-disclosure fact already surfaces as the folded
+  :proxy-history-used data note."
   ([state draft readiness history-load-state]
    (history-assumption-rail-model state draft readiness history-load-state nil))
   ([state draft readiness history-load-state opts]
@@ -84,11 +87,9 @@
                      :mode (:mode card)
                      :configured? (:engine-applied? card)
                      :history-loading? (boolean (:history-loading? card))
+                     :summary (:summary card)
                      :summary-pairs (rail-summary-pairs card)})
                   cards)
       :all-configured? all-configured?
       :any-loading? any-loading?
-      :any-proxy? (boolean (some #(= :proxy (:mode %)) cards))
-      :ready-message (when all-configured?
-                       "All short-history assets have assumptions. Ready to run.")
-      :disclosure-note "Proxy assumptions are disclosed in results."})))
+      :configured-count (count (filter :engine-applied? cards))})))

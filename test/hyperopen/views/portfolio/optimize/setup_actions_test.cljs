@@ -171,3 +171,29 @@
                :result-path "/portfolio/optimize/draft"})]
     (is (nil? (ts/node-by-role node "portfolio-optimizer-view-results")))
     (is (nil? (ts/node-by-role node "portfolio-optimizer-view-rebalance")))))
+
+(deftest run-status-caution-verdict-turns-ready-pill-amber-test
+  ;; The unified verdict (2026-07-10): runnable-with-warnings must not read as
+  ;; a green "Ready to run" next to a visible warning (e.g. current exposure
+  ;; outside the configured policy) — the pill adopts the verdict's amber
+  ;; label while the Run CTA stays available.
+  (let [status (setup-actions/run-status {:run-triggerable? true
+                                          :running? false
+                                          :readiness {:runnable? true}
+                                          :asset-count 4
+                                          :verdict {:level :caution
+                                                    :label "Ready with 1 warning"
+                                                    :warning-count 1}})]
+    (is (true? (:ready? status)))
+    (is (= :caution (:tone status)))
+    (is (= "Ready with 1 warning" (:label status))))
+  ;; A ready verdict leaves the green pill exactly as before.
+  (let [status (setup-actions/run-status {:run-triggerable? true
+                                          :running? false
+                                          :readiness {:runnable? true}
+                                          :asset-count 4
+                                          :verdict {:level :ready
+                                                    :label "Ready to run"
+                                                    :warning-count 0}})]
+    (is (= :ready (:tone status)))
+    (is (= "Ready to run" (:label status)))))

@@ -88,6 +88,10 @@
   [readiness history-load-state]
   (setup/readiness-panel-model readiness history-load-state))
 
+(defn run-verdict
+  [readiness history-load-state opts]
+  (setup/run-verdict readiness history-load-state opts))
+
 (defn setup-summary-model
   ([draft]
    (setup/setup-summary-model draft))

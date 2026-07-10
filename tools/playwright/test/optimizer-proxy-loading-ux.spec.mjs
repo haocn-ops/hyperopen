@@ -159,8 +159,11 @@ test("portfolio optimizer proxy workflow surfaces in-flight history loading @reg
   await expect(railStatus).toContainText("Loading history");
   await expect(page.locator("[data-role='portfolio-optimizer-history-assumption-apply-perp:WLFI']"))
     .toBeDisabled();
-  await expect(page.locator("[data-role='portfolio-optimizer-history-assumptions-ready']"))
-    .toHaveCount(0);
+  // The rail header count must not pass a configured-verdict mid-flight (the
+  // old all-configured ready banner is gone; the count carries the gate now).
+  const railCount = page.locator("[data-role='portfolio-optimizer-history-assumptions-rail-count']");
+  await expect(railCount).toHaveAttribute("data-loading", "true");
+  await expect(railCount).toContainText("Loading history");
   expect(bundleRequests).toBeGreaterThan(0);
 
   // --- Release the response: the provisional loading labels settle to the
@@ -171,6 +174,10 @@ test("portfolio optimizer proxy workflow surfaces in-flight history loading @reg
   await expect(chip).not.toHaveAttribute("data-loading", "true");
   await expect(page.locator("[data-role='portfolio-optimizer-history-assumptions-loading-banner']"))
     .toHaveCount(0);
-  await expect(railStatus).toContainText("Configured");
+  // Configured settles to the glyph chip (aria-label "Configured") and the
+  // header count states the aggregate once.
+  await expect(railStatus).toContainText("✓");
   await expect(railStatus).not.toHaveAttribute("data-loading", "true");
+  await expect(railCount).toContainText("1 of 1 configured");
+  await expect(railCount).not.toHaveAttribute("data-loading", "true");
 });

@@ -1,5 +1,7 @@
 (ns hyperopen.views.portfolio.optimize.setup-context
-  (:require [hyperopen.portfolio.optimizer.application.view-model :as optimizer-view-model]
+  (:require [hyperopen.portfolio.optimizer.application.current-portfolio :as current-portfolio]
+            [hyperopen.portfolio.optimizer.application.view-model :as optimizer-view-model]
+            [hyperopen.portfolio.optimizer.application.view-model.exposure :as exposure-vm]
             [hyperopen.portfolio.routes :as portfolio-routes]
             [hyperopen.views.portfolio.optimize.optimization-progress-panel :as optimization-progress-panel]
             [hyperopen.views.portfolio.optimize.run-status-panel :as run-status-panel]
@@ -23,13 +25,52 @@
                    "text-trading-text"]}
     value]])
 
+(defn- exposure-policy-warning
+  "Amber card naming the side of the exposure policy the CURRENT portfolio
+  violates, with a plain fragment anchor to the exposure section (the
+  disclosure panels carry :id = data-role). This is the rail's half of the
+  unified verdict: the footer says \"Ready with N warnings\", this card says
+  which warning and where to act on it."
+  [{:keys [on-policy? gross-ok? net-ok?] :as preview}]
+  (when (and preview (false? on-policy?))
+    [:div {:class ["mt-2" "border" "border-warning/40" "bg-warning/10" "p-2"]
+           :data-role "portfolio-optimizer-exposure-policy-warning"}
+     [:p {:class ["text-[0.75rem]" "leading-[1.45]" "font-medium" "text-warning"]}
+      (cond
+        (and (not gross-ok?) (not net-ok?))
+        "Current gross and net exposure are outside the selected policy."
+        (not gross-ok?)
+        "Current gross exposure is outside the selected policy."
+        :else
+        "Current net exposure is outside the selected policy.")]
+     [:a {:href "#portfolio-optimizer-constraints-panel"
+          :class ["mt-1" "inline-block" "text-[0.6875rem]" "font-semibold"
+                  "text-warning" "underline" "underline-offset-2"]
+          :data-role "portfolio-optimizer-exposure-policy-warning-review"}
+      "Review exposure →"]]))
+
+(defn- verdict-value
+  "Colored Status value for the Run summary: the same run-verdict the footer
+  pill renders, so the rail and the run bar can never disagree about \"ready\"."
+  [{:keys [level label]}]
+  [:span {:class ["font-semibold"
+                  (case level
+                    :blocked "text-error"
+                    :caution "text-warning"
+                    :ready "text-success"
+                    "text-trading-muted")]
+          :data-role "portfolio-optimizer-run-summary-status"
+          :data-verdict (some-> level name)}
+   label])
+
 (defn- summary-card
-  "The scenario contract: the exact universe/objective/model/constraint policy the
-  solver will receive, as a labeled stack the user can verify at a glance instead
-  of inferring it from scattered controls. Derived output, not primary input.
-  While the holdings auto-seed is pending the Universe row says so — the rail is
-  where the user looks to confirm readiness, so it must reflect the wait."
-  [draft readiness]
+  "The Run summary: the exact universe/objective/model/constraint policy the
+  solver will receive plus the global verdict, as a labeled stack the user can
+  verify at a glance instead of inferring it from scattered controls. Derived
+  output, not primary input. While the holdings auto-seed is pending the
+  Universe row says so — the rail is where the user looks to confirm readiness,
+  so it must reflect the wait."
+  [draft readiness {:keys [history-data-label verdict exposure-preview]}]
   (let [{:keys [preset-label asset-count universe-source-kind objective-label
                 return-forecast-label risk-label exposure-rows]}
         (optimizer-view-model/setup-summary-card-model draft {:labelize controls/labelize})
@@ -37,7 +78,7 @@
     [:section {:class ["optimizer-setup-panel" "border" "border-base-300" "bg-base-100/90" "p-3"]
                :data-role "portfolio-optimizer-setup-summary-card"}
      [:div {:class ["flex" "items-baseline" "justify-between" "gap-2"]}
-      [:p {:class eyebrow-class} "Scenario contract"]
+      [:p {:class eyebrow-class} "Run summary"]
       [:span {:class ["font-mono" "text-[0.6875rem]" "uppercase" "tracking-[0.1em]"
                       "text-trading-muted/70"]}
        preset-label]]
@@ -57,8 +98,17 @@
       ;; model name.
       (contract-row "Return forecast" return-forecast-label)
       (contract-row "Risk model" risk-label)
+      ;; One compact provenance line ("70 native · 8 via assumptions") instead
+      ;; of restating each assumption — the assumptions panel below carries the
+      ;; per-asset detail.
+      (when history-data-label
+        (contract-row "History data"
+                      [:span {:data-role "portfolio-optimizer-run-summary-history-data"}
+                       history-data-label]))
       ;; Stacked exposure rows: four numbers the user must verify, one per
-      ;; line, instead of a single wrapping compressed string.
+      ;; line, instead of a single wrapping compressed string. These are the
+      ;; run's RECEIPT (what the solver is sent) — the current target readout
+      ;; lives in the center panel and is deliberately not repeated here.
       (contract-row "Exposure policy"
                     (into [:span {:class ["block" "font-mono" "text-[0.75rem]"
                                           "text-trading-muted"]
@@ -67,74 +117,92 @@
                                  [:span {:class ["flex" "justify-between" "gap-2"]}
                                   [:span {:class ["text-trading-muted/70"]} label]
                                   [:span value]]))
-                          exposure-rows))]]))
+                          exposure-rows))
+      (when verdict
+        (contract-row "Status" (verdict-value verdict)))]
+     (exposure-policy-warning exposure-preview)]))
+
+(defn- rail-assumption-row
+  "One-line disclosure per workflow asset: label + the same one-line summary
+  the center's collapsed card shows + the status chip; the full label/value
+  pairs sit behind the toggle. A row that still needs input renders forced
+  open so unfinished work stays visible (machine condition, so re-asserting
+  :open against the user's toggle is the point); complete and loading rows
+  rest closed — the detail is one click away, not deleted."
+  [{:keys [instrument-id label configured? history-loading? summary summary-pairs]}]
+  (let [needs-input? (and (not configured?) (not history-loading?))]
+    [:details (cond-> {:class ["border" "border-base-300" "bg-base-200/20"]
+                       :data-role (str "portfolio-optimizer-history-assumptions-rail-row-"
+                                       instrument-id)
+                       :replicant/key (str "history-assumptions-rail-row-" instrument-id)}
+                needs-input? (assoc :open true))
+     [:summary {:class ["flex" "cursor-pointer" "select-none" "items-center" "gap-2"
+                        "p-2" "focus:outline-none" "focus:text-warning"]}
+      [:span {:class ["shrink-0" "font-mono" "text-[0.75rem]" "font-semibold"]}
+       label]
+      [:span {:class ["min-w-0" "flex-1" "truncate" "text-[0.6875rem]"
+                      "text-trading-muted"]
+              :data-role (str "portfolio-optimizer-history-assumptions-rail-summary-"
+                              instrument-id)}
+       (or summary "Not configured yet")]
+      ;; While this asset's proxy history is still fetching, both "Configured"
+      ;; and "Needs input" are provisional verdicts - say loading until the
+      ;; fetch settles. Configured is a glyph (the row already says everything
+      ;; else); actionable states keep words.
+      [:span (cond-> {:class ["ml-auto" "shrink-0" "font-mono" "text-[0.625rem]"
+                              "uppercase" "tracking-[0.08em]"
+                              (when history-loading? "animate-pulse")
+                              (cond history-loading? "text-trading-muted"
+                                    configured? "text-success"
+                                    :else "text-warning")]
+                      :data-role (str "portfolio-optimizer-history-assumptions-rail-status-"
+                                      instrument-id)}
+               configured? (assoc :aria-label "Configured")
+               history-loading? (assoc :data-loading "true"))
+       (cond history-loading? "Loading history…"
+             configured? "✓"
+             :else "Needs input")]]
+     (into [:div {:class ["space-y-0.5" "border-t" "border-base-300" "p-2"]}]
+           (map (fn [[pair-label pair-value]]
+                  (contract-row pair-label pair-value)))
+           summary-pairs)]))
 
 (defn- history-assumptions-rail-panel
-  "Compact modeling summary for every asset in the assumption workflow: mode,
-  proxies, and the caps the engine will honor, plus the aggregate readiness line
-  and the results-disclosure note."
-  [state draft readiness history-load-state]
-  (let [{:keys [applicable? rows all-configured? any-proxy?
-                ready-message disclosure-note]}
-        (optimizer-view-model/history-assumption-rail-model state
-                                                            draft
-                                                            readiness
-                                                            history-load-state
-                                                            {:labelize controls/labelize
-                                                             :percent-label controls/percent-label})]
-    (when applicable?
-      [:section {:class ["optimizer-setup-panel" "border" "border-base-300"
-                         "bg-base-100/90" "p-3"]
-                 :data-role "portfolio-optimizer-history-assumptions-rail"
-                 :replicant/key "history-assumptions-rail"}
-       [:p {:class eyebrow-class} "History assumptions"]
-       ;; Height-capped and internally scrollable, same idiom as the Return
-       ;; views editor's optimizer-objective-view-rows: a universe with many
-       ;; thin-history assets otherwise grows this list without bound, which
-       ;; stretches the whole 3-column setup grid row (default CSS Grid
-       ;; align-items: stretch) and leaves the shorter columns trailing acres
-       ;; of empty panel background below their actual content.
-       (into [:div {:class ["optimizer-history-assumptions-rows" "min-h-0" "mt-2" "space-y-2"
-                            "overflow-x-hidden" "overflow-y-auto"]
-                    :data-role "portfolio-optimizer-history-assumptions-rail-rows"}]
-             (map (fn [{:keys [instrument-id label configured? history-loading?
-                               summary-pairs]}]
-                    [:div {:class ["border" "border-base-300" "bg-base-200/20" "p-2"]
-                           :data-role (str "portfolio-optimizer-history-assumptions-rail-row-"
-                                           instrument-id)}
-                     [:div {:class ["flex" "items-baseline" "justify-between" "gap-2"]}
-                      [:span {:class ["font-mono" "text-[0.75rem]" "font-semibold"]}
-                       label]
-                      ;; While this asset's proxy history is still fetching,
-                      ;; both "Configured" and "Needs input" are provisional
-                      ;; verdicts - say loading until the fetch settles.
-                      [:span (cond-> {:class ["font-mono" "text-[0.625rem]" "uppercase"
-                                              "tracking-[0.08em]"
-                                              (when history-loading? "animate-pulse")
-                                              (cond history-loading? "text-trading-muted"
-                                                    configured? "text-success"
-                                                    :else "text-warning")]
-                                      :data-role (str "portfolio-optimizer-history-assumptions-rail-status-"
-                                                      instrument-id)}
-                               history-loading? (assoc :data-loading "true"))
-                       (cond history-loading? "Loading history…"
-                             configured? "Configured"
-                             :else "Needs input")]]
-                     (into [:div {:class ["mt-1.5" "space-y-0.5"]}]
-                           (map (fn [[pair-label pair-value]]
-                                  (contract-row pair-label pair-value)))
-                           summary-pairs)]))
-             rows)
-       (when all-configured?
-         [:p {:class ["mt-2" "border" "border-success/40" "bg-success/10" "p-2"
-                      "text-[0.75rem]" "font-medium" "text-success"]
-              :data-role "portfolio-optimizer-history-assumptions-ready"}
-          ready-message])
-       (when any-proxy?
-         [:p {:class ["mt-2" "flex" "items-center" "gap-1.5" "border" "border-warning/30"
-                      "bg-warning/5" "p-2" "text-[0.6875rem]" "text-trading-muted"]
-              :data-role "portfolio-optimizer-history-assumptions-disclosure-note"}
-          disclosure-note])])))
+  "Per-asset modeling summary for the assumption workflow: one disclosure line
+  per asset with the compact facts behind it, and a configured-count in the
+  header. No aggregate ready banner — \"ready\" lives in the run verdict and
+  Data health only. While any proxy history is still fetching the count reads
+  loading (a configured-count judged against a not-yet-loaded usable set is
+  the same mid-flight falsehood the old ready banner gated on)."
+  [{:keys [applicable? rows configured-count any-loading?]}]
+  (when applicable?
+    [:section {:class ["optimizer-setup-panel" "border" "border-base-300"
+                       "bg-base-100/90" "p-3"]
+               :data-role "portfolio-optimizer-history-assumptions-rail"
+               :replicant/key "history-assumptions-rail"}
+     [:div {:class ["flex" "items-baseline" "justify-between" "gap-2"]}
+      [:p {:class eyebrow-class} "History assumptions"]
+      [:span (cond-> {:class ["font-mono" "text-[0.6875rem]" "tracking-[0.08em]"
+                              (cond any-loading? "text-trading-muted"
+                                    (= configured-count (count rows)) "text-success"
+                                    :else "text-warning")
+                              (when any-loading? "animate-pulse")]
+                      :data-role "portfolio-optimizer-history-assumptions-rail-count"}
+               any-loading? (assoc :data-loading "true"))
+       (if any-loading?
+         "Loading history…"
+         (str configured-count " of " (count rows) " configured"))]]
+     ;; Height-capped and internally scrollable, same idiom as the Return
+     ;; views editor's optimizer-objective-view-rows: a universe with many
+     ;; thin-history assets otherwise grows this list without bound, which
+     ;; stretches the whole 3-column setup grid row (default CSS Grid
+     ;; align-items: stretch) and leaves the shorter columns trailing acres
+     ;; of empty panel background below their actual content.
+     (into [:div {:class ["optimizer-history-assumptions-rows" "min-h-0" "mt-2" "space-y-1"
+                          "overflow-x-hidden" "overflow-y-auto"]
+                  :data-role "portfolio-optimizer-history-assumptions-rail-rows"}]
+           (map rail-assumption-row)
+           rows)]))
 
 (defn context-rail
   [{:keys [draft state readiness snapshot preview-snapshot run-state optimization-progress
@@ -161,6 +229,26 @@
         views-active? (= :black-litterman (get-in draft [:return-model :kind]))
         min-variance? (= :minimum-variance (get-in draft [:objective :kind]))
         readiness-model (optimizer-view-model/readiness-panel-model readiness history-load-state)
+        ;; Computed once for the whole rail: the assumptions panel rows, the
+        ;; Run-summary History-data line, and the unified verdict (the same
+        ;; run-verdict the footer pill consumes, so rail and run bar can never
+        ;; disagree about "ready").
+        rail-model (optimizer-view-model/history-assumption-rail-model
+                    state draft readiness history-load-state
+                    {:labelize controls/labelize
+                     :percent-label controls/percent-label})
+        assumption-count (count (:rows rail-model))
+        history-data-label (when (pos? assumption-count)
+                             (str (max 0 (- (count (:universe draft)) assumption-count))
+                                  " native · " assumption-count " via assumptions"))
+        exposure-preview (exposure-vm/exposure-preview
+                          {:current-exposure (exposure-vm/snapshot->current-exposure
+                                              (current-portfolio/current-portfolio-snapshot state))
+                           :constraints (:constraints draft)})
+        verdict (optimizer-view-model/run-verdict
+                 readiness history-load-state
+                 {:off-policy? (and exposure-preview
+                                    (false? (:on-policy? exposure-preview)))})
         snapshot-line (cond
                         (not (:snapshot-loaded? snapshot))
                         (if (= :manual (get-in preview-snapshot [:capital :source]))
@@ -181,7 +269,9 @@
                                "Portfolio snapshot and optimizer history loaded.")]
     [:aside {:class ["optimizer-context-rail" "min-h-0"]
              :data-role "portfolio-optimizer-right-rail"}
-     (summary-card draft readiness)
+     (summary-card draft readiness {:history-data-label history-data-label
+                                    :verdict verdict
+                                    :exposure-preview exposure-preview})
      ;; The full Return views editor renders only while the views-aware model is
      ;; live; when views are inert the section is demoted to the one-line note
      ;; below, so inactive functionality never competes with live warnings.
@@ -207,35 +297,32 @@
            :collapsible? true
            :open? true
            :description "Edit any return to save it as your view. Saved views override implied returns; the rest use the implied baseline."})]])
-     ;; Demoted inactive note: one line + the one-click way to make views
-     ;; matter. The whole Return-views slot (editor or note) sits ABOVE Data
-     ;; health so the rail order is stable across goals; the folded data notes
-     ;; keep the health section compact (owner review 2026-07-04).
+     ;; Demoted inactive note: a TRUE one-liner — eyebrow, status, and the
+     ;; one-click way to make views matter, on a single row. An inactive
+     ;; feature must not spend a titled section + explainer announcing that it
+     ;; is not in use (comprehension pass 2026-07-10). The whole Return-views
+     ;; slot (editor or note) sits ABOVE Data health so the rail order is
+     ;; stable across goals (owner review 2026-07-04).
      (when-not views-active?
        [:section {:class ["optimizer-setup-panel" "border" "border-base-300" "bg-base-100/90" "p-3"]
                   :data-role "portfolio-optimizer-assumptions-rail"
                   :replicant/key "return-views-inactive"}
-        [:div {:class ["flex" "items-baseline" "justify-between" "gap-2"]}
+        [:div {:class ["flex" "flex-wrap" "items-center" "gap-x-3" "gap-y-1.5"]}
          [:p {:class eyebrow-class} "Return views"]
-         [:span {:class ["font-mono" "text-[0.6875rem]" "uppercase" "tracking-[0.1em]"
-                         "text-trading-muted/50"]
+         [:span {:class ["min-w-0" "truncate" "text-[0.6875rem]" "text-trading-muted"]
                  :data-role "portfolio-optimizer-return-views-inactive"}
-          (if min-variance? "Not used by Minimum risk" "Not used")]]
-        [:p {:class ["mt-1.5" "text-[0.6875rem]" "leading-[1.4]" "text-trading-muted"]}
-         (if min-variance?
-           "Minimum risk ignores expected-return forecasts."
-           "This return model uses the historical estimate directly.")]
-        [:button {:type "button"
-                  :class ["mt-2" "border" "border-base-300" "bg-base-200/40" "px-2"
-                          "py-1" "text-[0.6875rem]" "font-semibold" "text-trading-muted"
-                          "hover:bg-base-200/60"]
-                  :data-role "portfolio-optimizer-return-views-activate"
-                  :on {:click (if min-variance?
-                                [[:actions/apply-portfolio-optimizer-setup-preset :max-sharpe]]
-                                [[:actions/set-portfolio-optimizer-return-model-kind
-                                  :black-litterman]])}}
-         (if min-variance? "Switch to Maximum Sharpe" "Use my views")]])
-     (history-assumptions-rail-panel state draft readiness history-load-state)
+          (if min-variance? "Not used by Minimum risk" "Not used")]
+         [:button {:type "button"
+                   :class ["ml-auto" "shrink-0" "border" "border-base-300" "bg-base-200/40"
+                           "px-2" "py-0.5" "text-[0.6875rem]" "font-semibold"
+                           "text-trading-muted" "hover:bg-base-200/60"]
+                   :data-role "portfolio-optimizer-return-views-activate"
+                   :on {:click (if min-variance?
+                                 [[:actions/apply-portfolio-optimizer-setup-preset :max-sharpe]]
+                                 [[:actions/set-portfolio-optimizer-return-model-kind
+                                   :black-litterman]])}}
+          (if min-variance? "Switch to Maximum Sharpe" "Use my views")]]])
+     (history-assumptions-rail-panel rail-model)
      (when status-visible?
        [:section {:class ["optimizer-setup-panel" "border-t" "border-base-300" "bg-base-100/90" "p-3"]
                   :data-role "portfolio-optimizer-trust-freshness-panel"

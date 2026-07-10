@@ -64,7 +64,20 @@ async function seedWorkflow(page) {
   await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
 }
 
+// The section is a collapsed-by-exception <details> (2026-07-10): it rests
+// closed when nothing needs attention, so toolbar interactions must open it
+// first. Re-checked before every interaction group because a state change can
+// legitimately re-collapse it (needs-attention transitioning true -> false
+// drops the forced :open).
+async function ensureAssumptionsOpen(page) {
+  const section = page.locator("[data-role='portfolio-optimizer-history-assumptions-section']");
+  if (!(await section.evaluate((el) => el.open))) {
+    await section.locator("summary").first().click();
+  }
+}
+
 async function importFile(page, name, contents) {
+  await ensureAssumptionsOpen(page);
   const [chooser] = await Promise.all([
     page.waitForEvent("filechooser"),
     page.click("[data-role='portfolio-optimizer-history-assumptions-import']")
@@ -80,8 +93,12 @@ test("portfolio optimizer history assumptions export/import round-trips an agent
   await visitRoute(page, "/portfolio/optimize/new");
   await seedWorkflow(page);
 
+  // One asset is in the workflow: the section's trailing status role exists
+  // exactly while the workflow is non-empty (its text now carries configured/
+  // needs-setup state rather than a raw count, so assert presence).
   await expect(page.locator("[data-role='portfolio-optimizer-history-assumptions-count']"))
-    .toContainText("1 asset in the workflow");
+    .toHaveCount(1);
+  await ensureAssumptionsOpen(page);
 
   // --- Export (workflow scope): the template carries the flagged asset, the
   // user-selected candidate menu, and the embedded agent instructions.
@@ -163,6 +180,9 @@ test("portfolio optimizer history assumptions export/import round-trips an agent
   // Assert on :coin — clj->js drops keyword namespaces, so the decoration key
   // :optimizer-history/instrument-id shadows :instrument-id in this JS view.
   expect((references ?? []).map((reference) => reference.coin)).toContain("SOL");
+  // The import may complete the card and let the section re-collapse; the
+  // card content is still there, one summary-click away.
+  await ensureAssumptionsOpen(page);
   await expect(page.locator("[data-role='portfolio-optimizer-history-assumption-rationale-perp:WLFI']"))
     .toContainText("Agent rationale: Anchor plus Solana ecosystem beta.");
   await expect(page.locator("[data-role='portfolio-optimizer-history-assumption-proxy-chip-perp:WLFI-perp:BTC']"))

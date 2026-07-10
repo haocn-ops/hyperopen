@@ -48,8 +48,11 @@
   "Pure derivation of the Run button + status-pill state from the run gate and
   readiness. The pill never reads green \"Ready to run\" while readiness is not
   runnable; instead it names the blocking reason so the CTA cannot contradict the
-  Readiness panel beside it."
-  [{:keys [run-triggerable? running? readiness asset-count]}]
+  Readiness panel beside it. `:verdict` (view-model run-verdict) folds in the
+  page-wide warning state: runnable-with-warnings reads as an amber
+  \"Ready with N warning(s)\" so a green pill can never sit next to a visible
+  warning (e.g. current exposure outside the configured policy)."
+  [{:keys [run-triggerable? running? readiness asset-count verdict]}]
   (let [runnable? (if (some? readiness)
                     (boolean (:runnable? readiness))
                     true)
@@ -57,6 +60,9 @@
     (cond
       running?
       {:ready? false :tone :busy :label "Optimizing"}
+
+      (and ready? (= :caution (:level verdict)))
+      {:ready? true :tone :caution :label (:label verdict)}
 
       ready?
       {:ready? true :tone :ready :label "Ready to run"}
@@ -100,7 +106,8 @@
    label])
 
 (defn setup-bottom-actions
-  [{:keys [draft readiness running? run-triggerable? saving-scenario? solved-run? result-path]}]
+  [{:keys [draft readiness running? run-triggerable? saving-scenario? solved-run?
+           result-path verdict]}]
   (let [asset-count (count (:universe draft))
         objective-copy (action-objective-label (get-in draft [:objective :kind]))
         model-copy (action-model-label (get-in draft [:return-model :kind])
@@ -108,7 +115,8 @@
         status (run-status {:run-triggerable? run-triggerable?
                             :running? running?
                             :readiness readiness
-                            :asset-count asset-count})
+                            :asset-count asset-count
+                            :verdict verdict})
         ready? (:ready? status)
         holdings-loading? (= :holdings-loading (:reason readiness))]
     [:section {:class ["optimizer-setup-actions"
@@ -180,10 +188,10 @@
                      "sm:justify-end"]
              :data-role "portfolio-optimizer-setup-bottom-actions-status-meta"
              :data-run-status (name (:tone status))}
-       (when ready?
+       (when (= :ready (:tone status))
          [:span {:class ["h-2" "w-2" "rounded-full" "bg-success"]
                  :aria-hidden "true"}])
-       (when (= :blocked (:tone status))
+       (when (contains? #{:blocked :caution} (:tone status))
          [:span {:class ["h-2" "w-2" "rounded-full" "bg-warning"]
                  :aria-hidden "true"}])
        [:span (:label status)]

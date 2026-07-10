@@ -125,11 +125,10 @@
      (when kicker
        [:p {:class ["mt-1.5" "font-mono" "text-[0.625rem]" "uppercase" "tracking-[0.16em]"
                     "text-trading-muted/70"]}
-        kicker])]
-    (when selected?
-      [:span {:class ["border" "border-base-300" "px-1.5" "py-0.5" "font-mono"
-                      "text-[0.625rem]" "uppercase" "tracking-[0.12em]" "text-trading-muted/70"]}
-       "active"])]])
+        kicker])]]])
+    ;; No "active" corner chip: the filled radio glyph, warning border/tint, and
+    ;; aria-pressed already say selected — a fourth signal was noise
+    ;; (comprehension pass 2026-07-10).
 
 (defn- secondary-goal-card
   "Compact goal card for the advanced targets (Target volatility / Target return):

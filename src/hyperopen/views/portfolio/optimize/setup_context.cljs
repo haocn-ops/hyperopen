@@ -1,6 +1,5 @@
 (ns hyperopen.views.portfolio.optimize.setup-context
-  (:require ["lucide/dist/esm/icons/asterisk.js" :default lucide-asterisk]
-            ["lucide/dist/esm/icons/circle-alert.js" :default lucide-circle-alert]
+  (:require ["lucide/dist/esm/icons/circle-alert.js" :default lucide-circle-alert]
             ["lucide/dist/esm/icons/circle-check.js" :default lucide-circle-check]
             ["lucide/dist/esm/icons/clock.js" :default lucide-clock]
             ["lucide/dist/esm/icons/history.js" :default lucide-history]
@@ -135,7 +134,7 @@
   reflect the wait. The exposure line reads the policy TARGET; the band
   numbers live in the exposure section itself."
   [draft readiness {:keys [history-data-label verdict exposure-preview]}]
-  (let [{:keys [asset-count objective-label risk-label exposure-target]}
+  (let [{:keys [asset-count objective-label exposure-target]}
         (optimizer-view-model/setup-summary-card-model draft {:labelize controls/labelize})
         holdings-loading? (= :holdings-loading (:reason readiness))]
     [:section {:class ["optimizer-setup-panel" "border" "border-base-300" "bg-base-100/90" "p-3"]
@@ -156,7 +155,6 @@
         (summary-row lucide-history "History data"
                      [:span {:data-role "portfolio-optimizer-run-summary-history-data"}
                       history-data-label]))
-      (summary-row lucide-asterisk "Risk model" risk-label)
       (when verdict
         (summary-row lucide-clock "Status" (verdict-value verdict)))]
      (exposure-policy-warning exposure-preview)]))

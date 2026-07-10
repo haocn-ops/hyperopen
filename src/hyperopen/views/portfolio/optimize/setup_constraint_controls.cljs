@@ -222,7 +222,7 @@
   the editable inputs then show the same numbers); the body is the EXISTING
   editable controls, roles and dispatches untouched. Never :open from state."
   [{:keys [icon title role rows body]}]
-  [:details {:class ["border" "border-base-300" "bg-base-200/20"]
+  [:details {:class ["flex-1" "border" "border-base-300" "bg-base-200/20"]
              :data-role role
              :replicant/key role}
    [:summary {:class ["optimizer-plain-summary" "cursor-pointer" "select-none" "p-2.5"
@@ -252,8 +252,8 @@
              :data-role "portfolio-optimizer-exposure-fine-tune"
              :replicant/key "exposure-fine-tune"}
    [:summary {:class ["optimizer-plain-summary" "flex" "cursor-pointer" "select-none"
-                      "justify-end" "focus:outline-none"]}
-    [:span {:class ["inline-flex" "items-center" "gap-1.5" "border"
+                      "focus:outline-none"]}
+    [:span {:class ["flex" "w-full" "items-center" "justify-between" "gap-1.5" "border"
                     "border-base-300" "bg-base-200/30" "px-3" "py-1.5"
                     "text-[0.75rem]" "font-medium" "text-trading-text"
                     "hover:border-warning/50"]}
@@ -352,17 +352,19 @@
            "Custom from holdings"]
           [:span {:class ["text-[0.6875rem]" "text-trading-muted"]}
            "Review before running"]])
-       (fine-tune-drawer exposure-model)
        ;; The resting view (designer mock, 2026-07-10): the pad with its large
-       ;; stacked readout beside it, and the two read-only constraint cards.
-       ;; Every canonical control keeps its single data-role — the cards' Edit
-       ;; state renders the exact rows the flat groups used to.
+       ;; stacked readout beside it, and the right column — Fine-tune control on
+       ;; top (its summary lines up with the pad's axis header), then the two
+       ;; read-only constraint cards flexing to close the column at the pad's
+       ;; bottom edge. Every canonical control keeps its single data-role — the
+       ;; cards' Edit state renders the exact rows the flat groups used to.
        [:div {:class ["grid" "grid-cols-1" "gap-3"
                       "lg:grid-cols-[minmax(0,1.15fr)_minmax(15rem,1fr)]"]}
         [:div {:class ["flex" "min-w-0" "items-stretch" "gap-4"]}
          (exposure-map/pad-frame exposure-model)
          (exposure-map/readout exposure-model)]
-        [:div {:class ["flex" "flex-col" "gap-3"]}
+        [:div {:class ["flex" "min-h-0" "flex-col" "gap-3"]}
+         (fine-tune-drawer exposure-model)
          (constraint-card
           {:icon lucide-shield
            :title "Risk guards"

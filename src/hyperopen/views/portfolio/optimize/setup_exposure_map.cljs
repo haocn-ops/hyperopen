@@ -311,7 +311,9 @@
   "The bounded pad with its axis frame — the one always-visible exposure
   control. Carries the section's exposure-map role."
   [model]
-  [:div {:class ["optimizer-exposure-map" "min-w-0" "flex-1"]
+  ;; The pad is aspect-ratio 1:1, so capping its width caps its height — the
+  ;; right column's fine-tune + two cards close at the same bottom edge.
+  [:div {:class ["optimizer-exposure-map" "min-w-0" "flex-1" "max-w-[19rem]"]
          :data-role "portfolio-optimizer-exposure-map"}
    (axis-frame (:axis model) (:zoom model) (exposure-pad model))])
 

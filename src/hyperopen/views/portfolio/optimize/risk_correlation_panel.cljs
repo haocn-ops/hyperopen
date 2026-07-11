@@ -57,6 +57,10 @@
                       ", minmax(0, 1fr))")]
     [:div {:class ["optimizer-risk-corr-grid"]
            :data-role (str "portfolio-optimizer-risk-corr-grid-" (name mode))
+           ;; Past ~12 columns the cells get narrow even at full card width;
+           ;; dense mode drops the cell/label type a step so the numbers
+           ;; keep fitting (CSS can't count grid columns).
+           :data-dense (when (> (count entries) 12) "true")
            :style {:grid-template-columns template}}
      (into [:div {:class ["contents"]}]
            (cons [:span {:class ["optimizer-risk-corr-corner"]}]

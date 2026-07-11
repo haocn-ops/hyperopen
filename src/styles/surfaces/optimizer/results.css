@@ -1895,6 +1895,23 @@
     background-color: var(--optimizer-surface-2);
   }
 
+  /* Dense mode (heatmaps past ~12 columns, flagged by the view): one type
+     step down and shorter cells so a 24-column matrix keeps its numbers
+     legible at full card width. */
+  .portfolio-optimizer
+    .optimizer-risk-corr-grid[data-dense="true"] .optimizer-risk-corr-cell {
+    height: 24px;
+    font-size: 8.5px;
+  }
+
+  .portfolio-optimizer
+    .optimizer-risk-corr-grid[data-dense="true"] .optimizer-risk-corr-col-label,
+  .portfolio-optimizer
+    .optimizer-risk-corr-grid[data-dense="true"] .optimizer-risk-corr-row-label {
+    font-size: 8.5px;
+    padding-right: 4px;
+  }
+
   .portfolio-optimizer .optimizer-risk-corr-cell[data-sign="positive"] {
     background-color: color-mix(in srgb,
                                 var(--optimizer-long) var(--corr-strength),

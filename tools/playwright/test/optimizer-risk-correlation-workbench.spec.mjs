@@ -199,17 +199,17 @@ test.describe("equal risk correlation view (workbench scenes)", () => {
     expect(heatmapBox.width).toBeGreaterThan(cardBox.width * 0.9);
   });
 
-  test("a 16-asset book caps the heatmap at 12 and says how many it dropped", async ({
+  test("a 28-asset book caps the heatmap at 24 and says how many it dropped", async ({
     page
   }) => {
-    const frame = await openScene(page, "correlation-capped-sixteen-assets");
+    const frame = await openScene(page, "correlation-capped-twenty-eight-assets");
     await frame
       .locator(role("portfolio-optimizer-risk-view-tab-correlation"))
       .click();
     const positionGrid = frame.locator(
       role("portfolio-optimizer-risk-corr-grid-position")
     );
-    await expect(positionGrid.locator("[data-diagonal='true']")).toHaveCount(12);
+    await expect(positionGrid.locator("[data-diagonal='true']")).toHaveCount(24);
     await expect(
       frame.locator(role("portfolio-optimizer-risk-corr-overflow"))
     ).toContainText("+ 4 more held assets not shown");

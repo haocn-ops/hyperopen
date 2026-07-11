@@ -6,9 +6,9 @@
   clicking an Allocation row OR picking from the breakdown tab's Change-asset
   select re-targets the per-asset contribution panel exactly as the app does
   (the correlation tab is the full-width heatmap alone). The other scenes
-  stress the states the mock doesn't draw: a 16-asset book whose heatmap caps
-  at 12 with the honest remainder line (while the Change-asset select still
-  offers all 16), and a degenerate zero-variance asset whose correlations
+  stress the states the mock doesn't draw: a 28-asset book whose heatmap caps
+  at 24 with the honest remainder line (while the Change-asset select still
+  offers all 28), and a degenerate zero-variance asset whose correlations
   render as em-dashes.
 
   Every fixture's :risk-contributions AND :risk-structure sections are
@@ -143,9 +143,10 @@
           [2 3] 0.22 [2 4] 0.05
           [3 4] 0.32}}))
 
-;; 16 held assets: the persisted matrix caps at 12 (largest |net share|) and
-;; the heatmap must say how many it dropped.
-(def ^:private capped-sixteen-result
+;; 28 held assets: the persisted matrix caps at 24 (largest |net share|) and
+;; the heatmap must say how many it dropped — also the full-width legibility
+;; stress (24 columns of cells in the card-wide grid).
+(def ^:private capped-twenty-eight-result
   (structured-result
    {:assets (vec
              (map-indexed (fn [idx symbol]
@@ -154,7 +155,9 @@
                                 (+ 0.04 (* 0.011 idx)))
                              (+ 0.3 (* 0.045 idx))])
                           ["BTC" "ETH" "SOL" "AVAX" "LINK" "ARB" "OP" "DOGE"
-                           "AAVE" "UNI" "INJ" "TIA" "MKR" "LDO" "NEAR" "SUI"]))
+                           "AAVE" "UNI" "INJ" "TIA" "MKR" "LDO" "NEAR" "SUI"
+                           "APT" "SEI" "JUP" "WLD" "PYTH" "ENA" "ONDO" "STX"
+                           "RUNE" "ATOM" "DOT" "FIL"]))
     :rho {}
     :rho-fallback 0.35}))
 
@@ -216,9 +219,9 @@
   [store]
   (results-scene store designer-parity-result))
 
-(portfolio/defscene correlation-capped-sixteen-assets
+(portfolio/defscene correlation-capped-twenty-eight-assets
   []
-  (static-card-scene capped-sixteen-result))
+  (static-card-scene capped-twenty-eight-result))
 
 (portfolio/defscene correlation-degenerate-column
   []

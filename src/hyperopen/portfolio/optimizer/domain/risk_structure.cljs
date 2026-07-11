@@ -34,9 +34,13 @@
 (def correlation-display-cap
   "Instruments kept in the persisted correlation matrix, largest |net share|
   first. Results persist per wallet (IndexedDB) and universes reach 88+
-  assets, so the full O(n^2) matrix is deliberately not stored; 12 columns is
-  also the most that renders legibly in the card's half-width heatmap."
-  12)
+  assets, so the full O(n^2) matrix is deliberately not stored. 24 columns is
+  what renders legibly now that the correlation tab gives the heatmap the
+  card's FULL width (2026-07-11 per-asset breakdown redesign — the old cap of
+  12 was sized for a half-width heatmap and, on an equal-risk book where
+  every |net share| is near-equal, dropped an essentially arbitrary subset of
+  the held assets)."
+  24)
 
 (def asset-variance-tolerance-factor
   "Relative floor for a usable per-asset variance: Sigma_ii must exceed this

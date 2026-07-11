@@ -54,14 +54,8 @@
         current-exposure (exposure-vm/snapshot->current-exposure
                           (current-portfolio/current-portfolio-snapshot state))
         ;; One global verdict for the footer pill (the rail computes the same
-        ;; one from the same inputs): readiness + exposure-policy compliance.
-        exposure-preview (exposure-vm/exposure-preview
-                          {:current-exposure current-exposure
-                           :constraints (:constraints draft)})
-        verdict (optimizer-view-model/run-verdict
-                 readiness history-load-state
-                 {:off-policy? (and exposure-preview
-                                    (false? (:on-policy? exposure-preview)))})]
+        ;; one from the same readiness inputs).
+        verdict (optimizer-view-model/run-verdict readiness history-load-state)]
     (into
      [:main {:class ["optimizer-policy-pane" "space-y-4" "leading-4"]
              :data-role "portfolio-optimizer-setup-policy-pane"}

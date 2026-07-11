@@ -190,17 +190,13 @@
 
 (defn run-verdict
   "Global run verdict shared by the footer status pill and the rail Run-summary
-  Status row — ONE vocabulary for \"ready\". Data health supplies the readiness
-  side; `:off-policy?` folds in exposure-policy compliance (the current
-  portfolio sits outside the configured gross/net bands), which is a
-  constraints fact and deliberately NOT injected into readiness `:warnings`
-  (raw readiness lists feed the history-status/assumption-card projections).
-  Green means nothing needs review; anything reviewable turns the verdict into
-  an amber \"Ready with N warning(s)\" instead of letting a green \"Ready to
-  run\" contradict a visible warning elsewhere on the page."
-  [readiness history-load-state {:keys [off-policy?]}]
+  Status row — ONE vocabulary for \"ready\", derived from Data health readiness
+  alone. Green means nothing needs review; anything reviewable turns the
+  verdict into an amber \"Ready with N warning(s)\" instead of letting a green
+  \"Ready to run\" contradict a visible warning elsewhere on the page."
+  [readiness history-load-state]
   (let [{:keys [level issue-count]} (:status (readiness-panel-model readiness history-load-state))
-        warning-count (+ (or issue-count 0) (if off-policy? 1 0))]
+        warning-count (or issue-count 0)]
     (cond
       (= :loading level)
       {:level :loading :label "Loading…" :warning-count warning-count}

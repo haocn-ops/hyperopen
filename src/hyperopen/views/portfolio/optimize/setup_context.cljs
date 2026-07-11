@@ -6,11 +6,8 @@
             ["lucide/dist/esm/icons/loader-circle.js" :default lucide-loader-circle]
             ["lucide/dist/esm/icons/scaling.js" :default lucide-scaling]
             ["lucide/dist/esm/icons/target.js" :default lucide-target]
-            ["lucide/dist/esm/icons/triangle-alert.js" :default lucide-triangle-alert]
             ["lucide/dist/esm/icons/waypoints.js" :default lucide-waypoints]
-            [hyperopen.portfolio.optimizer.application.current-portfolio :as current-portfolio]
             [hyperopen.portfolio.optimizer.application.view-model :as optimizer-view-model]
-            [hyperopen.portfolio.optimizer.application.view-model.exposure :as exposure-vm]
             [hyperopen.portfolio.routes :as portfolio-routes]
             [hyperopen.views.portfolio.optimize.optimization-progress-panel :as optimization-progress-panel]
             [hyperopen.views.portfolio.optimize.run-status-panel :as run-status-panel]
@@ -38,37 +35,11 @@
   ;; Shared helper (setup-controls) — icons themselves stay per-ns requires.
   controls/lucide-icon)
 
-(defn- exposure-policy-warning
-  "Amber card naming the side of the exposure policy the CURRENT portfolio
-  violates, with a plain fragment anchor to the exposure section (the
-  disclosure panels carry :id = data-role). This is the rail's half of the
-  unified verdict: the footer says \"Ready with N warnings\", this card says
-  which warning and where to act on it."
-  [{:keys [on-policy? gross-ok? net-ok?] :as preview}]
-  (when (and preview (false? on-policy?))
-    [:div {:class ["mt-3" "border" "border-warning/40" "bg-warning/10" "p-2.5"]
-           :data-role "portfolio-optimizer-exposure-policy-warning"}
-     [:div {:class ["flex" "items-start" "gap-2"]}
-      (lucide-icon lucide-triangle-alert ["mt-0.5" "text-warning"])
-      [:p {:class ["min-w-0" "text-[0.75rem]" "leading-[1.5]" "text-warning"]}
-       (cond
-         (and (not gross-ok?) (not net-ok?))
-         "Current gross and net exposure are outside the selected policy."
-         (not gross-ok?)
-         "Current gross exposure is outside the selected policy."
-         :else
-         "Current net exposure is outside the selected policy.")]]
-     [:div {:class ["mt-1" "text-right"]}
-      [:a {:href "#portfolio-optimizer-constraints-panel"
-           :class ["text-[0.75rem]" "font-semibold" "text-warning" "hover:underline"]
-           :data-role "portfolio-optimizer-exposure-policy-warning-review"}
-       "Review warning →"]]]))
-
 (defn- verdict-value
   "Status value for the Run summary: the same run-verdict the footer pill
   renders, so the rail and the run bar can never disagree about \"ready\".
-  Runnable states carry a green check and plain text (the warning card below
-  owns the amber); blocked gets the red alert, loading a spinner."
+  Runnable states carry a green check and plain text; blocked gets the red
+  alert, loading a spinner."
   [{:keys [level label]}]
   [:span {:class ["inline-flex" "min-w-0" "items-center" "justify-end" "gap-1.5"]
           :data-role "portfolio-optimizer-run-summary-status"
@@ -116,7 +87,7 @@
   so — the rail is where the user looks to confirm readiness, so it must
   reflect the wait. The exposure line reads the policy TARGET; the band
   numbers live in the exposure section itself."
-  [draft readiness {:keys [history-data-label verdict exposure-preview]}]
+  [draft readiness {:keys [history-data-label verdict]}]
   (let [{:keys [asset-count objective-label exposure-target]}
         (optimizer-view-model/setup-summary-card-model draft {:labelize controls/labelize})
         holdings-loading? (= :holdings-loading (:reason readiness))]
@@ -139,8 +110,7 @@
                      [:span {:data-role "portfolio-optimizer-run-summary-history-data"}
                       history-data-label]))
       (when verdict
-        (summary-row lucide-clock "Status" (verdict-value verdict)))]
-     (exposure-policy-warning exposure-preview)]))
+        (summary-row lucide-clock "Status" (verdict-value verdict)))]]))
 
 (defn- rail-assumption-row
   "One-line disclosure per workflow asset: label + the same one-line summary
@@ -261,14 +231,7 @@
         history-data-label (when (pos? assumption-count)
                              (str (max 0 (- (count (:universe draft)) assumption-count))
                                   " native · " assumption-count " modeled"))
-        exposure-preview (exposure-vm/exposure-preview
-                          {:current-exposure (exposure-vm/snapshot->current-exposure
-                                              (current-portfolio/current-portfolio-snapshot state))
-                           :constraints (:constraints draft)})
-        verdict (optimizer-view-model/run-verdict
-                 readiness history-load-state
-                 {:off-policy? (and exposure-preview
-                                    (false? (:on-policy? exposure-preview)))})
+        verdict (optimizer-view-model/run-verdict readiness history-load-state)
         snapshot-line (cond
                         (not (:snapshot-loaded? snapshot))
                         (if (= :manual (get-in preview-snapshot [:capital :source]))
@@ -290,8 +253,7 @@
     [:aside {:class ["optimizer-context-rail" "min-h-0"]
              :data-role "portfolio-optimizer-right-rail"}
      (summary-card draft readiness {:history-data-label history-data-label
-                                    :verdict verdict
-                                    :exposure-preview exposure-preview})
+                                    :verdict verdict})
      ;; The full Return views editor renders only while the views-aware model is
      ;; live; when views are inert the section is demoted to the one-line note
      ;; below, so inactive functionality never competes with live warnings.

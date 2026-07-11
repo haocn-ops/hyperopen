@@ -99,7 +99,17 @@
     (testing "risk/return context is the card's second tab, never a frontier"
       (is (some? (node-by-role view-node "portfolio-optimizer-risk-return-context")))
       (is (some? (node-by-role view-node "portfolio-optimizer-risk-return-target")))
-      (is (some #(str/includes? % "did not affect the Equal Risk allocation") strings)))
+      (is (some #(str/includes? % "did not determine the Equal Risk allocation") strings)))
+    (testing "the risk/return tab is a real chart (designer spec 2026-07-11)"
+      (is (some? (node-by-role view-node "portfolio-optimizer-risk-return-svg")))
+      (is (some? (node-by-role view-node "portfolio-optimizer-risk-return-zero-line")))
+      (is (some? (node-by-role view-node "portfolio-optimizer-risk-return-crosshair"))
+          "the dashed crosshair drops through the current book's volatility")
+      (is (some? (node-by-role view-node "portfolio-optimizer-risk-return-current")))
+      (is (some? (node-by-role view-node "portfolio-optimizer-risk-return-legend")))
+      (is (some? (node-by-role view-node "portfolio-optimizer-risk-return-current-box")))
+      (is (some? (node-by-role view-node "portfolio-optimizer-risk-return-recommended-box")))
+      (is (some? (node-by-role view-node "portfolio-optimizer-risk-return-context-box"))))
     (testing "the why-card speaks in risk contributions"
       (is (some? (node-by-role view-node "portfolio-optimizer-equal-risk-context")))
       (is (nil? (node-by-role view-node "portfolio-optimizer-target-context")))

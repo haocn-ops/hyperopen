@@ -1482,10 +1482,173 @@
     color: var(--optimizer-text-3);
   }
 
-  /* Scatter plot frame inside the RISK / RETURN tab. */
-  .portfolio-optimizer .optimizer-risk-balance-plot {
+  /* ── RISK / RETURN tab (designer spec 2026-07-11) ──────────────────
+     Header line + context boxes above the chart, legend below it. The
+     chart itself is SVG sharing the frontier chart's chrome; only its
+     HTML frame is styled here. */
+  .portfolio-optimizer .optimizer-risk-return-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 4px 16px;
+  }
+
+  .portfolio-optimizer .optimizer-risk-return-title-wrap {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+  }
+
+  .portfolio-optimizer .optimizer-risk-return-title {
+    font-family: "JetBrains Mono", var(--font-mono);
+    font-size: 9.5px;
+    font-weight: 650;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--optimizer-text-2);
+  }
+
+  .portfolio-optimizer .optimizer-risk-return-info {
+    font-size: 10px;
+    color: var(--optimizer-text-3);
+    cursor: help;
+  }
+
+  .portfolio-optimizer .optimizer-risk-return-note {
+    font-size: 11px;
+    line-height: 1.4;
+    color: var(--optimizer-text-2);
+  }
+
+  .portfolio-optimizer .optimizer-risk-return-boxes {
+    margin-top: 10px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 8px;
+  }
+
+  .portfolio-optimizer .optimizer-risk-return-box {
     border: 1px solid var(--optimizer-border);
     background-color: var(--optimizer-bg);
+    padding: 9px 12px 10px;
+  }
+
+  .portfolio-optimizer .optimizer-risk-return-box--recommended {
+    border-color: color-mix(in srgb, var(--optimizer-long) 45%, transparent);
+  }
+
+  .portfolio-optimizer
+    .optimizer-risk-return-box--recommended
+    .optimizer-risk-return-box-title {
+    color: var(--optimizer-long);
+  }
+
+  .portfolio-optimizer .optimizer-risk-return-box-title {
+    font-family: "JetBrains Mono", var(--font-mono);
+    font-size: 9.5px;
+    font-weight: 650;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--optimizer-text-3);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .portfolio-optimizer .optimizer-risk-return-box-stats {
+    margin-top: 6px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 18px;
+  }
+
+  .portfolio-optimizer .optimizer-risk-return-box-label {
+    font-family: "JetBrains Mono", var(--font-mono);
+    font-size: 8.5px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--optimizer-text-3);
+  }
+
+  .portfolio-optimizer .optimizer-risk-return-box-value {
+    margin-top: 3px;
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+
+  .portfolio-optimizer .optimizer-risk-return-box-value--vol {
+    color: var(--optimizer-target);
+  }
+
+  .portfolio-optimizer .optimizer-risk-return-box-value--ret {
+    color: var(--optimizer-long);
+  }
+
+  .portfolio-optimizer .optimizer-risk-return-box-body {
+    margin-top: 6px;
+    font-size: 11px;
+    line-height: 1.45;
+    color: var(--optimizer-text-2);
+  }
+
+  /* Legend: asset icons (capped with an honest overflow count) plus the
+     two portfolio-marker swatches — a ring with a core dot, matching the
+     SVG markers. */
+  .portfolio-optimizer .optimizer-risk-return-legend {
+    margin-top: 4px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 6px 14px;
+    font-size: 10.5px;
+    color: var(--optimizer-text-2);
+  }
+
+  .portfolio-optimizer .optimizer-risk-return-legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .portfolio-optimizer .optimizer-risk-return-legend-icon {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    border: 1px solid var(--optimizer-border-strong);
+    background-color: var(--optimizer-surface-3);
+  }
+
+  .portfolio-optimizer .optimizer-risk-return-legend-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: var(--optimizer-text-3);
+  }
+
+  .portfolio-optimizer .optimizer-risk-return-legend-more {
+    color: var(--optimizer-text-3);
+  }
+
+  .portfolio-optimizer .optimizer-risk-return-legend-swatch {
+    width: 12px;
+    height: 12px;
+    box-sizing: border-box;
+    border-radius: 50%;
+    border: 1.5px solid var(--optimizer-text);
+    background: radial-gradient(circle,
+                                var(--optimizer-text) 0 2px,
+                                transparent 2.5px);
+  }
+
+  .portfolio-optimizer .optimizer-risk-return-legend-swatch--recommended {
+    border-color: var(--optimizer-long);
+    background: radial-gradient(circle,
+                                var(--optimizer-long) 0 2px,
+                                transparent 2.5px);
   }
 
   /* ── "Why this risk allocation" icon cards ──────────────────── */

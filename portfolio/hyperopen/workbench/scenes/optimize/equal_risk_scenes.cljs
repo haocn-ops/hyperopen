@@ -23,15 +23,18 @@
 
 (defn- equal-risk-result
   "Solved-result fixture for the card: `rows` are
-  [symbol weight share current-share target-share]."
-  [{:keys [rows quality rms max-abs freedom solver-extra diagnostics]}]
+  [symbol weight share current-share target-share]. `overrides` shallow-merges
+  over the finished result — pass COMPLETE replacement values (a partial
+  nested map replaces the whole key; deep-merge traps live here)."
+  [{:keys [rows quality rms max-abs freedom solver-extra diagnostics overrides]}]
   (let [symbols (mapv first rows)
         ids (mapv (comp instrument-id first) rows)
         weights (mapv second rows)
         shares (mapv #(nth % 2) rows)
         currents (mapv #(nth % 3) rows)
         targets (mapv #(nth % 4) rows)]
-    {:status :solved
+    (merge
+     {:status :solved
      :as-of-ms 1752200000000
      :solver {:strategy :sequential-equal-risk
               :objective-kind :equal-risk}
@@ -79,19 +82,25 @@
                                {:seed-kind :inverse-volatility :status :completed
                                 :objective 2.1e-4 :converged? true}]}
             solver-extra)
-     :diagnostics (merge {:gross-exposure 1.0
-                          :net-exposure 0.5
-                          :long-exposure 0.75
-                          :short-exposure 0.25
-                          :binding-constraints
-                          [{:instrument-id (first ids)
-                            :constraint :upper-bound
-                            :weight (second (first rows))
-                            :bound (second (first rows))}]}
-                         diagnostics)}))
+      :diagnostics (merge {:gross-exposure 1.0
+                           :net-exposure 0.5
+                           :long-exposure 0.75
+                           :short-exposure 0.25
+                           :binding-constraints
+                           [{:instrument-id (first ids)
+                             :constraint :upper-bound
+                             :weight (second (first rows))
+                             :bound (second (first rows))}]}
+                          diagnostics)}
+     overrides)))
 
 ;; The mock's book: 3 long / 2 short, per-side signed targets (the designer's
 ;; reading), deviations within a few points, gray current circles further out.
+;; The overrides carry the RISK / RETURN mock's exact portfolio points
+;; (current 298.88% / 853.23%, recommended 301.47% / 841.91%) and its five
+;; labeled standalone assets, so the tab can be pixel-compared against the
+;; 2026-07-11 designer spec. Equity-index ids use their real dex namespaces
+;; so asset icons resolve.
 (def ^:private designer-parity-result
   (equal-risk-result
    {:rows [["BTC" 0.30 0.231 0.302 0.20]
@@ -105,7 +114,35 @@
     :freedom {:status :limited
               :free-degrees 2
               :binding-count 2
-              :books {:long 3 :short 2}}}))
+              :books {:long 3 :short 2}}
+    :overrides
+    {:volatility 3.0147
+     :expected-return 8.4191
+     :current-volatility 2.9888
+     :current-expected-return 8.5323
+     :performance {:in-sample-sharpe 2.79}
+     :current-performance {:in-sample-sharpe 2.86}
+     :frontier-overlays
+     {:standalone [{:instrument-id "perp:SOL"
+                    :label "SOL"
+                    :volatility 2.35
+                    :expected-return 10.1}
+                   {:instrument-id "perp:BTC"
+                    :label "BTC"
+                    :volatility 4.42
+                    :expected-return 8.05}
+                   {:instrument-id "perp:ETH"
+                    :label "ETH"
+                    :volatility 3.55
+                    :expected-return 5.1}
+                   {:instrument-id "perp:xyz:SP500"
+                    :label "SP500"
+                    :volatility 1.02
+                    :expected-return 4.55}
+                   {:instrument-id "perp:xyz:MSTR"
+                    :label "MSTR"
+                    :volatility 3.32
+                    :expected-return -3.4}]}}}))
 
 ;; The real engine's uniform +1/n target on a hedged book: hedges sit far
 ;; below target and the deviation column must say so honestly.

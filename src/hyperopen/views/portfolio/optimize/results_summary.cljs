@@ -1,5 +1,7 @@
 (ns hyperopen.views.portfolio.optimize.results-summary
   (:require [clojure.string :as str]
+            [hyperopen.portfolio.optimizer.application.view-model.equal-risk-results
+             :as equal-risk-results]
             [hyperopen.portfolio.optimizer.application.view-model.results :as results-model]
             [hyperopen.views.portfolio.optimize.format :as opt-format]))
 
@@ -81,9 +83,12 @@
   convention: lower volatility and higher return are good). Falls back to non-delta
   phrasing when there is no current baseline.
 
-  `deltas` is the map produced by scenario-detail-view's `recommendation-deltas`."
+  `deltas` is the map produced by scenario-kpi-strip's `recommendation-deltas`;
+  `:objective-body`, when present, replaces the vol/return sentence with
+  objective-specific copy (Equal Risk supplies its balance framing, including
+  the constraint-determined case)."
   [{:keys [target-vol vol-delta target-return return-delta trade-count
-           blocked-count at-target?]}]
+           blocked-count at-target? objective-body]}]
   (let [vol-clause (if (opt-format/finite-number? vol-delta)
                      (str "estimated volatility " (opt-format/format-pct target-vol)
                           " (" (opt-format/format-pct-delta vol-delta) " vs current)")
@@ -92,7 +97,8 @@
                         (str "expected return " (opt-format/format-pct target-return)
                              " (" (opt-format/format-pct-delta return-delta) " vs current)")
                         (str "an estimated " (opt-format/format-pct target-return) " expected return"))
-        body (str "Targets " vol-clause " and " return-clause ".")
+        body (or objective-body
+                 (str "Targets " vol-clause " and " return-clause "."))
         trades-clause (cond
                         (not (opt-format/finite-number? trade-count)) nil
                         ;; Sendable trades only. An all-blocked plan is NOT "at
@@ -213,6 +219,55 @@
             [:p {:class ["mt-1" "text-xs" "text-trading-muted"]}
              "None — the target sits inside your constraints."])]]))))
 
+(defn equal-risk-context-card
+  "Why this risk allocation: the Equal Risk replacement for the Why-this-target
+  card — book shape, the equal per-asset target, the largest risk CONTRIBUTOR
+  (more relevant to this objective than the largest weight), allocation
+  freedom, and the binding limits. Facts only, all from the run result."
+  [result]
+  (when-let [model (equal-risk-results/balance-model result)]
+    (let [weights (:target-weights-by-instrument result)
+          labels (:labels-by-instrument result)
+          bindings (get-in result [:diagnostics :binding-constraints])
+          {:keys [asset-count longs shorts]} (target-shape weights)
+          largest (when (seq (:rows model))
+                    (apply max-key #(or (:share %) ##-Inf) (:rows model)))
+          freedom (equal-risk-results/freedom-view
+                   (equal-risk-results/allocation-freedom result))]
+      [:section {:class ["optimizer-target-context" "rounded-xl" "border"
+                         "border-base-300" "bg-base-100/95" "p-4"]
+                 :data-role "portfolio-optimizer-equal-risk-context"}
+       [:p {:class ["optimizer-target-context-title" "font-mono" "text-[0.62rem]"
+                    "uppercase" "tracking-[0.08em]" "text-trading-muted/70"]}
+        "Why this risk allocation"]
+       [:div {:class ["mt-3" "grid" "grid-cols-1" "gap-2" "sm:grid-cols-2"]}
+        (context-fact "portfolio-optimizer-equal-risk-context-shape"
+                      "Book shape"
+                      (str longs " long · " shorts " short of " asset-count " assets"))
+        (context-fact "portfolio-optimizer-equal-risk-context-target"
+                      "Equal target"
+                      (str (opt-format/format-pct (:target-share model)) " per asset"))
+        (context-fact "portfolio-optimizer-equal-risk-context-largest"
+                      "Largest risk contributor"
+                      (if largest
+                        (str (context-label labels (:instrument-id largest))
+                             " · " (opt-format/format-pct (:share largest))
+                             " · " (equal-risk-results/format-signed-pts
+                                    (:deviation-pts largest))
+                             " vs target")
+                        "—"))
+        (context-fact "portfolio-optimizer-equal-risk-context-freedom"
+                      "Allocation freedom"
+                      (str (:label freedom) " — " (:detail freedom)))]
+       [:div {:class ["mt-2"]
+              :data-role "portfolio-optimizer-equal-risk-context-limits"}
+        [:span {:class ["optimizer-target-context-label"]} "Limits hit"]
+        (if (seq bindings)
+          (into [:div {:class ["mt-1" "flex" "flex-wrap" "gap-1.5"]}]
+                (map (partial binding-limit-row labels) bindings))
+          [:p {:class ["mt-1" "text-xs" "text-trading-muted"]}
+           "None — the balance sits inside your constraints."])]])))
+
 (defn- history-lookback-label
   [result]
   (let [summary (:history-summary result)
@@ -244,7 +299,14 @@
       "Run Assumptions"]
      [:div {:class ["mt-3" "grid" "grid-cols-2" "gap-2" "xl:grid-cols-5"]}
       (compact-fact "Objective" (opt-format/keyword-label objective-kind))
-      (compact-fact "Return Model" (opt-format/keyword-label (:return-model result)))
+      (compact-fact "Return Model"
+                    ;; Equal Risk never uses returns to size positions — say so
+                    ;; where the model is named, or users will assume the
+                    ;; historical mean drove the weights.
+                    (if (= :equal-risk objective-kind)
+                      (str (opt-format/keyword-label (:return-model result))
+                           " · analytics only")
+                      (opt-format/keyword-label (:return-model result))))
       (compact-fact "Risk Model" (opt-format/keyword-label (:risk-model result)))
       (compact-fact "Lookback" (history-lookback-label result))
       (compact-fact "Funding" (funding-assumption-label result))]]))

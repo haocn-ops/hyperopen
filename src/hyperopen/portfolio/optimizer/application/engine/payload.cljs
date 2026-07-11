@@ -1,14 +1,14 @@
 (ns hyperopen.portfolio.optimizer.application.engine.payload
   (:require [clojure.string :as str]
             [hyperopen.portfolio.optimizer.application.display-frontier :as display-frontier]
+            [hyperopen.portfolio.optimizer.application.engine.equal-risk-payload
+             :as equal-risk-payload]
             [hyperopen.portfolio.optimizer.application.engine.target-selection :as target-selection]
             [hyperopen.portfolio.optimizer.application.instrument-labels :as instrument-labels]
             [hyperopen.portfolio.optimizer.domain.diagnostics :as diagnostics]
-            [hyperopen.portfolio.optimizer.domain.equal-risk :as equal-risk]
             [hyperopen.portfolio.optimizer.domain.frontier-overlays :as frontier-overlays]
             [hyperopen.portfolio.optimizer.domain.math :as math]
             [hyperopen.portfolio.optimizer.domain.rebalance :as rebalance]
-            [hyperopen.portfolio.optimizer.domain.risk-contributions :as risk-contributions]
             [hyperopen.portfolio.optimizer.domain.weight-cleaning :as weight-cleaning]
             [hyperopen.portfolio.optimizer.coercion :as coercion]))
 
@@ -55,31 +55,11 @@
      :dropped (:dropped cleaned)}))
 
 (defn- equal-risk-sections
-  "The :risk-contributions and :equal-risk-solver payload sections plus any
-  warnings, ALL computed from the FINAL published target weights (never the
-  raw solver candidate). Quality gates :exact on solver convergence."
-  [request risk-result selection instrument-ids target-weights]
+  "Equal-risk payload sections (see engine.equal-risk-payload); nil for every
+  other objective."
+  [request sections-inputs]
   (when (equal-risk-request? request)
-    (let [n (count instrument-ids)
-          targets (vec (repeat n (/ 1 n)))
-          solver-metadata (get-in selection [:selected :equal-risk])
-          converged? (boolean (:converged? solver-metadata))
-          summary (risk-contributions/contribution-summary
-                   {:instrument-ids instrument-ids
-                    :covariance (:covariance risk-result)
-                    :weights target-weights
-                    :targets targets})]
-      (if (not= :ok (:status summary))
-        {:warnings [{:code :equal-risk-contributions-unavailable
-                     :message "Risk contributions could not be computed for the published weights (degenerate portfolio variance)."}]}
-        (let [quality (equal-risk/classify-quality summary n converged?)]
-          {:risk-contributions (-> summary
-                                   (dissoc :status)
-                                   (assoc :quality quality))
-           :equal-risk-solver solver-metadata
-           :warnings (when (= :not-converged quality)
-                       [{:code :equal-risk-not-converged
-                         :message "Equal Risk stopped at its iteration limit before converging - showing the best feasible portfolio found. Risk contributions are labeled Not converged."}])})))))
+    (equal-risk-payload/equal-risk-sections sections-inputs)))
 
 (defn- normalized-instruments-by-id
   [universe]
@@ -357,10 +337,13 @@
                           (math/portfolio-return target-weights expected-returns))
         volatility (sqrt (math/portfolio-variance target-weights (:covariance risk-result)))
         equal-risk-sections* (equal-risk-sections request
-                                                  risk-result
-                                                  selection
-                                                  instrument-ids
-                                                  target-weights)
+                                                  {:risk-result risk-result
+                                                   :selection selection
+                                                   :solver-plan solver-plan
+                                                   :diagnostics diagnostics*
+                                                   :instrument-ids instrument-ids
+                                                   :target-weights target-weights
+                                                   :current-weights current-weights*})
         labels-by-instrument* (labels-by-instrument
                                request
                                (vec (distinct (concat instrument-ids
@@ -388,7 +371,9 @@
                             (when sparse-warning [sparse-warning]))))]
     (merge
      ;; :equal-risk only: contribution + solver sections from published weights.
-     (select-keys equal-risk-sections* [:risk-contributions :equal-risk-solver])
+     (select-keys equal-risk-sections* [:risk-contributions
+                                        :current-risk-contributions
+                                        :equal-risk-solver])
     {:status :solved
      :scenario-id (:scenario-id request)
      :as-of-ms (:as-of-ms request)

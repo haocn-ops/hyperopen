@@ -79,6 +79,35 @@ model is invalid the run still solves; return-based display metrics are omitted 
 warning instead of being fabricated. There is no efficient frontier for this objective
 — the results page replaces the frontier chart with the risk-contribution table.
 
+## Results page
+
+The primary evidence the objective worked is the **Risk Contribution Balance
+chart** (`views/portfolio/optimize/risk_contributions_card.cljs`): a
+horizontal diverging chart on a signed axis through zero — one row per asset
+with the recommended share as a sign-colored bar, the current share as a muted
+marker, the dashed equal-target line, and the deviation in points. Rows sort
+by |deviation| and cap at 16 with an honest remainder line. No pie, donut,
+stacked, or absolute form is ever used: those all misrepresent negative
+contributions and >100% positive shares. No efficient frontier is computed,
+drawn, or implied for this objective anywhere; a collapsed "Risk / Return
+Context" scatter (`risk_return_context.cljs`) shows current/recommended/
+standalone points with an explicit returns-are-context-only note.
+
+The KPI strip (`scenario_kpi_strip.cljs`) swaps the Sharpe tile for RISK
+BALANCE (current → recommended max deviation in points) and renders the
+volatility/return deltas neutrally — direction is not success for a balance
+objective. The confidence rail (`equal_risk_confidence_rail.cljs`) shows
+Equal-Risk Fit, **Allocation Freedom**, Solution Stability (agreement of the
+deterministic starts), and the solver's real stop reason. Allocation freedom
+comes from the payload (`:equal-risk-solver :allocation-freedom`): each book's
+sum equality pins its last unlocked member, so a book with one asset has zero
+freedom — a one-long/one-short book is **fully determined** by the gross/net
+targets, and the page says so ("Equal Risk evaluates the resulting balance
+but cannot improve it") instead of implying the optimizer chose the weights.
+The payload also carries `:current-risk-contributions` (same summary over the
+current aligned book) for the current-vs-recommended comparison; views degrade
+to em-dashes on persisted results that predate these fields.
+
 ## Solver (for maintainers)
 
 Deterministic sequential quadratic programming through the existing injected QP

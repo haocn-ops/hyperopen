@@ -129,6 +129,17 @@
         (is (keyword? (:selected-initialization solver)))
         (is (number? (:objective-value solver)))
         (is (number? (:exactness-tolerance solver)))))
+    (testing "current-book contributions ride the payload for the balance chart"
+      (let [current (:current-risk-contributions result)]
+        (is (map? current))
+        (is (contains? (:relative-contributions-by-instrument current) "perp:BTC"))
+        (is (number? (:max-absolute-error current)))))
+    (testing "allocation freedom classifies the problem geometry"
+      (let [freedom (get-in result [:equal-risk-solver :allocation-freedom])]
+        (is (contains? #{:open :limited} (:status freedom))
+            "two free longs in one book leave one degree of freedom")
+        (is (= {:long 2 :short 0} (:books freedom)))
+        (is (= 1 (:free-degrees freedom)))))
     (testing "the solved payload passes the canonical result specs"
       (is (s/valid? :hyperopen.portfolio.optimizer.contracts/result-payload result)
           (s/explain-str :hyperopen.portfolio.optimizer.contracts/result-payload result)))))
@@ -250,7 +261,13 @@
     (is (near? 1.0 (nth weights 0)))
     (is (near? -1.0 (nth weights 1)))
     (is (near? 2.0 (get-in result [:diagnostics :gross-exposure]) 1e-6))
-    (is (near? 0.0 (get-in result [:diagnostics :net-exposure]) 1e-6))))
+    (is (near? 0.0 (get-in result [:diagnostics :net-exposure]) 1e-6))
+    ;; One asset per book: the exposure targets pin both weights exactly —
+    ;; the commentary's constraint-determined case.
+    (is (= :fully-determined
+           (get-in result [:equal-risk-solver :allocation-freedom :status])))
+    (is (zero? (get-in result [:equal-risk-solver :allocation-freedom
+                               :free-degrees])))))
 
 (deftest equal-risk-lopsided-books-warn-on-the-solved-result-test
   ;; Feasible-but-degenerate targets (G=2, N=1.9 => 0.05x short budget shared

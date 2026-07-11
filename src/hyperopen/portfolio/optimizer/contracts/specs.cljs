@@ -366,6 +366,7 @@
                      (:relative-contributions-by-instrument contributions))
                     (instrument-keyed-map?
                      (:target-relative-contributions-by-instrument contributions)))))
+         (optional? map? (:current-risk-contributions value))
          (optional? map? (:equal-risk-solver value))
          (or (nil? (:rebalance-preview value))
              (and (map? (:rebalance-preview value))

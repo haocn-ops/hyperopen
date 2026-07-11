@@ -290,6 +290,7 @@
             [hyperopen.portfolio.optimizer.application.view-model-scenario-library-test]
             [hyperopen.portfolio.optimizer.application.view-model-setup-boundary-test]
             [hyperopen.portfolio.optimizer.application.view-model-test]
+            [hyperopen.portfolio.optimizer.application.view-model.equal-risk-results-test]
             [hyperopen.portfolio.optimizer.application.view-model.execution-commit-block-test]
             [hyperopen.portfolio.optimizer.application.view-model.execution-reconcile-test]
             [hyperopen.portfolio.optimizer.application.view-model.exposure-test]
@@ -612,6 +613,7 @@
             [hyperopen.views.portfolio.optimize.return-views-io-panel-test]
             [hyperopen.views.portfolio.optimize.run-status-banner-test]
             [hyperopen.views.portfolio.optimize.scenario-detail-view-test]
+            [hyperopen.views.portfolio.optimize.scenario-kpi-strip-test]
             [hyperopen.views.portfolio.optimize.scenario-picker-test]
             [hyperopen.views.portfolio.optimize.setup-actions-test]
             [hyperopen.views.portfolio.optimize.setup-context-test]
@@ -1100,6 +1102,7 @@
              'hyperopen.portfolio.optimizer.application.view-model-scenario-library-test
              'hyperopen.portfolio.optimizer.application.view-model-setup-boundary-test
              'hyperopen.portfolio.optimizer.application.view-model-test
+             'hyperopen.portfolio.optimizer.application.view-model.equal-risk-results-test
              'hyperopen.portfolio.optimizer.application.view-model.execution-commit-block-test
              'hyperopen.portfolio.optimizer.application.view-model.execution-reconcile-test
              'hyperopen.portfolio.optimizer.application.view-model.exposure-test
@@ -1422,6 +1425,7 @@
              'hyperopen.views.portfolio.optimize.return-views-io-panel-test
              'hyperopen.views.portfolio.optimize.run-status-banner-test
              'hyperopen.views.portfolio.optimize.scenario-detail-view-test
+             'hyperopen.views.portfolio.optimize.scenario-kpi-strip-test
              'hyperopen.views.portfolio.optimize.scenario-picker-test
              'hyperopen.views.portfolio.optimize.setup-actions-test
              'hyperopen.views.portfolio.optimize.setup-context-test

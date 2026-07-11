@@ -362,11 +362,20 @@
                   :value (history-window-value (:history-summary result))
                   :subtext (history-window-subtext result
                                                    (:history-summary result))})
-      (let [status (diversification-status effective-n universe-size)]
-        (trust-row {:label "Diversification"
-                    :status status
-                    :value (str "Effective N · " (opt-format/format-effective-n effective-n universe-size) " of " universe-size)
-                    :subtext (diversification-subtext status)}))
+      ;; Equal Risk replaces the weight-based diversification read with the
+      ;; contribution-based one: how many positions HEDGE the book. A negative
+      ;; contributor is not an error and not the same thing as a short.
+      (if-let [contributions (:risk-contributions result)]
+        (trust-row {:label "Negative contributors"
+                    :status :ok
+                    :value (str (or (:negative-contribution-count contributions) 0)
+                                " of " universe-size)
+                    :subtext "Negative contributors hedge total volatility — side and contribution sign are independent."})
+        (let [status (diversification-status effective-n universe-size)]
+          (trust-row {:label "Diversification"
+                      :status status
+                      :value (str "Effective N · " (opt-format/format-effective-n effective-n universe-size) " of " universe-size)
+                      :subtext (diversification-subtext status)})))
       (trust-row {:label "Weight Stability"
                   :status weight-stability-status
                   :value (if sensitivity-top "Moderate" "Stable")
@@ -407,7 +416,9 @@
     :provisional :caution
     :ok))
 
-(defn- confidence-row
+(defn confidence-row
+  "Shared confidence-rail row (public: the equal-risk confidence rail reuses
+  it)."
   [{:keys [label status value subtext value-class]}]
   (let [{status-label :label status-class :class} (when status (status-token status))]
     [:div {:class ["border-b" "border-base-300" "px-4" "py-3"]}

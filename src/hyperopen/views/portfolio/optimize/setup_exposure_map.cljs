@@ -180,7 +180,7 @@
      [:span {:class ["optimizer-exposure-map__y-axis-label"
                      "optimizer-exposure-map__axis-title"]
              :data-role "portfolio-optimizer-exposure-y-title"}
-      "Gross leverage (×)"]
+      "Gross leverage"]
      [:div {:class ["optimizer-exposure-map__yticks"]}
       [:span {:data-role "portfolio-optimizer-exposure-y-max"} (fmt-axis g-max)]
       [:span (fmt-axis (/ g-max 2))]
@@ -195,15 +195,16 @@
       [:span {:class ["optimizer-exposure-map__axis-title"
                       "optimizer-exposure-map__axis-title--x"]
               :data-role "portfolio-optimizer-exposure-x-title"}
-       "Net bias (×)"]
+       "Net bias"]
       [:span {:class ["optimizer-exposure-map__axis-end"
                       "optimizer-exposure-map__axis-end--long"]}
        (str "+" (fmt-axis n-ext))]]]))
 
 (defn readout
   "The large stacked echo of the dragged targets beside the pad — the primary
-  numbers of the section (designer mock, 2026-07-10): gross over its label,
-  then the net figure tinted by direction."
+  numbers of the section (designer mock, 2026-07-10): gross over its
+  \"Leverage\" label (crypto vocabulary — the gross figure IS the leverage
+  multiple), then the net figure tinted by direction."
   [{:keys [policy net-direction]}]
   [:div {:class ["flex" "shrink-0" "flex-col" "justify-center" "gap-4" "pl-1"]
          :data-role "portfolio-optimizer-exposure-readout"}
@@ -214,7 +215,7 @@
      (fmt-mult (:gross-target policy))]
     [:p {:class ["mt-1" "font-mono" "text-[0.6875rem]" "uppercase"
                  "tracking-[0.08em]" "text-trading-muted"]}
-     "gross"]]
+     "leverage"]]
    [:div
     [:p {:class ["font-mono" "text-[1.375rem]" "font-semibold" "leading-none"
                  (case net-direction

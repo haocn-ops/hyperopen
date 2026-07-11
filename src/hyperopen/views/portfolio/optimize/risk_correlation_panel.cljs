@@ -1,25 +1,21 @@
 (ns hyperopen.views.portfolio.optimize.risk-correlation-panel
   "CORRELATION tab of the Equal Risk risk-contribution card (designer spec
-  2026-07-11): left, the correlation heatmap with a POSITION P&L /
-  UNDERLYING RETURNS toggle — position-P&L correlations are the underlying
-  correlations sign-flipped by position sides, the actual correlation between
-  the trades as held; right, the CONTRIBUTION BREAKDOWN block decomposing the
-  selected asset's net contribution into standalone risk plus diversification
-  effect over a shared axis with the dashed equal-target line.
+  2026-07-11): the correlation heatmap at the card's FULL width — the room
+  matters as held-asset counts approach the payload's 12-asset matrix cap —
+  with a POSITION P&L / UNDERLYING RETURNS toggle. Position-P&L correlations
+  are the underlying correlations sign-flipped by position sides, the actual
+  correlation between the trades as held. The per-asset contribution
+  breakdown that used to share this tab lives on the BREAKDOWN tab
+  (risk-asset-breakdown-panel) as of the 2026-07-11 per-asset redesign.
 
   The mode toggle is DOM state (label-wrapped sr-only radios + scoped :has()
   CSS, exactly like the card's tabs): BOTH heatmap grids and captions are
   pre-rendered and CSS swaps them, so toggling never re-renders. Every cell
   carries a native multi-line title with both correlations and the
   portfolio-risk verdict — hover answers 'economically correlated but held
-  opposite?' without a chart change. Which ASSET the breakdown explains is
-  real app state (Allocation-row clicks); the panel just renders the model."
+  opposite?' without a chart change."
   (:require [hyperopen.portfolio.optimizer.application.view-model.equal-risk-structure
-             :as structure-model]
-            [hyperopen.views.portfolio.optimize.risk-breakdown-panel
-             :as breakdown-panel]))
-
-(def ^:private decomp-row-class "optimizer-risk-decomp-row")
+             :as structure-model]))
 
 ;; --- Heatmap -------------------------------------------------------------------
 
@@ -127,104 +123,17 @@
            (when (not= 1 hidden-count) "s")
            " not shown (the largest risk shares are kept).")])])
 
-;; --- Selected-asset contribution breakdown --------------------------------------
-
-(defn- decomp-row
-  [scale {:keys [label sub value bar-value kind role]}]
-  [:div {:class [decomp-row-class]
-         :data-role role}
-   [:div {:class ["min-w-0"]}
-    [:p {:class ["optimizer-risk-decomp-label"]} label]
-    [:p {:class ["optimizer-risk-decomp-sub"]} sub]]
-   [:span {:class ["optimizer-risk-decomp-value" "font-mono" "tabular-nums"]
-           :data-kind kind
-           :data-sign (cond
-                        (not (number? bar-value)) nil
-                        (neg? bar-value) "negative"
-                        :else "positive")}
-    value]
-   [:div {:class ["optimizer-risk-balance-lane" "relative" "min-w-0"]}
-    (when (number? bar-value)
-      (let [x0 ((:x scale) 0)
-            xv ((:x scale) bar-value)]
-        [:div {:class ["optimizer-risk-decomp-bar"
-                       "optimizer-risk-decomp-bar--full"]
-               :data-kind kind
-               :data-sign (if (neg? bar-value) "negative" "positive")
-               :style {:left (str (min x0 xv) "%")
-                       :width (str (max 0.4 (js/Math.abs (- xv x0))) "%")}}]))]])
-
-(defn- breakdown-block
-  [{:keys [label side standalone diversification net target-share]}]
-  (let [scale (structure-model/fit-scale
-               [(or target-share 0) standalone diversification net])
-        side-word (structure-model/side-label side)]
-    [:div {:class ["optimizer-risk-corr-block"]
-           :data-role "portfolio-optimizer-risk-selected-breakdown"}
-     [:div {:class ["optimizer-risk-corr-head"]}
-      [:div {:class ["min-w-0"]}
-       [:p {:class ["optimizer-risk-corr-title"]} "Contribution breakdown"]
-       [:p {:class ["optimizer-risk-decomp-selected"]}
-        "Selected asset: "
-        [:span {:class ["optimizer-risk-decomp-selected-asset" "font-mono"]
-                :data-role "portfolio-optimizer-risk-selected-asset"
-                :data-side (some-> side name)}
-         (str label (when side-word (str " " side-word)))]]]]
-     [:div {:class ["optimizer-risk-balance-rows" "relative" "mt-2"]}
-      (breakdown-panel/plot-backdrop scale target-share
-                                     {:row-class decomp-row-class
-                                      :lead-cells 2
-                                      :tail-cells 0
-                                      :max-labels 4})
-      [:div {:class ["relative" "space-y-2"]}
-       (decomp-row scale
-                   {:label "Standalone risk"
-                    :sub "Risk if held in isolation"
-                    :value (structure-model/format-pct standalone)
-                    :bar-value standalone
-                    :kind "standalone"
-                    :role "portfolio-optimizer-risk-selected-standalone"})
-       (decomp-row scale
-                   {:label "Diversification effect"
-                    :sub "From correlations with other positions"
-                    :value (breakdown-panel/format-signed-pct diversification)
-                    :bar-value diversification
-                    :kind "diversification"
-                    :role "portfolio-optimizer-risk-selected-diversification"})
-       (decomp-row scale
-                   {:label "Net risk contribution"
-                    :sub "To total portfolio volatility"
-                    :value (structure-model/format-pct net)
-                    :bar-value net
-                    :kind "net"
-                    :role "portfolio-optimizer-risk-selected-net"})]]
-     (breakdown-panel/axis-rows scale
-                                {:row-class decomp-row-class
-                                 :lead-cells 2
-                                 :tail-cells 0
-                                 :max-labels 4})
-     [:p {:class ["optimizer-risk-decomp-identity"]
-          :data-role "portfolio-optimizer-risk-selected-identity"
-          :title "The signed Euler contribution splits exactly into the position's own-variance term plus its cross-covariance term."}
-      "Net contribution = standalone risk + diversification effect"
-      [:span {:class ["optimizer-risk-corr-info"]} "ⓘ"]]]))
-
 ;; --- Panel ----------------------------------------------------------------------
 
 (defn correlation-panel
   "Panel body for the CORRELATION tab; nil when the result predates
-  :risk-structure or holds no positions (the card then drops the tab).
-  `selected-instrument-id` is the app-state selection; fallback rules live in
-  the view-model."
-  [{:keys [result kpi-strip selected-instrument-id]}]
+  :risk-structure or holds no positions (the card then drops the tab). The
+  heatmap is the layout grid's only child, so it takes the full card width."
+  [{:keys [result kpi-strip]}]
   (when-let [corr-model (structure-model/correlation-model result)]
-    (let [selected (structure-model/selected-breakdown result
-                                                       selected-instrument-id)
-          radio-name (str (structure-model/risk-view-radio-name result)
+    (let [radio-name (str (structure-model/risk-view-radio-name result)
                           "-corr-mode")]
       [:div
        kpi-strip
        [:div {:class ["optimizer-risk-corr-layout"]}
-        (heatmap-block corr-model radio-name)
-        (when selected
-          (breakdown-block selected))]])))
+        (heatmap-block corr-model radio-name)]])))

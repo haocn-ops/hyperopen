@@ -38,10 +38,27 @@
                                     :checked true}}]
     (dispatch/dispatch! {:replicant/node node
                          :replicant/dom-event dom-event}
-                        [[:actions/set-search :event.target/value]
-                         [:actions/set-checked :event.target/checked]])
+                        [[:actions/set-search [:event.target/value]]
+                         [:actions/set-checked [:event.target/checked]]])
     (is (= "btc" (:search @store)))
     (is (true? (:checked? @store)))))
+
+(deftest dispatch-treats-bare-placeholder-keywords-as-plain-data-test
+  ;; Nexus parity: the real runtime's interpolate only matches the VECTOR
+  ;; form, so a bare placeholder keyword must reach the reducer untouched —
+  ;; a workbench that resolved it would green-light views that break in the
+  ;; app (and postwalk would double-resolve [:event.target/value] to a
+  ;; wrapped ["value"], corrupting canonical-form args).
+  (let [store (ws/create-store ::bare-keyword {:search :unset})
+        _scene-id (dispatch/install-dispatch! store
+                                              {:actions/set-search
+                                               (fn [state _dispatch-data value]
+                                                 (assoc state :search value))})
+        node (scene-node (dispatch/scene-attr store))]
+    (dispatch/dispatch! {:replicant/node node
+                         :replicant/dom-event #js {:target #js {:value "btc"}}}
+                        [[:actions/set-search :event.target/value]])
+    (is (= :event.target/value (:search @store)))))
 
 (deftest dispatch-resolves-current-target-bounds-placeholder-test
   (let [store (ws/create-store ::bounds-test {:anchor nil})
@@ -60,7 +77,7 @@
                                                   :height 60})}}]
     (dispatch/dispatch! {:replicant/node node
                          :replicant/dom-event dom-event}
-                        [[:actions/set-anchor :event.currentTarget/bounds]])
+                        [[:actions/set-anchor [:event.currentTarget/bounds]]])
     (is (= {:left 100
             :right 180
             :top 240
@@ -92,12 +109,12 @@
     (dispatch/dispatch! {:replicant/node node
                          :replicant/dom-event dom-event}
                         [[:actions/capture-event
-                          :event/key
-                          :event/metaKey
-                          :event/ctrlKey
-                          :event.target/scrollTop
-                          :event/timeStamp
-                          :event/clientX]])
+                          [:event/key]
+                          [:event/metaKey]
+                          [:event/ctrlKey]
+                          [:event.target/scrollTop]
+                          [:event/timeStamp]
+                          [:event/clientX]]])
     (is (= {:key "Enter"
             :meta-key? true
             :ctrl-key? false
@@ -113,7 +130,7 @@
                                  (fn [state _dispatch-data value]
                                    (assoc state :search value))})
     (dispatch/dispatch! {:replicant/dom-event #js {:target #js {:value "eth"}}}
-                        [:actions/set-search :event.target/value])
+                        [:actions/set-search [:event.target/value]])
     (is (= "eth" (:search @store)))))
 
 (deftest dispatch-resolves-scene-id-from-an-ancestor-node-test
@@ -149,7 +166,7 @@
         node (scene-node (dispatch/scene-attr store))]
     (dispatch/dispatch! {:replicant/node node
                          :replicant/dom-event #js {:currentTarget #js {}}}
-                        [:actions/set-anchor :event.currentTarget/bounds])
+                        [:actions/set-anchor [:event.currentTarget/bounds]])
     (is (nil? (:anchor @store)))))
 
 (deftest dispatch-logs-unsupported-actions-test
@@ -182,7 +199,7 @@
     (dispatch/install-dispatch! store-a reducers)
     (dispatch/install-dispatch! store-b reducers)
     (dispatch/dispatch! {:replicant/dom-event #js {:target #js {:value "btc"}}}
-                        [:actions/set-value :event.target/value])
+                        [:actions/set-value [:event.target/value]])
     (is (nil? (:value @store-a)))
     (is (nil? (:value @store-b)))))
 

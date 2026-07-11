@@ -139,6 +139,68 @@
              (dissoc solved-result :risk-structure)
              []))))
 
+(deftest breakdown-asset-options-lists-held-assets-sorted-test
+  (testing "held assets sort by label; the zero-weight zero-net DUST is
+            unheld and never offered for inspection"
+    (is (= [{:instrument-id "perp:BTC" :label "BTC" :side :long}
+            {:instrument-id "perp:ETH" :label "ETH" :side :long}
+            {:instrument-id "perp:MSTR" :label "MSTR" :side :short}]
+           (structure-model/breakdown-asset-options solved-result))))
+  (testing "no contributions, no options"
+    (is (= [] (structure-model/breakdown-asset-options {})))))
+
+(deftest asset-breakdown-tiles-tell-the-four-stories-test
+  (let [result (assoc solved-result
+                      :equal-risk-solver
+                      {:allocation-freedom {:status :limited
+                                            :free-degrees 1
+                                            :binding-count 2
+                                            :books {:long 2 :short 1}}})
+        selected (structure-model/selected-breakdown result "perp:MSTR")
+        tiles (structure-model/asset-breakdown-tiles result selected)
+        by-key (into {} (map (juxt :key identity)) tiles)]
+    (is (= [:summary :diversification :net :freedom] (mapv :key tiles)))
+    (testing "equal-risk summary reads the book-level RMS against the target"
+      (is (= "RMS deviation 12.5 pts" (:value (by-key :summary))))
+      (is (= "Assets spread around 25.0% target" (:sub (by-key :summary)))))
+    (testing "a negative diversification is a benefit in green"
+      (is (= "MSTR diversification" (:label (by-key :diversification))))
+      (is (= "-12.5 pts benefit" (:value (by-key :diversification))))
+      (is (= "Reduces total portfolio risk" (:sub (by-key :diversification))))
+      (is (= "long" (:icon-tone (by-key :diversification)))))
+    (testing "net contribution states the signed deviation from target"
+      (is (= "12.5% of total risk" (:value (by-key :net))))
+      (is (= "-12.5 pts vs 25.0% target" (:sub (by-key :net)))))
+    (testing "allocation freedom reuses the why-card copy"
+      (is (= "Limited · 2 binding caps" (:value (by-key :freedom))))
+      (is (= "Caps constrain exact equality" (:sub (by-key :freedom))))
+      (is (= :lock (:icon (by-key :freedom))))
+      (is (= "warn" (:icon-tone (by-key :freedom)))))))
+
+(deftest asset-breakdown-tiles-cost-and-degradation-test
+  (testing "a positive diversification is an honest concentration cost"
+    (let [amplified (assoc-in solved-result
+                              [:risk-structure
+                               :diversification-share-by-instrument
+                               "perp:BTC"]
+                              0.125)
+          selected (structure-model/selected-breakdown amplified "perp:BTC")
+          tile (nth (structure-model/asset-breakdown-tiles amplified selected)
+                    1)]
+      (is (= "+12.5 pts cost" (:value tile)))
+      (is (= "Adds to total portfolio risk" (:sub tile)))
+      (is (= "short" (:icon-tone tile)))))
+  (testing "a persisted result without allocation freedom degrades honestly"
+    (let [selected (structure-model/selected-breakdown solved-result
+                                                       "perp:MSTR")
+          freedom (nth (structure-model/asset-breakdown-tiles solved-result
+                                                              selected)
+                       3)]
+      (is (= "—" (:value freedom)))
+      (is (= "Not recorded on this result" (:sub freedom)))))
+  (testing "nil selection yields no tiles"
+    (is (nil? (structure-model/asset-breakdown-tiles solved-result nil)))))
+
 (deftest pnl-portfolio-correlation-lookup-test
   (is (= 0.25 (structure-model/pnl-portfolio-correlation solved-result
                                                           "perp:MSTR")))

@@ -1,10 +1,13 @@
-// Equal Risk correlation view (designer spec 2026-07-11). The workbench
-// scenes render the REAL risk card + Allocation table with a scene-local
-// dispatcher, so this covers the browser-only behavior deterministically
-// without solving an optimization in-app: DOM-state tab switching, the
-// POSITION P&L / UNDERLYING RETURNS matrix toggle (sign flips included),
-// click-to-select from allocation rows re-targeting the contribution
-// breakdown, the 12-asset heatmap cap, and degenerate-variance em-dashes.
+// Equal Risk correlation + per-asset breakdown views (designer specs
+// 2026-07-11). The workbench scenes render the REAL risk card + Allocation
+// table with a scene-local dispatcher, so this covers the browser-only
+// behavior deterministically without solving an optimization in-app:
+// DOM-state tab switching, the POSITION P&L / UNDERLYING RETURNS matrix
+// toggle (sign flips included), the BREAKDOWN tab's per-asset default with
+// its Selected asset / All assets sub-toggle, selection flowing between
+// allocation-row clicks and the Change-asset select, the full-width
+// correlation heatmap, the 12-asset heatmap cap, and degenerate-variance
+// em-dashes.
 import { expect, test } from "@playwright/test";
 
 const SCENE_BASE =
@@ -79,16 +82,22 @@ test.describe("equal risk correlation view (workbench scenes)", () => {
     await expect(underlyingGrid).toBeHidden();
   });
 
-  test("clicking an allocation row re-targets the contribution breakdown and the highlight", async ({
+  test("the BREAKDOWN tab defaults to the per-asset panel; row clicks and the Change-asset select share one selection", async ({
     page
   }) => {
     const frame = await openScene(page, "correlation-designer-parity");
     await frame
-      .locator(role("portfolio-optimizer-risk-view-tab-correlation"))
+      .locator(role("portfolio-optimizer-risk-view-tab-breakdown"))
       .click();
 
+    const assetPanel = frame.locator(
+      role("portfolio-optimizer-risk-selected-breakdown")
+    );
     const selected = frame.locator(
       role("portfolio-optimizer-risk-selected-asset")
+    );
+    const picker = frame.locator(
+      role("portfolio-optimizer-risk-asset-select")
     );
     const mstrRow = frame.locator(
       role("portfolio-optimizer-target-exposure-asset-MSTR")
@@ -98,17 +107,33 @@ test.describe("equal risk correlation view (workbench scenes)", () => {
     );
 
     // The scene store preselects MSTR — the short whose decomposition the
-    // designer's spec explains.
-    await expect(selected).toHaveText("MSTR Short");
+    // designer's spec explains. The per-asset view is the default sub-view,
+    // and the select must sync to the selection on first render.
+    await expect(assetPanel).toBeVisible();
+    await expect(selected).toHaveText("MSTR");
+    await expect(picker).toHaveValue("perp:MSTR");
     await expect(mstrRow).toHaveAttribute("data-selected", "true");
     await expect(
       frame.locator(role("portfolio-optimizer-risk-selected-identity"))
-    ).toContainText("Net contribution = standalone risk + diversification effect");
+    ).toContainText("Net Risk Contribution");
+    await expect(
+      frame.locator(role("portfolio-optimizer-risk-asset-tile-freedom"))
+    ).toContainText("Limited · 2 binding caps");
 
+    // Allocation-row click re-targets the panel AND the select's value.
     await btcRow.click();
-    await expect(selected).toHaveText("BTC Long");
+    await expect(selected).toHaveText("BTC");
     await expect(btcRow).toHaveAttribute("data-selected", "true");
     await expect(mstrRow).not.toHaveAttribute("data-selected", "true");
+    await expect(picker).toHaveValue("perp:BTC");
+
+    // The Change-asset select drives the same app state back the other way.
+    await picker.selectOption("perp:ETH");
+    await expect(selected).toHaveText("ETH");
+    await expect(
+      frame.locator(role("portfolio-optimizer-target-exposure-asset-ETH"))
+    ).toHaveAttribute("data-selected", "true");
+    await expect(btcRow).not.toHaveAttribute("data-selected", "true");
 
     // The per-row P&L-correlation line rides every held row.
     await expect(
@@ -116,6 +141,62 @@ test.describe("equal risk correlation view (workbench scenes)", () => {
         role("portfolio-optimizer-target-exposure-pnl-corr-perp-MSTR")
       )
     ).toContainText("+0.");
+  });
+
+  test("the breakdown sub-toggle swaps per-asset and all-assets views without touching app state", async ({
+    page
+  }) => {
+    const frame = await openScene(page, "correlation-designer-parity");
+    await frame
+      .locator(role("portfolio-optimizer-risk-view-tab-breakdown"))
+      .click();
+
+    const assetPanel = frame.locator(
+      role("portfolio-optimizer-risk-selected-breakdown")
+    );
+    const allChart = frame.locator(
+      role("portfolio-optimizer-risk-breakdown-chart")
+    );
+    await expect(assetPanel).toBeVisible();
+    await expect(allChart).toBeHidden();
+
+    await frame
+      .locator(role("portfolio-optimizer-risk-breakdown-view-all"))
+      .click();
+    await expect(allChart).toBeVisible();
+    await expect(assetPanel).toBeHidden();
+
+    await frame
+      .locator(role("portfolio-optimizer-risk-breakdown-view-asset"))
+      .click();
+    await expect(assetPanel).toBeVisible();
+    await expect(allChart).toBeHidden();
+  });
+
+  test("the correlation tab is the heatmap alone at full card width", async ({
+    page
+  }) => {
+    const frame = await openScene(page, "correlation-designer-parity");
+    await frame
+      .locator(role("portfolio-optimizer-risk-view-tab-correlation"))
+      .click();
+
+    const heatmap = frame.locator(
+      role("portfolio-optimizer-risk-correlation-heatmap")
+    );
+    await expect(heatmap).toBeVisible();
+    // The old in-tab breakdown block now lives on the BREAKDOWN tab, so it
+    // must be hidden while the correlation tab is active.
+    await expect(
+      frame.locator(role("portfolio-optimizer-risk-selected-breakdown"))
+    ).toBeHidden();
+
+    const card = frame.locator(
+      role("portfolio-optimizer-risk-contributions")
+    );
+    const cardBox = await card.boundingBox();
+    const heatmapBox = await heatmap.boundingBox();
+    expect(heatmapBox.width).toBeGreaterThan(cardBox.width * 0.9);
   });
 
   test("a 16-asset book caps the heatmap at 12 and says how many it dropped", async ({

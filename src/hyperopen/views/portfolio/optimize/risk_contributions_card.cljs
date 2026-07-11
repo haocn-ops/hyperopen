@@ -19,12 +19,15 @@
   RISK / RETURN) whose state lives entirely in the DOM as visually-hidden
   radio inputs toggled by scoped :has() CSS — no app state, same zero-state
   constraint the old <details> disclosure satisfied. The BREAKDOWN and
-  CORRELATION tabs (designer spec 2026-07-11, correlation view) render only
-  when the result carries the :risk-structure payload section, so persisted
-  pre-structure results keep the original pair; their panel bodies live in
-  risk-breakdown-panel / risk-correlation-panel. Which asset the correlation
-  tab's breakdown block explains IS app state (Allocation-row clicks set it) —
-  that selection routes data across cards, which DOM-state radios cannot.
+  CORRELATION tabs (designer specs 2026-07-11: correlation view + per-asset
+  breakdown) render only when the result carries the :risk-structure payload
+  section, so persisted pre-structure results keep the original pair; their
+  panel bodies live in risk-asset-breakdown-panel (which defaults to one
+  asset's decomposition and toggles to the all-assets chart) and
+  risk-correlation-panel (the full-width P&L/underlying heatmap). Which asset
+  the breakdown tab explains IS app state (Allocation-row clicks and the
+  panel's Change-asset select both set it) — that selection routes data
+  across cards, which DOM-state radios cannot.
 
   Rows come pre-ordered and capped from the equal-risk-results view-model
   (worst deviations survive the cap, display order is signed share descending,
@@ -36,8 +39,8 @@
              :as equal-risk-results]
             [hyperopen.portfolio.optimizer.application.view-model.equal-risk-structure
              :as structure-model]
-            [hyperopen.views.portfolio.optimize.risk-breakdown-panel
-             :as breakdown-panel]
+            [hyperopen.views.portfolio.optimize.risk-asset-breakdown-panel
+             :as asset-breakdown-panel]
             [hyperopen.views.portfolio.optimize.risk-correlation-panel
              :as correlation-panel]
             [hyperopen.views.portfolio.optimize.risk-return-context
@@ -381,8 +384,9 @@
   RISK / RETURN tab disappears when no portfolio points exist, and the
   BREAKDOWN / CORRELATION tabs disappear when the result predates the
   :risk-structure section. `selected-risk-instrument` (app state, set by
-  Allocation-row clicks) picks which asset the correlation tab's breakdown
-  block explains; the view-model falls back when it is nil or stale."
+  Allocation-row clicks and the breakdown tab's Change-asset select) picks
+  which asset the breakdown tab's per-asset panel explains; the view-model
+  falls back when it is nil or stale."
   ([result] (risk-contributions-card result nil))
   ([result {:keys [selected-risk-instrument]}]
    (when-let [model (equal-risk-results/balance-model result)]
@@ -392,14 +396,14 @@
            correlation-body (correlation-panel/correlation-panel
                              {:result result
                               :kpi-strip (kpi-strip model
-                                                    "Correlation / decomposition")
-                              :selected-instrument-id selected-risk-instrument})
-           breakdown-body (breakdown-panel/breakdown-panel
-                           {:rows (structure-model/breakdown-rows result rows)
+                                                    "Correlation matrix")})
+           breakdown-body (asset-breakdown-panel/breakdown-tab-panel
+                           {:result result
+                            :rows (structure-model/breakdown-rows result rows)
                             :target-share target-share
-                            :kpi-strip (kpi-strip model
-                                                  "Standalone vs diversification")
-                            :overflow-note (overflow-line model)})]
+                            :kpi-strip (kpi-strip model "Breakdown details")
+                            :overflow-note (overflow-line model)
+                            :selected-instrument-id selected-risk-instrument})]
        [:section {:class ["optimizer-risk-balance" "rounded-xl" "border"
                           "border-base-300"]
                   :data-role "portfolio-optimizer-risk-contributions"}

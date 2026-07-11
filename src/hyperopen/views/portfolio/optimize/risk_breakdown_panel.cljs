@@ -1,16 +1,18 @@
 (ns hyperopen.views.portfolio.optimize.risk-breakdown-panel
-  "BREAKDOWN tab of the Equal Risk risk-contribution card: one lane per
+  "The ALL ASSETS sub-view of the Equal Risk BREAKDOWN tab: one lane per
   balance-chart row (same cap, same signed-share display order) splitting the
   signed net contribution into its standalone (own-variance, always
   positive, purple) and diversification (cross-covariance, signed,
   green/red) components, both drawn from zero as paired sub-bars with a
   purple net marker at their sum and the shared dashed equal-target line
   behind. Numeric Div / Net columns mirror the contribution tab's
-  Target / Deviation columns.
+  Target / Deviation columns. The tab's default per-asset sub-view and the
+  toggle between the two live in risk-asset-breakdown-panel, which composes
+  this chart as the second view.
 
   Also home of the small plot primitives (backdrop, axis, lane scale ticks)
-  the correlation panel's selected-asset block reuses — both panels draw the
-  same decomposition language, just grouped differently."
+  the per-asset panel reuses — both views draw the same decomposition
+  language, just grouped differently."
   (:require [hyperopen.portfolio.optimizer.application.view-model.equal-risk-structure
              :as structure-model]))
 
@@ -163,9 +165,10 @@
         "contribution tab.")])
 
 (defn breakdown-panel
-  "Panel body for the BREAKDOWN tab. `rows` come pre-joined from the
-  structure view-model (balance rows + standalone/diversification); the card
-  passes the KPI strip and the remainder line so all tabs stay in lockstep."
+  "The all-assets chart body. `rows` come pre-joined from the structure
+  view-model (balance rows + standalone/diversification); the composing
+  per-asset panel passes the remainder line (and owns the KPI strip, so
+  `kpi-strip` is normally nil here)."
   [{:keys [rows target-share kpi-strip overflow-note]}]
   (when (seq rows)
     (let [scale (structure-model/fit-scale

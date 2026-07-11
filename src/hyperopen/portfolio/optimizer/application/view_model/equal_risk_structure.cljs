@@ -114,6 +114,24 @@
                   :pnl-portfolio-correlation-by-instrument
                   instrument-id]))
 
+(defn breakdown-asset-options
+  "Options for the per-asset breakdown panel's Change-asset select: every
+  instrument with a finite net contribution (the full universe — the
+  decomposition maps are never capped, unlike the correlation matrix), sorted
+  by label so a long book scans alphabetically. A zero-weight instrument with
+  a zero contribution is not held and is dropped — there is nothing to
+  inspect. Empty when the result carries no contributions."
+  [result]
+  (->> (net-shares-by-instrument result)
+       (keep (fn [[instrument-id net]]
+               (let [side (instrument-side result instrument-id)]
+                 (when (or side (not (zero? net)))
+                   {:instrument-id instrument-id
+                    :label (label-for result instrument-id)
+                    :side side}))))
+       (sort-by :label)
+       vec))
+
 ;; --- Correlation heatmap ---------------------------------------------------------
 
 (defn- pair-effect
@@ -231,6 +249,104 @@
          :negative? (and (finite-number? net) (neg? net))
          :target-share (first (get-in result [:risk-contributions
                                               :target-relative-contributions]))}))))
+
+;; --- Per-asset summary tiles ------------------------------------------------------
+
+(defn- summary-tile
+  [rms-pts target-share]
+  (let [target-pts (when (finite-number? target-share) (* 100 target-share))
+        tone (equal-risk-results/deviation-tone rms-pts target-pts)]
+    {:key :summary
+     :icon :shield
+     :icon-tone (case tone :good "info" :caution "warn" :bad "warn" "info")
+     :label "Equal-risk summary"
+     :value (str "RMS deviation " (equal-risk-results/format-pts rms-pts))
+     :sub (if (finite-number? target-share)
+            (case tone
+              :good (str "All assets near " (format-pct target-share)
+                         " target")
+              :caution (str "Assets spread around " (format-pct target-share)
+                            " target")
+              :bad (str "Contributions far from " (format-pct target-share)
+                        " target")
+              (str "Target " (format-pct target-share) " per asset"))
+            "—")}))
+
+(defn- diversification-tile
+  [label diversification]
+  (let [div-pts (when (finite-number? diversification)
+                  (* 100 diversification))
+        direction (cond
+                    (not (finite-number? div-pts)) nil
+                    (< (js/Math.abs div-pts) 0.05) :neutral
+                    (neg? div-pts) :benefit
+                    :else :cost)]
+    {:key :diversification
+     :icon :arrows
+     :icon-tone (case direction :benefit "long" :cost "short" "info")
+     :label (str label " diversification")
+     :value (case direction
+              :benefit (str (equal-risk-results/format-signed-pts div-pts)
+                            " benefit")
+              :cost (str (equal-risk-results/format-signed-pts div-pts)
+                         " cost")
+              :neutral "0.0 pts"
+              "—")
+     :sub (case direction
+            :benefit "Reduces total portfolio risk"
+            :cost "Adds to total portfolio risk"
+            :neutral "No net correlation effect"
+            "—")}))
+
+(defn- net-tile
+  [net target-share]
+  (let [deviation-pts (when (and (finite-number? net)
+                                 (finite-number? target-share))
+                        (* 100 (- net target-share)))
+        target-pts (when (finite-number? target-share) (* 100 target-share))]
+    {:key :net
+     :icon :scale
+     :icon-tone (case (equal-risk-results/deviation-tone
+                       deviation-pts target-pts)
+                  :good "info"
+                  :caution "warn"
+                  :bad "warn"
+                  "info")
+     :label "Net contribution"
+     :value (if (finite-number? net)
+              (str (format-pct net) " of total risk")
+              "—")
+     :sub (if (finite-number? deviation-pts)
+            (str (equal-risk-results/format-signed-pts deviation-pts)
+                 " vs " (format-pct target-share) " target")
+            "—")}))
+
+(defn- freedom-tile
+  [result]
+  (let [freedom (equal-risk-results/freedom-card-view
+                 (equal-risk-results/allocation-freedom result))]
+    {:key :freedom
+     :icon (if (:locked? freedom) :lock :lock-open)
+     :icon-tone (if (:locked? freedom) "warn" "long")
+     :label "Allocation freedom"
+     :value (:value freedom)
+     :sub (:sub freedom)}))
+
+(defn asset-breakdown-tiles
+  "The four summary tiles under the per-asset CONTRIBUTION BREAKDOWN panel
+  (designer spec 2026-07-11, per-asset breakdown): the book-level equal-risk
+  fit, the selected asset's diversification benefit/cost, its net share vs the
+  equal target, and allocation freedom (same copy as the why-card's fact
+  card). Data only — the view maps :icon/:icon-tone to markup. `selected` is
+  a `selected-breakdown` map; nil in, nil out."
+  [result {:keys [label diversification net target-share] :as selected}]
+  (when selected
+    (let [rms-pts (let [rms (get-in result [:risk-contributions :rms-error])]
+                    (when (finite-number? rms) (* 100 rms)))]
+      [(summary-tile rms-pts target-share)
+       (diversification-tile label diversification)
+       (net-tile net target-share)
+       (freedom-tile result)])))
 
 ;; --- Plot scale ------------------------------------------------------------------
 

@@ -1684,6 +1684,12 @@
     background-color: color-mix(in srgb, var(--optimizer-long) 12%, transparent);
   }
 
+  .portfolio-optimizer .optimizer-equal-risk-fact-icon[data-tone="short"] {
+    color: var(--optimizer-short);
+    border-color: color-mix(in srgb, var(--optimizer-short) 35%, transparent);
+    background-color: color-mix(in srgb, var(--optimizer-short) 12%, transparent);
+  }
+
   .portfolio-optimizer .optimizer-equal-risk-fact-icon[data-tone="accent"] {
     color: var(--optimizer-accent);
     border-color: color-mix(in srgb, var(--optimizer-accent) 35%, transparent);
@@ -1943,16 +1949,9 @@
     cursor: help;
   }
 
-  /* ── Decomposition rows (Breakdown tab + the correlation tab's selected-
-     asset block): standalone = own-variance (purple), diversification =
-     cross-covariance (green removes / red adds), net = their exact sum. */
-  .portfolio-optimizer .optimizer-risk-decomp-row {
-    display: grid;
-    grid-template-columns: minmax(0, 8.5rem) 3.5rem minmax(0, 1fr);
-    column-gap: 10px;
-    align-items: center;
-  }
-
+  /* ── Decomposition primitives (Breakdown tab, both sub-views): standalone =
+     own-variance (purple), diversification = cross-covariance (green removes
+     / red adds), net = their exact sum. */
   .portfolio-optimizer .optimizer-risk-decomp-label {
     font-size: 11.5px;
     color: var(--optimizer-text);
@@ -2072,12 +2071,6 @@
     color: var(--optimizer-short);
   }
 
-  .portfolio-optimizer .optimizer-risk-decomp-selected {
-    margin-top: 4px;
-    font-size: 12px;
-    color: var(--optimizer-text-2);
-  }
-
   .portfolio-optimizer .optimizer-risk-decomp-selected-asset {
     font-weight: 600;
     color: var(--optimizer-text);
@@ -2093,14 +2086,269 @@
     color: var(--optimizer-short);
   }
 
-  .portfolio-optimizer .optimizer-risk-decomp-identity {
+  /* ── Per-asset breakdown (designer spec 2026-07-11, per-asset view): the
+     BREAKDOWN tab's default sub-view. The Selected asset / All assets toggle
+     is the card's usual DOM-state radio pattern, scoped to the tab body; the
+     per-asset block reuses the corr-block chrome and the decomp bar colors. */
+  .portfolio-optimizer .optimizer-risk-breakdown-toolbar {
     margin-top: 12px;
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  .portfolio-optimizer .optimizer-risk-breakdown-mode-tabs {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: stretch;
+    border: 1px solid var(--optimizer-border-strong);
+  }
+
+  .portfolio-optimizer .optimizer-risk-breakdown-mode-tab {
+    display: flex;
+    align-items: center;
+    padding: 4px 9px;
+    cursor: pointer;
+    font-family: "JetBrains Mono", var(--font-mono);
+    font-size: 9px;
+    font-weight: 650;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    color: var(--optimizer-text-3);
+    transition: color 120ms ease, background-color 120ms ease;
+  }
+
+  .portfolio-optimizer
+    .optimizer-risk-breakdown-mode-tab + .optimizer-risk-breakdown-mode-tab {
+    border-left: 1px solid var(--optimizer-border-strong);
+  }
+
+  .portfolio-optimizer .optimizer-risk-breakdown-mode-tab:hover {
+    color: var(--optimizer-text-2);
+  }
+
+  .portfolio-optimizer
+    .optimizer-risk-breakdown-body:not(:has(input[data-breakdown-view]:checked))
+    .optimizer-risk-breakdown-mode-tab:first-child,
+  .portfolio-optimizer
+    .optimizer-risk-breakdown-mode-tab:has(> input:checked) {
+    background-color: var(--optimizer-surface-3);
+    color: var(--optimizer-text);
+    box-shadow: inset 0 -2px 0 var(--optimizer-accent);
+  }
+
+  .portfolio-optimizer
+    .optimizer-risk-breakdown-mode-tab:has(> input:focus-visible) {
+    outline: 1px solid var(--optimizer-accent-border);
+    outline-offset: 2px;
+  }
+
+  /* Both sub-views are pre-rendered; the checked radio picks one. The
+     per-asset view is the default (first tab active until any radio is
+     checked). */
+  .portfolio-optimizer
+    .optimizer-risk-breakdown-body [data-breakdown-only] {
+    display: none;
+    margin-top: 12px;
+  }
+
+  .portfolio-optimizer
+    .optimizer-risk-breakdown-body:not(:has(input[data-breakdown-view]:checked))
+    [data-breakdown-only="asset"],
+  .portfolio-optimizer
+    .optimizer-risk-breakdown-body:has(input[data-breakdown-view="asset"]:checked)
+    [data-breakdown-only="asset"],
+  .portfolio-optimizer
+    .optimizer-risk-breakdown-body:has(input[data-breakdown-view="all"]:checked)
+    [data-breakdown-only="all"] {
+    display: block;
+  }
+
+  .portfolio-optimizer .optimizer-risk-asset-explainer {
+    margin-top: 4px;
+    max-width: 56ch;
+    font-size: 11px;
+    line-height: 1.45;
+    color: var(--optimizer-text-3);
+  }
+
+  .portfolio-optimizer .optimizer-risk-asset-side-badge {
+    display: inline-grid;
+    place-content: center;
+    margin-left: 8px;
+    width: 14px;
+    height: 14px;
+    vertical-align: text-bottom;
+    border-radius: 2px;
+    font-size: 9px;
+    font-weight: 700;
+  }
+
+  .portfolio-optimizer .optimizer-risk-asset-side-badge[data-side="long"] {
+    color: var(--optimizer-long);
+    background-color: color-mix(in srgb, var(--optimizer-long) 16%, transparent);
+    border: 1px solid color-mix(in srgb, var(--optimizer-long) 40%, transparent);
+  }
+
+  .portfolio-optimizer .optimizer-risk-asset-side-badge[data-side="short"] {
+    color: var(--optimizer-short);
+    background-color: color-mix(in srgb, var(--optimizer-short) 16%, transparent);
+    border: 1px solid color-mix(in srgb, var(--optimizer-short) 40%, transparent);
+  }
+
+  .portfolio-optimizer .optimizer-risk-asset-picker {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .portfolio-optimizer .optimizer-risk-asset-picker-label {
+    font-family: "JetBrains Mono", var(--font-mono);
+    font-size: 9.5px;
+    font-weight: 650;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    color: var(--optimizer-text-3);
+  }
+
+  .portfolio-optimizer .optimizer-risk-asset-picker-select {
+    min-width: 7.5rem;
+  }
+
+  /* Per-asset component rows: wider label column than the all-assets lanes
+     (the labels carry sub-lines), tall lanes, hairline row separators with a
+     stronger rule above the Net sum row. */
+  .portfolio-optimizer .optimizer-risk-asset-row {
+    display: grid;
+    grid-template-columns: minmax(0, 11.5rem) 4.5rem minmax(0, 1fr);
+    column-gap: 12px;
+    align-items: center;
+  }
+
+  .portfolio-optimizer .optimizer-risk-asset-row--component {
+    padding: 9px 0;
+    border-bottom: 1px solid color-mix(in srgb, var(--optimizer-border) 72%, transparent);
+  }
+
+  .portfolio-optimizer .optimizer-risk-asset-row--sum {
+    border-top: 1px solid var(--optimizer-border-strong);
+    border-bottom-color: transparent;
+  }
+
+  .portfolio-optimizer .optimizer-risk-asset-row .optimizer-risk-balance-lane {
+    height: 36px;
+  }
+
+  .portfolio-optimizer
+    .optimizer-risk-decomp-value[data-kind="standalone"] {
+    color: var(--optimizer-target);
+  }
+
+  .portfolio-optimizer
+    .optimizer-risk-decomp-value[data-kind="net"] {
+    color: var(--optimizer-target);
+  }
+
+  /* Value label riding the free end of each bar: positive bars label to the
+     right of the bar end, negative bars to the left. */
+  .portfolio-optimizer .optimizer-risk-asset-bar-label {
+    position: absolute;
+    top: 50%;
+    transform: translate(8px, -50%);
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
+    color: var(--optimizer-text-2);
+  }
+
+  .portfolio-optimizer .optimizer-risk-asset-bar-label[data-dir="negative"] {
+    transform: translate(-100%, -50%) translateX(-8px);
+  }
+
+  .portfolio-optimizer .optimizer-risk-asset-bar-label[data-kind="standalone"],
+  .portfolio-optimizer .optimizer-risk-asset-bar-label[data-kind="net"] {
+    color: var(--optimizer-target);
+  }
+
+  /* Color follows the value's SIGN, not the label's placement side — a
+     cramped negative label flips to the zero side (data-dir) but must keep
+     its negative color. */
+  .portfolio-optimizer
+    .optimizer-risk-asset-bar-label[data-kind="diversification"][data-sign="negative"] {
+    color: var(--optimizer-long);
+  }
+
+  .portfolio-optimizer
+    .optimizer-risk-asset-bar-label[data-kind="diversification"][data-sign="positive"] {
+    color: var(--optimizer-short);
+  }
+
+  /* Framed identity equation with the actual numbers: terms on the first
+     line, values on the second, colored by component. */
+  .portfolio-optimizer .optimizer-risk-asset-equation {
+    margin-top: 14px;
     border: 1px solid var(--optimizer-border);
     background-color: var(--optimizer-surface-2);
-    padding: 8px 10px;
+    padding: 10px 12px;
     text-align: center;
+  }
+
+  .portfolio-optimizer .optimizer-risk-asset-equation-terms,
+  .portfolio-optimizer .optimizer-risk-asset-equation-values {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: center;
+    column-gap: 10px;
+    row-gap: 2px;
+  }
+
+  .portfolio-optimizer .optimizer-risk-asset-equation-terms {
     font-size: 11px;
     color: var(--optimizer-text-2);
+  }
+
+  .portfolio-optimizer .optimizer-risk-asset-equation-values {
+    margin-top: 4px;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--optimizer-text);
+  }
+
+  .portfolio-optimizer .optimizer-risk-asset-equation-op {
+    color: var(--optimizer-text-3);
+    font-weight: 400;
+  }
+
+  .portfolio-optimizer
+    .optimizer-risk-asset-equation-values [data-kind="standalone"],
+  .portfolio-optimizer
+    .optimizer-risk-asset-equation-values [data-kind="net"] {
+    color: var(--optimizer-target);
+  }
+
+  .portfolio-optimizer
+    .optimizer-risk-asset-equation-values
+    [data-kind="diversification"][data-sign="negative"] {
+    color: var(--optimizer-long);
+  }
+
+  .portfolio-optimizer
+    .optimizer-risk-asset-equation-values
+    [data-kind="diversification"][data-sign="positive"] {
+    color: var(--optimizer-short);
+  }
+
+  /* Summary tiles: the why-card's fact-card language in a container-driven
+     auto-fit grid (the card renders inside workbench iframes — never
+     viewport media queries). */
+  .portfolio-optimizer .optimizer-risk-asset-tiles {
+    margin-top: 12px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 8px;
   }
 
   /* ── Allocation table: Equal Risk row selection + P&L-corr line ── */

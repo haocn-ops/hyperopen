@@ -1,12 +1,15 @@
 (ns hyperopen.workbench.scenes.optimize.equal-risk-correlation-scenes
   "Workbench scenes for the Equal Risk CORRELATION / BREAKDOWN tabs (designer
-  spec 2026-07-11, correlation view) and the Allocation table's row selection
-  + P&L-correlation line. `designer-parity` mirrors the mock's 3-long/2-short
-  book with an INTERACTIVE selection store: clicking an Allocation row
-  re-targets the contribution-breakdown block exactly as the app does. The
-  other scenes stress the states the mock doesn't draw: a 16-asset book whose
-  heatmap caps at 12 with the honest remainder line, and a degenerate
-  zero-variance asset whose correlations render as em-dashes.
+  specs 2026-07-11: correlation view + per-asset breakdown) and the
+  Allocation table's row selection + P&L-correlation line. `designer-parity`
+  mirrors the mock's 3-long/2-short book with an INTERACTIVE selection store:
+  clicking an Allocation row OR picking from the breakdown tab's Change-asset
+  select re-targets the per-asset contribution panel exactly as the app does
+  (the correlation tab is the full-width heatmap alone). The other scenes
+  stress the states the mock doesn't draw: a 16-asset book whose heatmap caps
+  at 12 with the honest remainder line (while the Change-asset select still
+  offers all 16), and a degenerate zero-variance asset whose correlations
+  render as em-dashes.
 
   Every fixture's :risk-contributions AND :risk-structure sections are
   computed by the REAL domain math over an explicit covariance, so the scene

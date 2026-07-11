@@ -67,5 +67,5 @@
            (:data-workbench-scene-id attrs)))
     (dispatch/dispatch! {:replicant/node node
                          :replicant/dom-event #js {:target #js {:value "sol"}}}
-                        [:actions/set-search :event.target/value])
+                        [:actions/set-search [:event.target/value]])
     (is (= "sol" (:search @store)))))

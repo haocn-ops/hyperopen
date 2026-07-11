@@ -289,3 +289,51 @@
         (is (pos? (reduce + 0 (map * probe bp))))))
     ;; Invalid curvature leaves B unchanged.
     (is (= b (equal-risk/bfgs-update b [0 0] [0 0])))))
+
+(deftest presolve-warns-on-lopsided-book-budgets-test
+  (let [covariance [[0.01 0.0 0.0]
+                    [0.0 0.04 0.0]
+                    [0.0 0.0 0.02]]]
+    (testing "a starved multi-asset book warns without blocking"
+      ;; G=2, N=1.9 => short budget 0.05x (2.5% of gross) shared by TWO shorts.
+      (let [enc (encoded [(perp "perp:A" :long)
+                          (perp "perp:B" :short)
+                          (perp "perp:C" :short)]
+                         {:gross-leverage 2.0
+                          :net-exposure {:min 1.9 :max 1.9}
+                          :max-asset-weight 2.0})
+            result (equal-risk-presolve/presolve enc covariance)
+            warning (first (:warnings result))]
+        (is (= :ok (:status result)))
+        (is (= :equal-risk-lopsided-books (:code warning)))
+        (is (= :short (:book warning)))
+        (is (= 2 (:asset-count warning)))
+        (is (near? 0.05 (:budget warning) 1e-9))
+        (is (string? (:message warning)))
+        (testing "the plan carries the warning for the solved payload"
+          (let [plan (equal-risk-plan/build-plan
+                      {:instrument-ids ["perp:A" "perp:B" "perp:C"]
+                       :covariance covariance
+                       :encoded-constraints enc})]
+            (is (= :ok (:status plan)))
+            (is (= [:equal-risk-lopsided-books]
+                   (mapv :code (:warnings plan))))))))
+    (testing "balanced books produce no warning"
+      (let [enc (encoded [(perp "perp:A" :long)
+                          (perp "perp:B" :short)
+                          (perp "perp:C" :short)]
+                         {:gross-leverage 2.0
+                          :net-exposure {:min 0.0 :max 0.0}
+                          :max-asset-weight 2.0})
+            result (equal-risk-presolve/presolve enc covariance)]
+        (is (= :ok (:status result)))
+        (is (= [] (:warnings result)))))
+    (testing "a deliberately one-sided SINGLE-asset book does not warn"
+      (let [enc (encoded [(perp "perp:A" :long)
+                          (perp "perp:B" :short)]
+                         {:gross-leverage 2.0
+                          :net-exposure {:min 1.9 :max 1.9}
+                          :max-asset-weight 2.0})
+            result (equal-risk-presolve/presolve enc [[0.01 0.0] [0.0 0.04]])]
+        (is (= :ok (:status result)))
+        (is (= [] (:warnings result)))))))

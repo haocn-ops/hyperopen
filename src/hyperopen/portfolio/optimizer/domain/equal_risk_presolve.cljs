@@ -154,9 +154,43 @@
   [_encoded-constraints]
   [])
 
+(def lopsided-book-ratio
+  "A book whose budget falls below this fraction of gross is starved: with
+  several assets forced to share almost nothing, Equal Risk must concentrate
+  risk in the other book and the run will land far from parity. Warn — the
+  request is still mathematically valid, so never block."
+  0.05)
+
+(defn- lopsided-book-warnings
+  "Non-blocking warnings for feasible-but-degenerate exposure targets:
+  min(G_long, G_short) is tiny relative to gross while MULTIPLE assets sit on
+  the starved side (a deliberately one-sided single-asset book is not
+  surprising the way four shorts sharing 0.02x is)."
+  [books gross long-gross short-gross]
+  (if-not (and (finite-number? gross) (pos? gross))
+    []
+    (->> [[:long long-gross (count (:long books))]
+          [:short short-gross (count (:short books))]]
+         (keep (fn [[book budget asset-count]]
+                 (when (and (> asset-count 1)
+                            (< budget (* lopsided-book-ratio gross)))
+                   {:code :equal-risk-lopsided-books
+                    :book book
+                    :budget budget
+                    :gross gross
+                    :asset-count asset-count
+                    :message (str "Your gross/net targets leave only " (fmt budget)
+                                  " for the " asset-count " "
+                                  (if (= :long book) "Long" "Short")
+                                  " assets — Equal Risk will concentrate risk in"
+                                  " the other book. Reduce the net bias or"
+                                  " change sides.")})))
+         vec)))
+
 (defn presolve
   "Explicit feasibility screening before the nonlinear solver. Returns
-  {:status :ok :targets {:gross :net :long-gross :short-gross} :books {...}}
+  {:status :ok :targets {:gross :net :long-gross :short-gross} :books {...}
+   :warnings [...]} (non-blocking, e.g. lopsided book budgets)
   or {:status :infeasible :violations [...]} with specific codes."
   [{:keys [instrument-ids lower-bounds upper-bounds] :as encoded-constraints}
    covariance]
@@ -202,4 +236,5 @@
                  :net net
                  :long-gross long-gross
                  :short-gross short-gross}
-       :books (select-keys books [:long :short])})))
+       :books (select-keys books [:long :short])
+       :warnings (lopsided-book-warnings books gross long-gross short-gross)})))

@@ -189,6 +189,9 @@
         {:status :ok
          :strategy :sequential-equal-risk
          :selection-objective {:kind :equal-risk}
+         ;; Non-blocking presolve warnings (lopsided book budgets) ride the
+         ;; plan and surface on the solved result's warnings panel.
+         :warnings (vec (:warnings presolve-result))
          :problems [(plan-problem (assoc encoded-constraints
                                          :instrument-ids (vec instrument-ids))
                                   covariance*

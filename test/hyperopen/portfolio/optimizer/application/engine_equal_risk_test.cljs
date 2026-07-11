@@ -26,10 +26,16 @@
            {:time-ms 100 :close "102"}
            {:time-ms 200 :close "103.02"}
            {:time-ms 300 :close "103.02"}
-           {:time-ms 400 :close "107"}]}
+           {:time-ms 400 :close "107"}]
+    "SOL" [{:time-ms 0 :close "100"}
+           {:time-ms 100 :close "99"}
+           {:time-ms 200 :close "104"}
+           {:time-ms 300 :close "101"}
+           {:time-ms 400 :close "105"}]}
    :funding-history-by-coin
    {"BTC" [{:time-ms 0 :funding-rate-raw 0.00001}]
-    "ETH" [{:time-ms 0 :funding-rate-raw -0.00001}]}})
+    "ETH" [{:time-ms 0 :funding-rate-raw -0.00001}]
+    "SOL" [{:time-ms 0 :funding-rate-raw 0.00001}]}})
 
 (defn- equal-risk-request
   [& [draft-overrides]]
@@ -245,3 +251,45 @@
     (is (near? -1.0 (nth weights 1)))
     (is (near? 2.0 (get-in result [:diagnostics :gross-exposure]) 1e-6))
     (is (near? 0.0 (get-in result [:diagnostics :net-exposure]) 1e-6))))
+
+(deftest equal-risk-lopsided-books-warn-on-the-solved-result-test
+  ;; Feasible-but-degenerate targets (G=2, N=1.9 => 0.05x short budget shared
+  ;; by TWO shorts) must solve AND carry the non-blocking lopsided-books
+  ;; warning through to the published payload; the balanced mixed-books run
+  ;; above must NOT carry it.
+  (let [result (engine/run-optimization
+                (equal-risk-request
+                 {:universe [{:instrument-id "perp:BTC"
+                              :market-type :perp
+                              :coin "BTC"
+                              :shortable? true
+                              :position-side :long}
+                             {:instrument-id "perp:ETH"
+                              :market-type :perp
+                              :coin "ETH"
+                              :shortable? true
+                              :position-side :short}
+                             {:instrument-id "perp:SOL"
+                              :market-type :perp
+                              :coin "SOL"
+                              :shortable? true
+                              :position-side :short}]
+                  :constraints {:long-only? false
+                                :gross-max 2.0
+                                :net-min 1.9
+                                :net-max 1.9
+                                :max-asset-weight 2.0
+                                :max-turnover nil
+                                :perp-leverage {"perp:BTC" {:max-weight 2.0}
+                                                "perp:ETH" {:max-weight 2.0}}
+                                :rebalance-tolerance 0.001}})
+                {:solve-problem solver-adapter/solve-with-quadprog})
+        lopsided (filter #(= :equal-risk-lopsided-books (:code %))
+                         (:warnings result))]
+    (is (= :solved (:status result))
+        (pr-str (select-keys result [:status :reason :details :message])))
+    (is (= 1 (count lopsided)))
+    (let [warning (first lopsided)]
+      (is (= :short (:book warning)))
+      (is (= 2 (:asset-count warning)))
+      (is (string? (:message warning))))))

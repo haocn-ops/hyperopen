@@ -376,6 +376,7 @@
                    (dedupe-warnings
                     (concat (:warnings request)
                             (:warnings encoded)
+                            (:warnings solver-plan)
                             (:warnings risk-result)
                             (:warnings return-result)
                             (:warnings default-frontier)

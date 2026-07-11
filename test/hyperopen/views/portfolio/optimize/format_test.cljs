@@ -29,6 +29,7 @@
   (is (= "N/A" (opt-format/keyword-label nil)))
   (doseq [[value label] [[:minimum-variance "Minimum risk"]
                          [:max-sharpe "Maximum Sharpe"]
+                         [:equal-risk "Equal Risk"]
                          [:target-volatility "Target volatility"]
                          [:target-return "Target return"]
                          [:historical-mean "Historical mean"]

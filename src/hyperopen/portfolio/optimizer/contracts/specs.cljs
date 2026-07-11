@@ -354,6 +354,19 @@
              (map? (:return-decomposition-by-instrument value)))
          (or (nil? (:diagnostics value))
              (map? (:diagnostics value)))
+         ;; Present only on :equal-risk runs: the signed Euler risk-contribution
+         ;; section and the sequential-solver metadata.
+         (or (nil? (:risk-contributions value))
+             (let [contributions (:risk-contributions value)]
+               (and (map? contributions)
+                    (keyword? (:quality contributions))
+                    (finite-number-vector? (:relative-contributions contributions))
+                    (finite-number-vector? (:target-relative-contributions contributions))
+                    (instrument-keyed-map?
+                     (:relative-contributions-by-instrument contributions))
+                    (instrument-keyed-map?
+                     (:target-relative-contributions-by-instrument contributions)))))
+         (optional? map? (:equal-risk-solver value))
          (or (nil? (:rebalance-preview value))
              (and (map? (:rebalance-preview value))
                   (optional? vector? (get-in value [:rebalance-preview :rows]))

@@ -21,6 +21,7 @@
   [objective-kind]
   (case objective-kind
     :max-sharpe "Maximum Sharpe"
+    :equal-risk "Equal Risk"
     :target-volatility "Target volatility"
     :target-return "Target return"
     "Minimum risk"))

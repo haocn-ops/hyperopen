@@ -217,29 +217,36 @@
         expected-return (math/portfolio-return weights expected-returns)
         variance (math/portfolio-variance weights covariance)
         volatility (sqrt variance)]
-    {:id idx
-     :return-tilt (get-in result [:problem :return-tilt])
-     :weights weights
-     :expected-return expected-return
-     :volatility volatility
-     :sharpe (when (pos? volatility)
-               (/ (- expected-return (or risk-free-rate 0))
-                  volatility))
-     :solver-status (:status result)
-     :solver (:solver result)
-     :iterations (:iterations result)
-     :elapsed-ms (:elapsed-ms result)}))
+    (cond-> {:id idx
+             :return-tilt (get-in result [:problem :return-tilt])
+             :weights weights
+             :expected-return expected-return
+             :volatility volatility
+             :sharpe (when (pos? volatility)
+                       (/ (- expected-return (or risk-free-rate 0))
+                          volatility))
+             :solver-status (:status result)
+             :solver (:solver result)
+             :iterations (:iterations result)
+             :elapsed-ms (:elapsed-ms result)}
+      (:equal-risk result)
+      (assoc :equal-risk (:equal-risk result)))))
 
 (defn- rejected-results
   [solver-results]
   (->> solver-results
        (keep-indexed (fn [idx result]
                        (when-not (solved? result)
-                         {:index idx
-                          :status (:status result)
-                          :solver (:solver result)
-                          :objective-value (:objective-value result)
-                          :violations (solver-result-violations result)})))
+                         (cond-> {:index idx
+                                  :status (:status result)
+                                  :solver (:solver result)
+                                  :objective-value (:objective-value result)
+                                  :violations (solver-result-violations result)}
+                           ;; Iterative strategies attach a specific failure
+                           ;; reason/message (e.g. :equal-risk-no-feasible-start);
+                           ;; carry them so the run banner can say why.
+                           (:reason result) (assoc :reason (:reason result))
+                           (:message result) (assoc :message (:message result))))))
        vec))
 
 (defn- solver-failure

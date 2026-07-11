@@ -278,3 +278,86 @@
           (.catch (fn [err]
                     (is false (str "worker performance guard failed: " err))
                     (done)))))))
+
+(defn- equal-risk-worker-request
+  []
+  (let [instrument-ids ["perp:QA0" "perp:QA1" "perp:QA2"]
+        observations 90]
+    {:scenario-id "equal-risk-worker"
+     :universe [{:instrument-id "perp:QA0"
+                 :market-type :perp
+                 :coin "QA0"
+                 :shortable? true
+                 :position-side :long}
+                {:instrument-id "perp:QA1"
+                 :market-type :perp
+                 :coin "QA1"
+                 :shortable? true
+                 :position-side :long}
+                {:instrument-id "perp:QA2"
+                 :market-type :perp
+                 :coin "QA2"
+                 :shortable? true
+                 :position-side :short}]
+     :current-portfolio {:capital {:nav-usdc 100000}
+                         :by-instrument {"perp:QA0" {:weight 0.5}
+                                         "perp:QA1" {:weight 0.5}
+                                         "perp:QA2" {:weight -0.5}}}
+     :return-model {:kind :historical-mean}
+     :risk-model {:kind :diagonal-shrink}
+     :objective {:kind :equal-risk}
+     :constraints {:gross-leverage 2.0
+                   :net-exposure {:min 0.5 :max 0.5}
+                   :max-asset-weight 1.5
+                   :rebalance-tolerance 0.0001}
+     :execution-assumptions {:fallback-slippage-bps 25
+                             :prices-by-id (into {}
+                                                 (map-indexed
+                                                  (fn [idx instrument-id]
+                                                    [instrument-id (+ 100 idx)]))
+                                                 instrument-ids)}
+     :history {:return-series-by-instrument
+               (into {}
+                     (map-indexed
+                      (fn [idx instrument-id]
+                        [instrument-id
+                         (synthetic-return-series idx observations)]))
+                     instrument-ids)
+               :funding-by-instrument
+               (into {}
+                     (map (fn [instrument-id]
+                            [instrument-id {:annualized-carry 0
+                                            :source :synthetic-fixture}]))
+                     instrument-ids)}
+     :warnings []
+     :as-of-ms 1777046400000}))
+
+(deftest optimizer-worker-solves-equal-risk-with-exact-exposure-targets-test
+  ;; The real worker path (OSQP under Node): the sequential equal-risk solve
+  ;; must produce a solved payload whose published weights hit the gross/net
+  ;; TARGETS exactly and whose risk-contribution section is present and sane.
+  (async done
+    (-> (worker/optimizer-result-payload (equal-risk-worker-request))
+        (.then (fn [result]
+                 (is (= :solved (:status result))
+                     (pr-str (select-keys result [:status :reason :details])))
+                 (is (= :sequential-equal-risk (get-in result [:solver :strategy])))
+                 (let [weights (:target-weights result)
+                       gross (reduce + 0 (map js/Math.abs weights))
+                       net (reduce + 0 weights)]
+                   (is (< (js/Math.abs (- gross 2.0)) 1e-5))
+                   (is (< (js/Math.abs (- net 0.5)) 1e-5))
+                   (is (neg? (nth weights 2)) "the short side stays short"))
+                 (let [contributions (:risk-contributions result)]
+                   (is (= :signed-euler-volatility (:method contributions)))
+                   (is (contains? #{:exact :approximate :not-converged}
+                                  (:quality contributions)))
+                   (is (< (js/Math.abs (- 1 (:sum-relative-contributions contributions)))
+                          1e-6)))
+                 (is (map? (:equal-risk-solver result)))
+                 (is (= 1 (count (:frontier result)))
+                     "no frontier sweep: only the selected point")
+                 (done)))
+        (.catch (fn [err]
+                  (is false (str "worker equal-risk run failed: " err))
+                  (done))))))

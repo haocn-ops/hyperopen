@@ -1656,7 +1656,12 @@ test("portfolio optimizer setup exposes separate model layers @regression", asyn
   await expect.poll(async () => constraintsPanel.evaluate((element) => element.open)).toBe(true);
   await expect.poll(async () => advancedPanel.evaluate((element) => element.open)).toBe(false);
   await expect(returnModelPanel).toBeHidden();
-  await expect(maxAssetWeight).toBeVisible();
+  // Since the 2026-07-10 quieter-by-default pass the per-asset cap rests as a
+  // read-only value on the Risk guards card; the editable input appears only
+  // after the card's Edit disclosure opens.
+  await expect(maxAssetWeight).toBeHidden();
+  await expect(page.locator("[data-role='portfolio-optimizer-risk-guards-cap-value']"))
+    .toContainText("50%");
 
   const summaryPane = page.locator("[data-role='portfolio-optimizer-setup-policy-pane']");
   const assumptionsPanel = page.locator("[data-role='portfolio-optimizer-model-assumptions-panel']");
@@ -1747,6 +1752,7 @@ test("portfolio optimizer setup exposes separate model layers @regression", asyn
   await expect(riskModelPanel).toBeVisible();
 
   await expect.poll(async () => constraintsPanel.evaluate((element) => element.open)).toBe(true);
+  await page.locator("[data-role='portfolio-optimizer-risk-guards-card'] summary").click();
   await expect(maxAssetWeight).toBeVisible();
 
   const maxSharpe = page.locator("[data-role='portfolio-optimizer-objective-max-sharpe']");
@@ -1793,6 +1799,21 @@ test("portfolio optimizer setup exposes separate model layers @regression", asyn
   // The advanced targets live behind the collapsed "More goals" drawer since
   // the goal consolidation; open it before selecting one.
   await page.locator("[data-role='portfolio-optimizer-more-goals'] summary").click();
+
+  // Equal Risk is the parameterless More-goals card: selecting it flips the
+  // card, sets only the objective (no return-model change, no parameter
+  // block), and its covariance-only framing is stated on the card itself.
+  const equalRiskObjective = page.locator("[data-role='portfolio-optimizer-objective-equal-risk']");
+  await expect(equalRiskObjective)
+    .toContainText("Balance each position's share of portfolio risk");
+  await expect(equalRiskObjective).toContainText("no return forecast needed");
+  await expect(equalRiskObjective).toHaveAttribute("aria-pressed", "false");
+  await equalRiskObjective.click();
+  await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
+  await expect(equalRiskObjective).toHaveAttribute("aria-pressed", "true");
+  await expect(targetReturn).toHaveCount(0);
+  await expect(targetVolatility).toHaveCount(0);
+
   await targetVolatilityObjective.click();
   await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
   await expect(targetVolatility).toHaveValue("20");

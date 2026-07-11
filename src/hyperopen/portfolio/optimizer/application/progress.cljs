@@ -45,6 +45,7 @@
                                (:universe request)))
         return-model (:return-model request)
         risk-model (:risk-model request)
+        equal-risk? (= :equal-risk (get-in request [:objective :kind]))
         frontier-count (or (get-in request [:objective :frontier-points])
                            40)]
     [{:id :fetch-returns
@@ -64,16 +65,30 @@
       :detail (keyword-label (:kind return-model))
       :status :pending
       :percent 0}
-     {:id :solve
-      :label "QP solve"
-      :detail "OSQP"
-      :status :pending
-      :percent 0}
-     {:id :frontier
-      :label "frontier sweep"
-      :detail (str frontier-count " points")
-      :status :pending
-      :percent 0}
+     (if equal-risk?
+       {:id :solve
+        :label "equal-risk solve"
+        :detail "sequential QP"
+        :status :pending
+        :percent 0}
+       {:id :solve
+        :label "QP solve"
+        :detail "OSQP"
+        :status :pending
+        :percent 0})
+     ;; Equal Risk produces one selected portfolio - there is no return-tilt
+     ;; sweep, so the frontier step only covers target selection.
+     (if equal-risk?
+       {:id :frontier
+        :label "target selection"
+        :detail "selected point"
+        :status :pending
+        :percent 0}
+       {:id :frontier
+        :label "frontier sweep"
+        :detail (str frontier-count " points")
+        :status :pending
+        :percent 0})
      {:id :diagnostics
       :label "diagnostics + rebalance preview"
       :detail "signed exposure"

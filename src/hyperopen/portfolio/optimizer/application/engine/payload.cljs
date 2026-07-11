@@ -4,9 +4,11 @@
             [hyperopen.portfolio.optimizer.application.engine.target-selection :as target-selection]
             [hyperopen.portfolio.optimizer.application.instrument-labels :as instrument-labels]
             [hyperopen.portfolio.optimizer.domain.diagnostics :as diagnostics]
+            [hyperopen.portfolio.optimizer.domain.equal-risk :as equal-risk]
             [hyperopen.portfolio.optimizer.domain.frontier-overlays :as frontier-overlays]
             [hyperopen.portfolio.optimizer.domain.math :as math]
             [hyperopen.portfolio.optimizer.domain.rebalance :as rebalance]
+            [hyperopen.portfolio.optimizer.domain.risk-contributions :as risk-contributions]
             [hyperopen.portfolio.optimizer.domain.weight-cleaning :as weight-cleaning]
             [hyperopen.portfolio.optimizer.coercion :as coercion]))
 
@@ -31,17 +33,53 @@
                  (pos? nav-usdc))
         (/ dust-usdc nav-usdc)))))
 
+(defn- equal-risk-request?
+  [request]
+  (= :equal-risk (get-in request [:objective :kind])))
+
 (defn- aligned-clean-weights
   [instrument-ids weights encoded-constraints request]
   (let [cleaned (weight-cleaning/clean-weights
                  {:instrument-ids instrument-ids
                   :weights weights
-                  :dust-threshold (dust-threshold request)
+                  ;; Equal Risk publishes the validated solver weights verbatim:
+                  ;; dust removal would break the exact book equalities and
+                  ;; every position in the fixed universe is intentional.
+                  :dust-threshold (if (equal-risk-request? request)
+                                    0
+                                    (dust-threshold request))
                   :long-only? (:long-only? encoded-constraints)
                   :target-net (:net-target encoded-constraints)})
         by-id (zipmap (:instrument-ids cleaned) (:weights cleaned))]
     {:target-weights (mapv #(or (get by-id %) 0) instrument-ids)
      :dropped (:dropped cleaned)}))
+
+(defn- equal-risk-sections
+  "The :risk-contributions and :equal-risk-solver payload sections plus any
+  warnings, ALL computed from the FINAL published target weights (never the
+  raw solver candidate). Quality gates :exact on solver convergence."
+  [request risk-result selection instrument-ids target-weights]
+  (when (equal-risk-request? request)
+    (let [n (count instrument-ids)
+          targets (vec (repeat n (/ 1 n)))
+          solver-metadata (get-in selection [:selected :equal-risk])
+          converged? (boolean (:converged? solver-metadata))
+          summary (risk-contributions/contribution-summary
+                   {:instrument-ids instrument-ids
+                    :covariance (:covariance risk-result)
+                    :weights target-weights
+                    :targets targets})]
+      (if (not= :ok (:status summary))
+        {:warnings [{:code :equal-risk-contributions-unavailable
+                     :message "Risk contributions could not be computed for the published weights (degenerate portfolio variance)."}]}
+        (let [quality (equal-risk/classify-quality summary n converged?)]
+          {:risk-contributions (-> summary
+                                   (dissoc :status)
+                                   (assoc :quality quality))
+           :equal-risk-solver solver-metadata
+           :warnings (when (= :not-converged quality)
+                       [{:code :equal-risk-not-converged
+                         :message "Equal Risk stopped at its iteration limit before converging - showing the best feasible portfolio found. Risk contributions are labeled Not converged."}])})))))
 
 (defn- normalized-instruments-by-id
   [universe]
@@ -311,8 +349,18 @@
                                       current-weights*)
         current-expected-return (:expected-return current-portfolio-metrics*)
         current-volatility (:volatility current-portfolio-metrics*)
-        expected-return (math/portfolio-return target-weights expected-returns)
+        ;; Equal Risk solves through an invalid return model (it never uses
+        ;; returns); return-based display metrics are then omitted, not faked.
+        returns-unavailable? (and (equal-risk-request? request)
+                                  (= :invalid (:status return-result)))
+        expected-return (when-not returns-unavailable?
+                          (math/portfolio-return target-weights expected-returns))
         volatility (sqrt (math/portfolio-variance target-weights (:covariance risk-result)))
+        equal-risk-sections* (equal-risk-sections request
+                                                  risk-result
+                                                  selection
+                                                  instrument-ids
+                                                  target-weights)
         labels-by-instrument* (labels-by-instrument
                                request
                                (vec (distinct (concat instrument-ids
@@ -331,8 +379,15 @@
                             (:warnings risk-result)
                             (:warnings return-result)
                             (:warnings default-frontier)
+                            (:warnings equal-risk-sections*)
+                            (when returns-unavailable?
+                              [{:code :return-model-unavailable-for-display
+                                :message "Expected-return estimates are unavailable; Equal Risk weights never use them, so only return-based display metrics are hidden."}])
                             (when cash-warning [cash-warning])
                             (when sparse-warning [sparse-warning]))))]
+    (merge
+     ;; :equal-risk only: contribution + solver sections from published weights.
+     (select-keys equal-risk-sections* [:risk-contributions :equal-risk-solver])
     {:status :solved
      :scenario-id (:scenario-id request)
      :as-of-ms (:as-of-ms request)
@@ -383,7 +438,7 @@
      :rebalance-preview (rebalance-preview request
                                            instrument-ids
                                            current-weights*
-                                           target-weights)}))
+                                           target-weights)})))
 
 (defn infeasible-payload
   [request risk-result return-result solver-plan]

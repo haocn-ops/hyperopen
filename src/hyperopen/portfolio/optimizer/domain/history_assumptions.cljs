@@ -131,7 +131,8 @@
 
 (def objectives-needing-expected-return
   "Objective kinds that score on expected returns, so a no/short-history asset must
-  supply an expected return. Minimum-variance is the only kind that does not."
+  supply an expected return. Minimum-variance and equal-risk are covariance-only
+  and stay out of this set."
   #{:max-sharpe :target-return :target-volatility})
 
 (defn return-required-for-objective?

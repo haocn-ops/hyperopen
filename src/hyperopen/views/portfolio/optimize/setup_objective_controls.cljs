@@ -11,6 +11,7 @@
   [objective-kind]
   (case objective-kind
     :max-sharpe "Maximum Sharpe — best risk-adjusted return, uses your views"
+    :equal-risk "Equal Risk — balance each position's share of portfolio risk"
     :target-volatility "Target volatility — max return at a pinned σ"
     :target-return "Target return — lowest risk at a required return"
     "Minimum risk — lowest volatility, no return forecast needed"))
@@ -63,10 +64,12 @@
         (= :max-sharpe objective-kind)
         "portfolio-optimizer-objective-max-sharpe"
         [:actions/apply-portfolio-optimizer-setup-preset :max-sharpe])]
-      ;; The advanced targets are needed by exception: collapsed by default so
+      ;; The advanced goals are needed by exception: collapsed by default so
       ;; the goal section stays two cards tall. Selecting one keeps the drawer
       ;; open on re-render (the attribute only sets initial state otherwise).
-      (let [advanced? (contains? #{:target-volatility :target-return} objective-kind)]
+      (let [advanced? (contains? #{:target-volatility :target-return :equal-risk}
+                                 objective-kind)
+            parameterized? (contains? #{:target-volatility :target-return} objective-kind)]
         [:details (cond-> {:class ["mt-3"]
                            :data-role "portfolio-optimizer-more-goals"}
                     advanced? (assoc :open true))
@@ -75,6 +78,13 @@
                                  controls/eyebrow-class)}
           "More goals"]
          [:div {:class ["mt-2" "grid" "grid-cols-1" "gap-1.5" "sm:grid-cols-2"]}
+          ;; Parameterless like Minimum risk: covariance decides the sizing, the
+          ;; user's sides and exposure targets stay authoritative, and the return
+          ;; model is left untouched (forecasts never move Equal Risk weights).
+          (secondary-goal-card "Equal Risk" "Balance each position's share of portfolio risk · no return forecast needed"
+                               (= :equal-risk objective-kind)
+                               "portfolio-optimizer-objective-equal-risk"
+                               [:actions/set-portfolio-optimizer-objective-kind :equal-risk])
           (secondary-goal-card "Target volatility" "Pin σ to a fixed level, max return at that σ"
                                (= :target-volatility objective-kind)
                                "portfolio-optimizer-objective-target-volatility"
@@ -83,7 +93,7 @@
                                (= :target-return objective-kind)
                                "portfolio-optimizer-objective-target-return"
                                [:actions/set-portfolio-optimizer-objective-kind :target-return])]
-         (when advanced?
+         (when parameterized?
            [:div {:class ["mt-2"]}
             (case objective-kind
               :target-volatility

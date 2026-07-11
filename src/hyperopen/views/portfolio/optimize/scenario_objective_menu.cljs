@@ -21,6 +21,9 @@
    {:key :max-sharpe
     :title "Maximum Sharpe"
     :description "Best risk-adjusted return — uses your return views where you have them, implied returns otherwise"}
+   {:key :equal-risk
+    :title "Equal Risk"
+    :description "Balances each position's contribution to portfolio volatility as closely as possible while preserving your long/short sides, gross leverage, net bias, and position limits. Covariance-only — return forecasts never move the weights; exact equality may not be achievable under your exposure targets"}
    {:key :target-volatility
     :title "Target volatility"
     :description "Pin σ to a fixed level, max return at that σ"}
@@ -36,6 +39,7 @@
                            (get-in result [:solver :objective-kind]))]
     (cond
       (= :minimum-variance objective-kind) :minimum-volatility
+      (= :equal-risk objective-kind) :equal-risk
       (= :target-volatility objective-kind) :target-volatility
       (= :target-return objective-kind) :maximum-return
       :else :max-sharpe)))

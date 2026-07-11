@@ -4,6 +4,7 @@
             [hyperopen.views.portfolio.optimize.refinement-status-card :as refinement-card]
             [hyperopen.views.portfolio.optimize.results-diagnostics-rail :as diagnostics-rail]
             [hyperopen.views.portfolio.optimize.results-summary :as summary]
+            [hyperopen.views.portfolio.optimize.risk-contributions-card :as risk-contributions-card]
             [hyperopen.views.portfolio.optimize.scenario-objective-menu :as objective-menu]
             [hyperopen.views.portfolio.optimize.target-exposure-table :as target-exposure-table]))
 
@@ -58,16 +59,24 @@
          [:div {:class ["optimizer-results-center-panel" "min-h-0" "bg-base-100" "p-6"
                         "space-y-4"]
                 :data-role "portfolio-optimizer-results-center-panel"}
-          (frontier-chart/frontier-chart
-           draft
-           result
-           frontier-overlay-mode
-           constrain-frontier?)
+          ;; Equal Risk yields one selected portfolio, not a frontier: the
+          ;; risk-contribution balance replaces the frontier chart (a one-point
+          ;; "curve" whose click handler would silently switch the objective to
+          ;; Target Return), and the frontier-density refinement card goes with
+          ;; it — there is no sweep to refine.
+          (if (= :equal-risk (get-in result [:solver :objective-kind]))
+            (risk-contributions-card/risk-contributions-card result)
+            (frontier-chart/frontier-chart
+             draft
+             result
+             frontier-overlay-mode
+             constrain-frontier?))
           ;; Decision-support before solver tuning: the engine-derived "why this
           ;; target" facts sit directly under the chart; the refinement card below
           ;; is compact with its options behind a disclosure.
           (summary/target-context-card result)
-          (refinement-card/refinement-status-card refinement)]
+          (when-not (= :equal-risk (get-in result [:solver :objective-kind]))
+            (refinement-card/refinement-status-card refinement))]
          ;; Rail order is review-first: confidence (leads with the next-step row),
          ;; then trust diagnostics, then the collapsed views editor — input editing
          ;; is the by-exception task on this page.

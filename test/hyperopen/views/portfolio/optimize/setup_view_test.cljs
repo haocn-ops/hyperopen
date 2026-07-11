@@ -36,6 +36,13 @@
            (click-actions
             (node-by-role view-node
                           "portfolio-optimizer-objective-max-sharpe"))))
+    ;; Equal Risk is a parameterless More-goals card: it sets only the
+    ;; objective, leaving the return model untouched (forecasts never move
+    ;; Equal Risk weights).
+    (is (= [[:actions/set-portfolio-optimizer-objective-kind :equal-risk]]
+           (click-actions
+            (node-by-role view-node
+                          "portfolio-optimizer-objective-equal-risk"))))
     (is (nil? (node-by-role view-node "portfolio-optimizer-setup-preset-risk-adjusted")))
     (is (nil? (node-by-role view-node "portfolio-optimizer-setup-preset-use-my-views")))
     (is (some? (node-by-role view-node "portfolio-optimizer-draft-state")))

@@ -10,7 +10,18 @@
    :gross-floor-above-gross-max #{:gross-min :gross-max}
    :gross-floor-exceeds-capacity #{:gross-min :max-asset-weight}
    :solver-result-gross-exposure-violation #{:gross-max}
-   :solver-result-turnover-violation #{:max-turnover}})
+   :solver-result-turnover-violation #{:max-turnover}
+   :equal-risk-net-exceeds-gross #{:gross-max :net-min :net-max}
+   :equal-risk-net-target-outside-band #{:net-min :net-max}
+   :equal-risk-gross-target-not-positive #{:gross-max}
+   :equal-risk-gross-target-above-max #{:gross-max}
+   :equal-risk-gross-target-below-floor #{:gross-min :gross-max}
+   :equal-risk-long-book-empty #{:net-min :net-max}
+   :equal-risk-short-book-empty #{:net-min :net-max}
+   :equal-risk-long-book-minimum-above-target #{:held-locks}
+   :equal-risk-short-book-minimum-above-target #{:held-locks}
+   :equal-risk-long-book-capacity-below-target #{:max-asset-weight}
+   :equal-risk-short-book-capacity-below-target #{:max-asset-weight}})
 
 (def ^:private violation-constraint-control-keys
   {:gross-exposure #{:gross-max}

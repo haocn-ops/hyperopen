@@ -11,18 +11,27 @@
     :instrument-type
     :kind
     :market-type
+    ;; Equal-risk result sections (:risk-contributions / :equal-risk-solver):
+    ;; contribution method, exact/approximate quality, solver termination, and
+    ;; the initializer name all cross the worker boundary as keyword values.
+    :method
     :model
     :objective-kind
     :order-type
+    :position-side
     :prior-source
+    :quality
     :reason
     :regression-status
     :regression-skip-reason
     :relationship-strength
+    :selected-initialization
+    :seed-kind
     :side
     :source
     :status
     :strategy
+    :termination-reason
     :type})
 
 (def instrument-keyed-map-keys
@@ -61,6 +70,9 @@
     ;; "market-metadata-missing" rows in the rebalance preview.
     :current-portfolio-weights-by-instrument
     :weight-sensitivity-by-instrument
+    ;; Equal-risk :risk-contributions submaps (result-only).
+    :relative-contributions-by-instrument
+    :target-relative-contributions-by-instrument
     :pair-metadata
     :labels-by-instrument})
 

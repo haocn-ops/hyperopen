@@ -1,6 +1,7 @@
 (ns hyperopen.portfolio.optimizer.domain.objectives
   (:require [hyperopen.portfolio.optimizer.coercion :as coercion]
-            [hyperopen.portfolio.optimizer.domain.closed-form :as closed-form]))
+            [hyperopen.portfolio.optimizer.domain.closed-form :as closed-form]
+            [hyperopen.portfolio.optimizer.domain.equal-risk-plan :as equal-risk-plan]))
 
 (def default-frontier-point-count
   40)
@@ -471,6 +472,11 @@
 
         :target-volatility
         (frontier-plan opts)
+
+        ;; Covariance-only: never consumes expected returns, never sweeps a
+        ;; frontier. One :sequential-equal-risk problem (or presolve failure).
+        :equal-risk
+        (equal-risk-plan/build-plan opts)
 
         {:status :infeasible
          :reason :unknown-objective

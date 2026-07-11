@@ -403,3 +403,39 @@
     ;; ... and NOT the L1 split-variable channel (where a >= floor is unenforceable)
     (is (not-any? #(= :gross-floor (:code %))
                   (get-in plan [:problems 0 :l1-constraints])))))
+
+(deftest build-solver-plan-selects-sequential-equal-risk-strategy-test
+  (let [encoded {:status :ok
+                 :long-only? false
+                 :instrument-ids ["perp:A" "perp:B"]
+                 :current-weights [0 0]
+                 :lower-bounds [0 -1]
+                 :upper-bounds [1 0]
+                 :locked-weights []
+                 :gross-exposure {:max 2.0}
+                 :net-exposure {:min 0.0 :max 0.0}
+                 :exposure-targets {:gross-target 2.0 :gross-band 0.0
+                                    :net-target 0.0 :net-band 0.0}
+                 :side-metadata [{:instrument-id "perp:A"
+                                  :requested-side :long
+                                  :shortable? true}
+                                 {:instrument-id "perp:B"
+                                  :requested-side :short
+                                  :shortable? true}]
+                 :violations []}
+        opts {:objective {:kind :equal-risk}
+              :instrument-ids ["perp:A" "perp:B"]
+              :expected-returns [0.1 0.2]
+              :covariance [[0.04 0.01] [0.01 0.04]]
+              :encoded-constraints encoded}
+        plan (objectives/build-solver-plan opts)]
+    (is (= :ok (:status plan)))
+    (is (= :sequential-equal-risk (:strategy plan)))
+    (is (= 1 (count (:problems plan))))
+    (is (= :sequential-equal-risk (get-in plan [:problems 0 :kind])))
+    (is (= :equal-risk (get-in plan [:problems 0 :objective-kind])))
+    ;; Covariance-only: the planned problem never carries expected returns.
+    (is (nil? (get-in plan [:problems 0 :expected-returns])))
+    (is (nil? (get-in plan [:problems 0 :linear])))
+    ;; Equal-risk never builds a display-frontier plan (no sweep to draw).
+    (is (nil? (objectives/build-display-frontier-plan opts)))))

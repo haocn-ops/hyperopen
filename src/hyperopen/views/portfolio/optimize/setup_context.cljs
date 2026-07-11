@@ -8,6 +8,7 @@
             ["lucide/dist/esm/icons/target.js" :default lucide-target]
             ["lucide/dist/esm/icons/waypoints.js" :default lucide-waypoints]
             [hyperopen.portfolio.optimizer.application.view-model :as optimizer-view-model]
+            [hyperopen.portfolio.optimizer.application.view-model.setup-summary :as setup-summary]
             [hyperopen.portfolio.routes :as portfolio-routes]
             [hyperopen.views.portfolio.optimize.optimization-progress-panel :as optimization-progress-panel]
             [hyperopen.views.portfolio.optimize.run-status-panel :as run-status-panel]
@@ -217,7 +218,14 @@
                             last-run-visible?
                             read-only-message)
         views-active? (= :black-litterman (get-in draft [:return-model :kind]))
-        min-variance? (= :minimum-variance (get-in draft [:objective :kind]))
+        objective-kind (get-in draft [:objective :kind])
+        ;; Covariance-only goals: views never influence the weights, so the
+        ;; rail note names the goal and the CTA switches goals.
+        return-free? (contains? setup-summary/return-free-objective-kinds
+                                objective-kind)
+        return-free-label (case objective-kind
+                            :equal-risk "Not used by Equal Risk"
+                            "Not used by Minimum risk")
         readiness-model (optimizer-view-model/readiness-panel-model readiness history-load-state)
         ;; Computed once for the whole rail: the assumptions panel rows, the
         ;; Run-summary History-data line, and the unified verdict (the same
@@ -293,17 +301,17 @@
          [:p {:class eyebrow-class} "Return views"]
          [:span {:class ["min-w-0" "truncate" "text-[0.6875rem]" "text-trading-muted"]
                  :data-role "portfolio-optimizer-return-views-inactive"}
-          (if min-variance? "Not used by Minimum risk" "Not used")]
+          (if return-free? return-free-label "Not used")]
          [:button {:type "button"
                    :class ["ml-auto" "shrink-0" "border" "border-base-300" "bg-base-200/40"
                            "px-2" "py-0.5" "text-[0.6875rem]" "font-semibold"
                            "text-trading-muted" "hover:bg-base-200/60"]
                    :data-role "portfolio-optimizer-return-views-activate"
-                   :on {:click (if min-variance?
+                   :on {:click (if return-free?
                                  [[:actions/apply-portfolio-optimizer-setup-preset :max-sharpe]]
                                  [[:actions/set-portfolio-optimizer-return-model-kind
                                    :black-litterman]])}}
-          (if min-variance? "Switch to Maximum Sharpe" "Use my views")]]])
+          (if return-free? "Switch to Maximum Sharpe" "Use my views")]]])
      (history-assumptions-rail-panel rail-model)
      (when status-visible?
        [:section {:class ["optimizer-setup-panel" "border-t" "border-base-300" "bg-base-100/90" "p-3"]

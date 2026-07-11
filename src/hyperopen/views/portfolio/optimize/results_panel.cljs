@@ -1,9 +1,13 @@
 (ns hyperopen.views.portfolio.optimize.results-panel
   (:require [hyperopen.portfolio.optimizer.application.view-model.results :as results-model]
+            [hyperopen.views.portfolio.optimize.equal-risk-confidence-rail
+             :as equal-risk-confidence-rail]
             [hyperopen.views.portfolio.optimize.frontier-chart :as frontier-chart]
             [hyperopen.views.portfolio.optimize.refinement-status-card :as refinement-card]
             [hyperopen.views.portfolio.optimize.results-diagnostics-rail :as diagnostics-rail]
             [hyperopen.views.portfolio.optimize.results-summary :as summary]
+            [hyperopen.views.portfolio.optimize.risk-contributions-card :as risk-contributions-card]
+            [hyperopen.views.portfolio.optimize.risk-return-context :as risk-return-context]
             [hyperopen.views.portfolio.optimize.scenario-objective-menu :as objective-menu]
             [hyperopen.views.portfolio.optimize.target-exposure-table :as target-exposure-table]))
 
@@ -58,22 +62,49 @@
          [:div {:class ["optimizer-results-center-panel" "min-h-0" "bg-base-100" "p-6"
                         "space-y-4"]
                 :data-role "portfolio-optimizer-results-center-panel"}
-          (frontier-chart/frontier-chart
-           draft
-           result
-           frontier-overlay-mode
-           constrain-frontier?)
-          ;; Decision-support before solver tuning: the engine-derived "why this
-          ;; target" facts sit directly under the chart; the refinement card below
-          ;; is compact with its options behind a disclosure.
-          (summary/target-context-card result)
-          (refinement-card/refinement-status-card refinement)]
+          ;; Equal Risk yields one selected portfolio, not a frontier: the
+          ;; risk-contribution balance chart replaces the frontier chart (a
+          ;; one-point "curve" whose click handler would silently switch the
+          ;; objective to Target Return), a collapsed Risk/Return Context
+          ;; scatter provides the vol/return view without implying a frontier,
+          ;; the why-card speaks in risk contributions, and the
+          ;; frontier-density refinement card disappears — there is no sweep
+          ;; to refine.
+          (let [equal-risk? (= :equal-risk (get-in result [:solver :objective-kind]))]
+            ;; Plain conditional siblings, never a list-as-one-child (Replicant
+            ;; stringifies those); the whole set only toggles when the solved
+            ;; objective itself changes.
+            [:div {:class ["space-y-4"]
+                   :replicant/key (if equal-risk? "equal-risk-center" "frontier-center")}
+             (when equal-risk?
+               (risk-contributions-card/risk-contributions-card result))
+             (when equal-risk?
+               (risk-return-context/risk-return-context result))
+             (when equal-risk?
+               (summary/equal-risk-context-card result))
+             (when-not equal-risk?
+               (frontier-chart/frontier-chart
+                draft
+                result
+                frontier-overlay-mode
+                constrain-frontier?))
+             ;; Decision-support before solver tuning: the engine-derived "why
+             ;; this target" facts sit directly under the chart; the refinement
+             ;; card below is compact with its options behind a disclosure.
+             (when-not equal-risk?
+               (summary/target-context-card result))
+             (when-not equal-risk?
+               (refinement-card/refinement-status-card refinement))])]
          ;; Rail order is review-first: confidence (leads with the next-step row),
          ;; then trust diagnostics, then the collapsed views editor — input editing
          ;; is the by-exception task on this page.
          [:div {:class ["optimizer-results-right-panel" "min-h-0"
                         "xl:col-span-2" "2xl:col-span-1"]
                 :data-role "portfolio-optimizer-results-right-panel"}
-          (diagnostics-rail/result-confidence-rail refinement)
+          ;; Equal Risk gets its own confidence rail (fit / allocation freedom
+          ;; / solution stability / real stop reasons); the refinement-based
+          ;; rail speaks frontier language that does not exist for it.
+          (or (equal-risk-confidence-rail/equal-risk-confidence-rail result)
+              (diagnostics-rail/result-confidence-rail refinement))
           (diagnostics-rail/trust-diagnostics-rail result)
           (active-views-editor state draft result readiness)]]]))))

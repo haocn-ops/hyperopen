@@ -8,7 +8,9 @@
             [hyperopen.workbench.support.layout :as layout]
             [hyperopen.views.portfolio.optimize.results-panel :as results-panel]
             [hyperopen.views.portfolio.optimize.results-summary :as results-summary]
-            [hyperopen.views.portfolio.optimize.scenario-detail-view :as scenario-detail]))
+            ;; recommendation-deltas moved here from scenario-detail-view when
+            ;; the KPI strip was extracted (Equal Risk results redesign).
+            [hyperopen.views.portfolio.optimize.scenario-kpi-strip :as kpi-strip]))
 
 (portfolio/configure-scenes
   {:title "Recommendation tab"
@@ -161,7 +163,7 @@
     [:div {:class ["portfolio-optimizer" "mx-auto" "w-full"]
            :style {:max-width "1440px"}}
      [:div {:class ["space-y-0"]}
-      (results-summary/verdict-headline (scenario-detail/recommendation-deltas result))
+      (results-summary/verdict-headline (kpi-strip/recommendation-deltas result))
       (results-panel/results-panel
        {:result result
         :computed-at-ms 1751400000000}

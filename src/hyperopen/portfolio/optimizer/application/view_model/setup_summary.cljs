@@ -66,8 +66,14 @@
   and stays in secondary/technical copy only."
   {:minimum-variance "Minimum risk"
    :max-sharpe "Maximum Sharpe"
+   :equal-risk "Equal Risk"
    :target-volatility "Target volatility"
    :target-return "Target return"})
+
+(def return-free-objective-kinds
+  "Objectives whose weights never consume expected returns (covariance-only),
+  so the Run summary shows \"Not used\" under Return forecast for them."
+  #{:minimum-variance :equal-risk})
 
 (defn- universe-label
   [instrument]
@@ -247,7 +253,7 @@
          labelize* #(apply-labelize labelize %)
          preset (active-preset draft)
          objective-kind (get-in draft [:objective :kind])
-         min-variance? (= :minimum-variance objective-kind)
+         return-free? (contains? return-free-objective-kinds objective-kind)
          returns-label (or (returns-source-label draft)
                            (labelize* (get-in draft [:return-model :kind])))
          strip (fn [label prefix]
@@ -258,11 +264,13 @@
       :objective-label (get objective-display-names objective-kind
                             (labelize* objective-kind))
       :returns-label returns-label
-      ;; Minimum variance does not consume expected returns at all: saying
-      ;; "Historical mean" under Returns implies the forecast drives the result.
-      :return-forecast-label (if min-variance? "Not used" returns-label)
+      ;; Covariance-only objectives (Minimum risk, Equal Risk) never consume
+      ;; expected returns: saying "Historical mean" under Returns would imply
+      ;; the forecast drives the result.
+      :return-forecast-label (if return-free? "Not used" returns-label)
       :views-active? (= :black-litterman (get-in draft [:return-model :kind]))
-      :min-variance? min-variance?
+      :min-variance? (= :minimum-variance objective-kind)
+      :return-free? return-free?
       ;; The policy's TARGET point (band centers), formatted for the Run
       ;; summary's single Exposure line — the designer's card reads the target,
       ;; not the four band rows (2026-07-10 mock parity).

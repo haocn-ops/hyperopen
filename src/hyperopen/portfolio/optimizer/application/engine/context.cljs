@@ -355,7 +355,11 @@
              :detail "encoding constraints"})
          current-portfolio-analysis* (current-portfolio-analysis request
                                                                  return-result)]
-     (if (= :invalid (:status return-result))
+     ;; Equal Risk is covariance-only: an invalid return model must not block
+     ;; the solve (risk-model readiness still applies). Return-dependent
+     ;; objectives keep the invalid-return-model infeasibility.
+     (if (and (= :invalid (:status return-result))
+              (not= :equal-risk (get-in request [:objective :kind])))
        {:risk-result risk-result
         :return-result return-result
         :expected-returns expected-returns

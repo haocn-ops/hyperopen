@@ -260,8 +260,9 @@
                    target-volatility-draft
                    nil)
         wrappers (option-card-wrappers menu-node)]
-    ;; Four objectives since the consolidation: "Use my views" is a return-input
-    ;; policy carried by Maximum Sharpe, not a peer option.
-    (is (= 4 (count wrappers)))
+    ;; Five objectives: the four from the consolidation ("Use my views" is a
+    ;; return-input policy carried by Maximum Sharpe, not a peer option) plus
+    ;; Equal Risk.
+    (is (= 5 (count wrappers)))
     (is (every? #(some? (click-actions %)) wrappers)
         "the whole padded option card selects, not just the inner row")))

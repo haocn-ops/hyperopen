@@ -150,6 +150,21 @@
      :net-target (round4 net-target)
      :net-band (round4 (max 0.0 net-band))}))
 
+(defn engine-constraints->policy
+  "Canonical gross/net TARGETS from the ENGINE-side constraint keys. The request
+  builder renames the draft keys before the solver sees them (:gross-max →
+  :gross-leverage, :gross-min → :gross-floor, :net-min/:net-max →
+  :net-exposure {:min :max}); this delegates to `constraints->policy` so the
+  midpoint semantics live in exactly one place. Objectives that treat gross and
+  net as exact TARGETS (Equal Risk) read this instead of re-deriving targets
+  from bands — in particular gross-max alone is only the target when no floor
+  (band) is present."
+  [constraints]
+  (constraints->policy {:gross-max (:gross-leverage constraints)
+                        :gross-min (:gross-floor constraints)
+                        :net-min (get-in constraints [:net-exposure :min])
+                        :net-max (get-in constraints [:net-exposure :max])}))
+
 ;; --- Reverse: exposure policy -> canonical constraints ------------------------------------
 
 (defn policy->constraints

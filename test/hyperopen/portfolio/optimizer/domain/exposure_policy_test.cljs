@@ -215,3 +215,22 @@
     (is (< 0.0 (:w rect)) "net band ⇒ box has width"))
   (is (nil? (policy/current-exposure-marker {:gross nil :net 1.0})))
   (is (some? (policy/current-exposure-marker {:gross 1.8 :net 1.2}))))
+
+(deftest engine-constraints-policy-derives-the-same-targets-test
+  ;; The request builder renames the draft keys before the engine sees them;
+  ;; engine-constraints->policy must recover the SAME targets constraints->policy
+  ;; derives from the draft keys — one midpoint semantics, two key spellings.
+  (is (= (policy/constraints->policy {:gross-max 2.0 :net-min 1.0 :net-max 1.0})
+         (policy/engine-constraints->policy {:gross-leverage 2.0
+                                             :net-exposure {:min 1.0 :max 1.0}}))
+      "zero band: gross target IS the ceiling")
+  (is (= (policy/constraints->policy {:gross-max 3.0 :gross-min 1.0
+                                      :net-min -0.5 :net-max 1.5})
+         (policy/engine-constraints->policy {:gross-leverage 3.0
+                                             :gross-floor 1.0
+                                             :net-exposure {:min -0.5 :max 1.5}}))
+      "banded: targets are the midpoints, never the ceilings")
+  (is (= {:gross-target 2.0 :gross-band 1.0 :net-target 0.5 :net-band 1.0}
+         (policy/engine-constraints->policy {:gross-leverage 3.0
+                                             :gross-floor 1.0
+                                             :net-exposure {:min -0.5 :max 1.5}}))))

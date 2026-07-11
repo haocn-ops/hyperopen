@@ -1,5 +1,6 @@
 (ns hyperopen.portfolio.optimizer.domain.constraints
   (:require [hyperopen.portfolio.optimizer.coercion :as coercion]
+            [hyperopen.portfolio.optimizer.domain.exposure-policy :as exposure-policy]
             [hyperopen.portfolio.optimizer.domain.history-series :as history-series]))
 
 (def default-max-asset-weight
@@ -481,6 +482,16 @@
                       sparse-caps)))
     constraints))
 
+(defn- side-metadata
+  "Requested side + shortability per instrument, in universe order. Equal Risk
+  presolve rejects short requests `bounds-for` silently long-flipped."
+  [constraints universe]
+  (mapv (fn [instrument]
+          {:instrument-id (instrument-id instrument)
+           :requested-side (position-side instrument)
+           :shortable? (instrument-shortable? constraints instrument)})
+        universe))
+
 (defn- encoded-result
   [constraints universe current-weights]
   (let [ids (mapv instrument-id universe)
@@ -501,6 +512,11 @@
      :gross-exposure {:max (:gross-leverage constraints)}
      :gross-floor floor-spec
      :net-exposure (:net-exposure constraints)
+     ;; Canonical gross/net TARGETS (exposure-policy midpoints) for objectives
+     ;; that hit exposures exactly rather than treating band edges as limits.
+     ;; Derived HERE, not on the request, so draft signatures stay unchanged.
+     :exposure-targets (exposure-policy/engine-constraints->policy constraints)
+     :side-metadata (side-metadata constraints universe)
      :max-turnover (:max-turnover constraints)
      :rebalance-tolerance (:rebalance-tolerance constraints)
      :violations violations*}))

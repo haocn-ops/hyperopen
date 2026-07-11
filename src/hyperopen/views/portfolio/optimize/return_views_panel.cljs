@@ -351,22 +351,25 @@
                            :black-litterman]]}}
     "Use views where I have them"]])
 
+(defn- return-free-objective-label
+  ;; The covariance-only goal in play; its weights never consume returns.
+  [objective-kind]
+  (if (= :equal-risk objective-kind) "Equal Risk" "Minimum risk"))
+
 (defn- min-variance-note
-  [container-role]
+  [container-role objective-kind]
   [:p {:class ["border" "border-base-300" "bg-base-200/20" "p-2"
                "text-[0.6875rem]" "leading-[1.4]" "text-trading-muted"]
        :data-role (str container-role "-objective-note")}
-   "Minimum risk ignores expected returns — views change the displayed return, not this recommendation. Switch to Maximum Sharpe to optimize with them."])
+   (str (return-free-objective-label objective-kind) " ignores expected returns — views change the displayed return, not this recommendation. Switch to Maximum Sharpe to optimize with them.")])
 
 (defn- conservative-note
-  ;; Conservative preset (minimum variance + historical estimator): views have no
-  ;; effect at all, so the panel says only that — no dead controls, no CTA that
-  ;; would half-switch the preset.
-  [container-role]
+  ;; Covariance-only goal + historical estimator: views have no effect at all.
+  [container-role objective-kind]
   [:p {:class ["border" "border-base-300" "bg-base-200/20" "p-3"
                "text-[0.75rem]" "leading-[1.45]" "text-trading-muted"]
        :data-role (str container-role "-conservative-note")}
-   "Return views are not used by Minimum risk. Switch to the Maximum Sharpe goal to optimize with your expected-return views."])
+   (str "Return views are not used by " (return-free-objective-label objective-kind) ". Switch to the Maximum Sharpe goal to optimize with your expected-return views.")])
 
 (defn return-views-panel
   "The provenance-aware Return views panel. Options:
@@ -388,7 +391,8 @@
          apply-role "portfolio-optimizer-objective-menu-apply"}}]
   (let [universe (vec (:universe draft))
         black-litterman? (= :black-litterman (get-in draft [:return-model :kind]))
-        min-variance? (= :minimum-variance (get-in draft [:objective :kind]))
+        objective-kind (get-in draft [:objective :kind])
+        return-free? (contains? #{:minimum-variance :equal-risk} objective-kind)
         rows (return-views/rows
               {:universe universe
                :views (get-in draft [:return-model :views])
@@ -419,16 +423,16 @@
                          :data-role (str container-role "-confidence-help")}
                      "Confidence sets how strongly the optimizer trusts each return — a low setting tilts gently, a high setting pulls hard."])]
         body (cond
-               (and (not black-litterman?) min-variance?)
-               (conservative-note container-role)
+               (and (not black-litterman?) return-free?)
+               (conservative-note container-role objective-kind)
 
                (not black-litterman?)
                (views-off-note container-role)
 
                :else
                [:div {:class ["flex" "min-h-0" "flex-col"]}
-                (when min-variance?
-                  [:div {:class ["mb-2"]} (min-variance-note container-role)])
+                (when return-free?
+                  [:div {:class ["mb-2"]} (min-variance-note container-role objective-kind)])
                 [:p {:class ["font-mono" "text-[0.6875rem]" "font-semibold" "text-trading-text"]
                      :data-role (str container-role "-summary")}
                  (return-views/summary-line summary)]

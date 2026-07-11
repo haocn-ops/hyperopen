@@ -818,10 +818,11 @@
         "Views are an input policy of Maximum Sharpe now, not an objective.")
     (is (= ["portfolio-optimizer-objective-menu-option-minimum-volatility"
             "portfolio-optimizer-objective-menu-option-max-sharpe"
+            "portfolio-optimizer-objective-menu-option-equal-risk"
             "portfolio-optimizer-objective-menu-option-target-volatility"
             "portfolio-optimizer-objective-menu-option-maximum-return"]
            option-roles)
-        "All four objective options always render; the use-my-views option is gone.")
+        "All five objective options always render; the use-my-views option is gone.")
     (is (= [[:actions/select-portfolio-optimizer-objective-menu-option :minimum-volatility]]
            (click-actions minimum-row)))
     (is (= [[:actions/select-portfolio-optimizer-objective-menu-option :max-sharpe]]

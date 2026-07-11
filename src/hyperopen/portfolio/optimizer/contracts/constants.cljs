@@ -15,7 +15,7 @@
   #{:solved :infeasible :error :failed})
 
 (def objective-kinds
-  #{:minimum-variance :max-sharpe :target-return :target-volatility})
+  #{:minimum-variance :max-sharpe :target-return :target-volatility :equal-risk})
 
 (def return-model-kinds
   #{:historical-mean :ew-mean :black-litterman})

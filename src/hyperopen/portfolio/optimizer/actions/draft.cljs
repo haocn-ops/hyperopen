@@ -30,6 +30,7 @@
   (let [objective-kind (get-in state (conj contracts/draft-objective-path :kind))]
     (cond
       (= :minimum-variance objective-kind) :minimum-volatility
+      (= :equal-risk objective-kind) :equal-risk
       (= :target-volatility objective-kind) :target-volatility
       (= :target-return objective-kind) :maximum-return
       :else :max-sharpe)))

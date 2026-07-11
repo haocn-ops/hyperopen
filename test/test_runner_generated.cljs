@@ -219,6 +219,7 @@
             [hyperopen.portfolio.optimizer.application.display-frontier-test]
             [hyperopen.portfolio.optimizer.application.engine-blocklist-test]
             [hyperopen.portfolio.optimizer.application.engine-current-portfolio-test]
+            [hyperopen.portfolio.optimizer.application.engine-equal-risk-test]
             [hyperopen.portfolio.optimizer.application.engine-history-window-test]
             [hyperopen.portfolio.optimizer.application.engine-progress-test]
             [hyperopen.portfolio.optimizer.application.engine-return-inputs-memo-test]
@@ -227,6 +228,7 @@
             [hyperopen.portfolio.optimizer.application.engine-sparse-caps-test]
             [hyperopen.portfolio.optimizer.application.engine-test]
             [hyperopen.portfolio.optimizer.application.engine-warning-labels-test]
+            [hyperopen.portfolio.optimizer.application.engine.equal-risk-solve-test]
             [hyperopen.portfolio.optimizer.application.execution-amend-test]
             [hyperopen.portfolio.optimizer.application.execution-amend-view-model-test]
             [hyperopen.portfolio.optimizer.application.execution-carryover-test]
@@ -288,6 +290,7 @@
             [hyperopen.portfolio.optimizer.application.view-model-scenario-library-test]
             [hyperopen.portfolio.optimizer.application.view-model-setup-boundary-test]
             [hyperopen.portfolio.optimizer.application.view-model-test]
+            [hyperopen.portfolio.optimizer.application.view-model.equal-risk-results-test]
             [hyperopen.portfolio.optimizer.application.view-model.execution-commit-block-test]
             [hyperopen.portfolio.optimizer.application.view-model.execution-reconcile-test]
             [hyperopen.portfolio.optimizer.application.view-model.exposure-test]
@@ -295,6 +298,7 @@
             [hyperopen.portfolio.optimizer.black-litterman-actions-test]
             [hyperopen.portfolio.optimizer.black-litterman-view-edits-test]
             [hyperopen.portfolio.optimizer.coercion-test]
+            [hyperopen.portfolio.optimizer.contracts-equal-risk-test]
             [hyperopen.portfolio.optimizer.contracts-test]
             [hyperopen.portfolio.optimizer.current-portfolio-constraint-actions-test]
             [hyperopen.portfolio.optimizer.defaults-test]
@@ -302,6 +306,7 @@
             [hyperopen.portfolio.optimizer.domain.closed-form-test]
             [hyperopen.portfolio.optimizer.domain.constraints-test]
             [hyperopen.portfolio.optimizer.domain.diagnostics-test]
+            [hyperopen.portfolio.optimizer.domain.equal-risk-test]
             [hyperopen.portfolio.optimizer.domain.exposure-policy-test]
             [hyperopen.portfolio.optimizer.domain.frontier-overlays-test]
             [hyperopen.portfolio.optimizer.domain.frontier-test]
@@ -310,6 +315,7 @@
             [hyperopen.portfolio.optimizer.domain.objectives-test]
             [hyperopen.portfolio.optimizer.domain.rebalance-test]
             [hyperopen.portfolio.optimizer.domain.returns-test]
+            [hyperopen.portfolio.optimizer.domain.risk-contributions-test]
             [hyperopen.portfolio.optimizer.domain.risk-ledoit-wolf-test]
             [hyperopen.portfolio.optimizer.domain.risk-test]
             [hyperopen.portfolio.optimizer.domain.weight-cleaning-test]
@@ -601,11 +607,13 @@
             [hyperopen.views.portfolio.optimize.refinement-status-card-test]
             [hyperopen.views.portfolio.optimize.result-vault-labels-test]
             [hyperopen.views.portfolio.optimize.results-diagnostics-rail-test]
+            [hyperopen.views.portfolio.optimize.results-panel-equal-risk-test]
             [hyperopen.views.portfolio.optimize.results-panel-hierarchy-test]
             [hyperopen.views.portfolio.optimize.results-panel-test]
             [hyperopen.views.portfolio.optimize.return-views-io-panel-test]
             [hyperopen.views.portfolio.optimize.run-status-banner-test]
             [hyperopen.views.portfolio.optimize.scenario-detail-view-test]
+            [hyperopen.views.portfolio.optimize.scenario-kpi-strip-test]
             [hyperopen.views.portfolio.optimize.scenario-picker-test]
             [hyperopen.views.portfolio.optimize.setup-actions-test]
             [hyperopen.views.portfolio.optimize.setup-context-test]
@@ -1023,6 +1031,7 @@
              'hyperopen.portfolio.optimizer.application.display-frontier-test
              'hyperopen.portfolio.optimizer.application.engine-blocklist-test
              'hyperopen.portfolio.optimizer.application.engine-current-portfolio-test
+             'hyperopen.portfolio.optimizer.application.engine-equal-risk-test
              'hyperopen.portfolio.optimizer.application.engine-history-window-test
              'hyperopen.portfolio.optimizer.application.engine-progress-test
              'hyperopen.portfolio.optimizer.application.engine-return-inputs-memo-test
@@ -1031,6 +1040,7 @@
              'hyperopen.portfolio.optimizer.application.engine-sparse-caps-test
              'hyperopen.portfolio.optimizer.application.engine-test
              'hyperopen.portfolio.optimizer.application.engine-warning-labels-test
+             'hyperopen.portfolio.optimizer.application.engine.equal-risk-solve-test
              'hyperopen.portfolio.optimizer.application.execution-amend-test
              'hyperopen.portfolio.optimizer.application.execution-amend-view-model-test
              'hyperopen.portfolio.optimizer.application.execution-carryover-test
@@ -1092,6 +1102,7 @@
              'hyperopen.portfolio.optimizer.application.view-model-scenario-library-test
              'hyperopen.portfolio.optimizer.application.view-model-setup-boundary-test
              'hyperopen.portfolio.optimizer.application.view-model-test
+             'hyperopen.portfolio.optimizer.application.view-model.equal-risk-results-test
              'hyperopen.portfolio.optimizer.application.view-model.execution-commit-block-test
              'hyperopen.portfolio.optimizer.application.view-model.execution-reconcile-test
              'hyperopen.portfolio.optimizer.application.view-model.exposure-test
@@ -1099,6 +1110,7 @@
              'hyperopen.portfolio.optimizer.black-litterman-actions-test
              'hyperopen.portfolio.optimizer.black-litterman-view-edits-test
              'hyperopen.portfolio.optimizer.coercion-test
+             'hyperopen.portfolio.optimizer.contracts-equal-risk-test
              'hyperopen.portfolio.optimizer.contracts-test
              'hyperopen.portfolio.optimizer.current-portfolio-constraint-actions-test
              'hyperopen.portfolio.optimizer.defaults-test
@@ -1106,6 +1118,7 @@
              'hyperopen.portfolio.optimizer.domain.closed-form-test
              'hyperopen.portfolio.optimizer.domain.constraints-test
              'hyperopen.portfolio.optimizer.domain.diagnostics-test
+             'hyperopen.portfolio.optimizer.domain.equal-risk-test
              'hyperopen.portfolio.optimizer.domain.exposure-policy-test
              'hyperopen.portfolio.optimizer.domain.frontier-overlays-test
              'hyperopen.portfolio.optimizer.domain.frontier-test
@@ -1114,6 +1127,7 @@
              'hyperopen.portfolio.optimizer.domain.objectives-test
              'hyperopen.portfolio.optimizer.domain.rebalance-test
              'hyperopen.portfolio.optimizer.domain.returns-test
+             'hyperopen.portfolio.optimizer.domain.risk-contributions-test
              'hyperopen.portfolio.optimizer.domain.risk-ledoit-wolf-test
              'hyperopen.portfolio.optimizer.domain.risk-test
              'hyperopen.portfolio.optimizer.domain.weight-cleaning-test
@@ -1405,11 +1419,13 @@
              'hyperopen.views.portfolio.optimize.refinement-status-card-test
              'hyperopen.views.portfolio.optimize.result-vault-labels-test
              'hyperopen.views.portfolio.optimize.results-diagnostics-rail-test
+             'hyperopen.views.portfolio.optimize.results-panel-equal-risk-test
              'hyperopen.views.portfolio.optimize.results-panel-hierarchy-test
              'hyperopen.views.portfolio.optimize.results-panel-test
              'hyperopen.views.portfolio.optimize.return-views-io-panel-test
              'hyperopen.views.portfolio.optimize.run-status-banner-test
              'hyperopen.views.portfolio.optimize.scenario-detail-view-test
+             'hyperopen.views.portfolio.optimize.scenario-kpi-strip-test
              'hyperopen.views.portfolio.optimize.scenario-picker-test
              'hyperopen.views.portfolio.optimize.setup-actions-test
              'hyperopen.views.portfolio.optimize.setup-context-test

@@ -70,8 +70,19 @@
         lo0 (reduce min 0 values)
         hi0 (reduce max 0 values)
         pad (max 0.02 (* 0.08 (- hi0 lo0)))
-        lo (* 0.05 (js/Math.floor (/ (- lo0 pad) 0.05)))
-        hi (* 0.05 (js/Math.ceil (/ (+ hi0 pad) 0.05)))
+        lo1 (- lo0 pad)
+        hi1 (+ hi0 pad)
+        ;; Balance floor: once the book mixes signs, the smaller side gets at
+        ;; least 45% of the larger side's extent so the zero origin reads
+        ;; "between" the green and red bars — a tiny hedge no longer pins
+        ;; zero to the plot edge, and a purely one-sided book still uses the
+        ;; full width for its bars.
+        mixed? (and (some #(< % -1e-9) values)
+                    (some #(> % 1e-9) values))
+        lo2 (if mixed? (min lo1 (* -0.45 hi1)) lo1)
+        hi2 (if mixed? (max hi1 (* 0.45 (js/Math.abs lo2))) hi1)
+        lo (* 0.05 (js/Math.floor (/ lo2 0.05)))
+        hi (* 0.05 (js/Math.ceil (/ hi2 0.05)))
         span (max 1e-9 (- hi lo))]
     {:lo lo
      :hi hi

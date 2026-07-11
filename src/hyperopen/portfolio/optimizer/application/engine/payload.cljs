@@ -373,7 +373,8 @@
      ;; :equal-risk only: contribution + solver sections from published weights.
      (select-keys equal-risk-sections* [:risk-contributions
                                         :current-risk-contributions
-                                        :equal-risk-solver])
+                                        :equal-risk-solver
+                                        :risk-structure])
     {:status :solved
      :scenario-id (:scenario-id request)
      :as-of-ms (:as-of-ms request)

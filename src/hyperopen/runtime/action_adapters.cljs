@@ -279,6 +279,9 @@
 (def set-portfolio-optimizer-results-tab-action
   portfolio-optimizer-actions/set-portfolio-optimizer-results-tab)
 
+(def set-portfolio-optimizer-selected-risk-instrument-action
+  portfolio-optimizer-actions/set-portfolio-optimizer-selected-risk-instrument)
+
 (def set-portfolio-optimizer-frontier-overlay-mode-action
   portfolio-optimizer-frontier-actions/set-portfolio-optimizer-frontier-overlay-mode)
 

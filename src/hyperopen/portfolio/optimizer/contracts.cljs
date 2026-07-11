@@ -95,6 +95,7 @@
 (def ui-proxy-search-queries-path paths/ui-proxy-search-queries-path)
 (def ui-assumption-cards-collapsed-path paths/ui-assumption-cards-collapsed-path)
 (def ui-draft-add-asset-open-path paths/ui-draft-add-asset-open-path)
+(def ui-selected-risk-instrument-path paths/ui-selected-risk-instrument-path)
 (def ui-objective-menu-open-path paths/ui-objective-menu-open-path)
 (def ui-scenario-menu-open-path paths/ui-scenario-menu-open-path)
 (def ui-objective-menu-selection-path paths/ui-objective-menu-selection-path)

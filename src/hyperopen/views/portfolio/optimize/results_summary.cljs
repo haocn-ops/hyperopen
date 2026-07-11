@@ -1,5 +1,6 @@
 (ns hyperopen.views.portfolio.optimize.results-summary
   (:require ["lucide/dist/esm/icons/crosshair.js" :default lucide-crosshair]
+            ["lucide/dist/esm/icons/grid-3x3.js" :default lucide-grid]
             ["lucide/dist/esm/icons/list.js" :default lucide-list]
             ["lucide/dist/esm/icons/lock-open.js" :default lucide-lock-open]
             ["lucide/dist/esm/icons/lock.js" :default lucide-lock]
@@ -7,6 +8,8 @@
             [clojure.string :as str]
             [hyperopen.portfolio.optimizer.application.view-model.equal-risk-results
              :as equal-risk-results]
+            [hyperopen.portfolio.optimizer.application.view-model.equal-risk-structure
+             :as structure-model]
             [hyperopen.portfolio.optimizer.application.view-model.results :as results-model]
             [hyperopen.views.portfolio.optimize.format :as opt-format]
             [hyperopen.views.portfolio.optimize.setup-controls :as controls]))
@@ -228,27 +231,37 @@
 (defn- equal-risk-fact-card
   "One icon card of the WHY THIS RISK ALLOCATION row (designer spec
   2026-07-11): tinted icon tile, tiny uppercase label, value line, one-line
-  sub. `sub-class` opts the sub-line into a signal color."
-  [data-role tone icon-node label value sub sub-class]
-  [:div {:class ["optimizer-equal-risk-fact"]
-         :data-role data-role}
-   [:span {:class ["optimizer-equal-risk-fact-icon"]
-           :data-tone tone}
-    (controls/lucide-icon icon-node nil)]
-   [:div {:class ["min-w-0"]}
-    [:p {:class ["optimizer-equal-risk-fact-label"]} label]
-    [:p {:class ["optimizer-equal-risk-fact-value" "font-mono" "tabular-nums"]}
-     value]
-    [:p {:class ["optimizer-equal-risk-fact-sub"
-                 (or sub-class "text-trading-muted")]}
-     sub]]])
+  sub. `sub-class` opts the sub-line into a signal color. With :for-radio the
+  card renders as a <label> targeting a tab radio of the risk card — clicking
+  it activates that tab with zero app state — and the scoped :has() CSS
+  highlights it while that tab is active."
+  ([data-role tone icon-node label value sub sub-class]
+   (equal-risk-fact-card data-role tone icon-node label value sub sub-class nil))
+  ([data-role tone icon-node label value sub sub-class {:keys [for-radio]}]
+   [(if for-radio :label :div)
+    (cond-> {:class (cond-> ["optimizer-equal-risk-fact"]
+                      for-radio (conj "optimizer-equal-risk-fact--link"))
+             :data-role data-role}
+      for-radio (assoc :for for-radio))
+    [:span {:class ["optimizer-equal-risk-fact-icon"]
+            :data-tone tone}
+     (controls/lucide-icon icon-node nil)]
+    [:div {:class ["min-w-0"]}
+     [:p {:class ["optimizer-equal-risk-fact-label"]} label]
+     [:p {:class ["optimizer-equal-risk-fact-value" "font-mono" "tabular-nums"]}
+      value]
+     [:p {:class ["optimizer-equal-risk-fact-sub"
+                  (or sub-class "text-trading-muted")]}
+      sub]]]))
 
 (defn equal-risk-context-card
   "Why this risk allocation: the Equal Risk replacement for the Why-this-target
   card — four icon cards for book shape, the equal per-asset target, the
-  largest risk CONTRIBUTOR (more relevant to this objective than the largest
-  weight), and allocation freedom. Facts only, all from the run result; the
-  binding-constraint enumeration lives in the trust-diagnostics rail."
+  correlation view (a label that jumps to the risk card's Correlation tab —
+  results with no :risk-structure section fall back to the largest risk
+  CONTRIBUTOR card), and allocation freedom. Facts only, all from the run
+  result; the binding-constraint enumeration lives in the trust-diagnostics
+  rail."
   [result]
   (when-let [model (equal-risk-results/balance-model result)]
     (let [weights (:target-weights-by-instrument result)
@@ -256,6 +269,7 @@
           {:keys [asset-count longs shorts]} (target-shape weights)
           largest (:largest model)
           largest-dev (:deviation-pts largest)
+          correlation? (some? (structure-model/correlation-model result))
           freedom (equal-risk-results/freedom-card-view
                    (equal-risk-results/allocation-freedom result))]
       [:section {:class ["optimizer-target-context" "rounded-xl" "border"
@@ -280,26 +294,36 @@
                                    " per asset")
                               "Equal risk objective"
                               nil)
-        (equal-risk-fact-card "portfolio-optimizer-equal-risk-context-largest"
-                              "accent" lucide-star
-                              "Largest risk contributor"
-                              (if largest
-                                (str (context-label labels (:instrument-id largest))
-                                     " · " (opt-format/format-pct (:share largest)))
-                                "—")
-                              (cond
-                                (not (opt-format/finite-number? largest-dev)) "—"
-                                (< (js/Math.abs largest-dev) 0.05) "On target"
-                                :else (str (equal-risk-results/format-signed-pts
-                                            largest-dev)
-                                           (if (neg? largest-dev)
-                                             " below target"
-                                             " above target")))
-                              (when (and (opt-format/finite-number? largest-dev)
-                                         (>= (js/Math.abs largest-dev) 0.05))
-                                (if (neg? largest-dev)
-                                  "text-trading-green"
-                                  "text-trading-red")))
+        (if correlation?
+          (equal-risk-fact-card "portfolio-optimizer-equal-risk-context-correlation"
+                                "accent" lucide-grid
+                                "Correlation view"
+                                "Position P&L"
+                                "Shows how held trades interact"
+                                nil
+                                {:for-radio (structure-model/risk-view-radio-id
+                                             result
+                                             "correlation")})
+          (equal-risk-fact-card "portfolio-optimizer-equal-risk-context-largest"
+                                "accent" lucide-star
+                                "Largest risk contributor"
+                                (if largest
+                                  (str (context-label labels (:instrument-id largest))
+                                       " · " (opt-format/format-pct (:share largest)))
+                                  "—")
+                                (cond
+                                  (not (opt-format/finite-number? largest-dev)) "—"
+                                  (< (js/Math.abs largest-dev) 0.05) "On target"
+                                  :else (str (equal-risk-results/format-signed-pts
+                                              largest-dev)
+                                             (if (neg? largest-dev)
+                                               " below target"
+                                               " above target")))
+                                (when (and (opt-format/finite-number? largest-dev)
+                                           (>= (js/Math.abs largest-dev) 0.05))
+                                  (if (neg? largest-dev)
+                                    "text-trading-green"
+                                    "text-trading-red"))))
         (equal-risk-fact-card "portfolio-optimizer-equal-risk-context-freedom"
                               "warn"
                               (if (:locked? freedom) lucide-lock lucide-lock-open)

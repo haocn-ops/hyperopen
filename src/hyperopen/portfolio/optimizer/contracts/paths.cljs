@@ -100,6 +100,11 @@
   (conj optimizer-ui-path :assumption-cards-collapsed))
 (def ui-draft-add-asset-open-path
   (conj optimizer-ui-path :draft-add-asset-open?))
+;; Instrument whose contribution breakdown the Equal Risk correlation view
+;; explains (set by Allocation-row clicks). Never cleaned up: an id absent
+;; from the current result falls back to the view-model's default selection.
+(def ui-selected-risk-instrument-path
+  (conj optimizer-ui-path :selected-risk-instrument))
 (def ui-objective-menu-open-path
   (conj optimizer-ui-path :objective-menu-open?))
 ;; Workspace-header "Scenarios" popover (the saved-scenario library menu).
@@ -210,6 +215,7 @@
    :optimizer-ui/universe-search-query ui-universe-search-query-path
    :optimizer-ui/universe-search-active-index ui-universe-search-active-index-path
    :optimizer-ui/draft-add-asset-open ui-draft-add-asset-open-path
+   :optimizer-ui/selected-risk-instrument ui-selected-risk-instrument-path
    :optimizer-ui/objective-menu-open ui-objective-menu-open-path
    :optimizer-ui/scenario-menu-open ui-scenario-menu-open-path
    :optimizer-ui/objective-menu-selection ui-objective-menu-selection-path

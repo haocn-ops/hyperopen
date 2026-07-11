@@ -487,6 +487,13 @@
           [:effects/replace-shareable-route-query]]
          (actions/set-portfolio-optimizer-results-tab {} :wat))))
 
+(deftest set-portfolio-optimizer-selected-risk-instrument-saves-ui-state-test
+  (is (= [[:effects/save [:portfolio-ui :optimizer :selected-risk-instrument]
+           "perp:MSTR"]]
+         (actions/set-portfolio-optimizer-selected-risk-instrument
+          {}
+          "perp:MSTR"))))
+
 (deftest scenario-board-row-actions-emit-persistence-effects-test
   (is (= [[:effects/archive-portfolio-optimizer-scenario "scn_01"]]
          (actions/archive-portfolio-optimizer-scenario

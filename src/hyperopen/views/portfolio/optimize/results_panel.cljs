@@ -1,5 +1,6 @@
 (ns hyperopen.views.portfolio.optimize.results-panel
   (:require [hyperopen.portfolio.optimizer.application.view-model.results :as results-model]
+            [hyperopen.portfolio.optimizer.contracts :as contracts]
             [hyperopen.views.portfolio.optimize.equal-risk-confidence-rail
              :as equal-risk-confidence-rail]
             [hyperopen.views.portfolio.optimize.frontier-chart :as frontier-chart]
@@ -40,7 +41,9 @@
                                       constrain-frontier?
                                       refinement]
                                :or {frontier-overlay-mode :standalone}}]
-   (let [result (results-model/enrich-result-labels (:result last-successful-run) draft)]
+   (let [result (results-model/enrich-result-labels (:result last-successful-run) draft)
+         selected-risk-instrument (get-in state
+                                          contracts/ui-selected-risk-instrument-path)]
      (when (= :solved (:status result))
        [:section {:class ["optimizer-results-surface" "space-y-0" "leading-4"]
                   :replicant/key "optimizer-results-surface"
@@ -57,7 +60,9 @@
                 :data-role "portfolio-optimizer-results-left-panel"}
           (target-exposure-table/target-exposure-table result
                                                         {:state state
-                                                         :draft draft})]
+                                                         :draft draft
+                                                         :selected-risk-instrument
+                                                         selected-risk-instrument})]
          [:div {:class ["optimizer-results-center-panel" "min-h-0" "bg-base-100" "p-6"
                         "space-y-4"]
                 :data-role "portfolio-optimizer-results-center-panel"}
@@ -75,7 +80,9 @@
             [:div {:class ["space-y-4"]
                    :replicant/key (if equal-risk? "equal-risk-center" "frontier-center")}
              (when equal-risk?
-               (risk-contributions-card/risk-contributions-card result))
+               (risk-contributions-card/risk-contributions-card
+                result
+                {:selected-risk-instrument selected-risk-instrument}))
              (when equal-risk?
                (summary/equal-risk-context-card result))
              (when-not equal-risk?

@@ -225,6 +225,8 @@
     :set-portfolio-optimizer-constrain-frontier]
    [:actions/set-portfolio-optimizer-results-tab
     :set-portfolio-optimizer-results-tab]
+   [:actions/set-portfolio-optimizer-selected-risk-instrument
+    :set-portfolio-optimizer-selected-risk-instrument]
    [:actions/add-portfolio-optimizer-universe-instrument
     :add-portfolio-optimizer-universe-instrument]
 	   [:actions/add-portfolio-optimizer-universe-instrument-and-run

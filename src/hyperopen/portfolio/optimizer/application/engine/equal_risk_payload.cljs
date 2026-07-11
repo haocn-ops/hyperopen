@@ -14,9 +14,16 @@
     member, so free degrees = sum over books of max(0, unlocked members - 1).
     Zero degrees => :fully-determined (the commentary's constraint-determined
     case: gross and net targets dictate every weight); binding bound
-    constraints on a non-degenerate problem => :limited; else :open."
+    constraints on a non-degenerate problem => :limited; else :open.
+  - :risk-structure — the correlation-view section (see domain.risk-structure):
+    per-instrument standalone/diversification decomposition of the SAME net
+    shares, P&L-to-portfolio correlations, and the capped underlying
+    correlation matrix. Computed from the same covariance + published weights
+    as :risk-contributions; the covariance itself is not persisted, so this
+    section is the only correlation data the results page ever has."
   (:require [hyperopen.portfolio.optimizer.domain.equal-risk :as equal-risk]
-            [hyperopen.portfolio.optimizer.domain.risk-contributions :as risk-contributions]))
+            [hyperopen.portfolio.optimizer.domain.risk-contributions :as risk-contributions]
+            [hyperopen.portfolio.optimizer.domain.risk-structure :as risk-structure]))
 
 (defn- book-free-count
   [instrument-ids locked-ids indexes]
@@ -87,7 +94,11 @@
                              {:instrument-ids instrument-ids
                               :covariance covariance
                               :current-weights current-weights
-                              :targets targets})]
+                              :targets targets})
+            structure (risk-structure/structure-summary
+                       {:instrument-ids instrument-ids
+                        :covariance covariance
+                        :weights target-weights})]
         (cond-> {:risk-contributions (-> summary
                                          (dissoc :status)
                                          (assoc :quality quality))
@@ -96,4 +107,6 @@
                  :warnings (when (= :not-converged quality)
                              [{:code :equal-risk-not-converged
                                :message "Equal Risk stopped at its iteration limit before converging - showing the best feasible portfolio found. Risk contributions are labeled Not converged."}])}
-          current-summary (assoc :current-risk-contributions current-summary))))))
+          current-summary (assoc :current-risk-contributions current-summary)
+          (= :ok (:status structure)) (assoc :risk-structure
+                                             (dissoc structure :status)))))))

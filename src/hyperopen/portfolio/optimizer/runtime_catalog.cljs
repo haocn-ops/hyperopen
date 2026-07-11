@@ -155,6 +155,8 @@
     frontier-actions/set-portfolio-optimizer-constrain-frontier
     :set-portfolio-optimizer-results-tab
     actions/set-portfolio-optimizer-results-tab
+    :set-portfolio-optimizer-selected-risk-instrument
+    actions/set-portfolio-optimizer-selected-risk-instrument
     :add-portfolio-optimizer-universe-instrument
     actions/add-portfolio-optimizer-universe-instrument
     :add-portfolio-optimizer-universe-instrument-and-run

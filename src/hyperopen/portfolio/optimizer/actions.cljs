@@ -164,6 +164,9 @@
 (def set-portfolio-optimizer-results-tab
   run/set-portfolio-optimizer-results-tab)
 
+(def set-portfolio-optimizer-selected-risk-instrument
+  run/set-portfolio-optimizer-selected-risk-instrument)
+
 (def add-portfolio-optimizer-universe-instrument
   universe/add-portfolio-optimizer-universe-instrument)
 

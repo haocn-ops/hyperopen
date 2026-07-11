@@ -1162,6 +1162,12 @@
     .optimizer-risk-balance:has(input[data-risk-view="contribution"]:checked)
     .optimizer-risk-balance-panel--contribution,
   .portfolio-optimizer
+    .optimizer-risk-balance:has(input[data-risk-view="breakdown"]:checked)
+    .optimizer-risk-balance-panel--breakdown,
+  .portfolio-optimizer
+    .optimizer-risk-balance:has(input[data-risk-view="correlation"]:checked)
+    .optimizer-risk-balance-panel--correlation,
+  .portfolio-optimizer
     .optimizer-risk-balance:has(input[data-risk-view="risk-return"]:checked)
     .optimizer-risk-balance-panel--risk-return {
     display: block;
@@ -1552,5 +1558,421 @@
        does not specificity-lock it; see the kpi-card value note above. */
     margin-top: 2px;
     font-size: 11px;
+  }
+
+  /* The Correlation-view card is a <label> for the correlation tab's radio:
+     clicking it switches the tab (zero app state), and while that tab is
+     active the card lights up — the :has() scope is the center panel, the
+     nearest ancestor containing both the card and the radios. */
+  .portfolio-optimizer .optimizer-equal-risk-fact--link {
+    cursor: pointer;
+    transition: border-color 120ms ease, background-color 120ms ease;
+  }
+
+  .portfolio-optimizer .optimizer-equal-risk-fact--link:hover {
+    border-color: var(--optimizer-border-strong);
+  }
+
+  .portfolio-optimizer
+    .optimizer-results-center-panel:has(input[data-risk-view="correlation"]:checked)
+    .optimizer-equal-risk-fact--link {
+    border-color: var(--optimizer-accent-border);
+    background-color: var(--optimizer-accent-soft);
+  }
+
+  /* ── Correlation tab (designer spec 2026-07-11, correlation view) ──
+     Two sub-panels: the heatmap with its POSITION P&L / UNDERLYING RETURNS
+     DOM-state toggle, and the selected-asset contribution breakdown. Track
+     sizing is container-driven (auto-fit), never viewport media queries —
+     the card also renders inside workbench iframes. */
+  .portfolio-optimizer .optimizer-risk-corr-layout {
+    margin-top: 12px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(330px, 1fr));
+    gap: 12px;
+    align-items: start;
+  }
+
+  .portfolio-optimizer .optimizer-risk-corr-block {
+    border: 1px solid var(--optimizer-border);
+    background-color: var(--optimizer-bg);
+    padding: 12px 14px;
+    min-width: 0;
+  }
+
+  .portfolio-optimizer .optimizer-risk-corr-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .portfolio-optimizer .optimizer-risk-corr-title {
+    font-family: "JetBrains Mono", var(--font-mono);
+    font-size: 10.5px;
+    font-weight: 650;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--optimizer-text-2);
+  }
+
+  /* Mode toggle: same DOM-state radio pattern as the card tabs, one size
+     down. First segment is active until any radio is checked. */
+  .portfolio-optimizer .optimizer-risk-corr-mode-tabs {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: stretch;
+    border: 1px solid var(--optimizer-border-strong);
+  }
+
+  .portfolio-optimizer .optimizer-risk-corr-mode-tab {
+    display: flex;
+    align-items: center;
+    padding: 4px 9px;
+    cursor: pointer;
+    font-family: "JetBrains Mono", var(--font-mono);
+    font-size: 9px;
+    font-weight: 650;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    color: var(--optimizer-text-3);
+    transition: color 120ms ease, background-color 120ms ease;
+  }
+
+  .portfolio-optimizer
+    .optimizer-risk-corr-mode-tab + .optimizer-risk-corr-mode-tab {
+    border-left: 1px solid var(--optimizer-border-strong);
+  }
+
+  .portfolio-optimizer .optimizer-risk-corr-mode-tab:hover {
+    color: var(--optimizer-text-2);
+  }
+
+  .portfolio-optimizer
+    .optimizer-risk-corr-block:not(:has(input[data-corr-mode]:checked))
+    .optimizer-risk-corr-mode-tab:first-child,
+  .portfolio-optimizer .optimizer-risk-corr-mode-tab:has(> input:checked) {
+    background-color: var(--optimizer-surface-3);
+    color: var(--optimizer-text);
+    box-shadow: inset 0 -2px 0 var(--optimizer-accent);
+  }
+
+  .portfolio-optimizer
+    .optimizer-risk-corr-mode-tab:has(> input:focus-visible) {
+    outline: 1px solid var(--optimizer-accent-border);
+    outline-offset: 2px;
+  }
+
+  /* Both matrices (and their titles/captions) are pre-rendered; the checked
+     radio picks which mode's elements show. Position P&L is the default. */
+  .portfolio-optimizer .optimizer-risk-corr-block [data-corr-only] {
+    display: none;
+  }
+
+  .portfolio-optimizer
+    .optimizer-risk-corr-block:not(:has(input[data-corr-mode]:checked))
+    [data-corr-only="position"],
+  .portfolio-optimizer
+    .optimizer-risk-corr-block:has(input[data-corr-mode="position"]:checked)
+    [data-corr-only="position"],
+  .portfolio-optimizer
+    .optimizer-risk-corr-block:has(input[data-corr-mode="underlying"]:checked)
+    [data-corr-only="underlying"] {
+    display: block;
+  }
+
+  /* Heatmap grid: column tracks are inline (dynamic asset count). Cell
+     color mixes the sign color into the surface by |correlation| via the
+     per-cell --corr-strength custom property. */
+  .portfolio-optimizer .optimizer-risk-corr-grid {
+    margin-top: 10px;
+    display: grid;
+    gap: 3px;
+  }
+
+  .portfolio-optimizer .optimizer-risk-corr-corner {
+    min-width: 0;
+  }
+
+  .portfolio-optimizer .optimizer-risk-corr-col-label {
+    min-width: 0;
+    padding-bottom: 3px;
+    text-align: center;
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--optimizer-text-2);
+  }
+
+  .portfolio-optimizer .optimizer-risk-corr-row-label {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    min-width: 0;
+    padding-right: 7px;
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--optimizer-text-2);
+  }
+
+  .portfolio-optimizer .optimizer-risk-corr-cell {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 33px;
+    min-width: 0;
+    font-size: 10.5px;
+    color: var(--optimizer-text);
+    background-color: var(--optimizer-surface-2);
+  }
+
+  .portfolio-optimizer .optimizer-risk-corr-cell[data-sign="positive"] {
+    background-color: color-mix(in srgb,
+                                var(--optimizer-long) var(--corr-strength),
+                                var(--optimizer-surface-2));
+  }
+
+  .portfolio-optimizer .optimizer-risk-corr-cell[data-sign="negative"] {
+    background-color: color-mix(in srgb,
+                                var(--optimizer-short) var(--corr-strength),
+                                var(--optimizer-surface-2));
+  }
+
+  .portfolio-optimizer .optimizer-risk-corr-cell[data-sign="missing"] {
+    color: var(--optimizer-text-3);
+  }
+
+  .portfolio-optimizer .optimizer-risk-corr-cell[data-diagonal="true"] {
+    box-shadow: inset 0 0 0 1px var(--optimizer-border-strong);
+    font-weight: 600;
+  }
+
+  .portfolio-optimizer .optimizer-risk-corr-legend {
+    margin-top: 10px;
+  }
+
+  .portfolio-optimizer .optimizer-risk-corr-legend-bar {
+    height: 7px;
+    background: linear-gradient(to right,
+                                var(--optimizer-short),
+                                var(--optimizer-surface-2),
+                                var(--optimizer-long));
+  }
+
+  .portfolio-optimizer .optimizer-risk-corr-legend-labels {
+    margin-top: 3px;
+    display: flex;
+    justify-content: space-between;
+    font-size: 9.5px;
+    color: var(--optimizer-text-3);
+  }
+
+  .portfolio-optimizer .optimizer-risk-corr-caption {
+    margin-top: 8px;
+    text-align: center;
+    font-size: 11px;
+    color: var(--optimizer-text-2);
+  }
+
+  .portfolio-optimizer .optimizer-risk-corr-info {
+    margin-left: 6px;
+    color: var(--optimizer-text-3);
+    cursor: help;
+  }
+
+  /* ── Decomposition rows (Breakdown tab + the correlation tab's selected-
+     asset block): standalone = own-variance (purple), diversification =
+     cross-covariance (green removes / red adds), net = their exact sum. */
+  .portfolio-optimizer .optimizer-risk-decomp-row {
+    display: grid;
+    grid-template-columns: minmax(0, 8.5rem) 3.5rem minmax(0, 1fr);
+    column-gap: 10px;
+    align-items: center;
+  }
+
+  .portfolio-optimizer .optimizer-risk-decomp-label {
+    font-size: 11.5px;
+    color: var(--optimizer-text);
+  }
+
+  .portfolio-optimizer .optimizer-risk-decomp-sub {
+    margin-top: 1px;
+    font-size: 10px;
+    line-height: 1.35;
+    color: var(--optimizer-text-3);
+  }
+
+  .portfolio-optimizer .optimizer-risk-decomp-value {
+    font-size: 12px;
+    font-weight: 600;
+    text-align: right;
+    color: var(--optimizer-text);
+  }
+
+  .portfolio-optimizer
+    .optimizer-risk-decomp-value[data-kind="diversification"][data-sign="negative"] {
+    color: var(--optimizer-long);
+  }
+
+  .portfolio-optimizer
+    .optimizer-risk-decomp-value[data-kind="diversification"][data-sign="positive"] {
+    color: var(--optimizer-short);
+  }
+
+  /* Paired sub-bars in the Breakdown tab lanes: standalone rides the upper
+     half, diversification the lower, both from zero; the purple net marker
+     sits at their sum. The --full modifier (correlation tab, one row per
+     component) restores a single full-height bar — it is declared AFTER the
+     kind rules on equal specificity, so only the geometry is overridden. */
+  .portfolio-optimizer .optimizer-risk-decomp-bar {
+    position: absolute;
+  }
+
+  .portfolio-optimizer .optimizer-risk-decomp-bar[data-kind="standalone"] {
+    top: 6px;
+    height: 7px;
+    background-color: color-mix(in srgb, var(--optimizer-target) 78%, transparent);
+  }
+
+  .portfolio-optimizer .optimizer-risk-decomp-bar[data-kind="diversification"] {
+    bottom: 6px;
+    height: 7px;
+  }
+
+  .portfolio-optimizer
+    .optimizer-risk-decomp-bar[data-kind="diversification"][data-sign="negative"] {
+    background-color: color-mix(in srgb, var(--optimizer-long) 82%, transparent);
+  }
+
+  .portfolio-optimizer
+    .optimizer-risk-decomp-bar[data-kind="diversification"][data-sign="positive"] {
+    background-color: color-mix(in srgb, var(--optimizer-short) 82%, transparent);
+  }
+
+  .portfolio-optimizer .optimizer-risk-decomp-bar[data-kind="net"] {
+    background-color: color-mix(in srgb, var(--optimizer-target) 92%, transparent);
+  }
+
+  .portfolio-optimizer
+    .optimizer-risk-decomp-bar.optimizer-risk-decomp-bar--full {
+    top: 8px;
+    bottom: 8px;
+    height: auto;
+  }
+
+  .portfolio-optimizer .optimizer-risk-decomp-net {
+    display: inline-block;
+    flex: 0 0 auto;
+    width: 8px;
+    height: 8px;
+    box-sizing: border-box;
+    border-radius: 50%;
+    border: 1px solid color-mix(in srgb, var(--optimizer-target) 55%, black);
+    background-color: var(--optimizer-target);
+  }
+
+  .portfolio-optimizer .optimizer-risk-decomp-swatch {
+    display: inline-block;
+    flex: 0 0 auto;
+    width: 10px;
+    height: 10px;
+  }
+
+  .portfolio-optimizer .optimizer-risk-decomp-swatch[data-kind="standalone"] {
+    background-color: color-mix(in srgb, var(--optimizer-target) 78%, transparent);
+  }
+
+  .portfolio-optimizer
+    .optimizer-risk-decomp-swatch[data-kind="diversification"] {
+    background-color: color-mix(in srgb, var(--optimizer-long) 82%, transparent);
+  }
+
+  .portfolio-optimizer .optimizer-risk-decomp-div-cell,
+  .portfolio-optimizer .optimizer-risk-decomp-net-cell {
+    font-size: 12px;
+    text-align: right;
+    color: var(--optimizer-text-2);
+  }
+
+  .portfolio-optimizer .optimizer-risk-decomp-net-cell {
+    color: var(--optimizer-text);
+    font-weight: 600;
+  }
+
+  .portfolio-optimizer
+    .optimizer-risk-decomp-div-cell[data-sign="negative"] {
+    color: var(--optimizer-long);
+  }
+
+  .portfolio-optimizer
+    .optimizer-risk-decomp-div-cell[data-sign="positive"] {
+    color: var(--optimizer-short);
+  }
+
+  .portfolio-optimizer .optimizer-risk-decomp-selected {
+    margin-top: 4px;
+    font-size: 12px;
+    color: var(--optimizer-text-2);
+  }
+
+  .portfolio-optimizer .optimizer-risk-decomp-selected-asset {
+    font-weight: 600;
+    color: var(--optimizer-text);
+  }
+
+  .portfolio-optimizer
+    .optimizer-risk-decomp-selected-asset[data-side="long"] {
+    color: var(--optimizer-long);
+  }
+
+  .portfolio-optimizer
+    .optimizer-risk-decomp-selected-asset[data-side="short"] {
+    color: var(--optimizer-short);
+  }
+
+  .portfolio-optimizer .optimizer-risk-decomp-identity {
+    margin-top: 12px;
+    border: 1px solid var(--optimizer-border);
+    background-color: var(--optimizer-surface-2);
+    padding: 8px 10px;
+    text-align: center;
+    font-size: 11px;
+    color: var(--optimizer-text-2);
+  }
+
+  /* ── Allocation table: Equal Risk row selection + P&L-corr line ── */
+  .portfolio-optimizer .optimizer-exposure-row[data-selectable="true"],
+  .portfolio-optimizer .optimizer-target-exposure-asset[data-selectable="true"] {
+    cursor: pointer;
+  }
+
+  .portfolio-optimizer .optimizer-exposure-row[data-selected="true"],
+  .portfolio-optimizer .optimizer-target-exposure-asset[data-selected="true"] {
+    outline: 1px solid var(--optimizer-accent-border);
+    outline-offset: -1px;
+  }
+
+  .portfolio-optimizer .optimizer-exposure-row[data-selected="true"] td,
+  .portfolio-optimizer
+    .optimizer-target-exposure-asset[data-selected="true"] td {
+    background-color: var(--optimizer-accent-soft);
+  }
+
+  .portfolio-optimizer .optimizer-target-exposure-pnl-corr {
+    margin-top: 2px;
+    font-size: 10.5px;
+    font-weight: 400;
+    white-space: nowrap;
+    color: var(--optimizer-text-3);
+  }
+
+  .portfolio-optimizer
+    .optimizer-target-exposure-pnl-corr [data-sign="positive"] {
+    color: var(--optimizer-long);
+  }
+
+  .portfolio-optimizer
+    .optimizer-target-exposure-pnl-corr [data-sign="negative"] {
+    color: var(--optimizer-short);
   }
 }

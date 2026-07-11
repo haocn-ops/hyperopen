@@ -2,6 +2,8 @@
   (:require [clojure.string :as str]
             [hyperopen.platform :as platform]
             [hyperopen.portfolio.optimizer.application.view-model :as optimizer-view-model]
+            [hyperopen.portfolio.optimizer.application.view-model.equal-risk-structure
+             :as structure-model]
             [hyperopen.portfolio.optimizer.application.view-model.rebalance :as rebalance-view-model]
             [hyperopen.portfolio.optimizer.contracts :as contracts]
             [hyperopen.views.asset-icon :as asset-icon]
@@ -158,6 +160,40 @@
      (side-button scope role-id instrument-id position-side short-selectable? :long)
      (side-button scope role-id instrument-id position-side short-selectable? :short)]))
 
+;; --- Equal Risk row selection + P&L-correlation line ---------------------------
+;; Present only when the result carries :risk-structure (equal-risk runs):
+;; clicking a row with an instrument selects it for the correlation tab's
+;; contribution breakdown, and each held row shows Corr(side·returns,
+;; portfolio returns) — a short can correlate POSITIVELY with the book it
+;; hedges, which is exactly the point of surfacing it.
+
+(defn- pnl-corr-line
+  [result instrument-id]
+  (when-let [corr (structure-model/pnl-portfolio-correlation result
+                                                             instrument-id)]
+    [:span {:class ["optimizer-target-exposure-pnl-corr" "block"]
+            :data-role (str "portfolio-optimizer-target-exposure-pnl-corr-"
+                            (data-role-token instrument-id))}
+     "P&L corr. to portfolio "
+     [:span {:class ["font-mono" "tabular-nums"]
+             :data-sign (if (neg? corr) "negative" "positive")}
+      (structure-model/format-signed-correlation corr)]]))
+
+(defn- selection-attrs
+  "Attrs merged onto a row's <tr>: click-to-select + the highlight ring on the
+  EFFECTIVE selection (explicit or view-model fallback), so the ring always
+  agrees with the breakdown panel."
+  [{:keys [structure? selected-id]} instrument-id excluded?]
+  (let [selectable? (boolean (and structure? instrument-id (not excluded?)))]
+    (cond-> {}
+      selectable?
+      (assoc :data-selectable "true"
+             :title "Show this position's contribution breakdown"
+             :on {:click [[:actions/set-portfolio-optimizer-selected-risk-instrument
+                           instrument-id]]})
+      (and selectable? (= instrument-id selected-id))
+      (assoc :data-selected "true"))))
+
 (defn- change-cell
   [role-token delta emphasis?]
   [:td {:class (cond-> [(delta-tone-class delta)
@@ -184,20 +220,23 @@
     [:span {:class ["optimizer-target-exposure-delta-bar-fill"]}]]])
 
 (defn- exposure-row
-  [max-delta {:keys [idx binding? binding-kind hidden? current-sign target-sign leg-label current-weight
-                     target-weight delta excluded? status-label instrument-id]
-              :as row}]
+  [{:keys [max-delta result] :as ctx}
+   {:keys [idx binding? binding-kind hidden? current-sign target-sign leg-label current-weight
+           target-weight delta excluded? status-label instrument-id]
+    :as row}]
   (let [role-token (data-role-token (or instrument-id (str "row-" idx)))]
-    [:tr {:class (cond-> ["optimizer-target-exposure-row" "optimizer-exposure-row"]
-                  binding? (conj "bg-warning/10")
-                  excluded? (conj "optimizer-target-exposure-row--excluded")
-                  hidden? (conj "hidden"))
-          :data-role (str "portfolio-optimizer-target-exposure-row-" idx)
-          :data-binding (when binding? "true")
-          :data-binding-kind (when binding? (name (or binding-kind :capped)))
-          :data-excluded (when excluded? "true")
-          :data-current-sign current-sign
-          :data-target-sign target-sign}
+    [:tr (merge
+          {:class (cond-> ["optimizer-target-exposure-row" "optimizer-exposure-row"]
+                    binding? (conj "bg-warning/10")
+                    excluded? (conj "optimizer-target-exposure-row--excluded")
+                    hidden? (conj "hidden"))
+           :data-role (str "portfolio-optimizer-target-exposure-row-" idx)
+           :data-binding (when binding? "true")
+           :data-binding-kind (when binding? (name (or binding-kind :capped)))
+           :data-excluded (when excluded? "true")
+           :data-current-sign current-sign
+           :data-target-sign target-sign}
+          (selection-attrs ctx instrument-id excluded?))
      [:td {:class ["text-trading-muted"]} ""]
      [:td {:class ["pl-8" "text-trading-muted"]}
       [:span {:class (cond-> ["inline-flex" "items-center" "gap-2"]
@@ -205,7 +244,11 @@
        leg-label]
       (when excluded?
         [:span {:class ["optimizer-target-exposure-status" "ml-2"]}
-         status-label])]
+         status-label])
+      ;; Hidden single-leg rows mirror their group row — skip the line there
+      ;; so each instrument's P&L correlation renders exactly once.
+      (when-not hidden?
+        (pnl-corr-line result instrument-id))]
      [:td {:class ["px-2" "text-right"]}
       (side-control "portfolio-optimizer-target-exposure-row" row)]
      [:td {:class (cond-> ["font-mono" "text-right" "tabular-nums"]
@@ -222,17 +265,20 @@
      (delta-bar-cell role-token delta max-delta)]))
 
 (defn- exposure-group-row
-  [max-delta {:keys [asset current-weight target-weight delta binding? binding-kind
-                     expandable? target-sign excluded? status-label instrument-id]
-              :as group}]
+  [{:keys [max-delta result] :as ctx}
+   {:keys [asset current-weight target-weight delta binding? binding-kind
+           expandable? target-sign excluded? status-label instrument-id]
+    :as group}]
   (let [asset-token (data-role-token asset)
         token (data-role-token (or instrument-id asset))]
-    [:tr {:class (cond-> ["optimizer-target-exposure-asset" "optimizer-exposure-row" "cursor-pointer"]
-                  excluded? (conj "optimizer-target-exposure-row--excluded"))
-        :data-role (str "portfolio-optimizer-target-exposure-asset-"
-                        (data-role-token asset))
-        :data-excluded (when excluded? "true")
-        :data-target-sign target-sign}
+    [:tr (merge
+          {:class (cond-> ["optimizer-target-exposure-asset" "optimizer-exposure-row" "cursor-pointer"]
+                    excluded? (conj "optimizer-target-exposure-row--excluded"))
+           :data-role (str "portfolio-optimizer-target-exposure-asset-"
+                           (data-role-token asset))
+           :data-excluded (when excluded? "true")
+           :data-target-sign target-sign}
+          (selection-attrs ctx instrument-id excluded?))
    [:td {:class ["w-8" "font-mono" "text-trading-muted/70"]}
     (if instrument-id
       [:button {:type "button"
@@ -273,7 +319,8 @@
          (if floored? "floored" "capped")]))
     (when excluded?
       [:span {:class ["optimizer-target-exposure-status" "ml-2"]}
-       status-label])]
+       status-label])
+    (pnl-corr-line result instrument-id)]
    [:td {:class ["px-2" "text-right"]}
     (side-control "portfolio-optimizer-target-exposure" group)]
    [:td {:class (cond-> ["font-mono" "text-right" "font-semibold" "tabular-nums"]
@@ -428,10 +475,20 @@
          (add-asset-popover state draft))])))
 
 (defn- exposure-table-body
-  [result draft]
+  [result draft selected-risk-instrument]
   (let [{:keys [groups]} (rebalance-view-model/target-exposure-table-model result
                                                                             {:draft draft})
-        max-delta (max-abs-delta groups)]
+        max-delta (max-abs-delta groups)
+        ;; Highlight the EFFECTIVE selection (explicit or fallback) so the
+        ;; ring always points at the asset the breakdown panel explains.
+        structure? (some? (:risk-structure result))
+        ctx {:max-delta max-delta
+             :result result
+             :structure? structure?
+             :selected-id (when structure?
+                            (structure-model/selected-instrument
+                             result
+                             selected-risk-instrument))}]
     [:div {:class ["overflow-auto"]}
       [:table {:class ["w-full" "border-collapse" "text-[0.6875rem]"]}
        [:thead
@@ -451,30 +508,31 @@
 	        (mapcat
 	         (fn [{:keys [rows] :as group}]
 	            (concat
-	             [(exposure-group-row max-delta group)]
-	             (map (partial exposure-row max-delta) rows)))
+	             [(exposure-group-row ctx group)]
+	             (map (partial exposure-row ctx) rows)))
 	          groups))]]))
 
 ;; The row hiccup scales with the universe (100+ assets on levered accounts)
-;; and depends only on result + draft, both identity-stable across streaming
-;; ticks and target-sigma dial events — a single-entry memo keeps those
-;; renders cheap. Same pattern as the frontier-chart memo.
+;; and depends only on result + draft + the selected risk instrument, all
+;; identity-stable across streaming ticks and target-sigma dial events — a
+;; single-entry memo keeps those renders cheap. Same pattern as the
+;; frontier-chart memo.
 (def ^:private exposure-table-memo (volatile! nil))
 
 (defn- memoized-exposure-table-body
-  [result draft]
-  (let [inputs [result draft]
+  [result draft selected-risk-instrument]
+  (let [inputs [result draft selected-risk-instrument]
         cached @exposure-table-memo]
     (if (and cached (= inputs (:inputs cached)))
       (:hiccup cached)
-      (let [hiccup (exposure-table-body result draft)]
+      (let [hiccup (exposure-table-body result draft selected-risk-instrument)]
         (vreset! exposure-table-memo {:inputs inputs :hiccup hiccup})
         hiccup))))
 
 (defn target-exposure-table
   ([result]
    (target-exposure-table result nil))
-  ([result {:keys [state draft]}]
+  ([result {:keys [state draft selected-risk-instrument]}]
    [:section {:class ["optimizer-target-exposure-table"
                       "min-h-0" "border-r" "border-base-300" "bg-base-100/95" "leading-4"]
               :data-role "portfolio-optimizer-target-exposure-table"}
@@ -495,4 +553,4 @@
                  :class ["px-3" "py-1" "text-trading-muted"]}
         "By Leg"]]
       (add-asset-controls state draft)]]
-    (memoized-exposure-table-body result draft)]))
+    (memoized-exposure-table-body result draft selected-risk-instrument)]))

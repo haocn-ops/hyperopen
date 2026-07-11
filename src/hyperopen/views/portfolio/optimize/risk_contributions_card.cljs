@@ -15,10 +15,16 @@
 
   A five-cell KPI strip (Equal target / Status / RMS / Max / Negative
   contributors) sits between the header and the plot; the header's right side
-  is a two-tab switcher (RISK CONTRIBUTION / RISK / RETURN) whose state lives
-  entirely in the DOM as a pair of visually-hidden radio inputs toggled by
-  scoped :has() CSS — no app state, same zero-state constraint the old
-  <details> disclosure satisfied.
+  is a tab switcher (RISK CONTRIBUTION / BREAKDOWN / CORRELATION /
+  RISK / RETURN) whose state lives entirely in the DOM as visually-hidden
+  radio inputs toggled by scoped :has() CSS — no app state, same zero-state
+  constraint the old <details> disclosure satisfied. The BREAKDOWN and
+  CORRELATION tabs (designer spec 2026-07-11, correlation view) render only
+  when the result carries the :risk-structure payload section, so persisted
+  pre-structure results keep the original pair; their panel bodies live in
+  risk-breakdown-panel / risk-correlation-panel. Which asset the correlation
+  tab's breakdown block explains IS app state (Allocation-row clicks set it) —
+  that selection routes data across cards, which DOM-state radios cannot.
 
   Rows come pre-ordered and capped from the equal-risk-results view-model
   (worst deviations survive the cap, display order is signed share descending,
@@ -28,6 +34,12 @@
   from a frontier and must not be plotted as if it were."
   (:require [hyperopen.portfolio.optimizer.application.view-model.equal-risk-results
              :as equal-risk-results]
+            [hyperopen.portfolio.optimizer.application.view-model.equal-risk-structure
+             :as structure-model]
+            [hyperopen.views.portfolio.optimize.risk-breakdown-panel
+             :as breakdown-panel]
+            [hyperopen.views.portfolio.optimize.risk-correlation-panel
+             :as correlation-panel]
             [hyperopen.views.portfolio.optimize.risk-return-context
              :as risk-return-context]))
 
@@ -114,37 +126,45 @@
     value]])
 
 (defn- kpi-strip
-  [{:keys [target-share quality rms-pts max-pts negative-count]}]
-  (let [target-pts (when (number? target-share) (* 100 target-share))
-        quality* (get quality-copy quality)]
-    [:div {:class ["optimizer-risk-balance-kpis"]
-           :data-role "portfolio-optimizer-risk-balance-kpis"}
-     (kpi-cell "portfolio-optimizer-risk-contributions-target"
-               "Equal target"
-               (str (format-pct target-share) " per asset")
-               {:value-class "optimizer-risk-balance-kpi-value--target"})
-     (kpi-cell "portfolio-optimizer-risk-contributions-quality"
-               "Status"
-               (or (:label quality*) "—")
-               {:value-class "optimizer-risk-balance-kpi-value--status"
-                :tone (case quality
-                        :exact :good
-                        :approximate :caution
-                        :not-converged :bad
-                        nil)
-                :title (:note quality*)})
-     (kpi-cell "portfolio-optimizer-risk-contributions-rms"
-               "RMS deviation"
-               (equal-risk-results/format-pts rms-pts)
-               {:tone (equal-risk-results/deviation-tone rms-pts target-pts)})
-     (kpi-cell "portfolio-optimizer-risk-contributions-max"
-               "Max deviation"
-               (equal-risk-results/format-pts max-pts)
-               {:tone (equal-risk-results/deviation-tone max-pts target-pts)})
-     (kpi-cell "portfolio-optimizer-risk-contributions-negative"
-               "Negative contributors"
-               (str (or negative-count 0))
-               {:tone (when (pos? (or negative-count 0)) :bad)})]))
+  "The five shared cells, plus an optional per-tab View cell so the
+  correlation/breakdown panels can label what they show without the strips
+  drifting apart."
+  ([model] (kpi-strip model nil))
+  ([{:keys [target-share quality rms-pts max-pts negative-count]} view-text]
+   (let [target-pts (when (number? target-share) (* 100 target-share))
+         quality* (get quality-copy quality)]
+     (cond-> [:div {:class ["optimizer-risk-balance-kpis"]
+                    :data-role "portfolio-optimizer-risk-balance-kpis"}
+              (kpi-cell "portfolio-optimizer-risk-contributions-target"
+                        "Equal target"
+                        (str (format-pct target-share) " per asset")
+                        {:value-class "optimizer-risk-balance-kpi-value--target"})
+              (kpi-cell "portfolio-optimizer-risk-contributions-quality"
+                        "Status"
+                        (or (:label quality*) "—")
+                        {:value-class "optimizer-risk-balance-kpi-value--status"
+                         :tone (case quality
+                                 :exact :good
+                                 :approximate :caution
+                                 :not-converged :bad
+                                 nil)
+                         :title (:note quality*)})
+              (kpi-cell "portfolio-optimizer-risk-contributions-rms"
+                        "RMS deviation"
+                        (equal-risk-results/format-pts rms-pts)
+                        {:tone (equal-risk-results/deviation-tone rms-pts target-pts)})
+              (kpi-cell "portfolio-optimizer-risk-contributions-max"
+                        "Max deviation"
+                        (equal-risk-results/format-pts max-pts)
+                        {:tone (equal-risk-results/deviation-tone max-pts target-pts)})
+              (kpi-cell "portfolio-optimizer-risk-contributions-negative"
+                        "Negative contributors"
+                        (str (or negative-count 0))
+                        {:tone (when (pos? (or negative-count 0)) :bad)})]
+       view-text (conj (kpi-cell "portfolio-optimizer-risk-contributions-view"
+                                 "View"
+                                 view-text
+                                 {}))))))
 
 ;; --- Plot ---------------------------------------------------------------------
 
@@ -339,12 +359,15 @@
 (defn- tab-label
   "A tab is a label wrapping its own visually-hidden radio: checked state
   lives in the DOM (never controlled by the render), and the scoped :has()
-  CSS in optimizer/results.css does the active styling + panel switching."
-  [radio-name view text]
+  CSS in optimizer/results.css does the active styling + panel switching.
+  The radio gets a deterministic id so out-of-card labels (the why-card's
+  Correlation view card) can activate a tab with plain label/for."
+  [result view text]
   [:label {:class ["optimizer-risk-balance-tab"]
            :data-role (str "portfolio-optimizer-risk-view-tab-" view)}
    [:input {:type "radio"
-            :name radio-name
+            :name (structure-model/risk-view-radio-name result)
+            :id (structure-model/risk-view-radio-id result view)
             :class ["sr-only"]
             :data-risk-view view}]
    text])
@@ -354,45 +377,73 @@
 (defn risk-contributions-card
   "Renders nil unless the result carries the :risk-contributions section
   (present only on :equal-risk runs). Degrades gracefully on persisted
-  pre-redesign results: no current markers/connectors, no solver footer, and
-  the RISK / RETURN tab disappears when no portfolio points exist."
-  [result]
-  (when-let [model (equal-risk-results/balance-model result)]
-    (let [{:keys [rows target-share current]} model
-          scale (lane-scale model)
-          risk-return-panel (risk-return-context/risk-return-panel result)
-          radio-name (str "optimizer-risk-view-" (or (:as-of-ms result) "result"))]
-      [:section {:class ["optimizer-risk-balance" "rounded-xl" "border"
-                         "border-base-300"]
-                 :data-role "portfolio-optimizer-risk-contributions"}
-       [:div {:class ["optimizer-risk-balance-header"]}
-        [:div {:class ["min-w-0"]}
-         [:p {:class ["optimizer-risk-balance-title"]}
-          "Risk contribution balance"]
-         [:p {:class ["optimizer-risk-balance-subtitle"]}
-          "Signed Euler contribution to total portfolio volatility"]]
+  pre-redesign results: no current markers/connectors, no solver footer, the
+  RISK / RETURN tab disappears when no portfolio points exist, and the
+  BREAKDOWN / CORRELATION tabs disappear when the result predates the
+  :risk-structure section. `selected-risk-instrument` (app state, set by
+  Allocation-row clicks) picks which asset the correlation tab's breakdown
+  block explains; the view-model falls back when it is nil or stale."
+  ([result] (risk-contributions-card result nil))
+  ([result {:keys [selected-risk-instrument]}]
+   (when-let [model (equal-risk-results/balance-model result)]
+     (let [{:keys [rows target-share current]} model
+           scale (lane-scale model)
+           risk-return-panel (risk-return-context/risk-return-panel result)
+           correlation-body (correlation-panel/correlation-panel
+                             {:result result
+                              :kpi-strip (kpi-strip model
+                                                    "Correlation / decomposition")
+                              :selected-instrument-id selected-risk-instrument})
+           breakdown-body (breakdown-panel/breakdown-panel
+                           {:rows (structure-model/breakdown-rows result rows)
+                            :target-share target-share
+                            :kpi-strip (kpi-strip model
+                                                  "Standalone vs diversification")
+                            :overflow-note (overflow-line model)})]
+       [:section {:class ["optimizer-risk-balance" "rounded-xl" "border"
+                          "border-base-300"]
+                  :data-role "portfolio-optimizer-risk-contributions"}
+        [:div {:class ["optimizer-risk-balance-header"]}
+         [:div {:class ["min-w-0"]}
+          [:p {:class ["optimizer-risk-balance-title"]}
+           "Risk contribution balance"]
+          [:p {:class ["optimizer-risk-balance-subtitle"]}
+           "Signed Euler contribution to total portfolio volatility"]]
+         (when (or risk-return-panel breakdown-body correlation-body)
+           [:div {:class ["optimizer-risk-balance-tabs"]
+                  :data-role "portfolio-optimizer-risk-view-tabs"}
+            (tab-label result "contribution" "Risk contribution")
+            (when breakdown-body
+              (tab-label result "breakdown" "Breakdown"))
+            (when correlation-body
+              (tab-label result "correlation" "Correlation"))
+            (when risk-return-panel
+              (tab-label result "risk-return" "Risk / Return"))])]
+        [:div {:class ["optimizer-risk-balance-panel"
+                       "optimizer-risk-balance-panel--contribution"]}
+         (kpi-strip model)
+         [:div {:class ["optimizer-risk-balance-plot-frame"]
+                :data-role "portfolio-optimizer-risk-contribution-chart"}
+          (legend-row target-share (some? current))
+          [:div {:class ["optimizer-risk-balance-rows" "relative"]}
+           (plot-backdrop scale target-share)
+           (into [:div {:class ["relative" "space-y-1"]}]
+                 (map (partial contribution-row scale))
+                 rows)]
+          (axis-rows scale)]
+         (reading-note model)
+         (overflow-line model)
+         (exposure-line (:diagnostics result))
+         (solver-footer result)]
+        (when breakdown-body
+          [:div {:class ["optimizer-risk-balance-panel"
+                         "optimizer-risk-balance-panel--breakdown"]}
+           breakdown-body])
+        (when correlation-body
+          [:div {:class ["optimizer-risk-balance-panel"
+                         "optimizer-risk-balance-panel--correlation"]}
+           correlation-body])
         (when risk-return-panel
-          [:div {:class ["optimizer-risk-balance-tabs"]
-                 :data-role "portfolio-optimizer-risk-view-tabs"}
-           (tab-label radio-name "contribution" "Risk contribution")
-           (tab-label radio-name "risk-return" "Risk / Return")])]
-       [:div {:class ["optimizer-risk-balance-panel"
-                      "optimizer-risk-balance-panel--contribution"]}
-        (kpi-strip model)
-        [:div {:class ["optimizer-risk-balance-plot-frame"]
-               :data-role "portfolio-optimizer-risk-contribution-chart"}
-         (legend-row target-share (some? current))
-         [:div {:class ["optimizer-risk-balance-rows" "relative"]}
-          (plot-backdrop scale target-share)
-          (into [:div {:class ["relative" "space-y-1"]}]
-                (map (partial contribution-row scale))
-                rows)]
-         (axis-rows scale)]
-        (reading-note model)
-        (overflow-line model)
-        (exposure-line (:diagnostics result))
-        (solver-footer result)]
-       (when risk-return-panel
-         [:div {:class ["optimizer-risk-balance-panel"
-                        "optimizer-risk-balance-panel--risk-return"]}
-          risk-return-panel])])))
+          [:div {:class ["optimizer-risk-balance-panel"
+                         "optimizer-risk-balance-panel--risk-return"]}
+           risk-return-panel])]))))

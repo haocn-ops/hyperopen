@@ -291,6 +291,7 @@
             [hyperopen.portfolio.optimizer.application.view-model-setup-boundary-test]
             [hyperopen.portfolio.optimizer.application.view-model-test]
             [hyperopen.portfolio.optimizer.application.view-model.equal-risk-results-test]
+            [hyperopen.portfolio.optimizer.application.view-model.equal-risk-structure-test]
             [hyperopen.portfolio.optimizer.application.view-model.execution-commit-block-test]
             [hyperopen.portfolio.optimizer.application.view-model.execution-reconcile-test]
             [hyperopen.portfolio.optimizer.application.view-model.exposure-test]
@@ -317,6 +318,7 @@
             [hyperopen.portfolio.optimizer.domain.returns-test]
             [hyperopen.portfolio.optimizer.domain.risk-contributions-test]
             [hyperopen.portfolio.optimizer.domain.risk-ledoit-wolf-test]
+            [hyperopen.portfolio.optimizer.domain.risk-structure-test]
             [hyperopen.portfolio.optimizer.domain.risk-test]
             [hyperopen.portfolio.optimizer.domain.weight-cleaning-test]
             [hyperopen.portfolio.optimizer.draft-actions-test]
@@ -1103,6 +1105,7 @@
              'hyperopen.portfolio.optimizer.application.view-model-setup-boundary-test
              'hyperopen.portfolio.optimizer.application.view-model-test
              'hyperopen.portfolio.optimizer.application.view-model.equal-risk-results-test
+             'hyperopen.portfolio.optimizer.application.view-model.equal-risk-structure-test
              'hyperopen.portfolio.optimizer.application.view-model.execution-commit-block-test
              'hyperopen.portfolio.optimizer.application.view-model.execution-reconcile-test
              'hyperopen.portfolio.optimizer.application.view-model.exposure-test
@@ -1129,6 +1132,7 @@
              'hyperopen.portfolio.optimizer.domain.returns-test
              'hyperopen.portfolio.optimizer.domain.risk-contributions-test
              'hyperopen.portfolio.optimizer.domain.risk-ledoit-wolf-test
+             'hyperopen.portfolio.optimizer.domain.risk-structure-test
              'hyperopen.portfolio.optimizer.domain.risk-test
              'hyperopen.portfolio.optimizer.domain.weight-cleaning-test
              'hyperopen.portfolio.optimizer.draft-actions-test

@@ -17,6 +17,14 @@
     (optimizer-query-state/normalize-results-tab tab)]
    [:effects/replace-shareable-route-query]])
 
+(defn set-portfolio-optimizer-selected-risk-instrument
+  "Selects the instrument whose contribution breakdown the Equal Risk
+  correlation view explains; Allocation rows dispatch it on click. A stale id
+  (result re-solved with a different universe) needs no cleanup — the
+  view-model falls back to its default selection."
+  [_state instrument-id]
+  [[:effects/save contracts/ui-selected-risk-instrument-path instrument-id]])
+
 (defn load-portfolio-optimizer-history-from-draft
   [state]
   (if (seq (get-in state contracts/draft-universe-path))

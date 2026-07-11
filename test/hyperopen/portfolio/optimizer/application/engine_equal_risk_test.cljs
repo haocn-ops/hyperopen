@@ -134,6 +134,29 @@
         (is (map? current))
         (is (contains? (:relative-contributions-by-instrument current) "perp:BTC"))
         (is (number? (:max-absolute-error current)))))
+    (testing "the correlation-view structure section rides the payload"
+      (let [structure (:risk-structure result)
+            correlation (:correlation structure)
+            nets (:relative-contributions-by-instrument
+                  (:risk-contributions result))]
+        (is (= :signed-euler-decomposition (:method structure)))
+        (is (number? (:portfolio-volatility structure)))
+        (testing "standalone + diversification reproduces the sibling section's
+                  net share exactly (same covariance, same weights)"
+          (doseq [instrument-id ["perp:BTC" "perp:ETH"]]
+            (is (near? (get nets instrument-id)
+                       (+ (get-in structure [:standalone-share-by-instrument
+                                             instrument-id])
+                          (get-in structure [:diversification-share-by-instrument
+                                             instrument-id]))
+                       1e-12))))
+        (is (every? #(and (>= % -1) (<= % 1))
+                    (vals (:pnl-portfolio-correlation-by-instrument structure))))
+        (is (= (set (:instrument-ids correlation)) #{"perp:BTC" "perp:ETH"}))
+        (is (every? #(= 1.0 %)
+                    (map-indexed (fn [idx row] (nth row idx))
+                                 (:matrix correlation))))
+        (is (zero? (:hidden-count correlation)))))
     (testing "allocation freedom classifies the problem geometry"
       (let [freedom (get-in result [:equal-risk-solver :allocation-freedom])]
         (is (contains? #{:open :limited} (:status freedom))

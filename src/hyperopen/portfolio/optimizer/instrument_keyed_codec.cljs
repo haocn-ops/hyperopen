@@ -73,6 +73,11 @@
     ;; Equal-risk :risk-contributions submaps (result-only).
     :relative-contributions-by-instrument
     :target-relative-contributions-by-instrument
+    ;; Equal-risk :risk-structure submaps (result-only): the correlation-view
+    ;; decomposition and P&L-to-portfolio correlations.
+    :standalone-share-by-instrument
+    :diversification-share-by-instrument
+    :pnl-portfolio-correlation-by-instrument
     :pair-metadata
     :labels-by-instrument})
 

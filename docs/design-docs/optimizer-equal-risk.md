@@ -99,16 +99,46 @@ explain an Approximate verdict always survive), then displayed in signed
 share descending order with an honest remainder line. No pie, donut, stacked,
 or absolute form is ever used: those all misrepresent negative contributions
 and >100% positive shares. No efficient frontier is computed, drawn, or
-implied for this objective anywhere; the card's second tab, RISK / RETURN
-(`risk_return_context.cljs`), shows current/recommended/standalone points with
-an explicit returns-are-context-only note. The tab switcher is a pair of
-visually-hidden radio inputs toggled by scoped `:has()` CSS — tab state lives
-in the DOM, never in app state. The "Why this risk allocation" card renders
-four icon facts (book shape, equal target, largest risk contributor over the
-full universe, allocation freedom with its binding-cap count); the
-binding-constraint enumeration lives in the trust-diagnostics rail. Workbench
-scenes (`workbench/scenes/optimize/equal_risk_scenes.cljs`) pin the
-designer-parity book plus the hedged/exact/capped/persisted states.
+implied for this objective anywhere. The card carries four DOM-state tabs
+(designer spec 2026-07-11, correlation view): RISK CONTRIBUTION | BREAKDOWN |
+CORRELATION | RISK / RETURN — visually-hidden radio inputs toggled by scoped
+`:has()` CSS, tab state in the DOM, never in app state. BREAKDOWN
+(`risk_breakdown_panel.cljs`) splits each charted asset's signed net share
+into its always-positive **standalone** (own-variance) component and its
+signed **diversification** (cross-covariance) component — paired sub-bars
+from zero with a purple net marker at their exact sum — because a short can
+be negatively correlated with every long and still contribute positive risk.
+CORRELATION (`risk_correlation_panel.cljs`) shows the correlation heatmap
+with a POSITION P&L / UNDERLYING RETURNS toggle (position-P&L correlation =
+sideᵢ·sideⱼ·underlying correlation; both matrices pre-render and a second
+DOM-state radio pair swaps them; every cell's native tooltip carries both
+numbers plus a Diversifying/Amplifying/Neutral verdict) beside a
+CONTRIBUTION BREAKDOWN block for the **selected asset**. Which asset is
+selected IS app state (`ui-selected-risk-instrument-path`, set by
+`set-portfolio-optimizer-selected-risk-instrument` from Allocation-row
+clicks — the one selection that must route data across cards); the fallback
+is the most negative net contributor, else the largest |net|. The heatmap's
+data comes from the persisted `:risk-structure` payload section (the
+covariance itself is never persisted), capped at the 12 largest |net share|
+positions with an honest remainder line, ordered by signed net share to
+match the balance chart. Allocation rows gain a "P&L corr. to portfolio"
+line (Corr(sᵢrᵢ, r_p)) and an accent ring on the effective selection.
+RISK / RETURN (`risk_return_context.cljs`) shows
+current/recommended/standalone points with an explicit
+returns-are-context-only note. Persisted results that predate
+`:risk-structure` keep the original two tabs. The "Why this risk allocation"
+card renders four icon facts (book shape, equal target, a CORRELATION VIEW
+label that activates the correlation tab — falling back to the largest risk
+contributor on pre-structure results — and allocation freedom with its
+binding-cap count); the binding-constraint enumeration lives in the
+trust-diagnostics rail. Workbench scenes
+(`workbench/scenes/optimize/equal_risk_scenes.cljs` and
+`equal_risk_correlation_scenes.cljs`) pin the designer-parity books (the
+correlation one computes its payload sections through the real domain math,
+with an interactive selection store) plus the
+hedged/exact/capped/degenerate/persisted states;
+`tools/playwright/test/optimizer-risk-correlation-workbench.spec.mjs` covers
+the tab/toggle switching and the click-to-select flow deterministically.
 
 The KPI strip (`scenario_kpi_strip.cljs`) swaps the Sharpe tile for RISK
 BALANCE (current → recommended max deviation in points) and renders the

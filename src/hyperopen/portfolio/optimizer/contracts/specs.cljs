@@ -368,6 +368,30 @@
                      (:target-relative-contributions-by-instrument contributions)))))
          (optional? map? (:current-risk-contributions value))
          (optional? map? (:equal-risk-solver value))
+         ;; Present only on :equal-risk runs: the correlation-view section —
+         ;; standalone/diversification decomposition maps plus the capped
+         ;; underlying correlation matrix (square, aligned to its own id list;
+         ;; entries may be nil for degenerate-variance assets).
+         (or (nil? (:risk-structure value))
+             (let [structure (:risk-structure value)
+                   correlation (:correlation structure)
+                   correlation-ids (:instrument-ids correlation)]
+               (and (map? structure)
+                    (finite-field? structure :portfolio-volatility)
+                    (instrument-keyed-map?
+                     (:standalone-share-by-instrument structure))
+                    (instrument-keyed-map?
+                     (:diversification-share-by-instrument structure))
+                    (instrument-keyed-map?
+                     (:pnl-portfolio-correlation-by-instrument structure))
+                    (map? correlation)
+                    (vector? correlation-ids)
+                    (every? non-blank-string? correlation-ids)
+                    (vector? (:matrix correlation))
+                    (= (count correlation-ids) (count (:matrix correlation)))
+                    (every? #(and (vector? %)
+                                  (= (count correlation-ids) (count %)))
+                            (:matrix correlation)))))
          (or (nil? (:rebalance-preview value))
              (and (map? (:rebalance-preview value))
                   (optional? vector? (get-in value [:rebalance-preview :rows]))

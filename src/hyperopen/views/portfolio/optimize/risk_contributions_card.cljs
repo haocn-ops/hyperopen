@@ -1,22 +1,35 @@
 (ns hyperopen.views.portfolio.optimize.risk-contributions-card
-  "Equal Risk results centerpiece: the RISK CONTRIBUTION BALANCE chart — a
+  "Equal Risk results centerpiece: the RISK CONTRIBUTION BALANCE card — a
   horizontal diverging chart of each position's SIGNED Euler share of
-  portfolio volatility against the equal 1/n target. One row per asset:
-  recommended share as the bar (colored by contribution SIGN, never by
-  position side), the current share as a muted dot, the dashed equal-target
-  line, and the deviation in points. The axis always includes zero: a
-  negative share means the position HEDGES the book, and positive shares can
-  exceed 100% when another is negative — the signed shares still sum to 100%.
-  No pies, donuts, stacked bars, or absolute contributions: those forms all
-  lie once a contribution is negative.
+  portfolio volatility against the equal 1/n target, built to the designer's
+  2026-07-11 spec. One row per asset: recommended share as the sign-colored
+  bar (colored by contribution SIGN, never by position side) capped with a
+  green recommended dot, the current share as a gray outlined circle joined
+  to the bar end by a dashed connector, a purple per-row target tick on the
+  continuous dashed purple equal-target line, and purple Target / sign-colored
+  Deviation columns. The axis always includes zero: a negative share means the
+  position HEDGES the book, and positive shares can exceed 100% when another
+  is negative — the signed shares still sum to 100%. No pies, donuts, stacked
+  bars, or absolute contributions: those forms all lie once a contribution is
+  negative.
 
-  Rows come pre-sorted and capped from the equal-risk-results view-model
-  (worst deviations first, honest remainder line); the lanes are plain HTML
-  so the zero/target lines stay 1px and markers stay round at any width.
-  Replaces the efficient-frontier chart for :equal-risk — that objective is
-  not selected from a frontier and must not be plotted as if it were."
+  A five-cell KPI strip (Equal target / Status / RMS / Max / Negative
+  contributors) sits between the header and the plot; the header's right side
+  is a two-tab switcher (RISK CONTRIBUTION / RISK / RETURN) whose state lives
+  entirely in the DOM as a pair of visually-hidden radio inputs toggled by
+  scoped :has() CSS — no app state, same zero-state constraint the old
+  <details> disclosure satisfied.
+
+  Rows come pre-ordered and capped from the equal-risk-results view-model
+  (worst deviations survive the cap, display order is signed share descending,
+  honest remainder line); the lanes are plain HTML so the zero/target lines
+  stay 1px and markers stay round at any width. Replaces the
+  efficient-frontier chart for :equal-risk — that objective is not selected
+  from a frontier and must not be plotted as if it were."
   (:require [hyperopen.portfolio.optimizer.application.view-model.equal-risk-results
-             :as equal-risk-results]))
+             :as equal-risk-results]
+            [hyperopen.views.portfolio.optimize.risk-return-context
+             :as risk-return-context]))
 
 (defn- format-pct
   ([value] (format-pct value 1))
@@ -27,35 +40,23 @@
 
 (def ^:private quality-copy
   {:exact {:label "Exact"
-           :note "Risk contributions are balanced within tolerance."
-           :class ["border-success/50" "bg-success/10" "text-success"]}
+           :note "Risk contributions are balanced within tolerance."}
    :approximate {:label "Approximate"
-                 :note "Best solution found under the selected constraints — exposure targets and limits take priority over exact parity."
-                 :class ["border-warning/60" "bg-warning/10" "text-warning"]}
+                 :note "Best solution found under the selected constraints — exposure targets and limits take priority over exact parity."}
    :not-converged {:label "Not converged"
-                   :note "The solver stopped at its iteration limit; this is the best feasible portfolio found."
-                   :class ["border-error/60" "bg-error/10" "text-error"]}})
-
-(defn- quality-badge
-  [quality]
-  (when-let [copy (get quality-copy quality)]
-    [:span {:class (into ["inline-flex" "items-center" "border" "px-1.5" "py-0.5"
-                          "font-mono" "text-[0.625rem]" "font-semibold" "uppercase"
-                          "tracking-[0.08em]"]
-                         (:class copy))
-            :data-role "portfolio-optimizer-risk-contributions-quality"}
-     (:label copy)]))
+                   :note "The solver stopped at its iteration limit; this is the best feasible portfolio found."}})
 
 ;; --- Shared lane scale --------------------------------------------------------
 
 (defn- lane-scale
-  "One scale for every lane: covers zero, the target, and every visible
+  "One scale for every lane: covers zero, every target, and every visible
   recommended/current share, padded and rounded to 5% so the domain reads as
   clean ticks. Returns {:lo :hi :x (fraction-of-total -> 0..100 percent)}."
   [{:keys [rows target-share]}]
   (let [values (concat [0 (or target-share 0)]
                        (keep :share rows)
-                       (keep :current-share rows))
+                       (keep :current-share rows)
+                       (keep :target-share rows))
         lo0 (reduce min 0 values)
         hi0 (reduce max 0 values)
         pad (max 0.02 (* 0.08 (- hi0 lo0)))
@@ -72,108 +73,208 @@
 (defn- tick-values
   [{:keys [lo hi]}]
   (let [span (- hi lo)
-        step (or (first (filter #(<= (/ span %) 6)
+        step (or (first (filter #(<= (/ span %) 8)
                                 [0.05 0.1 0.2 0.25 0.5 1 2 5]))
                  5)]
     (->> (range (js/Math.ceil (/ lo step)) (inc (js/Math.floor (/ hi step))))
          (map #(* step %)))))
 
-;; --- Lanes --------------------------------------------------------------------
+;; --- KPI strip ----------------------------------------------------------------
 
-(defn- lane-line
-  [x-pct classes]
-  [:div {:class (into ["absolute" "inset-y-0" "w-0"] classes)
-         :style {:left (str x-pct "%")}}])
-
-(defn- contribution-lane
-  "The row's plot area: zero line, dashed target line, the recommended-share
-  bar from zero (sign-colored), and the muted current-share dot."
-  [{:keys [x]} target-share {:keys [share current-share negative?]}]
-  (let [x0 (x 0)
-        xs (when (number? share) (x share))]
-    [:div {:class ["relative" "h-4" "min-w-0" "bg-base-200/30"]}
-     (lane-line x0 ["border-l" "border-base-300"])
-     (when (number? target-share)
-       (lane-line (x target-share) ["border-l" "border-dashed" "border-warning/70"]))
-     (when xs
-       [:div {:class ["absolute" "top-1" "bottom-1"
-                      (if negative? "bg-error/70" "bg-success/70")]
-              :data-role "portfolio-optimizer-risk-contribution-bar"
-              :style {:left (str (min x0 xs) "%")
-                      :width (str (max 0.4 (js/Math.abs (- xs x0))) "%")}}])
-     (when (number? current-share)
-       [:div {:class ["absolute" "top-1/2" "h-1.5" "w-1.5" "-translate-x-1/2"
-                      "-translate-y-1/2" "rounded-full" "border" "border-base-300"
-                      "bg-base-100"]
-              :data-role "portfolio-optimizer-risk-contribution-current"
-              :style {:left (str (x current-share) "%")}}])]))
-
-(def ^:private row-grid
-  ["grid" "grid-cols-[minmax(0,7.5rem)_minmax(0,1fr)_3.75rem_4.25rem]"
-   "items-center" "gap-2"])
-
-(defn- contribution-row
-  [scale target-share {:keys [instrument-id label share deviation-pts negative?] :as row}]
-  [:div {:class (into ["py-0.5"] row-grid)
-         :data-role "portfolio-optimizer-risk-contribution-row"
-         :data-instrument-id instrument-id}
-   [:span {:class ["truncate" "text-[0.75rem]" "text-trading-text"]} label]
-   (contribution-lane scale target-share row)
-   [:span {:class ["text-right" "font-mono" "text-[0.75rem]" "tabular-nums"
-                   (if negative? "text-error" "text-trading-text")]}
-    (format-pct share)]
-   [:span {:class ["text-right" "font-mono" "text-[0.6875rem]" "tabular-nums"
-                   "text-trading-muted"]}
-    (equal-risk-results/format-signed-pts deviation-pts)]])
-
-(defn- tick-lane
-  [{:keys [x] :as scale}]
-  [:div {:class (into ["mt-1"] row-grid)}
-   [:span]
-   (into [:div {:class ["relative" "h-4"]}]
-         (map (fn [tick]
-                [:span {:class ["absolute" "-translate-x-1/2" "font-mono"
-                                "text-[0.5625rem]" "text-trading-muted/70"]
-                        :style {:left (str (x tick) "%")}}
-                 (format-pct tick 0)])
-              (tick-values scale)))
-   [:span] [:span]])
-
-(defn- column-headers
-  []
-  [:div {:class (into ["border-b" "border-base-300" "pb-1"] row-grid)}
-   [:span {:class ["font-mono" "text-[0.5625rem]" "uppercase"
-                   "tracking-[0.08em]" "text-trading-muted/70"]} "Asset"]
-   [:span]
-   [:span {:class ["text-right" "font-mono" "text-[0.5625rem]" "uppercase"
-                   "tracking-[0.08em]" "text-trading-muted/70"]} "Share"]
-   [:span {:class ["text-right" "font-mono" "text-[0.5625rem]" "uppercase"
-                   "tracking-[0.08em]" "text-trading-muted/70"]} "Deviation"]])
-
-;; --- Summary strip ------------------------------------------------------------
-
-(defn- summary-fact
-  [data-role label value]
-  [:div {:data-role data-role}
-   [:p {:class ["font-mono" "text-[0.5625rem]" "uppercase" "tracking-[0.08em]"
-                "text-trading-muted/70"]}
-    label]
-   [:p {:class ["mt-0.5" "font-mono" "text-[0.75rem]" "font-semibold"
-                "tabular-nums" "text-trading-text"]}
+(defn- kpi-cell
+  [data-role label value {:keys [value-class tone title]}]
+  [:div {:class ["optimizer-risk-balance-kpi"]
+         :data-role data-role
+         :title title}
+   [:p {:class ["optimizer-risk-balance-kpi-label"]} label]
+   [:p {:class (into ["optimizer-risk-balance-kpi-value" "font-mono" "tabular-nums"]
+                     (when value-class [value-class]))
+        :data-tone (some-> tone name)}
     value]])
 
-(defn- summary-strip
-  [{:keys [target-share rms-pts max-pts negative-count]}]
-  [:div {:class ["mt-3" "grid" "grid-cols-2" "gap-2" "border" "border-base-300"
-                 "bg-base-200/20" "p-2.5" "sm:grid-cols-4"]}
-   (summary-fact "portfolio-optimizer-risk-contributions-target"
-                 "Equal target" (str (format-pct target-share) " per asset"))
-   (summary-fact "portfolio-optimizer-risk-contributions-rms"
-                 "RMS deviation" (equal-risk-results/format-pts rms-pts))
-   (summary-fact "portfolio-optimizer-risk-contributions-max"
-                 "Max deviation" (equal-risk-results/format-pts max-pts))
-   (summary-fact "portfolio-optimizer-risk-contributions-negative"
-                 "Negative contributors" (str (or negative-count 0)))])
+(defn- kpi-strip
+  [{:keys [target-share quality rms-pts max-pts negative-count]}]
+  (let [target-pts (when (number? target-share) (* 100 target-share))
+        quality* (get quality-copy quality)]
+    [:div {:class ["optimizer-risk-balance-kpis"]
+           :data-role "portfolio-optimizer-risk-balance-kpis"}
+     (kpi-cell "portfolio-optimizer-risk-contributions-target"
+               "Equal target"
+               (str (format-pct target-share) " per asset")
+               {:value-class "optimizer-risk-balance-kpi-value--target"})
+     (kpi-cell "portfolio-optimizer-risk-contributions-quality"
+               "Status"
+               (or (:label quality*) "—")
+               {:value-class "optimizer-risk-balance-kpi-value--status"
+                :tone (case quality
+                        :exact :good
+                        :approximate :caution
+                        :not-converged :bad
+                        nil)
+                :title (:note quality*)})
+     (kpi-cell "portfolio-optimizer-risk-contributions-rms"
+               "RMS deviation"
+               (equal-risk-results/format-pts rms-pts)
+               {:tone (equal-risk-results/deviation-tone rms-pts target-pts)})
+     (kpi-cell "portfolio-optimizer-risk-contributions-max"
+               "Max deviation"
+               (equal-risk-results/format-pts max-pts)
+               {:tone (equal-risk-results/deviation-tone max-pts target-pts)})
+     (kpi-cell "portfolio-optimizer-risk-contributions-negative"
+               "Negative contributors"
+               (str (or negative-count 0))
+               {:tone (when (pos? (or negative-count 0)) :bad)})]))
+
+;; --- Plot ---------------------------------------------------------------------
+
+(defn- legend-row
+  [target-share current?]
+  [:div {:class ["optimizer-risk-balance-row" "optimizer-risk-balance-legend-row"]}
+   [:span]
+   [:div {:class ["optimizer-risk-balance-legend"]}
+    [:span {:class ["optimizer-risk-balance-legend-item"]}
+     [:span {:class ["optimizer-risk-balance-legend-dash"]}]
+     (str "Target (" (format-pct target-share) ")")]
+    (when current?
+      [:span {:class ["optimizer-risk-balance-legend-item"]}
+       [:span {:class ["optimizer-risk-balance-current"]}]
+       "Current"])
+    [:span {:class ["optimizer-risk-balance-legend-item"]}
+     [:span {:class ["optimizer-risk-balance-legend-tick"]}]
+     "Target (equal)"]
+    [:span {:class ["optimizer-risk-balance-legend-item"]}
+     [:span {:class ["optimizer-risk-balance-dot"]}]
+     "Recommended"]]
+   [:span {:class ["optimizer-risk-balance-col-head"]} "Target"]
+   [:span {:class ["optimizer-risk-balance-col-head"]} "Deviation"]])
+
+(defn- plot-backdrop
+  "Gridlines, the zero axis, and the continuous dashed target line, drawn once
+  behind the whole row stack in a same-grid overlay so they read as one plot."
+  [{:keys [x] :as scale} target-share]
+  [:div {:class ["optimizer-risk-balance-row" "optimizer-risk-balance-backdrop"
+                 "pointer-events-none"]}
+   [:span]
+   (into [:div {:class ["relative" "h-full"]}]
+         (concat
+          (map (fn [tick]
+                 [:div {:class ["optimizer-risk-balance-gridline"]
+                        :style {:left (str (x tick) "%")}}])
+               (remove zero? (tick-values scale)))
+          [[:div {:class ["optimizer-risk-balance-zeroline"]
+                  :style {:left (str (x 0) "%")}}]]
+          (when (number? target-share)
+            [[:div {:class ["optimizer-risk-balance-targetline"]
+                    :style {:left (str (x target-share) "%")}}]])))
+   [:span]
+   [:span]])
+
+(defn- contribution-lane
+  "The row's plot area: dashed current↔recommended connector, the
+  recommended-share bar from zero (sign-colored), the purple per-row target
+  tick, the gray current circle, and the green recommended dot."
+  [{:keys [x]} {:keys [share current-share target-share negative?]}]
+  (let [x0 (x 0)
+        xs (when (number? share) (x share))
+        xc (when (number? current-share) (x current-share))]
+    [:div {:class ["optimizer-risk-balance-lane" "relative" "min-w-0"]}
+     (when (and xs xc)
+       [:div {:class ["optimizer-risk-balance-connector"]
+              :style {:left (str (min xs xc) "%")
+                      :width (str (js/Math.abs (- xs xc)) "%")}}])
+     (when xs
+       [:div {:class ["optimizer-risk-balance-bar"]
+              :data-role "portfolio-optimizer-risk-contribution-bar"
+              :data-sign (if negative? "negative" "positive")
+              :style {:left (str (min x0 xs) "%")
+                      :width (str (max 0.4 (js/Math.abs (- xs x0))) "%")}}])
+     (when (number? target-share)
+       [:div {:class ["optimizer-risk-balance-tick"]
+              :data-role "portfolio-optimizer-risk-contribution-target-tick"
+              :style {:left (str (x target-share) "%")}}])
+     (when xc
+       [:div {:class ["optimizer-risk-balance-current" "optimizer-risk-balance-marker"]
+              :data-role "portfolio-optimizer-risk-contribution-current"
+              :style {:left (str xc "%")}}])
+     (when xs
+       [:div {:class ["optimizer-risk-balance-dot" "optimizer-risk-balance-marker"]
+              :data-role "portfolio-optimizer-risk-contribution-recommended"
+              :style {:left (str xs "%")}}])]))
+
+(defn- deviation-sign
+  [deviation-pts]
+  (cond
+    (not (number? deviation-pts)) nil
+    (< (js/Math.abs deviation-pts) 0.05) "zero"
+    (pos? deviation-pts) "positive"
+    :else "negative"))
+
+(defn- contribution-row
+  [scale {:keys [instrument-id label share current-share target-share
+                 deviation-pts] :as row}]
+  [:div {:class ["optimizer-risk-balance-row"]
+         :data-role "portfolio-optimizer-risk-contribution-row"
+         :data-instrument-id instrument-id
+         :title (str label
+                     " · recommended " (format-pct share)
+                     (when (number? current-share)
+                       (str " · current " (format-pct current-share)))
+                     " · target " (format-pct target-share)
+                     " · " (equal-risk-results/format-signed-pts deviation-pts)
+                     " vs target")}
+   [:span {:class ["optimizer-risk-balance-label" "truncate"]} label]
+   (contribution-lane scale row)
+   [:span {:class ["optimizer-risk-balance-target-cell" "font-mono" "tabular-nums"]
+           :data-role "portfolio-optimizer-risk-contribution-target"}
+    (format-pct target-share)]
+   [:span {:class ["optimizer-risk-balance-deviation-cell" "font-mono" "tabular-nums"]
+           :data-role "portfolio-optimizer-risk-contribution-deviation"
+           :data-sign (deviation-sign deviation-pts)}
+    (equal-risk-results/format-signed-pts deviation-pts)]])
+
+(defn- axis-rows
+  [{:keys [x] :as scale}]
+  [:div
+   [:div {:class ["optimizer-risk-balance-row"]}
+    [:span]
+    (into [:div {:class ["optimizer-risk-balance-axis" "relative"]}]
+          (map (fn [tick]
+                 [:span {:class ["optimizer-risk-balance-axis-label" "absolute"
+                                 "-translate-x-1/2" "font-mono"]
+                         :style {:left (str (x tick) "%")}}
+                  (format-pct tick 0)])
+               (tick-values scale)))
+    [:span] [:span]]
+   [:div {:class ["optimizer-risk-balance-row"]}
+    [:span]
+    [:p {:class ["optimizer-risk-balance-axis-title"]}
+     "Contribution to Total Volatility (%)"]
+    [:span] [:span]]])
+
+;; --- Footnotes ----------------------------------------------------------------
+
+(defn- reading-note
+  [{:keys [target-share negative-count]}]
+  [:p {:class ["optimizer-risk-balance-reading"]
+       :data-role "portfolio-optimizer-risk-contributions-reading"}
+   [:span {:class ["optimizer-risk-balance-reading-label"]} "Reading this"]
+   [:span {:class ["optimizer-risk-balance-reading-sep"]} "·"]
+   (str "Bars show recommended contribution. Gray circle is current. Purple "
+        "line marks equal target (" (format-pct target-share) " per asset).")
+   (when (and (number? negative-count) (pos? negative-count))
+     (str " " negative-count
+          (if (= 1 negative-count)
+            " position hedges the book (negative risk contribution)."
+            " positions hedge the book (negative risk contributions).")))])
+
+(defn- overflow-line
+  [{:keys [hidden-count hidden-max-pts]}]
+  (when (pos? (or hidden-count 0))
+    [:p {:class ["mt-2" "text-[0.6875rem]" "text-trading-muted"]
+         :data-role "portfolio-optimizer-risk-contributions-overflow"}
+     (str "+ " hidden-count " more within ±"
+          (.toFixed (or hidden-max-pts 0) 1)
+          " pts of target (the largest deviations are shown).")]))
 
 (defn- exposure-line
   [{:keys [gross-exposure net-exposure long-exposure short-exposure]}]
@@ -196,57 +297,65 @@
             (when-let [start (:selected-initialization solver)]
               (str " · " (name start) " start")))])))
 
+;; --- Tabs ---------------------------------------------------------------------
+
+(defn- tab-label
+  "A tab is a label wrapping its own visually-hidden radio: checked state
+  lives in the DOM (never controlled by the render), and the scoped :has()
+  CSS in optimizer/results.css does the active styling + panel switching."
+  [radio-name view text]
+  [:label {:class ["optimizer-risk-balance-tab"]
+           :data-role (str "portfolio-optimizer-risk-view-tab-" view)}
+   [:input {:type "radio"
+            :name radio-name
+            :class ["sr-only"]
+            :data-risk-view view}]
+   text])
+
 ;; --- Card ---------------------------------------------------------------------
 
 (defn risk-contributions-card
   "Renders nil unless the result carries the :risk-contributions section
   (present only on :equal-risk runs). Degrades gracefully on persisted
-  pre-redesign results: no current markers, no solver footer."
+  pre-redesign results: no current markers/connectors, no solver footer, and
+  the RISK / RETURN tab disappears when no portfolio points exist."
   [result]
   (when-let [model (equal-risk-results/balance-model result)]
-    (let [{:keys [rows hidden-count hidden-max-pts target-share quality
-                  negative-count current]} model
+    (let [{:keys [rows target-share current]} model
           scale (lane-scale model)
-          quality-note (get-in quality-copy [quality :note])]
-      [:section {:class ["optimizer-risk-contributions" "rounded-xl" "border"
-                         "border-base-300" "bg-base-100/95" "p-4"]
+          risk-return-panel (risk-return-context/risk-return-panel result)
+          radio-name (str "optimizer-risk-view-" (or (:as-of-ms result) "result"))]
+      [:section {:class ["optimizer-risk-balance" "rounded-xl" "border"
+                         "border-base-300"]
                  :data-role "portfolio-optimizer-risk-contributions"}
-       [:div {:class ["flex" "items-center" "justify-between" "gap-2"]}
-        [:p {:class ["font-mono" "text-[0.62rem]" "uppercase" "tracking-[0.08em]"
-                     "text-trading-muted/70"]}
-         "Risk contribution balance"]
-        (quality-badge quality)]
-       [:p {:class ["mt-1.5" "text-[0.75rem]" "leading-[1.4]" "text-trading-muted"]}
-        "Signed Euler contribution to total portfolio volatility. Sized by the risk model only — return forecasts never move these weights."]
-       (when quality-note
-         [:p {:class ["mt-1" "text-[0.6875rem]" "leading-[1.4]" "text-trading-muted/80"]
-              :data-role "portfolio-optimizer-risk-contributions-quality-note"}
-          quality-note])
-       (summary-strip model)
-       [:div {:class ["mt-3"]
-              :data-role "portfolio-optimizer-risk-contribution-chart"}
-        (column-headers)
-        (into [:div {:class ["mt-1" "space-y-0.5"]}]
-              (map (partial contribution-row scale target-share))
-              rows)
-        (tick-lane scale)
-        [:p {:class ["mt-1" "text-[0.625rem]" "text-trading-muted/70"]}
-         (str "■ Recommended (green adds risk, red hedges) · "
-              (when current "● Current · ")
-              "┄ Target (" (format-pct target-share) " per asset). "
-              "A negative share means the position reduces total volatility.")]]
-       (when (pos? (or hidden-count 0))
-         [:p {:class ["mt-2" "text-[0.6875rem]" "text-trading-muted"]
-              :data-role "portfolio-optimizer-risk-contributions-overflow"}
-          (str "+ " hidden-count " more within ±"
-               (.toFixed (or hidden-max-pts 0) 1)
-               " pts of target (rows are sorted by deviation).")])
-       (when (and (number? negative-count) (pos? negative-count))
-         [:p {:class ["mt-2" "text-[0.6875rem]" "text-trading-muted"]
-              :data-role "portfolio-optimizer-risk-contributions-negative-note"}
-          (str negative-count
-               (if (= 1 negative-count)
-                 " position hedges the book (negative risk contribution)."
-                 " positions hedge the book (negative risk contributions)."))])
-       (exposure-line (:diagnostics result))
-       (solver-footer result)])))
+       [:div {:class ["optimizer-risk-balance-header"]}
+        [:div {:class ["min-w-0"]}
+         [:p {:class ["optimizer-risk-balance-title"]}
+          "Risk contribution balance"]
+         [:p {:class ["optimizer-risk-balance-subtitle"]}
+          "Signed Euler contribution to total portfolio volatility"]]
+        (when risk-return-panel
+          [:div {:class ["optimizer-risk-balance-tabs"]
+                 :data-role "portfolio-optimizer-risk-view-tabs"}
+           (tab-label radio-name "contribution" "Risk contribution")
+           (tab-label radio-name "risk-return" "Risk / Return")])]
+       [:div {:class ["optimizer-risk-balance-panel"
+                      "optimizer-risk-balance-panel--contribution"]}
+        (kpi-strip model)
+        [:div {:class ["optimizer-risk-balance-plot-frame"]
+               :data-role "portfolio-optimizer-risk-contribution-chart"}
+         (legend-row target-share (some? current))
+         [:div {:class ["optimizer-risk-balance-rows" "relative"]}
+          (plot-backdrop scale target-share)
+          (into [:div {:class ["relative" "space-y-1"]}]
+                (map (partial contribution-row scale))
+                rows)]
+         (axis-rows scale)]
+        (reading-note model)
+        (overflow-line model)
+        (exposure-line (:diagnostics result))
+        (solver-footer result)]
+       (when risk-return-panel
+         [:div {:class ["optimizer-risk-balance-panel"
+                        "optimizer-risk-balance-panel--risk-return"]}
+          risk-return-panel])])))

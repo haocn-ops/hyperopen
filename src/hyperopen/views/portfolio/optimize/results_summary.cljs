@@ -1,9 +1,15 @@
 (ns hyperopen.views.portfolio.optimize.results-summary
-  (:require [clojure.string :as str]
+  (:require ["lucide/dist/esm/icons/crosshair.js" :default lucide-crosshair]
+            ["lucide/dist/esm/icons/list.js" :default lucide-list]
+            ["lucide/dist/esm/icons/lock-open.js" :default lucide-lock-open]
+            ["lucide/dist/esm/icons/lock.js" :default lucide-lock]
+            ["lucide/dist/esm/icons/star.js" :default lucide-star]
+            [clojure.string :as str]
             [hyperopen.portfolio.optimizer.application.view-model.equal-risk-results
              :as equal-risk-results]
             [hyperopen.portfolio.optimizer.application.view-model.results :as results-model]
-            [hyperopen.views.portfolio.optimize.format :as opt-format]))
+            [hyperopen.views.portfolio.optimize.format :as opt-format]
+            [hyperopen.views.portfolio.optimize.setup-controls :as controls]))
 
 (defn summary-card
   [label value]
@@ -219,20 +225,38 @@
             [:p {:class ["mt-1" "text-xs" "text-trading-muted"]}
              "None — the target sits inside your constraints."])]]))))
 
+(defn- equal-risk-fact-card
+  "One icon card of the WHY THIS RISK ALLOCATION row (designer spec
+  2026-07-11): tinted icon tile, tiny uppercase label, value line, one-line
+  sub. `sub-class` opts the sub-line into a signal color."
+  [data-role tone icon-node label value sub sub-class]
+  [:div {:class ["optimizer-equal-risk-fact"]
+         :data-role data-role}
+   [:span {:class ["optimizer-equal-risk-fact-icon"]
+           :data-tone tone}
+    (controls/lucide-icon icon-node nil)]
+   [:div {:class ["min-w-0"]}
+    [:p {:class ["optimizer-equal-risk-fact-label"]} label]
+    [:p {:class ["optimizer-equal-risk-fact-value" "font-mono" "tabular-nums"]}
+     value]
+    [:p {:class ["optimizer-equal-risk-fact-sub"
+                 (or sub-class "text-trading-muted")]}
+     sub]]])
+
 (defn equal-risk-context-card
   "Why this risk allocation: the Equal Risk replacement for the Why-this-target
-  card — book shape, the equal per-asset target, the largest risk CONTRIBUTOR
-  (more relevant to this objective than the largest weight), allocation
-  freedom, and the binding limits. Facts only, all from the run result."
+  card — four icon cards for book shape, the equal per-asset target, the
+  largest risk CONTRIBUTOR (more relevant to this objective than the largest
+  weight), and allocation freedom. Facts only, all from the run result; the
+  binding-constraint enumeration lives in the trust-diagnostics rail."
   [result]
   (when-let [model (equal-risk-results/balance-model result)]
     (let [weights (:target-weights-by-instrument result)
           labels (:labels-by-instrument result)
-          bindings (get-in result [:diagnostics :binding-constraints])
           {:keys [asset-count longs shorts]} (target-shape weights)
-          largest (when (seq (:rows model))
-                    (apply max-key #(or (:share %) ##-Inf) (:rows model)))
-          freedom (equal-risk-results/freedom-view
+          largest (:largest model)
+          largest-dev (:deviation-pts largest)
+          freedom (equal-risk-results/freedom-card-view
                    (equal-risk-results/allocation-freedom result))]
       [:section {:class ["optimizer-target-context" "rounded-xl" "border"
                          "border-base-300" "bg-base-100/95" "p-4"]
@@ -240,33 +264,49 @@
        [:p {:class ["optimizer-target-context-title" "font-mono" "text-[0.62rem]"
                     "uppercase" "tracking-[0.08em]" "text-trading-muted/70"]}
         "Why this risk allocation"]
-       [:div {:class ["mt-3" "grid" "grid-cols-1" "gap-2" "sm:grid-cols-2"]}
-        (context-fact "portfolio-optimizer-equal-risk-context-shape"
-                      "Book shape"
-                      (str longs " long · " shorts " short of " asset-count " assets"))
-        (context-fact "portfolio-optimizer-equal-risk-context-target"
-                      "Equal target"
-                      (str (opt-format/format-pct (:target-share model)) " per asset"))
-        (context-fact "portfolio-optimizer-equal-risk-context-largest"
-                      "Largest risk contributor"
-                      (if largest
-                        (str (context-label labels (:instrument-id largest))
-                             " · " (opt-format/format-pct (:share largest))
-                             " · " (equal-risk-results/format-signed-pts
-                                    (:deviation-pts largest))
-                             " vs target")
-                        "—"))
-        (context-fact "portfolio-optimizer-equal-risk-context-freedom"
-                      "Allocation freedom"
-                      (str (:label freedom) " — " (:detail freedom)))]
-       [:div {:class ["mt-2"]
-              :data-role "portfolio-optimizer-equal-risk-context-limits"}
-        [:span {:class ["optimizer-target-context-label"]} "Limits hit"]
-        (if (seq bindings)
-          (into [:div {:class ["mt-1" "flex" "flex-wrap" "gap-1.5"]}]
-                (map (partial binding-limit-row labels) bindings))
-          [:p {:class ["mt-1" "text-xs" "text-trading-muted"]}
-           "None — the balance sits inside your constraints."])]])))
+       [:div {:class ["mt-3" "grid" "grid-cols-1" "gap-2" "sm:grid-cols-2"
+                      "xl:grid-cols-4"]}
+        (equal-risk-fact-card "portfolio-optimizer-equal-risk-context-shape"
+                              "info" lucide-list
+                              "Book shape"
+                              (str longs " long · " shorts " short · "
+                                   asset-count " assets")
+                              "Long & short books preserved"
+                              nil)
+        (equal-risk-fact-card "portfolio-optimizer-equal-risk-context-target"
+                              "long" lucide-crosshair
+                              "Equal target"
+                              (str (opt-format/format-pct (:target-share model))
+                                   " per asset")
+                              "Equal risk objective"
+                              nil)
+        (equal-risk-fact-card "portfolio-optimizer-equal-risk-context-largest"
+                              "accent" lucide-star
+                              "Largest risk contributor"
+                              (if largest
+                                (str (context-label labels (:instrument-id largest))
+                                     " · " (opt-format/format-pct (:share largest)))
+                                "—")
+                              (cond
+                                (not (opt-format/finite-number? largest-dev)) "—"
+                                (< (js/Math.abs largest-dev) 0.05) "On target"
+                                :else (str (equal-risk-results/format-signed-pts
+                                            largest-dev)
+                                           (if (neg? largest-dev)
+                                             " below target"
+                                             " above target")))
+                              (when (and (opt-format/finite-number? largest-dev)
+                                         (>= (js/Math.abs largest-dev) 0.05))
+                                (if (neg? largest-dev)
+                                  "text-trading-green"
+                                  "text-trading-red")))
+        (equal-risk-fact-card "portfolio-optimizer-equal-risk-context-freedom"
+                              "warn"
+                              (if (:locked? freedom) lucide-lock lucide-lock-open)
+                              "Allocation freedom"
+                              (:value freedom)
+                              (:sub freedom)
+                              nil)]])))
 
 (defn- history-lookback-label
   [result]

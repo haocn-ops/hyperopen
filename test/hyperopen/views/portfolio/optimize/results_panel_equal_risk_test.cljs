@@ -77,6 +77,7 @@
       (is (some? (node-by-role view-node "portfolio-optimizer-risk-contribution-bar")))
       (is (some? (node-by-role view-node "portfolio-optimizer-risk-contribution-current"))
           "current contributions render as muted markers when present")
+      (is (some? (node-by-role view-node "portfolio-optimizer-risk-contribution-recommended")))
       (is (contains? strings "Risk contribution balance"))
       (is (contains? strings "Approximate"))
       (is (some? (node-by-role view-node "portfolio-optimizer-risk-contributions-quality")))
@@ -84,7 +85,18 @@
       (is (some? (node-by-role view-node "portfolio-optimizer-risk-contributions-max")))
       (is (contains? strings "50.0% per asset"))
       (is (some #(re-find #"Converged · 7 iterations" %) strings)))
-    (testing "risk/return context is a secondary disclosure, never a frontier"
+    (testing "the designer-spec chrome renders: KPI strip, tabs, columns, reading row"
+      (is (some? (node-by-role view-node "portfolio-optimizer-risk-balance-kpis")))
+      (is (contains? strings "Status"))
+      (is (contains? strings "Negative contributors"))
+      (is (some? (node-by-role view-node "portfolio-optimizer-risk-view-tabs")))
+      (is (some? (node-by-role view-node "portfolio-optimizer-risk-view-tab-contribution")))
+      (is (some? (node-by-role view-node "portfolio-optimizer-risk-view-tab-risk-return")))
+      (is (some? (node-by-role view-node "portfolio-optimizer-risk-contribution-target")))
+      (is (some? (node-by-role view-node "portfolio-optimizer-risk-contribution-deviation")))
+      (is (contains? strings "Reading this"))
+      (is (contains? strings "Contribution to Total Volatility (%)")))
+    (testing "risk/return context is the card's second tab, never a frontier"
       (is (some? (node-by-role view-node "portfolio-optimizer-risk-return-context")))
       (is (some? (node-by-role view-node "portfolio-optimizer-risk-return-target")))
       (is (some #(str/includes? % "did not affect the Equal Risk allocation") strings)))
@@ -93,7 +105,9 @@
       (is (nil? (node-by-role view-node "portfolio-optimizer-target-context")))
       (is (contains? strings "Why this risk allocation"))
       (is (contains? strings "Largest risk contributor"))
-      (is (some #(str/includes? % "Limited by constraints") strings)))
+      (is (contains? strings "Limited · 2 binding caps"))
+      (is (some #(str/includes? % "Limited by constraints") strings)
+          "the confidence rail keeps the long-form freedom label"))
     (testing "the equal-risk confidence rail replaces frontier language"
       (is (some? (node-by-role view-node "portfolio-optimizer-equal-risk-confidence-panel")))
       (is (contains? strings "Equal-risk fit"))

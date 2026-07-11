@@ -7,7 +7,6 @@
             [hyperopen.views.portfolio.optimize.results-diagnostics-rail :as diagnostics-rail]
             [hyperopen.views.portfolio.optimize.results-summary :as summary]
             [hyperopen.views.portfolio.optimize.risk-contributions-card :as risk-contributions-card]
-            [hyperopen.views.portfolio.optimize.risk-return-context :as risk-return-context]
             [hyperopen.views.portfolio.optimize.scenario-objective-menu :as objective-menu]
             [hyperopen.views.portfolio.optimize.target-exposure-table :as target-exposure-table]))
 
@@ -63,13 +62,12 @@
                         "space-y-4"]
                 :data-role "portfolio-optimizer-results-center-panel"}
           ;; Equal Risk yields one selected portfolio, not a frontier: the
-          ;; risk-contribution balance chart replaces the frontier chart (a
+          ;; risk-contribution balance card replaces the frontier chart (a
           ;; one-point "curve" whose click handler would silently switch the
-          ;; objective to Target Return), a collapsed Risk/Return Context
-          ;; scatter provides the vol/return view without implying a frontier,
-          ;; the why-card speaks in risk contributions, and the
-          ;; frontier-density refinement card disappears — there is no sweep
-          ;; to refine.
+          ;; objective to Target Return) and carries the Risk/Return scatter
+          ;; as its second DOM-state tab, the why-card speaks in risk
+          ;; contributions, and the frontier-density refinement card
+          ;; disappears — there is no sweep to refine.
           (let [equal-risk? (= :equal-risk (get-in result [:solver :objective-kind]))]
             ;; Plain conditional siblings, never a list-as-one-child (Replicant
             ;; stringifies those); the whole set only toggles when the solved
@@ -78,8 +76,6 @@
                    :replicant/key (if equal-risk? "equal-risk-center" "frontier-center")}
              (when equal-risk?
                (risk-contributions-card/risk-contributions-card result))
-             (when equal-risk?
-               (risk-return-context/risk-return-context result))
              (when equal-risk?
                (summary/equal-risk-context-card result))
              (when-not equal-risk?

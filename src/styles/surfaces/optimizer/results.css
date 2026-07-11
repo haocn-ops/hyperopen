@@ -1066,4 +1066,468 @@
   .portfolio-optimizer .optimizer-target-context-binding {
     border-radius: 0;
   }
+
+  /* ── Risk contribution balance card (designer spec 2026-07-11) ──
+     Dense charcoal card: header + DOM-state tab switcher, five-cell KPI
+     strip, framed plot with backdrop gridlines and the continuous dashed
+     purple equal-target line, HTML lanes, purple Target / signed Deviation
+     columns, READING THIS footnote. Tab state is a pair of visually-hidden
+     radios toggled purely by :has() — no app state. */
+  .portfolio-optimizer .optimizer-risk-balance {
+    border-radius: 0;
+    background-color: var(--optimizer-surface);
+    padding: 14px 16px 16px;
+  }
+
+  .portfolio-optimizer .optimizer-risk-balance-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .portfolio-optimizer .optimizer-risk-balance-title {
+    font-family: "JetBrains Mono", var(--font-mono);
+    font-size: 11px;
+    font-weight: 650;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--optimizer-text);
+  }
+
+  .portfolio-optimizer .optimizer-risk-balance-subtitle {
+    margin-top: 4px;
+    font-size: 11px;
+    color: var(--optimizer-text-2);
+  }
+
+  /* Tab switcher: one hairline frame, mono uppercase segments, active segment
+     lifted with the amber underline. The first tab is active by default until
+     any radio is checked. */
+  .portfolio-optimizer .optimizer-risk-balance-tabs {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: stretch;
+    border: 1px solid var(--optimizer-border-strong);
+    background-color: var(--optimizer-surface);
+  }
+
+  .portfolio-optimizer .optimizer-risk-balance-tab {
+    display: flex;
+    align-items: center;
+    padding: 7px 12px;
+    cursor: pointer;
+    font-family: "JetBrains Mono", var(--font-mono);
+    font-size: 9.5px;
+    font-weight: 650;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    color: var(--optimizer-text-3);
+    box-shadow: inset 0 -2px 0 transparent;
+    transition: color 120ms ease, background-color 120ms ease;
+  }
+
+  .portfolio-optimizer .optimizer-risk-balance-tab + .optimizer-risk-balance-tab {
+    border-left: 1px solid var(--optimizer-border-strong);
+  }
+
+  .portfolio-optimizer .optimizer-risk-balance-tab:hover {
+    color: var(--optimizer-text-2);
+  }
+
+  .portfolio-optimizer
+    .optimizer-risk-balance:not(:has(input[data-risk-view]:checked))
+    .optimizer-risk-balance-tabs
+    .optimizer-risk-balance-tab:first-child,
+  .portfolio-optimizer .optimizer-risk-balance-tab:has(> input:checked) {
+    background-color: var(--optimizer-surface-3);
+    color: var(--optimizer-text);
+    box-shadow: inset 0 -2px 0 var(--optimizer-accent);
+  }
+
+  .portfolio-optimizer .optimizer-risk-balance-tab:has(> input:focus-visible) {
+    outline: 1px solid var(--optimizer-accent-border);
+    outline-offset: 2px;
+  }
+
+  .portfolio-optimizer .optimizer-risk-balance-panel {
+    display: none;
+  }
+
+  .portfolio-optimizer
+    .optimizer-risk-balance:not(:has(input[data-risk-view]:checked))
+    .optimizer-risk-balance-panel--contribution,
+  .portfolio-optimizer
+    .optimizer-risk-balance:has(input[data-risk-view="contribution"]:checked)
+    .optimizer-risk-balance-panel--contribution,
+  .portfolio-optimizer
+    .optimizer-risk-balance:has(input[data-risk-view="risk-return"]:checked)
+    .optimizer-risk-balance-panel--risk-return {
+    display: block;
+  }
+
+  .portfolio-optimizer .optimizer-risk-balance-panel--risk-return {
+    margin-top: 12px;
+  }
+
+  /* KPI strip: one bordered band, hairline-divided cells (1px grid-gap trick
+     so the hairlines survive responsive column wraps). */
+  .portfolio-optimizer .optimizer-risk-balance-kpis {
+    margin-top: 12px;
+    display: grid;
+    /* auto-fit tracks the CONTAINER (the center panel), not the viewport:
+       all five cells share one row above ~760px of card width and wrap into
+       even rows below it — the hairline 1px-gap trick survives the wrap. */
+    grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
+    gap: 1px;
+    border: 1px solid var(--optimizer-border);
+    background-color: var(--optimizer-border);
+  }
+
+  .portfolio-optimizer .optimizer-risk-balance-kpi {
+    background-color: var(--optimizer-bg);
+    padding: 9px 12px 10px;
+  }
+
+  .portfolio-optimizer .optimizer-risk-balance-kpi-label {
+    font-family: "JetBrains Mono", var(--font-mono);
+    font-size: 9px;
+    font-weight: 650;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--optimizer-text-3);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .portfolio-optimizer .optimizer-risk-balance-kpi-value {
+    margin-top: 5px;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--optimizer-text);
+  }
+
+  .portfolio-optimizer .optimizer-risk-balance-kpi-value--target {
+    color: var(--optimizer-target);
+  }
+
+  .portfolio-optimizer .optimizer-risk-balance-kpi-value[data-tone="good"] {
+    color: var(--optimizer-long);
+  }
+
+  .portfolio-optimizer .optimizer-risk-balance-kpi-value[data-tone="caution"] {
+    color: var(--optimizer-warn);
+  }
+
+  .portfolio-optimizer .optimizer-risk-balance-kpi-value[data-tone="bad"] {
+    color: var(--optimizer-short);
+  }
+
+  /* Plot frame + the shared four-column row grid (static tracks — Tailwind's
+     JIT intermittently drops arbitrary grid-cols-[…] values in watch mode;
+     see the universe panel precedent). */
+  .portfolio-optimizer .optimizer-risk-balance-plot-frame {
+    margin-top: 12px;
+    border: 1px solid var(--optimizer-border);
+    background-color: var(--optimizer-bg);
+    padding: 12px 14px 10px;
+  }
+
+  .portfolio-optimizer .optimizer-risk-balance-row {
+    display: grid;
+    grid-template-columns: minmax(0, 4.25rem) minmax(0, 1fr) 3.75rem 4.5rem;
+    column-gap: 12px;
+    align-items: center;
+  }
+
+  .portfolio-optimizer .optimizer-risk-balance-legend-row {
+    padding-bottom: 10px;
+  }
+
+  .portfolio-optimizer .optimizer-risk-balance-legend {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    column-gap: 16px;
+    row-gap: 4px;
+    min-width: 0;
+  }
+
+  .portfolio-optimizer .optimizer-risk-balance-legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 10px;
+    color: var(--optimizer-text-2);
+    white-space: nowrap;
+  }
+
+  .portfolio-optimizer .optimizer-risk-balance-legend-dash {
+    width: 18px;
+    border-top: 1px dashed var(--optimizer-target);
+  }
+
+  .portfolio-optimizer .optimizer-risk-balance-legend-tick {
+    width: 2px;
+    height: 11px;
+    background-color: var(--optimizer-target);
+  }
+
+  .portfolio-optimizer .optimizer-risk-balance-col-head {
+    font-family: "JetBrains Mono", var(--font-mono);
+    font-size: 9px;
+    font-weight: 650;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    text-align: right;
+    color: var(--optimizer-text-3);
+  }
+
+  .portfolio-optimizer .optimizer-risk-balance-rows {
+    padding: 2px 0;
+  }
+
+  .portfolio-optimizer .optimizer-risk-balance-backdrop {
+    position: absolute;
+    inset: 0;
+  }
+
+  .portfolio-optimizer .optimizer-risk-balance-gridline {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    background-color: color-mix(in srgb, var(--optimizer-border) 72%, transparent);
+  }
+
+  .portfolio-optimizer .optimizer-risk-balance-zeroline {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    background-color: var(--optimizer-border-strong);
+  }
+
+  .portfolio-optimizer .optimizer-risk-balance-targetline {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    border-left: 1px dashed var(--optimizer-target-border);
+  }
+
+  .portfolio-optimizer .optimizer-risk-balance-label {
+    font-size: 11px;
+    color: var(--optimizer-text);
+  }
+
+  .portfolio-optimizer .optimizer-risk-balance-lane {
+    height: 28px;
+  }
+
+  .portfolio-optimizer .optimizer-risk-balance-connector {
+    position: absolute;
+    top: 50%;
+    border-top: 1px dashed color-mix(in srgb, var(--optimizer-text-2) 55%, transparent);
+  }
+
+  .portfolio-optimizer .optimizer-risk-balance-bar {
+    position: absolute;
+    top: 8px;
+    bottom: 8px;
+  }
+
+  .portfolio-optimizer .optimizer-risk-balance-bar[data-sign="positive"] {
+    background-color: color-mix(in srgb, var(--optimizer-long) 82%, transparent);
+  }
+
+  .portfolio-optimizer .optimizer-risk-balance-bar[data-sign="negative"] {
+    background-color: color-mix(in srgb, var(--optimizer-short) 82%, transparent);
+  }
+
+  .portfolio-optimizer .optimizer-risk-balance-tick {
+    position: absolute;
+    top: 6px;
+    bottom: 6px;
+    width: 2px;
+    margin-left: -1px;
+    background-color: var(--optimizer-target);
+  }
+
+  /* Marker glyphs double as legend swatches: sizing/shape here, absolute
+     lane positioning only via .optimizer-risk-balance-marker. */
+  .portfolio-optimizer .optimizer-risk-balance-current {
+    display: inline-block;
+    flex: 0 0 auto;
+    width: 10px;
+    height: 10px;
+    box-sizing: border-box;
+    border-radius: 50%;
+    border: 1.5px solid var(--optimizer-text-2);
+    background-color: var(--optimizer-bg);
+  }
+
+  .portfolio-optimizer .optimizer-risk-balance-dot {
+    display: inline-block;
+    flex: 0 0 auto;
+    width: 9px;
+    height: 9px;
+    box-sizing: border-box;
+    border-radius: 50%;
+    border: 1px solid color-mix(in srgb, var(--optimizer-long) 55%, black);
+    background-color: var(--optimizer-long);
+  }
+
+  .portfolio-optimizer .optimizer-risk-balance-marker {
+    position: absolute;
+    top: 50%;
+    transform: translate(-50%, -50%);
+  }
+
+  .portfolio-optimizer .optimizer-risk-balance-target-cell {
+    font-size: 11px;
+    text-align: right;
+    color: var(--optimizer-target);
+  }
+
+  .portfolio-optimizer .optimizer-risk-balance-deviation-cell {
+    font-size: 11px;
+    text-align: right;
+    color: var(--optimizer-text-2);
+  }
+
+  .portfolio-optimizer
+    .optimizer-risk-balance-deviation-cell[data-sign="positive"] {
+    color: var(--optimizer-short);
+  }
+
+  .portfolio-optimizer
+    .optimizer-risk-balance-deviation-cell[data-sign="negative"] {
+    color: var(--optimizer-long);
+  }
+
+  .portfolio-optimizer .optimizer-risk-balance-axis {
+    height: 16px;
+    margin-top: 6px;
+    border-top: 1px solid var(--optimizer-border);
+  }
+
+  .portfolio-optimizer .optimizer-risk-balance-axis-label {
+    top: 4px;
+    font-size: 9.5px;
+    color: var(--optimizer-text-3);
+  }
+
+  .portfolio-optimizer .optimizer-risk-balance-axis-title {
+    margin-top: 10px;
+    text-align: center;
+    font-size: 10.5px;
+    letter-spacing: 0.02em;
+    color: var(--optimizer-text-2);
+  }
+
+  .portfolio-optimizer .optimizer-risk-balance-reading {
+    margin-top: 12px;
+    font-size: 10.5px;
+    line-height: 1.5;
+    color: var(--optimizer-text-2);
+  }
+
+  .portfolio-optimizer .optimizer-risk-balance-reading-label {
+    font-family: "JetBrains Mono", var(--font-mono);
+    font-size: 9px;
+    font-weight: 650;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--optimizer-text-3);
+  }
+
+  .portfolio-optimizer .optimizer-risk-balance-reading-sep {
+    margin: 0 6px;
+    color: var(--optimizer-text-3);
+  }
+
+  /* Scatter plot frame inside the RISK / RETURN tab. */
+  .portfolio-optimizer .optimizer-risk-balance-plot {
+    border: 1px solid var(--optimizer-border);
+    background-color: var(--optimizer-bg);
+  }
+
+  /* ── "Why this risk allocation" icon cards ──────────────────── */
+  .portfolio-optimizer .optimizer-equal-risk-fact {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    border: 1px solid var(--optimizer-border);
+    background-color: var(--optimizer-bg);
+    padding: 10px 12px;
+  }
+
+  .portfolio-optimizer .optimizer-equal-risk-fact-icon {
+    display: grid;
+    place-content: center;
+    flex: 0 0 auto;
+    width: 26px;
+    height: 26px;
+    border: 1px solid var(--optimizer-border);
+    border-radius: 2px;
+    color: var(--optimizer-text-2);
+  }
+
+  .portfolio-optimizer .optimizer-equal-risk-fact-icon[data-tone="info"] {
+    color: var(--optimizer-info);
+    border-color: color-mix(in srgb, var(--optimizer-info) 35%, transparent);
+    background-color: color-mix(in srgb, var(--optimizer-info) 12%, transparent);
+  }
+
+  .portfolio-optimizer .optimizer-equal-risk-fact-icon[data-tone="long"] {
+    color: var(--optimizer-long);
+    border-color: color-mix(in srgb, var(--optimizer-long) 35%, transparent);
+    background-color: color-mix(in srgb, var(--optimizer-long) 12%, transparent);
+  }
+
+  .portfolio-optimizer .optimizer-equal-risk-fact-icon[data-tone="accent"] {
+    color: var(--optimizer-accent);
+    border-color: color-mix(in srgb, var(--optimizer-accent) 35%, transparent);
+    background-color: color-mix(in srgb, var(--optimizer-accent) 12%, transparent);
+  }
+
+  .portfolio-optimizer .optimizer-equal-risk-fact-icon[data-tone="warn"] {
+    color: var(--optimizer-warn);
+    border-color: color-mix(in srgb, var(--optimizer-warn) 35%, transparent);
+    background-color: color-mix(in srgb, var(--optimizer-warn) 12%, transparent);
+  }
+
+  .portfolio-optimizer .optimizer-equal-risk-fact-label {
+    font-family: "JetBrains Mono", var(--font-mono);
+    font-size: 9px;
+    font-weight: 650;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--optimizer-text-3);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .portfolio-optimizer .optimizer-equal-risk-fact-value {
+    margin-top: 3px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--optimizer-text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .portfolio-optimizer .optimizer-equal-risk-fact-sub {
+    /* Color comes from a utility class in markup (text-trading-muted by
+       default, or a signal color for above/below-target deltas) so this rule
+       does not specificity-lock it; see the kpi-card value note above. */
+    margin-top: 2px;
+    font-size: 10.5px;
+  }
 }

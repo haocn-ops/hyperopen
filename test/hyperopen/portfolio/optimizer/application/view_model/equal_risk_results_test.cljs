@@ -29,21 +29,29 @@
       solver (assoc :equal-risk-solver solver)
       diagnostics (assoc :diagnostics diagnostics))))
 
-(deftest balance-model-sorts-by-deviation-and-caps-rows-test
-  (testing "rows are worst-deviation-first with current shares attached"
+(deftest balance-model-caps-by-deviation-and-displays-by-share-test
+  (testing "display order is signed share descending with current shares attached"
     (let [model (equal-risk-results/balance-model
                  (result-with-shares [0.5 0.1 0.4]
                                      :current-shares [0.9 0.05 0.05]))]
-      (is (= ["perp:A1" "perp:A0" "perp:A2"]
+      (is (= ["perp:A0" "perp:A2" "perp:A1"]
              (mapv :instrument-id (:rows model)))
-          "|0.1-1/3| > |0.5-1/3| > |0.4-1/3|")
+          "longs high-to-low: 0.5 > 0.4 > 0.1")
       (is (= 0.9 (:current-share (first (filter #(= "perp:A0" (:instrument-id %))
                                                 (:rows model))))))
       (is (zero? (:hidden-count model)))))
-  (testing "large universes cap at 16 rows with an honest remainder"
+  (testing "hedges display at the bottom regardless of deviation size"
+    (let [model (equal-risk-results/balance-model
+                 (result-with-shares [0.4 -0.1 0.7]))]
+      (is (= ["perp:A2" "perp:A0" "perp:A1"]
+             (mapv :instrument-id (:rows model))))))
+  (testing "the cap still keeps the WORST deviations, then re-orders by share"
+    ;; 25 assets, target 4%: A0 (90%) is the largest deviation and must both
+    ;; survive the cap and display first (largest share).
     (let [shares (into [0.9] (repeat 24 (/ 0.1 24)))
           model (equal-risk-results/balance-model (result-with-shares shares))]
       (is (= equal-risk-results/display-row-cap (count (:rows model))))
+      (is (= "perp:A0" (:instrument-id (first (:rows model)))))
       (is (= (- 25 equal-risk-results/display-row-cap) (:hidden-count model)))
       (is (number? (:hidden-max-pts model)))))
   (testing "negative shares flag as hedges"
@@ -51,6 +59,54 @@
                  (result-with-shares [1.1 -0.1]))]
       (is (true? (:negative? (first (filter #(= "perp:A1" (:instrument-id %))
                                             (:rows model)))))))))
+
+(deftest balance-model-carries-per-row-targets-and-largest-test
+  (testing "each row carries its own target (uniform fallback)"
+    (let [model (equal-risk-results/balance-model (result-with-shares [0.6 0.4]))]
+      (is (= [0.5 0.5] (mapv :target-share (:rows model))))))
+  (testing "per-instrument targets win over the uniform target"
+    (let [result (-> (result-with-shares [0.625 -0.375])
+                     (assoc-in [:risk-contributions
+                                :target-relative-contributions-by-instrument]
+                               {"perp:A0" 0.5 "perp:A1" -0.5}))
+          model (equal-risk-results/balance-model result)
+          by-id (into {} (map (juxt :instrument-id identity)) (:rows model))]
+      (is (= -0.5 (:target-share (get by-id "perp:A1"))))
+      (is (= 12.5 (:deviation-pts (get by-id "perp:A1")))
+          "-0.375 against a -0.5 target is +12.5 pts")))
+  (testing "largest contributor is picked over ALL rows, not just the visible cap"
+    ;; 25 assets, target 4%: A0 holds the largest share (5%, deviation 1 pt)
+    ;; while every other row deviates by 2 pts — the cap drops A0, yet it
+    ;; must still be reported as the largest contributor.
+    (let [shares (into [0.05] (repeat 24 0.02))
+          model (equal-risk-results/balance-model (result-with-shares shares))]
+      (is (not-any? #(= "perp:A0" (:instrument-id %)) (:rows model))
+          "A0's small deviation loses the cap to the 2-pt rows")
+      (is (= 0.05 (:share (:largest model)))))))
+
+(deftest deviation-tone-grades-against-the-target-test
+  (is (= :good (equal-risk-results/deviation-tone 1.8 20.0)))
+  (is (= :good (equal-risk-results/deviation-tone -4.0 20.0)))
+  (is (= :caution (equal-risk-results/deviation-tone 6.0 20.0)))
+  (is (= :bad (equal-risk-results/deviation-tone 15.0 20.0)))
+  (is (nil? (equal-risk-results/deviation-tone nil 20.0)))
+  (is (nil? (equal-risk-results/deviation-tone 1.0 nil)))
+  (is (nil? (equal-risk-results/deviation-tone 1.0 0))))
+
+(deftest freedom-card-view-copy-test
+  (is (= "Limited · 2 binding caps"
+         (:value (equal-risk-results/freedom-card-view
+                  {:status :limited :binding-count 2}))))
+  (is (= "Limited · 1 binding cap"
+         (:value (equal-risk-results/freedom-card-view
+                  {:status :limited :binding-count 1}))))
+  (is (false? (:locked? (equal-risk-results/freedom-card-view {:status :open}))))
+  (is (= "Fully determined"
+         (:value (equal-risk-results/freedom-card-view
+                  {:status :fully-determined}))))
+  (testing "persisted pre-redesign results degrade honestly"
+    (is (str/includes? (:sub (equal-risk-results/freedom-card-view nil))
+                       "Not recorded"))))
 
 (deftest kpi-risk-balance-reads-current-and-target-deviations-test
   (let [with-current (equal-risk-results/kpi-risk-balance

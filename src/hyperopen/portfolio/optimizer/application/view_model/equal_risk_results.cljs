@@ -52,11 +52,31 @@
     (str (.toFixed value 2) "x")
     "—"))
 
+(defn deviation-tone
+  "Severity of a deviation (in points) against the equal target (in points):
+  :good within 20% of the target, :caution within 50%, :bad beyond. Keeps the
+  KPI strip honest — a badly unbalanced book can never show green — while
+  matching the designer's green for mock-sized deviations. Nil when either
+  side is missing."
+  [deviation-pts target-pts]
+  (when (and (finite-number? deviation-pts)
+             (finite-number? target-pts)
+             (pos? target-pts))
+    (let [fraction (/ (js/Math.abs deviation-pts) target-pts)]
+      (cond
+        (<= fraction 0.2) :good
+        (<= fraction 0.5) :caution
+        :else :bad))))
+
 (defn balance-model
-  "Chart model from the payload's contribution sections. Rows are sorted by
-  |deviation from the equal target| descending and capped at
-  `display-row-cap`; the remainder is summarized honestly instead of silently
-  truncated. Current shares are nil-safe (old persisted results, flat books)."
+  "Chart model from the payload's contribution sections. The `display-row-cap`
+  worst rows by |deviation from target| are selected (so the rows that explain
+  an Approximate verdict always survive the cap), then DISPLAYED in signed
+  share descending order — longs high-to-low with hedges at the bottom, the
+  designer's diverging silhouette. The remainder is summarized honestly
+  instead of silently truncated. Current shares are nil-safe (old persisted
+  results, flat books); per-row targets read the per-instrument section and
+  fall back to the uniform equal target."
   [result]
   (when-let [contributions (:risk-contributions result)]
     (let [{:keys [instrument-ids relative-contributions
@@ -64,31 +84,49 @@
                   max-absolute-error negative-contribution-count]} contributions
           labels (:labels-by-instrument result)
           weights (:target-weights-by-instrument result)
+          targets-by-id (:target-relative-contributions-by-instrument contributions)
           current-by-id (get-in result [:current-risk-contributions
                                         :relative-contributions-by-instrument])
           target-share (first target-relative-contributions)
           rows (->> (map (fn [instrument-id share]
-                           (let [deviation (when (and (finite-number? share)
-                                                      (finite-number? target-share))
-                                             (- share target-share))]
+                           (let [row-target (let [target (get targets-by-id instrument-id)]
+                                              (if (finite-number? target)
+                                                target
+                                                target-share))
+                                 deviation (when (and (finite-number? share)
+                                                      (finite-number? row-target))
+                                             (- share row-target))]
                              {:instrument-id instrument-id
                               :label (or (get labels instrument-id) instrument-id)
                               :weight (get weights instrument-id)
                               :share share
                               :current-share (get current-by-id instrument-id)
+                              :target-share row-target
                               :deviation-pts (pts deviation)
                               :negative? (and (finite-number? share) (neg? share))}))
                          instrument-ids
                          relative-contributions)
                     (sort-by (fn [{:keys [deviation-pts]}]
                                (- (js/Math.abs (or deviation-pts 0))))))
-          visible (vec (take display-row-cap rows))
+          visible (->> (take display-row-cap rows)
+                       (sort-by (fn [{:keys [share]}]
+                                  (- (or share ##-Inf))))
+                       vec)
           hidden (drop display-row-cap rows)]
       {:rows visible
        :hidden-count (count hidden)
        :hidden-max-pts (when (seq hidden)
                          (reduce max 0 (map #(js/Math.abs (or (:deviation-pts %) 0))
                                             hidden)))
+       ;; Largest contributor over EVERY row (not just the visible cap): on a
+       ;; wide near-balanced universe the largest share can carry a small
+       ;; deviation and fall outside the worst-deviation cap.
+       :largest (when (seq rows)
+                  (-> (apply max-key
+                             #(if (finite-number? (:share %)) (:share %) ##-Inf)
+                             rows)
+                      (select-keys [:instrument-id :label :share
+                                    :target-share :deviation-pts])))
        :target-share target-share
        :quality quality
        :rms-pts (pts rms-error)
@@ -142,6 +180,32 @@
     {:status :unknown
      :label "—"
      :detail "Not recorded on this result (re-run to compute)"}))
+
+(defn freedom-card-view
+  "Compact copy for the why-card's Allocation freedom icon card (designer
+  spec): value line + one-line explanation + which lock glyph. Nil-safe for
+  persisted results that predate the field."
+  [freedom]
+  (case (:status freedom)
+    :fully-determined
+    {:locked? true
+     :value "Fully determined"
+     :sub "Exposure targets pin every weight"}
+
+    :limited
+    (let [n (or (:binding-count freedom) 0)]
+      {:locked? true
+       :value (str "Limited · " n " binding cap" (when (not= 1 n) "s"))
+       :sub "Caps constrain exact equality"})
+
+    :open
+    {:locked? false
+     :value "Open"
+     :sub "No binding limits on the balance"}
+
+    {:locked? true
+     :value "—"
+     :sub "Not recorded on this result"}))
 
 (defn solution-stability
   "Classified from the solver's deterministic starts: agreement of the

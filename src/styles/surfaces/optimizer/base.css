@@ -17,6 +17,12 @@
     --optimizer-short: #c25b5b;
     --optimizer-warn: #d49a3a;
     --optimizer-info: #6b8db5;
+    /* Target/equal-budget color for the Equal Risk balance chart (designer
+       spec 2026-07-11): purple so it can never be confused with the long/short
+       signal pair or the amber accent. */
+    --optimizer-target: #a78bfa;
+    --optimizer-target-border: rgb(167 139 250 / 0.55);
+    --optimizer-target-soft: rgb(167 139 250 / 0.14);
     /* Pin DaisyUI base surfaces to the optimizer charcoal so every bg-base-100/200/300
        (and opacity variant, which all resolve to oklch(var(--b1|2|3)/a)) stays
        theme-independent — the design surface is near-black, not the active theme's

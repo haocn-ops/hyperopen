@@ -82,16 +82,33 @@ warning instead of being fabricated. There is no efficient frontier for this obj
 ## Results page
 
 The primary evidence the objective worked is the **Risk Contribution Balance
-chart** (`views/portfolio/optimize/risk_contributions_card.cljs`): a
-horizontal diverging chart on a signed axis through zero — one row per asset
-with the recommended share as a sign-colored bar, the current share as a muted
-marker, the dashed equal-target line, and the deviation in points. Rows sort
-by |deviation| and cap at 16 with an honest remainder line. No pie, donut,
-stacked, or absolute form is ever used: those all misrepresent negative
-contributions and >100% positive shares. No efficient frontier is computed,
-drawn, or implied for this objective anywhere; a collapsed "Risk / Return
-Context" scatter (`risk_return_context.cljs`) shows current/recommended/
-standalone points with an explicit returns-are-context-only note.
+card** (`views/portfolio/optimize/risk_contributions_card.cljs`, built to the
+designer's 2026-07-11 spec): a horizontal diverging chart on a signed axis
+through zero — one row per asset with the recommended share as a sign-colored
+bar capped by a green recommended dot, the current share as a gray outlined
+circle joined to the bar end by a dashed connector, a continuous dashed
+**purple** equal-target line (`--optimizer-target`, defined in the scoped
+optimizer palette) with per-row target ticks, and purple Target / sign-colored
+Deviation columns (above target = red, below = green). Between the header and
+the plot sits a five-cell KPI strip: Equal target (purple), Status
+(exact/approximate/not-converged), RMS and Max deviation (magnitude-toned:
+green ≤20% of the target, amber ≤50%, red beyond), and Negative contributors
+(red when any). A READING THIS footnote explains the encoding and names
+hedges. Rows are capped at 16 selected by worst |deviation| (so the rows that
+explain an Approximate verdict always survive), then displayed in signed
+share descending order with an honest remainder line. No pie, donut, stacked,
+or absolute form is ever used: those all misrepresent negative contributions
+and >100% positive shares. No efficient frontier is computed, drawn, or
+implied for this objective anywhere; the card's second tab, RISK / RETURN
+(`risk_return_context.cljs`), shows current/recommended/standalone points with
+an explicit returns-are-context-only note. The tab switcher is a pair of
+visually-hidden radio inputs toggled by scoped `:has()` CSS — tab state lives
+in the DOM, never in app state. The "Why this risk allocation" card renders
+four icon facts (book shape, equal target, largest risk contributor over the
+full universe, allocation freedom with its binding-cap count); the
+binding-constraint enumeration lives in the trust-diagnostics rail. Workbench
+scenes (`workbench/scenes/optimize/equal_risk_scenes.cljs`) pin the
+designer-parity book plus the hedged/exact/capped/persisted states.
 
 The KPI strip (`scenario_kpi_strip.cljs`) swaps the Sharpe tile for RISK
 BALANCE (current → recommended max deviation in points) and renders the

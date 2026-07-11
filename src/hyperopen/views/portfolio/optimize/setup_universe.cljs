@@ -1,5 +1,6 @@
 (ns hyperopen.views.portfolio.optimize.setup-universe
-  (:require [hyperopen.portfolio.optimizer.application.view-model :as optimizer-view-model]
+  (:require [clojure.string :as str]
+            [hyperopen.portfolio.optimizer.application.view-model :as optimizer-view-model]
             [hyperopen.portfolio.optimizer.application.view-model.universe :as universe-vm]))
 
 (def ^:private eyebrow-class
@@ -158,6 +159,16 @@
                    :data-role tooltip-id}
             assumption-badge-tooltip]])))))
 
+(defn- duplicate-secondary?
+  "A sublabel that just repeats the ticker (DOT/DOT, S/S, GRAM/GRAM) is a
+  wasted line on most rows of a holdings-seeded universe — render it only when
+  it adds information."
+  [primary-label secondary-label]
+  (and (some? primary-label)
+       (some? secondary-label)
+       (= (str/lower-case (str primary-label))
+          (str/lower-case (str secondary-label)))))
+
 (defn- selected-row
   [{:keys [instrument-id
            market-type
@@ -166,8 +177,10 @@
            history-status
            position-side
            short-selectable?]
-    :as row}]
+    :as row}
+   show-type?]
     [:div {:class ["optimizer-universe-row"
+                   (when-not show-type? "optimizer-universe-cols-4")
                    "grid" "items-center" "gap-2" "border-b" "border-base-300"
                    "px-2" "py-1.5" "last:border-b-0" "hover:bg-base-200/30"]
            :data-role (str "portfolio-optimizer-universe-selected-row-" instrument-id)
@@ -178,10 +191,17 @@
        primary-label]
       ;; Demoted a full tier below the symbol: the canonical id/name is context,
       ;; and must not compete with the tradable symbol the user scans for.
-      [:span {:class ["block" "truncate" "text-[0.6875rem]" "text-trading-muted/80"]}
-       secondary-label]
+      ;; Suppressed entirely when it merely repeats the symbol.
+      (when-not (duplicate-secondary? primary-label secondary-label)
+        [:span {:class ["block" "truncate" "text-[0.6875rem]" "text-trading-muted/80"]}
+         secondary-label])
       (assumption-workflow-chip row)]
-     [:span {:class ["flex" "justify-center"]} (market-type-tags market-type)]
+     ;; TYPE is by-exception: a homogeneous universe (78 identical PERP chips)
+     ;; renders no type column at all — the 4-track grid variant keeps header
+     ;; and rows aligned. Search results keep their type tags (vaults appear
+     ;; there).
+     (when show-type?
+       [:span {:class ["flex" "justify-center"]} (market-type-tags market-type)])
      (side-control instrument-id position-side short-selectable?)
      [:span {:class ["text-right"]}
       [:button {:type "button"
@@ -217,8 +237,9 @@
       "+ add"]])
 
 (defn- selected-table-header
-  []
+  [show-type?]
   [:div {:class ["optimizer-universe-selected-header"
+                 (when-not show-type? "optimizer-universe-cols-4")
                  "grid" "items-center" "gap-2" "border-b" "border-base-300"
                  "bg-base-200/40" "px-2" "py-1.5" "font-mono"
                  "text-[0.625rem]" "font-semibold" "uppercase"
@@ -226,7 +247,8 @@
          :data-role "portfolio-optimizer-universe-selected-header"}
    [:span ""]
    [:span "Asset"]
-   [:span {:class ["text-center"]} "Type"]
+   (when show-type?
+     [:span {:class ["text-center"]} "Type"])
    [:span {:class ["text-center"]} "Side"]
    [:span {:class ["sr-only"]} "Remove"]])
 
@@ -262,51 +284,50 @@
     [:div {:class ["optimizer-universe-skeleton-row"]}]]])
 
 (defn- selected-table
+  ;; The included-count deliberately does NOT repeat here: the panel header
+  ;; owns it. This bar carries only the Clear action (and disappears with an
+  ;; empty universe).
   [selected-rows universe holdings-loading? no-importable-holdings?]
-  [:div {:class ["mt-2" "border" "border-base-300" "bg-base-100/50"]}
-   [:div {:class ["flex" "items-center" "justify-between" "gap-2" "border-b"
-                  "border-base-300" "px-2" "py-1.5"]}
-    [:span {:class ["font-mono" "text-[0.6875rem]" "uppercase" "tracking-[0.12em]"
-                    "text-trading-muted"]}
-     (if holdings-loading?
-       "Loading holdings…"
-       (str (count universe) " included"))]
-    (when (seq universe)
-      [:button {:type "button"
-                :class ["font-mono" "text-[0.6875rem]" "uppercase" "tracking-[0.12em]"
-                        "text-trading-muted" "hover:text-warning"]
-                :data-role "portfolio-optimizer-universe-clear"
-                :on {:click [[:actions/clear-portfolio-optimizer-universe]]}}
-       "Clear universe"])]
-   (cond
-     (seq universe)
-     (into [:div {:class ["text-xs"]}]
-           (cons (selected-table-header)
-                 (map selected-row selected-rows)))
+  (let [show-type? (< 1 (count (distinct (keep :market-type selected-rows))))]
+    [:div {:class ["mt-2" "border" "border-base-300" "bg-base-100/50"]}
+     (when (seq universe)
+       [:div {:class ["flex" "items-center" "justify-end" "gap-2" "border-b"
+                      "border-base-300" "px-2" "py-1.5"]}
+        [:button {:type "button"
+                  :class ["font-mono" "text-[0.6875rem]" "uppercase" "tracking-[0.12em]"
+                          "text-trading-muted" "hover:text-warning"]
+                  :data-role "portfolio-optimizer-universe-clear"
+                  :on {:click [[:actions/clear-portfolio-optimizer-universe]]}}
+         "Clear universe"]])
+     (cond
+       (seq universe)
+       (into [:div {:class ["text-xs"]}]
+             (cons (selected-table-header show-type?)
+                   (map #(selected-row % show-type?) selected-rows)))
 
-     holdings-loading?
-     (holdings-loading-block)
+       holdings-loading?
+       (holdings-loading-block)
 
-     ;; The account snapshot arrived and there is nothing to import: say so
-     ;; instead of repeating a "holdings load automatically" promise this
-     ;; account can never keep — and so "Load my holdings" is never a silent
-     ;; no-op.
-     no-importable-holdings?
-     [:div {:class ["flex" "flex-col" "items-start" "gap-1" "px-2" "py-3"]
-            :data-role "portfolio-optimizer-universe-holdings-empty"}
-      [:p {:class ["text-xs" "text-trading-muted"]}
-       "No open positions to import for this account."]
-      [:p {:class ["text-[0.75rem]" "text-trading-muted/80"]}
-       "Search above to add perps, spot, or vault return legs and build a custom set."]]
+       ;; The account snapshot arrived and there is nothing to import: say so
+       ;; instead of repeating a "holdings load automatically" promise this
+       ;; account can never keep — and so "Load my holdings" is never a silent
+       ;; no-op.
+       no-importable-holdings?
+       [:div {:class ["flex" "flex-col" "items-start" "gap-1" "px-2" "py-3"]
+              :data-role "portfolio-optimizer-universe-holdings-empty"}
+        [:p {:class ["text-xs" "text-trading-muted"]}
+         "No open positions to import for this account."]
+        [:p {:class ["text-[0.75rem]" "text-trading-muted/80"]}
+         "Search above to add perps, spot, or vault return legs and build a custom set."]]
 
-     ;; Empty universe: either "no account/holdings" or a deliberately cleared
-     ;; set (a clear records a custom source, which ends the loading state).
-     :else
-     [:div {:class ["flex" "flex-col" "items-start" "gap-1" "px-2" "py-3"]}
-      [:p {:class ["text-xs" "text-trading-muted"]}
-       "No assets selected yet."]
-      [:p {:class ["text-[0.75rem]" "text-trading-muted/80"]}
-       "Holdings load automatically when your account is connected — use “My holdings” above to re-import them, or search to build a custom set."]])])
+       ;; Empty universe: either "no account/holdings" or a deliberately cleared
+       ;; set (a clear records a custom source, which ends the loading state).
+       :else
+       [:div {:class ["flex" "flex-col" "items-start" "gap-1" "px-2" "py-3"]}
+        [:p {:class ["text-xs" "text-trading-muted"]}
+         "No assets selected yet."]
+        [:p {:class ["text-[0.75rem]" "text-trading-muted/80"]}
+         "Holdings load automatically when your account is connected — use “My holdings” above to re-import them, or search to build a custom set."]])]))
 
 (defn- omission-reason-copy
   [reason]
@@ -318,8 +339,9 @@
 (defn- universe-source-line
   "Visible-automation line under the source strip: says where the universe came
   from and accounts for every asset a holdings load left out (nothing is dropped
-  silently)."
-  [universe-source universe-count]
+  silently). The included-count is NOT repeated here — the panel header owns
+  the one visible count."
+  [universe-source]
   (let [holdings? (= :holdings (:kind universe-source))
         omitted (vec (or (:omitted universe-source) []))]
     (when universe-source
@@ -327,7 +349,7 @@
              :data-role "portfolio-optimizer-universe-source-line"
              :data-universe-source (name (or (:kind universe-source) :custom))}
        (if holdings?
-         [:p (str "From holdings · " universe-count " included"
+         [:p (str "From holdings"
                   (when (pos? (count omitted))
                     (str " · " (count omitted) " omitted")))]
          [:p "Custom universe"])
@@ -406,7 +428,7 @@
               :data-role "portfolio-optimizer-universe-source-custom"
               :data-active (when (and universe-source (not holdings-source?)) "true")}
        "Custom"]]
-     (universe-source-line universe-source (count universe))
+     (universe-source-line universe-source)
      [:div {:class ["sr-only"]} "Manual Add"]
      [:div {:class ["mt-3" "relative"]}
       [:div {:class ["optimizer-universe-search-shell"

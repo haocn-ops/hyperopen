@@ -87,6 +87,14 @@
     grid-template-columns: 18px minmax(0, 1fr) 48px 56px 20px;
   }
 
+  /* By-exception TYPE column: a homogeneous universe (all-perp) renders no
+     type cell, so the 48px track disappears with it — header and rows switch
+     to this variant class together (see setup_universe.cljs selected-table). */
+  .portfolio-optimizer .optimizer-universe-selected-header.optimizer-universe-cols-4,
+  .portfolio-optimizer .optimizer-universe-row.optimizer-universe-cols-4 {
+    grid-template-columns: 18px minmax(0, 1fr) 56px 20px;
+  }
+
   .portfolio-optimizer .optimizer-universe-candidate-header,
   .portfolio-optimizer .optimizer-universe-candidate-row {
     grid-template-columns: 66px minmax(0, 1fr) 58px 44px;

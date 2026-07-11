@@ -31,10 +31,12 @@
     (is (nil? (node-by-role
                view-node
                "portfolio-optimizer-setup-use-my-views-editor-conservative-note")))
-    ;; The scenario contract states the goal and that the forecast is not used,
-    ;; instead of the misleading "Returns: Historical mean" under Minimum Variance.
-    (is (contains? strings "Return forecast"))
-    (is (contains? strings "Not used"))
+    ;; The Run summary is the designer's icon-row card (2026-07-10): no
+    ;; "Return forecast" row — the inactive Return-views one-liner (asserted
+    ;; above) carries the not-used fact — and a Status row shares the footer's
+    ;; run-verdict.
+    (is (not (contains? strings "Return forecast")))
+    (is (contains? strings "Status"))
     (is (not (contains? strings "Trust & Freshness")))
     (is (nil? (node-by-role view-node "portfolio-optimizer-left-rail")))
     (is (contains? strings "Portfolio Optimizer"))
@@ -46,7 +48,10 @@
     (is (contains? strings "My holdings"))
     (is (contains? strings "Custom"))
     (is (not (contains? strings "Index")))
-    (is (contains? strings "Scenario contract"))
+    ;; Renamed from "Scenario contract" (2026-07-10): the card now also carries
+    ;; the History-data line and the global Status verdict.
+    (is (contains? strings "Run summary"))
+    (is (not (contains? strings "Scenario contract")))
     (is (not (contains? strings "What this scenario will solve for")))
     (is (contains? strings "Why this preset is safe"))
     (is (not (contains? strings "Execution Assumptions")))))
@@ -415,14 +420,19 @@
     (is (contains? strings "Custom"))
     (is (contains? strings "Portfolio exposure"))
     (is (contains? strings "Set target leverage and net long/short bias."))
-    ;; The drag hint is short, actionable, and rendered BEFORE the pad it explains
-    ;; (the old post-chart paragraph is gone).
-    (is (contains? strings "Drag the dot to set target exposure."))
+    ;; The simplified default view (2026-07-10): no drag caption, no
+    ;; "Positioning" eyebrow, no preset chips — pad + stacked readout + the two
+    ;; read-only cards ("Risk guards" / "Rebalancing") with the editable
+    ;; controls behind their Edit disclosures, and the band sliders behind
+    ;; "Fine-tune exposure".
+    (is (not (contains? strings "Drag the dot to set target exposure.")))
     (is (not (some #(str/includes? % "The dot shows the target gross leverage")
                    strings)))
-    (is (contains? strings "Positioning"))
+    (is (not (contains? strings "Positioning")))
+    (is (not (contains? strings "Exposure presets")))
     (is (contains? strings "Risk guards"))
-    (is (contains? strings "Rebalance behavior"))
+    (is (contains? strings "Rebalancing"))
+    (is (contains? strings "Fine-tune exposure"))
     ;; The exact solver echo is an audit detail: it lives inside the Advanced
     ;; solver limits drawer, not in the primary controls column.
     (is (contains? strings "Sent to solver"))

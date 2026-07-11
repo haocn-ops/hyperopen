@@ -1,9 +1,11 @@
 (ns hyperopen.workbench.scenes.optimize.exposure-scenes
-  "Workbench scenes for the 2D exposure-map Positioning control
+  "Workbench scenes for the 2D exposure-map pieces
   (views.portfolio.optimize.setup-exposure-map). Each scene builds the exposure-map view-model
   from a seeded constraint map + current exposure so every state — default (Balanced), a seeded
   gross floor, a long-bias band, an off-policy current dot, and a saved-default profile — can be
-  eyeballed in isolation inside the .portfolio-optimizer scope."
+  eyeballed in isolation inside the .portfolio-optimizer scope. Since the 2026-07-10 simplified
+  default view the ns exports pieces instead of one composition, so the scene shell stacks them
+  all (pad + readout, bands, current line, profile, warning) with everything visible."
   (:require [portfolio.replicant :as portfolio]
             [hyperopen.workbench.support.layout :as layout]
             [hyperopen.portfolio.optimizer.application.view-model.exposure :as exposure-vm]
@@ -24,7 +26,16 @@
 
 (defn- render
   [opts]
-  (shell (exposure-map/exposure-map (exposure-vm/exposure-map-model opts))))
+  (let [model (exposure-vm/exposure-map-model opts)]
+    (shell
+     [:div {:class ["space-y-3"]}
+      [:div {:class ["flex" "min-w-0" "items-stretch" "gap-4"]}
+       (exposure-map/pad-frame model)
+       (exposure-map/readout model)]
+      (exposure-map/bands-block model)
+      (exposure-map/preview-block (:preview model))
+      (exposure-map/profile-row (:profile model))
+      (exposure-map/policy-warning (:preview model))])))
 
 (portfolio/defscene balanced-default
   []

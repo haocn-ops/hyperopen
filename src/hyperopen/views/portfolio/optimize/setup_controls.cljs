@@ -39,9 +39,13 @@
         children))
 
 (defn disclosure-panel
+  ;; :id mirrors the data-role (roles are unique per page) so plain fragment
+  ;; anchors — e.g. the rail's exposure-policy warning link — can scroll to a
+  ;; panel without any dispatch machinery.
   [role & children]
   (into [:details {:class ["optimizer-setup-panel" "border" "border-base-300" "bg-base-100/90" "p-3"]
-                   :data-role role}]
+                   :data-role role
+                   :id role}]
         children))
 
 (defn disclosure-panel-open
@@ -51,6 +55,7 @@
   [role & children]
   (into [:details {:class ["optimizer-setup-panel" "border" "border-base-300" "bg-base-100/90" "p-3"]
                    :data-role role
+                   :id role
                    :open true}]
         children))
 
@@ -150,6 +155,29 @@
         (str (js/Math.round pct))
         (str pct)))
     ""))
+
+(defn- lucide-node->hiccup
+  [node]
+  (let [tag-name (aget node 0)
+        attrs (js->clj (aget node 1) :keywordize-keys true)]
+    [(keyword tag-name) attrs]))
+
+(defn lucide-icon
+  "Render a lucide icon-node array (from a direct
+  [\"lucide/dist/esm/icons/<name>.js\" :default node] require at the call
+  site) as an inline 14px stroke icon."
+  [node extra-class]
+  (into [:svg {:viewBox "0 0 24 24"
+               :width 14
+               :height 14
+               :fill "none"
+               :stroke "currentColor"
+               :stroke-width 1.75
+               :stroke-linecap "round"
+               :stroke-linejoin "round"
+               :aria-hidden "true"
+               :class (into ["shrink-0"] (or extra-class []))}]
+        (map lucide-node->hiccup (array-seq node))))
 
 (defn percent-input
   "Percent-entry numeric input: the user types a percent (15 = 15%); it commits on

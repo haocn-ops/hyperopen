@@ -279,12 +279,19 @@
         row (first (:rows model))]
     (is (true? (:applicable? model)))
     (is (true? (:all-configured? model)))
-    (is (true? (:any-proxy? model)))
-    (is (= "All short-history assets have assumptions. Ready to run."
-           (:ready-message model)))
-    (is (= "Proxy assumptions are disclosed in results." (:disclosure-note model)))
+    (is (= 1 (:configured-count model)))
+    ;; The aggregate ready banner and the results-disclosure note are gone
+    ;; (2026-07-10 comprehension pass): "ready" belongs to the run verdict +
+    ;; Data health, and the disclosure fact is the folded :proxy-history-used
+    ;; data note.
+    (is (not (contains? model :ready-message)))
+    (is (not (contains? model :disclosure-note)))
     (is (= "perp:NEW" (:instrument-id row)))
     (is (true? (:configured? row)))
+    (is (string? (:summary row))
+        "Each rail row carries the one-line summary its disclosure header shows.")
+    (is (not-any? #(= "Status" (first %)) (:summary-pairs row))
+        "No textual Status pair — the row's status chip already carries it.")
     (is (some #(= ["Proxy assets" "BTC"] %) (:summary-pairs row)))
     (is (some #(= ["Final modeled basket" "BTC 100%"] %) (:summary-pairs row))
         "The rail reports the confidence-shrunk basket that drives covariance.")

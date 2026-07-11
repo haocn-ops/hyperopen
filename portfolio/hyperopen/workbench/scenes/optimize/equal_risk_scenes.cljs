@@ -165,6 +165,27 @@
                 :binding-count 3
                 :books {:long 24 :short 0}}})))
 
+;; The 2026-07-11 live-session shape: the CURRENT book concentrates ~100% of
+;; volatility in one asset (that concentration is why Equal Risk gets run), so
+;; its current marker sits far beyond the recommended/target range. The scale
+;; must stay fitted to the bars and render that current as an edge chevron —
+;; not stretch the axis to 100% and squash everything left.
+(def ^:private concentrated-current-result
+  (equal-risk-result
+   {:rows [["BTC" 0.35 0.278 0.005 0.20]
+           ["ETH" 0.30 0.252 0.012 0.20]
+           ["FARTCOIN" 0.25 0.243 0.008 0.20]
+           ["xyz:MSTR" 0.20 0.239 0.004 0.20]
+           ["xyz:SP500" -0.10 -0.012 0.971 0.20]]
+    :quality :approximate
+    :rms 0.107
+    :max-abs 0.212
+    :freedom {:status :open
+              :free-degrees 3
+              :binding-count 0
+              :books {:long 4 :short 1}}
+    :diagnostics {:binding-constraints []}}))
+
 ;; Persisted pre-redesign payload: no current contributions, no allocation
 ;; freedom, no initializations — honest placeholders, no fabricated markers.
 (def ^:private persisted-pre-redesign-result
@@ -200,6 +221,10 @@
 (portfolio/defscene capped-24-asset-universe
   []
   (card-shell capped-universe-result))
+
+(portfolio/defscene concentrated-current-off-scale
+  []
+  (card-shell concentrated-current-result))
 
 (portfolio/defscene persisted-pre-redesign
   []

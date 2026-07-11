@@ -8,7 +8,7 @@
             [clojure.string :as str]
             [hyperopen.views.portfolio.optimize.results-panel :as results-panel]
             [hyperopen.views.portfolio.optimize.test-support
-             :refer [collect-strings node-by-role solved-result]]))
+             :refer [collect-nodes collect-strings node-by-role solved-result]]))
 
 (def ^:private equal-risk-solver-section
   {:strategy :sequential-equal-risk
@@ -117,6 +117,27 @@
     (testing "the trust rail reads contributions, not weight-based effective N"
       (is (contains? strings "Negative contributors"))
       (is (not (contains? strings "Diversification"))))))
+
+(deftest results-panel-equal-risk-clamps-off-scale-current-markers-test
+  ;; A current book concentrating ~all volatility in one asset (the usual
+  ;; reason to run Equal Risk) must not stretch the chart scale: that current
+  ;; renders as an edge chevron (data-offscale) while in-range currents keep
+  ;; their circles.
+  (let [result (assoc approximate-result
+                      :current-risk-contributions
+                      {:relative-contributions-by-instrument {"perp:BTC" 3.0
+                                                              "spot:PURR" 0.1}
+                       :rms-error 1.2
+                       :max-absolute-error 2.5})
+        view-node (render result)
+        currents (collect-nodes
+                  view-node
+                  #(= "portfolio-optimizer-risk-contribution-current"
+                      (get-in % [1 :data-role])))]
+    (is (= 2 (count currents)))
+    (is (= #{"right" nil}
+           (set (map #(get-in % [1 :data-offscale]) currents)))
+        "the 300% current pins to the right edge; the in-range one stays a circle")))
 
 (deftest results-panel-equal-risk-distinguishes-exact-quality-and-hedges-test
   (let [exact-result (-> approximate-result

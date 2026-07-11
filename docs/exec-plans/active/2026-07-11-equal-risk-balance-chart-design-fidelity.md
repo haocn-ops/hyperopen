@@ -33,7 +33,8 @@ Local scratch refs (non-authoritative): none.
 - [x] (2026-07-11) Browser QA on the workbench scenes via the worktree static-serve (:8090) recipe: computed-style checks (purple line/columns, amber active-tab underline, sign-colored bars, 10px current ring, one-row KPI strip), zero-app-state tab switching exercised both ways, degradation scene shows no fabricated markers, no console errors; screenshots captured for the user.
 - [x] (2026-07-11) `docs/design-docs/optimizer-equal-risk.md` results-page section rewritten for the new card.
 - [x] (2026-07-11) Gates green: `npm run gates` Overall PASS (34/34 — check lints + all 6 shadow builds + `npm test` 6134 tests/32623 assertions + `test:websocket`); high-resolution proof screenshots captured (designer-parity and hedged-book scenes) and delivered.
-- [ ] User-side visual pass in the live dev session, then land the branch (commit/merge are left to the user's call).
+- [x] (2026-07-11) User live-session pass surfaced three parity gaps: a wildly concentrated CURRENT book (one asset at ~100% of volatility) stretched the shared scale to 100%+, squashing every bar left and clipping the small negative bar; the stretched domain left dead space before the Target/Deviation columns; and the type scale read too small. Fixed: the scale now fits the PRIMARY data (zero + targets + recommended shares) and admits current shares only within 35% of the primary span beyond it — currents past that render as gray edge chevrons (`data-offscale`, true value in the tooltip) with the connector running to the plot edge; fonts bumped ~1px across the card (KPI values 14px, row labels/cells 12px, legend 11px, reading 11.5px); label column widened to 5rem for `xyz:`-prefixed names; why-card values wrap instead of truncating ("5 …"). New `concentrated-current-off-scale` workbench scene reproduces the live case; new view test pins the chevron/circle split; designer-parity scene re-verified unchanged. Suite 5429/29280 green.
+- [ ] User re-check in the live dev session, then land the branch (merge is left to the user's call).
 
 ## Surprises & Discoveries
 
@@ -68,6 +69,9 @@ Local scratch refs (non-authoritative): none.
 - Decision: Legend renders all four mock items (dashed Target line, gray Current circle, purple per-row Target tick, green Recommended dot); per-row target ticks draw at each row's own target so they coincide with the global line today but stay correct if per-row targets ever diverge.
   Rationale: pixel parity plus forward-compatibility with the per-instrument targets already in the payload.
   Date/Author: 2026-07-11.
+- Decision: The lane scale fits the PRIMARY data only (zero, targets, recommended shares); current shares extend the domain only when they fall within 35% of the primary span beyond it, and anything further renders as a gray chevron pinned to the plot edge with the true value in the tooltip.
+  Rationale: the current book's whole point of failure (all volatility in one asset) is the common reason to run Equal Risk — letting that outlier into the fit squashed the recommended bars into ~25% of the plot and clipped small negative bars (observed live 2026-07-11). A clamped circle would lie about the value's position; the chevron says "beyond the chart" honestly while the deviation column and tooltip carry the numbers.
+  Date/Author: 2026-07-11 / live-session feedback pass.
 - Decision: Chart rows keep the HTML-lane construction (absolutely positioned divs on one shared scale) — no SVG — with the gridline/zero/target backdrop drawn once behind the row stack in a same-grid overlay; the row grid template moves to static CSS in `results.css`.
   Rationale: the parent plan's HTML-lanes ruling stands (1px lines, round markers at any width); static CSS tracks are the established fix for Tailwind JIT intermittently dropping arbitrary `grid-cols-[…]` values in watch mode.
   Date/Author: 2026-07-11.

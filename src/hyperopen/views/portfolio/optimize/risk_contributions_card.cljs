@@ -49,14 +49,24 @@
 ;; --- Shared lane scale --------------------------------------------------------
 
 (defn- lane-scale
-  "One scale for every lane: covers zero, every target, and every visible
-  recommended/current share, padded and rounded to 5% so the domain reads as
-  clean ticks. Returns {:lo :hi :x (fraction-of-total -> 0..100 percent)}."
+  "One scale for every lane, fitted to the PRIMARY data — zero, every target,
+  and every recommended share — padded and rounded to 5% so the domain reads
+  as clean ticks. Current shares only extend the domain when they sit within
+  35% of the primary span beyond it: a wildly unbalanced current book (one
+  asset carrying ~100% of volatility is exactly why Equal Risk gets run)
+  must not squash the recommended bars into a corner. Currents beyond that
+  render as off-scale edge chevrons (see contribution-lane). Returns
+  {:lo :hi :x (fraction-of-total -> 0..100 percent)}."
   [{:keys [rows target-share]}]
-  (let [values (concat [0 (or target-share 0)]
-                       (keep :share rows)
-                       (keep :current-share rows)
-                       (keep :target-share rows))
+  (let [primary (concat [0 (or target-share 0)]
+                        (keep :share rows)
+                        (keep :target-share rows))
+        lo-p (reduce min 0 primary)
+        hi-p (reduce max 0 primary)
+        reach (* 0.35 (max 0.05 (- hi-p lo-p)))
+        values (concat primary
+                       (filter #(<= (- lo-p reach) % (+ hi-p reach))
+                               (keep :current-share rows)))
         lo0 (reduce min 0 values)
         hi0 (reduce max 0 values)
         pad (max 0.02 (* 0.08 (- hi0 lo0)))
@@ -172,16 +182,26 @@
 (defn- contribution-lane
   "The row's plot area: dashed current↔recommended connector, the
   recommended-share bar from zero (sign-colored), the purple per-row target
-  tick, the gray current circle, and the green recommended dot."
-  [{:keys [x]} {:keys [share current-share target-share negative?]}]
+  tick, the gray current circle, and the green recommended dot. A current
+  share beyond the fitted domain (see lane-scale) draws as a gray chevron
+  pinned to the plot edge — honest 'off the chart' instead of a circle that
+  pretends the value sits at the edge — with the true value in the tooltip."
+  [{:keys [x lo hi]} {:keys [label share current-share target-share negative?]}]
   (let [x0 (x 0)
         xs (when (number? share) (x share))
-        xc (when (number? current-share) (x current-share))]
+        off-direction (when (number? current-share)
+                        (cond
+                          (> current-share hi) "right"
+                          (< current-share lo) "left"
+                          :else nil))
+        xc (when (and (number? current-share) (nil? off-direction))
+             (x current-share))
+        connector-to (or xc (case off-direction "right" 100 "left" 0 nil))]
     [:div {:class ["optimizer-risk-balance-lane" "relative" "min-w-0"]}
-     (when (and xs xc)
+     (when (and xs connector-to)
        [:div {:class ["optimizer-risk-balance-connector"]
-              :style {:left (str (min xs xc) "%")
-                      :width (str (js/Math.abs (- xs xc)) "%")}}])
+              :style {:left (str (min xs connector-to) "%")
+                      :width (str (js/Math.abs (- xs connector-to)) "%")}}])
      (when xs
        [:div {:class ["optimizer-risk-balance-bar"]
               :data-role "portfolio-optimizer-risk-contribution-bar"
@@ -196,6 +216,12 @@
        [:div {:class ["optimizer-risk-balance-current" "optimizer-risk-balance-marker"]
               :data-role "portfolio-optimizer-risk-contribution-current"
               :style {:left (str xc "%")}}])
+     (when off-direction
+       [:div {:class ["optimizer-risk-balance-current-offscale"]
+              :data-role "portfolio-optimizer-risk-contribution-current"
+              :data-offscale off-direction
+              :title (str label " · current " (format-pct current-share)
+                          " — beyond the chart scale")}])
      (when xs
        [:div {:class ["optimizer-risk-balance-dot" "optimizer-risk-balance-marker"]
               :data-role "portfolio-optimizer-risk-contribution-recommended"
@@ -270,7 +296,7 @@
 (defn- overflow-line
   [{:keys [hidden-count hidden-max-pts]}]
   (when (pos? (or hidden-count 0))
-    [:p {:class ["mt-2" "text-[0.6875rem]" "text-trading-muted"]
+    [:p {:class ["mt-2" "text-xs" "text-trading-muted"]
          :data-role "portfolio-optimizer-risk-contributions-overflow"}
      (str "+ " hidden-count " more within ±"
           (.toFixed (or hidden-max-pts 0) 1)
@@ -279,7 +305,7 @@
 (defn- exposure-line
   [{:keys [gross-exposure net-exposure long-exposure short-exposure]}]
   (when (number? gross-exposure)
-    [:p {:class ["mt-2" "font-mono" "text-[0.6875rem]" "text-trading-muted"]
+    [:p {:class ["mt-2" "font-mono" "text-xs" "text-trading-muted"]
          :data-role "portfolio-optimizer-risk-contributions-exposure"}
      (str "Realized · gross " (format-pct gross-exposure 0)
           " · net " (format-pct net-exposure 0)
@@ -290,7 +316,7 @@
   [result]
   (let [solver (:equal-risk-solver result)]
     (when (some? (:converged? solver))
-      [:p {:class ["mt-1" "font-mono" "text-[0.625rem]" "text-trading-muted/70"]
+      [:p {:class ["mt-1" "font-mono" "text-[0.6875rem]" "text-trading-muted/70"]
            :data-role "portfolio-optimizer-risk-contributions-solver"}
        (str (if (:converged? solver) "Converged" "Not converged")
             " · " (:iterations solver) " iterations"

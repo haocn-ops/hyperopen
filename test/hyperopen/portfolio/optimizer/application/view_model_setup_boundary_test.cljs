@@ -329,26 +329,24 @@
     (is (str/includes? (:assumption-badge-tooltip row) "modeled from a basket of similar assets")
         "Its chip hover explains that returns are modeled from similar assets.")))
 
-(deftest run-verdict-unifies-readiness-and-exposure-policy-test
-  ;; ONE vocabulary for "ready" (2026-07-10 comprehension pass): the footer
-  ;; pill and the rail Status row both consume this verdict, so a green
-  ;; "Ready to run" can never sit next to a visible exposure-policy warning.
+(deftest run-verdict-reflects-readiness-test
+  ;; ONE vocabulary for "ready": the footer pill and the rail Status row both
+  ;; consume this verdict, so a green "Ready to run" can never sit next to a
+  ;; visible readiness warning elsewhere on the page. (Exposure-policy
+  ;; compliance no longer folds in here — comparing the CURRENT portfolio
+  ;; against a freshly-edited policy is the normal state, not a warning.)
   (let [clean {:status :ok :runnable? true :warnings [] :blocking-warnings []}
         loaded {:status :succeeded}]
     (is (= {:level :ready :label "Ready to run" :warning-count 0}
-           (view-model/run-verdict clean loaded {:off-policy? false})))
-    (is (= {:level :caution :label "Ready with 1 warning" :warning-count 1}
-           (view-model/run-verdict clean loaded {:off-policy? true})))
+           (view-model/run-verdict clean loaded)))
     (is (= :loading
            (:level (view-model/run-verdict {:reason :history-loading}
-                                           {:status :loading}
-                                           {:off-policy? true}))))
+                                           {:status :loading}))))
     (let [blocked (view-model/run-verdict {:status :blocked
                                            :reason :missing-history-assumptions
                                            :blocking-warnings []
                                            :warnings []}
-                                          loaded
-                                          {:off-policy? false})]
+                                          loaded)]
       (is (= :blocked (:level blocked)))
       (is (= "Action needed" (:label blocked))))
     (let [cautioned (view-model/run-verdict
@@ -357,8 +355,6 @@
                       :warnings [{:code :source-fetch-failed
                                   :instrument-id "perp:BTC"
                                   :message "History fetch failed for BTC."}]}
-                     loaded
-                     {:off-policy? true})]
+                     loaded)]
       (is (= :caution (:level cautioned)))
-      (is (= "Ready with 2 warnings" (:label cautioned))
-          "Data cautions and the exposure-policy violation add up in one count."))))
+      (is (= "Ready with 1 warning" (:label cautioned))))))

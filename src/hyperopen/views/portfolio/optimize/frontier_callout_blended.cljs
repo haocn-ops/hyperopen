@@ -145,21 +145,30 @@
      :height height*}))
 
 (defn- metric-row
-  [start-y idx {:keys [label value]}]
+  [start-y idx {:keys [label value divider?]}]
   (let [row-y (+ start-y (* row-height idx))]
-    [:g {:key (str "blended-metric-row-" idx)}
-     [:text {:x 10
-             :y row-y
-             :fill "var(--optimizer-text-2)"
-             :fontSize 10}
-      (metric-label label)]
-     [:text {:x (- callout-width 10)
-             :y row-y
-             :fill "var(--optimizer-text)"
-             :fontSize 10
-             :fontWeight 700
-             :text-anchor "end"}
-      value]]))
+    (if divider?
+      ;; Separates optimizer outputs from the volatility-intuition rows.
+      [:line {:key (str "blended-metric-row-" idx)
+              :x1 10
+              :x2 (- callout-width 10)
+              :y1 (- row-y 4)
+              :y2 (- row-y 4)
+              :stroke "rgba(255, 255, 255, 0.08)"
+              :strokeWidth 1}]
+      [:g {:key (str "blended-metric-row-" idx)}
+       [:text {:x 10
+               :y row-y
+               :fill "var(--optimizer-text-2)"
+               :fontSize 10}
+        (metric-label label)]
+       [:text {:x (- callout-width 10)
+               :y row-y
+               :fill "var(--optimizer-text)"
+               :fontSize 10
+               :fontWeight 700
+               :text-anchor "end"}
+        value]])))
 
 (defn- allocation-segment-width
   [total-abs row]

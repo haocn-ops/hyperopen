@@ -59,7 +59,13 @@
                              "portfolio-optimizer-results-your-views-editor-toggle")
         toggle-strings (set (collect-strings toggle))]
     (is (< (index-of order "portfolio-optimizer-result-confidence-panel")
+           (index-of order "portfolio-optimizer-volatility-intuition"))
+        "The volatility-intuition card reads after the confidence verdict.")
+    (is (< (index-of order "portfolio-optimizer-volatility-intuition")
            (index-of order "portfolio-optimizer-trust-caution-panel")))
+    ;; The leverage-risk card is gated on gross ≥ 2x / σ ≥ 100%; this result
+    ;; (0.37x gross, 42% σ) must not surface it.
+    (is (nil? (index-of order "portfolio-optimizer-leverage-risk")))
     (is (< (index-of order "portfolio-optimizer-trust-caution-panel")
            (index-of order "portfolio-optimizer-results-your-views-editor")))
     (is (= :details (first editor)))

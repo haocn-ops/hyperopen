@@ -4,12 +4,15 @@
             [hyperopen.views.portfolio.optimize.equal-risk-confidence-rail
              :as equal-risk-confidence-rail]
             [hyperopen.views.portfolio.optimize.frontier-chart :as frontier-chart]
+            [hyperopen.views.portfolio.optimize.leverage-risk-card :as leverage-risk-card]
             [hyperopen.views.portfolio.optimize.refinement-status-card :as refinement-card]
             [hyperopen.views.portfolio.optimize.results-diagnostics-rail :as diagnostics-rail]
             [hyperopen.views.portfolio.optimize.results-summary :as summary]
             [hyperopen.views.portfolio.optimize.risk-contributions-card :as risk-contributions-card]
             [hyperopen.views.portfolio.optimize.scenario-objective-menu :as objective-menu]
-            [hyperopen.views.portfolio.optimize.target-exposure-table :as target-exposure-table]))
+            [hyperopen.views.portfolio.optimize.target-exposure-table :as target-exposure-table]
+            [hyperopen.views.portfolio.optimize.volatility-intuition-card
+             :as volatility-intuition-card]))
 
 (defn- active-views-editor
   ;; Rendered whenever the return model consumes views, regardless of objective —
@@ -91,6 +94,11 @@
                 result
                 frontier-overlay-mode
                 constrain-frontier?))
+             ;; The strip's slot wrapper always renders, so the insight
+             ;; appearing/disappearing across reruns can never shift the
+             ;; disclosure-holding cards below it.
+             (when-not equal-risk?
+               (volatility-intuition-card/insight-strip result))
              ;; Decision-support before solver tuning: the engine-derived "why
              ;; this target" facts sit directly under the chart; the refinement
              ;; card below is compact with its options behind a disclosure.
@@ -109,5 +117,13 @@
           ;; rail speaks frontier language that does not exist for it.
           (or (equal-risk-confidence-rail/equal-risk-confidence-rail result)
               (diagnostics-rail/result-confidence-rail refinement))
+          ;; Always-present wrapper: the two cards inside are conditional
+          ;; (volatility needs a solved σ, leverage risk is gated on gross/σ),
+          ;; and without a stable slot their mounting would shift the trust
+          ;; rail and views editor below — resetting open <details> state.
+          [:div {:replicant/key "optimizer-volatility-risk-cards"
+                 :data-role "portfolio-optimizer-volatility-risk-cards"}
+           (volatility-intuition-card/volatility-intuition-card result)
+           (leverage-risk-card/leverage-risk-card result)]
           (diagnostics-rail/trust-diagnostics-rail result)
           (active-views-editor state draft result readiness)]]]))))

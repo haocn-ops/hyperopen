@@ -295,6 +295,7 @@
             [hyperopen.portfolio.optimizer.application.view-model.execution-commit-block-test]
             [hyperopen.portfolio.optimizer.application.view-model.execution-reconcile-test]
             [hyperopen.portfolio.optimizer.application.view-model.exposure-test]
+            [hyperopen.portfolio.optimizer.application.view-model.volatility-intuition-test]
             [hyperopen.portfolio.optimizer.application.view-model.workspace-loading-test]
             [hyperopen.portfolio.optimizer.black-litterman-actions-test]
             [hyperopen.portfolio.optimizer.black-litterman-view-edits-test]
@@ -313,6 +314,7 @@
             [hyperopen.portfolio.optimizer.domain.frontier-test]
             [hyperopen.portfolio.optimizer.domain.history-assumption-proxy-test]
             [hyperopen.portfolio.optimizer.domain.history-assumptions-test]
+            [hyperopen.portfolio.optimizer.domain.leverage-risk-test]
             [hyperopen.portfolio.optimizer.domain.objectives-test]
             [hyperopen.portfolio.optimizer.domain.rebalance-test]
             [hyperopen.portfolio.optimizer.domain.returns-test]
@@ -320,6 +322,7 @@
             [hyperopen.portfolio.optimizer.domain.risk-ledoit-wolf-test]
             [hyperopen.portfolio.optimizer.domain.risk-structure-test]
             [hyperopen.portfolio.optimizer.domain.risk-test]
+            [hyperopen.portfolio.optimizer.domain.volatility-intuition-test]
             [hyperopen.portfolio.optimizer.domain.weight-cleaning-test]
             [hyperopen.portfolio.optimizer.draft-actions-test]
             [hyperopen.portfolio.optimizer.draft-model-actions-test]
@@ -605,6 +608,7 @@
             [hyperopen.views.portfolio.optimize.frontier-chart-toolbar-test]
             [hyperopen.views.portfolio.optimize.frontier-overlay-markers-test]
             [hyperopen.views.portfolio.optimize.inputs-tab-test]
+            [hyperopen.views.portfolio.optimize.leverage-risk-card-test]
             [hyperopen.views.portfolio.optimize.optimization-progress-panel-test]
             [hyperopen.views.portfolio.optimize.refinement-status-card-test]
             [hyperopen.views.portfolio.optimize.result-vault-labels-test]
@@ -633,6 +637,7 @@
             [hyperopen.views.portfolio.optimize.universe-panel-test]
             [hyperopen.views.portfolio.optimize.unsaved-draft-route-test]
             [hyperopen.views.portfolio.optimize.view-test]
+            [hyperopen.views.portfolio.optimize.volatility-intuition-card-test]
             [hyperopen.views.portfolio.optimize.workspace-view-test]
             [hyperopen.views.portfolio.performance-metrics-view-test]
             [hyperopen.views.portfolio.summary-cards-test]
@@ -1110,6 +1115,7 @@
              'hyperopen.portfolio.optimizer.application.view-model.execution-commit-block-test
              'hyperopen.portfolio.optimizer.application.view-model.execution-reconcile-test
              'hyperopen.portfolio.optimizer.application.view-model.exposure-test
+             'hyperopen.portfolio.optimizer.application.view-model.volatility-intuition-test
              'hyperopen.portfolio.optimizer.application.view-model.workspace-loading-test
              'hyperopen.portfolio.optimizer.black-litterman-actions-test
              'hyperopen.portfolio.optimizer.black-litterman-view-edits-test
@@ -1128,6 +1134,7 @@
              'hyperopen.portfolio.optimizer.domain.frontier-test
              'hyperopen.portfolio.optimizer.domain.history-assumption-proxy-test
              'hyperopen.portfolio.optimizer.domain.history-assumptions-test
+             'hyperopen.portfolio.optimizer.domain.leverage-risk-test
              'hyperopen.portfolio.optimizer.domain.objectives-test
              'hyperopen.portfolio.optimizer.domain.rebalance-test
              'hyperopen.portfolio.optimizer.domain.returns-test
@@ -1135,6 +1142,7 @@
              'hyperopen.portfolio.optimizer.domain.risk-ledoit-wolf-test
              'hyperopen.portfolio.optimizer.domain.risk-structure-test
              'hyperopen.portfolio.optimizer.domain.risk-test
+             'hyperopen.portfolio.optimizer.domain.volatility-intuition-test
              'hyperopen.portfolio.optimizer.domain.weight-cleaning-test
              'hyperopen.portfolio.optimizer.draft-actions-test
              'hyperopen.portfolio.optimizer.draft-model-actions-test
@@ -1420,6 +1428,7 @@
              'hyperopen.views.portfolio.optimize.frontier-chart-toolbar-test
              'hyperopen.views.portfolio.optimize.frontier-overlay-markers-test
              'hyperopen.views.portfolio.optimize.inputs-tab-test
+             'hyperopen.views.portfolio.optimize.leverage-risk-card-test
              'hyperopen.views.portfolio.optimize.optimization-progress-panel-test
              'hyperopen.views.portfolio.optimize.refinement-status-card-test
              'hyperopen.views.portfolio.optimize.result-vault-labels-test
@@ -1448,6 +1457,7 @@
              'hyperopen.views.portfolio.optimize.universe-panel-test
              'hyperopen.views.portfolio.optimize.unsaved-draft-route-test
              'hyperopen.views.portfolio.optimize.view-test
+             'hyperopen.views.portfolio.optimize.volatility-intuition-card-test
              'hyperopen.views.portfolio.optimize.workspace-view-test
              'hyperopen.views.portfolio.performance-metrics-view-test
              'hyperopen.views.portfolio.summary-cards-test

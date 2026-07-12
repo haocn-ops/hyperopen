@@ -109,10 +109,22 @@
             :r radius
             :class "portfolio-frontier-focus-ring"}])
 
+(defn- horizon-rows
+  "Divider + the shorter-horizon 1σ rows for the Current/Target callouts
+  (`horizons` from view-model.volatility-intuition/horizons — same scaling
+  basis as the displayed annualized volatility). Sweep-point callouts don't
+  pass horizons and stay compact."
+  [{:keys [daily weekly monthly]}]
+  (let [pm #(str "±" (opt-format/format-pct %))]
+    [{:divider? true}
+     {:label "Daily 1σ" :value (pm daily)}
+     {:label "Weekly 1σ" :value (pm weekly)}
+     {:label "Monthly 1σ" :value (pm monthly)}]))
+
 (defn point-rows
   ([point]
    (point-rows point {}))
-  ([point {:keys [return-label volatility-label target-weight exposure]
+  ([point {:keys [return-label volatility-label target-weight exposure horizons]
            :or {return-label "Expected Return"
                 volatility-label "Volatility"}}]
    (cond-> [{:label return-label
@@ -131,7 +143,10 @@
 
      (some? (:net exposure))
      (conj {:label "Net Exposure"
-            :value (opt-format/format-multiple (:net exposure))}))))
+            :value (opt-format/format-multiple (:net exposure))})
+
+     (some? horizons)
+     (into (horizon-rows horizons)))))
 
 (defn aria-label
   [label rows]
@@ -141,7 +156,7 @@
               (interpose ", "
                          (map (fn [{:keys [label value]}]
                                 (str label " " value))
-                              rows)))))
+                              (remove :divider? rows))))))
 
 (defn- clamp
   [min* max* value]
@@ -257,21 +272,30 @@
 (defn- row-nodes
   [rows width* header-height*]
   (map-indexed
-   (fn [idx {:keys [label value]}]
+   (fn [idx {:keys [label value divider?]}]
      (let [row-y (+ header-height* (* row-height idx))]
-       [:g {:key (str "row-" idx)}
-        [:text {:x 10
-                :y row-y
-                :fill "var(--optimizer-text-2)"
-                :fontSize 10}
-         label]
-        [:text {:x (- width* 10)
-                :y row-y
-                :fill "var(--optimizer-text)"
-                :fontSize 10
-                :fontWeight 700
-                :text-anchor "end"}
-         value]]))
+       (if divider?
+         ;; Separates optimizer outputs from the volatility-intuition rows.
+         [:line {:key (str "row-" idx)
+                 :x1 10
+                 :x2 (- width* 10)
+                 :y1 (- row-y 4)
+                 :y2 (- row-y 4)
+                 :stroke "rgba(255, 255, 255, 0.08)"
+                 :strokeWidth 1}]
+         [:g {:key (str "row-" idx)}
+          [:text {:x 10
+                  :y row-y
+                  :fill "var(--optimizer-text-2)"
+                  :fontSize 10}
+           label]
+          [:text {:x (- width* 10)
+                  :y row-y
+                  :fill "var(--optimizer-text)"
+                  :fontSize 10
+                  :fontWeight 700
+                  :text-anchor "end"}
+           value]])))
    rows))
 
 (defn- target-callout

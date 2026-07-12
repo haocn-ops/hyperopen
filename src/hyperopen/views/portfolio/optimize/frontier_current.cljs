@@ -1,5 +1,7 @@
 (ns hyperopen.views.portfolio.optimize.frontier-current
-  (:require [hyperopen.views.portfolio.optimize.frontier-callout :as frontier-callout]))
+  (:require [hyperopen.portfolio.optimizer.application.view-model.volatility-intuition
+             :as volatility-intuition-vm]
+            [hyperopen.views.portfolio.optimize.frontier-callout :as frontier-callout]))
 
 (def current-color "#2f9bff")
 (def current-fill "rgba(47, 155, 255, 0.22)")
@@ -17,7 +19,8 @@
         label "Current"
         rows (frontier-callout/point-rows
               point
-              {:exposure (frontier-callout/exposure-summary result :current)})
+              {:exposure (frontier-callout/exposure-summary result :current)
+               :horizons (volatility-intuition-vm/horizons (:volatility point))})
         allocations (frontier-callout/allocation-summary
                      (or (:current-portfolio-instrument-ids result)
                          (:instrument-ids result))

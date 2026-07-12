@@ -228,16 +228,25 @@
         "Callouts should not intercept marker hover targets.")
     (is (= "end" (node-attr (text-node standalone-callout "40.00%") :text-anchor)))
     (is (nil? (node-attr (text-node standalone-callout "40.00%") :textAnchor)))
+    ;; Target/Current callouts carry the volatility-intuition horizon rows
+    ;; (365-day √time scaling of the displayed annualized σ); sweep-point
+    ;; callouts (asserted below) stay compact without them.
     (is (= #{"TARGET"
              "PORTFOLIO"
              "μ · return"
              "σ · vol"
              "Sharpe"
+             "Daily 1σ"
+             "Weekly 1σ"
+             "Monthly 1σ"
              "IMPLIED ALLOCATION"
              "BTC"
              "PURR"
              "18.00%"
              "42.00%"
+             "±2.20%"
+             "±5.82%"
+             "±12.04%"
              "0.43"
              "35.0%"
              "-2.0%"}
@@ -263,11 +272,17 @@
              "Sharpe"
              "Gross Exposure"
              "Net Exposure"
+             "Daily 1σ"
+             "Weekly 1σ"
+             "Monthly 1σ"
              "IMPLIED ALLOCATION"
              "BTC"
              "PURR"
              "12.00%"
              "24.00%"
+             "±1.26%"
+             "±3.32%"
+             "±6.88%"
              "0.5"
              "0.30x"
              "20.0%"

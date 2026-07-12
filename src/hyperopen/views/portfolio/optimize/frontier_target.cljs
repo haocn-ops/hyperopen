@@ -1,5 +1,7 @@
 (ns hyperopen.views.portfolio.optimize.frontier-target
-  (:require [hyperopen.views.portfolio.optimize.frontier-callout :as frontier-callout]))
+  (:require [hyperopen.portfolio.optimizer.application.view-model.volatility-intuition
+             :as volatility-intuition-vm]
+            [hyperopen.views.portfolio.optimize.frontier-callout :as frontier-callout]))
 
 (def target-cyan "#48d4ff")
 (def target-blue "#5d7cff")
@@ -83,7 +85,8 @@
         label-y (- y 23)
         label "Target"
         rows (frontier-callout/point-rows
-              point)
+              point
+              {:horizons (volatility-intuition-vm/horizons (:volatility point))})
         allocations (frontier-callout/allocation-summary
                      (:instrument-ids result)
                      (:target-weights result)

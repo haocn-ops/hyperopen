@@ -2413,4 +2413,196 @@
     .optimizer-target-exposure-pnl-corr [data-sign="negative"] {
     color: var(--optimizer-short);
   }
+
+  /* ── Volatility intuition rail card (designer spec 2026-07-12) ──
+     Annualized σ translated into daily/weekly/monthly 1σ move scales with
+     aria-hidden magnitude bars. The Target/Current switch is a pair of
+     visually hidden radios toggled purely by :has() — no app state; with no
+     radio checked the Target panel shows (the recommendation default). */
+  .portfolio-optimizer .optimizer-vol-intuition-tabs {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: stretch;
+    border: 1px solid var(--optimizer-border-strong);
+    background-color: var(--optimizer-surface);
+  }
+
+  .portfolio-optimizer .optimizer-vol-intuition-tab {
+    display: flex;
+    align-items: center;
+    padding: 4px 9px;
+    cursor: pointer;
+    font-family: "JetBrains Mono", var(--font-mono);
+    font-size: 9.5px;
+    font-weight: 650;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    color: var(--optimizer-text-3);
+    box-shadow: inset 0 -2px 0 transparent;
+    transition: color 120ms ease, background-color 120ms ease;
+  }
+
+  .portfolio-optimizer .optimizer-vol-intuition-tab + .optimizer-vol-intuition-tab {
+    border-left: 1px solid var(--optimizer-border-strong);
+  }
+
+  .portfolio-optimizer .optimizer-vol-intuition-tab:hover {
+    color: var(--optimizer-text-2);
+  }
+
+  .portfolio-optimizer
+    .optimizer-vol-intuition:not(:has(input[data-vol-view]:checked))
+    .optimizer-vol-intuition-tabs
+    .optimizer-vol-intuition-tab:first-child,
+  .portfolio-optimizer .optimizer-vol-intuition-tab:has(> input:checked) {
+    background-color: var(--optimizer-surface-3);
+    color: var(--optimizer-text);
+    box-shadow: inset 0 -2px 0 var(--optimizer-accent);
+  }
+
+  .portfolio-optimizer .optimizer-vol-intuition-tab:has(> input:focus-visible) {
+    outline: 1px solid var(--optimizer-accent-border);
+    outline-offset: 2px;
+  }
+
+  .portfolio-optimizer .optimizer-vol-intuition-body {
+    display: none;
+  }
+
+  .portfolio-optimizer
+    .optimizer-vol-intuition:not(:has(input[data-vol-view]:checked))
+    .optimizer-vol-intuition-body--target,
+  .portfolio-optimizer
+    .optimizer-vol-intuition:has(input[data-vol-view="target"]:checked)
+    .optimizer-vol-intuition-body--target,
+  .portfolio-optimizer
+    .optimizer-vol-intuition:has(input[data-vol-view="current"]:checked)
+    .optimizer-vol-intuition-body--current {
+    display: block;
+  }
+
+  .portfolio-optimizer .optimizer-vol-intuition-row {
+    display: grid;
+    grid-template-columns: 84px minmax(0, 1fr) 68px;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .portfolio-optimizer .optimizer-vol-intuition-row-label {
+    font-size: 10.5px;
+    color: var(--optimizer-text-2);
+    white-space: nowrap;
+  }
+
+  .portfolio-optimizer .optimizer-vol-intuition-row-value {
+    font-size: 11px;
+    font-weight: 600;
+    text-align: right;
+    color: var(--optimizer-text);
+    white-space: nowrap;
+  }
+
+  .portfolio-optimizer .optimizer-vol-intuition-track {
+    height: 6px;
+    background-color: var(--optimizer-surface-3);
+    overflow: hidden;
+  }
+
+  .portfolio-optimizer .optimizer-vol-intuition-fill {
+    height: 100%;
+    background-color: var(--optimizer-target);
+    opacity: 0.85;
+  }
+
+  .portfolio-optimizer
+    .optimizer-vol-intuition-body--current
+    .optimizer-vol-intuition-fill {
+    background-color: var(--optimizer-info);
+  }
+
+  .portfolio-optimizer .optimizer-vol-intuition-callout {
+    border: 1px solid rgb(212 154 58 / 0.4);
+    background-color: rgb(212 154 58 / 0.1);
+    padding: 6px 8px;
+    line-height: 1.5;
+    color: var(--optimizer-warn);
+  }
+
+  /* Under-chart one-liner (very-high/extreme target σ only). The slot keeps
+     the siblings' positions stable when the insight is absent. */
+  .portfolio-optimizer .optimizer-vol-insight {
+    border: 1px solid var(--optimizer-target-border);
+    background-color: var(--optimizer-target-soft);
+    padding: 8px 12px;
+  }
+
+  .portfolio-optimizer .optimizer-vol-insight-lead {
+    color: var(--optimizer-target);
+  }
+
+  /* ── Leverage risk rail card (designer spec 2026-07-12, trimmed) ──
+     Modeled one-year equity outcomes; surfaces only for levered/extreme
+     targets (gate in the view-model). Bars share one scale with a hairline
+     tick at the starting equity. */
+  .portfolio-optimizer .optimizer-leverage-risk-chip {
+    border: 1px solid rgb(212 154 58 / 0.4);
+    padding: 2px 6px;
+    font-family: "JetBrains Mono", var(--font-mono);
+    font-size: 9px;
+    font-weight: 650;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    color: var(--optimizer-warn);
+  }
+
+  .portfolio-optimizer .optimizer-leverage-risk-median-row {
+    display: grid;
+    grid-template-columns: 52px minmax(0, 1fr) 82px;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .portfolio-optimizer .optimizer-leverage-risk-median-label {
+    font-size: 10.5px;
+    color: var(--optimizer-text-2);
+    white-space: nowrap;
+  }
+
+  .portfolio-optimizer .optimizer-leverage-risk-median-value {
+    font-size: 11px;
+    font-weight: 600;
+    text-align: right;
+    color: var(--optimizer-text);
+    white-space: nowrap;
+  }
+
+  .portfolio-optimizer .optimizer-leverage-risk-track {
+    position: relative;
+    height: 6px;
+    background-color: var(--optimizer-surface-3);
+    overflow: hidden;
+  }
+
+  .portfolio-optimizer .optimizer-leverage-risk-start-tick {
+    position: absolute;
+    top: -1px;
+    bottom: -1px;
+    width: 1px;
+    background-color: var(--optimizer-text-3);
+  }
+
+  .portfolio-optimizer .optimizer-leverage-risk-fill {
+    height: 100%;
+    opacity: 0.85;
+  }
+
+  .portfolio-optimizer .optimizer-leverage-risk-fill--current {
+    background-color: var(--optimizer-info);
+  }
+
+  .portfolio-optimizer .optimizer-leverage-risk-fill--target {
+    background-color: var(--optimizer-target);
+  }
 }

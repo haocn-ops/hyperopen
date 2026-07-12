@@ -178,3 +178,52 @@
            (node-attr long-label :data-full-label)))
     (is (contains? strings "50.0%"))
     (is (= "end" (node-attr value-node :text-anchor)))))
+
+(deftest point-rows-append-horizon-vols-behind-a-divider-test
+  ;; Current/Target callouts pass :horizons (view-model scaling, 365-day
+  ;; basis); sweep-point callouts don't and stay compact.
+  (let [rows (frontier-callout/point-rows
+              {:expected-return 18.6606
+               :volatility 4.1182}
+              {:horizons {:daily 0.2155565
+                          :weekly 0.5703081
+                          :monthly 1.1806513}})
+        value-by-label (into {} (map (juxt :label :value) rows))
+        divider-index (first (keep-indexed (fn [idx row]
+                                             (when (:divider? row) idx))
+                                           rows))]
+    (is (= 3 divider-index)
+        "The divider sits after the optimizer outputs (return/vol/Sharpe).")
+    (is (= "±21.56%" (get value-by-label "Daily 1σ")))
+    (is (= "±57.03%" (get value-by-label "Weekly 1σ")))
+    ;; Tooltip precision keeps two decimals even above 100% — uncapped.
+    (is (= "±118.07%" (get value-by-label "Monthly 1σ")))
+    (is (nil? (some :divider? (frontier-callout/point-rows
+                               {:expected-return 0.1 :volatility 0.2}))))))
+
+(deftest callout-renders-divider-rows-as-hairlines-test
+  (let [callout (frontier-callout/callout
+                 {:bounds {:width 560 :height 340}
+                  :data-role "portfolio-optimizer-frontier-callout-target"
+                  :label "Target"
+                  :variant :blended
+                  :point {:x 120 :y 70}
+                  :rows (frontier-callout/point-rows
+                         {:expected-return 0.146 :volatility 0.12 :sharpe 0.84}
+                         {:horizons {:daily 0.0062810
+                                     :weekly 0.0166182
+                                     :monthly 0.0344029}})
+                  :allocations {:rows [{:label "BTC" :weight 1 :value "100.0%"}]}})
+        strings (set (collect-strings callout))
+        aria (frontier-callout/aria-label
+              "Target"
+              (frontier-callout/point-rows
+               {:expected-return 0.146 :volatility 0.12 :sharpe 0.84}
+               {:horizons {:daily 0.0062810
+                           :weekly 0.0166182
+                           :monthly 0.0344029}}))]
+    (is (contains? strings "Daily 1σ"))
+    (is (contains? strings "±0.63%"))
+    ;; The divider must never leak into the screen-reader label.
+    (is (not (re-find #",\s*," aria)))
+    (is (re-find #"Daily 1σ ±0.63%" aria))))

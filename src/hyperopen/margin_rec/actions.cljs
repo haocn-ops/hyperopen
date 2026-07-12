@@ -27,11 +27,15 @@
                         (apply dissoc
                                (get-in state margin-rec-state/recs-path)
                                prune-keys)]])
-        candle-stamp-saves (map (fn [coin]
-                                  [:effects/save
-                                   (conj margin-rec-state/candle-requests-path coin)
-                                   now-ms])
-                                candle-coins)
+        ;; One save of the whole map: :effects/save paths must be keyword-only
+        ;; segments (::common/state-path), so the coin strings live in the
+        ;; value, never in the path.
+        candle-stamp-saves (when (seq candle-coins)
+                             [[:effects/save
+                               margin-rec-state/candle-requests-path
+                               (reduce (fn [stamps coin] (assoc stamps coin now-ms))
+                                       (get-in state margin-rec-state/candle-requests-path)
+                                       candle-coins)]])
         fills-saves (when fills-address
                       [[:effects/save
                         margin-rec-state/fills-path

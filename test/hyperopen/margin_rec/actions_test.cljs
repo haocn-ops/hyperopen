@@ -1,8 +1,20 @@
 (ns hyperopen.margin-rec.actions-test
-  (:require [cljs.test :refer-macros [deftest is testing]]
+  (:require [cljs.spec.alpha :as s]
+            [cljs.test :refer-macros [deftest is testing]]
             [hyperopen.margin-rec.actions :as actions]
             [hyperopen.margin-rec.state :as state]
+            [hyperopen.schema.contracts.common :as common]
             [hyperopen.trading-settings :as trading-settings]))
+
+(defn- assert-save-effects-valid!
+  "Every emitted :effects/save must satisfy the runtime arg contract —
+  notably keyword-only path segments (coin strings belong in values). The
+  runtime wrapper enforces this in dev; unit tests bypass it, so pin it here."
+  [effects]
+  (doseq [[effect-id & args] effects
+          :when (= :effects/save effect-id)]
+    (is (s/valid? ::common/save-args (vec args))
+        (str "invalid save args: " (pr-str args)))))
 
 (def now 1780000000000)
 
@@ -44,7 +56,12 @@
   (testing "missing candles: stamp save precedes the candle fetch"
     (let [effects (actions/margin-rec-sync (base-state) now)
           ids (mapv first effects)]
+      (assert-save-effects-valid! effects)
       (is (= [:effects/save :effects/fetch-candle-snapshot] ids))
+      (testing "request stamps keep coin strings in the value, not the path"
+        (let [[_ path value] (first effects)]
+          (is (= state/candle-requests-path path))
+          (is (= {"xyz:TSM" now} value))))
       (is (= [:effects/fetch-candle-snapshot
               :coin "xyz:TSM"
               :interval state/candle-interval
@@ -56,6 +73,7 @@
                           (fresh-candles 80))
           effects (actions/margin-rec-sync ready now)
           ids (mapv first effects)]
+      (assert-save-effects-valid! effects)
       (is (= [:effects/save :effects/margin-rec-compute] ids))
       (let [[_ path value] (first effects)]
         (is (= state/computing-path path))
@@ -109,6 +127,7 @@
   (let [state (with-intent (base-state) (pending-intent))
         effects (actions/margin-rec-process-intents state (+ now 5000))
         [save submit] effects]
+    (assert-save-effects-valid! effects)
     (is (= 2 (count effects)))
     (is (= :effects/save (first save)))
     (let [saved-intent (get (nth save 2) "xyz:TSM|xyz")]

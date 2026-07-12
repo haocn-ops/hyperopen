@@ -84,12 +84,17 @@
   loss probabilities:
 
     {:log-drift ν
+     :log-sigma σ
      :median-ending-factor e^ν
      :p5-ending-factor     e^(ν − 1.645σ)
      :p95-ending-factor    e^(ν + 1.645σ)
      :mean-ending-factor   1+μ
      :prob-terminal-loss-half   P(ending ≤ half of start)
      :prob-touch-half-drawdown  P(touching half of start during the year)}
+
+  ν and σ are the lognormal model's own parameters (annual log-growth ~
+  Normal(ν, σ)) so a view can draw the ending-wealth distribution without
+  re-deriving them from the factors.
 
   nil when μ/σ are missing or invalid (μ ≤ −100%, σ < 0, NaN, ∞)."
   [{:keys [expected-return volatility]}]
@@ -99,6 +104,7 @@
       (let [nu (- (js/Math.log (+ 1 mu)) (/ (* sigma sigma) 2))
             spread (* z-95 sigma)]
         {:log-drift nu
+         :log-sigma sigma
          :median-ending-factor (js/Math.exp nu)
          :p5-ending-factor (js/Math.exp (- nu spread))
          :p95-ending-factor (js/Math.exp (+ nu spread))

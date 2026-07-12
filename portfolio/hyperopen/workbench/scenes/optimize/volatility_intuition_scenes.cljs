@@ -1,18 +1,19 @@
 (ns hyperopen.workbench.scenes.optimize.volatility-intuition-scenes
-  "Workbench scenes for the volatility-intuition rail card, the under-chart
-  insight strip, and the leverage-risk card (designer spec 2026-07-12,
-  user-trimmed). The extreme scene mirrors the mock's levered book (411.82%
-  annualized σ) on the repo's 365-calendar-day scaling; the moderate scene
-  proves the quiet path (no severity callout, no insight strip, no leverage
-  card); the very-high scene exercises the vol-only gate, the missing-current
+  "Workbench scenes for the volatility-intuition rail card and the
+  under-chart ONE-YEAR MODELED LEVERAGE IMPACT panel (designer mockup,
+  user-trimmed 2026-07-12). The extreme scene mirrors the mock's levered book
+  (411.82% annualized σ) on the repo's 365-calendar-day scaling; the moderate
+  scene proves the quiet path (no severity callout, no leverage panel); the
+  very-high scene exercises the vol-only gate, the missing-current
   degradation (no Target/Current toggle), and the no-capital fallback where
-  the leverage card speaks in multiples of starting equity.
+  the panel — including its ending-wealth distribution markers — speaks in
+  multiples of starting equity.
 
   The Target/Current toggle is DOM-radio + :has() state, so it works in these
   static scenes exactly as in the app — click the tabs."
   (:require [portfolio.replicant :as portfolio]
-            [hyperopen.views.portfolio.optimize.leverage-risk-card
-             :as leverage-risk-card]
+            [hyperopen.views.portfolio.optimize.leverage-impact-panel
+             :as leverage-impact-panel]
             [hyperopen.views.portfolio.optimize.volatility-intuition-card
              :as volatility-intuition-card]
             [hyperopen.workbench.support.layout :as layout]))
@@ -23,9 +24,9 @@
 
 ;; The mock's levered book: gross 8.15x, extreme annualized σ. On the 365-day
 ;; basis the card must show ±21.56% / ±57.03% / ±118.1% (uncapped) with the
-;; extreme callout, the −100% boundary note, the insight strip, and a
-;; leverage-risk card whose median target outcome collapses despite the huge
-;; arithmetic mean.
+;; extreme callout and the −100% boundary note, and the leverage-impact panel
+;; must show a target median that collapses despite the huge arithmetic mean —
+;; with the distribution's median marker far left of its mean marker.
 (def ^:private extreme-levered-result
   {:status :solved
    :as-of-ms 1752300000100
@@ -40,8 +41,8 @@
    :rebalance-preview {:capital-usd 100000}})
 
 ;; A defensive book: 40% target σ against a 30% current book. No severity
-;; note, no boundary note, empty insight slot, and the leverage-risk card
-;; must NOT render (0.9x gross, σ below the 100% gate).
+;; note, no boundary note, and the leverage-impact panel must NOT render
+;; (0.9x gross, σ below the 100% gate) — the slot under the chart stays empty.
 (def ^:private moderate-result
   {:status :solved
    :as-of-ms 1752300000200
@@ -54,8 +55,9 @@
    :rebalance-preview {:capital-usd 100000}})
 
 ;; Very high σ with no current baseline and no account equity: toggle absent,
-;; vol-only gate surfaces the leverage card, and its rows speak in multiples
-;; of starting equity instead of dollars.
+;; vol-only gate surfaces the leverage-impact panel, and its rows and
+;; distribution markers speak in multiples of starting equity instead of
+;; dollars.
 (def ^:private very-high-no-current-result
   {:status :solved
    :as-of-ms 1752300000300
@@ -65,21 +67,21 @@
                  :net-exposure 1.2}})
 
 (defn- recommendation-slice
-  "Center-column strip + right-rail cards at the app's rail width."
+  "Center column (frontier placeholder + leverage-impact panel) + the rail
+  card at the app's rail width."
   [result]
   (layout/page-shell
    [:div {:class ["portfolio-optimizer" "mx-auto" "w-full"]
-          :style {:max-width "1080px"}}
+          :style {:max-width "1240px"}}
     [:div {:class ["grid" "gap-4" "p-4" "items-start"]
            :style {:grid-template-columns "minmax(0, 1fr) 340px"}}
      [:div {:class ["optimizer-results-center-panel" "space-y-4" "bg-base-100" "p-4"]}
       [:div {:class ["border" "border-base-300" "bg-base-200/30" "p-10"
                      "text-center" "text-xs" "text-trading-muted"]}
        "(efficient frontier chart)"]
-      (volatility-intuition-card/insight-strip result)]
+      (leverage-impact-panel/leverage-impact-panel result)]
      [:div {:class ["optimizer-results-right-panel" "bg-base-100/95"]}
-      (volatility-intuition-card/volatility-intuition-card result)
-      (leverage-risk-card/leverage-risk-card result)]]]))
+      (volatility-intuition-card/volatility-intuition-card result)]]]))
 
 (portfolio/defscene extreme-levered-book
   []

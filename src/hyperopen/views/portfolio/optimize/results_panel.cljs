@@ -4,7 +4,8 @@
             [hyperopen.views.portfolio.optimize.equal-risk-confidence-rail
              :as equal-risk-confidence-rail]
             [hyperopen.views.portfolio.optimize.frontier-chart :as frontier-chart]
-            [hyperopen.views.portfolio.optimize.leverage-risk-card :as leverage-risk-card]
+            [hyperopen.views.portfolio.optimize.leverage-impact-panel
+             :as leverage-impact-panel]
             [hyperopen.views.portfolio.optimize.refinement-status-card :as refinement-card]
             [hyperopen.views.portfolio.optimize.results-diagnostics-rail :as diagnostics-rail]
             [hyperopen.views.portfolio.optimize.results-summary :as summary]
@@ -94,11 +95,13 @@
               result
               frontier-overlay-mode
               constrain-frontier?))
-           ;; The strip's slot wrapper always renders, so the insight
-           ;; appearing/disappearing across reruns can never shift the
-           ;; disclosure-holding cards below it.
+           ;; The panel's slot wrapper always renders, so the gated
+           ;; leverage-impact panel appearing/disappearing across reruns can
+           ;; never shift the disclosure-holding cards below it.
            (when-not equal-risk?
-             (volatility-intuition-card/insight-strip result))
+             [:div {:replicant/key "optimizer-leverage-impact-slot"
+                    :data-role "portfolio-optimizer-leverage-impact-slot"}
+              (leverage-impact-panel/leverage-impact-panel result)])
            ;; Decision-support before solver tuning: the engine-derived "why
            ;; this target" facts sit directly under the chart; the refinement
            ;; card below is compact with its options behind a disclosure.
@@ -106,10 +109,10 @@
              (summary/target-context-card result))
            (when-not equal-risk?
              (refinement-card/refinement-status-card refinement))]]
-         ;; Rail order is review-first: the next-step row leads, then
-         ;; volatility/leverage-risk context, then frontier solve-quality
-         ;; detail, then trust diagnostics, then the collapsed views editor —
-         ;; input editing is the by-exception task on this page.
+         ;; Rail order is review-first: the next-step row leads, then the
+         ;; volatility-intuition context, then frontier solve-quality detail,
+         ;; then trust diagnostics, then the collapsed views editor — input
+         ;; editing is the by-exception task on this page.
          [:div {:class ["optimizer-results-right-panel" "min-h-0"
                         "xl:col-span-2" "2xl:col-span-1"]
                 :data-role "portfolio-optimizer-results-right-panel"}
@@ -118,16 +121,16 @@
           ;; rail speaks frontier language that does not exist for it.
           (or (equal-risk-confidence-rail/equal-risk-confidence-rail result)
               (diagnostics-rail/result-confidence-rail refinement))
-          ;; Always-present wrapper: the two cards inside are conditional
-          ;; (volatility needs a solved σ, leverage risk is gated on gross/σ),
-          ;; and without a stable slot their mounting would shift the trust
-          ;; rail and views editor below — resetting open <details> state.
+          ;; Always-present wrapper: the volatility card is conditional (it
+          ;; needs a solved σ), and without a stable slot its mounting would
+          ;; shift the trust rail and views editor below — resetting open
+          ;; <details> state. (Leverage impact moved to the center column
+          ;; under the frontier chart, 2026-07-12 user request.)
           [:div {:replicant/key "optimizer-volatility-risk-cards"
                  :data-role "portfolio-optimizer-volatility-risk-cards"}
-           (volatility-intuition-card/volatility-intuition-card result)
-           (leverage-risk-card/leverage-risk-card result)]
+           (volatility-intuition-card/volatility-intuition-card result)]
           ;; Frontier quality / selection stability / stop reason (2026-07-12
-          ;; user request): relocated below the volatility/leverage-risk cards
+          ;; user request): relocated below the volatility-intuition card
           ;; instead of leading the rail — the next-step row above is the
           ;; higher-priority lead and stays put. Equal Risk already carries its
           ;; analogous rows in equal-risk-confidence-rail's single card.

@@ -114,18 +114,3 @@
     ;; daily/monthly = 1/sqrt(30) ≈ 18.26% of the monthly bar.
     (is (str/starts-with? (fill-width daily-row) "18.2"))))
 
-(deftest insight-strip-gates-on-very-high-target-volatility-test
-  (let [quiet (card/insight-strip (fixtures/sample-solved-result))
-        loud (card/insight-strip
-              (fixtures/sample-solved-result {:volatility 4.1182}))
-        loud-section (node-by-role loud
-                                   "portfolio-optimizer-volatility-insight")]
-    ;; The slot wrapper always renders (sibling stability); the section only
-    ;; at very-high/extreme σ.
-    (is (some? quiet))
-    (is (nil? (node-by-role quiet "portfolio-optimizer-volatility-insight")))
-    (is (some? loud-section))
-    (is (some #(str/includes? % "a typical 1σ day is about ±21.56%")
-              (collect-strings loud-section)))
-    (is (some #(str/includes? % "path dependency and liquidation risk")
-              (collect-strings loud-section)))))

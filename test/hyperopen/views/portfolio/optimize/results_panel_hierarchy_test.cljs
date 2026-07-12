@@ -1,11 +1,11 @@
 (ns hyperopen.views.portfolio.optimize.results-panel-hierarchy-test
   "Review-and-act hierarchy contracts for the results grid (2026-07-02 redesign,
   rail order revised 2026-07-12): the rail reads next-step confidence →
-  volatility/leverage-risk context → frontier solve-quality detail → trust →
-  collapsed views editor, and the center column carries the engine-derived
-  'Why this target' card between the frontier chart and the demoted refinement
-  card. Split from results-panel-test to stay under the namespace-size
-  ceiling."
+  volatility-intuition context → frontier solve-quality detail → trust →
+  collapsed views editor, and the center column carries the gated
+  leverage-impact panel directly under the frontier chart followed by the
+  engine-derived 'Why this target' card and the demoted refinement card.
+  Split from results-panel-test to stay under the namespace-size ceiling."
   (:require [cljs.test :refer-macros [deftest is]]
             [hyperopen.views.portfolio.optimize.results-panel :as results-panel]
             [hyperopen.views.portfolio.optimize.test-support
@@ -73,9 +73,11 @@
         "Frontier quality/selection stability/stop reason trail the volatility card.")
     (is (< (index-of order "portfolio-optimizer-result-confidence-quality-panel")
            (index-of order "portfolio-optimizer-trust-caution-panel")))
-    ;; The leverage-risk card is gated on gross ≥ 2x / σ ≥ 100%; this result
-    ;; (0.37x gross, 42% σ) must not surface it.
-    (is (nil? (index-of order "portfolio-optimizer-leverage-risk")))
+    ;; The leverage-impact panel is gated on gross ≥ 2x / σ ≥ 100%; this
+    ;; result (0.37x gross, 42% σ) must not surface it — but its center-column
+    ;; slot always renders so the gate toggling can't shift the cards below.
+    (is (nil? (index-of order "portfolio-optimizer-leverage-impact")))
+    (is (some? (index-of order "portfolio-optimizer-leverage-impact-slot")))
     (is (< (index-of order "portfolio-optimizer-trust-caution-panel")
            (index-of order "portfolio-optimizer-results-your-views-editor")))
     (is (contains? (set (collect-strings quality-panel)) "Frontier quality")
@@ -98,13 +100,11 @@
            (click-actions
             (node-by-role editor "portfolio-optimizer-results-your-views-apply"))))))
 
-(deftest results-panel-solve-quality-trails-leverage-risk-card-test
-  ;; When the target is levered enough to surface the leverage-risk card, the
-  ;; relocated Frontier quality / Selection stability / Stop reason card must
-  ;; still land after it, not just after volatility-intuition — the wrapper
-  ;; div holding both conditional cards is a single prior sibling, so this is
-  ;; a structural guarantee, but assert it directly so a future refactor of
-  ;; that wrapper cannot silently reorder it.
+(deftest results-panel-leverage-impact-sits-under-the-frontier-chart-test
+  ;; The one-year modeled leverage impact panel (2026-07-12 user request) is a
+  ;; CENTER-column component: directly under the frontier chart, above the
+  ;; 'Why this target' card — never in the right rail (the rail keeps only the
+  ;; volatility-intuition card between confidence and solve quality).
   (let [levered-result (assoc-in solved-result [:diagnostics :gross-exposure] 2.5)
         view-node (results-panel/results-panel
                    {:result levered-result
@@ -112,12 +112,17 @@
                    {:objective {:kind :max-sharpe}}
                    {:frontier-overlay-mode :standalone
                     :refinement rail-refinement})
-        order (data-role-order view-node)]
-    (is (some? (index-of order "portfolio-optimizer-leverage-risk"))
-        "2.5x gross must clear the leverage-risk gate.")
+        order (data-role-order view-node)
+        rail (node-by-role view-node "portfolio-optimizer-results-right-panel")]
+    (is (some? (index-of order "portfolio-optimizer-leverage-impact"))
+        "2.5x gross must clear the leverage-impact gate.")
+    (is (< (index-of order "portfolio-optimizer-frontier-panel")
+           (index-of order "portfolio-optimizer-leverage-impact")))
+    (is (< (index-of order "portfolio-optimizer-leverage-impact")
+           (index-of order "portfolio-optimizer-target-context")))
+    (is (nil? (node-by-role rail "portfolio-optimizer-leverage-impact"))
+        "The panel lives in the center column, not the rail.")
     (is (< (index-of order "portfolio-optimizer-volatility-intuition")
-           (index-of order "portfolio-optimizer-leverage-risk")))
-    (is (< (index-of order "portfolio-optimizer-leverage-risk")
            (index-of order "portfolio-optimizer-result-confidence-quality-panel")))))
 
 (deftest results-panel-renders-target-context-card-between-chart-and-refinement-test

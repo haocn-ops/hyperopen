@@ -2529,23 +2529,13 @@
     color: var(--optimizer-warn);
   }
 
-  /* Under-chart one-liner (very-high/extreme target σ only). The slot keeps
-     the siblings' positions stable when the insight is absent. */
-  .portfolio-optimizer .optimizer-vol-insight {
-    border: 1px solid var(--optimizer-target-border);
-    background-color: var(--optimizer-target-soft);
-    padding: 8px 12px;
-  }
-
-  .portfolio-optimizer .optimizer-vol-insight-lead {
-    color: var(--optimizer-target);
-  }
-
-  /* ── Leverage risk rail card (designer spec 2026-07-12, trimmed) ──
-     Modeled one-year equity outcomes; surfaces only for levered/extreme
-     targets (gate in the view-model). Bars share one scale with a hairline
-     tick at the starting equity. */
-  .portfolio-optimizer .optimizer-leverage-risk-chip {
+  /* ── One-year modeled leverage impact panel (designer mockup, user-trimmed
+     2026-07-12) ── Full-width center-column card under the efficient
+     frontier: median-ending-wealth bars sharing one scale with a hairline
+     tick at the starting equity, the shortfall headline, stat tiles, and the
+     modeled ending-wealth distribution. Surfaces only for levered/extreme
+     targets (gate in the view-model). */
+  .portfolio-optimizer .optimizer-leverage-impact-chip {
     border: 1px solid rgb(212 154 58 / 0.4);
     padding: 2px 6px;
     font-family: "JetBrains Mono", var(--font-mono);
@@ -2557,35 +2547,52 @@
     color: var(--optimizer-warn);
   }
 
-  .portfolio-optimizer .optimizer-leverage-risk-median-row {
+  .portfolio-optimizer .optimizer-leverage-impact-median-row {
     display: grid;
-    grid-template-columns: 52px minmax(0, 1fr) 82px;
+    grid-template-columns: 76px minmax(0, 1fr) 96px;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
   }
 
-  .portfolio-optimizer .optimizer-leverage-risk-median-label {
+  .portfolio-optimizer .optimizer-leverage-impact-median-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
     font-size: 10.5px;
     color: var(--optimizer-text-2);
     white-space: nowrap;
   }
 
-  .portfolio-optimizer .optimizer-leverage-risk-median-value {
-    font-size: 11px;
+  .portfolio-optimizer .optimizer-leverage-impact-legend {
+    width: 7px;
+    height: 7px;
+    flex: 0 0 auto;
+  }
+
+  .portfolio-optimizer .optimizer-leverage-impact-legend--current {
+    background-color: var(--optimizer-info);
+  }
+
+  .portfolio-optimizer .optimizer-leverage-impact-legend--target {
+    background-color: var(--optimizer-target);
+  }
+
+  .portfolio-optimizer .optimizer-leverage-impact-median-value {
+    font-size: 12px;
     font-weight: 600;
     text-align: right;
     color: var(--optimizer-text);
     white-space: nowrap;
   }
 
-  .portfolio-optimizer .optimizer-leverage-risk-track {
+  .portfolio-optimizer .optimizer-leverage-impact-track {
     position: relative;
-    height: 6px;
+    height: 7px;
     background-color: var(--optimizer-surface-3);
     overflow: hidden;
   }
 
-  .portfolio-optimizer .optimizer-leverage-risk-start-tick {
+  .portfolio-optimizer .optimizer-leverage-impact-start-tick {
     position: absolute;
     top: -1px;
     bottom: -1px;
@@ -2593,16 +2600,16 @@
     background-color: var(--optimizer-text-3);
   }
 
-  .portfolio-optimizer .optimizer-leverage-risk-fill {
+  .portfolio-optimizer .optimizer-leverage-impact-fill {
     height: 100%;
     opacity: 0.85;
   }
 
-  .portfolio-optimizer .optimizer-leverage-risk-fill--current {
+  .portfolio-optimizer .optimizer-leverage-impact-fill--current {
     background-color: var(--optimizer-info);
   }
 
-  .portfolio-optimizer .optimizer-leverage-risk-fill--target {
+  .portfolio-optimizer .optimizer-leverage-impact-fill--target {
     background-color: var(--optimizer-target);
   }
 }

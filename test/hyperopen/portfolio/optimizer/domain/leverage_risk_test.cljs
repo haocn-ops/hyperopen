@@ -23,11 +23,13 @@
 
 (deftest moderate-book-outcomes-test
   ;; μ = 10%, σ = 40%: ν = ln(1.1) − 0.08 = 0.0153102.
-  (let [{:keys [log-drift median-ending-factor p5-ending-factor
+  (let [{:keys [log-drift log-sigma median-ending-factor p5-ending-factor
                 p95-ending-factor mean-ending-factor
                 prob-terminal-loss-half prob-touch-half-drawdown]}
         (leverage-risk/outcome-model {:expected-return 0.10 :volatility 0.40})]
     (is (near? 0.0153102 log-drift 1e-6))
+    (is (near? 0.40 log-sigma 1e-12)
+        "The model exposes its own σ so views can draw the distribution.")
     (is (near? 1.0154280 median-ending-factor 1e-5))
     (is (near? 0.5259088 p5-ending-factor 1e-5))
     (is (near? 1.9606021 p95-ending-factor 1e-5))

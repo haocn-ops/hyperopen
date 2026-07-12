@@ -608,7 +608,7 @@
             [hyperopen.views.portfolio.optimize.frontier-chart-toolbar-test]
             [hyperopen.views.portfolio.optimize.frontier-overlay-markers-test]
             [hyperopen.views.portfolio.optimize.inputs-tab-test]
-            [hyperopen.views.portfolio.optimize.leverage-risk-card-test]
+            [hyperopen.views.portfolio.optimize.leverage-impact-panel-test]
             [hyperopen.views.portfolio.optimize.optimization-progress-panel-test]
             [hyperopen.views.portfolio.optimize.refinement-status-card-test]
             [hyperopen.views.portfolio.optimize.result-vault-labels-test]
@@ -1428,7 +1428,7 @@
              'hyperopen.views.portfolio.optimize.frontier-chart-toolbar-test
              'hyperopen.views.portfolio.optimize.frontier-overlay-markers-test
              'hyperopen.views.portfolio.optimize.inputs-tab-test
-             'hyperopen.views.portfolio.optimize.leverage-risk-card-test
+             'hyperopen.views.portfolio.optimize.leverage-impact-panel-test
              'hyperopen.views.portfolio.optimize.optimization-progress-panel-test
              'hyperopen.views.portfolio.optimize.refinement-status-card-test
              'hyperopen.views.portfolio.optimize.result-vault-labels-test

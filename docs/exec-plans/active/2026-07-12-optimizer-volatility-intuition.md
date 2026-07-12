@@ -303,6 +303,27 @@ engine paths, and the full existing optimizer test surface stays green.
   in the request). Full suite 5548/5548 green; `npm run gates` 34/34 PASS;
   browser-verified on the workbench build (screenshot showed the
   duplicate-header rough edge, which prompted the "Solve quality" rename).
+- [x] (2026-07-12) Follow-up (direct user request, revisiting the mockup's
+  ONE-YEAR MODELED LEVERAGE IMPACT component): the leverage-risk content was
+  promoted from a right-rail card to its own full-width center-column panel
+  (`leverage_impact_panel.cljs`) directly under the efficient frontier,
+  replacing the one-line volatility insight strip (deleted along with
+  `insight-model`; the rail card `leverage_risk_card.cljs` deleted too — the
+  rail keeps only the volatility-intuition card). The panel follows the
+  mockup: median-ending-wealth bars with legend, a big signed "Median wealth
+  shortfall vs current" headline, a mean / 5th-percentile / loss-odds tile
+  row (funding + execution cost tiles deliberately omitted per the user), and
+  the NEW piece — the modeled target ending-wealth distribution: the
+  lognormal density drawn on a log dollar axis with 5th-pct / median / mean
+  markers (`domain.leverage-risk/outcome-model` now exposes `:log-sigma` so
+  the view can draw its own model). Marker labels use compact dollars
+  ($408 / $2M) with a push-apart pass so median/mean labels never collide at
+  moderate σ; the axis is explicitly disclosed as log-scaled (linear dollars
+  would crush the skew the panel exists to show) and carries no invented
+  ticks. Distribution is skipped for the degenerate σ=0 case. Suite
+  5549/5549 green, workbench Playwright spec 6/6 (now including distribution
+  marker ordering: mean strictly right of median by the σ²/2 drag),
+  browser-verified in dollar and multiples modes.
 - [ ] Post-merge follow-up (optional, deferred): empirical short-horizon
   intuition (historical percentile one-day/one-week moves) fed from the
   history store, labeled "Historical" vs the model-scaled values per the

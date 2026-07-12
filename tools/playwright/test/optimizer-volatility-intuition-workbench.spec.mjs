@@ -1,13 +1,15 @@
-// Volatility intuition + leverage risk (designer spec 2026-07-12, trimmed per
-// the direct user request). The workbench scenes render the REAL rail cards
-// and insight strip over explicit result fixtures, so this covers the
-// browser-only behavior deterministically without solving an optimization:
-// the 365-calendar-day sqrt-time scaling of the displayed values, the
-// DOM-radio Target/Current toggle, severity + (-100%)-boundary messaging with
-// the monthly value uncapped, the insight strip's very-high gate, the
-// leverage-risk card's gross/volatility gates, its modeled dollar rows with
-// the vs-current shortfall, and the multiples fallback when account equity is
-// unknown.
+// Volatility intuition + one-year modeled leverage impact (designer spec
+// 2026-07-12, trimmed per the direct user request; leverage impact promoted
+// to a center-column panel with the mockup's ending-wealth distribution on
+// 2026-07-12 follow-up). The workbench scenes render the REAL rail card and
+// panel over explicit result fixtures, so this covers the browser-only
+// behavior deterministically without solving an optimization: the
+// 365-calendar-day sqrt-time scaling of the displayed values, the DOM-radio
+// Target/Current toggle, severity + (-100%)-boundary messaging with the
+// monthly value uncapped, the leverage panel's gross/volatility gates, its
+// modeled dollar rows with the vs-current shortfall headline, the lognormal
+// ending-wealth distribution markers, and the multiples fallback when
+// account equity is unknown.
 import { expect, test } from "@playwright/test";
 
 const SCENE_BASE =
@@ -75,10 +77,6 @@ test.describe("volatility intuition (workbench scenes)", () => {
     await expect(
       frame.locator(role("portfolio-optimizer-volatility-intuition"))
     ).toContainText("not a forecast or maximum loss");
-    // The under-chart insight strip fires at very-high/extreme σ.
-    await expect(
-      frame.locator(role("portfolio-optimizer-volatility-insight"))
-    ).toContainText("a typical 1σ day is about ±21.56%");
   });
 
   test("the Target/Current toggle is pure DOM state", async ({ page }) => {
@@ -117,40 +115,85 @@ test.describe("volatility intuition (workbench scenes)", () => {
     await expect(currentPanel).toBeHidden();
   });
 
-  test("the leverage-risk card models dollar outcomes honestly for the levered book", async ({
+  test("the leverage-impact panel models dollar outcomes honestly for the levered book", async ({
     page
   }) => {
     const frame = await openScene(page, "extreme-levered-book");
-    const card = frame.locator(role("portfolio-optimizer-leverage-risk"));
+    const panel = frame.locator(role("portfolio-optimizer-leverage-impact"));
 
-    await expect(card).toBeVisible();
-    await expect(card).toContainText("1y · modeled");
-    // Median ending equity: the volatility drag makes the target median
+    await expect(panel).toBeVisible();
+    await expect(panel).toContainText("One-year modeled leverage impact");
+    await expect(panel).toContainText("Modeled");
+    await expect(panel).toContainText(
+      "Modeled dollar outcomes on account equity $100,000"
+    );
+    // Median ending wealth: the volatility drag makes the target median
     // collapse even though its arithmetic mean is +1866%.
     await expect(
-      card.locator(role("portfolio-optimizer-leverage-risk-median-current"))
+      panel.locator(role("portfolio-optimizer-leverage-impact-median-current"))
     ).toContainText("$18,356");
     await expect(
-      card.locator(role("portfolio-optimizer-leverage-risk-median-target"))
+      panel.locator(role("portfolio-optimizer-leverage-impact-median-target"))
     ).toContainText("$408");
+    const shortfall = panel.locator(
+      role("portfolio-optimizer-leverage-impact-median-shortfall")
+    );
+    await expect(shortfall).toContainText("Median wealth shortfall vs current");
+    await expect(shortfall).toContainText("−$17,948");
+    // Tiles: mean is pulled up by rare extreme paths; both loss odds render.
     await expect(
-      card.locator(role("portfolio-optimizer-leverage-risk-median-shortfall"))
-    ).toHaveText("Median vs current: −$17,948");
-    await expect(card).toContainText("On account equity $100,000");
+      panel.locator(role("portfolio-optimizer-leverage-impact-mean"))
+    ).toContainText("$1,966,060");
     await expect(
-      card.locator(role("portfolio-optimizer-leverage-risk-terminal"))
+      panel.locator(role("portfolio-optimizer-leverage-impact-terminal"))
     ).toContainText("87.8%");
     // Never a liquidation probability — the drawdown odds are a floor.
-    await expect(
-      card.locator(role("portfolio-optimizer-leverage-risk-touch"))
-    ).toContainText("98.2%");
-    await expect(
-      card.locator(role("portfolio-optimizer-leverage-risk-touch"))
-    ).toContainText("floor on ruin risk");
-    await expect(card).toContainText("Modeled, not a guarantee");
+    const touch = panel.locator(
+      role("portfolio-optimizer-leverage-impact-touch")
+    );
+    await expect(touch).toContainText("98.2%");
+    await expect(touch).toContainText("floor on ruin risk");
+    await expect(panel).toContainText("Modeled, not a guarantee");
   });
 
-  test("a moderate book stays quiet: designer's 40% vector, no warnings, no leverage card", async ({
+  test("the ending-wealth distribution draws the lognormal with 5th/median/mean markers", async ({
+    page
+  }) => {
+    const frame = await openScene(page, "extreme-levered-book");
+    const dist = frame.locator(
+      role("portfolio-optimizer-leverage-impact-distribution")
+    );
+
+    await expect(dist).toBeVisible();
+    await expect(dist).toContainText("Target ending wealth distribution");
+    await expect(
+      dist.locator(role("portfolio-optimizer-leverage-impact-dist-curve"))
+    ).toBeVisible();
+    // Compact marker labels: near-total median loss, mean in the millions.
+    await expect(
+      dist.locator(role("portfolio-optimizer-leverage-impact-dist-p5"))
+    ).toContainText("$0");
+    await expect(
+      dist.locator(role("portfolio-optimizer-leverage-impact-dist-median"))
+    ).toContainText("$408");
+    await expect(
+      dist.locator(role("portfolio-optimizer-leverage-impact-dist-mean"))
+    ).toContainText("$2M");
+    await expect(dist).toContainText("Lower");
+    await expect(dist).toContainText("Higher");
+    // The mean marker sits right of the median marker by the σ²/2 drag.
+    const medianDot = dist
+      .locator(`${role("portfolio-optimizer-leverage-impact-dist-median")} circle`)
+      .first();
+    const meanDot = dist
+      .locator(`${role("portfolio-optimizer-leverage-impact-dist-mean")} circle`)
+      .first();
+    const medianX = Number(await medianDot.getAttribute("cx"));
+    const meanX = Number(await meanDot.getAttribute("cx"));
+    expect(meanX).toBeGreaterThan(medianX);
+  });
+
+  test("a moderate book stays quiet: designer's 40% vector, no warnings, no leverage panel", async ({
     page
   }) => {
     const frame = await openScene(page, "moderate-book");
@@ -173,14 +216,11 @@ test.describe("volatility intuition (workbench scenes)", () => {
       )
     ).toHaveCount(0);
     await expect(
-      frame.locator(role("portfolio-optimizer-volatility-insight"))
-    ).toHaveCount(0);
-    await expect(
-      frame.locator(role("portfolio-optimizer-leverage-risk"))
+      frame.locator(role("portfolio-optimizer-leverage-impact"))
     ).toHaveCount(0);
   });
 
-  test("without a current book or account equity the card degrades honestly", async ({
+  test("without a current book or account equity the panel degrades honestly", async ({
     page
   }) => {
     const frame = await openScene(page, "very-high-vol-no-current");
@@ -194,16 +234,20 @@ test.describe("volatility intuition (workbench scenes)", () => {
         role("portfolio-optimizer-volatility-intuition-panel-current")
       )
     ).toHaveCount(0);
-    // σ ≥ 100% surfaces the leverage card even at 1.2x gross, speaking in
-    // multiples of starting equity because no capital is known.
-    const card = frame.locator(role("portfolio-optimizer-leverage-risk"));
-    await expect(card).toBeVisible();
+    // σ ≥ 100% surfaces the panel even at 1.2x gross, speaking in multiples
+    // of starting equity because no capital is known — the distribution
+    // markers included.
+    const panel = frame.locator(role("portfolio-optimizer-leverage-impact"));
+    await expect(panel).toBeVisible();
+    await expect(panel).toContainText("multiples of starting equity");
     await expect(
-      card.locator(role("portfolio-optimizer-leverage-risk-median-target"))
+      panel.locator(role("portfolio-optimizer-leverage-impact-median-target"))
     ).toContainText("0.58x start");
     await expect(
-      card.locator(role("portfolio-optimizer-leverage-risk-median-shortfall"))
+      panel.locator(role("portfolio-optimizer-leverage-impact-median-shortfall"))
     ).toHaveCount(0);
-    await expect(card).toContainText("multiple of starting equity");
+    await expect(
+      panel.locator(role("portfolio-optimizer-leverage-impact-dist-median"))
+    ).toContainText("0.58x");
   });
 });

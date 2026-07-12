@@ -31,19 +31,6 @@
   (is (nil? (vm/card-model (fixtures/sample-solved-result {:volatility js/NaN}))))
   (is (nil? (vm/card-model {}))))
 
-(deftest insight-model-gates-on-very-high-volatility-test
-  (is (nil? (vm/insight-model (fixtures/sample-solved-result)))
-      "28% σ is ordinary — no strip.")
-  (is (nil? (vm/insight-model (fixtures/sample-solved-result {:volatility 0.99}))))
-  (let [at-threshold (vm/insight-model
-                      (fixtures/sample-solved-result {:volatility 1.0}))
-        extreme (vm/insight-model
-                 (fixtures/sample-solved-result {:volatility 4.1182}))]
-    (is (some? at-threshold))
-    (is (= :very-high (:severity at-threshold)))
-    (is (= :extreme (:severity extreme)))
-    (is (near? 0.2155565 (:daily extreme) 1e-5))))
-
 (deftest leverage-risk-model-gates-on-gross-or-volatility-test
   ;; Base fixture is 0.9x gross at 28% σ — no card.
   (is (nil? (vm/leverage-risk-model (fixtures/sample-solved-result))))

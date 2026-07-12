@@ -52,17 +52,6 @@
              :target-radio-id (view-radio-id result "target")
              :current-radio-id (view-radio-id result "current")))))
 
-(defn insight-model
-  "Under-chart one-liner, only when target volatility is very high (≥100%
-  annualized) — at ordinary levels the strip would restate the card."
-  [result]
-  (let [{:keys [status target]} (intuition/intuition-model
-                                 {:target-volatility (:volatility result)
-                                  :periods-per-year risk/default-periods-per-year})]
-    (when (and (= :ok status)
-               (intuition/severity-at-least? (:severity target) :very-high))
-      target)))
-
 (def leverage-gate-gross-exposure
   "Gross exposure (x) at or above which the target counts as 'using higher
   leverage' and the leverage-risk card surfaces."

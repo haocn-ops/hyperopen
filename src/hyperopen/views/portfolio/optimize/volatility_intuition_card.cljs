@@ -1,8 +1,10 @@
 (ns hyperopen.views.portfolio.optimize.volatility-intuition-card
-  "The VOLATILITY INTUITION rail card and the under-chart insight strip:
-  translate the run's annualized volatility into daily / weekly / monthly
-  one-standard-deviation (1σ) move scales a person can feel. Explanatory
-  only — reads the solved result, never feeds the solver.
+  "The VOLATILITY INTUITION rail card: translate the run's annualized
+  volatility into daily / weekly / monthly one-standard-deviation (1σ) move
+  scales a person can feel. Explanatory only — reads the solved result, never
+  feeds the solver. (The under-chart slot this namespace once fed with a
+  one-line insight strip now carries the leverage-impact panel instead —
+  2026-07-12 user request.)
 
   The Target/Current toggle is a pair of visually hidden radios toggled by
   scoped :has() CSS in src/styles/surfaces/optimizer/results.css (the Equal
@@ -145,21 +147,3 @@
            :data-role "portfolio-optimizer-volatility-intuition-basis"}
        (str "Scaled from annualized volatility using √time · "
             (:periods-per-year basis) " " (:period-label basis) "/year.")]]]))
-
-(defn insight-strip
-  "One-line read under the frontier chart, only at very-high/extreme target
-  volatility. The wrapper div always renders so conditional appearance can
-  never shift the keyed siblings below the chart (open <details> state)."
-  [result]
-  [:div {:class ["optimizer-vol-insight-slot"]
-         :replicant/key "optimizer-vol-insight-slot"}
-   (when-let [{:keys [annualized daily]} (vm/insight-model result)]
-     [:section {:class ["optimizer-vol-insight"]
-                :data-role "portfolio-optimizer-volatility-insight"}
-      [:p {:class ["text-[0.72rem]" "leading-[1.5]" "text-trading-muted"]}
-       [:span {:class ["font-semibold" "optimizer-vol-insight-lead"]}
-        "Volatility intuition: "]
-       (str "at " (horizon-pct annualized)
-            " annualized volatility, a typical 1σ day is about "
-            (plus-minus daily)
-            ". At this level, path dependency and liquidation risk can matter more than the average expected return.")]])])

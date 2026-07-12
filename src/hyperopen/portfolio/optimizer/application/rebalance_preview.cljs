@@ -186,6 +186,28 @@
                            (:exposures portfolio))))
       (get-in portfolio [:capital :nav-usdc]))))
 
+(defn- blocklisted-id?
+  "True when the row's instrument is on the draft blocklist (matched across every id
+   candidate, since the blocklist may store a different alias than the row id)."
+  [blocklist instruments-by-id instrument-id]
+  (boolean (and (seq blocklist)
+                (or (contains? blocklist instrument-id)
+                    (some blocklist
+                          (ids/instrument-id-candidates
+                           (get instruments-by-id instrument-id)))))))
+
+(defn- target-weight-for
+  "Target weight the preview trades toward, or nil when the optimizer expressed no
+   opinion. Only an explicit result target — or an explicit user blocklisting, which
+   means \"exit this position\" — may stage a trade; a held instrument the allocator
+   excluded (out-of-universe spot, dropped for missing history, ...) must NOT default
+   to a 0% target, which would stage it as a sell-to-zero."
+  [target-by-id blocklist instruments-by-id instrument-id]
+  (if (contains? target-by-id instrument-id)
+    (get target-by-id instrument-id)
+    (when (blocklisted-id? blocklist instruments-by-id instrument-id)
+      0)))
+
 (defn- leverage-by-id
   [request]
   (or (get-in request [:constraints :perp-leverage])
@@ -198,7 +220,10 @@
         instrument-ids (preview-instrument-ids request
                                                result
                                                target-by-id
-                                               current-by-id)]
+                                               current-by-id)
+        instruments (instruments-by-id request)
+        blocklist (set (keep non-blank-text
+                             (get-in request [:constraints :blocklist])))]
     (when (seq instrument-ids)
       (rebalance/build-rebalance-preview
        {:capital-usd (capital-usd request)
@@ -218,8 +243,12 @@
                                         :fallback-slippage-bps])
         :instrument-ids instrument-ids
         :current-weights (mapv #(get current-by-id % 0) instrument-ids)
-        :target-weights (mapv #(get target-by-id % 0) instrument-ids)
-        :instruments-by-id (instruments-by-id request)
+        :target-weights (mapv #(target-weight-for target-by-id
+                                                  blocklist
+                                                  instruments
+                                                  %)
+                              instrument-ids)
+        :instruments-by-id instruments
         :prices-by-id (prices-by-id request instrument-ids)
         :cost-contexts-by-id (get-in request
                                      [:execution-assumptions

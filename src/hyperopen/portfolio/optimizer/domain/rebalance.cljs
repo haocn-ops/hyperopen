@@ -488,36 +488,57 @@
     :else
     {:status :ready}))
 
+(defn- excluded-row
+  ;; The optimizer expressed NO target for this held instrument (out of the optimized
+  ;; universe, dropped by the allocator, or spot excluded from the run). A missing
+  ;; target is not a 0% target: the row is held as-is, never staged as a sell-to-zero.
+  [opts instrument-id current-weight]
+  (let [instrument (get-in opts [:instruments-by-id instrument-id])]
+    {:instrument-id instrument-id
+     :instrument-type (:instrument-type instrument)
+     :coin (:coin instrument)
+     :current-weight (or current-weight 0)
+     :target-weight nil
+     :delta-weight 0
+     :delta-notional-usd 0
+     :side :none
+     :price (get-in opts [:prices-by-id instrument-id])
+     :quantity nil
+     :status :excluded
+     :reason :excluded-from-optimization}))
+
 (defn- rebalance-row
   [opts instrument-id current-weight target-weight]
-  (let [instrument (get-in opts [:instruments-by-id instrument-id])
-        price (get-in opts [:prices-by-id instrument-id])
-        capital-usd (or (:capital-usd opts) 0)
-        delta-weight (- target-weight current-weight)
-        delta-notional-usd (* capital-usd delta-weight)
-        quantity (executable-quantity instrument price delta-notional-usd)
-        status (row-status opts instrument price capital-usd delta-weight delta-notional-usd quantity)
-        side (side-for (if (finite-nonzero? delta-notional-usd)
-                         delta-notional-usd
-                         delta-weight))]
-    (merge {:instrument-id instrument-id
-            :instrument-type (:instrument-type instrument)
-            :coin (:coin instrument)
-            :current-weight current-weight
-            :target-weight target-weight
-            :delta-weight delta-weight
-            :delta-notional-usd delta-notional-usd
-            :side side
-            :price price
-            :quantity quantity}
-           status
-           (when (= :ready (:status status))
-             {:cost (cost-estimate opts
-                                   instrument-id
-                                   side
-                                   price
-                                   delta-notional-usd
-                                   quantity)}))))
+  (if (nil? target-weight)
+    (excluded-row opts instrument-id current-weight)
+    (let [instrument (get-in opts [:instruments-by-id instrument-id])
+          price (get-in opts [:prices-by-id instrument-id])
+          capital-usd (or (:capital-usd opts) 0)
+          delta-weight (- target-weight current-weight)
+          delta-notional-usd (* capital-usd delta-weight)
+          quantity (executable-quantity instrument price delta-notional-usd)
+          status (row-status opts instrument price capital-usd delta-weight delta-notional-usd quantity)
+          side (side-for (if (finite-nonzero? delta-notional-usd)
+                           delta-notional-usd
+                           delta-weight))]
+      (merge {:instrument-id instrument-id
+              :instrument-type (:instrument-type instrument)
+              :coin (:coin instrument)
+              :current-weight current-weight
+              :target-weight target-weight
+              :delta-weight delta-weight
+              :delta-notional-usd delta-notional-usd
+              :side side
+              :price price
+              :quantity quantity}
+             status
+             (when (= :ready (:status status))
+               {:cost (cost-estimate opts
+                                     instrument-id
+                                     side
+                                     price
+                                     delta-notional-usd
+                                     quantity)})))))
 
 (defn- preview-status
   [rows]
@@ -633,6 +654,7 @@
      :summary {:ready-count (count (filter #(= :ready (:status %)) rows))
                :blocked-count (count (filter #(= :blocked (:status %)) rows))
                :within-tolerance-count (count (filter #(= :within-tolerance (:status %)) rows))
+               :excluded-count (count (filter #(= :excluded (:status %)) rows))
                :gross-trade-notional-usd (reduce + 0 (map #(abs-num (:delta-notional-usd %)) ready-rows))
                :estimated-fees-usd (reduce + 0 (map #(or (get-in % [:cost :estimated-fee-usd]) 0) ready-rows))
                :estimated-slippage-usd (reduce + 0 (map #(or (get-in % [:cost :estimated-slippage-usd]) 0) ready-rows))

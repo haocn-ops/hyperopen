@@ -119,6 +119,7 @@
          " — no trade needed")
     :already-filled "already filled on a previous attempt"
     :already-resting "already resting on the book"
+    :excluded-from-optimization "excluded from the optimization — held, not sold"
     (some-> reason opt-format/keyword-label)))
 
 (defn- truncate-text
@@ -596,10 +597,17 @@
                 [:span {:class ["optimizer-table-kind-badge" "ml-1.5"]
                         :data-kind (name (:instrument-type row))}
                  (name (:instrument-type row))])]
-             [:td (shared/chip (name (or (:side row) :flat)) (side-tone (:side row)))]
+             [:td (let [side (:side row)]
+                    ;; :none = an excluded/held row — there is no trade direction, so
+                    ;; "hold" reads truthfully where "none" would read as broken data.
+                    (if (contains? #{:buy :sell} side)
+                      (shared/chip (name side) (side-tone side))
+                      (shared/chip "hold" :muted)))]
              [:td {:class ["num" "right" "text-trading-muted"]}
-              (str (if (= :buy (:side row)) "+" "−")
-                   (opt-format/format-usdc (shared/abs-num (:delta-notional-usd row))))]
+              (if (contains? #{:buy :sell} (:side row))
+                (str (if (= :buy (:side row)) "+" "−")
+                     (opt-format/format-usdc (shared/abs-num (:delta-notional-usd row))))
+                "—")]
              [:td {:class ["text-[0.75rem]"]} (state-cell :skipped row)]]]))]])))
 
 (defn order-table

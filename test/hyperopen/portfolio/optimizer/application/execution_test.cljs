@@ -571,3 +571,27 @@
     (is (not (contains? ids "perp:ETH")) "the resting (unfilled) leg is NOT reversed")
     (is (= 1 (count (:rows revert))))))
 
+
+(deftest build-execution-plan-skips-allocator-excluded-rows-test
+  ;; A preview row the allocator excluded (held, no target) must land in the skipped
+  ;; (will-not-move) section with its reason — never as a blocked or ready order.
+  (let [plan (execution/build-execution-plan
+              {:scenario-id "scn_1"
+               :rebalance-preview
+               {:status :ready
+                :summary {}
+                :rows [{:instrument-id "spot:@107"
+                        :instrument-type :spot
+                        :coin "HYPE"
+                        :status :excluded
+                        :reason :excluded-from-optimization
+                        :side :none
+                        :delta-notional-usd 0}]}
+               :execution-assumptions {:default-order-type :market}})
+        row (get-in plan [:rows 0])]
+    (is (= :skipped (:status row)))
+    (is (= :excluded-from-optimization (:reason row)))
+    (is (nil? (:intent row)))
+    (is (= 1 (get-in plan [:summary :skipped-count])))
+    (is (= 0 (get-in plan [:summary :ready-count])))
+    (is (= 0 (get-in plan [:summary :blocked-count])))))

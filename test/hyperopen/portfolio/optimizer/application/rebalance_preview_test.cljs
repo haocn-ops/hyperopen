@@ -57,3 +57,49 @@
     (is (= 4.5 (get-in (first rows) [:cost :fee-bps])))
     (is (pos? (get-in (first rows) [:cost :estimated-fee-usd])))
     (is (pos? (get-in preview [:summary :estimated-fees-usd])))))
+
+(deftest preview-holds-portfolio-assets-the-allocator-excluded-test
+  ;; A held spot asset absent from the result's targets (allocator excluded it from
+  ;; the optimization) must surface as a held :excluded row, never a sell-to-zero.
+  (let [request (-> (sample-request)
+                    (assoc-in [:current-portfolio :by-instrument "spot:@107"]
+                              {:instrument-id "spot:@107"
+                               :market-type :spot
+                               :coin "HYPE"
+                               :weight 0.01
+                               :mark-price 40
+                               :close 40}))
+        result (rebalance-preview/result-with-rebalance-preview request
+                                                                (sample-result))
+        rows (get-in result [:rebalance-preview :rows])
+        spot-row (first (filter #(= "spot:@107" (:instrument-id %)) rows))]
+    (is (some? spot-row))
+    (is (= :excluded (:status spot-row)))
+    (is (= :excluded-from-optimization (:reason spot-row)))
+    (is (= :none (:side spot-row)))
+    (is (zero? (:delta-notional-usd spot-row)))
+    ;; The optimized asset still trades normally.
+    (is (= 1 (get-in result [:rebalance-preview :summary :ready-count])))))
+
+(deftest preview-still-exits-blocklisted-holdings-test
+  ;; Blocklisting is an explicit user "exit this position" — those holdings keep the
+  ;; sell-to-zero behavior even though the result carries no target for them.
+  (let [request (-> (sample-request)
+                    (assoc-in [:current-portfolio :by-instrument "perp:ETH"]
+                              {:instrument-id "perp:ETH"
+                               :market-type :perp
+                               :weight 0.2
+                               :mark-price 100
+                               :close 100})
+                    (update :universe conj {:instrument-id "perp:ETH"
+                                            :instrument-type :perp
+                                            :coin "ETH"})
+                    (assoc-in [:constraints :blocklist] ["perp:ETH"]))
+        result (rebalance-preview/result-with-rebalance-preview request
+                                                                (sample-result))
+        rows (get-in result [:rebalance-preview :rows])
+        eth-row (first (filter #(= "perp:ETH" (:instrument-id %)) rows))]
+    (is (some? eth-row))
+    (is (= :ready (:status eth-row)))
+    (is (= :sell (:side eth-row)))
+    (is (= 0 (:target-weight eth-row)))))

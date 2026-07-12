@@ -663,3 +663,35 @@
   (is (near? 100 (rebalance/realized-slippage-bps :sell 100 99)))
   (is (near? 0 (rebalance/realized-slippage-bps :buy 100 99)))
   (is (nil? (rebalance/realized-slippage-bps :buy 100 nil))))
+
+;; ── excluded (no optimizer target) rows ────────────────────────────────────
+
+(deftest build-rebalance-preview-holds-rows-with-no-target-weight-test
+  ;; A nil target means the optimizer expressed NO opinion (out-of-universe holding,
+  ;; asset dropped by the allocator). The row must be held — never staged as a
+  ;; sell-to-zero — and must not count as ready or blocked.
+  (let [preview (rebalance/build-rebalance-preview
+                 {:capital-usd 10000
+                  :rebalance-tolerance 0.005
+                  :instrument-ids ["perp:BTC" "spot:@107"]
+                  :current-weights [0.2 0.01]
+                  :target-weights [0.35 nil]
+                  :instruments-by-id {"perp:BTC" {:instrument-type :perp
+                                                  :coin "BTC"}
+                                      "spot:@107" {:instrument-type :spot
+                                                   :coin "HYPE"}}
+                  :prices-by-id {"perp:BTC" 30000
+                                 "spot:@107" 40}})
+        [perp-row spot-row] (:rows preview)]
+    (is (= :ready (:status perp-row)))
+    (is (= :excluded (:status spot-row)))
+    (is (= :excluded-from-optimization (:reason spot-row)))
+    (is (= :none (:side spot-row)))
+    (is (nil? (:target-weight spot-row)))
+    (is (zero? (:delta-notional-usd spot-row)))
+    (is (= :ready (:status preview)))
+    (is (= 1 (get-in preview [:summary :ready-count])))
+    (is (= 0 (get-in preview [:summary :blocked-count])))
+    (is (= 1 (get-in preview [:summary :excluded-count])))
+    ;; The held row contributes nothing to the trade notional.
+    (is (near? 1500 (get-in preview [:summary :gross-trade-notional-usd])))))

@@ -86,7 +86,10 @@
    ;; A Resume skips orders already filled or already resting (open) on the book so it can
    ;; never duplicate a live order.
    :already-filled "Already filled"
-   :already-resting "Already resting"})
+   :already-resting "Already resting"
+   ;; A held instrument the allocator expressed no target for (out-of-universe spot,
+   ;; dropped for missing history) — it is held as-is, never staged as a sell-to-zero.
+   :excluded-from-optimization "Excluded from optimization — held"})
 
 (defn keyword-label
   ([value]

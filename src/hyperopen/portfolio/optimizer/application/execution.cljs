@@ -83,6 +83,14 @@
                      :reason :within-tolerance)
         (some? (:tolerance row)) (assoc :tolerance (:tolerance row)))
 
+      (= :excluded (:status row))
+      ;; Allocator expressed no target for this held instrument — it is held, not
+      ;; traded, so it belongs with the skipped (will-not-move) rows, never in the
+      ;; order list as a sell.
+      (assoc base-row
+             :status :skipped
+             :reason (or (:reason row) :excluded-from-optimization))
+
       (= :blocked (:status row))
       (assoc base-row
              :status :blocked

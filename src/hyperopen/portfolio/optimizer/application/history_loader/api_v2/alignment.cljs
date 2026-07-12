@@ -335,17 +335,15 @@
                                                         instrument-id))
                                         (not= :rejected (:lineage-kind series))))
                                  rows)
-        ;; The response's calendars are the BACKEND's intersection over every
-        ;; instrument in the fetch — which can be a superset of this alignment's
-        ;; universe (history-assumption assets ride the same fetch but are
-        ;; excluded from alignment precisely so they cannot truncate the shared
-        ;; window). When the response covers extra instruments AND the members'
-        ;; own series support a longer shared window than the backend calendar,
-        ;; the backend calendar is poisoned by the excluded instruments: fall
-        ;; back to the client-side point-level intersection.
+        ;; Reject superset calendars that omit an actual member-valid timestamp.
         candidate-series-by-id (into {}
                                      (map (juxt :instrument-id :series))
                                      base-candidates)
+        candidate-calendars (delay
+                              (let [common (calendar/common-calendar
+                                            (map :points (vals candidate-series-by-id)))]
+                                [common (point-level-return-calendar
+                                         candidate-series-by-id common)]))
         response-superset? (let [member? (set (keys candidate-series-by-id))]
                              (boolean
                               (some #(not (member? %))
@@ -356,12 +354,9 @@
                                                        api-v2-history)
                                                       {}))))))
         calendar-poisoned? (and response-superset?
-                                (> (count (point-level-return-calendar
-                                           candidate-series-by-id
-                                           (calendar/common-calendar
-                                            (map :points
-                                                 (vals candidate-series-by-id)))))
-                                   (count (:return-calendar api-v2-history))))
+                                (let [[common returns] @candidate-calendars]
+                                  (or (not (every? (set (:common-calendar api-v2-history)) common))
+                                      (not (every? (set (:return-calendar api-v2-history)) returns)))))
         use-aligned? (and (not calendar-poisoned?)
                           (all-selected-aligned-returns-usable?
                            api-v2-history
@@ -434,12 +429,17 @@
                              (vec (:common-calendar api-v2-history))
                              (if use-aligned?
                                (vec (:return-calendar api-v2-history))
-                               (calendar/common-calendar (map :points
-                                                             (vals series-by-local-id)))))
+                               (if (= (set eligible-local-ids) (set (keys candidate-series-by-id)))
+                                 (first @candidate-calendars)
+                                 (calendar/common-calendar
+                                  (map :points (vals series-by-local-id))))))
         effective-return-calendar (if use-aligned?
                                     (vec (:return-calendar api-v2-history))
-                                    (point-level-return-calendar series-by-local-id
-                                                                 effective-calendar))
+                                    (if (= (set eligible-local-ids)
+                                           (set (keys candidate-series-by-id)))
+                                      (second @candidate-calendars)
+                                      (point-level-return-calendar series-by-local-id
+                                                                   effective-calendar)))
         return-series-by-instrument (if use-aligned?
                                       (into {}
                                             (map (fn [local-id]

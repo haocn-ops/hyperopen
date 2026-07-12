@@ -140,6 +140,148 @@
     (is (= ["perp:BTC" "perp:ETH"]
            (mapv :instrument-id (:eligible-instruments aligned))))))
 
+(deftest align-api-v2-mixed-cadence-poisoned-response-calendar-recomputed-test
+  (let [d0 (day-start-ms "2026-01-01")
+        day (fn [n] (+ d0 (* n day-ms)))
+        universe [{:instrument-id "perp:BTC"
+                   :market-type :perp
+                   :coin "BTC"
+                   :optimizer-history/instrument-id "hl:perp:BTC"}
+                  {:instrument-id "external:AAPL"
+                   :market-type :external
+                   :coin "AAPL"
+                   :optimizer-history/instrument-id "proxy:aapl"}]
+        points (fn [base days]
+                 (mapv (fn [n]
+                         {:time_ms (day n)
+                          :close (+ base n)
+                          :return (when (pos? n) 0.001)})
+                       days))
+        series (fn [id point-series]
+                 {:instrument_id id
+                  :lineage_kind "native"
+                  :series_kind "market_price"
+                  :points point-series
+                  :funding {:status "available" :annualized_carry 0}
+                  :warnings []})
+        normalized (api-v2/normalize-history-bundle
+                    {:universe universe}
+                    {:contract_version "optimizer-history-api-v2"
+                     :request_id "rid-mixed-cadence-poisoned"
+                     :dataset_version "dv-mixed-cadence-poisoned"
+                     :status "ok"
+                     :common_calendar (mapv day [4 5 6 7 8 9])
+                     :return_calendar (mapv day [5 6 7 8 9])
+                     :aligned_returns_by_instrument {}
+                     :series_by_instrument
+                     {"hl:perp:BTC" (series "hl:perp:BTC"
+                                                   (points 100 (range 10)))
+                      "proxy:aapl" (series "proxy:aapl"
+                                             (points 200 [0 1 2 7 8]))
+                      "hl:perp:SOPH" (series "hl:perp:SOPH"
+                                                    (points 10 (range 4 10)))}
+                     :warnings []})
+        aligned (api-v2/align-api-v2-history-inputs
+                 {:universe universe
+                  :api-v2-history normalized
+                  :min-observations 2})]
+    (is (= (mapv day [0 1 2 7 8])
+           (:calendar aligned)))
+    (is (= (mapv day [1 2 7 8])
+           (:return-calendar aligned))
+        "A later daily response calendar must not clip earlier timestamps shared by the selected mixed-cadence members.")
+    (is (= ["perp:BTC" "external:AAPL"]
+           (mapv :instrument-id (:eligible-instruments aligned))))
+    (is (= #{"perp:BTC" "external:AAPL"}
+           (set (keys (:return-series-by-instrument aligned)))))
+    (is (not (contains? (:return-series-by-instrument aligned)
+                        "hl:perp:SOPH")))
+    (is (= :api-v2-point-returns
+           (get-in aligned [:alignment-source :kind])))))
+
+(defn- align-api-v2-common-boundary-fixture
+  [response-common-days]
+  (let [d0 (day-start-ms "2026-01-01")
+        day (fn [n] (+ d0 (* n day-ms)))
+        universe [{:instrument-id "perp:BTC"
+                   :market-type :perp
+                   :coin "BTC"
+                   :optimizer-history/instrument-id "hl:perp:BTC"}
+                  {:instrument-id "perp:ETH"
+                   :market-type :perp
+                   :coin "ETH"
+                   :optimizer-history/instrument-id "hl:perp:ETH"}]
+        points (fn [base days]
+                 (mapv (fn [n]
+                         {:time_ms (day n)
+                          :close (+ base n)
+                          :return (when (pos? n) 0.001)})
+                       days))
+        series (fn [id point-series]
+                 {:instrument_id id
+                  :lineage_kind "native"
+                  :series_kind "market_price"
+                  :points point-series
+                  :funding {:status "available" :annualized_carry 0}
+                  :warnings []})
+        normalized (api-v2/normalize-history-bundle
+                    {:universe universe}
+                    {:contract_version "optimizer-history-api-v2"
+                     :request_id "rid-common-boundary"
+                     :dataset_version "dv-common-boundary"
+                     :status "ok"
+                     :common_calendar (mapv day response-common-days)
+                     :return_calendar (mapv day [1 3])
+                     :aligned_returns_by_instrument
+                     {"hl:perp:BTC" {:instrument_id "hl:perp:BTC"
+                                     :returns [0.01 0.02]}
+                      "hl:perp:ETH" {:instrument_id "hl:perp:ETH"
+                                     :returns [0.03 0.04]}
+                      "hl:perp:SOPH" {:instrument_id "hl:perp:SOPH"
+                                      :returns [0.05 0.06]}}
+                     :series_by_instrument
+                     {"hl:perp:BTC" (series "hl:perp:BTC"
+                                                   (points 100 [0 1 3]))
+                      "hl:perp:ETH" (series "hl:perp:ETH"
+                                                   (points 2000 [0 1 3]))
+                      "hl:perp:SOPH" (series "hl:perp:SOPH"
+                                                    (points 10 response-common-days))}
+                     :warnings []})]
+    {:day day
+     :aligned (api-v2/align-api-v2-history-inputs
+               {:universe universe
+                :api-v2-history normalized
+                :min-observations 2})}))
+
+(deftest align-api-v2-superset-missing-common-boundary-recomputed-test
+  (let [{:keys [day aligned]} (align-api-v2-common-boundary-fixture [1 3])]
+    (is (= (mapv day [0 1 3])
+           (:calendar aligned))
+        "A superset response must not drop a selected member's interval predecessor even when it covers every return timestamp.")
+    (is (= (mapv day [1 3])
+           (:return-calendar aligned)))
+    (is (= [{:start-ms (day 0) :end-ms (day 1) :dt-days 1}
+            {:start-ms (day 1) :end-ms (day 3) :dt-days 2}]
+           (mapv #(select-keys % [:start-ms :end-ms :dt-days])
+                 (:return-intervals aligned))))
+    (is (= {"perp:BTC" [0.001 0.001]
+            "perp:ETH" [0.001 0.001]}
+           (:return-series-by-instrument aligned)))
+    (is (= :api-v2-point-returns
+           (get-in aligned [:alignment-source :kind])))))
+
+(deftest align-api-v2-superset-covering-member-calendars-preserves-aligned-test
+  (let [{:keys [day aligned]} (align-api-v2-common-boundary-fixture [0 1 3])]
+    (is (= (mapv day [0 1 3])
+           (:calendar aligned)))
+    (is (= (mapv day [1 3])
+           (:return-calendar aligned)))
+    (is (= {"perp:BTC" [0.01 0.02]
+            "perp:ETH" [0.03 0.04]}
+           (:return-series-by-instrument aligned)))
+    (is (= :api-v2-aligned-returns
+           (get-in aligned [:alignment-source :kind])))))
+
 (deftest align-history-inputs-history-window-identifies-late-starting-limiter-test
   (let [day (fn [n] (* n day-ms))
         aligned (history-loader/align-history-inputs

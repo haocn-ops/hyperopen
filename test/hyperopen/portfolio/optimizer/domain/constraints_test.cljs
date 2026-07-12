@@ -381,3 +381,65 @@
     (is (= :infeasible (:status encoded)))
     (is (some #(= :gross-floor-above-gross-max (:code %))
               (:violations encoded)))))
+
+(deftest net-band-pct-encodes-spec-with-signed-gross-representation-test
+  (let [encoded (constraints/encode-constraints
+                 {:universe [{:instrument-id "A" :market-type :perp :position-side :long}
+                             {:instrument-id "B" :market-type :perp :position-side :short}]
+                  :constraints {:long-only? false
+                                :gross-leverage 15.0
+                                :net-band-pct 0.05
+                                :net-exposure {:min 0.0 :max 0.0}
+                                :max-asset-weight 10.0}})]
+    (is (= :ok (:status encoded)))
+    (is (= {:pct 0.05 :signs [1 -1] :min 0.0 :max 0.0}
+           (:net-band-spec encoded))
+        "the band rides the single-signed gross representation (realized gross)")
+    (is (= [] (:warnings encoded)))))
+
+(deftest net-band-pct-zero-or-missing-encodes-no-spec-test
+  (let [base {:universe [{:instrument-id "A" :market-type :perp :position-side :long}
+                         {:instrument-id "B" :market-type :perp :position-side :short}]
+              :constraints {:long-only? false
+                            :gross-leverage 2.0
+                            :net-exposure {:min 1.0 :max 1.0}
+                            :max-asset-weight 1.0}}]
+    (is (nil? (:net-band-spec (constraints/encode-constraints base)))
+        "no :net-band-pct key ⇒ no band spec")
+    (is (nil? (:net-band-spec (constraints/encode-constraints
+                               (assoc-in base [:constraints :net-band-pct] 0.0))))
+        "0% must reproduce the exact-net-target behavior")))
+
+(deftest net-band-pct-with-mixed-sign-bounds-drops-band-with-warning-test
+  ;; Free-sign bounds make gross non-linear, so the coupled band rows would be
+  ;; unsound; the encoder holds the exact net bounds (conservative) and says so.
+  (let [encoded (constraints/encode-constraints
+                 {:universe [{:instrument-id "A" :market-type :perp}
+                             {:instrument-id "B" :market-type :perp}]
+                  :constraints {:long-only? false
+                                :gross-leverage 2.0
+                                :net-band-pct 0.05
+                                :net-exposure {:min 0.0 :max 0.0}
+                                :max-asset-weight 1.0}})]
+    (is (nil? (:net-band-spec encoded)))
+    (is (= [:net-band-requires-fixed-sides] (mapv :code (:warnings encoded))))))
+
+(deftest net-band-pct-widens-presolve-feasibility-test
+  ;; Side-assigned book: A long (bounds [0, 0.5]), B short (bounds [-10, 0]).
+  ;; sum-upper = 0.5 < net target 1.0 ⇒ infeasible with an exact target...
+  (let [base {:universe [{:instrument-id "A" :market-type :perp :position-side :long
+                          :shortable? true}
+                         {:instrument-id "B" :market-type :perp :position-side :short
+                          :shortable? true}]
+              :constraints {:long-only? false
+                            :gross-leverage 10.0
+                            :net-exposure {:min 1.0 :max 1.0}
+                            :max-asset-weight 10.0
+                            :per-asset-overrides {"A" {:max-weight 0.5}}}}
+        exact (constraints/encode-constraints base)
+        banded (constraints/encode-constraints
+                (assoc-in base [:constraints :net-band-pct] 0.1))]
+    (is (= :infeasible (:status exact)))
+    ;; ... but a 10% band widens the reachable net by pct·capacity, so the
+    ;; presolve no longer rejects it outright.
+    (is (= :ok (:status banded)))))

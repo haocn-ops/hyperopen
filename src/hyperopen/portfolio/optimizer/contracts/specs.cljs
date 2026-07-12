@@ -186,6 +186,7 @@
                 :gross-leverage
                 :net-min
                 :net-max
+                :net-band-pct
                 :max-weight
                 :max-long-weight
                 :max-short-weight

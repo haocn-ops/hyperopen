@@ -186,14 +186,17 @@
       (str (fmt-signed-mult net-min) "–" (fmt-signed-mult net-max) " " direction-copy))))
 
 (defn net-range-label
-  [{:keys [net-min net-max]}]
-  (cond
-    (and (number? net-min) (number? net-max))
-    (str "Net " (net-range-copy net-min net-max))
+  [{:keys [net-min net-max net-band-pct]}]
+  (let [band-suffix (when (and (number? net-band-pct) (pos? net-band-pct))
+                      (str " ±" (.toFixed (* 100 net-band-pct) 1) "% of gross"))
+        base (cond
+               (and (number? net-min) (number? net-max))
+               (str "Net " (net-range-copy net-min net-max))
 
-    (number? net-max) (str "Net ≤ " (fmt-signed-mult net-max))
-    (number? net-min) (str "Net ≥ " (fmt-signed-mult net-min))
-    :else nil))
+               (number? net-max) (str "Net ≤ " (fmt-signed-mult net-max))
+               (number? net-min) (str "Net ≥ " (fmt-signed-mult net-min))
+               :else nil)]
+    (when base (str base band-suffix))))
 
 (defn- cap-label
   [cap]

@@ -672,3 +672,54 @@
     (is (s/valid? ::contracts/worker-envelope
                   {:type (:type normalized)
                    :payload (:payload normalized)}))))
+
+(deftest migrate-draft-converts-absolute-net-band-to-percentage-test
+  ;; Old drafts persisted the net band as a net-min/net-max spread in leverage
+  ;; units. q = half-width / gross-target; the min/max collapse to the target.
+  (let [draft (assoc-in (optimizer-fixtures/sample-draft) [:constraints]
+                        {:long-only? false
+                         :gross-max 15.35
+                         :net-min -0.5
+                         :net-max 0.5})
+        constraints (:constraints (contracts/migrate-draft draft))]
+    (is (= 0.0 (:net-min constraints)))
+    (is (= 0.0 (:net-max constraints)))
+    (is (= 0.032573 (:net-band-pct constraints))
+        "0.50x band at a 15.35x gross target ⇒ 3.2573% of gross")))
+
+(deftest migrate-draft-net-band-uses-gross-midpoint-and-clamps-test
+  (let [constraints (:constraints
+                     (contracts/migrate-draft
+                      (assoc-in (optimizer-fixtures/sample-draft) [:constraints]
+                                {:gross-min 1.0 :gross-max 3.0
+                                 :net-min 0.0 :net-max 6.0})))]
+    (is (= 3.0 (:net-min constraints)))
+    (is (= 3.0 (:net-max constraints)))
+    (is (= 1.0 (:net-band-pct constraints))
+        "a 3.0x half-width at a 2.0x gross target clamps to the 100% ceiling")))
+
+(deftest migrate-draft-net-band-resets-safely-without-a-gross-target-test
+  (doseq [gross [nil 0 -1 js/NaN]]
+    (let [constraints (:constraints
+                       (contracts/migrate-draft
+                        (assoc-in (optimizer-fixtures/sample-draft) [:constraints]
+                                  {:gross-max gross
+                                   :net-min 0.5 :net-max 1.5})))]
+      (is (= 1.0 (:net-min constraints)))
+      (is (= 1.0 (:net-max constraints)))
+      (is (= 0.0 (:net-band-pct constraints))
+          "no usable gross target ⇒ reset to the 0% default, never divide"))))
+
+(deftest migrate-draft-net-band-is-idempotent-and-preserves-new-drafts-test
+  (let [migrated (:constraints
+                  (contracts/migrate-draft
+                   (assoc-in (optimizer-fixtures/sample-draft) [:constraints]
+                             {:gross-max 2.0 :net-min -0.5 :net-max 0.5})))
+        again (:constraints (contracts/migrate-draft
+                             (assoc (optimizer-fixtures/sample-draft) :constraints migrated)))]
+    (is (= migrated again) "re-running the migration changes nothing"))
+  (let [new-shape {:gross-max 2.0 :net-min -0.2 :net-max 0.8 :net-band-pct 0.05}]
+    (is (= new-shape
+           (:constraints (contracts/migrate-draft
+                          (assoc (optimizer-fixtures/sample-draft) :constraints new-shape))))
+        "a draft already carrying :net-band-pct keeps its advanced net range")))

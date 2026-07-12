@@ -13,22 +13,23 @@
    :max-asset-weight 0.5})
 
 (deftest constraints->policy-derives-default-targets-and-zero-bands-test
-  (let [{:keys [gross-target gross-band net-target net-band]}
+  (let [{:keys [gross-target gross-band net-target net-band-pct]}
         (policy/constraints->policy default-constraints)]
     (is (= 2.0 gross-target) "gross target is the ceiling when there is no floor")
     (is (= 0.0 gross-band) "no gross floor ⇒ zero gross band")
     (is (= 1.0 net-target))
-    (is (= 0.0 net-band))))
+    (is (= 0.0 net-band-pct) "no :net-band-pct key ⇒ zero percentage band")))
 
 (deftest constraints->policy-handles-a-seeded-gross-floor-test
   ;; The screenshot case: gross 1.91..1.92, net 1.31..1.42.
-  (let [{:keys [gross-target gross-band net-target net-band]}
+  (let [{:keys [gross-target gross-band net-target net-band-pct]}
         (policy/constraints->policy {:gross-min 1.91 :gross-max 1.92
-                                     :net-min 1.31 :net-max 1.42})]
+                                     :net-min 1.31 :net-max 1.42
+                                     :net-band-pct 0.05})]
     (is (= 1.915 gross-target))
     (is (= 0.005 gross-band))
-    (is (= 1.365 net-target))
-    (is (= 0.055 net-band))))
+    (is (= 1.365 net-target) "net target is the min/max midpoint")
+    (is (= 0.05 net-band-pct) "the percentage band reads straight from :net-band-pct")))
 
 (deftest policy->constraints-round-trips-and-preserves-no-floor-test
   (testing "zero gross band clears the floor (dissoc, not nil)"
@@ -59,17 +60,18 @@
 
 (deftest apply-band-widens-one-axis-and-clamps-test
   (let [out (policy/apply-band default-constraints :net 0.25)]
-    (is (= 0.75 (:net-min out)))
-    (is (= 1.25 (:net-max out)))
+    (is (= 1.0 (:net-min out)) "the percentage band never moves the net target")
+    (is (= 1.0 (:net-max out)))
+    (is (= 0.25 (:net-band-pct out)) "the net band is stored as a decimal fraction of gross")
     (is (not (contains? out :gross-min)) "net band change leaves gross floor absent"))
   (testing "a positive gross band introduces a floor"
     (let [out (policy/apply-band default-constraints :gross 0.1)]
       (is (= 1.9 (:gross-min out)))
       (is (= 2.1 (:gross-max out)))))
-  (testing "bands clamp to max-band"
-    (let [out (policy/apply-band default-constraints :net 5.0)]
-      (is (= (- 1.0 policy/max-band) (:net-min out)))
-      (is (= (+ 1.0 policy/max-band) (:net-max out))))))
+  (testing "the net band clamps to max-net-band-pct (100%), never below 0%"
+    (is (= policy/max-net-band-pct
+           (:net-band-pct (policy/apply-band default-constraints :net 5.0))))
+    (is (= 0.0 (:net-band-pct (policy/apply-band default-constraints :net -0.2))))))
 
 (deftest point->targets-maps-fractions-and-ignores-hover-test
   (let [bounds {:left 0.0 :top 0.0 :width 100.0 :height 100.0}]
@@ -163,13 +165,16 @@
       (is (= 2.5 (:gross-target (policy/point->targets
                                  {:client-x 50.0 :client-y 0.0 :bounds bounds :buttons 1
                                   :gross-band 0.5})))))
-    (testing "a positive net band pulls the reachable net edges inward"
-      (is (= 1.5 (:net-target (policy/point->targets
-                               {:client-x 100.0 :client-y 0.0 :bounds bounds :buttons 1
-                                :net-band 0.5}))))
-      (is (= -1.5 (:net-target (policy/point->targets
-                                {:client-x 0.0 :client-y 0.0 :bounds bounds :buttons 1
-                                 :net-band 0.5})))))
+    (testing "a positive percentage net band pulls the reachable net edges inward by
+              pct · gross so the wedge stays in view"
+      ;; gross-target at the top edge is 3.0; a 25% band spans ±0.75 there, so the
+      ;; reachable net edge is 2.0 − 0.75 = 1.25.
+      (is (= 1.25 (:net-target (policy/point->targets
+                                {:client-x 100.0 :client-y 0.0 :bounds bounds :buttons 1
+                                 :net-band-pct 0.25}))))
+      (is (= -1.25 (:net-target (policy/point->targets
+                                 {:client-x 0.0 :client-y 0.0 :bounds bounds :buttons 1
+                                  :net-band-pct 0.25})))))
     (testing "band 0 keeps the full range reachable"
       (is (= 3.0 (:gross-target (policy/point->targets
                                  {:client-x 50.0 :client-y 0.0 :bounds bounds :buttons 1
@@ -210,7 +215,7 @@
     (is (= 0.5 (:x marker)) "net 0 is centre-x")
     (is (= 0.5 (:y marker)) "gross 1.5 of 3.0 is centre-y"))
   (let [rect (policy/band-rect {:gross-target 1.5 :gross-band 0.0
-                                :net-target 0.0 :net-band 0.5})]
+                                :net-target 0.0 :net-band-pct 0.25})]
     (is (= 0.0 (:h rect)) "zero gross band ⇒ flat box")
     (is (< 0.0 (:w rect)) "net band ⇒ box has width"))
   (is (nil? (policy/current-exposure-marker {:gross nil :net 1.0})))
@@ -230,7 +235,47 @@
                                              :gross-floor 1.0
                                              :net-exposure {:min -0.5 :max 1.5}}))
       "banded: targets are the midpoints, never the ceilings")
-  (is (= {:gross-target 2.0 :gross-band 1.0 :net-target 0.5 :net-band 1.0}
+  (is (= {:gross-target 2.0 :gross-band 1.0 :net-target 0.5 :net-band-pct 0.1}
          (policy/engine-constraints->policy {:gross-leverage 3.0
                                              :gross-floor 1.0
+                                             :net-band-pct 0.1
                                              :net-exposure {:min -0.5 :max 1.5}}))))
+
+(deftest net-band-edges-scale-with-gross-and-clip-naturally-test
+  (testing "the permitted net range is target ± pct·gross"
+    (is (= {:left -0.75 :right 0.75} (policy/net-band-edges 0.0 0.05 15.0)))
+    (is (= {:left -0.1 :right 0.1} (policy/net-band-edges 0.0 0.05 2.0)))
+    (is (= {:left 0.0 :right 2.0} (policy/net-band-edges 1.0 0.1 10.0))
+        "a nonzero target keeps the band centered on the target"))
+  (testing "the |net| ≤ gross relationship clips the edges"
+    (is (= {:left -1.0 :right 1.0} (policy/net-band-edges 0.0 1.0 1.0)))
+    (is (= {:left -0.5 :right 1.0} (policy/net-band-edges 0.5 1.0 1.0))
+        "a right edge past gross clamps to gross")
+    (is (= {:left 1.0 :right 1.0} (policy/net-band-edges 1.5 0.5 1.0))
+        "a band entirely past gross collapses to the reachable edge"))
+  (testing "zero gross collapses to a point (never divides)"
+    (is (= {:left 0.0 :right 0.0} (policy/net-band-edges 0.0 0.05 0.0)))))
+
+(deftest band-wedge-renders-sloped-boundaries-test
+  ;; A percentage band must be a wedge: wider (in net) at higher gross. Compare
+  ;; the x-extent of the polygon's top edge (max gross) vs bottom edge.
+  (let [axis {:gross-max 20.0 :net-extent 10.0}
+        {:keys [points]} (policy/band-wedge {:gross-target 10.0 :gross-band 5.0
+                                             :net-target 0.0 :net-band-pct 0.1}
+                                            axis)
+        by-y (group-by second points)
+        width-at (fn [y] (let [xs (map first (get by-y y))]
+                           (- (apply max xs) (apply min xs))))
+        y-top (apply min (map second points))
+        y-bot (apply max (map second points))]
+    (is (= 4 (count points)))
+    (is (< (width-at y-bot) (width-at y-top))
+        "the wedge is wider at the higher-gross edge — sloped, not vertical")
+    ;; exact: at gross 15 the band spans ±1.5 (3.0 of the 20-unit x range =
+    ;; 0.15); at gross 5 it spans ±0.5.
+    (is (< (js/Math.abs (- 0.15 (width-at y-top))) 1e-9))
+    (is (< (js/Math.abs (- 0.05 (width-at y-bot))) 1e-9)))
+  (testing "zero band degenerates to a vertical segment at the target"
+    (let [{:keys [points]} (policy/band-wedge {:gross-target 2.0 :gross-band 0.5
+                                               :net-target 1.0 :net-band-pct 0.0})]
+      (is (every? #(= (ffirst points) (first %)) points)))))

@@ -287,6 +287,11 @@
       (active-net-range? encoded-constraints)
       {:eligible? false :reason :net-exposure-range}
 
+      ;; A percentage-of-gross net band couples net to realized gross via
+      ;; inequality rows the closed form cannot encode; keep the QP path.
+      (some? (:net-band-spec encoded-constraints))
+      {:eligible? false :reason :net-band-pct}
+
       ;; No single net equality => the GMV/frontier formulas have no b.
       (nil? net-target)
       {:eligible? false :reason :missing-net-equality}

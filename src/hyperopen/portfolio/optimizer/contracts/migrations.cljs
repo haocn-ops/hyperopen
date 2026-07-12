@@ -190,6 +190,63 @@
                         c
                         constraints-id-map-keys))))))
 
+(defn- finite-number?
+  [x]
+  (and (number? x) (js/isFinite x)))
+
+(defn- clamp01
+  [x]
+  (-> x (max 0.0) (min 1.0)))
+
+(defn migrate-constraints-net-band
+  "The net band changed units: it used to be an ABSOLUTE leverage half-width
+  persisted as a net-min/net-max spread; it is now :net-band-pct, a decimal
+  fraction of REALIZED gross (5% = 0.05). A stored spread with a valid gross
+  target converts via q = half-width / gross-target (so the widest permitted
+  absolute deviation is preserved at the configured gross); the min/max
+  collapse to their midpoint, which is the target the new band widens. Without
+  a usable gross target the band resets to the 0% default rather than guessing.
+  Constraints already carrying :net-band-pct only get the value re-clamped.
+  Idempotent; purely additive for min = max drafts, so no schema-version bump."
+  [constraints]
+  (if-not (map? constraints)
+    constraints
+    (let [nmin (:net-min constraints)
+          nmax (:net-max constraints)
+          gmin (:gross-min constraints)
+          gmax (:gross-max constraints)
+          gross-target (cond
+                         (and (finite-number? gmin) (finite-number? gmax))
+                         (/ (+ gmin gmax) 2)
+
+                         (finite-number? gmax) gmax
+                         (finite-number? gmin) gmin
+                         :else nil)]
+      (cond
+        (contains? constraints :net-band-pct)
+        (update constraints :net-band-pct
+                #(if (finite-number? %) (clamp01 %) 0.0))
+
+        (and (finite-number? nmin) (finite-number? nmax) (> nmax nmin))
+        (let [half (/ (- nmax nmin) 2)
+              midpoint (/ (+ nmin nmax) 2)
+              pct (if (and (finite-number? gross-target) (pos? gross-target))
+                    (clamp01 (/ half gross-target))
+                    0.0)]
+          (assoc constraints
+                 :net-min midpoint
+                 :net-max midpoint
+                 :net-band-pct (/ (js/Math.round (* pct 1000000)) 1000000)))
+
+        :else
+        (assoc constraints :net-band-pct 0.0)))))
+
+(defn- migrate-draft-net-band
+  [draft]
+  (if (map? (:constraints draft))
+    (update draft :constraints migrate-constraints-net-band)
+    draft))
+
 (defn migrate-draft
   [draft]
   (let [draft* (or draft {})
@@ -200,6 +257,7 @@
             migrate-draft-history-assumptions
             migrate-draft-history-assumption-behaviors
             migrate-draft-doubled-dex-ids
+            migrate-draft-net-band
             (assoc :schema-version draft-schema-version))
       (throw (ex-info "Unsupported optimizer draft schema version."
                       {:contract :optimizer/draft

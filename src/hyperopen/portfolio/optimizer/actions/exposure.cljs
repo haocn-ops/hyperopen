@@ -50,7 +50,7 @@
     state client-x client-y bounds buttons gross-axis-max net-axis-extent nil))
   ([state client-x client-y bounds buttons gross-axis-max net-axis-extent render-level]
    (let [constraints (current-constraints state)
-         {:keys [gross-band net-band]} (policy/constraints->policy constraints)]
+         {:keys [gross-band net-band-pct]} (policy/constraints->policy constraints)]
      (if-let [targets (policy/point->targets {:client-x client-x
                                               :client-y client-y
                                               :bounds bounds
@@ -58,7 +58,7 @@
                                               :gross-axis-max gross-axis-max
                                               :net-axis-extent net-axis-extent
                                               :gross-band gross-band
-                                              :net-band net-band})]
+                                              :net-band-pct net-band-pct})]
        (into (write-constraints (policy/apply-point constraints targets))
              (pin-zoom-effects state render-level))
        []))))
@@ -71,7 +71,12 @@
    (set-portfolio-optimizer-exposure-band state axis value nil))
   ([state axis value render-level]
    (let [axis* (common/normalize-keyword-like axis)
-         value* (common/parse-number-value value)]
+         value* (common/parse-number-value value)
+         ;; :net-pct is the :net band with the value in PERCENT (the UI controls
+         ;; read "5.0%"); the canonical decimal fraction is value / 100.
+         [axis* value*] (if (= :net-pct axis*)
+                          [:net (when (some? value*) (/ value* 100))]
+                          [axis* value*])]
      (if (and (contains? #{:gross :net} axis*) (some? value*))
        (into (write-constraints (policy/apply-band (current-constraints state) axis* value*))
              (pin-zoom-effects state render-level))

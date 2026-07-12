@@ -225,6 +225,9 @@
                                    :gross-max 1.3
                                    :net-min -0.2
                                    :net-max 0.8
+                                   ;; present ⇒ the net-band migration leaves the
+                                   ;; advanced absolute range untouched
+                                   :net-band-pct 0.05
                                    :max-asset-weight 0.6
                                    :allowlist ["perp:BTC"]
                                    :blocklist ["spot:PURR"]
@@ -251,6 +254,8 @@
     (is (= 1.3 (:gross-leverage constraints)))
     (is (= 0.9 (:gross-floor constraints)))
     (is (= {:min -0.2 :max 0.8} (:net-exposure constraints)))
+    (is (= 0.05 (:net-band-pct constraints))
+        "the percentage net band rides through to the engine constraints")
     (is (= ["perp:BTC"] (:allowlist constraints)))
     (is (= ["spot:PURR"] (:blocklist constraints)))
     (is (= 0.7 (:max-long-weight constraints)))

@@ -19,7 +19,8 @@
   (let [record (profiles/profile-record {:gross-max 2.0} "u1" 1000)
         store (profiles/put-profile {} record)]
     (is (= record (profiles/select-profile store "u1")))
-    (is (= {:gross-max 2.0} (profiles/remembered-constraints store "u1")))
+    (is (= {:gross-max 2.0 :net-band-pct 0.0} (profiles/remembered-constraints store "u1"))
+        "a pre-percentage profile reads back with the migrated :net-band-pct default")
     (is (true? (profiles/has-default? store "u1")))
     (is (false? (profiles/has-default? store "u2")))
     (is (nil? (profiles/remembered-constraints store "u2")))))
@@ -27,7 +28,7 @@
 (deftest auto-apply-respects-pristine-draft-test
   (let [store (profiles/put-profile {} (profiles/profile-record {:gross-max 1.5} "u1" 1000))]
     (testing "pristine draft with a saved default ⇒ apply"
-      (is (= {:gross-max 1.5}
+      (is (= {:gross-max 1.5 :net-band-pct 0.0}
              (profiles/auto-apply-constraints {:profiles store :universe-key "u1" :dirty? false}))))
     (testing "dirty draft ⇒ never clobber"
       (is (nil? (profiles/auto-apply-constraints {:profiles store :universe-key "u1" :dirty? true}))))

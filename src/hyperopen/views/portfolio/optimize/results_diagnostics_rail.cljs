@@ -148,6 +148,16 @@
      "Warnings explain assumptions or mathematically valid outcomes that may require a rerun with different controls."
      (warning-rows (:labels-by-instrument result) (:warnings result)))))
 
+(defn- format-net-gross
+  "Signed net-to-gross percentage, or — when gross is zero/near zero (never a
+  division by zero or a misleading percentage)."
+  [{:keys [net-exposure gross-exposure]}]
+  (if (and (number? net-exposure) (number? gross-exposure)
+           (> (js/Math.abs gross-exposure) 1e-9))
+    (let [r (/ net-exposure gross-exposure)]
+      (str (when-not (neg? r) "+") (.toFixed (* 100 r) 1) "%"))
+    "—"))
+
 (defn diagnostics-panel
   [result]
   (let [diagnostics (:diagnostics result)
@@ -162,6 +172,7 @@
      [:div {:class ["grid" "grid-cols-2" "gap-2" "lg:grid-cols-4"]}
       (summary/summary-card "Gross" (opt-format/format-multiple (:gross-exposure diagnostics)))
       (summary/summary-card "Net" (opt-format/format-multiple (:net-exposure diagnostics)))
+      (summary/summary-card "Net/Gross" (format-net-gross diagnostics))
       (summary/summary-card "Effective N" (opt-format/format-decimal (:effective-n diagnostics)))
       (summary/summary-card "Turnover" (opt-format/format-pct (:turnover diagnostics)))]
      [:div {:class ["grid" "grid-cols-1" "gap-2" "lg:grid-cols-3"]}
@@ -400,6 +411,7 @@
        [:div {:class ["space-y-2" "px-4" "pb-4"]}
         (summary/summary-card "Gross" (opt-format/format-multiple (:gross-exposure diagnostics)))
         (summary/summary-card "Net" (opt-format/format-multiple (:net-exposure diagnostics)))
+        (summary/summary-card "Net/Gross" (format-net-gross diagnostics))
         (summary/summary-card "Turnover" (opt-format/format-pct (:turnover diagnostics)))
         (summary/summary-card "Condition #" (opt-format/format-decimal (:condition-number conditioning)))]]]]))
 

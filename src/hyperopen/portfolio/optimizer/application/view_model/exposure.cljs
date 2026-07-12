@@ -24,20 +24,39 @@
        (or (not (number? lo)) (>= v lo))
        (or (not (number? hi)) (<= v hi))))
 
+(def ^:private gross-eps 1e-9)
+
+(defn net-gross-ratio
+  "net / gross, or nil when gross is zero or numerically near zero (the UI
+  renders — instead of a misleading percentage)."
+  [net gross]
+  (when (and (number? net) (number? gross) (> (js/Math.abs gross) gross-eps))
+    (/ net gross)))
+
 (defn exposure-preview
   "Honest pre-run preview: compares the CURRENT portfolio exposure to the target band and reports
-  whether it is already on policy. It deliberately does NOT estimate a trade count — that needs a
-  solve, and the setup panel is shown while constraints are being edited (which makes any prior
-  run stale), so a number here would mislead. The exact trades appear in Results after Run."
+  whether it is already on policy. The net band is a percentage of REALIZED gross, so the
+  allowed net range for the current book is net-min/max widened by pct · current gross. It
+  deliberately does NOT estimate a trade count — that needs a solve, and the setup panel is
+  shown while constraints are being edited (which makes any prior run stale), so a number here
+  would mislead. The exact trades appear in Results after Run."
   [{:keys [current-exposure constraints]}]
   (when current-exposure
     (let [{:keys [gross net]} current-exposure
           {:keys [gross-min gross-max net-min net-max]} constraints
+          pct (policy/clamp-net-band-pct (:net-band-pct constraints))
+          slack (* pct (max 0.0 (or gross 0.0)))
           gross-ok? (within? gross gross-min gross-max)
-          net-ok? (within? net net-min net-max)]
+          net-ok? (within? net
+                           (when (number? net-min) (- net-min slack))
+                           (when (number? net-max) (+ net-max slack)))]
       {:current-exposure current-exposure
        :gross-ok? gross-ok?
        :net-ok? net-ok?
+       :net-gross-ratio (net-gross-ratio net gross)
+       :net-band-pct pct
+       :net-target (when (and (number? net-min) (number? net-max))
+                     (/ (+ net-min net-max) 2))
        :on-policy? (and gross-ok? net-ok?)})))
 
 (defn- gross-highlighted?
@@ -81,17 +100,36 @@
      :zoom (select-keys zoom [:level :fit-level :zoom-in-level :zoom-out-level])
      :target-marker (policy/target-marker policy* axis)
      :band-rect (policy/band-rect policy* axis)
+     :band-wedge (policy/band-wedge policy* axis)
+     :band-wedge-stripe (policy/band-wedge-stripe policy* axis)
+     ;; Allowed net range at the TARGET gross — the pad's horizontal range bar.
+     :band-edges (let [{:keys [left right]} (policy/net-band-edges
+                                             (:net-target policy*)
+                                             (:net-band-pct policy*)
+                                             (:gross-target policy*))]
+                   (let [n-ext (:net-extent axis)
+                         ->x (fn [v] (-> (/ (+ v n-ext) (* 2 n-ext))
+                                         (max 0.0) (min 1.0)))]
+                     {:left-x (->x left) :right-x (->x right)}))
      :current-marker (policy/current-exposure-marker current-exposure axis)
      :current-exposure current-exposure
      :gross-band (:gross-band policy*)
-     :net-band (:net-band policy*)
+     :net-band-pct (:net-band-pct policy*)
+     ;; Approximate ABSOLUTE net half-width at the configured max gross — a UI
+     ;; preview only; the solver scales the band with realized gross.
+     :net-band-abs-preview (let [gmax (+ (max 0.0 (or (:gross-target policy*) 0.0))
+                                         (max 0.0 (or (:gross-band policy*) 0.0)))]
+                             (* (:net-band-pct policy*) gmax))
      :max-band policy/max-band
+     :max-net-band-pct policy/max-net-band-pct
+     :net-band-pct-slider-max policy/net-band-pct-slider-max
      :axis axis
      :echo {:gross-min gross-min
             :gross-max gross-max
             :gross-floored? (some? gross-min)
             :net-min net-min
-            :net-max net-max}
+            :net-max net-max
+            :net-band-pct (:net-band-pct policy*)}
      :preview (exposure-preview {:current-exposure current-exposure
                                  :constraints constraints*})
      :active-preset active

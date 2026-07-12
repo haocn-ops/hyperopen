@@ -86,3 +86,49 @@
     (is (= :long (direction 0.5 1.5)))
     (is (= :short (direction -1.5 -0.5)))
     (is (= :neutral (direction -0.5 0.5)))))
+
+(deftest exposure-preview-net-band-uses-realized-gross-test
+  (let [constraints {:gross-max 20.0 :net-min 0.0 :net-max 0.0 :net-band-pct 0.05}]
+    (testing "the allowed net widens by pct · CURRENT gross"
+      (is (true? (:net-ok? (vm/exposure-preview
+                            {:current-exposure {:gross 15.0 :net 0.75}
+                             :constraints constraints})))
+          "0.75x net at 15x gross is exactly the 5% edge")
+      (is (false? (:net-ok? (vm/exposure-preview
+                             {:current-exposure {:gross 15.0 :net 0.9}
+                              :constraints constraints}))))
+      (is (false? (:net-ok? (vm/exposure-preview
+                             {:current-exposure {:gross 2.0 :net 0.75}
+                              :constraints constraints})))
+          "the same 0.75x net at only 2x gross is outside 5%"))
+    (testing "net/gross ratio is surfaced for the status line"
+      (let [p (vm/exposure-preview {:current-exposure {:gross 15.0 :net 14.955}
+                                    :constraints constraints})]
+        (is (< (js/Math.abs (- 0.997 (:net-gross-ratio p))) 1e-9))
+        (is (= 0.05 (:net-band-pct p)))
+        (is (= 0.0 (:net-target p)))))
+    (testing "zero gross reports no ratio (— in the UI), never a division"
+      (is (nil? (:net-gross-ratio (vm/exposure-preview
+                                   {:current-exposure {:gross 0.0 :net 0.0}
+                                    :constraints constraints})))))))
+
+(deftest exposure-map-model-carries-percentage-band-shape-test
+  (let [model (vm/exposure-map-model
+               {:constraints {:gross-max 15.35 :net-min 0.0 :net-max 0.0
+                              :net-band-pct 0.05 :max-asset-weight 0.5}
+                :highlighted-controls #{}})]
+    (is (= 0.05 (:net-band-pct model)))
+    (is (< (js/Math.abs (- 0.7675 (:net-band-abs-preview model))) 1e-9)
+        "≈ ±0.77x at 15.35x gross — the UI preview at the gross target")
+    (is (seq (get-in model [:band-wedge :points])))
+    (is (seq (get-in model [:band-wedge-stripe :points])))
+    (is (= 0.05 (get-in model [:echo :net-band-pct])))
+    (testing "the absolute preview tracks the gross target"
+      (is (< (js/Math.abs
+              (- 0.1
+                 (:net-band-abs-preview
+                  (vm/exposure-map-model
+                   {:constraints {:gross-max 2.0 :net-min 0.0 :net-max 0.0
+                                  :net-band-pct 0.05}
+                    :highlighted-controls #{}}))))
+             1e-9)))))

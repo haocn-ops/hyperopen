@@ -69,6 +69,11 @@
         :coefficients (ones n)
         :target net-target}]
 
+      ;; An active percentage net band replaces the exact-net equality with the
+      ;; coupled band inequalities below (q = 0 keeps the equality unchanged).
+      (some? (:net-band-spec encoded-constraints))
+      []
+
       (and (map? net-exposure)
            (= (:min net-exposure) (:max net-exposure))
            (finite-number? (:min net-exposure)))
@@ -82,6 +87,7 @@
   [encoded-constraints n]
   (let [net-exposure (:net-exposure encoded-constraints)]
     (if (and (map? net-exposure)
+             (nil? (:net-band-spec encoded-constraints))
              (not= (:min net-exposure) (:max net-exposure)))
       (vec (concat
             (when (finite-number? (:min net-exposure))
@@ -93,6 +99,28 @@
                 :coefficients (ones n)
                 :upper (:max net-exposure)}])))
       [])))
+
+(defn- net-band-inequalities
+  "The percentage-of-gross net band as signed-linear rows in weight space:
+     net(w) − q·gross(w) ≤ net-max   →  sum((1 − q·sign_i)·w_i) ≤ net-max
+     net(w) + q·gross(w) ≥ net-min   →  sum((1 + q·sign_i)·w_i) ≥ net-min
+   Realized gross rides the same single-signed representation as the gross
+   floor (sum(sign_i·w_i) = sum|w_i| on the fixed-sign box), so the tolerance
+   scales with the portfolio the solver actually picks — never the gross
+   target. Empty when no band spec is encoded."
+  [encoded-constraints]
+  (let [{:keys [pct signs] :as spec} (:net-band-spec encoded-constraints)]
+    (if-not spec
+      []
+      (vec (concat
+            (when (finite-number? (:max spec))
+              [{:code :net-band
+                :coefficients (mapv #(- 1 (* pct %)) signs)
+                :upper (:max spec)}])
+            (when (finite-number? (:min spec))
+              [{:code :net-band
+                :coefficients (mapv #(+ 1 (* pct %)) signs)
+                :lower (:min spec)}]))))))
 
 (defn- target-return-inequality
   [expected-returns objective]
@@ -277,6 +305,7 @@
      :return-tilt (or return-tilt 0)
      :equalities (equality-constraints encoded-constraints n)
      :inequalities (vec (concat (net-inequalities encoded-constraints n)
+                                (net-band-inequalities encoded-constraints)
                                 (when-let [floor (gross-floor-inequality encoded-constraints)]
                                   [floor])
                                 (when target-return [target-return])))
@@ -312,6 +341,7 @@
      ;; validation in target selection check closed-form weights unchanged.
      :equalities (equality-constraints encoded-constraints n)
      :inequalities (vec (concat (net-inequalities encoded-constraints n)
+                                (net-band-inequalities encoded-constraints)
                                 (when-let [floor (gross-floor-inequality encoded-constraints)]
                                   [floor])
                                 (when target-return [target-return])))

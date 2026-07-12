@@ -161,21 +161,36 @@ test.describe("optimizer exposure-map Positioning control", () => {
     await expect(maxWeight).toBeVisible();
   });
 
-  test("widening the net band updates the net range sent to the solver", async ({ page }) => {
+  test("widening the net band stores a percentage of gross, leaving the target alone", async ({
+    page
+  }) => {
     await openFineTune(page);
     const slider = page.locator("[data-role='portfolio-optimizer-exposure-net-band']");
     await slider.evaluate((el) => {
-      el.value = "0.25";
+      el.value = "25"; // the control is denominated in percent
       el.dispatchEvent(new Event("input", { bubbles: true }));
     });
     await waitForIdle(page);
 
+    await expect(
+      page.locator("[data-role='portfolio-optimizer-exposure-net-band-value']")
+    ).toHaveText("± 25.0% of gross");
+    expect(
+      await readOptimizerState(page, optimizerPath("draft", "constraints", "net-band-pct"))
+    ).toBe(0.25);
+    // The percentage band is a tolerance around the UNCHANGED net target.
     expect(await readOptimizerState(page, optimizerPath("draft", "constraints", "net-min"))).toBe(
-      0.75
+      1
     );
     expect(await readOptimizerState(page, optimizerPath("draft", "constraints", "net-max"))).toBe(
-      1.25
+      1
     );
+    // The approximate absolute preview reflects the configured gross target
+    // (2x by default): 25% of 2x ≈ ±0.50x. Solver-side the band scales with
+    // realized gross, so this line is explicitly a preview.
+    await expect(
+      page.locator("[data-role='portfolio-optimizer-exposure-net-band-abs-preview']")
+    ).toContainText("≈ ±0.50× at 2.00× gross");
   });
 
   test("the Advanced drawer exposes the raw gross/net min/max fields", async ({ page }) => {
@@ -211,9 +226,10 @@ test.describe("optimizer exposure-map Positioning control", () => {
     );
     await expect(grossStripe).toHaveCount(1);
     await expect(netStripe).toHaveCount(1);
-    // Stripes span the full pad on their fixed axis.
+    // The gross stripe spans the full pad width; the net band renders as a
+    // sloped WEDGE polygon (net = target ± pct·gross), not a vertical stripe.
     await expect(grossStripe).toHaveAttribute("width", "100");
-    await expect(netStripe).toHaveAttribute("height", "100");
+    await expect(netStripe).toHaveAttribute("points", /,/);
     const heightBefore = Number(await grossStripe.getAttribute("height"));
     // Drag the gross band slider to its maximum.
     const box = await grossSlider.boundingBox();
@@ -224,12 +240,33 @@ test.describe("optimizer exposure-map Positioning control", () => {
     ).toHaveText("± 0.50×");
     const heightAfter = Number(await grossStripe.getAttribute("height"));
     expect(heightAfter).toBeGreaterThan(heightBefore);
-    // The stripe mirrors the band box's gross extent exactly (same y/height).
+    // The allowed-region band box is the wedge/gross-stripe intersection.
     const bandBox = page.locator("[data-role='portfolio-optimizer-exposure-band-box']");
-    expect(await grossStripe.getAttribute("y")).toBe(await bandBox.getAttribute("y"));
-    expect(await grossStripe.getAttribute("height")).toBe(
-      await bandBox.getAttribute("height")
-    );
+    await expect(bandBox).toHaveAttribute("points", /,/);
+  });
+
+  test("the net band wedge is sloped: wider at higher gross", async ({ page }) => {
+    await openFineTune(page);
+    const slider = page.locator("[data-role='portfolio-optimizer-exposure-net-band']");
+    await slider.evaluate((el) => {
+      el.value = "20";
+      el.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await waitForIdle(page);
+    const points = await page
+      .locator("[data-role='portfolio-optimizer-exposure-net-stripe']")
+      .getAttribute("points");
+    const vertices = points.split(" ").map((pair) => pair.split(",").map(Number));
+    const ys = vertices.map(([, y]) => y);
+    const topY = Math.min(...ys);
+    const bottomY = Math.max(...ys);
+    const widthAt = (y) => {
+      const xs = vertices.filter(([, vy]) => vy === y).map(([x]) => x);
+      return Math.max(...xs) - Math.min(...xs);
+    };
+    // y grows downward: the top edge is the highest gross, where the
+    // percentage band's absolute width must be largest.
+    expect(widthAt(topY)).toBeGreaterThan(widthAt(bottomY));
   });
 });
 

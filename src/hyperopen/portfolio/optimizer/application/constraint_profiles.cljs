@@ -4,7 +4,8 @@
   in a map keyed by a stable hash of the universe's instrument-id set, so the same universe gets
   the same remembered policy across sessions, while a materially different universe does not
   silently inherit it. Persistence and timestamps live in the effect/boundary layer; this
-  namespace is pure and side-effect free.")
+  namespace is pure and side-effect free."
+  (:require [hyperopen.portfolio.optimizer.contracts.migrations :as migrations]))
 
 (def profile-version 1)
 
@@ -27,9 +28,12 @@
     (get profiles universe-key)))
 
 (defn remembered-constraints
-  "The remembered constraint map for a universe, or nil."
+  "The remembered constraint map for a universe, or nil. Profiles saved before
+  the net band became a percentage of gross are migrated on read (the stored
+  absolute net-min/net-max spread converts against the saved gross target)."
   [profiles universe-key]
-  (:controls (select-profile profiles universe-key)))
+  (some-> (:controls (select-profile profiles universe-key))
+          migrations/migrate-constraints-net-band))
 
 (defn profile-record
   "Build the stored profile record. `now-ms` is supplied by the effect layer."

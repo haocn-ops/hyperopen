@@ -59,6 +59,7 @@
     :gross-max
     :net-min
     :net-max
+    :net-band-pct
     :dust-usdc
     :max-turnover
     :rebalance-tolerance})

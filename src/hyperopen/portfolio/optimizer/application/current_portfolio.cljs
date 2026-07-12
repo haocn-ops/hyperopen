@@ -531,10 +531,17 @@
                exposures)
       (let [gross-ratio (/ gross-usdc nav-usdc)
             net-ratio (/ net-usdc nav-usdc)
-            net-min (floor-to-constraint-precision
-                     (- net-ratio exposure-band-width))
-            net-max (ceil-to-constraint-precision
-                     (+ net-ratio exposure-band-width))
+            ;; Net target = the book's current net; the tolerance is a fraction
+            ;; of REALIZED gross (:net-band-pct). Preserve the old ±0.05x
+            ;; absolute width at the current gross (0.05 / gross), clamped to
+            ;; the valid [0, 1] range.
+            net-min (floor-to-constraint-precision net-ratio)
+            net-max net-min
+            net-band-pct (if (> gross-ratio 1e-9)
+                           (min 1.0 (/ (js/Math.round
+                                        (* 1000000 (/ exposure-band-width gross-ratio)))
+                                       1000000))
+                           0.0)
             gross-max (ceil-to-constraint-precision
                        (max gross-ratio
                             (abs-number net-min)
@@ -555,5 +562,6 @@
                :gross-max gross-max
                :net-min net-min
                :net-max net-max
+               :net-band-pct net-band-pct
                :max-asset-weight max-asset-weight
                :max-turnover nil)))))

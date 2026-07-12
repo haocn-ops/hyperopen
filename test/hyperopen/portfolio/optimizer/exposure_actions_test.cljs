@@ -33,7 +33,9 @@
     (is (= (expect-write expected)
            (actions/set-portfolio-optimizer-exposure-point
             (state-with base-constraints) 50.0 50.0 bounds 1)))
-    (is (= {:gross-max 1.5 :net-min 0.0 :net-max 0.0 :max-asset-weight 0.5} expected)
+    (is (= {:gross-max 1.5 :net-min 0.0 :net-max 0.0 :net-band-pct 0.0
+            :max-asset-weight 0.5}
+           expected)
         "centre drag caps gross at 1.5 and flattens net, with no floor")))
 
 (deftest exposure-point-hover-is-a-no-op-test
@@ -66,13 +68,19 @@
         (is (= [:effects/save zoom-level-path 2] (second out)))))))
 
 (deftest exposure-band-writes-one-axis-test
-  (testing "net band widens net-min/net-max symmetrically"
+  (testing "net band stores the percentage-of-gross fraction, leaving the target alone"
     (let [expected (policy/apply-band base-constraints :net 0.25)]
       (is (= (expect-write expected)
              (actions/set-portfolio-optimizer-exposure-band
               (state-with base-constraints) :net "0.25")))
-      (is (= 0.75 (:net-min expected)))
-      (is (= 1.25 (:net-max expected)))))
+      (is (= 1.0 (:net-min expected)))
+      (is (= 1.0 (:net-max expected)))
+      (is (= 0.25 (:net-band-pct expected)))))
+  (testing ":net-pct is the same band with the value in percent (UI controls)"
+    (is (= (actions/set-portfolio-optimizer-exposure-band
+            (state-with base-constraints) :net "0.25")
+           (actions/set-portfolio-optimizer-exposure-band
+            (state-with base-constraints) :net-pct "25"))))
   (testing "an unknown axis or non-number is a no-op"
     (is (= [] (actions/set-portfolio-optimizer-exposure-band
                (state-with base-constraints) :sideways "0.1")))
@@ -111,7 +119,8 @@
       "the action is pure; the effect reads the draft, stamps time, and persists"))
 
 (deftest apply-constraint-default-writes-remembered-constraints-test
-  (let [remembered {:gross-max 1.5 :net-min 0.0 :net-max 0.0 :max-asset-weight 0.3}
+  (let [remembered {:gross-max 1.5 :net-min 0.0 :net-max 0.0 :net-band-pct 0.0
+                    :max-asset-weight 0.3}
         universe [{:instrument-id "perp:BTC"} {:instrument-id "perp:ETH"}]
         uk (profiles/universe-key universe)
         state {:portfolio {:optimizer

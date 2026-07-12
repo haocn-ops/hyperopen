@@ -42,7 +42,8 @@
 (deftest load-constraint-profiles-effect-auto-applies-on-pristine-draft-test
   (async done
     (let [uk (profiles/universe-key universe)
-          remembered {:gross-max 1.5 :net-min 0.0 :net-max 0.0 :max-asset-weight 0.3}
+          remembered {:gross-max 1.5 :net-min 0.0 :net-max 0.0 :net-band-pct 0.0
+                      :max-asset-weight 0.3}
           stored {uk {:universe-key uk :controls remembered}}
           store (store-with {:constraints {:gross-max 2.0 :net-min 1.0 :net-max 1.0}
                              :dirty? false})]

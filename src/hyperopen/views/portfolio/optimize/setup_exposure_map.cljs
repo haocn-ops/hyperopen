@@ -13,7 +13,8 @@
   All dispatch goes through the atomic exposure actions; the pad's pointer coordinates are
   resolved by the :event/clientX, :event/clientY, :event.currentTarget/bounds, and
   :event/pointer-buttons placeholders and converted to targets purely in the action handler."
-  (:require [hyperopen.views.portfolio.optimize.setup-controls :as controls]))
+  (:require [clojure.string :as str]
+            [hyperopen.views.portfolio.optimize.setup-controls :as controls]))
 
 ;; --- formatting ---------------------------------------------------------------------------
 
@@ -42,6 +43,25 @@
   [f]
   (* 100 (or f 0)))
 
+(defn- fmt-band-pct
+  "Net-band fraction (0..1) → display percentage with one decimal (0.05 → \"5.0%\")."
+  [q]
+  (if (number? q) (str (.toFixed (* 100 q) 1) "%") "--"))
+
+(defn- fmt-signed-pct
+  "Signed ratio → display percentage (0.997 → \"+99.7%\"), or — when nil (zero gross)."
+  [r]
+  (if (number? r)
+    (str (when-not (neg? r) "+") (.toFixed (* 100 r) 1) "%")
+    "—"))
+
+(defn- polygon-points
+  "Fractional [[x y] ...] vertices → SVG points string on the 0..100 pad."
+  [points]
+  (->> points
+       (map (fn [[x y]] (str (.toFixed (pct x) 2) "," (.toFixed (pct y) 2))))
+       (str/join " ")))
+
 (defn- gross-echo
   [{:keys [gross-min gross-max gross-floored?]}]
   (if gross-floored?
@@ -49,14 +69,19 @@
     (str "gross ≤ " (fmt-mult gross-max))))
 
 (defn- net-echo
-  [{:keys [net-min net-max]}]
-  (cond
-    (and (number? net-min) (number? net-max))
-    (str "net " (fmt-mult net-min) "–" (fmt-mult net-max))
+  [{:keys [net-min net-max net-band-pct]}]
+  (let [band-suffix (when (and (number? net-band-pct) (pos? net-band-pct))
+                      (str " ± " (fmt-band-pct net-band-pct) " of gross"))]
+    (cond
+      (and (number? net-min) (number? net-max) (== net-min net-max))
+      (str "net " (fmt-mult net-min) band-suffix)
 
-    (number? net-max) (str "net ≤ " (fmt-mult net-max))
-    (number? net-min) (str "net ≥ " (fmt-mult net-min))
-    :else "net unbounded"))
+      (and (number? net-min) (number? net-max))
+      (str "net " (fmt-mult net-min) "–" (fmt-mult net-max) band-suffix)
+
+      (number? net-max) (str "net ≤ " (fmt-mult net-max) band-suffix)
+      (number? net-min) (str "net ≥ " (fmt-mult net-min) band-suffix)
+      :else "net unbounded")))
 
 ;; --- the SVG pad --------------------------------------------------------------------------
 
@@ -75,13 +100,14 @@
     (:level zoom)]])
 
 (defn- exposure-pad
-  [{:keys [target-marker band-rect current-marker highlighted policy] :as model}]
+  [{:keys [target-marker band-rect band-wedge band-wedge-stripe band-edges
+           current-marker highlighted policy] :as model}]
   (let [{tx :x ty :y} target-marker
-        {bx :x by :y bw :w bh :h} band-rect
-        x0 (pct bx)
-        x1 (pct (+ bx bw))
+        {by :y bh :h} band-rect
         y-top (pct by)
         y-bot (pct (+ by bh))
+        range-x0 (pct (:left-x band-edges))
+        range-x1 (pct (:right-x band-edges))
         target-x (pct tx)
         target-y (pct ty)
         gross-warn? (:gross highlighted)
@@ -108,23 +134,25 @@
      [:line {:class ["optimizer-exposure-map__grid" "optimizer-exposure-map__grid--mid"]
              :x1 0 :y1 50 :x2 100 :y2 50}]
      [:line {:class ["optimizer-exposure-map__grid"] :x1 0 :y1 75 :x2 100 :y2 75}]
-     ;; full-length band stripes: the gross range as a full-width horizontal
-     ;; stripe, the net range as a full-height vertical stripe. At a wide axis
-     ;; (e.g. a 15x book forcing the 0-20x frame) the band box around the dot is
-     ;; smaller than the drag handle itself, so the stripes are what make a band
+     ;; full-length band regions: the gross range as a full-width horizontal
+     ;; stripe, the net band as a SLOPED WEDGE (its absolute width is a
+     ;; percentage of gross, so the boundaries are net = target ± pct·gross,
+     ;; never fixed verticals). At a wide axis the band box around the dot is
+     ;; smaller than the drag handle itself, so these are what make a band
      ;; slider drag visibly expand/contract the allowed region at ANY zoom.
      [:rect {:class ["optimizer-exposure-map__band-stripe"]
              :data-role "portfolio-optimizer-exposure-gross-stripe"
              :x 0 :y y-top :width 100 :height (max 0 (- y-bot y-top))}]
-     [:rect {:class ["optimizer-exposure-map__band-stripe"]
-             :data-role "portfolio-optimizer-exposure-net-stripe"
-             :x x0 :y 0 :width (max 0 (- x1 x0)) :height 100}]
-     ;; the allowed-region band box (the stripes' intersection, emphasized)
-     [:rect {:class ["optimizer-exposure-map__band"]
-             :data-role "portfolio-optimizer-exposure-band-box"
-             :x x0 :y y-top :width (max 0 (- x1 x0)) :height (max 0 (- y-bot y-top))}]
-     ;; net range bar (horizontal) and gross range bar (vertical) — always legible, even at band 0
-     [:line {:class ["optimizer-exposure-map__range"] :x1 x0 :y1 target-y :x2 x1 :y2 target-y}]
+     [:polygon {:class ["optimizer-exposure-map__band-stripe"]
+                :data-role "portfolio-optimizer-exposure-net-stripe"
+                :points (polygon-points (:points band-wedge-stripe))}]
+     ;; the allowed-region band wedge (the regions' intersection, emphasized)
+     [:polygon {:class ["optimizer-exposure-map__band"]
+                :data-role "portfolio-optimizer-exposure-band-box"
+                :points (polygon-points (:points band-wedge))}]
+     ;; net range bar (horizontal, at the target gross) and gross range bar (vertical)
+     [:line {:class ["optimizer-exposure-map__range"]
+             :x1 range-x0 :y1 target-y :x2 range-x1 :y2 target-y}]
      [:line {:class ["optimizer-exposure-map__range"] :x1 target-x :y1 y-top :x2 target-x :y2 y-bot}]
      ;; current portfolio dot
      (when current-marker
@@ -255,8 +283,40 @@
            :data-role (str role "-value")}
     (str "± " (fmt-mult value))]])
 
+(defn- net-off-policy-sentence
+  "The net side of an off-policy explanation. With an active percentage band the
+  honest framing is net-to-gross: around a ~zero net target the band IS a
+  net/gross limit; around a nonzero target it is a tolerance of ±pct·gross
+  AROUND that target, and the copy must say so."
+  [{:keys [net-gross-ratio net-band-pct net-target]}]
+  (let [zero-target? (and (number? net-target) (< (js/Math.abs net-target) 0.005))]
+    (cond
+      (and (number? net-band-pct) (pos? net-band-pct) zero-target?)
+      (str "Current portfolio net-to-gross exposure is " (fmt-signed-pct net-gross-ratio)
+           ", outside the allowed ±" (fmt-band-pct net-band-pct) " band.")
+
+      (and (number? net-band-pct) (pos? net-band-pct))
+      (str "Current portfolio net is outside the allowed band of the "
+           (fmt-signed-mult net-target) " net target ±" (fmt-band-pct net-band-pct)
+           " of gross (net/gross is " (fmt-signed-pct net-gross-ratio) ").")
+
+      :else
+      "Current portfolio is outside this exposure policy: net is out of range.")))
+
+(defn- off-policy-sentence
+  [{:keys [gross-ok? net-ok?] :as preview}]
+  (cond
+    (and (not gross-ok?) (not net-ok?))
+    (str "Current portfolio is outside this exposure policy: gross is out of range and "
+         (let [s (net-off-policy-sentence preview)]
+           (str (.toLowerCase (subs s 0 1)) (subs s 1))))
+    (not gross-ok?)
+    "Current portfolio is outside this exposure policy: gross is out of range."
+    :else
+    (net-off-policy-sentence preview)))
+
 (defn preview-block
-  [{:keys [current-exposure on-policy? gross-ok? net-ok?]}]
+  [{:keys [current-exposure on-policy? net-gross-ratio] :as preview}]
   (when current-exposure
     [:p {:class ["optimizer-exposure-map__preview"]
          :data-role "portfolio-optimizer-exposure-preview"
@@ -264,15 +324,12 @@
      [:span {:class controls/eyebrow-class} "Current"]
      [:span {:class ["optimizer-exposure-map__preview-value"]}
       (str (fmt-mult (:gross current-exposure)) " gross · "
-           (fmt-mult (:net current-exposure)) " net")]
+           (fmt-mult (:net current-exposure)) " net · "
+           (fmt-signed-pct net-gross-ratio) " net/gross")]
      [:span {:class ["optimizer-exposure-map__preview-verdict"]}
       ;; Inside policy is the quiet state: chip-length, no sentence. Only the
       ;; off-policy states earn a full explanation.
-      (cond
-        on-policy? "Inside policy"
-        (and (not gross-ok?) (not net-ok?)) "Current portfolio is outside this exposure policy: gross and net are out of range."
-        (not gross-ok?) "Current portfolio is outside this exposure policy: gross is out of range."
-        :else "Current portfolio is outside this exposure policy: net is out of range.")]]))
+      (if on-policy? "Inside policy" (off-policy-sentence preview))]]))
 
 (defn profile-row
   [{:keys [has-default?]}]
@@ -319,31 +376,87 @@
          :data-role "portfolio-optimizer-exposure-map"}
    (axis-frame (:axis model) (:zoom model) (exposure-pad model))])
 
+(def ^:private net-band-help
+  "Allows net exposure to vary above or below the net target by this percentage of realized gross exposure.")
+
+(def ^:private net-band-preset-pcts
+  [0 2.5 5 10 20])
+
+(defn- net-band-row
+  "The percentage net band control: a 0–50% slider, direct numeric entry up to
+  100%, quick presets, and an approximate absolute preview at the configured
+  gross target (the solver always uses realized gross)."
+  [{:keys [net-band-pct net-band-abs-preview gross-max level]}]
+  (let [pct-value (* 100 (or net-band-pct 0))
+        role "portfolio-optimizer-exposure-net-band"]
+    [:div {:class ["optimizer-exposure-map__band-group"]
+           :title net-band-help}
+     [:label {:class ["optimizer-exposure-map__band-row"]}
+      [:span {:class controls/eyebrow-class} "Net band"]
+      [:input {:type "range"
+               :min 0
+               :max 50
+               :step 0.5
+               :value (str pct-value)
+               :class ["optimizer-exposure-band" "w-full" "accent-warning"]
+               :aria-label "Net band, percent of gross"
+               :data-role role
+               :on {:input [[:actions/set-portfolio-optimizer-exposure-band
+                             :net-pct [:event.target/value] level]]}}]
+      [:span {:class ["optimizer-exposure-map__band-value"]
+              :data-role (str role "-value")}
+       (str "± " (fmt-band-pct net-band-pct) " of gross")]]
+     [:div {:class ["flex" "items-center" "gap-2" "pl-1"]}
+      [:input {:type "number"
+               :min 0
+               :max 100
+               :step 0.1
+               :value (str pct-value)
+               :replicant/key (str "net-band-pct:" pct-value)
+               :class ["optimizer-exposure-map__band-input" "input" "input-xs"
+                       "w-16" "font-mono"]
+               :aria-label "Net band percent, direct entry"
+               :data-role (str role "-input")
+               :on {:change [[:actions/set-portfolio-optimizer-exposure-band
+                              :net-pct [:event.target/value] level]]}}]
+      [:span {:class ["font-mono" "text-[0.625rem]" "text-trading-muted"]} "%"]
+      (into [:span {:class ["flex" "gap-1"]
+                    :data-role (str role "-presets")}]
+            (map (fn [p]
+                   [:button {:type "button"
+                             :class ["optimizer-exposure-map__profile-btn"]
+                             :data-role (str role "-preset-" p)
+                             :on {:click [[:actions/set-portfolio-optimizer-exposure-band
+                                           :net-pct p level]]}}
+                    (str p "%")]))
+            net-band-preset-pcts)]
+     (when (and (number? net-band-pct) (pos? net-band-pct)
+                (number? gross-max) (pos? gross-max))
+       [:p {:class ["pl-1" "font-mono" "text-[0.625rem]" "text-trading-muted"]
+            :data-role (str role "-abs-preview")}
+        (str "≈ ±" (fmt-mult net-band-abs-preview) " at " (fmt-mult gross-max)
+             " gross (preview — the solver scales with realized gross)")])]))
+
 (defn bands-block
-  "Both band-tightness sliders, for the Fine-tune drawer."
-  [{:keys [gross-band net-band max-band zoom]}]
+  "Both band-tightness controls, for the Fine-tune drawer: the gross band stays
+  an absolute leverage half-width; the net band is a percentage of gross."
+  [{:keys [gross-band net-band-pct net-band-abs-preview max-band zoom echo]}]
   [:div {:class ["optimizer-exposure-map__bands"]}
    (band-slider {:label "Gross band" :axis :gross :value gross-band
                  :max-band max-band
                  :level (:level zoom)
                  :role "portfolio-optimizer-exposure-gross-band"})
-   (band-slider {:label "Net band" :axis :net :value net-band
-                 :max-band max-band
-                 :level (:level zoom)
-                 :role "portfolio-optimizer-exposure-net-band"})])
+   (net-band-row {:net-band-pct net-band-pct
+                  :net-band-abs-preview net-band-abs-preview
+                  :gross-max (:gross-max echo)
+                  :level (:level zoom)})])
 
 (defn policy-warning
   "Off-policy sentence for the DEFAULT view — an actionable violation must not
   hide behind the Fine-tune drawer (the rail's Review-warning anchor lands on
   this panel). The quiet CURRENT/'Inside policy' line stays in preview-block."
-  [{:keys [current-exposure on-policy? gross-ok? net-ok?] :as preview}]
+  [{:keys [current-exposure on-policy?] :as preview}]
   (when (and preview current-exposure (false? on-policy?))
     [:p {:class ["font-mono" "text-[0.6875rem]" "leading-[1.5]" "text-warning"]
          :data-role "portfolio-optimizer-exposure-policy-line"}
-     (cond
-       (and (not gross-ok?) (not net-ok?))
-       "Current portfolio is outside this exposure policy: gross and net are out of range."
-       (not gross-ok?)
-       "Current portfolio is outside this exposure policy: gross is out of range."
-       :else
-       "Current portfolio is outside this exposure policy: net is out of range.")]))
+     (off-policy-sentence preview)]))

@@ -17,6 +17,8 @@
                  :gross-max 2.0
                  :net-min 1.0
                  :net-max 1.0
+                 ;; Net tolerance as a decimal fraction of realized gross (5% = 0.05).
+                 :net-band-pct 0.0
                  :max-asset-weight 0.5
                  :dust-usdc 0.0
                  :asset-overrides {}

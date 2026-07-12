@@ -379,11 +379,52 @@
    signed coefficients turn the floor into the convex linear inequality
    sum(sign_i * w_i) >= G, which equals true gross only on the fixed-sign region
    each asset's bounds carve out."
-  [constraints lower-bounds upper-bounds]
+  [constraints signs]
   (let [floor (:gross-floor constraints)]
-    (when (finite-number? floor)
-      (when-let [signs (gross-floor-signs lower-bounds upper-bounds)]
-        {:min floor :signs signs}))))
+    (when (and (finite-number? floor) signs)
+      {:min floor :signs signs})))
+
+(defn- net-band-pct-value
+  "The active net-band percentage (decimal fraction of realized gross), or nil
+   when unset/zero. Values above 1 add nothing beyond |net| ≤ gross; cap there."
+  [constraints]
+  (let [pct (:net-band-pct constraints)]
+    (when (and (finite-number? pct) (pos? pct))
+      (min pct 1.0))))
+
+(defn- net-band-spec
+  "Encoded percentage net band {:pct q :signs [...] :min nmin :max nmax}: the
+   solver permits net-min − q·gross(w) ≤ net(w) ≤ net-max + q·gross(w) using the
+   SAME signed-linear gross representation as the gross floor (realized gross,
+   never the gross target). Requires every asset single-signed — with mixed-sign
+   bounds gross is not linear and the coupled rows would be unsound — and a
+   finite net bound to widen. nil (band not applied; the exact net bounds stay
+   in force, which is strictly conservative) otherwise."
+  [constraints signs]
+  (let [pct (net-band-pct-value constraints)
+        net-exposure (:net-exposure constraints)
+        nmin (:min net-exposure)
+        nmax (:max net-exposure)]
+    (when (and pct
+               signs
+               (not (:long-only? constraints))
+               (or (finite-number? nmin) (finite-number? nmax)))
+      (cond-> {:pct pct :signs signs}
+        (finite-number? nmin) (assoc :min nmin)
+        (finite-number? nmax) (assoc :max nmax)))))
+
+(defn- net-band-warnings
+  "Explains a requested-but-unapplied percentage net band: with mixed-sign
+   bounds the tolerance cannot be encoded, so the solver holds the exact net
+   target instead (never a violation of the band, but tighter than asked)."
+  [constraints signs]
+  (if (and (net-band-pct-value constraints)
+           (nil? signs)
+           (not (:long-only? constraints)))
+    [{:code :net-band-requires-fixed-sides
+      :message (str "The net band (% of gross) needs every asset assigned to a "
+                    "long or short side; holding the exact net target instead.")}]
+    []))
 
 (defn- gross-capacity
   "Largest gross the box bounds can physically reach: sum of per-asset
@@ -397,15 +438,24 @@
                upper-bounds)))
 
 (defn- violations
-  [lower-bounds upper-bounds bounds constraints floor-spec]
+  [lower-bounds upper-bounds bounds constraints floor-spec band-spec]
   (let [target-net* (target-net constraints)
         net-limits (finite-net-limits constraints)
-        net-min (:min net-limits)
-        net-max (:max net-limits)
+        ;; A percentage net band widens the reachable net range by pct·gross;
+        ;; feasibility checks use the widest case (pct·capacity) so a band that
+        ;; makes the target reachable is not flagged infeasible, and the minimum
+        ;; gross the target forces shrinks to |target|/(1+pct).
+        band-pct (or (:pct band-spec) 0.0)
+        band-slack (* band-pct (gross-capacity lower-bounds upper-bounds))
+        net-min (when (finite-number? (:min net-limits))
+                  (- (:min net-limits) band-slack))
+        net-max (when (finite-number? (:max net-limits))
+                  (+ (:max net-limits) band-slack))
         sum-lower (reduce + 0 lower-bounds)
         sum-upper (reduce + 0 upper-bounds)
         gross-max (:gross-leverage constraints)
-        min-required-gross (minimum-required-gross net-limits)
+        min-required-gross (when-let [g (minimum-required-gross net-limits)]
+                             (/ g (+ 1.0 band-pct)))
         locked-weights (vec (keep :locked-validation bounds))
         locked-gross* (locked-gross locked-weights)]
     (vec (concat
@@ -499,8 +549,11 @@
                      universe)
         lower-bounds (mapv :lower bounds)
         upper-bounds (mapv :upper bounds)
-        floor-spec (gross-floor-spec constraints lower-bounds upper-bounds)
-        violations* (violations lower-bounds upper-bounds bounds constraints floor-spec)]
+        signs (gross-floor-signs lower-bounds upper-bounds)
+        floor-spec (gross-floor-spec constraints signs)
+        band-spec (net-band-spec constraints signs)
+        violations* (violations lower-bounds upper-bounds bounds constraints
+                                floor-spec band-spec)]
     {:status (if (seq violations*) :infeasible :ok)
      :long-only? (:long-only? constraints)
      :net-target (target-net constraints)
@@ -512,6 +565,9 @@
      :gross-exposure {:max (:gross-leverage constraints)}
      :gross-floor floor-spec
      :net-exposure (:net-exposure constraints)
+     ;; Percentage-of-realized-gross net tolerance (see net-band-spec).
+     :net-band-spec band-spec
+     :net-band-warnings (net-band-warnings constraints signs)
      ;; Canonical gross/net TARGETS (exposure-policy midpoints) for objectives
      ;; that hit exposures exactly rather than treating band edges as limits.
      ;; Derived HERE, not on the request, so draft signatures stay unchanged.
@@ -538,8 +594,9 @@
                                        current-weights*)]
     (cond
       (empty? sparse-caps)
-      (assoc base-encoded :warnings [])
+      (assoc base-encoded :warnings (vec (:net-band-warnings base-encoded)))
 
       :else
       (assoc capped-encoded
-             :warnings (mapv sparse-cap-warning sparse-caps)))))
+             :warnings (into (mapv sparse-cap-warning sparse-caps)
+                             (:net-band-warnings capped-encoded))))))

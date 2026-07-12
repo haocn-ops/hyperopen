@@ -44,6 +44,12 @@
 (def target-snap 0.05)
 (def band-eps 1e-6)
 (def max-band 0.5)
+;; The net band is a PERCENTAGE OF REALIZED GROSS (stored as a decimal: 5% = 0.05),
+;; not a leverage amount: the solver permits net within target ± pct·gross(w).
+;; 1.0 (100%) adds no restriction beyond |net| ≤ gross, so it is the hard ceiling.
+(def max-net-band-pct 1.0)
+;; The slider stops at 50%; direct numeric entry may go to max-net-band-pct.
+(def net-band-pct-slider-max 0.5)
 
 (def preset-keys [:conservative :balanced :high-gross :long-bias])
 
@@ -77,12 +83,14 @@
 
 (defn- axis-needs
   "The gross/net magnitudes the view must contain: the far band edges of the policy plus the
-  current portfolio exposure (so the 'current' dot is always framed)."
-  [{:keys [gross-target gross-band net-target net-band current-gross current-net]}]
-  {:gross (max (+ (max 0.0 (or gross-target 0.0)) (max 0.0 (or gross-band 0.0)))
-               (or current-gross 0.0))
-   :net (max (+ (js/Math.abs (or net-target 0.0)) (max 0.0 (or net-band 0.0)))
-             (js/Math.abs (or current-net 0.0)))})
+  current portfolio exposure (so the 'current' dot is always framed). The net band is a
+  fraction of gross, so its widest absolute extent sits at the policy's max gross."
+  [{:keys [gross-target gross-band net-target net-band-pct current-gross current-net]}]
+  (let [gross-hi (+ (max 0.0 (or gross-target 0.0)) (max 0.0 (or gross-band 0.0)))
+        pct (max 0.0 (or net-band-pct 0.0))]
+    {:gross (max gross-hi (or current-gross 0.0))
+     :net (max (+ (js/Math.abs (or net-target 0.0)) (* pct gross-hi))
+               (js/Math.abs (or current-net 0.0)))}))
 
 (defn- overflow-axis
   "Scale for values beyond the largest zoom level (only reachable through the advanced raw
@@ -124,10 +132,18 @@
 
 ;; --- Forward: canonical constraints -> exposure policy ------------------------------------
 
+(defn clamp-net-band-pct
+  "Coerce a net-band percentage (decimal: 5% = 0.05) to [0, max-net-band-pct],
+  rounded to 1e-6 so persisted values stay clean."
+  [value]
+  (let [v (clamp (if (finite-number? value) value 0.0) 0.0 max-net-band-pct)]
+    (/ (js/Math.round (* v 1000000)) 1000000)))
+
 (defn constraints->policy
-  "Derive {:gross-target :gross-band :net-target :net-band} from the canonical constraint map.
-  Net defaults to both bounds present; gross-min is nilable (nil ⇒ ceiling-only ⇒ band 0,
-  target = gross-max)."
+  "Derive {:gross-target :gross-band :net-target :net-band-pct} from the canonical constraint
+  map. The net target is the min/max midpoint (the advanced raw fields may still hold a spread);
+  the net band is the :net-band-pct fraction-of-gross tolerance around that target. gross-min is
+  nilable (nil ⇒ ceiling-only ⇒ band 0, target = gross-max)."
   [constraints]
   (let [gmax (when (finite-number? (:gross-max constraints)) (:gross-max constraints))
         gmin (when (finite-number? (:gross-min constraints)) (:gross-min constraints))
@@ -138,7 +154,6 @@
                      nmax nmax
                      nmin nmin
                      :else 0.0)
-        net-band (if (and nmin nmax) (/ (- nmax nmin) 2) 0.0)
         gross-target (cond
                        (and gmin gmax) (/ (+ gmin gmax) 2)
                        gmax gmax
@@ -148,7 +163,7 @@
     {:gross-target (round4 gross-target)
      :gross-band (round4 (max 0.0 gross-band))
      :net-target (round4 net-target)
-     :net-band (round4 (max 0.0 net-band))}))
+     :net-band-pct (clamp-net-band-pct (:net-band-pct constraints))}))
 
 (defn engine-constraints->policy
   "Canonical gross/net TARGETS from the ENGINE-side constraint keys. The request
@@ -163,24 +178,33 @@
   (constraints->policy {:gross-max (:gross-leverage constraints)
                         :gross-min (:gross-floor constraints)
                         :net-min (get-in constraints [:net-exposure :min])
-                        :net-max (get-in constraints [:net-exposure :max])}))
+                        :net-max (get-in constraints [:net-exposure :max])
+                        :net-band-pct (:net-band-pct constraints)}))
 
 ;; --- Reverse: exposure policy -> canonical constraints ------------------------------------
 
 (defn policy->constraints
   "Return `constraints` with gross/net bounds recomputed from `policy`. Writes gross-max,
-  net-min, net-max always; writes gross-min only when the gross band is positive, otherwise
-  DISSOCs it to preserve the no-floor default. Returns a full constraints map so callers persist
-  it whole."
-  [constraints {:keys [gross-target gross-band net-target net-band]}]
+  net-min, net-max, net-band-pct always; writes gross-min only when the gross band is positive,
+  otherwise DISSOCs it to preserve the no-floor default. Any pre-existing net min/max SPREAD
+  (set through the advanced raw fields) is preserved around the moved target, so the pad never
+  silently collapses an advanced absolute range. Returns a full constraints map so callers
+  persist it whole."
+  [constraints {:keys [gross-target gross-band net-target net-band-pct]}]
   (let [gt (max 0.0 (or gross-target 0.0))
         gb (max 0.0 (or gross-band 0.0))
         nt (or net-target 0.0)
-        nb (max 0.0 (or net-band 0.0))]
+        nmin (:net-min constraints)
+        nmax (:net-max constraints)
+        spread (if (and (finite-number? nmin) (finite-number? nmax) (> nmax nmin))
+                 (- nmax nmin)
+                 0.0)
+        half (/ spread 2)]
     (cond-> (assoc constraints
                    :gross-max (round4 (+ gt gb))
-                   :net-min (round4 (- nt nb))
-                   :net-max (round4 (+ nt nb)))
+                   :net-min (round4 (- nt half))
+                   :net-max (round4 (+ nt half))
+                   :net-band-pct (clamp-net-band-pct net-band-pct))
       (> gb band-eps) (assoc :gross-min (round4 (max 0.0 (- gt gb))))
       (<= gb band-eps) (dissoc :gross-min))))
 
@@ -189,21 +213,22 @@
 (defn apply-point
   "Move the target point to `{:gross-target :net-target}` while preserving both bands."
   [constraints {:keys [gross-target net-target]}]
-  (let [{:keys [gross-band net-band]} (constraints->policy constraints)]
+  (let [{:keys [gross-band net-band-pct]} (constraints->policy constraints)]
     (policy->constraints constraints
                          {:gross-target gross-target
                           :gross-band gross-band
                           :net-target net-target
-                          :net-band net-band})))
+                          :net-band-pct net-band-pct})))
 
 (defn apply-band
-  "Set the `axis` (:gross | :net) band to `value`, clamped to [0, max-band], preserving targets."
+  "Set the `axis` band, preserving targets. :gross is an absolute leverage half-width clamped
+  to [0, max-band]; :net is a PERCENTAGE OF GROSS (decimal) clamped to [0, max-net-band-pct]."
   [constraints axis value]
   (let [policy (constraints->policy constraints)
-        v (clamp (max 0.0 (or value 0.0)) 0.0 max-band)
         policy' (case axis
-                  :gross (assoc policy :gross-band v)
-                  :net (assoc policy :net-band v)
+                  :gross (assoc policy :gross-band
+                                (clamp (max 0.0 (or value 0.0)) 0.0 max-band))
+                  :net (assoc policy :net-band-pct (clamp-net-band-pct value))
                   policy)]
     (policy->constraints constraints policy')))
 
@@ -214,10 +239,16 @@
 ;; points a trader can then nudge; see the ExecPlan Decision Log for the rationale.
 
 (def presets
-  {:conservative {:gross-max 1.0 :net-min 0.0 :net-max 0.0 :max-asset-weight 0.25}
-   :balanced     {:gross-max 2.0 :net-min 1.0 :net-max 1.0 :max-asset-weight 0.5}
-   :high-gross   {:gross-max 3.0 :net-min 1.0 :net-max 1.0 :max-asset-weight 0.5}
-   :long-bias    {:gross-max 2.0 :net-min 1.25 :net-max 1.75 :max-asset-weight 0.5}})
+  {:conservative {:gross-max 1.0 :net-min 0.0 :net-max 0.0 :net-band-pct 0.0
+                  :max-asset-weight 0.25}
+   :balanced     {:gross-max 2.0 :net-min 1.0 :net-max 1.0 :net-band-pct 0.0
+                  :max-asset-weight 0.5}
+   :high-gross   {:gross-max 3.0 :net-min 1.0 :net-max 1.0 :net-band-pct 0.0
+                  :max-asset-weight 0.5}
+   ;; Long Bias: net target 1.5x with a ±12.5%-of-gross tolerance (the old ±0.25x
+   ;; absolute band at the preset's 2.0x gross target).
+   :long-bias    {:gross-max 2.0 :net-min 1.5 :net-max 1.5 :net-band-pct 0.125
+                  :max-asset-weight 0.5}})
 
 (def preset-labels
   {:conservative "Conservative"
@@ -238,11 +269,14 @@
   else :custom."
   [constraints]
   (or (some (fn [k]
-              (let [{:keys [gross-max net-min net-max max-asset-weight]} (get presets k)]
+              (let [{:keys [gross-max net-min net-max net-band-pct max-asset-weight]}
+                    (get presets k)]
                 (when (and (nil? (:gross-min constraints))
                            (approx= (:gross-max constraints) gross-max)
                            (approx= (:net-min constraints) net-min)
                            (approx= (:net-max constraints) net-max)
+                           (approx= (or (:net-band-pct constraints) 0.0)
+                                    (or net-band-pct 0.0))
                            (approx= (:max-asset-weight constraints) max-asset-weight))
                   k)))
             preset-keys)
@@ -259,12 +293,12 @@
   reachable range so the WHOLE band box stays inside the view: `target + band ≤ axis max` is the
   fixpoint that keeps a drag from ever forcing a re-fit of the scale mid-gesture."
   [{:keys [client-x client-y bounds buttons gross-axis-max net-axis-extent
-           gross-band net-band]}]
+           gross-band net-band-pct]}]
   (let [{:keys [left top width height]} bounds
         g-max (if (finite-number? gross-axis-max) gross-axis-max gross-axis-floor)
         n-ext (if (finite-number? net-axis-extent) net-axis-extent net-axis-floor)
         g-band (if (finite-number? gross-band) (max 0.0 gross-band) 0.0)
-        n-band (if (finite-number? net-band) (max 0.0 net-band) 0.0)
+        n-pct (clamp-net-band-pct net-band-pct)
         pressed? (and (number? buttons) (pos? buttons))]
     (when (and pressed?
                (finite-number? client-x) (finite-number? client-y)
@@ -274,14 +308,18 @@
       (let [fx (clamp (/ (- client-x left) width) 0.0 1.0)
             fy (clamp (/ (- client-y top) height) 0.0 1.0)
             gross-reach (max 0.0 (- g-max g-band))
+            gross-target (min (snap (* g-max (- 1.0 fy))) gross-reach)
             ;; Net reach also respects the gross reach: gross ≥ |net| lifts the gross target to
             ;; |net|, so a net target beyond gross-reach would push gross-target + gross-band
             ;; past the axis max (reachable via advanced raw fields, where the gross band is not
-            ;; capped at max-band) and force a mid-drag re-fit.
-            net-reach (max 0.0 (min (- n-ext n-band) gross-reach))
+            ;; capped at max-band) and force a mid-drag re-fit. The net band's absolute extent
+            ;; is pct·(gross-target + gross-band); the (1+pct) division covers the case where
+            ;; |net| itself lifts the gross target (gross* = |net|).
+            net-reach (max 0.0 (min (- n-ext (* n-pct (+ gross-target g-band)))
+                                    (/ (- n-ext (* n-pct g-band)) (+ 1.0 n-pct))
+                                    gross-reach))
             net-target (clamp (snap (+ (- n-ext) (* fx (* 2 n-ext))))
                               (- net-reach) net-reach)
-            gross-target (min (snap (* g-max (- 1.0 fy))) gross-reach)
             ;; Gross is total absolute exposure, so it can never be below the absolute net
             ;; target; clamp to keep the box physically meaningful.
             gross-target* (max gross-target (js/Math.abs net-target))]
@@ -308,14 +346,76 @@
    {:x (net->fraction (or net-target 0.0) net-extent)
     :y (gross->fraction (or gross-target 0.0) gross-max)}))
 
+(defn net-band-edges
+  "Allowed net range at realized gross `g`: target ± pct·g, clipped to the natural |net| ≤ g
+  relationship. When the target itself is unreachable at this gross the range collapses onto
+  the clamped target so the geometry stays degenerate rather than inverted."
+  [net-target pct g]
+  (let [g* (max 0.0 (or g 0.0))
+        nt (or net-target 0.0)
+        p (clamp-net-band-pct pct)
+        lo (max (- nt (* p g*)) (- g*))
+        hi (min (+ nt (* p g*)) g*)]
+    (if (<= lo hi)
+      {:left lo :right hi}
+      (let [c (clamp nt (- g*) g*)]
+        {:left c :right c}))))
+
+(defn- wedge-breakpoints
+  "Gross values in (g0, g1) where a band edge meets the |net| ≤ gross clip and the boundary
+  slope changes (the wedge polygon needs a vertex there)."
+  [nt pct g0 g1]
+  (if (>= pct 1.0)
+    []
+    (->> [(/ nt (- 1.0 pct)) (/ (- nt) (- 1.0 pct))]
+         (filter #(and (finite-number? %) (< g0 %) (< % g1)))
+         sort
+         vec)))
+
+(defn- wedge-points
+  "Fractional polygon vertices (counter-clockwise in pad space) of the region
+  gross ∈ [g0, g1] × net ∈ [target − pct·gross, target + pct·gross] ∩ |net| ≤ gross."
+  [nt pct g0 g1 {:keys [gross-max net-extent]}]
+  (let [gs (into [g0] (conj (wedge-breakpoints nt pct g0 g1) g1))
+        point (fn [net g]
+                [(net->fraction net net-extent) (gross->fraction g gross-max)])
+        right-side (mapv (fn [g] (point (:right (net-band-edges nt pct g)) g)) gs)
+        left-side (mapv (fn [g] (point (:left (net-band-edges nt pct g)) g)) (rseq gs))]
+    (into right-side left-side)))
+
+(defn band-wedge
+  "Fractional polygon {:points [[x y] ...]} of the allowed exposure region: the gross band
+  crossed with the percentage net band, whose absolute width scales with gross — a sloped
+  wedge, not a fixed-width vertical stripe."
+  ([policy] (band-wedge policy default-axis))
+  ([{:keys [gross-target gross-band net-target net-band-pct]} axis]
+   (let [gt (max 0.0 (or gross-target 0.0))
+         gb (max 0.0 (or gross-band 0.0))
+         g0 (max 0.0 (- gt gb))
+         g1 (+ gt gb)]
+     {:points (wedge-points (or net-target 0.0)
+                            (clamp-net-band-pct net-band-pct)
+                            g0 g1 axis)})))
+
+(defn band-wedge-stripe
+  "Fractional polygon of the percentage net band swept across the FULL gross axis (0..max) —
+  the full-height analogue of the old vertical net stripe, now sloped."
+  ([policy] (band-wedge-stripe policy default-axis))
+  ([{:keys [net-target net-band-pct]} {:keys [gross-max] :as axis}]
+   {:points (wedge-points (or net-target 0.0)
+                          (clamp-net-band-pct net-band-pct)
+                          0.0 gross-max axis)}))
+
 (defn band-rect
-  "Fractional {:x :y :w :h} (0..1) rectangle of the allowed exposure region (the band box)."
+  "Fractional {:x :y :w :h} (0..1) rectangle of the allowed exposure region evaluated at the
+  policy's MAX gross (the wedge's widest extent). Kept for framing math; the pad renders
+  `band-wedge` so the sloped percentage boundaries are visible."
   ([policy] (band-rect policy default-axis))
-  ([{:keys [gross-target gross-band net-target net-band]} {:keys [gross-max net-extent]}]
+  ([{:keys [gross-target gross-band net-target net-band-pct]} {:keys [gross-max net-extent]}]
    (let [gt (or gross-target 0.0)
          gb (max 0.0 (or gross-band 0.0))
          nt (or net-target 0.0)
-         nb (max 0.0 (or net-band 0.0))
+         nb (* (clamp-net-band-pct net-band-pct) (+ gt gb))
          x0 (net->fraction (- nt nb) net-extent)
          x1 (net->fraction (+ nt nb) net-extent)
          y-top (gross->fraction (+ gt gb) gross-max)

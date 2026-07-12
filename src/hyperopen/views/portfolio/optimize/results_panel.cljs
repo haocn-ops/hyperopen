@@ -129,12 +129,11 @@
           [:div {:replicant/key "optimizer-volatility-risk-cards"
                  :data-role "portfolio-optimizer-volatility-risk-cards"}
            (volatility-intuition-card/volatility-intuition-card result)]
-          ;; Frontier quality / selection stability / stop reason (2026-07-12
-          ;; user request): relocated below the volatility-intuition card
-          ;; instead of leading the rail — the next-step row above is the
-          ;; higher-priority lead and stays put. Equal Risk already carries its
-          ;; analogous rows in equal-risk-confidence-rail's single card.
-          (when-not equal-risk?
+          ;; Quality detail follows volatility intuition for both objectives;
+          ;; their lead cards remain above it. Each renderer owns the rows
+          ;; meaningful to its objective.
+          (if equal-risk?
+            (equal-risk-confidence-rail/equal-risk-confidence-quality-rail result)
             (diagnostics-rail/result-confidence-quality-rail refinement))
           (diagnostics-rail/trust-diagnostics-rail result)
           (active-views-editor state draft result readiness)]]]))))

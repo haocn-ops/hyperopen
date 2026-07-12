@@ -8,7 +8,8 @@
             [clojure.string :as str]
             [hyperopen.views.portfolio.optimize.results-panel :as results-panel]
             [hyperopen.views.portfolio.optimize.test-support
-             :refer [collect-nodes collect-strings node-by-role solved-result]]))
+             :refer [collect-nodes collect-strings data-role-order index-of
+                     node-by-role solved-result]]))
 
 (def ^:private equal-risk-solver-section
   {:strategy :sequential-equal-risk
@@ -131,6 +132,26 @@
     (testing "the trust rail reads contributions, not weight-based effective N"
       (is (contains? strings "Negative contributors"))
       (is (not (contains? strings "Diversification"))))))
+
+(deftest results-panel-equal-risk-places-quality-below-volatility-intuition-test
+  (let [view-node (render approximate-result)
+        order (data-role-order view-node)
+        quality-panel (node-by-role view-node
+                                    "portfolio-optimizer-equal-risk-confidence-quality-panel")
+        quality-strings (set (collect-strings quality-panel))]
+    (is (every? quality-strings
+                ["Equal-risk fit"
+                 "Allocation freedom"
+                 "Solution stability"
+                 "Stop reason"])
+        "The Equal Risk diagnostic rows render together in their own quality block.")
+    (is (and (< (index-of order "portfolio-optimizer-equal-risk-confidence-panel")
+               (index-of order "portfolio-optimizer-volatility-risk-cards"))
+             (< (index-of order "portfolio-optimizer-equal-risk-next-step")
+               (index-of order "portfolio-optimizer-volatility-risk-cards"))
+             (< (index-of order "portfolio-optimizer-volatility-risk-cards")
+               (index-of order "portfolio-optimizer-equal-risk-confidence-quality-panel")))
+        "The Equal Risk lead stays above volatility intuition; its quality block follows it.")))
 
 (deftest results-panel-equal-risk-clamps-off-scale-current-markers-test
   ;; A current book concentrating ~all volatility in one asset (the usual

@@ -45,8 +45,24 @@
 
 (defn equal-risk-confidence-rail
   "Renders nil for non-equal-risk results (the caller falls back to the
-  refinement rail). Degrades gracefully on persisted pre-redesign results:
-  freedom/stability rows show em-dashes instead of guessing."
+  refinement rail). The quality rows render separately below the volatility
+  intuition slot."
+  [result]
+  (when (equal-risk-results/equal-risk-result? result)
+    (let [fully-determined? (= :fully-determined
+                               (:status (equal-risk-results/allocation-freedom result)))]
+      [:aside {:class ["optimizer-result-confidence-panel"
+                       "min-h-0" "border-l" "border-base-300" "bg-base-100/95"]
+               :data-role "portfolio-optimizer-equal-risk-confidence-panel"}
+       [:div {:class ["border-b" "border-base-300" "px-4" "py-3"]}
+        [:p {:class ["font-mono" "text-[0.62rem]" "uppercase" "tracking-[0.08em]" "text-trading-muted/70"]}
+         "Result confidence"]]
+       (from-here-row fully-determined?)])))
+
+(defn equal-risk-confidence-quality-rail
+  "Renders the four Equal Risk quality rows below the volatility-intuition
+  slot. Degrades gracefully on persisted pre-redesign results: freedom and
+  stability rows show em-dashes instead of guessing."
   [result]
   (when (equal-risk-results/equal-risk-result? result)
     (let [quality (get-in result [:risk-contributions :quality])
@@ -54,17 +70,11 @@
           max-pts (get-in result [:risk-contributions :max-absolute-error])
           freedom (equal-risk-results/freedom-view
                    (equal-risk-results/allocation-freedom result))
-          fully-determined? (= :fully-determined
-                              (:status (equal-risk-results/allocation-freedom result)))
           stability (equal-risk-results/solution-stability result)
           stop (equal-risk-results/stop-reason result)]
       [:aside {:class ["optimizer-result-confidence-panel"
                        "min-h-0" "border-l" "border-base-300" "bg-base-100/95"]
-               :data-role "portfolio-optimizer-equal-risk-confidence-panel"}
-       [:div {:class ["border-b" "border-base-300" "px-4" "py-3"]}
-        [:p {:class ["font-mono" "text-[0.62rem]" "uppercase" "tracking-[0.08em]" "text-trading-muted/70"]}
-         "Result confidence"]]
-       (from-here-row fully-determined?)
+               :data-role "portfolio-optimizer-equal-risk-confidence-quality-panel"}
        (rail/confidence-row
         {:label "Equal-risk fit"
          :status (status->row-status (:status quality-view))

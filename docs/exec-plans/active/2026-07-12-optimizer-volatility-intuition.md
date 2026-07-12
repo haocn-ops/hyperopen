@@ -303,6 +303,19 @@ engine paths, and the full existing optimizer test surface stays green.
   in the request). Full suite 5548/5548 green; `npm run gates` 34/34 PASS;
   browser-verified on the workbench build (screenshot showed the
   duplicate-header rough edge, which prompted the "Solve quality" rename).
+- [x] (2026-07-12) Follow-up: apply the same hierarchy to Equal Risk without
+  changing its objective-specific content. The frozen RED contract moves its
+  four existing confidence rows into
+  `portfolio-optimizer-equal-risk-confidence-quality-panel` after the stable
+  volatility-intuition slot, while retaining the Result confidence header and
+  From here lead above it; non-Equal-Risk ordering remains unchanged. The
+  frozen RED run failed only on the absent panel/order assertions; after the
+  two-file renderer split, `npm test` passed (814 namespaces, 0 compile
+  warnings). Final validation passed all 34 repository gates (6,264 tests,
+  33,465 assertions), the focused volatility-intuition Playwright spec passed
+  7/7, and all six governed browser-QA passes passed at 375, 768, 1280, and
+  1440 with a supplemental 1920 capture confirming the three-column rail;
+  browser cleanup succeeded.
 - [x] (2026-07-12) Follow-up (direct user request, revisiting the mockup's
   ONE-YEAR MODELED LEVERAGE IMPACT component): the leverage-risk content was
   promoted from a right-rail card to its own full-width center-column panel
@@ -420,6 +433,13 @@ engine paths, and the full existing optimizer test surface stays green.
 
 ## Outcomes & Retrospective
 
+- (2026-07-12, Equal Risk hierarchy follow-up) The Equal Risk Result confidence
+  header and From here lead stay above Volatility intuition, while its existing
+  Fit, Allocation freedom, Solution stability, and Stop reason rows render in a
+  separate panel immediately afterward and before trust diagnostics. The frozen
+  DOM-order contract, full gate matrix, focused Playwright, and governed browser
+  QA all pass; the supplemental 1920 capture directly verifies the user-visible
+  three-column placement.
 - 2026-07-12: Shipped end to end — two pure domain namespaces
   (volatility-intuition scaling, leverage-risk lognormal outcomes), one shared
   read-model, the rail card with DOM-radio Target/Current toggle, the gated

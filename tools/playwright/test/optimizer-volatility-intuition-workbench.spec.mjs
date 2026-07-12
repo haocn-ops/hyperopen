@@ -87,10 +87,26 @@ test.describe("volatility intuition (workbench scenes)", () => {
     const currentPanel = frame.locator(
       role("portfolio-optimizer-volatility-intuition-panel-current")
     );
+    const dailyTrack = targetPanel
+      .locator(role("portfolio-optimizer-volatility-intuition-target-daily"))
+      .locator(".optimizer-vol-intuition-track");
+    const dailyFill = dailyTrack.locator(".optimizer-vol-intuition-fill");
+    const targetTab = frame.locator(
+      role("portfolio-optimizer-volatility-intuition-tab-target")
+    );
 
     // Target is the recommendation default (no radio checked yet).
     await expect(targetPanel).toBeVisible();
     await expect(currentPanel).toBeHidden();
+    // Reference-worktree visual contract: the magnitude track is visible and
+    // the active tab carries the amber underline rather than browser defaults.
+    await expect(dailyTrack).toHaveCSS("height", "6px");
+    await expect(dailyFill).toHaveCSS("height", "6px");
+    await expect(dailyFill).not.toHaveCSS("width", "0px");
+    await expect(targetTab).toHaveCSS(
+      "box-shadow",
+      /rgb\(212, 181, 88\) 0px -2px 0px/
+    );
 
     await frame
       .locator(role("portfolio-optimizer-volatility-intuition-tab-current"))

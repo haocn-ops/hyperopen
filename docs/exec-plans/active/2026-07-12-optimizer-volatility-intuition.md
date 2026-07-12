@@ -267,6 +267,13 @@ engine paths, and the full existing optimizer test surface stays green.
 
 ## Progress
 
+- [x] (2026-07-12) Restored exact visual parity with the source worktree for
+  Volatility Intuition and One-Year Modeled Leverage Impact. The apparent
+  missing-bar/duplicated-panel regression came from a different worktree's
+  dev server owning port 8080, not divergent component source. Focused browser
+  coverage now asserts the reference 6px bars, amber active-tab underline,
+  and one-visible-panel Target/Current behavior.
+
 - [x] (2026-07-12) Recon: annualization convention confirmed 365 in
   `domain/risk.cljs` + `domain/returns.cljs`; result payload keys confirmed
   (`:volatility`, `:current-volatility`, `:expected-return`,

@@ -3,8 +3,20 @@
             [cljs.test :refer-macros [deftest is testing]]
             [hyperopen.margin-rec.actions :as actions]
             [hyperopen.margin-rec.state :as state]
+            [hyperopen.schema.contracts.action-args :as action-args]
             [hyperopen.schema.contracts.common :as common]
             [hyperopen.trading-settings :as trading-settings]))
+
+(deftest toggle-panel-arg-spec-accepts-dispatch-payloads
+  ;; The runtime validates the RAW dispatch args before placeholders resolve,
+  ;; so the anchor slot carries the literal :event.currentTarget/bounds keyword
+  ;; (not a map). The chip's dispatch payload must satisfy the spec, else the
+  ;; action is rejected and the popover never opens.
+  (is (s/valid? ::action-args/margin-rec-panel-args
+                ["xyz:TSM|xyz" :event.currentTarget/bounds]))
+  (is (s/valid? ::action-args/margin-rec-panel-args ["xyz:TSM|xyz"]))
+  (is (s/valid? ::action-args/margin-rec-panel-args
+                ["xyz:TSM|xyz" {:left 1 :top 2}])))
 
 (defn- assert-save-effects-valid!
   "Every emitted :effects/save must satisfy the runtime arg contract —

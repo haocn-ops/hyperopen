@@ -162,9 +162,12 @@
 (s/def ::action-id (s/and keyword?
                           #(= "actions" (namespace %))))
 (s/def ::margin-rec-now-args (s/tuple number?))
+;; The anchor slot carries the raw :event.currentTarget/bounds placeholder at
+;; dispatch-validation time (placeholders resolve after this check), so it must
+;; accept `any?` — mirrors ::position-margin-open-args / ::position-reduce-open-args.
 (s/def ::margin-rec-panel-args
-  (s/cat :position-key (s/nilable ::common/non-empty-string)
-         :anchor (s/? (s/nilable map?))))
+  (s/or :key-only (s/tuple (s/nilable ::common/non-empty-string))
+        :key-and-anchor (s/tuple (s/nilable ::common/non-empty-string) any?)))
 (s/def ::margin-rec-risk-mode-args
   (s/tuple (s/or :keyword keyword? :string string?)))
 (def action-args-spec-by-id

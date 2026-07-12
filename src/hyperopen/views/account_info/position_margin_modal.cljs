@@ -340,8 +340,33 @@
             :on {:click [[:actions/close-position-margin-modal]]}}
    "x"])
 
+(defn- recommendation-hint-row
+  "One-tap prefill of the modeled recommended top-up (from margin-rec)."
+  [{:keys [additional p-now p-after]}]
+  (when (number? additional)
+    [:button {:type "button"
+              :data-role "position-margin-rec-hint"
+              :class ["flex" "w-full" "items-center" "justify-between" "gap-3"
+                      "rounded-md" "border" "border-amber-500/30" "bg-amber-500/10"
+                      "px-3" "py-2" "text-left" "text-xs" "text-amber-200"
+                      "transition-colors" "hover:bg-amber-500/20"
+                      "focus:outline-none"]
+              :on {:click [[:actions/set-position-margin-modal-field [:mode] "add"]
+                           [:actions/set-position-margin-modal-field
+                            [:amount-input]
+                            (.toFixed additional 2)]]}}
+     [:span
+      (str "Recommended: add $" (.toFixed additional 2))
+      (when (and (number? p-now) (number? p-after))
+        (str " — modeled liq. risk "
+             (.toFixed (* 100 p-now) 1) "% → "
+             (.toFixed (* 100 p-after) 1) "%"))]
+     [:span {:class ["font-semibold"]} "Use"]]))
+
 (defn position-margin-modal-view
-  [modal]
+  ([modal]
+   (position-margin-modal-view modal nil))
+  ([modal opts]
   (let [modal* (or modal (position-margin/default-modal-state))]
     (when (position-margin/open? modal*)
       (let [validation (position-margin/validate-modal modal*)
@@ -370,6 +395,7 @@
 
              (metric-row "Current Margin" (format-usdc (:margin-used modal*)))
              (metric-row "Margin Available to Add" (format-usdc (:available-to-add modal*)))
+             (recommendation-hint-row (:recommendation opts))
              (drag-confirmation-summary modal*)
 
              (amount-input-row modal*)
@@ -463,4 +489,4 @@
                        :aria-label "Adjust Margin"
                        :data-position-margin-surface "true"
                        :on {:keydown [[:actions/handle-position-margin-modal-keydown [:event/key]]]}}]
-                (keep identity panel-children)))))))
+                (keep identity panel-children))))))))

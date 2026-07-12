@@ -18,6 +18,8 @@
         :modules {:main {:init-fn hyperopen.core/start!}
                   :trading_crypto {:entries [hyperopen.trading-crypto.module]
                                    :depends-on #{:main}}
+                  :margin_rec {:entries [hyperopen.margin-rec.engine-module]
+                               :depends-on #{:main}}
                   :trade_chart {:entries [hyperopen.views.trading-chart.module]
                                 :depends-on #{:main}}
                   :trading_indicators {:entries [hyperopen.views.trading-chart.indicators-module]
@@ -131,6 +133,8 @@
             :modules {:main {:init-fn hyperopen.core/start!}
                       :trading_crypto {:entries [hyperopen.trading-crypto.module]
                                        :depends-on #{:main}}
+                      :margin_rec {:entries [hyperopen.margin-rec.engine-module]
+                                   :depends-on #{:main}}
                       :trade_chart {:entries [hyperopen.views.trading-chart.module]
                                     :depends-on #{:main}}
                       :trading_indicators {:entries [hyperopen.views.trading-chart.indicators-module]

@@ -182,10 +182,17 @@
             [hyperopen.leaderboard.effects-test]
             [hyperopen.leaderboard.normalization-test]
             [hyperopen.leaderboard.preferences-test]
+            [hyperopen.margin-rec.actions-test]
+            [hyperopen.margin-rec.episodes-test]
+            [hyperopen.margin-rec.paths-test]
+            [hyperopen.margin-rec.recommend-test]
+            [hyperopen.margin-rec.state-test]
+            [hyperopen.margin-rec.tiers-test]
             [hyperopen.order.actions-test]
             [hyperopen.order.cancel-guard-test]
             [hyperopen.order.exchange-errors-test]
             [hyperopen.order.feedback-runtime-test]
+            [hyperopen.order.margin-rec-intent-test]
             [hyperopen.order.outcome-option-sort-test]
             [hyperopen.orderbook.actions-test]
             [hyperopen.orderbook.price-aggregation-test]
@@ -209,6 +216,7 @@
             [hyperopen.portfolio.montecarlo.actions-test]
             [hyperopen.portfolio.montecarlo.engine-test]
             [hyperopen.portfolio.optimizer.actions-test]
+            [hyperopen.portfolio.optimizer.actions.execution-margin-rec-test]
             [hyperopen.portfolio.optimizer.application.assumption-library-test]
             [hyperopen.portfolio.optimizer.application.black-litterman-calibration-test]
             [hyperopen.portfolio.optimizer.application.black-litterman-editor-model-test]
@@ -516,6 +524,7 @@
             [hyperopen.views.account-equity-view-token-price-test]
             [hyperopen.views.account-info-view-test]
             [hyperopen.views.account-info.cache-keys-test]
+            [hyperopen.views.account-info.margin-recommendation-panel-test]
             [hyperopen.views.account-info.navigation-test]
             [hyperopen.views.account-info.position-overlay-mobile-layout-test]
             [hyperopen.views.account-info.position-tpsl-modal-test]
@@ -1002,10 +1011,17 @@
              'hyperopen.leaderboard.effects-test
              'hyperopen.leaderboard.normalization-test
              'hyperopen.leaderboard.preferences-test
+             'hyperopen.margin-rec.actions-test
+             'hyperopen.margin-rec.episodes-test
+             'hyperopen.margin-rec.paths-test
+             'hyperopen.margin-rec.recommend-test
+             'hyperopen.margin-rec.state-test
+             'hyperopen.margin-rec.tiers-test
              'hyperopen.order.actions-test
              'hyperopen.order.cancel-guard-test
              'hyperopen.order.exchange-errors-test
              'hyperopen.order.feedback-runtime-test
+             'hyperopen.order.margin-rec-intent-test
              'hyperopen.order.outcome-option-sort-test
              'hyperopen.orderbook.actions-test
              'hyperopen.orderbook.price-aggregation-test
@@ -1029,6 +1045,7 @@
              'hyperopen.portfolio.montecarlo.actions-test
              'hyperopen.portfolio.montecarlo.engine-test
              'hyperopen.portfolio.optimizer.actions-test
+             'hyperopen.portfolio.optimizer.actions.execution-margin-rec-test
              'hyperopen.portfolio.optimizer.application.assumption-library-test
              'hyperopen.portfolio.optimizer.application.black-litterman-calibration-test
              'hyperopen.portfolio.optimizer.application.black-litterman-editor-model-test
@@ -1336,6 +1353,7 @@
              'hyperopen.views.account-equity-view-token-price-test
              'hyperopen.views.account-info-view-test
              'hyperopen.views.account-info.cache-keys-test
+             'hyperopen.views.account-info.margin-recommendation-panel-test
              'hyperopen.views.account-info.navigation-test
              'hyperopen.views.account-info.position-overlay-mobile-layout-test
              'hyperopen.views.account-info.position-tpsl-modal-test

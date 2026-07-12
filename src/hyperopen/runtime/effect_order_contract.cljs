@@ -150,6 +150,23 @@
     :allow-duplicate-heavy-effects? false
     :heavy-effect-ids #{:effects/api-submit-position-margin}}
 
+   ;; Background recommendation sync fans out one candle fetch per isolated
+   ;; coin, so duplicate heavy effects are expected.
+   :actions/margin-rec-sync
+   {:required-phase-order [:projection :persistence :heavy-io]
+    :require-projection-before-heavy? true
+    :allow-duplicate-heavy-effects? true
+    :heavy-effect-ids #{:effects/fetch-candle-snapshot
+                        :effects/margin-rec-fetch-fills
+                        :effects/margin-rec-compute}}
+
+   ;; Several matured intents may submit in one pass (one per position).
+   :actions/margin-rec-process-intents
+   {:required-phase-order [:projection :persistence :heavy-io]
+    :require-projection-before-heavy? true
+    :allow-duplicate-heavy-effects? true
+    :heavy-effect-ids #{:effects/api-submit-position-margin}}
+
    :actions/submit-vault-transfer
    {:required-phase-order [:projection :persistence :heavy-io]
     :require-projection-before-heavy? true

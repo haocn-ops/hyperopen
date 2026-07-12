@@ -2,6 +2,7 @@
   (:require [hyperopen.account.history.position-margin :as position-margin]
             [hyperopen.account.history.position-reduce :as position-reduce]
             [hyperopen.account.history.position-tpsl :as position-tpsl]
+            [hyperopen.margin-rec.state :as margin-rec-state]
             [hyperopen.router :as router]
             [hyperopen.views.account-info.position-margin-modal :as position-margin-modal]
             [hyperopen.views.account-info.position-reduce-popover :as position-reduce-popover]
@@ -54,7 +55,17 @@
         active-margin-modal?
         (and (not read-only?)
              (position-margin/open? margin-modal)
-             (= row-key (:position-key margin-modal)))]
+             (= row-key (:position-key margin-modal)))
+        margin-rec (:margin-rec positions-state)
+        rec-entry (get-in margin-rec [:recs row-key])
+        rec-result (:result rec-entry)
+        margin-rec-panel-open? (= row-key (:panel margin-rec))
+        risk-chip-label (when (contains? #{:ok :within-target} (:status rec-entry))
+                          (case (:risk-level rec-result)
+                            :high "Liq. risk high"
+                            :elevated "Liq. risk elevated"
+                            nil))
+        rec-hint (margin-rec-state/modal-hint (:recs margin-rec) row-key)]
     (into [:div {:class ["account-table-row"
                          "grid"
                          (positions-layout/positions-grid-template-class read-only?)
@@ -91,10 +102,23 @@
            [:div.text-left.font-semibold.num (:mark-price-display row-vm)]
            [:div {:class ["text-left" "font-semibold" "num" (:pnl-color-class row-vm)]}
             (positions-shared/format-pnl-inline (:pnl-num row-vm) (:pnl-percent row-vm))]
-           [:div.text-left.font-semibold.num
-            (positions-shared/explainable-value-node
-             (positions-shared/format-liquidation-price (:liq-price row-vm))
-             liq-explanation)]
+           [:div {:class ["text-left" "font-semibold" "num" "min-w-0"]}
+            [:div
+             (positions-shared/explainable-value-node
+              (positions-shared/format-liquidation-price (:liq-price row-vm))
+              liq-explanation)]
+            (when risk-chip-label
+              [:div
+               [:button {:type "button"
+                         :data-role "margin-rec-risk-chip"
+                         :aria-expanded (if margin-rec-panel-open? "true" "false")
+                         :class ["mt-0.5" "rounded" "border" "border-amber-500/40"
+                                 "bg-amber-500/10" "px-1.5" "py-0.5" "text-xs"
+                                 "font-medium" "text-amber-300" "transition-colors"
+                                 "hover:bg-amber-500/20" "focus:outline-none"
+                                 "whitespace-nowrap"]
+                         :on {:click [[:actions/toggle-margin-rec-panel row-key]]}}
+                risk-chip-label]])]
            [:div {:class ["text-left" "relative" "min-w-0" "font-semibold" "num"]}
             [:div {:class ["inline-flex"
                            "max-w-full"
@@ -115,9 +139,22 @@
                 "Edit Margin"
                 [[:actions/open-position-margin-modal position-data :event.currentTarget/bounds]]
                 :data-position-margin-trigger))]
+            (when rec-hint
+              [:div
+               [:button {:type "button"
+                         :data-role "margin-rec-row-suggestion"
+                         :aria-expanded (if margin-rec-panel-open? "true" "false")
+                         :class ["mt-0.5" "flex" "items-center" "gap-1" "bg-transparent"
+                                 "p-0" "text-xs" "font-medium" "text-amber-300"
+                                 "hover:text-amber-200" "focus:outline-none"]
+                         :on {:click [[:actions/toggle-margin-rec-panel row-key]]}}
+                [:span {:class ["inline-block" "h-1.5" "w-1.5" "rounded-full" "bg-amber-400"]}]
+                (str "Recommended: $" (shared/format-currency (:target rec-hint)))]])
             (when (and active-margin-modal?
                        (positions-layout/active-desktop-table-layout?))
-              (position-margin-modal/position-margin-modal-view margin-modal))]
+              (position-margin-modal/position-margin-modal-view
+               margin-modal
+               {:recommendation rec-hint}))]
            [:div.text-left.font-semibold.num
             (positions-shared/explainable-value-node
              [:span {:class [(:funding-tone-class row-vm) "num"]}

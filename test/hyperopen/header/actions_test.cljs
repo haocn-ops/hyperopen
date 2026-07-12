@@ -159,7 +159,8 @@
                 :updates {:open-order-safety-mode :extended}}]]
     (doseq [{:keys [args sym updates]} cases]
       (let [action (resolve-action sym)
-            expected-settings (merge base-settings updates)]
+            expected-settings (trading-settings/normalize-state
+                               (merge base-settings updates))]
         (is (some? action))
         (when action
           (is (= (expected-effects expected-settings)

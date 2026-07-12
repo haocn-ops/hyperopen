@@ -90,7 +90,9 @@
            install-working-order-refresh!
            working-order-refresh-deps
            install-optimizer-draft-watchers!
-           optimizer-draft-watchers-deps]}]
+           optimizer-draft-watchers-deps
+           install-margin-rec-watcher!
+           margin-rec-watcher-deps]}]
   (install-store-cache-watchers!
    store
    store-cache-watchers-deps)
@@ -103,7 +105,9 @@
   (when (fn? install-working-order-refresh!)
     (install-working-order-refresh! working-order-refresh-deps))
   (when (fn? install-optimizer-draft-watchers!)
-    (install-optimizer-draft-watchers! optimizer-draft-watchers-deps)))
+    (install-optimizer-draft-watchers! optimizer-draft-watchers-deps))
+  (when (fn? install-margin-rec-watcher!)
+    (install-margin-rec-watcher! margin-rec-watcher-deps)))
 
 (defn install-state-validation!
   [{:keys [store

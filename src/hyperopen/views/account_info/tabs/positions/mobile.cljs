@@ -3,6 +3,7 @@
             [hyperopen.account.history.position-margin :as position-margin]
             [hyperopen.account.history.position-reduce :as position-reduce]
             [hyperopen.account.history.position-tpsl :as position-tpsl]
+            [hyperopen.margin-rec.state :as margin-rec-state]
             [hyperopen.views.account-info.mobile-cards :as mobile-cards]
             [hyperopen.views.account-info.position-margin-modal :as position-margin-modal]
             [hyperopen.views.account-info.position-reduce-popover :as position-reduce-popover]
@@ -229,8 +230,11 @@
     overlay))
 
 (defn mobile-position-overlay-outlet
-  [visible-row-keys tpsl-modal reduce-popover margin-modal read-only?]
-  (when (and (positions-layout/active-card-layout?)
+  ([visible-row-keys tpsl-modal reduce-popover margin-modal read-only?]
+   (mobile-position-overlay-outlet visible-row-keys tpsl-modal reduce-popover
+                                   margin-modal read-only? nil))
+  ([visible-row-keys tpsl-modal reduce-popover margin-modal read-only? margin-rec]
+   (when (and (positions-layout/active-card-layout?)
              (not read-only?))
     (let [margin-modal* (ensure-active-layout-anchor margin-modal)
           reduce-popover* (ensure-active-layout-anchor reduce-popover)
@@ -238,7 +242,11 @@
       (cond
         (and (position-margin/open? margin-modal*)
              (active-position-key-visible? visible-row-keys margin-modal*))
-        (position-margin-modal/position-margin-modal-view margin-modal*)
+        (position-margin-modal/position-margin-modal-view
+         margin-modal*
+         {:recommendation (margin-rec-state/modal-hint
+                           (:recs margin-rec)
+                           (:position-key margin-modal*))})
 
         (and (position-reduce/open? reduce-popover*)
              (active-position-key-visible? visible-row-keys reduce-popover*))
@@ -249,4 +257,4 @@
         (position-tpsl-modal/position-tpsl-modal-view tpsl-modal*)
 
         :else
-        nil))))
+        nil)))))

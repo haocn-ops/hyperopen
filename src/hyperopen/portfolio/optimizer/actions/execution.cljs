@@ -1,5 +1,6 @@
 (ns hyperopen.portfolio.optimizer.actions.execution
   (:require [hyperopen.account.context :as account-context]
+            [hyperopen.margin-rec.state :as margin-rec-state]
             [hyperopen.portfolio.optimizer.actions.common :as common]
             [hyperopen.portfolio.optimizer.application.execution :as execution]
             [hyperopen.portfolio.optimizer.application.execution-amend :as execution-amend]
@@ -9,7 +10,8 @@
             [hyperopen.portfolio.optimizer.application.run-identity :as run-identity]
             [hyperopen.portfolio.optimizer.application.setup-readiness :as setup-readiness]
             [hyperopen.portfolio.optimizer.contracts :as contracts]
-            [hyperopen.portfolio.optimizer.defaults :as optimizer-defaults]))
+            [hyperopen.portfolio.optimizer.defaults :as optimizer-defaults]
+            [hyperopen.trading-settings :as trading-settings]))
 
 (def stale-recommendation-message
   "Inputs changed since this recommendation was computed — re-run the optimizer before executing.")
@@ -200,6 +202,26 @@
         (assoc selections oid-key true)
         (dissoc selections oid-key))]]))
 
+(defn margin-rec-execution-intent-save
+  "One-shot auto top-up intents for the isolated-margin legs of a confirmed
+  execution plan (consumed post-fill by :actions/margin-rec-process-intents).
+  Returns a projection effect or nil."
+  [state plan]
+  (when (trading-settings/margin-rec-auto-topup? state)
+    (let [legs (margin-rec-state/isolated-execution-legs state (:rows plan))]
+      (when (seq legs)
+        [:effects/save
+         margin-rec-state/intents-path
+         (reduce (fn [intents leg]
+                   (assoc intents
+                          (:position-key leg)
+                          (margin-rec-state/make-intent-draft
+                           (assoc leg
+                                  :target-equity nil
+                                  :source :optimizer))))
+                 (get-in state margin-rec-state/intents-path)
+                 legs)]))))
+
 (defn confirm-portfolio-optimizer-execution
   [state]
   (let [modal (get-in state contracts/execution-modal-path)
@@ -272,9 +294,12 @@
         "Enable trading before executing."]]
 
       :else
-      [[:effects/save contracts/execution-modal-submitting-path true]
-       [:effects/save contracts/execution-modal-error-path nil]
-       [:effects/execute-portfolio-optimizer-plan (attach-carryover-cancels state plan)]])))
+      (let [intent-save (margin-rec-execution-intent-save state plan)]
+        (into (if intent-save [intent-save] [])
+              [[:effects/save contracts/execution-modal-submitting-path true]
+               [:effects/save contracts/execution-modal-error-path nil]
+               [:effects/execute-portfolio-optimizer-plan
+                (attach-carryover-cancels state plan)]])))))
 
 (defn- amend-refusal-message
   [error]

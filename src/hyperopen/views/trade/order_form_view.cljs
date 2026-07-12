@@ -1,5 +1,7 @@
 (ns hyperopen.views.trade.order-form-view
-  (:require [hyperopen.state.trading :as trading]
+  (:require [hyperopen.margin-rec.state :as margin-rec-state]
+            [hyperopen.state.trading :as trading]
+            [hyperopen.trading-settings :as trading-settings]
             [hyperopen.ui.voice :as voice]
             [hyperopen.views.degen.order-form :as degen-order-form]
             [hyperopen.views.trade.order-form-component-primitives :as primitives]
@@ -230,6 +232,32 @@
         (primitives/row-toggle "Post Only"
                                (:post-only form)
                                (:on-toggle-post-only toggle-handlers)))
+
+      ;; Isolated perp orders can auto top-up to the modeled margin
+      ;; recommendation after the fill (one-shot, background).
+      (when (and (not outcome?)
+                 (not spot?)
+                 (= :isolated (:margin-mode form)))
+        (let [auto-topup? (trading-settings/margin-rec-auto-topup? state)
+              coin (get-in state [:active-market :coin])
+              rec-target (when (and auto-topup? (seq coin))
+                           (margin-rec-state/ready-recommended-equity
+                            state
+                            (margin-rec-state/position-key-for-coin coin)))]
+          [:div {:class ["flex" "flex-col" "gap-1"]
+                 :data-role "margin-rec-auto-topup-row"}
+           (primitives/row-toggle "Auto top-up isolated margin"
+                                  auto-topup?
+                                  [[:actions/set-margin-rec-auto-topup (not auto-topup?)]])
+           (when auto-topup?
+             [:div {:class ["text-xs" "leading-4" "text-gray-500"]
+                    :data-role "margin-rec-auto-topup-note"}
+              (str "After this order fills, isolated margin is topped up once to"
+                   " the modeled recommendation"
+                   (when (number? rec-target)
+                     (str " (currently $" (.toFixed rec-target 2) ")"))
+                   ", capped by available collateral. It never repeats or chases"
+                   " a falling position.")])]))
 
       (when error
         [:div {:class ["text-xs" "text-red-400"]} error])

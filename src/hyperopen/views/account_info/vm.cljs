@@ -2,6 +2,7 @@
   (:require [clojure.string :as str]
             [hyperopen.account.context :as account-context]
             [hyperopen.asset-selector.markets :as markets]
+            [hyperopen.margin-rec.state :as margin-rec-state]
             [hyperopen.order.cancel-visible-confirmation :as cancel-visible-confirmation]
             [hyperopen.platform :as platform]
             [hyperopen.portfolio.routes :as portfolio-routes]
@@ -357,6 +358,7 @@
                                         (portfolio-routes/portfolio-route? route)}
                                        (get-in state [:account-info :positions] {}))
                           true (assoc :read-only? read-only?)
+                          true (assoc :margin-rec (margin-rec-state/ui-slice state))
                           (seq read-only-message) (assoc :read-only-message read-only-message))
         open-orders-state (cond-> (-> (merge {:direction-filter :all
                                               :coin-search ""

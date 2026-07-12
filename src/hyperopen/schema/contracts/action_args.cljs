@@ -161,8 +161,17 @@
 
 (s/def ::action-id (s/and keyword?
                           #(= "actions" (namespace %))))
+(s/def ::margin-rec-now-args (s/tuple number?))
+(s/def ::margin-rec-panel-args (s/tuple (s/nilable ::common/non-empty-string)))
+(s/def ::margin-rec-risk-mode-args
+  (s/tuple (s/or :keyword keyword? :string string?)))
 (def action-args-spec-by-id
   {:actions/init-websockets ::common/no-args
+   :actions/margin-rec-sync ::margin-rec-now-args
+   :actions/margin-rec-process-intents ::margin-rec-now-args
+   :actions/toggle-margin-rec-panel ::margin-rec-panel-args
+   :actions/set-margin-rec-risk-mode ::margin-rec-risk-mode-args
+   :actions/set-margin-rec-auto-topup ::common/boolean-args
    :actions/subscribe-to-asset ::common/coin-args
    :actions/subscribe-to-webdata2 ::common/address-args
    :actions/connect-wallet ::common/optional-string-args

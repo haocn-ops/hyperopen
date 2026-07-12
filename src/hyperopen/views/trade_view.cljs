@@ -31,10 +31,12 @@
 (def ^:private account-info-view-base-state-keys
   [:account
    :account-info
+   :margin-rec
    :orders
    :perp-dex-clearinghouse
    :positions-ui
    :spot
+   :trading-settings
    :webdata2])
 
 (def ^:private account-equity-view-state-keys
@@ -49,12 +51,14 @@
    :active-assets
    :active-market
    :asset-contexts
+   :margin-rec
    :order-form
    :order-form-runtime
    :order-form-ui
    :orderbooks
    :perp-dex-clearinghouse
    :spot
+   :trading-settings
    :wallet
    :webdata2])
 

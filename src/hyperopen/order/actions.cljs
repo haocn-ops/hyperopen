@@ -1,6 +1,7 @@
 (ns hyperopen.order.actions
   (:require [hyperopen.account.context :as account-context]
             [hyperopen.api.trading :as trading-api]
+            [hyperopen.margin-rec.state :as margin-rec-state]
             [hyperopen.order.cancel-visible-confirmation :as cancel-visible-confirmation]
             [hyperopen.order.submit-confirmation :as submit-confirmation]
             [hyperopen.order.effects :as order-effects]
@@ -368,6 +369,57 @@
        [:effects/api-submit-order request]]
       (dismiss-order-submission-confirmation state))))
 
+(defn- parse-order-num
+  [value]
+  (let [n (cond
+            (number? value) value
+            (string? value) (js/parseFloat value)
+            :else js/NaN)]
+    (when (and (number? n) (js/isFinite n) (pos? n))
+      n)))
+
+(defn margin-rec-intent-save
+  "When auto top-up is enabled and this is a single risk-increasing isolated
+  perp order, record a one-shot intent keyed by the position; the background
+  intent pass tops the filled position up to the modeled recommendation.
+  Returns a projection effect or nil."
+  [state form request]
+  (when (and (trading-settings/margin-rec-auto-topup? state)
+             (= :isolated (:margin-mode form))
+             (= "order" (get-in request [:action :type])))
+    (let [orders (get-in request [:action :orders])
+          order (first orders)
+          coin (get-in state [:active-market :coin])
+          size (parse-order-num (:s order))]
+      (when (and (= 1 (count orders))
+                 (string? coin)
+                 (seq coin)
+                 size
+                 (not (true? (:r order))))
+        (let [position-key (margin-rec-state/position-key-for-coin coin)
+              current-szi (or (some #(when (= position-key (:position-key %))
+                                       (:szi %))
+                                    (margin-rec-state/isolated-positions state))
+                              0)
+              expected (+ current-szi (if (true? (:b order)) size (- size)))
+              expected-size (js/Math.abs expected)
+              price (parse-order-num (:p order))
+              order-notional (when price (* size price))]
+          (when (> expected-size (js/Math.abs current-szi))
+            (let [intent (margin-rec-state/make-intent-draft
+                          {:position-key position-key
+                           :coin coin
+                           :dex (margin-rec-state/dex-for-coin coin)
+                           :expected-size expected-size
+                           :target-equity nil
+                           :max-add order-notional
+                           :source :trade})]
+              [:effects/save
+               margin-rec-state/intents-path
+               (assoc (get-in state margin-rec-state/intents-path)
+                      position-key
+                      intent)])))))))
+
 (defn submit-order [state]
   (let [spectate-mode-message (account-context/mutations-blocked-message state)
         raw-form (trading/order-form-draft state)
@@ -395,8 +447,10 @@
                         persisted-ui (next-order-form-ui-state state form nil)
                         path-values [[[:order-form-runtime :error] nil]
                                      [[:order-form] persisted-form]
-                                     [[:order-form-ui] persisted-ui]]]
-                    (locked-submit-effects request path-values))
+                                     [[:order-form-ui] persisted-ui]]
+                        intent-save (margin-rec-intent-save state form request)]
+                    (into (if intent-save [intent-save] [])
+                          (locked-submit-effects request path-values)))
           :unlocking [[:effects/save [:order-form-runtime :error] error-message]]
           (open-enable-trading-recovery-effects error-message)))
 
@@ -408,16 +462,19 @@
             persisted-ui (next-order-form-ui-state state form nil)
             path-values [[[:order-form-runtime :error] nil]
                          [[:order-form] persisted-form]
-                         [[:order-form-ui] persisted-ui]]]
+                         [[:order-form-ui] persisted-ui]]
+            intent-save (margin-rec-intent-save state form request)]
         (if (trading-settings/confirm-open-orders? state)
-          [[:effects/confirm-api-submit-order {:variant :open-order
-                                               :message confirm-open-order-message
-                                               :request request
-                                               :path-values path-values}]]
-          [[:effects/save [:order-form-runtime :error] nil]
-           [:effects/save [:order-form] persisted-form]
-           [:effects/save [:order-form-ui] persisted-ui]
-           [:effects/api-submit-order request]])))))
+          (into (if intent-save [intent-save] [])
+                [[:effects/confirm-api-submit-order {:variant :open-order
+                                                     :message confirm-open-order-message
+                                                     :request request
+                                                     :path-values path-values}]])
+          (into (if intent-save [intent-save] [])
+                [[:effects/save [:order-form-runtime :error] nil]
+                 [:effects/save [:order-form] persisted-form]
+                 [:effects/save [:order-form-ui] persisted-ui]
+                 [:effects/api-submit-order request]]))))))
 
 (defn prune-canceled-open-orders
   [state request]

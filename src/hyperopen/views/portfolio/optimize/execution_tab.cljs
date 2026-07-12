@@ -14,7 +14,9 @@
   Honesty: each ready row is submitted with its selected order type (Market/Limit/TWAP/
   Passive maker), and the displayed type is the routed type — see execution-order-type."
   (:require [clojure.string :as str]
+            [hyperopen.margin-rec.state :as margin-rec-state]
             [hyperopen.portfolio.optimizer.application.view-model :as optimizer-view-model]
+            [hyperopen.trading-settings :as trading-settings]
             [hyperopen.views.portfolio.optimize.execution-order-table :as order-table]
             [hyperopen.views.portfolio.optimize.execution-shared :as shared]
             [hyperopen.views.portfolio.optimize.execution-strategy-band :as strategy-band]
@@ -171,7 +173,8 @@
 
 (defn- armed-band
   [{:keys [confirm-disabled? disabled-message summary
-           ready-buys-usd ready-sells-usd] :as model} rows]
+           ready-buys-usd ready-sells-usd
+           margin-rec-auto-topup? margin-rec-isolated-legs] :as model} rows]
   (let [order-count (count (filter #(= :ready (:status %)) rows))
         type-summary (order-summary-line model rows)
         gross (:gross-ready-notional-usd summary)
@@ -205,7 +208,23 @@
       [:p {:class (cond-> ["mt-0.5" "font-mono" "text-[0.72rem]" "text-trading-muted"]
                     margin-warn? (conj "text-trading-red"))}
        (str (when (seq type-summary) (str "Order types: " type-summary ". "))
-            "Filled trades can't be undone — closing them later sends new market orders at then-current prices and costs.")]]
+            "Filled trades can't be undone — closing them later sends new market orders at then-current prices and costs.")]
+      ;; Isolated-margin legs (HIP-3) get a per-position liquidation price; the
+      ;; margin-rec background loop can top each fill up to its modeled
+      ;; recommendation once, capped by available collateral.
+      (when (pos? (or margin-rec-isolated-legs 0))
+        [:label {:class ["mt-1" "flex" "w-fit" "cursor-pointer" "items-center" "gap-1.5"
+                         "font-mono" "text-[0.7rem]" "text-trading-muted"]
+                 :data-role "portfolio-optimizer-execution-auto-topup"}
+         [:input {:type "checkbox"
+                  :class ["h-3.5" "w-3.5" "rounded-[3px]" "border" "border-base-300"
+                          "bg-transparent"]
+                  :checked (boolean margin-rec-auto-topup?)
+                  :on {:change [[:actions/set-margin-rec-auto-topup
+                                 (not margin-rec-auto-topup?)]]}}]
+         (str "Auto top-up isolated margin to the modeled recommendation after fills ("
+              margin-rec-isolated-legs " isolated leg"
+              (when (not= 1 margin-rec-isolated-legs) "s") ")")])]
      [:span {:class ["flex-1"]}]
      [:button {:type "button"
                :class ["border" "border-base-300" "px-3" "py-2" "text-sm" "font-medium" "text-trading-muted"]
@@ -720,7 +739,12 @@
 (defn execution-tab
   [state]
   (let [{:keys [has-plan?] :as model} (optimizer-view-model/execution-tab-model state)
-        rows (:rows model)]
+        rows (:rows model)
+        model (assoc model
+                     :margin-rec-auto-topup?
+                     (trading-settings/margin-rec-auto-topup? state)
+                     :margin-rec-isolated-legs
+                     (count (margin-rec-state/isolated-execution-legs state rows)))]
     [:section {:class ["portfolio-optimizer-execution-tab" "border" "border-base-300" "bg-base-100/95"]
                :data-role "portfolio-optimizer-execution-tab"}
      (if has-plan?

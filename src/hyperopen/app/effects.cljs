@@ -4,6 +4,7 @@
             [hyperopen.route-modules :as route-modules]
             [hyperopen.runtime.collaborators :as runtime-collaborators]
             [hyperopen.runtime.effect-adapters :as effect-adapters]
+            [hyperopen.runtime.effect-adapters.margin-rec :as margin-rec-effects]
             [hyperopen.runtime.effect-adapters.spectate-mode :as spectate-mode-effects]
             [hyperopen.runtime.state :as runtime-state]
             [hyperopen.schema.runtime-registration.portfolio :as portfolio-registration]
@@ -97,6 +98,8 @@
               :api-submit-position-tpsl (effect-adapters/make-api-submit-position-tpsl runtime)
               :api-submit-position-margin (effect-adapters/make-api-submit-position-margin runtime)
               :clear-order-feedback-toast-timeout (effect-adapters/make-clear-order-feedback-toast-timeout runtime)}
+     :margin-rec {:margin-rec-fetch-fills margin-rec-effects/margin-rec-fetch-fills-effect
+                  :margin-rec-compute margin-rec-effects/margin-rec-compute-effect}
      :api (merge {:fetch-asset-selector-markets effect-adapters/fetch-asset-selector-markets-effect
                   :restore-dialog-focus effect-adapters/restore-dialog-focus-effect
                   :sync-active-asset-funding-predictability effect-adapters/sync-active-asset-funding-predictability

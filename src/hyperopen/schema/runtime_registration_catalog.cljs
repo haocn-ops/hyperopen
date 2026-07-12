@@ -3,6 +3,7 @@
             [hyperopen.schema.runtime-registration.funding :as funding]
             [hyperopen.schema.runtime-registration.funding-comparison :as funding-comparison]
             [hyperopen.schema.runtime-registration.leaderboard :as leaderboard]
+            [hyperopen.schema.runtime-registration.margin-rec :as margin-rec]
             [hyperopen.schema.runtime-registration.portfolio :as portfolio]
             [hyperopen.schema.runtime-registration.referrals :as referrals]
             [hyperopen.schema.runtime-registration.spectate-mode :as spectate-mode]
@@ -31,7 +32,8 @@
    trade/effect-binding-rows
    vaults/effect-binding-rows
    staking/effect-binding-rows
-   funding/effect-binding-rows))
+   funding/effect-binding-rows
+   margin-rec/effect-binding-rows))
 
 (def ^:private action-binding-rows-data
   (concat-row-groups
@@ -47,7 +49,8 @@
    subaccounts/action-binding-rows
    funding-comparison/action-binding-rows
    staking/action-binding-rows
-   vaults/action-binding-rows))
+   vaults/action-binding-rows
+   margin-rec/action-binding-rows))
 
 (def ^:private effect-order-policy-required-action-ids-data
   (set
@@ -62,7 +65,8 @@
            subaccounts/effect-order-policy-required-action-ids
            funding-comparison/effect-order-policy-required-action-ids
            staking/effect-order-policy-required-action-ids
-           vaults/effect-order-policy-required-action-ids)))
+           vaults/effect-order-policy-required-action-ids
+           margin-rec/effect-order-policy-required-action-ids)))
 
 (defn- duplicate-ids
   [rows]

@@ -23,6 +23,16 @@
 (s/def ::api-cancel-order-args (s/tuple ::api-submit-request))
 (s/def ::api-submit-position-tpsl-args (s/tuple ::api-submit-request))
 (s/def ::api-submit-position-margin-args (s/tuple ::api-submit-request))
+(s/def ::margin-rec-fetch-fills-args (s/tuple ::common/non-empty-string))
+
+(defn- margin-rec-compute-args?
+  [args]
+  (and (= 1 (count args))
+       (let [{:keys [key inputs]} (first args)]
+         (and (common/non-empty-string? key)
+              (map? inputs)))))
+
+(s/def ::margin-rec-compute-args margin-rec-compute-args?)
 (s/def ::api-submit-vault-transfer-args (s/tuple ::api-submit-request))
 (s/def ::api-submit-funding-transfer-args (s/tuple ::api-submit-request))
 (s/def ::api-submit-funding-send-args (s/tuple ::api-submit-request))
@@ -312,6 +322,8 @@
    :effects/api-cancel-order ::api-cancel-order-args
    :effects/api-submit-position-tpsl ::api-submit-position-tpsl-args
    :effects/api-submit-position-margin ::api-submit-position-margin-args
+   :effects/margin-rec-fetch-fills ::margin-rec-fetch-fills-args
+   :effects/margin-rec-compute ::margin-rec-compute-args
    :effects/clear-order-feedback-toast-timeout ::common/optional-string-args
    :effects/api-load-user-data ::common/address-args
    :effects/api-fetch-trader-portfolio-benchmark ::common/address-args

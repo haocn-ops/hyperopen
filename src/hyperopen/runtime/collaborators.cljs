@@ -8,6 +8,7 @@
             [hyperopen.runtime.collaborators.chart :as chart-collaborators]
             [hyperopen.runtime.collaborators.funding-comparison :as funding-comparison-collaborators]
             [hyperopen.runtime.collaborators.leaderboard :as leaderboard-collaborators]
+            [hyperopen.runtime.collaborators.margin-rec :as margin-rec-collaborators]
             [hyperopen.runtime.collaborators.order :as order-collaborators]
             [hyperopen.runtime.collaborators.spectate-mode :as spectate-mode-collaborators]
             [hyperopen.runtime.collaborators.staking :as staking-collaborators]
@@ -63,5 +64,6 @@
     :leaderboard (leaderboard-collaborators/action-deps)
     :funding-comparison (funding-comparison-collaborators/action-deps)
     :staking (staking-collaborators/action-deps)
-    :orders (order-collaborators/action-deps)}
+    :orders (order-collaborators/action-deps)
+    :margin-rec (margin-rec-collaborators/action-deps)}
    action-overrides))

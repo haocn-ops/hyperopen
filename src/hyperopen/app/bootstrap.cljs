@@ -10,6 +10,7 @@
             [hyperopen.runtime.validation :as runtime-validation]
             [hyperopen.runtime.wiring :as runtime-wiring]
             [hyperopen.account.context :as account-context]
+            [hyperopen.margin-rec.watcher :as margin-rec-watcher]
             [hyperopen.order.effects :as order-effects]
             [hyperopen.portfolio.optimizer.contracts :as optimizer-contracts]
             [hyperopen.portfolio.optimizer.infrastructure.draft-autosave :as optimizer-draft-autosave]
@@ -87,7 +88,11 @@
           (order-effects/refresh-account-surfaces-after-order-mutation! store* address)))}
      :install-optimizer-draft-watchers! optimizer-draft-autosave/install-optimizer-draft-watchers!
      :optimizer-draft-watchers-deps
-     {:store store}}
+     {:store store}
+     :install-margin-rec-watcher! margin-rec-watcher/install-margin-rec-watcher!
+     :margin-rec-watcher-deps
+     {:store store
+      :dispatch! nxr/dispatch}}
     :validation-deps
     {:store store
      :install-store-state-validation! runtime-validation/install-store-state-validation!}}))

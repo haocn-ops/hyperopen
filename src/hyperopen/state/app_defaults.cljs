@@ -11,6 +11,7 @@
             [hyperopen.order.cancel-visible-confirmation :as cancel-visible-confirmation]
             [hyperopen.order.submit-confirmation :as submit-confirmation]
             [hyperopen.leaderboard.actions :as leaderboard-actions]
+            [hyperopen.margin-rec.state :as margin-rec-state]
             [hyperopen.platform :as platform]
             [hyperopen.portfolio.actions :as portfolio-actions]
             [hyperopen.portfolio.optimizer.defaults :as portfolio-optimizer-defaults]
@@ -462,6 +463,7 @@
    :positions-ui {:tpsl-modal (position-tpsl/default-modal-state)
                   :reduce-popover (position-reduce/default-popover-state)
                   :margin-modal (position-margin/default-modal-state)}
+   :margin-rec (margin-rec-state/default-state)
    :funding-ui {:modal (funding-actions/default-funding-modal-state)
                 :tooltip {:visible-id nil
                           :pinned-id nil}

@@ -1,5 +1,6 @@
 (ns hyperopen.views.account-info.tabs.positions
-  (:require [hyperopen.views.account-info.positions-vm :as positions-vm]
+  (:require [hyperopen.views.account-info.margin-recommendation-panel :as margin-rec-panel]
+            [hyperopen.views.account-info.positions-vm :as positions-vm]
             [hyperopen.views.account-info.projections :as projections]
             [hyperopen.views.account-info.tabs.positions.desktop :as positions-desktop]
             [hyperopen.views.account-info.tabs.positions.mobile :as positions-mobile]
@@ -70,7 +71,14 @@
                                                                   (:direction sort-state*)))
         visible-row-keys (into #{}
                                (keep :row-key)
-                               sorted-row-vms)]
+                               sorted-row-vms)
+        margin-rec (:margin-rec positions-state)
+        margin-rec-panel-key (:panel margin-rec)
+        margin-rec-panel-row-vm (when (and margin-rec-panel-key
+                                           (contains? visible-row-keys
+                                                      margin-rec-panel-key))
+                                  (some #(when (= margin-rec-panel-key (:row-key %)) %)
+                                        sorted-row-vms))]
     (if (seq sorted-row-vms)
       [:div {:class ["flex" "h-full" "min-h-0" "flex-col"]}
        (positions-desktop/position-table-header sort-state* read-only? ["hidden" "lg:grid"])
@@ -92,6 +100,14 @@
                                                             read-only?
                                                             positions-state))
                   sorted-row-vms))
+       (when margin-rec-panel-row-vm
+         [:div {:class ["hidden" "lg:block" "shrink-0" "overflow-y-auto" "max-h-[70%]"]}
+          (margin-rec-panel/margin-recommendation-panel
+           {:position-key margin-rec-panel-key
+            :rec (get-in margin-rec [:recs margin-rec-panel-key])
+            :row-vm margin-rec-panel-row-vm
+            :read-only? read-only?
+            :risk-mode (:risk-mode margin-rec)})])
        (into [:div {:class ["lg:hidden"
                             "flex-1"
                             "min-h-0"
@@ -116,7 +132,8 @@
                                                         tpsl-modal
                                                         reduce-popover
                                                         margin-modal
-                                                        read-only?)]
+                                                        read-only?
+                                                        margin-rec)]
       (empty-state (if (seq positions*)
                      "No matching positions"
                      "No active positions")))))

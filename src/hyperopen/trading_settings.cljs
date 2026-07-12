@@ -17,6 +17,19 @@
       mode*
       :strict)))
 
+(def margin-rec-risk-modes
+  #{:conservative :balanced :capital-efficient})
+
+(defn normalize-margin-rec-risk-mode
+  [mode]
+  (let [mode* (cond
+                (keyword? mode) mode
+                (string? mode) (keyword mode)
+                :else nil)]
+    (if (contains? margin-rec-risk-modes mode*)
+      mode*
+      :balanced)))
+
 (def default-state
   {:fill-alerts-enabled? true
    :sound-on-fill? false
@@ -25,7 +38,9 @@
    :confirm-open-orders? false
    :confirm-close-position? false
    :confirm-market-orders? true
-   :open-order-safety-mode :strict})
+   :open-order-safety-mode :strict
+   :margin-rec-risk-mode :balanced
+   :margin-rec-auto-topup? false})
 
 (defn normalize-state
   [value]
@@ -38,7 +53,10 @@
      :confirm-close-position? (true? (:confirm-close-position? settings))
      :confirm-market-orders? (not (false? (:confirm-market-orders? settings)))
      :open-order-safety-mode (normalize-open-order-safety-mode
-                              (:open-order-safety-mode settings))}))
+                              (:open-order-safety-mode settings))
+     :margin-rec-risk-mode (normalize-margin-rec-risk-mode
+                            (:margin-rec-risk-mode settings))
+     :margin-rec-auto-topup? (true? (:margin-rec-auto-topup? settings))}))
 
 (defn restore-state
   []
@@ -85,3 +103,11 @@
 (defn open-order-safety-mode
   [state]
   (:open-order-safety-mode (state-settings state)))
+
+(defn margin-rec-risk-mode
+  [state]
+  (:margin-rec-risk-mode (state-settings state)))
+
+(defn margin-rec-auto-topup?
+  [state]
+  (:margin-rec-auto-topup? (state-settings state)))

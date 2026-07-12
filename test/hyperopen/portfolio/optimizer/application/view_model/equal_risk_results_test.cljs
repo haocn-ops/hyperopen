@@ -178,3 +178,15 @@
                             {:status :fully-determined}))]
         (is (str/includes? body "fully determine"))
         (is (str/includes? body "cannot improve it"))))))
+
+(deftest verdict-body-labels-gross-as-selected-and-net-as-resulting-test
+  (let [body (equal-risk-results/verdict-body
+              (result-with-shares [0.5 0.5]
+                                  :diagnostics {:gross-exposure 2.0
+                                                :net-exposure -0.35}))]
+    (is (str/includes? body "selected 2.00x gross")
+        "Equal Risk should frame gross as the selected target the trader controls.")
+    (is (str/includes? body "resulting -0.35x net")
+        "Equal Risk should frame net as an output determined by risk balance.")
+    (is (not (str/includes? (str/lower-case body) "preserving"))
+        "Equal Risk result copy must not imply stored net policy was enforced.")))

@@ -4,7 +4,7 @@
   Each of the deterministic initializers (domain.equal-risk/seed-kinds) is
   projected onto the FULL feasible region by a `min ||y - seed||^2` QP, then
   refined by sequential quadratic programming: at iterate w solve the convex
-  QP `min 0.5 y'By + (g - Bw)'y` over the book equalities + bounds + turnover
+  QP `min 0.5 y'By + (g - Bw)'y` over the gross equality + bounds + turnover
   region, Armijo-backtrack along the (always feasible, by convexity) segment
   toward the QP solution, and update B with a damped BFGS step. The best
   feasible final iterate across initializers wins; classification of the
@@ -289,8 +289,7 @@
   ([problem solve-problem on-progress]
    (let [covariance (:covariance problem)
          targets (get-in problem [:targets :relative-contributions])
-         book-targets (select-keys (:targets problem)
-                                   [:gross :net :long-gross :short-gross])
+         book-targets (select-keys (:targets problem) [:gross])
          template (equal-risk-plan/subproblem-template
                    {:instrument-ids (:instrument-ids problem)
                     :lower-bounds (:lower-bounds problem)

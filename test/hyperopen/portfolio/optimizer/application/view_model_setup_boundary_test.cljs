@@ -175,6 +175,40 @@
                {:labelize name
                 :percent-label str})))))
 
+(deftest setup-summary-card-equal-risk-renders-net-as-output-only-test
+  (let [constraints {:gross-min 1.95
+                     :gross-max 2.05
+                     :net-min -0.75
+                     :net-max 0.25
+                     :net-band-pct 0.10
+                     :max-asset-weight 0.5}
+        equal-risk (view-model/setup-summary-card-model
+                    {:universe [btc-instrument eth-instrument]
+                     :objective {:kind :equal-risk}
+                     :constraints constraints})
+        minimum-risk (view-model/setup-summary-card-model
+                      {:universe [btc-instrument eth-instrument]
+                       :objective {:kind :minimum-variance}
+                       :constraints constraints})]
+    (is (= {:gross-label "2.00×"
+            :net-label "Resulting net"
+            :direction :neutral
+            :net-output-only? true}
+           (:exposure-target equal-risk))
+        "Equal Risk summary must not present stored net min/max as the selected exposure target.")
+    (is (= ["Gross" "2.00× selected"] (first (:exposure-rows equal-risk)))
+        "Equal Risk still summarizes the selected gross target.")
+    (is (= ["Resulting net" "Determined by Equal Risk from covariance and selected sides"]
+           (second (:exposure-rows equal-risk)))
+        "Equal Risk should render output-only resulting-net language instead of stored net target values.")
+    (is (= {:gross-label "2.00×"
+            :net-label "-0.25×"
+            :direction :short}
+           (:exposure-target minimum-risk))
+        "Other objectives keep the gross + net target summary.")
+    (is (= ["Net" "-0.75×–+0.25× neutral range ±10.0% of gross"]
+           (second (:exposure-rows minimum-risk))))))
+
 (deftest constraints-summary-line-uses-readable-exposure-copy-test
   (is (= "Gross 4.80×–5.80× · Net +0.55×–1.55× long · Max asset 574% · Rebalance 3.0 pp"
          (view-model/constraints-summary-line

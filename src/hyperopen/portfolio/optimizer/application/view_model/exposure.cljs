@@ -74,15 +74,23 @@
     (and (number? net-target) (< net-target -0.001)) :short
     :else :neutral))
 
+(def equal-risk-net-output-copy
+  "Resulting net is determined by Equal Risk from covariance and selected sides.")
+
 (defn exposure-map-model
   "Build the exposure-map display model. `current-exposure` is `{:gross r :net r}` (ratios of
   capital) or nil when the current portfolio is not loaded; `highlighted-controls` is the set of
   constraint keys the last run flagged infeasible; `zoom-level` is the trader's stored zoom
   (optimizer UI state) — the pad scale is fixed at one of the paired zoom levels and only the
   zoom control (never a drag) changes it."
-  [{:keys [constraints current-exposure highlighted-controls has-saved-default? zoom-level]}]
+  [{:keys [objective-kind constraints current-exposure highlighted-controls
+           has-saved-default? zoom-level]}]
   (let [constraints* (or constraints {})
-        policy* (policy/constraints->policy constraints*)
+        equal-risk? (= :equal-risk objective-kind)
+        stored-policy (policy/constraints->policy constraints*)
+        policy* (if equal-risk?
+                  (assoc stored-policy :net-target 0.0 :net-band-pct 0.0)
+                  stored-policy)
         active (policy/active-preset constraints*)
         gross-min (:gross-min constraints*)
         gross-max (:gross-max constraints*)
@@ -96,7 +104,14 @@
                                         :current-net (:net current-exposure))
                                  zoom-level)]
     {:policy policy*
-     :net-direction (net-direction (:net-target policy*))
+     :interaction-mode (if equal-risk? :gross-only :gross-net)
+     :gross-editable? true
+     :net-editable? (not equal-risk?)
+     :net-output-only? equal-risk?
+     :net-output-copy (when equal-risk? equal-risk-net-output-copy)
+     :net-direction (if equal-risk?
+                      :neutral
+                      (net-direction (:net-target policy*)))
      :zoom (select-keys zoom [:level :fit-level :zoom-in-level :zoom-out-level])
      :target-marker (policy/target-marker policy* axis)
      :band-rect (policy/band-rect policy* axis)
@@ -113,13 +128,13 @@
                      {:left-x (->x left) :right-x (->x right)}))
      :current-marker (policy/current-exposure-marker current-exposure axis)
      :current-exposure current-exposure
-     :gross-band (:gross-band policy*)
-     :net-band-pct (:net-band-pct policy*)
+     :gross-band (:gross-band stored-policy)
+     :net-band-pct (:net-band-pct stored-policy)
      ;; Approximate ABSOLUTE net half-width at the configured max gross — a UI
      ;; preview only; the solver scales the band with realized gross.
-     :net-band-abs-preview (let [gmax (+ (max 0.0 (or (:gross-target policy*) 0.0))
-                                         (max 0.0 (or (:gross-band policy*) 0.0)))]
-                             (* (:net-band-pct policy*) gmax))
+     :net-band-abs-preview (let [gmax (+ (max 0.0 (or (:gross-target stored-policy) 0.0))
+                                         (max 0.0 (or (:gross-band stored-policy) 0.0)))]
+                             (* (:net-band-pct stored-policy) gmax))
      :max-band policy/max-band
      :max-net-band-pct policy/max-net-band-pct
      :net-band-pct-slider-max policy/net-band-pct-slider-max
@@ -129,9 +144,14 @@
             :gross-floored? (some? gross-min)
             :net-min net-min
             :net-max net-max
-            :net-band-pct (:net-band-pct policy*)}
+            :net-band-pct (:net-band-pct stored-policy)}
      :preview (exposure-preview {:current-exposure current-exposure
-                                 :constraints constraints*})
+                                 :constraints (if equal-risk?
+                                                (dissoc constraints*
+                                                        :net-min
+                                                        :net-max
+                                                        :net-band-pct)
+                                                constraints*)})
      :active-preset active
      :profile {:has-default? (boolean has-saved-default?)}
      ;; No :presets chip vector since 2026-07-10: the preset BUTTONS left the UI
@@ -139,4 +159,5 @@
      ;; recognized policy ("Conservative" / "Custom · from holdings"), and the
      ;; preset action + domain presets remain for programmatic use.
      :highlighted {:gross (gross-highlighted? highlighted-controls)
-                   :net (net-highlighted? highlighted-controls)}}))
+                   :net (and (not equal-risk?)
+                             (net-highlighted? highlighted-controls))}}))

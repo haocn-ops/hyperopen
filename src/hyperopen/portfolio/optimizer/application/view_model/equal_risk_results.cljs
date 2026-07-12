@@ -163,7 +163,7 @@
     :fully-determined
     {:status :caution
      :label "Fully determined"
-     :detail "Gross and net exposure determine every weight"}
+     :detail "Gross exposure and fixed limits determine every weight"}
 
     :limited
     {:status :caution
@@ -190,7 +190,7 @@
     :fully-determined
     {:locked? true
      :value "Fully determined"
-     :sub "Exposure targets pin every weight"}
+     :sub "Gross target pins every free weight"}
 
     :limited
     (let [n (or (:binding-count freedom) 0)]
@@ -256,7 +256,7 @@
                nil)]
     (if (= :fully-determined (:status (allocation-freedom result)))
       {:label "Allocation fully determined by constraints"
-       :detail (or base "The exposure targets pin every weight")}
+       :detail (or base "The gross target and fixed limits pin every weight")}
       {:label (or base "—")
        :detail "Why the current result is where it is."})))
 
@@ -283,14 +283,14 @@
           deviation-clause (str "Max contribution deviation "
                                 (format-pts max-pts*) ".")]
       (if (= :fully-determined (:status freedom))
-        (str "The selected " (format-multiple gross) " gross and "
-             (format-multiple net) " net exposures fully determine these "
-             "position sizes — with at most one free position per book, Equal "
-             "Risk evaluates the resulting balance but cannot improve it. "
+        (str "The selected " (format-multiple gross)
+             " gross target and fixed limits fully determine these "
+             "position sizes; Equal Risk reports the resulting "
+             (format-multiple net) " net exposure but cannot improve it. "
              deviation-clause)
         (str "Balances " n " selected positions toward "
              (format-share target-share 1) " of portfolio volatility each "
-             "while preserving " (format-multiple gross) " gross and "
+             "at selected " (format-multiple gross) " gross with resulting "
              (format-multiple net) " net exposure. "
              deviation-clause
              (when (and (= :limited (:status freedom))

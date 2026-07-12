@@ -332,10 +332,11 @@
      :warnings []
      :as-of-ms 1777046400000}))
 
-(deftest optimizer-worker-solves-equal-risk-with-exact-exposure-targets-test
+(deftest optimizer-worker-solves-equal-risk-with-exact-gross-target-test
   ;; The real worker path (OSQP under Node): the sequential equal-risk solve
-  ;; must produce a solved payload whose published weights hit the gross/net
-  ;; TARGETS exactly and whose risk-contribution section is present and sane.
+  ;; must produce a solved payload whose published weights hit the selected
+  ;; gross target exactly, leave net as a resulting exposure, and carry a sane
+  ;; risk-contribution section.
   (async done
     (-> (worker/optimizer-result-payload (equal-risk-worker-request))
         (.then (fn [result]
@@ -346,7 +347,11 @@
                        gross (reduce + 0 (map js/Math.abs weights))
                        net (reduce + 0 weights)]
                    (is (< (js/Math.abs (- gross 2.0)) 1e-5))
-                   (is (< (js/Math.abs (- net 0.5)) 1e-5))
+                   (is (< (js/Math.abs
+                           (- net (get-in result [:diagnostics :net-exposure])))
+                          1e-9))
+                   (is (not (< (js/Math.abs (- net 0.5)) 1e-5))
+                       "Equal Risk reports resulting net instead of enforcing the stored net target")
                    (is (neg? (nth weights 2)) "the short side stays short"))
                  (let [contributions (:risk-contributions result)]
                    (is (= :signed-euler-volatility (:method contributions)))

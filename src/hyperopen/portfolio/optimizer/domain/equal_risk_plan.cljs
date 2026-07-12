@@ -3,8 +3,8 @@
   objective. `build-plan` presolves the request (domain.equal-risk-presolve)
   and, when feasible, plans ONE :sequential-equal-risk problem carrying the
   FULL constraint encoding for final-result validation; the per-iteration
-  subproblems the sequential solver hands the injected QP adapter carry only
-  the minimal independent rows (two book equalities + bounds + the L1
+  subproblems the sequential solver hands the injected QP adapter carry the
+  minimal independent rows (one signed-gross equality + bounds + the L1
   turnover channel). Tolerances, books, and seeds live in domain.equal-risk."
   (:require [hyperopen.portfolio.optimizer.coercion :as coercion]
             [hyperopen.portfolio.optimizer.domain.equal-risk :as equal-risk]
@@ -12,22 +12,19 @@
 
 (def ^:private finite-number? coercion/finite-number?)
 
-(defn- book-equalities
-  [books targets n]
-  (let [indicator (fn [indexes sign]
-                    (let [index-set (set indexes)]
-                      (mapv (fn [idx] (if (contains? index-set idx) sign 0))
-                            (range n))))]
-    (cond-> []
-      (seq (:long books))
-      (conj {:code :equal-risk-long-book
-             :coefficients (indicator (:long books) 1)
-             :target (:long-gross targets)})
+(defn- gross-coefficients
+  [books n]
+  (reduce (fn [coefficients [idx sign]]
+            (assoc coefficients idx sign))
+          (vec (repeat n 0))
+          (concat (map #(vector % 1) (:long books))
+                  (map #(vector % -1) (:short books)))))
 
-      (seq (:short books))
-      (conj {:code :equal-risk-short-book
-             :coefficients (indicator (:short books) -1)
-             :target (:short-gross targets)}))))
+(defn- gross-equality
+  [books targets n]
+  [{:code :gross-target
+    :coefficients (gross-coefficients books n)
+    :target (:gross targets)}])
 
 (defn- turnover-l1-constraints
   "The existing solver turnover convention: user-facing :max-turnover is
@@ -41,12 +38,11 @@
     []))
 
 (defn subproblem-template
-  "The convex feasible region every sequential subproblem shares: the book
-  equalities (which pin gross and net exactly), the per-asset bounds (locks
-  are already tight bound pairs), and the turnover L1 budget when active. The
-  redundant gross cap / net band / gross floor rows are deliberately omitted
-  here (the books imply them; quadprog rejects dependent equality rows) but
-  are validated on the final result via the plan-level problem."
+  "The convex feasible region every sequential subproblem shares: one
+  signed-gross equality, the per-asset bounds (locks are already tight bound
+  pairs), and the turnover L1 budget when active. Stored net rows are
+  deliberately omitted for Equal Risk and are not reintroduced for final
+  validation."
   [{:keys [instrument-ids lower-bounds upper-bounds locked-weights] :as encoded-constraints}
    books
    targets]
@@ -54,7 +50,7 @@
     {:kind :quadratic-program
      :objective-kind :equal-risk
      :instrument-ids (vec instrument-ids)
-     :equalities (book-equalities books targets n)
+     :equalities (gross-equality books targets n)
      :inequalities []
      :l1-constraints (turnover-l1-constraints encoded-constraints)
      :lower-bounds (vec lower-bounds)
@@ -112,21 +108,15 @@
                     {:code :turnover :value value :max max}))))
             (:l1-constraints template))))))
 
-(defn- ones [n] (vec (repeat n 1)))
-
 (defn- plan-problem
   "The plan-level problem handed to the solve dispatcher and, afterwards, to
   target-selection's solver-result validation. It carries the FULL constraint
-  encoding (books, net, signed gross, floor, band, L1 gross cap + turnover,
-  bounds, locks) so the final published point is independently re-checked;
+  encoding (books, signed gross, gross floor/cap, turnover, bounds, locks) so
+  the final published point is independently re-checked;
   the per-iteration subproblems use only the minimal independent rows."
   [{:keys [instrument-ids] :as encoded-constraints} covariance books targets template]
   (let [n (count instrument-ids)
-        signs (reduce (fn [signs idx] (assoc signs idx -1))
-                      (vec (repeat n 1))
-                      (:short books))
-        net-min (get-in encoded-constraints [:net-exposure :min])
-        net-max (get-in encoded-constraints [:net-exposure :max])
+        signs (gross-coefficients books n)
         gross-floor (get-in encoded-constraints [:gross-floor :min])
         gross-max (get-in encoded-constraints [:gross-exposure :max])]
     (assoc template
@@ -139,22 +129,8 @@
            :current-weights (vec (:current-weights encoded-constraints))
            :max-turnover (:max-turnover encoded-constraints)
            :rebalance-tolerance (:rebalance-tolerance encoded-constraints)
-           :equalities (vec (concat (:equalities template)
-                                    [{:code :net-exposure
-                                      :coefficients (ones n)
-                                      :target (:net targets)}
-                                     {:code :gross-target
-                                      :coefficients signs
-                                      :target (:gross targets)}]))
+           :equalities (vec (:equalities template))
            :inequalities (vec (concat
-                               (when (finite-number? net-min)
-                                 [{:code :net-exposure
-                                   :coefficients (ones n)
-                                   :lower net-min}])
-                               (when (finite-number? net-max)
-                                 [{:code :net-exposure
-                                   :coefficients (ones n)
-                                   :upper net-max}])
                                (when (finite-number? gross-floor)
                                  [{:code :gross-floor
                                    :coefficients signs
@@ -189,8 +165,8 @@
         {:status :ok
          :strategy :sequential-equal-risk
          :selection-objective {:kind :equal-risk}
-         ;; Non-blocking presolve warnings (lopsided book budgets) ride the
-         ;; plan and surface on the solved result's warnings panel.
+         ;; Non-blocking presolve warnings ride the plan and surface on the
+         ;; solved result's warnings panel.
          :warnings (vec (:warnings presolve-result))
          :problems [(plan-problem (assoc encoded-constraints
                                          :instrument-ids (vec instrument-ids))

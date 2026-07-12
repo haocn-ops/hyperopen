@@ -3,7 +3,7 @@
   rail (frontier quality / draft point budget / selection stability) — none of
   which exist for this objective — with the honest equivalents: Equal-Risk Fit
   (the measured quality + max deviation), Allocation Freedom (open / limited /
-  fully determined by the exposure targets), Solution Stability (agreement of
+  fully determined by gross and binding constraints), Solution Stability (agreement of
   the solver's deterministic starts), and the solver's actual stop reason. All
   classification lives in the equal-risk-results view-model; this namespace
   only renders."
@@ -40,8 +40,8 @@
       " now, or refine constraints for tighter balance")]
    [:p {:class ["mt-0.5" "text-[0.6rem]" "text-trading-muted/70"]}
     (if fully-determined?
-      "Gross and net exposure fully determine the selected positions — only changing targets or sides can move the balance."
-      "Draft is solved and usable. Loosening binding caps or the net bias can tighten the risk balance.")]])
+      "Gross exposure and binding constraints fully determine the selected positions — only changing gross, sides, or limits can move the balance."
+      "Draft is solved and usable. Loosening binding caps or position limits can tighten the risk balance.")]])
 
 (defn equal-risk-confidence-rail
   "Renders nil for non-equal-risk results (the caller falls back to the

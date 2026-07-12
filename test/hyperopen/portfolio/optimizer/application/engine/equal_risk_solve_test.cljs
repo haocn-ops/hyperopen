@@ -107,44 +107,68 @@
       (is (near? 0.5 (nth rrc 0) 1e-9))
       (is (near? 0.5 (nth rrc 1) 1e-9)))))
 
-(deftest constrained-mixed-case-reports-honest-approximation-test
-  ;; Spec test 4: unequal book sizes force unequal contributions. Gross/net
-  ;; stay exact, signs hold, and the error is reported rather than hidden.
-  (let [problem (build-problem [(perp "perp:A" :long) (perp "perp:B" :short)]
-                               {:gross-leverage 2.0
-                                :net-exposure {:min -0.5 :max -0.5}
-                                :max-asset-weight 1.5}
-                               diag-covariance)
-        result (solve* problem)
-        weights (:weights result)
-        {:keys [gross net]} (exposure-of weights)]
-    (is (= :solved (:status result)))
-    (is (near? 2.0 gross 1e-6))
-    (is (near? -0.5 net 1e-6))
-    (is (pos? (nth weights 0)))
-    (is (neg? (nth weights 1)))
-    (let [rrc (contributions-of problem weights)
-          errors (map #(js/Math.abs (- % 0.5)) rrc)]
-      (is (true? (get-in result [:equal-risk :converged?])))
-      ;; Books are pinned at [0.75, -1.25]; parity is impossible here.
-      (is (> (apply max errors) (equal-risk/exactness-tolerance 2))))))
+(deftest mixed-long-short-unequal-vols-ignore-stored-net-and-balance-contributions-test
+  (let [universe [(perp "perp:A" :long) (perp "perp:B" :short)]
+        constraints-a {:gross-leverage 2.0
+                       :net-exposure {:min 0.0 :max 0.0}
+                       :max-asset-weight 2.0}
+        constraints-b {:gross-leverage 2.0
+                       :net-exposure {:min -1.0 :max -1.0}
+                       :max-asset-weight 2.0}
+        problem-a (build-problem universe constraints-a diag-covariance)
+        problem-b (build-problem universe constraints-b diag-covariance)
+        result-a (solve* problem-a)
+        result-b (solve* problem-b)]
+    (doseq [[stored-net problem result] [[0.0 problem-a result-a]
+                                         [-1.0 problem-b result-b]]]
+      (let [weights (:weights result)
+            {:keys [gross net]} (exposure-of weights)
+            rrc (contributions-of problem weights)]
+        (is (= :solved (:status result)))
+        (is (near? (/ 4 3) (nth weights 0) 1e-3))
+        (is (near? (- (/ 2 3)) (nth weights 1) 1e-3))
+        (is (near? 2.0 gross 1e-6))
+        (is (near? (/ 2 3) net 1e-3))
+        (is (not (near? stored-net net 1e-3)))
+        (is (near? 0.5 (nth rrc 0) 1e-3))
+        (is (near? 0.5 (nth rrc 1) 1e-3))
+        (is (true? (get-in result [:equal-risk :converged?])))))
+    (doseq [[a b] (map vector (:weights result-a) (:weights result-b))]
+      (is (near? a b 1e-6)))
+    (doseq [[a b] (map vector
+                       (contributions-of problem-a (:weights result-a))
+                       (contributions-of problem-b (:weights result-b)))]
+      (is (near? a b 1e-6)))))
 
-(deftest negative-contribution-is-preserved-through-the-solver-test
-  ;; Spec test 5: a hedged book where the short leg's Euler contribution is
-  ;; negative; contributions still sum to one and are never absolute-valued.
-  (let [problem (build-problem [(perp "perp:A" :long) (perp "perp:B" :short)]
-                               {:gross-leverage 2.0
-                                :net-exposure {:min 1.0 :max 1.0}
-                                :max-asset-weight 1.6}
-                               [[0.04 0.03]
-                                [0.03 0.04]])
-        result (solve* problem)
-        rrc (contributions-of problem (:weights result))]
-    (is (= :solved (:status result)))
-    (is (near? 1.5 (nth (:weights result) 0) 1e-6))
-    (is (near? -0.5 (nth (:weights result) 1) 1e-6))
-    (is (neg? (nth rrc 1)))
-    (is (near? 1.0 (reduce + 0 rrc) 1e-9))))
+(deftest all-long-and-all-short-books-ignore-opposite-stored-net-test
+  (let [long-encoded (constraints/encode-constraints
+                      {:universe [(perp "perp:A" :long)
+                                  (perp "perp:B" :long)]
+                       :constraints {:gross-leverage 1.0
+                                     :net-exposure {:min -1.0 :max -1.0}}})
+        short-encoded (constraints/encode-constraints
+                       {:universe [(perp "perp:A" :short)
+                                   (perp "perp:B" :short)]
+                        :constraints {:gross-leverage 1.0
+                                      :net-exposure {:min 1.0 :max 1.0}}})
+        long-plan (equal-risk-plan/build-plan {:instrument-ids ["perp:A" "perp:B"]
+                                          :covariance diag-covariance
+                                          :encoded-constraints long-encoded})
+        short-plan (equal-risk-plan/build-plan {:instrument-ids ["perp:A" "perp:B"]
+                                           :covariance diag-covariance
+                                           :encoded-constraints short-encoded})]
+    (is (= :ok (:status long-plan)))
+    (is (= :ok (:status short-plan)))
+    (when (and (= :ok (:status long-plan))
+               (= :ok (:status short-plan)))
+      (let [long-result (solve* (first (:problems long-plan)))
+            short-result (solve* (first (:problems short-plan)))]
+        (is (= :solved (:status long-result)))
+        (is (= :solved (:status short-result)))
+        (is (near? 1.0 (:gross (exposure-of (:weights long-result))) 1e-6))
+        (is (near? 1.0 (:net (exposure-of (:weights long-result))) 1e-6))
+        (is (near? 1.0 (:gross (exposure-of (:weights short-result))) 1e-6))
+        (is (near? -1.0 (:net (exposure-of (:weights short-result))) 1e-6))))))
 
 (deftest active-asset-cap-binds-while-books-stay-exact-test
   ;; Spec test 7: unconstrained ERC would give B 2/3 (vols 10% vs 5%), the
@@ -299,10 +323,9 @@
                                {"perp:A" 0.6})
         result (solve* problem)
         weights (:weights result)
-        {:keys [gross net]} (exposure-of weights)]
+        {:keys [gross]} (exposure-of weights)]
     (is (= :solved (:status result)))
     (is (near? 2.0 gross 1e-6))
-    (is (near? 0.5 net 1e-6))
     (is (near? 0.6 (nth weights 0) 1e-9))
     (is (<= (nth weights 1) (+ 0.7 1e-6)))
     (is (<= (nth weights 2) 1e-9))))

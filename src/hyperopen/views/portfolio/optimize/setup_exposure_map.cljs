@@ -101,7 +101,7 @@
 
 (defn- exposure-pad
   [{:keys [target-marker band-rect band-wedge band-wedge-stripe band-edges
-           current-marker highlighted policy] :as model}]
+           current-marker highlighted policy net-output-only?] :as model}]
   (let [{tx :x ty :y} target-marker
         {by :y bh :h} band-rect
         y-top (pct by)
@@ -112,10 +112,13 @@
         target-y (pct ty)
         gross-warn? (:gross highlighted)
         net-warn? (:net highlighted)
-        aria (str "Exposure map. Gross target " (fmt-mult (:gross-target policy))
-                  ", net target " (fmt-mult (:net-target policy))
-                  ". Drag the point to set the target, or use the zoom buttons, the"
-                  " Fine-tune band sliders, and the advanced fields.")]
+        aria (if net-output-only?
+               (str "Exposure map. Gross target " (fmt-mult (:gross-target policy))
+                    ". Equal Risk determines resulting net from covariance and selected sides.")
+               (str "Exposure map. Gross target " (fmt-mult (:gross-target policy))
+                    ", net target " (fmt-mult (:net-target policy))
+                    ". Drag the point to set the target, or use the zoom buttons, the"
+                    " Fine-tune band sliders, and the advanced fields."))]
     [:svg {:class ["optimizer-exposure-map__pad"]
            :viewBox "0 0 100 100"
            :preserveAspectRatio "none"
@@ -233,7 +236,7 @@
   numbers of the section (designer mock, 2026-07-10): gross over its
   \"Leverage\" label (crypto vocabulary — the gross figure IS the leverage
   multiple), then the net figure tinted by direction."
-  [{:keys [policy net-direction]}]
+  [{:keys [policy net-direction net-output-only?]}]
   [:div {:class ["flex" "shrink-0" "flex-col" "justify-center" "gap-4" "pl-1"]
          :data-role "portfolio-optimizer-exposure-readout"}
    [:div
@@ -252,33 +255,34 @@
                    "text-trading-text")]
          :data-role "portfolio-optimizer-exposure-readout-net"
          :data-net-direction (name (or net-direction :neutral))}
-     (fmt-signed-mult (:net-target policy))]
+     (if net-output-only? "--" (fmt-signed-mult (:net-target policy)))]
     [:p {:class ["mt-1" "font-mono" "text-[0.6875rem]" "uppercase"
                  "tracking-[0.08em]" "text-trading-muted"]}
-     (str "net" (case net-direction
-                  :long " long"
-                  :short " short"
-                  ""))]]])
+     (if net-output-only?
+       "resulting net"
+       (str "net" (case net-direction
+                    :long " long"
+                    :short " short"
+                    "")))]]])
 
 ;; --- band sliders + echo + presets + memory ------------------------------------------------
 
 (defn- band-slider
-  [{:keys [label axis value max-band role level]}]
+  [{:keys [label axis value max-band role level disabled?]}]
   [:label {:class ["optimizer-exposure-map__band-row"]}
    [:span {:class controls/eyebrow-class} label]
-   [:input {:type "range"
-            :min 0
-            :max max-band
-            :step 0.01
-            :value (str value)
-            :class ["optimizer-exposure-band" "w-full" "accent-warning"]
-            :aria-label (str label " band")
-            :data-role role
-            ;; Sliders commit per-input (no free-text decimal problem); the action clamps. The
-            ;; current zoom level is baked in so narrowing a band never shrinks the pad scale
-            ;; mid-slide (widening may still grow it one step — the box must stay visible).
-            :on {:input [[:actions/set-portfolio-optimizer-exposure-band
-                          axis [:event.target/value] level]]}}]
+   [:input (cond-> {:type "range"
+                    :min 0
+                    :max max-band
+                    :step 0.01
+                    :value (str value)
+                    :class ["optimizer-exposure-band" "w-full" "accent-warning"]
+                    :aria-label (str label " band")
+                    :data-role role
+                    :disabled (boolean disabled?)}
+             (not disabled?)
+             (assoc :on {:input [[:actions/set-portfolio-optimizer-exposure-band
+                                  axis [:event.target/value] level]]}))]
    [:span {:class ["optimizer-exposure-map__band-value"]
            :data-role (str role "-value")}
     (str "± " (fmt-mult value))]])
@@ -359,12 +363,15 @@
   "The exact generated-constraints line ('Sent to solver gross … · net …'). An
   implementation-facing audit detail, so it is rendered inside the Advanced
   solver limits drawer (setup-constraint-controls), not in the primary column."
-  [echo]
+  [{:keys [echo net-output-only?]}]
   [:p {:class ["optimizer-exposure-map__echo"]
        :data-role "portfolio-optimizer-exposure-echo"}
    [:span {:class controls/eyebrow-class} "Sent to solver"]
    [:span {:class ["optimizer-exposure-map__echo-value"]}
-    (str (gross-echo echo) " · " (net-echo echo))]])
+    (str (gross-echo echo) " · "
+         (if net-output-only?
+           "net determined by Equal Risk"
+           (net-echo echo)))]])
 
 (defn pad-frame
   "The bounded pad with its axis frame — the one always-visible exposure
@@ -386,39 +393,44 @@
   "The percentage net band control: a 0–50% slider, direct numeric entry up to
   100%, quick presets, and an approximate absolute preview at the configured
   gross target (the solver always uses realized gross)."
-  [{:keys [net-band-pct net-band-abs-preview gross-max level]}]
+  [{:keys [net-band-pct net-band-abs-preview gross-max level net-editable?]}]
   (let [pct-value (* 100 (or net-band-pct 0))
-        role "portfolio-optimizer-exposure-net-band"]
+        role "portfolio-optimizer-exposure-net-band"
+        editable? (not (false? net-editable?))]
     [:div {:class ["optimizer-exposure-map__band-group"]
            :title net-band-help}
      [:label {:class ["optimizer-exposure-map__band-row"]}
       [:span {:class controls/eyebrow-class} "Net band"]
-      [:input {:type "range"
-               :min 0
-               :max 50
-               :step 0.5
-               :value (str pct-value)
-               :class ["optimizer-exposure-band" "w-full" "accent-warning"]
-               :aria-label "Net band, percent of gross"
-               :data-role role
-               :on {:input [[:actions/set-portfolio-optimizer-exposure-band
-                             :net-pct [:event.target/value] level]]}}]
+      [:input (cond-> {:type "range"
+                       :min 0
+                       :max 50
+                       :step 0.5
+                       :value (str pct-value)
+                       :class ["optimizer-exposure-band" "w-full" "accent-warning"]
+                       :aria-label "Net band, percent of gross"
+                       :data-role role
+                       :disabled (not editable?)}
+                editable?
+                (assoc :on {:input [[:actions/set-portfolio-optimizer-exposure-band
+                                     :net-pct [:event.target/value] level]]}))]
       [:span {:class ["optimizer-exposure-map__band-value"]
               :data-role (str role "-value")}
        (str "± " (fmt-band-pct net-band-pct) " of gross")]]
      [:div {:class ["flex" "items-center" "gap-2" "pl-1"]}
-      [:input {:type "number"
-               :min 0
-               :max 100
-               :step 0.1
-               :value (str pct-value)
-               :replicant/key (str "net-band-pct:" pct-value)
-               :class ["optimizer-exposure-map__band-input" "input" "input-xs"
-                       "w-16" "font-mono"]
-               :aria-label "Net band percent, direct entry"
-               :data-role (str role "-input")
-               :on {:change [[:actions/set-portfolio-optimizer-exposure-band
-                              :net-pct [:event.target/value] level]]}}]
+      [:input (cond-> {:type "number"
+                       :min 0
+                       :max 100
+                       :step 0.1
+                       :value (str pct-value)
+                       :replicant/key (str "net-band-pct:" pct-value)
+                       :class ["optimizer-exposure-map__band-input" "input" "input-xs"
+                               "w-16" "font-mono"]
+                       :aria-label "Net band percent, direct entry"
+                       :data-role (str role "-input")
+                       :disabled (not editable?)}
+                editable?
+                (assoc :on {:change [[:actions/set-portfolio-optimizer-exposure-band
+                                      :net-pct [:event.target/value] level]]}))]
       [:span {:class ["font-mono" "text-[0.625rem]" "text-trading-muted"]} "%"]
       (into [:span {:class ["flex" "gap-1"]
                     :data-role (str role "-presets")}]
@@ -426,8 +438,10 @@
                    [:button {:type "button"
                              :class ["optimizer-exposure-map__profile-btn"]
                              :data-role (str role "-preset-" p)
-                             :on {:click [[:actions/set-portfolio-optimizer-exposure-band
-                                           :net-pct p level]]}}
+                             :disabled (not editable?)
+                             :on (when editable?
+                                   {:click [[:actions/set-portfolio-optimizer-exposure-band
+                                             :net-pct p level]]})}
                     (str p "%")]))
             net-band-preset-pcts)]
      (when (and (number? net-band-pct) (pos? net-band-pct)
@@ -440,7 +454,8 @@
 (defn bands-block
   "Both band-tightness controls, for the Fine-tune drawer: the gross band stays
   an absolute leverage half-width; the net band is a percentage of gross."
-  [{:keys [gross-band net-band-pct net-band-abs-preview max-band zoom echo]}]
+  [{:keys [gross-band net-band-pct net-band-abs-preview max-band zoom echo
+           net-editable?]}]
   [:div {:class ["optimizer-exposure-map__bands"]}
    (band-slider {:label "Gross band" :axis :gross :value gross-band
                  :max-band max-band
@@ -449,6 +464,7 @@
    (net-band-row {:net-band-pct net-band-pct
                   :net-band-abs-preview net-band-abs-preview
                   :gross-max (:gross-max echo)
+                  :net-editable? net-editable?
                   :level (:level zoom)})])
 
 (defn policy-warning

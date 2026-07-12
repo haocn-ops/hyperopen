@@ -10,11 +10,10 @@
     recommended balance. Omitted (nil) when the current book is empty or its
     variance is degenerate on the selected universe.
   - :equal-risk-solver — solver metadata plus :allocation-freedom, a property
-    of the problem geometry: each book's sum equality pins its last unlocked
-    member, so free degrees = sum over books of max(0, unlocked members - 1).
-    Zero degrees => :fully-determined (the commentary's constraint-determined
-    case: gross and net targets dictate every weight); binding bound
-    constraints on a non-degenerate problem => :limited; else :open.
+    of the problem geometry: one signed-gross equality pins one unlocked
+    selected member, so free degrees = unlocked selected positions - 1. Zero
+    degrees => :fully-determined; binding bound constraints on a
+    non-degenerate problem => :limited; else :open.
   - :risk-structure — the correlation-view section (see domain.risk-structure):
     per-instrument standalone/diversification decomposition of the SAME net
     shares, P&L-to-portfolio correlations, and the capped underlying
@@ -41,8 +40,7 @@
             locked-ids (set (keep :instrument-id (:locked-weights problem)))
             long-free (book-free-count instrument-ids locked-ids (:long books))
             short-free (book-free-count instrument-ids locked-ids (:short books))
-            free-degrees (+ (max 0 (dec (max 1 long-free)))
-                            (max 0 (dec (max 1 short-free))))
+            free-degrees (max 0 (dec (+ long-free short-free)))
             binding-count (count (distinct (keep :instrument-id
                                                  binding-constraints)))]
         {:status (cond

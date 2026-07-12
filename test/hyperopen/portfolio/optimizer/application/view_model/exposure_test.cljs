@@ -132,3 +132,38 @@
                                   :net-band-pct 0.05}
                     :highlighted-controls #{}}))))
              1e-9)))))
+
+(deftest exposure-map-model-equal-risk-makes-net-output-only-test
+  (let [constraints {:gross-max 2.0
+                     :net-min -0.75
+                     :net-max 0.25
+                     :net-band-pct 0.15
+                     :max-asset-weight 0.5}
+        equal-risk-model (vm/exposure-map-model
+                          {:objective-kind :equal-risk
+                           :constraints constraints
+                           :highlighted-controls #{:net-min}})
+        other-objective-model (vm/exposure-map-model
+                               {:objective-kind :minimum-variance
+                                :constraints constraints
+                                :highlighted-controls #{:net-min}})]
+    (testing "Equal Risk keeps gross editable and exposes net as solver output"
+      (is (= :gross-only (:interaction-mode equal-risk-model)))
+      (is (true? (:gross-editable? equal-risk-model)))
+      (is (false? (:net-editable? equal-risk-model)))
+      (is (true? (:net-output-only? equal-risk-model)))
+      (is (= "Resulting net is determined by Equal Risk from covariance and selected sides."
+             (:net-output-copy equal-risk-model)))
+      (is (false? (get-in equal-risk-model [:highlighted :net]))
+          "Stored net settings are inactive for Equal Risk and should not highlight the UI.")
+      (is (= -0.75 (get-in equal-risk-model [:echo :net-min])))
+      (is (= 0.25 (get-in equal-risk-model [:echo :net-max])))
+      (is (= 0.15 (get-in equal-risk-model [:echo :net-band-pct])))
+      (is (= :neutral (:net-direction equal-risk-model))
+          "A disabled net target should not advertise the stored long/short bias as active."))
+    (testing "other objectives retain the normal two-axis gross/net control"
+      (is (= :gross-net (:interaction-mode other-objective-model)))
+      (is (true? (:gross-editable? other-objective-model)))
+      (is (true? (:net-editable? other-objective-model)))
+      (is (false? (:net-output-only? other-objective-model)))
+      (is (true? (get-in other-objective-model [:highlighted :net]))))))

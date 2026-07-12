@@ -1,5 +1,5 @@
 (ns hyperopen.views.portfolio.optimize.setup-view-test
-  (:require [cljs.test :refer-macros [deftest is]]
+  (:require [cljs.test :refer-macros [deftest is testing]]
             [hyperopen.views.portfolio-view :as portfolio-view]
             [hyperopen.views.portfolio.optimize.test-support
              :refer [change-actions click-actions collect-nodes collect-strings
@@ -10,6 +10,24 @@
   (portfolio-view/portfolio-view
    {:router {:path "/portfolio/optimize/new"}
     :portfolio {:optimizer {:draft {:objective objective}}}}))
+
+(defn- portfolio-optimizer-setup-view-with-draft
+  [draft]
+  (portfolio-view/portfolio-view
+   {:router {:path "/portfolio/optimize/new"}
+    :portfolio {:optimizer {:draft draft}}}))
+
+(defn- unavailable-control?
+  [node event-actions]
+  (or (nil? node)
+      (and (true? (get-in node [1 :disabled]))
+           (nil? (event-actions node)))))
+
+(defn- available-control?
+  [node event-actions]
+  (and (some? node)
+       (not (true? (get-in node [1 :disabled])))
+       (some? (event-actions node))))
 
 (deftest portfolio-view-delegates-optimizer-new-route-to-setup-only-surface-test
   (let [view-node (portfolio-view/portfolio-view
@@ -207,6 +225,77 @@
         "sigma text input commits on change so the dial clamp cannot rewrite mid-typing")
     (doseq [[kind role] [[:target-return volatility-role] [:target-volatility return-role] [:max-sharpe return-role] [:max-sharpe volatility-role]]]
       (is (nil? (node-by-role (view-for kind) role))))))
+
+(deftest portfolio-optimizer-equal-risk-setup-makes-net-controls-output-only-test
+  (let [constraints {:gross-max 2.2
+                     :net-min -0.4
+                     :net-max 0.6
+                     :net-band-pct 0.15
+                     :max-asset-weight 0.5}
+        view-for-kind #(portfolio-optimizer-setup-view-with-draft
+                        {:objective {:kind %}
+                         :constraints constraints})
+        equal-risk-view (view-for-kind :equal-risk)
+        other-view (view-for-kind :minimum-variance)
+        equal-risk-strings (set (collect-strings equal-risk-view))]
+    (testing "Equal Risk keeps gross controls available"
+      (is (available-control?
+           (node-by-role equal-risk-view
+                         "portfolio-optimizer-exposure-gross-band")
+           input-actions))
+      (is (available-control?
+           (node-by-role equal-risk-view
+                         "portfolio-optimizer-constraint-gross-max-input")
+           change-actions)))
+    (testing "Equal Risk explains net as resulting output and makes net controls unavailable"
+      (is (contains? equal-risk-strings "Resulting net"))
+      (is (contains? equal-risk-strings
+                     "Resulting net is determined by Equal Risk from covariance and selected sides."))
+      (is (unavailable-control?
+           (node-by-role equal-risk-view
+                         "portfolio-optimizer-exposure-net-band")
+           input-actions))
+      (is (unavailable-control?
+           (node-by-role equal-risk-view
+                         "portfolio-optimizer-exposure-net-band-input")
+           change-actions))
+      (is (unavailable-control?
+           (node-by-role equal-risk-view
+                         "portfolio-optimizer-constraint-net-min-input")
+           change-actions))
+      (is (unavailable-control?
+           (node-by-role equal-risk-view
+                         "portfolio-optimizer-constraint-net-max-input")
+           change-actions)))
+    (testing "non Equal Risk objectives restore the existing net controls and values"
+      (is (available-control?
+           (node-by-role other-view
+                         "portfolio-optimizer-exposure-net-band")
+           input-actions))
+      (is (available-control?
+           (node-by-role other-view
+                         "portfolio-optimizer-exposure-net-band-input")
+           change-actions))
+      (is (= [[:actions/set-portfolio-optimizer-constraint
+               :net-min
+               [:event.target/value]]]
+             (change-actions
+              (node-by-role other-view
+                            "portfolio-optimizer-constraint-net-min-input"))))
+      (is (= [[:actions/set-portfolio-optimizer-constraint
+               :net-max
+               [:event.target/value]]]
+             (change-actions
+              (node-by-role other-view
+                            "portfolio-optimizer-constraint-net-max-input"))))
+      (is (= "-0.4"
+             (get-in (node-by-role other-view
+                                   "portfolio-optimizer-constraint-net-min-input")
+                     [1 :value])))
+      (is (= "0.6"
+             (get-in (node-by-role other-view
+                                   "portfolio-optimizer-constraint-net-max-input")
+                     [1 :value]))))))
 
 (deftest portfolio-optimizer-target-sigma-setup-block-renders-percent-controls-test
   (let [view-node (portfolio-optimizer-setup-view {:kind :target-volatility

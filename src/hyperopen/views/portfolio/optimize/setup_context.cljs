@@ -54,7 +54,7 @@
 (defn- exposure-target-value
   "One-line target-exposure echo (\"19.50× gross · +10.48× net long\") with the
   net side tinted by direction, matching the exposure pad's readout."
-  [{:keys [gross-label net-label direction]}]
+  [{:keys [gross-label net-label direction net-output-only?]}]
   [:span {:class ["font-mono"]}
    (or gross-label "--")
    [:span {:class ["text-trading-muted"]} " gross"]
@@ -64,11 +64,12 @@
                      :short "text-error"
                      "text-trading-text")]}
     (or net-label "--")]
-   [:span {:class ["text-trading-muted"]}
-    (case direction
-      :long " net long"
-      :short " net short"
-      " net")]])
+   (when-not net-output-only?
+     [:span {:class ["text-trading-muted"]}
+      (case direction
+        :long " net long"
+        :short " net short"
+        " net")])])
 
 (defn- summary-row
   "Run-summary line: muted icon + label on the left, right-aligned value."

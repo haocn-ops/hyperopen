@@ -19,6 +19,10 @@
   [constraints]
   {:portfolio {:optimizer {:draft {:constraints constraints}}}})
 
+(defn- state-with-draft
+  [draft]
+  {:portfolio {:optimizer {:draft draft}}})
+
 (defn- expect-write
   "The save-many effect a handler emits when it writes the whole constraints map."
   [constraints]
@@ -43,6 +47,26 @@
     (is (= [] (actions/set-portfolio-optimizer-exposure-point
                (state-with base-constraints) 50.0 50.0 bounds 0))
         "a pointer move with no button pressed must not rewrite the draft")))
+
+(deftest equal-risk-exposure-point-writes-gross-only-and-preserves-net-policy-test
+  (let [constraints {:gross-max 2.0
+                     :net-min -0.4
+                     :net-max 0.6
+                     :net-band-pct 0.15
+                     :max-asset-weight 0.5}
+        bounds {:left 0.0 :top 0.0 :width 100.0 :height 100.0}
+        out (actions/set-portfolio-optimizer-exposure-point
+             (state-with-draft {:objective {:kind :equal-risk}
+                                :constraints constraints})
+             10.0 25.0 bounds 1 4.0 3.0 1)
+        written (-> out first second first second)]
+    (is (= 3.0 (:gross-max written))
+        "Y-axis movement remains the Equal Risk gross target control.")
+    (is (not= (:gross-max constraints) (:gross-max written)))
+    (is (= (select-keys constraints [:net-min :net-max :net-band-pct])
+           (select-keys written [:net-min :net-max :net-band-pct]))
+        "X-axis movement is ignored for Equal Risk so stored net policy survives objective switching.")
+    (is (= [dirty-path true] (-> out first second second)))))
 
 (deftest exposure-interactions-pin-the-render-level-test
   ;; The view bakes the pad's current zoom level into drag/band dispatches; the handler pins it

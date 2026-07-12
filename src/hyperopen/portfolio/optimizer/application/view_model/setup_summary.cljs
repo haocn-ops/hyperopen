@@ -98,6 +98,10 @@
    :title title
    :copy copy})
 
+(defn- strip-label
+  [label prefix]
+  (when label (str/replace-first label prefix "")))
+
 (defn setup-summary-model
   ([draft]
    (setup-summary-model draft nil))
@@ -120,7 +124,7 @@
        (summary-row "Objective" (labelize* objective-kind)
                     "Objective remains separate from return model selection.")
        (summary-row "Portfolio exposure"
-                    (constraints-summary-line constraints)
+                    (constraints-summary-line constraints {:objective-kind objective-kind})
                     "Exposure limits are enforced before the recommendation is accepted.")
        (summary-row "Horizon" "Annualized"
                     "Displayed return and volatility metrics use the optimizer annualization convention.")]})))
@@ -208,17 +212,63 @@
   (when (number? tolerance)
     (str "Rebalance " (.toFixed (* 100 tolerance) 1) " pp")))
 
-(defn constraints-summary-line
-  "One scannable line of the live exposure-policy numbers (\"Gross 1.90–1.91× ·
-  Net +1.30×–1.41× long · Max asset 50% · Rebalance 3.0 pp\") shared by the
-  Portfolio exposure header and the scenario-contract card."
+(def ^:private equal-risk-net-output-row-copy
+  "Determined by Equal Risk from covariance and selected sides")
+
+(def ^:private equal-risk-net-output-summary-copy
+  "determined by Equal Risk from covariance and selected sides")
+
+(defn- gross-target-label
   [constraints]
-  (->> [(gross-range-label constraints)
-        (net-range-label constraints)
+  (fmt-mult (:gross-target (exposure-policy/constraints->policy (or constraints {})))))
+
+(defn- equal-risk-exposure-target
+  [constraints]
+  {:gross-label (gross-target-label constraints)
+   :net-label "Resulting net"
+   :direction :neutral
+   :net-output-only? true})
+
+(defn- equal-risk-gross-row-value
+  [constraints]
+  (when-let [gross-label (gross-target-label constraints)]
+    (str gross-label " selected")))
+
+(defn- equal-risk-exposure-rows
+  [constraints]
+  (filterv (fn [[_ value]] (some? value))
+           [["Gross" (equal-risk-gross-row-value constraints)]
+            ["Resulting net" equal-risk-net-output-row-copy]
+            ["Max asset" (strip-label (cap-label (:max-asset-weight constraints))
+                                      "Max asset ")]
+            ["Rebalance" (strip-label (band-label (:rebalance-tolerance constraints))
+                                      "Rebalance ")]]))
+
+(defn- equal-risk-constraints-summary-line
+  [constraints]
+  (->> [(when-let [gross-value (equal-risk-gross-row-value constraints)]
+         (str "Gross " gross-value))
+        (str "Resulting net " equal-risk-net-output-summary-copy)
         (cap-label (:max-asset-weight constraints))
         (band-label (:rebalance-tolerance constraints))]
        (keep identity)
        (str/join " · ")))
+
+(defn constraints-summary-line
+  "One scannable line of the live exposure-policy numbers (\"Gross 1.90–1.91× ·
+  Net +1.30×–1.41× long · Max asset 50% · Rebalance 3.0 pp\") shared by the
+  Portfolio exposure header and the scenario-contract card."
+  ([constraints]
+   (constraints-summary-line constraints nil))
+  ([constraints {:keys [objective-kind]}]
+   (if (= :equal-risk objective-kind)
+     (equal-risk-constraints-summary-line constraints)
+     (->> [(gross-range-label constraints)
+           (net-range-label constraints)
+           (cap-label (:max-asset-weight constraints))
+           (band-label (:rebalance-tolerance constraints))]
+          (keep identity)
+          (str/join " · ")))))
 
 (def return-model-display-names
   "Human names for return-model kinds, shared by the model-section header and the
@@ -256,11 +306,10 @@
          labelize* #(apply-labelize labelize %)
          preset (active-preset draft)
          objective-kind (get-in draft [:objective :kind])
+         equal-risk? (= :equal-risk objective-kind)
          return-free? (contains? return-free-objective-kinds objective-kind)
          returns-label (or (returns-source-label draft)
-                           (labelize* (get-in draft [:return-model :kind])))
-         strip (fn [label prefix]
-                 (when label (str/replace-first label prefix "")))]
+                           (labelize* (get-in draft [:return-model :kind])))]
      {:preset-label (get preset-display-names preset (labelize* preset))
       :asset-count (count (:universe draft))
       :universe-source-kind (get-in draft [:metadata :universe-source :kind])
@@ -278,20 +327,26 @@
       ;; summary's single Exposure line — the designer's card reads the target,
       ;; not the four band rows (2026-07-10 mock parity).
       :exposure-target
-      (let [{:keys [gross-target net-target]} (exposure-policy/constraints->policy
-                                               (or constraints {}))]
-        {:gross-label (fmt-mult gross-target)
-         :net-label (fmt-signed-mult net-target)
-         :direction (cond
-                      (and (number? net-target) (< 0.001 net-target)) :long
-                      (and (number? net-target) (< net-target -0.001)) :short
-                      :else :neutral)})
+      (if equal-risk?
+        (equal-risk-exposure-target constraints)
+        (let [{:keys [gross-target net-target]} (exposure-policy/constraints->policy
+                                                 (or constraints {}))]
+          {:gross-label (fmt-mult gross-target)
+           :net-label (fmt-signed-mult net-target)
+           :direction (cond
+                        (and (number? net-target) (< 0.001 net-target)) :long
+                        (and (number? net-target) (< net-target -0.001)) :short
+                        :else :neutral)}))
       :exposure-rows
-      (filterv (fn [[_ value]] (some? value))
-               [["Gross" (strip (gross-range-label constraints) "Gross ")]
-                ["Net" (strip (net-range-label constraints) "Net ")]
-                ["Max asset" (strip (cap-label (:max-asset-weight constraints)) "Max asset ")]
-                ["Rebalance" (strip (band-label (:rebalance-tolerance constraints)) "Rebalance ")]])
+      (if equal-risk?
+        (equal-risk-exposure-rows constraints)
+        (filterv (fn [[_ value]] (some? value))
+                 [["Gross" (strip-label (gross-range-label constraints) "Gross ")]
+                  ["Net" (strip-label (net-range-label constraints) "Net ")]
+                  ["Max asset" (strip-label (cap-label (:max-asset-weight constraints))
+                                            "Max asset ")]
+                  ["Rebalance" (strip-label (band-label (:rebalance-tolerance constraints))
+                                            "Rebalance ")]]))
       :return-label (or (get return-model-display-names
                              (get-in draft [:return-model :kind]))
                         (labelize* (get-in draft [:return-model :kind])))
@@ -304,4 +359,5 @@
       :net-max (:net-max constraints)
       :cap (:max-asset-weight constraints)
       :rebalance-tolerance (:rebalance-tolerance constraints)
-      :constraints-line (constraints-summary-line constraints)})))
+      :constraints-line (constraints-summary-line constraints
+                                                  {:objective-kind objective-kind})})))

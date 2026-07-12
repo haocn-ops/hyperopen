@@ -223,80 +223,74 @@
     (is (= :infeasible (:status max-sharpe-result)))
     (is (= :invalid-return-model (:reason max-sharpe-result)))))
 
-(deftest equal-risk-presolve-failure-surfaces-specific-violations-test
-  ;; Default-style exposure (gross 2, net +1) with an all-long universe
-  ;; implies 0.5x short gross; the run must fail in presolve with the
-  ;; specific short-book reason, before any solver call.
-  (let [called? (atom false)
-        result (engine/run-optimization
-                (equal-risk-request {:constraints {:long-only? false
-                                                   :gross-max 2.0
-                                                   :net-min 1.0
-                                                   :net-max 1.0
-                                                   :max-asset-weight 2.0
-                                                   :rebalance-tolerance 0.001}})
-                {:solve-problem (fn [_]
-                                  (reset! called? true)
-                                  {:status :solved :weights [0.5 0.5]})})]
-    (is (= :infeasible (:status result)))
-    (is (= :equal-risk-presolve (:reason result)))
-    (is (false? @called?))
-    (is (some #(= :equal-risk-short-book-empty (:code %))
-              (get-in result [:details :violations])))
-    (is (some (fn [violation]
-                (and (= :equal-risk-short-book-empty (:code violation))
-                     (string? (:message violation))))
-              (get-in result [:details :violations])))))
+(deftest equal-risk-solves-mixed-books-independent-of-stored-net-through-request-builder-test
+  (letfn [(run-with-net [net-target]
+            (engine/run-optimization
+             (equal-risk-request
+              {:universe [{:instrument-id "perp:BTC"
+                           :market-type :perp
+                           :coin "BTC"
+                           :shortable? true
+                           :position-side :long}
+                          {:instrument-id "perp:ETH"
+                           :market-type :perp
+                           :coin "ETH"
+                           :shortable? true
+                           :position-side :short}]
+               :constraints {:long-only? false
+                             :gross-max 2.0
+                             :net-min net-target
+                             :net-max net-target
+                             :max-asset-weight 2.0
+                             :max-turnover nil
+                             :perp-leverage {"perp:BTC" {:max-weight 2.0}
+                                             "perp:ETH" {:max-weight 2.0}}
+                             :rebalance-tolerance 0.001}})
+             {:solve-problem solver-adapter/solve-with-quadprog}))]
+    (let [zero-net-result (run-with-net 0.0)
+          short-net-result (run-with-net -1.0)
+          weights-a (:target-weights zero-net-result)
+          weights-b (:target-weights short-net-result)]
+      (doseq [result [zero-net-result short-net-result]]
+        (is (= :solved (:status result))
+            (pr-str (select-keys result [:status :reason :details :message])))
+        (is (pos? (nth (:target-weights result) 0)))
+        (is (neg? (nth (:target-weights result) 1)))
+        (is (near? 2.0 (get-in result [:diagnostics :gross-exposure]) 1e-6)))
+      (is (near? (get-in zero-net-result [:diagnostics :net-exposure])
+                 (get-in short-net-result [:diagnostics :net-exposure])
+                 1e-6))
+      (is (not (near? 0.0 (get-in zero-net-result [:diagnostics :net-exposure])
+                      1e-3)))
+      (is (not (near? -1.0 (get-in short-net-result [:diagnostics :net-exposure])
+                      1e-3)))
+      (doseq [[a b] (map vector weights-a weights-b)]
+        (is (near? a b 1e-6)))
+      (is (= (get-in zero-net-result [:equal-risk-solver :selected-initialization])
+             (get-in short-net-result [:equal-risk-solver :selected-initialization])))
+      (doseq [instrument-id ["perp:BTC" "perp:ETH"]]
+        (is (near? (get-in zero-net-result
+                           [:risk-contributions
+                            :relative-contributions-by-instrument
+                            instrument-id])
+                   (get-in short-net-result
+                           [:risk-contributions
+                            :relative-contributions-by-instrument
+                            instrument-id])
+                   1e-6)))
+      (let [freedom (get-in zero-net-result [:equal-risk-solver
+                                             :allocation-freedom])]
+        (is (not= :fully-determined (:status freedom)))
+        (is (= 1 (:free-degrees freedom)))
+        (is (= {:long 1 :short 1} (:books freedom))))
+      (doseq [result [zero-net-result short-net-result]]
+        (is (s/valid? :hyperopen.portfolio.optimizer.contracts/result-payload result)
+            (s/explain-str :hyperopen.portfolio.optimizer.contracts/result-payload
+                           result))))))
 
-(deftest equal-risk-solves-mixed-books-through-request-builder-test
-  ;; A short side survives the draft migration (shortable perp) and the books
-  ;; land exactly on the G=2, N=0 targets.
-  (let [result (engine/run-optimization
-                (equal-risk-request
-                 {:universe [{:instrument-id "perp:BTC"
-                              :market-type :perp
-                              :coin "BTC"
-                              :shortable? true
-                              :position-side :long}
-                             {:instrument-id "perp:ETH"
-                              :market-type :perp
-                              :coin "ETH"
-                              :shortable? true
-                              :position-side :short}]
-                  ;; The fixture's per-perp caps (0.75/0.7) and 0.5 turnover
-                  ;; deep-merge in and would (correctly) fail against the 1.0x
-                  ;; book targets from the [0.6, 0.4] current book, so this
-                  ;; case raises both explicitly: caps to 1.5 and the one-sided
-                  ;; turnover budget to 1.0 (the move needs sum|delta| = 1.8).
-                  :constraints {:long-only? false
-                                :gross-max 2.0
-                                :net-min 0.0
-                                :net-max 0.0
-                                :max-asset-weight 1.5
-                                :max-turnover 1.0
-                                :perp-leverage {"perp:BTC" {:max-weight 1.5}
-                                                "perp:ETH" {:max-weight 1.5}}
-                                :rebalance-tolerance 0.001}})
-                {:solve-problem solver-adapter/solve-with-quadprog})
-        weights (:target-weights result)]
-    (is (= :solved (:status result))
-        (pr-str (select-keys result [:status :reason :details :message])))
-    (is (near? 1.0 (nth weights 0)))
-    (is (near? -1.0 (nth weights 1)))
-    (is (near? 2.0 (get-in result [:diagnostics :gross-exposure]) 1e-6))
-    (is (near? 0.0 (get-in result [:diagnostics :net-exposure]) 1e-6))
-    ;; One asset per book: the exposure targets pin both weights exactly —
-    ;; the commentary's constraint-determined case.
-    (is (= :fully-determined
-           (get-in result [:equal-risk-solver :allocation-freedom :status])))
-    (is (zero? (get-in result [:equal-risk-solver :allocation-freedom
-                               :free-degrees])))))
-
-(deftest equal-risk-lopsided-books-warn-on-the-solved-result-test
-  ;; Feasible-but-degenerate targets (G=2, N=1.9 => 0.05x short budget shared
-  ;; by TWO shorts) must solve AND carry the non-blocking lopsided-books
-  ;; warning through to the published payload; the balanced mixed-books run
-  ;; above must NOT carry it.
+(deftest equal-risk-stored-net-extreme-does-not-warn-on-the-solved-result-test
+  ;; Stored net near gross used to starve the short book. Equal Risk now ignores
+  ;; that net setting, so no lopsided-books warning should ride the payload.
   (let [result (engine/run-optimization
                 (equal-risk-request
                  {:universe [{:instrument-id "perp:BTC"
@@ -328,8 +322,4 @@
                          (:warnings result))]
     (is (= :solved (:status result))
         (pr-str (select-keys result [:status :reason :details :message])))
-    (is (= 1 (count lopsided)))
-    (let [warning (first lopsided)]
-      (is (= :short (:book warning)))
-      (is (= 2 (:asset-count warning)))
-      (is (string? (:message warning))))))
+    (is (= [] (vec lopsided)))))

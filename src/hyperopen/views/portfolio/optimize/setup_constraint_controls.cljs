@@ -4,6 +4,7 @@
             ["lucide/dist/esm/icons/shield.js" :default lucide-shield]
             [hyperopen.portfolio.optimizer.application.view-model :as optimizer-view-model]
             [hyperopen.portfolio.optimizer.application.view-model.exposure :as exposure-vm]
+            [hyperopen.portfolio.optimizer.application.view-model.setup-summary :as setup-summary]
             [hyperopen.portfolio.optimizer.domain.exposure-policy :as exposure-policy]
             [hyperopen.views.portfolio.optimize.setup-controls :as controls]
             [hyperopen.views.portfolio.optimize.setup-exposure-map :as exposure-map]
@@ -62,8 +63,10 @@
 
 (defn- constraint-row
   ([label constraint-key value role highlighted? unit]
-   (constraint-row label nil constraint-key value role highlighted? unit))
+   (constraint-row label nil constraint-key value role highlighted? unit false))
   ([label hidden-label constraint-key value role highlighted? unit]
+   (constraint-row label hidden-label constraint-key value role highlighted? unit false))
+  ([label hidden-label constraint-key value role highlighted? unit disabled?]
    (let [tooltip-id (str role "-tooltip")
          help-copy (get constraint-help constraint-key)
          echo (constraint-echo unit value)]
@@ -79,27 +82,32 @@
          [:span {:class ["sr-only"]} hidden-label])
        [:span {:class ["ml-2" "font-mono" "text-[0.625rem]" "uppercase"
                        "tracking-[0.08em]" "text-trading-muted"]}
-        "edit"]
+        (if disabled? "output" "edit")]
        (when echo
          [:span {:class ["mt-0.5" "block" "font-mono" "text-[0.625rem]"
                          "normal-case" "tracking-normal" "text-trading-muted/70"]
                  :data-role (str role "-echo")}
           echo])]
-      [:input {:type "text"
-               :inputmode "decimal"
-               :class controls/input-class
-               :data-role role
-               :data-infeasible (when highlighted? "true")
-               :aria-invalid (when highlighted? "true")
-               :aria-describedby (when help-copy tooltip-id)
-               :value (str value)
-               ;; Commit on blur/Enter, not per keystroke: the handler parses the value with
-               ;; js/Number and writes it back into this controlled :value, so on :input a typed
-               ;; "0." snaps to "0" and a decimal can never be entered. :change keeps the raw
-               ;; text in the DOM until blur, then reconciles to the interpreted value.
-               :on {:change [[:actions/set-portfolio-optimizer-constraint
-                              constraint-key
-                              [:event.target/value]]]}}]])))
+      [:input (cond-> {:type "text"
+                       :inputmode "decimal"
+                       :class (cond-> controls/input-class
+                                disabled? (conj "opacity-50" "cursor-not-allowed"))
+                       :data-role role
+                       :data-infeasible (when highlighted? "true")
+                       :aria-invalid (when highlighted? "true")
+                       :aria-describedby (when help-copy tooltip-id)
+                       :value (str value)
+                       :disabled (boolean disabled?)}
+                (not disabled?)
+                ;; Commit on blur/Enter, not per keystroke: the handler parses the value with
+                ;; js/Number and writes it back into this controlled :value, so on :input a typed
+                ;; "0." snaps to "0" and a decimal can never be entered. :change keeps the raw
+                ;; text in the DOM until blur, then reconciles to the interpreted value.
+                (assoc :on {:change [[:actions/set-portfolio-optimizer-constraint
+                                      constraint-key
+                                      [:event.target/value]]]})
+                disabled?
+                (assoc :aria-disabled "true"))]])))
 
 (defn- turnover-cap-row
   [constraints highlighted?]
@@ -276,38 +284,47 @@
   behind a nested disclosure so the common path never sees it. Each field keeps its original
   data-role and appears exactly once in the panel — these are the only place
   gross-min/gross-max/net-min/net-max are editable."
-  [constraints highlighted-controls echo]
+  [constraints highlighted-controls exposure-model]
   (controls/disclosure-panel
    "portfolio-optimizer-constraints-advanced"
    (controls/disclosure-heading "Advanced solver limits" "raw min/max")
    [:div {:class ["mt-3"]}
-    (exposure-map/solver-echo echo)]
-   [:div {:class ["mt-3" "grid" "grid-cols-1" "gap-2"]}
-    (constraint-row "Gross exposure min" :gross-min (:gross-min constraints)
-                    "portfolio-optimizer-constraint-gross-min-input"
-                    (contains? highlighted-controls :gross-min)
-                    :mult)
-    (constraint-row "Gross exposure max" "Gross Leverage"
-                    :gross-max (:gross-max constraints)
-                    "portfolio-optimizer-constraint-gross-max-input"
-                    (contains? highlighted-controls :gross-max)
-                    :mult)
-    (constraint-row "Net exposure min" :net-min (:net-min constraints)
-                    "portfolio-optimizer-constraint-net-min-input"
-                    (contains? highlighted-controls :net-min)
-                    :mult)
-    (constraint-row "Net exposure max" :net-max (:net-max constraints)
-                    "portfolio-optimizer-constraint-net-max-input"
-                    (contains? highlighted-controls :net-max)
-                    :mult)]))
+    (exposure-map/solver-echo exposure-model)]
+   (let [net-disabled? (false? (:net-editable? exposure-model))]
+     [:div {:class ["mt-3" "grid" "grid-cols-1" "gap-2"]}
+      (constraint-row "Gross exposure min" :gross-min (:gross-min constraints)
+                      "portfolio-optimizer-constraint-gross-min-input"
+                      (contains? highlighted-controls :gross-min)
+                      :mult)
+      (constraint-row "Gross exposure max" "Gross Leverage"
+                      :gross-max (:gross-max constraints)
+                      "portfolio-optimizer-constraint-gross-max-input"
+                      (contains? highlighted-controls :gross-max)
+                      :mult)
+      (constraint-row "Net exposure min" nil
+                      :net-min (:net-min constraints)
+                      "portfolio-optimizer-constraint-net-min-input"
+                      (and (not net-disabled?)
+                           (contains? highlighted-controls :net-min))
+                      :mult
+                      net-disabled?)
+      (constraint-row "Net exposure max" nil
+                      :net-max (:net-max constraints)
+                      "portfolio-optimizer-constraint-net-max-input"
+                      (and (not net-disabled?)
+                           (contains? highlighted-controls :net-max))
+                      :mult
+                      net-disabled?)])))
 
 (defn constraints-section
   ([draft highlighted-controls]
    (constraints-section draft highlighted-controls nil))
   ([draft highlighted-controls {:keys [current-exposure has-saved-default? exposure-zoom-level]}]
    (let [constraints (:constraints draft)
+         objective-kind (get-in draft [:objective :kind])
          exposure-model (exposure-vm/exposure-map-model
-                         {:constraints constraints
+                         {:objective-kind objective-kind
+                          :constraints constraints
                           :current-exposure current-exposure
                           :highlighted-controls highlighted-controls
                           :has-saved-default? has-saved-default?
@@ -333,13 +350,19 @@
         [:span active-label]
         [:span {:class ["normal-case" "tracking-normal" "text-trading-muted"]
                 :data-role "portfolio-optimizer-constraints-header-summary"}
-         (optimizer-view-model/constraints-summary-line constraints)]])
+         (setup-summary/constraints-summary-line constraints
+                                                 {:objective-kind objective-kind})]])
       [:div {:class ["mt-3" "space-y-4"]}
-       [:p {:class ["text-[0.8125rem]" "leading-[1.45]" "text-trading-muted"]
-            :data-role "portfolio-optimizer-constraints-description"}
-        "Set target leverage and net long/short bias."]
+       (if (:net-output-only? exposure-model)
+         [:p {:class ["text-[0.8125rem]" "leading-[1.45]" "text-trading-muted"]
+              :data-role "portfolio-optimizer-constraints-description"}
+          [:span {:class ["font-semibold" "text-trading-text"]} "Resulting net"]
+          [:span {:class ["ml-2"]} (:net-output-copy exposure-model)]]
+         [:p {:class ["text-[0.8125rem]" "leading-[1.45]" "text-trading-muted"]
+              :data-role "portfolio-optimizer-constraints-description"}
+          "Set target leverage and net long/short bias."])
        ;; A holdings import rewrites the constraint envelope from the current book
-       ;; (gross floor, caps, net bias) — disclosed HERE, in the section that owns
+       ;; (gross floor, caps, net range) — disclosed HERE, in the section that owns
        ;; the constraints, not in the goal card (the objective didn't seed them).
        ;; Chip + short hint instead of a full amber sentence: the seeded-state
        ;; disclosure must not compete visually with the exposure controls.
@@ -408,4 +431,4 @@
                                   "portfolio-optimizer-constraint-dust-usdc-input" false
                                   :usd)]})]]
        (exposure-map/policy-warning (:preview exposure-model))
-       (advanced-drawer constraints highlighted-controls (:echo exposure-model))]))))
+       (advanced-drawer constraints highlighted-controls exposure-model)]))))

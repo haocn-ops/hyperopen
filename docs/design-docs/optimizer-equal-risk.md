@@ -1,7 +1,7 @@
 ---
 owner: portfolio
 status: canonical
-last_reviewed: 2026-07-11
+last_reviewed: 2026-07-12
 review_cycle_days: 90
 source_of_truth: true
 ---
@@ -23,9 +23,11 @@ presolve, tolerances), and
 ## What Equal Risk optimizes
 
 The user has already made every directional decision before the run: which assets are
-in, which are long, which are short, the gross leverage target, and the net bias
-target. Equal Risk only SIZES those predetermined positions so that each position's
-signed Euler contribution to total portfolio volatility is as equal as possible.
+in, which are long, which are short, and the gross leverage target. Equal Risk only
+SIZES those predetermined positions so that each position's signed Euler contribution
+to total portfolio volatility is as equal as possible. Stored net exposure policy is
+left intact in the draft for reversible objective switching, but it is not a
+constraint for `:equal-risk`.
 
 With covariance `Sigma`, weights `w`, `m = Sigma*w`, and portfolio variance
 `q = w'Sigma*w`, asset `i`'s relative risk contribution is `RRC_i = w_i*m_i / q`;
@@ -36,22 +38,29 @@ are fixed at `1/n`; there is no per-asset budget control.
 Equal Risk never chooses assets, never flips a side, never searches sign combinations,
 and is not HRP/HERC or clustering of any kind.
 
-## Exposure semantics: gross and net are targets
+## Exposure semantics: gross target, net output
 
-The Positioning control's target point (gross target `G`, net target `N` — the band
-midpoints from the canonical exposure-policy conversion) is honored EXACTLY, not as an
-upper limit: the long book must sum to `(G + N) / 2` and the short book to
-`(G - N) / 2`. Long-only runs pin `G = N = 1`. Feasibility requires `G > 0` and
-`|N| <= G`; requests violating this (or whose sides/caps/locks make a book target
-unreachable) fail before the solver runs, with specific `:equal-risk-*` presolve
-reasons and human-readable messages in the infeasible banner.
+The Positioning control's gross target `G` (the midpoint from the canonical
+exposure-policy conversion) is honored EXACTLY, not as an upper limit. Equal Risk
+uses one signed-gross equality: long weights plus absolute short weights must sum to
+`G`. Stored net target, net band, and raw net min/max fields are ignored by Equal
+Risk in presolve, seed projection, SQP subproblems, and final result validation.
+
+Long-only runs use the selected gross target when present and otherwise keep the
+legacy fully-invested fallback. Feasibility requires `G > 0` and enough aggregate
+magnitude capacity across the selected fixed-side positions. Fixed sides, bounds,
+locks, shortability, and turnover remain hard constraints with specific
+`:equal-risk-*` presolve reasons and human-readable messages in the infeasible
+banner.
 
 ## Why exact equality may be impossible
 
-Exact exposure targets, per-asset caps, locks, shortability, and the turnover budget
-take priority over exact risk parity. A two-asset long/short book at `G = 2, N = -0.5`
-pins the weights at `[0.75, -1.25]` outright — no freedom remains to balance
-contributions. The result is then the closest achievable balance and is labeled
+The exact gross target, per-asset caps, locks, shortability, and the turnover budget
+take priority over exact risk parity. A one-long/one-short book now has one free
+allocation dimension after gross normalization, so covariance can choose the
+long/short split. A single selected position, or a book whose caps/locks/turnover
+constraints consume the remaining degrees of freedom, can still leave no adjustable
+composition. The result is then the closest achievable balance and is labeled
 truthfully:
 
 - `exact` — the solver converged AND both the max and rms deviation of realized
@@ -147,10 +156,11 @@ objective. The confidence rail (`equal_risk_confidence_rail.cljs`) shows
 Equal-Risk Fit, **Allocation Freedom**, Solution Stability (agreement of the
 deterministic starts), and the solver's real stop reason. Allocation freedom
 comes from the payload (`:equal-risk-solver :allocation-freedom`): each book's
-sum equality pins its last unlocked member, so a book with one asset has zero
-freedom — a one-long/one-short book is **fully determined** by the gross/net
-targets, and the page says so ("Equal Risk evaluates the resulting balance
-but cannot improve it") instead of implying the optimizer chose the weights.
+free selected members share one gross equality before binding caps are counted.
+A one-long/one-short book therefore has one free allocation dimension; a single
+selected position remains fully determined. Fully determined cases say so ("Equal
+Risk evaluates the resulting balance but cannot improve it") instead of implying the
+optimizer chose the weights.
 The payload also carries `:current-risk-contributions` (same summary over the
 current aligned book) for the current-vs-recommended comparison; views degrade
 to em-dashes on persisted results that predate these fields.
@@ -160,7 +170,7 @@ to em-dashes on persisted results that predate these fields.
 Deterministic sequential quadratic programming through the existing injected QP
 adapter (quadprog synchronously, OSQP in the worker): four deterministic initializers
 (equal-notional, inverse-volatility, inverse-variance, current-weights — each
-projected onto the feasible set by a QP), damped-BFGS model Hessian, Armijo
+projected onto the one-gross-equation feasible set by a QP), damped-BFGS model Hessian, Armijo
 backtracking along always-feasible segments, per-iteration progress events, and an
 early exit once a start reaches `exact` quality. Turnover and the gross cap ride the
 existing split-variable L1 channel. All tolerances are centralized and documented in

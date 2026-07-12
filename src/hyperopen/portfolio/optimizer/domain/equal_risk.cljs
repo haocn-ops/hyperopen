@@ -4,19 +4,17 @@
   quality classification, and the damped-BFGS model-Hessian updates.
 
   The user has already fixed every directional decision (assets, sides, gross
-  target G, net target N). Equal Risk only SIZES those positions inside the
-  convex region the books carve out:
+  target G). Equal Risk ignores stored net policy and only sizes positions
+  inside one signed-gross equality:
 
       long book  = assets whose encoded bounds keep w_i >= 0
       short book = assets whose encoded bounds keep w_i <= 0
-      G_long  = (G + N) / 2   (exact equality: sum of long weights)
-      G_short = (G - N) / 2   (exact equality: sum of -w over short book)
+      G = sum(long weights) + sum(abs(short weights))
 
-  Encoding gross/net BY BOOK avoids rank-duplicate gross+net equality rows in
-  an all-long or all-short universe (net and true gross both follow from the
-  book sums because every asset is single-signed). Targets come from the
-  canonical exposure-policy midpoint semantics via the :exposure-targets the
-  constraint encoder carries; long-only requests pin G = N = 1.
+  Gross targets come from the canonical exposure-policy midpoint semantics via
+  the :exposure-targets the constraint encoder carries; long-only requests use
+  that gross target when present and otherwise keep the legacy fully-invested
+  fallback.
 
   Companions: contribution math and gradients in domain.risk-contributions,
   presolve feasibility in domain.equal-risk-presolve, the solver plan and QP
@@ -28,7 +26,7 @@
 (def tolerances
   "Every numeric tolerance the Equal Risk path uses, in one place.
 
-  :exposure-feasibility  weight-units slack for gross/net/book equalities and
+  :exposure-feasibility  weight-units slack for gross equality and
                          presolve capacity comparisons.
   :bound-feasibility     weight-units slack for per-asset bounds and locks when
                          validating solver iterates (QP solvers land ~1e-9
@@ -87,15 +85,13 @@
 ;; --- Targets and books -------------------------------------------------------
 
 (defn exposure-targets
-  "Gross/net TARGETS for this request. Long-only pins G = N = 1 (fully
-  invested single long book); otherwise the canonical exposure-policy
-  midpoints carried on the encoded constraints as :exposure-targets."
-  [encoded-constraints]
-  (if (:long-only? encoded-constraints)
-    {:gross 1 :net 1}
-    (let [{:keys [gross-target net-target]} (:exposure-targets encoded-constraints)]
-      {:gross gross-target
-       :net net-target})))
+  "Gross TARGET for Equal Risk. Stored net policy is deliberately omitted:
+  :equal-risk treats net as a solver output, not an input constraint."
+  [{:keys [long-only? exposure-targets]}]
+  (let [{:keys [gross-target]} exposure-targets]
+    {:gross (if long-only?
+              (or gross-target 1)
+              gross-target)}))
 
 (defn book-of-bounds
   "Book membership from the ENCODED bounds (the authoritative feasible region):
@@ -155,9 +151,16 @@
             (-> (- v lambda) (max lo) (min hi)))
           values magnitude-lowers magnitude-uppers)))
 
-(defn- book-seed-magnitudes
-  [kind indexes lower-bounds upper-bounds book target covariance current-weights]
-  (let [k (count indexes)
+(defn- book-by-index
+  [books]
+  (merge (zipmap (:long books) (repeat :long))
+         (zipmap (:short books) (repeat :short))))
+
+(defn- seed-magnitudes
+  [kind books lower-bounds upper-bounds target covariance current-weights]
+  (let [indexes (vec (concat (:long books) (:short books)))
+        by-index (book-by-index books)
+        k (count indexes)
         raw (case kind
               :equal-notional (vec (repeat k (/ target (max 1 k))))
               :inverse-volatility (let [sigmas (mapv #(js/Math.sqrt
@@ -173,22 +176,28 @@
                                           total (reduce + 0 inverses)]
                                       (mapv #(* target (/ % total)) inverses))))
               :current-weights (mapv (fn [idx]
-                                       (let [weight (nth current-weights idx)
+                                       (let [book (get by-index idx)
+                                             weight (or (nth current-weights idx nil) 0)
                                              signed (case book
                                                       :long weight
                                                       :short (- weight))]
                                          (max 0 signed)))
                                      indexes))]
     (when raw
-      (let [magnitude-lowers (mapv #(first (magnitude-bounds book
+      (let [magnitude-lowers (mapv #(first (magnitude-bounds (get by-index %)
                                                              (nth lower-bounds %)
                                                              (nth upper-bounds %)))
                                    indexes)
-            magnitude-uppers (mapv #(second (magnitude-bounds book
+            magnitude-uppers (mapv #(second (magnitude-bounds (get by-index %)
                                                               (nth lower-bounds %)
                                                               (nth upper-bounds %)))
                                    indexes)]
-        (project-book-magnitudes raw magnitude-lowers magnitude-uppers target)))))
+        {:indexes indexes
+         :books by-index
+         :magnitudes (project-book-magnitudes raw
+                                              magnitude-lowers
+                                              magnitude-uppers
+                                              target)}))))
 
 (def seed-kinds
   "Deterministic initializer order. The sequential solver runs them in this
@@ -197,28 +206,24 @@
 
 (defn seed-weights
   "Signed seed vector for one initializer kind, or nil when the kind cannot be
-  built (e.g. inverse-volatility with a zero-variance asset). Book targets are
-  hit exactly (up to bisection depth); turnover and cross-book couplings are
+  built (e.g. inverse-volatility with a zero-variance asset). The one gross
+  target is hit exactly (up to bisection depth); turnover couplings are
   handled afterwards by the projection QP in the solver."
   [kind {:keys [lower-bounds upper-bounds current-weights]} books targets covariance]
   (let [n (count lower-bounds)
-        long-magnitudes (book-seed-magnitudes kind (:long books) lower-bounds upper-bounds
-                                              :long (:long-gross targets)
-                                              covariance current-weights)
-        short-magnitudes (book-seed-magnitudes kind (:short books) lower-bounds upper-bounds
-                                               :short (:short-gross targets)
-                                               covariance current-weights)]
-    (when (and (or (empty? (:long books)) long-magnitudes)
-               (or (empty? (:short books)) short-magnitudes))
+        projected (seed-magnitudes kind books lower-bounds upper-bounds
+                                   (:gross targets)
+                                   covariance current-weights)]
+    (when projected
       (as-> (vec (repeat n 0)) weights
         (reduce (fn [acc [idx magnitude]]
-                  (assoc acc idx magnitude))
+                  (let [book (get (:books projected) idx)
+                        signed (case book
+                                 :long magnitude
+                                 :short (- magnitude))]
+                    (assoc acc idx signed)))
                 weights
-                (map vector (:long books) (or long-magnitudes [])))
-        (reduce (fn [acc [idx magnitude]]
-                  (assoc acc idx (- magnitude)))
-                weights
-                (map vector (:short books) (or short-magnitudes [])))))))
+                (map vector (:indexes projected) (:magnitudes projected)))))))
 
 ;; --- Damped BFGS -------------------------------------------------------------
 

@@ -27,6 +27,20 @@ async function openFineTune(page) {
   }
 }
 
+async function expectControlUnavailable(locator) {
+  const count = await locator.count();
+  if (count === 0) {
+    expect(count).toBe(0);
+    return;
+  }
+  await expect(locator.first()).toBeDisabled();
+}
+
+async function expectControlAvailable(locator) {
+  await expect(locator).toHaveCount(1);
+  await expect(locator).toBeEnabled();
+}
+
 test.describe("optimizer exposure-map Positioning control", () => {
   test.beforeEach(async ({ page }) => {
     await visitRoute(page, "/portfolio/optimize/new");
@@ -191,6 +205,107 @@ test.describe("optimizer exposure-map Positioning control", () => {
     await expect(
       page.locator("[data-role='portfolio-optimizer-exposure-net-band-abs-preview']")
     ).toContainText("≈ ±0.50× at 2.00× gross");
+  });
+
+  test("Equal Risk keeps gross editable and restores stored net controls after switching objectives", async ({
+    page
+  }) => {
+    await seedOptimizerState(page, [
+      seedPatch(optimizerPath("draft", "objective"), { kind: keyword("equal-risk") }),
+      seedPatch(optimizerPath("draft", "constraints"), {
+        "gross-max": 2.2,
+        "net-min": -0.4,
+        "net-max": 0.6,
+        "net-band-pct": 0.15,
+        "max-asset-weight": 0.5
+      })
+    ]);
+    await waitForIdle(page);
+
+    const panel = page.locator(PANEL);
+    await expect(panel).toContainText("Resulting net");
+    await expect(panel).toContainText(
+      "Resulting net is determined by Equal Risk from covariance and selected sides."
+    );
+    await expect(page.locator("[data-role='portfolio-optimizer-exposure-readout-gross']")).toHaveText(
+      "2.20×"
+    );
+
+    await openFineTune(page);
+    await expectControlAvailable(
+      page.locator("[data-role='portfolio-optimizer-exposure-gross-band']")
+    );
+    await expectControlUnavailable(
+      page.locator("[data-role='portfolio-optimizer-exposure-net-band']")
+    );
+    await expectControlUnavailable(
+      page.locator("[data-role='portfolio-optimizer-exposure-net-band-input']")
+    );
+    await expectControlUnavailable(
+      page.locator("[data-role='portfolio-optimizer-constraint-net-min-input']")
+    );
+    await expectControlUnavailable(
+      page.locator("[data-role='portfolio-optimizer-constraint-net-max-input']")
+    );
+
+    const storedNetBefore = {
+      min: await readOptimizerState(page, optimizerPath("draft", "constraints", "net-min")),
+      max: await readOptimizerState(page, optimizerPath("draft", "constraints", "net-max")),
+      band: await readOptimizerState(
+        page,
+        optimizerPath("draft", "constraints", "net-band-pct")
+      )
+    };
+    const grossBefore = await readOptimizerState(
+      page,
+      optimizerPath("draft", "constraints", "gross-max")
+    );
+    const pad = page.locator("[data-role='portfolio-optimizer-exposure-pad']");
+    await pad.scrollIntoViewIfNeeded();
+    const box = await pad.boundingBox();
+    await page.mouse.move(box.x + box.width * 0.1, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width * 0.1, box.y + box.height * 0.2, {
+      steps: 8
+    });
+    await page.mouse.up();
+    await waitForIdle(page);
+    expect(
+      await readOptimizerState(page, optimizerPath("draft", "constraints", "gross-max"))
+    ).not.toBe(grossBefore);
+    expect({
+      min: await readOptimizerState(page, optimizerPath("draft", "constraints", "net-min")),
+      max: await readOptimizerState(page, optimizerPath("draft", "constraints", "net-max")),
+      band: await readOptimizerState(
+        page,
+        optimizerPath("draft", "constraints", "net-band-pct")
+      )
+    }).toEqual(storedNetBefore);
+
+    await page.locator("[data-role='portfolio-optimizer-objective-minimum-variance']").click();
+    await waitForIdle(page);
+    await expect(panel).toContainText("Set target leverage and net long/short bias.");
+    await expectControlAvailable(
+      page.locator("[data-role='portfolio-optimizer-exposure-net-band']")
+    );
+    await expectControlAvailable(
+      page.locator("[data-role='portfolio-optimizer-exposure-net-band-input']")
+    );
+    await expectControlAvailable(
+      page.locator("[data-role='portfolio-optimizer-constraint-net-min-input']")
+    );
+    await expectControlAvailable(
+      page.locator("[data-role='portfolio-optimizer-constraint-net-max-input']")
+    );
+    expect(
+      await readOptimizerState(page, optimizerPath("draft", "constraints", "net-min"))
+    ).toBe(storedNetBefore.min);
+    expect(
+      await readOptimizerState(page, optimizerPath("draft", "constraints", "net-max"))
+    ).toBe(storedNetBefore.max);
+    expect(
+      await readOptimizerState(page, optimizerPath("draft", "constraints", "net-band-pct"))
+    ).toBe(storedNetBefore.band);
   });
 
   test("the Advanced drawer exposes the raw gross/net min/max fields", async ({ page }) => {

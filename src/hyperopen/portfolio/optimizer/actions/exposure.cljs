@@ -19,6 +19,22 @@
   [state]
   (or (get-in state contracts/draft-constraints-path) {}))
 
+(def ^:private net-policy-keys
+  [:net-min :net-max :net-band-pct])
+
+(defn- equal-risk-objective?
+  [state]
+  (= :equal-risk (get-in state (conj contracts/draft-objective-path :kind))))
+
+(defn- preserve-net-policy
+  [original updated]
+  (reduce (fn [acc k]
+            (if (contains? original k)
+              (assoc acc k (get original k))
+              (dissoc acc k)))
+          updated
+          net-policy-keys))
+
 (defn- write-constraints
   [constraints]
   (common/save-draft-path-values
@@ -50,16 +66,21 @@
     state client-x client-y bounds buttons gross-axis-max net-axis-extent nil))
   ([state client-x client-y bounds buttons gross-axis-max net-axis-extent render-level]
    (let [constraints (current-constraints state)
+         gross-only? (equal-risk-objective? state)
          {:keys [gross-band net-band-pct]} (policy/constraints->policy constraints)]
      (if-let [targets (policy/point->targets {:client-x client-x
                                               :client-y client-y
                                               :bounds bounds
                                               :buttons buttons
                                               :gross-axis-max gross-axis-max
-                                              :net-axis-extent net-axis-extent
+                                              :net-axis-extent (if gross-only?
+                                                                 0
+                                                                 net-axis-extent)
                                               :gross-band gross-band
                                               :net-band-pct net-band-pct})]
-       (into (write-constraints (policy/apply-point constraints targets))
+       (into (write-constraints
+              (cond->> (policy/apply-point constraints targets)
+                gross-only? (preserve-net-policy constraints)))
              (pin-zoom-effects state render-level))
        []))))
 

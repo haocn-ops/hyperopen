@@ -17,11 +17,100 @@
   maintenance margins are not in the result, so the 50%-drawdown odds are
   explained as a floor on ruin-type risk. The distribution's dollar axis is
   log-scaled (a linear axis would crush the skew this panel exists to show);
-  the axis carries no invented ticks, only the three model markers."
-  (:require [clojure.string :as str]
+  the axis carries no invented ticks, only the three model markers.
+
+  Every field carries an accessible info-tip (`info-tip` below, the codebase's
+  group / :has() hover-card idiom). The copy is written for THIS model — a
+  closed-form lognormal, not a Monte-Carlo simulation, with no funding /
+  execution / liquidation modeling — so it must never claim simulated paths,
+  cash costs, or a liquidation probability the model does not compute."
+  (:require ["lucide/dist/esm/icons/info.js" :default lucide-info]
+            [clojure.string :as str]
             [hyperopen.portfolio.optimizer.application.view-model.volatility-intuition
              :as vm]
-            [hyperopen.views.portfolio.optimize.format :as opt-format]))
+            [hyperopen.views.portfolio.optimize.format :as opt-format]
+            [hyperopen.views.portfolio.optimize.setup-controls :as controls]))
+
+(defn- info-tip
+  "Accessible hover/focus info-tip matching the optimizer idiom (setup_universe /
+  setup_controls): a focusable info glyph wrapped in a `group relative`, with an
+  absolutely-positioned `role=tooltip` card that opacity-toggles on
+  group-hover / group-focus-within. `position` (:start default / :center / :end)
+  aligns the card so edge tiles don't overflow the panel."
+  ([tooltip-id copy] (info-tip tooltip-id copy :start))
+  ([tooltip-id copy position]
+   (let [position-classes (case position
+                            :center ["left-1/2" "-translate-x-1/2"]
+                            :end ["right-0"]
+                            ["left-0"])]
+     [:span {:class ["optimizer-leverage-impact-tip" "group" "relative"
+                     "inline-flex" "items-center" "align-middle"]}
+      [:span {:class ["optimizer-leverage-impact-tip-glyph" "inline-flex"
+                      "cursor-help" "text-trading-muted/70"
+                      "hover:text-trading-text" "focus:text-trading-text"
+                      "focus:outline-none"]
+              :tabindex 0
+              :role "img"
+              :aria-label "More information"
+              :aria-describedby tooltip-id
+              :data-role (str tooltip-id "-trigger")}
+       (controls/lucide-icon lucide-info ["w-3" "h-3"])]
+      [:span {:class (into ["optimizer-leverage-impact-tip-card" "pointer-events-none"
+                            "absolute" "top-[calc(100%+6px)]" "z-40"
+                            "w-[min(22rem,calc(100vw-2rem))]" "border"
+                            "border-base-300" "bg-base-100" "px-2.5" "py-2"
+                            "font-sans" "text-[0.7rem]" "font-normal" "normal-case"
+                            "leading-[1.5]" "tracking-normal" "text-trading-muted"
+                            "opacity-0" "shadow-[0_12px_32px_rgba(0,0,0,0.5)]"
+                            "transition-opacity" "duration-150"
+                            "group-hover:opacity-100" "group-focus-within:opacity-100"]
+                           position-classes)
+              :id tooltip-id
+              :role "tooltip"
+              :data-role tooltip-id}
+       copy]])))
+
+;; Static tip copy, written for THIS model (closed-form lognormal, no
+;; simulation / funding / execution / liquidation). The median and shortfall
+;; tips are dynamic (they weave in the starting equity and the signed gap) and
+;; built at their call sites.
+(def ^:private tip-copy
+  {:panel
+   (str "Modeled one-year account-equity outcomes for the current and target "
+        "books, scaled from each book's estimated return and volatility. A "
+        "closed-form lognormal model over a 365-day horizon — not a "
+        "simulation. Funding, execution costs, and margin or liquidation "
+        "mechanics are not modeled.")
+   :modeled
+   (str "Calculated from a model, not observed results. Every number here "
+        "follows from the estimated return and volatility for each portfolio.")
+   :mean
+   (str "The average across the whole modeled distribution. Rare, very large "
+        "gains pull it well above the median, so it overstates a typical path "
+        "— the median is the more representative outcome.")
+   :p5
+   (str "A severe downside, not the worst case: 5% of modeled outcomes finish "
+        "below this and 95% above. Worse outcomes are possible — just rarer "
+        "than one in twenty.")
+   :terminal
+   (str "The share of the modeled distribution that finishes the year at or "
+        "below half your starting equity. An end-of-year outcome — a book can "
+        "fall past −50% mid-year and still recover above it (see the touching "
+        "−50% odds).")
+   :touch
+   (str "The chance the modeled path drops at least 50% below its starting "
+        "equity at any point in the year, even if it later recovers. A levered "
+        "book is usually force-liquidated before a drawdown this deep "
+        "completes, so read this as a floor on ruin risk — not a liquidation "
+        "probability, which would need maintenance margins this result does "
+        "not carry.")
+   :distribution
+   (str "The modeled spread of one-year target ending equity — a lognormal "
+        "density on a log-scaled dollar axis, so equal spacing means equal "
+        "multiples, not equal dollars (the mean can look only slightly right "
+        "of the median while being far larger). Markers: 5th percentile (5% "
+        "finish below), median (half below, half above), and mean (the "
+        "average, lifted by rare large gains).")})
 
 (defn- whole-usd
   [value]
@@ -103,14 +192,23 @@
         target-usd (get-in target [:dollar :median-usd])]
     (when (and (number? current-usd) (number? target-usd))
       (let [diff (- target-usd current-usd)
-            shortfall? (neg? diff)]
+            shortfall? (neg? diff)
+            tip (str "The gap between the two medians: the typical modeled "
+                     "target outcome ends " (whole-usd (js/Math.abs diff)) " "
+                     (if shortfall? "below" "above")
+                     " the typical current outcome. Not a guaranteed loss, a "
+                     "fee, or the difference of the two averages. Both books "
+                     "are modeled analytically, so this gap carries no "
+                     "simulation noise.")]
         [:div {:class ["mt-3" "flex" "flex-wrap" "items-baseline" "justify-between" "gap-2"]
                :data-role "portfolio-optimizer-leverage-impact-median-shortfall"}
-         [:span {:class ["text-[0.62rem]" "font-semibold" "uppercase" "tracking-[0.06em]"
+         [:span {:class ["inline-flex" "items-center" "gap-1.5" "text-[0.62rem]"
+                         "font-semibold" "uppercase" "tracking-[0.06em]"
                          (if shortfall? "text-warning" "text-trading-green")]}
           (if shortfall?
             "Median wealth shortfall vs current"
-            "Median wealth gain vs current")]
+            "Median wealth gain vs current")
+          (info-tip "portfolio-optimizer-leverage-impact-shortfall-tip" tip)]
          [:span {:class ["font-mono" "text-xl" "font-semibold" "tabular-nums"
                          (if shortfall? "text-warning" "text-trading-green")]}
           (str (if shortfall? "−" "+") (whole-usd (js/Math.abs diff)))]]))))
@@ -118,12 +216,15 @@
 ;; --- Stat tiles -----------------------------------------------------------------
 
 (defn- stat-tile
-  [{:keys [data-role label value subtext value-class]}]
+  [{:keys [data-role label value subtext value-class tip tip-id tip-position]}]
   [:div {:class ["optimizer-leverage-impact-tile" "border" "border-base-300"
                  "bg-base-200/40" "px-3" "py-2.5"]
          :data-role data-role}
-   [:p {:class ["text-[0.6rem]" "font-semibold" "uppercase" "tracking-[0.06em]" "text-trading-muted"]}
-    label]
+   [:p {:class ["flex" "items-center" "gap-1.5" "text-[0.6rem]" "font-semibold"
+                "uppercase" "tracking-[0.06em]" "text-trading-muted"]}
+    label
+    (when tip
+      (info-tip tip-id tip (or tip-position :start)))]
    [:p {:class ["mt-1" "font-mono" "text-base" "font-semibold" "tabular-nums"
                 (or value-class "text-trading-text")]}
     value]
@@ -240,8 +341,11 @@
                        [p5-ending-factor median-ending-factor mean-ending-factor])]
       [:div {:class ["mt-4"]
              :data-role "portfolio-optimizer-leverage-impact-distribution"}
-       [:p {:class ["text-[0.62rem]" "font-semibold" "uppercase" "tracking-[0.06em]" "text-trading-muted"]}
-        "Target ending wealth distribution"]
+       [:p {:class ["flex" "items-center" "gap-1.5" "text-[0.62rem]" "font-semibold"
+                    "uppercase" "tracking-[0.06em]" "text-trading-muted"]}
+        "Target ending wealth distribution"
+        (info-tip "portfolio-optimizer-leverage-impact-distribution-tip"
+                  (:distribution tip-copy))]
        [:svg {:viewBox (str "0 0 " dist-width " " dist-height)
               :class ["mt-1" "w-full" "h-auto"]
               :role "img"
@@ -305,18 +409,49 @@
                  :data-role "portfolio-optimizer-leverage-impact"}
        [:div {:class ["flex" "flex-wrap" "items-baseline" "justify-between" "gap-2"]}
         [:div {:class ["min-w-0"]}
-         [:p {:class ["font-mono" "text-[0.62rem]" "uppercase" "tracking-[0.08em]" "text-trading-muted/70"]}
-          "One-year modeled leverage impact"]
+         [:p {:class ["flex" "items-center" "gap-1.5" "font-mono" "text-[0.62rem]"
+                      "uppercase" "tracking-[0.08em]" "text-trading-muted/70"]}
+          "One-year modeled leverage impact"
+          (info-tip "portfolio-optimizer-leverage-impact-title-tip"
+                    (:panel tip-copy))]
          [:p {:class ["mt-0.5" "text-[0.68rem]" "text-trading-muted"]}
           (if capital-usd
             (str "Modeled dollar outcomes on account equity "
                  (whole-usd capital-usd) " · 1-year horizon")
             "Modeled outcomes as multiples of starting equity · 1-year horizon")]]
-        [:span {:class ["optimizer-leverage-impact-chip"]}
-         "Modeled"]]
+        [:span {:class ["optimizer-leverage-impact-chip-group" "group" "relative"
+                        "inline-flex" "items-center"]}
+         [:span {:class ["optimizer-leverage-impact-chip" "cursor-help"]
+                 :tabindex 0
+                 :aria-describedby "portfolio-optimizer-leverage-impact-modeled-tip"}
+          "Modeled"]
+         [:span {:class ["optimizer-leverage-impact-tip-card" "pointer-events-none"
+                         "absolute" "right-0" "top-[calc(100%+6px)]" "z-40"
+                         "w-[min(22rem,calc(100vw-2rem))]" "border" "border-base-300"
+                         "bg-base-100" "px-2.5" "py-2" "font-sans" "text-[0.7rem]"
+                         "font-normal" "normal-case" "leading-[1.5]" "tracking-normal"
+                         "text-trading-muted" "opacity-0"
+                         "shadow-[0_12px_32px_rgba(0,0,0,0.5)]" "transition-opacity"
+                         "duration-150" "group-hover:opacity-100"
+                         "group-focus-within:opacity-100"]
+                 :id "portfolio-optimizer-leverage-impact-modeled-tip"
+                 :role "tooltip"
+                 :data-role "portfolio-optimizer-leverage-impact-modeled-tip"}
+          (:modeled tip-copy)]]]
        [:div {:class ["mt-3"]}
-        [:p {:class ["text-[0.62rem]" "font-semibold" "uppercase" "tracking-[0.06em]" "text-trading-muted"]}
-         "Median ending wealth"]
+        [:p {:class ["flex" "items-center" "gap-1.5" "text-[0.62rem]" "font-semibold"
+                     "uppercase" "tracking-[0.06em]" "text-trading-muted"]}
+         "Median ending wealth"
+         (info-tip "portfolio-optimizer-leverage-impact-median-tip"
+                   (str "The midpoint of the modeled distribution of one-year "
+                        "ending equity: half the modeled outcomes finish above "
+                        "it, half below — one row per book. This is the typical "
+                        "outcome, not the average; for a levered book the mean "
+                        "sits well above the median because a few large winners "
+                        "pull it up."
+                        (when capital-usd
+                          (str " Both rows start from " (whole-usd capital-usd)
+                               "."))))]
         [:div {:class ["mt-2" "space-y-1.5"]}
          (when current
            (median-row "current" "Current" current capital-usd max-factor))
@@ -327,25 +462,35 @@
         (stat-tile {:data-role "portfolio-optimizer-leverage-impact-mean"
                     :label "Mean ending wealth"
                     :value (factor-text capital-usd (:mean-ending-factor target))
-                    :subtext "Pulled up by rare extreme outcomes."})
+                    :subtext "Pulled up by rare extreme outcomes."
+                    :tip (:mean tip-copy)
+                    :tip-id "portfolio-optimizer-leverage-impact-mean-tip"})
         (stat-tile {:data-role "portfolio-optimizer-leverage-impact-p5"
                     :label "5th percentile"
                     :value (factor-text capital-usd (:p5-ending-factor target))
-                    :subtext "One year in twenty ends at or below this."})
+                    :subtext "One year in twenty ends at or below this."
+                    :tip (:p5 tip-copy)
+                    :tip-id "portfolio-optimizer-leverage-impact-p5-tip"})
         (stat-tile {:data-role "portfolio-optimizer-leverage-impact-terminal"
                     :label "Odds of ending down 50%+"
                     :value (probability-pct terminal-odds)
                     :value-class (when (and (number? terminal-odds)
                                             (>= terminal-odds 0.5))
                                    "text-warning")
-                    :subtext "Chance the year ends at half of start or less."})
+                    :subtext "Chance the year ends at half of start or less."
+                    :tip (:terminal tip-copy)
+                    :tip-id "portfolio-optimizer-leverage-impact-terminal-tip"
+                    :tip-position :end})
         (stat-tile {:data-role "portfolio-optimizer-leverage-impact-touch"
                     :label "Odds of touching −50%"
                     :value (probability-pct touch-odds)
                     :value-class (when (and (number? touch-odds)
                                             (>= touch-odds 0.5))
                                    "text-warning")
-                    :subtext "Usually forced-liquidation territory — a floor on ruin risk."})]
+                    :subtext "Usually forced-liquidation territory — a floor on ruin risk."
+                    :tip (:touch tip-copy)
+                    :tip-id "portfolio-optimizer-leverage-impact-touch-tip"
+                    :tip-position :end})]
        (distribution-section target capital-usd)
        [:p {:class ["mt-3" "text-[0.6rem]" "text-trading-muted/70"]}
         "Lognormal model scaled from this run's return and volatility estimates; assumes continuous rebalancing to target weights. Distribution axis is log-scaled. Ignores fat tails, funding, execution costs, and margin mechanics. Modeled, not a guarantee."]])))

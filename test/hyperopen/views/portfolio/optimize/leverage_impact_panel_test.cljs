@@ -6,11 +6,17 @@
             [hyperopen.views.portfolio.optimize.format :as opt-format]
             [hyperopen.views.portfolio.optimize.leverage-impact-panel :as panel]
             [hyperopen.views.portfolio.optimize.test-support
-             :refer [collect-strings node-by-role]]))
+             :refer [collect-nodes collect-strings node-attr node-by-role]]))
 
 (defn- strings-of
   [node]
   (set (collect-strings node)))
+
+(defn- tooltip-text
+  [node tip-id]
+  (some->> (node-by-role node tip-id)
+           collect-strings
+           (str/join " ")))
 
 (defn- whole-usd
   [value]
@@ -50,9 +56,9 @@
     ;; The honesty fine print is always on the panel.
     (is (some #(str/includes? % "Lognormal model") (collect-strings node)))
     (is (some #(str/includes? % "Modeled, not a guarantee") (collect-strings node)))
-    ;; Never a liquidation claim — the drawdown odds are framed as a floor.
-    (is (not (some #(str/includes? (str/lower-case %) "liquidation probability")
-                   (collect-strings node))))
+    ;; The drawdown odds are framed as a floor on ruin risk; the only mention
+    ;; of "liquidation probability" is the honest disclaimer that we do NOT
+    ;; present one (checked precisely in the tips test below).
     (is (some #(str/includes? % "floor on ruin risk") (collect-strings node)))))
 
 (deftest median-shortfall-headline-is-signed-test
@@ -158,3 +164,78 @@
   (is (= "$186k" (panel/compact-usd 186000)))
   (is (= "$2M" (panel/compact-usd 1966060)))
   (is (= "−$500" (panel/compact-usd -500))))
+
+(deftest every-field-carries-an-accessible-info-tip-test
+  (let [node (panel/leverage-impact-panel
+              (fixtures/sample-solved-result
+               {:diagnostics {:gross-exposure 2.5}}))]
+    ;; Each tip is a role=tooltip card wired to a focusable trigger by
+    ;; aria-describedby — hover AND keyboard reach it.
+    (doseq [tip-id ["portfolio-optimizer-leverage-impact-title-tip"
+                    "portfolio-optimizer-leverage-impact-modeled-tip"
+                    "portfolio-optimizer-leverage-impact-median-tip"
+                    "portfolio-optimizer-leverage-impact-shortfall-tip"
+                    "portfolio-optimizer-leverage-impact-mean-tip"
+                    "portfolio-optimizer-leverage-impact-p5-tip"
+                    "portfolio-optimizer-leverage-impact-terminal-tip"
+                    "portfolio-optimizer-leverage-impact-touch-tip"
+                    "portfolio-optimizer-leverage-impact-distribution-tip"]]
+      (let [tip (node-by-role node tip-id)
+            trigger (first (collect-nodes node
+                                          #(= tip-id (get-in % [1 :aria-describedby]))))]
+        (is (some? tip) (str "missing tip " tip-id))
+        (is (= "tooltip" (node-attr tip :role)))
+        (is (= tip-id (node-attr tip :id)))
+        ;; A focusable trigger describes itself by this tip's id (hover AND
+        ;; keyboard reach it).
+        (is (some? trigger) (str "no aria-describedby trigger for " tip-id))
+        (is (some? (node-attr trigger :tabindex))
+            (str "trigger for " tip-id " is not keyboard-focusable"))))))
+
+(deftest median-tip-frames-median-vs-mean-and-anchors-starting-equity-test
+  (let [tip (tooltip-text
+             (panel/leverage-impact-panel
+              (fixtures/sample-solved-result {:diagnostics {:gross-exposure 2.5}}))
+             "portfolio-optimizer-leverage-impact-median-tip")]
+    ;; The user's #1 concern: median must not be read as the average.
+    (is (str/includes? tip "half the modeled outcomes finish above"))
+    (is (str/includes? tip "not the average"))
+    ;; Anchors the $ so $408 is never contextless.
+    (is (str/includes? tip (whole-usd 100000)))))
+
+(deftest ending-vs-touching-tips-are-distinct-and-honest-test
+  (let [node (panel/leverage-impact-panel
+              (fixtures/sample-solved-result {:diagnostics {:gross-exposure 2.5}}))
+        terminal (tooltip-text node "portfolio-optimizer-leverage-impact-terminal-tip")
+        touch (tooltip-text node "portfolio-optimizer-leverage-impact-touch-tip")]
+    ;; Ending-down is an end-of-year metric; touching is path-dependent — the
+    ;; guide's key distinction.
+    (is (str/includes? terminal "finishes the year"))
+    (is (str/includes? touch "at any point in the year"))
+    ;; Touching stays honest: a floor on ruin risk, never a liquidation prob.
+    (is (str/includes? touch "floor on ruin risk"))
+    (is (str/includes? touch "not a liquidation probability"))))
+
+(deftest tips-never-claim-a-simulation-or-unmodeled-costs-test
+  ;; Our model is closed-form lognormal with no funding/execution/liquidation.
+  ;; The tips must not borrow the mockup's simulation/cost language.
+  (let [copy (str/lower-case
+              (str/join " "
+                        (collect-strings
+                         (panel/leverage-impact-panel
+                          (fixtures/sample-solved-result
+                           {:diagnostics {:gross-exposure 2.5}})))))]
+    (is (str/includes? copy "not a simulation"))
+    (is (not (str/includes? copy "10,000")))
+    (is (not (str/includes? copy "simulated paths")))
+    ;; The panel names funding/execution/liquidation only to say they are NOT
+    ;; modeled — never as computed cash costs.
+    (is (str/includes? copy "not modeled"))))
+
+(deftest distribution-tip-discloses-the-log-axis-test
+  (let [tip (tooltip-text
+             (panel/leverage-impact-panel
+              (fixtures/sample-solved-result {:diagnostics {:gross-exposure 2.5}}))
+             "portfolio-optimizer-leverage-impact-distribution-tip")]
+    (is (str/includes? tip "log-scaled"))
+    (is (str/includes? tip "equal multiples, not equal dollars"))))

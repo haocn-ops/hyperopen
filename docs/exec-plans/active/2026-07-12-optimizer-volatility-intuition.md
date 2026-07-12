@@ -324,6 +324,27 @@ engine paths, and the full existing optimizer test surface stays green.
   5549/5549 green, workbench Playwright spec 6/6 (now including distribution
   marker ordering: mean strictly right of median by the σ²/2 drag),
   browser-verified in dollar and multiples modes.
+- [x] (2026-07-12) Follow-up (direct user request, with a detailed tooltip
+  guide written for the mockup's full Monte-Carlo model): added an accessible
+  info-tip to every field of the leverage-impact panel — panel title, Modeled
+  chip, Median ending wealth, the shortfall headline, all four stat tiles, and
+  the distribution heading. Reused the codebase's group / :has() hover-card
+  idiom (`info-tip`: focusable glyph + `role=tooltip` card, revealed on
+  group-hover / group-focus-within, aria-describedby wired, `:end` alignment
+  for right-edge tiles so they don't overflow). Copy was ADAPTED to our
+  closed-form lognormal model, not copied from the guide's simulation
+  language: the panel tip states "not a simulation" and that funding /
+  execution / liquidation are "not modeled"; the median tip frames median vs
+  mean and anchors the starting equity; the two loss-odds tips draw the
+  end-of-year (ending down 50%+) vs path-dependent (touching −50%) distinction
+  the guide insists on; the touch tip stays honest ("not a liquidation
+  probability, which would need maintenance margins this result does not
+  carry"); the distribution tip discloses the log axis. Suite 5554/5554;
+  workbench Playwright spec 7/7 (new test hovers AND keyboard-focuses a tip to
+  confirm it fades in); browser-verified the render + right-edge positioning.
+  Renames from the guide's table (wealth→equity, etc.) were NOT applied — the
+  tooltips resolve the ambiguity the user flagged, and a label sweep is a
+  separate call left for the owner.
 - [ ] Post-merge follow-up (optional, deferred): empirical short-horizon
   intuition (historical percentile one-day/one-week moves) fed from the
   history store, labeled "Historical" vs the model-scaled values per the

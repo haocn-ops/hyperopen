@@ -89,15 +89,15 @@
      (horizon-pct annualized)]]
    [:div {:class ["mt-2.5" "space-y-1.5"]}
     (horizon-row view {:key "daily"
-                       :label "Daily 1σ move"
+                       :label "Daily"
                        :value daily
                        :max-value monthly})
     (horizon-row view {:key "weekly"
-                       :label "Weekly 1σ move"
+                       :label "Weekly"
                        :value weekly
                        :max-value monthly})
     (horizon-row view {:key "monthly"
-                       :label "Monthly 1σ move"
+                       :label "Monthly"
                        :value monthly
                        :max-value monthly})]
    (severity-note view severity)

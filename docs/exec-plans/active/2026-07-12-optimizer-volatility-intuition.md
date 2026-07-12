@@ -345,6 +345,14 @@ engine paths, and the full existing optimizer test surface stays green.
   Renames from the guide's table (wealth→equity, etc.) were NOT applied — the
   tooltips resolve the ambiguity the user flagged, and a label sweep is a
   separate call left for the owner.
+- [x] (2026-07-12) Follow-up (direct user request): shortened the volatility-
+  intuition card's three row labels from "Daily 1σ move" / "Weekly 1σ move" /
+  "Monthly 1σ move" to plain "Daily" / "Weekly" / "Monthly" — the "1σ"
+  explanation stays in the card's always-visible fine print ("A 1σ move is a
+  volatility scale...") and the −100%-boundary note, so the meaning isn't
+  lost, just not repeated on every row. Suite 5554/5554, workbench Playwright
+  spec 7/7 unaffected (assertions target data-role + value text, not the
+  label strings), browser-verified.
 - [ ] Post-merge follow-up (optional, deferred): empirical short-horizon
   intuition (historical percentile one-day/one-week moves) fed from the
   history store, labeled "Historical" vs the model-scaled values per the

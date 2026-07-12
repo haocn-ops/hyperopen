@@ -94,6 +94,15 @@
     (is (= [[:effects/save state/panel-path "other"]]
            (actions/toggle-margin-rec-panel open "other")))))
 
+(deftest close-and-keydown-dismiss-panel
+  (is (= [[:effects/save state/panel-path nil]]
+         (actions/close-margin-rec-panel (base-state))))
+  (testing "Escape closes; other keys are inert"
+    (is (= [[:effects/save state/panel-path nil]]
+           (actions/handle-margin-rec-panel-keydown (base-state) "Escape")))
+    (is (= [] (actions/handle-margin-rec-panel-keydown (base-state) "Enter")))
+    (is (= [] (actions/handle-margin-rec-panel-keydown (base-state) "Tab")))))
+
 (deftest settings-setters-persist-normalized-state
   (let [effects (actions/set-margin-rec-risk-mode (base-state) "conservative")
         [[_ path saved] [_ storage-key stored]] effects]

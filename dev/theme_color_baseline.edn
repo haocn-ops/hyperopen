@@ -3,6 +3,7 @@
 ;; See docs/THEMING.md - do not raise counts by hand.
 {"src/hyperopen/telemetry/console_warning.cljs" 4
  "src/hyperopen/views/account_equity/funding_actions.cljs" 14
+ "src/hyperopen/views/account_info/margin_recommendation_panel.cljs" 1
  "src/hyperopen/views/account_info/mobile_cards.cljs" 2
  "src/hyperopen/views/account_info/position_margin_modal.cljs" 7
  "src/hyperopen/views/account_info/position_reduce_popover.cljs" 9

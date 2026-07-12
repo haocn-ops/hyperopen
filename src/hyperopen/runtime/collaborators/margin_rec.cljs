@@ -5,5 +5,7 @@
   {:margin-rec-sync margin-rec-actions/margin-rec-sync
    :margin-rec-process-intents margin-rec-actions/margin-rec-process-intents
    :toggle-margin-rec-panel margin-rec-actions/toggle-margin-rec-panel
+   :close-margin-rec-panel margin-rec-actions/close-margin-rec-panel
+   :handle-margin-rec-panel-keydown margin-rec-actions/handle-margin-rec-panel-keydown
    :set-margin-rec-risk-mode margin-rec-actions/set-margin-rec-risk-mode
    :set-margin-rec-auto-topup margin-rec-actions/set-margin-rec-auto-topup})

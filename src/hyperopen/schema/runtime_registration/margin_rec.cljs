@@ -8,6 +8,8 @@
   [[:actions/margin-rec-sync :margin-rec-sync]
    [:actions/margin-rec-process-intents :margin-rec-process-intents]
    [:actions/toggle-margin-rec-panel :toggle-margin-rec-panel]
+   [:actions/close-margin-rec-panel :close-margin-rec-panel]
+   [:actions/handle-margin-rec-panel-keydown :handle-margin-rec-panel-keydown]
    [:actions/set-margin-rec-risk-mode :set-margin-rec-risk-mode]
    [:actions/set-margin-rec-auto-topup :set-margin-rec-auto-topup]])
 

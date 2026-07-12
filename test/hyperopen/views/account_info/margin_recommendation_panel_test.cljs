@@ -112,21 +112,31 @@
                      "Funding buffer (3d)" "Exit / slippage buffer (1.0% notional)"
                      "Model uncertainty buffer" "Total recommended margin"]]
         (is (contains? strings label) label)))
-    (testing "apply opens the prefilled margin modal"
+    (testing "renders as a dismissable modal overlay"
+      (is (some? (node-by-role tree "margin-rec-overlay")))
+      (is (= [[:actions/close-margin-rec-panel]]
+             (click-actions (node-by-role tree "margin-rec-backdrop"))))
+      (is (= "dialog" (:role (node-attrs (node-by-role tree "margin-rec-panel"))))))
+    (testing "apply opens the prefilled margin modal then dismisses the panel"
       (let [apply-node (node-by-role tree "margin-rec-apply")
-            [[action-id payload placeholder]] (click-actions apply-node)]
+            [[action-id payload placeholder] close-action] (click-actions apply-node)]
         (is (contains? strings "Add recommended margin $6.22"))
         (is (= :actions/open-position-margin-modal action-id))
         (is (= 6.22 (:prefill-margin-amount payload)))
         (is (= :add (:prefill-margin-mode payload)))
         (is (= xyz-position (:position payload)))
-        (is (= :event.currentTarget/bounds placeholder))))
-    (testing "reduce and close"
+        (is (= :event.currentTarget/bounds placeholder))
+        (is (= [:actions/close-margin-rec-panel] close-action))))
+    (testing "reduce dismisses the panel; close button and Escape close it"
       (is (= [[:actions/open-position-reduce-popover position-data
-               :event.currentTarget/bounds]]
+               :event.currentTarget/bounds]
+              [:actions/close-margin-rec-panel]]
              (click-actions (node-by-role tree "margin-rec-reduce"))))
-      (is (= [[:actions/toggle-margin-rec-panel "xyz:TSM|xyz"]]
-             (click-actions (node-by-role tree "margin-rec-panel-close")))))
+      (is (= [[:actions/close-margin-rec-panel]]
+             (click-actions (node-by-role tree "margin-rec-panel-close"))))
+      (is (= [[:actions/handle-margin-rec-panel-keydown [:event/key]]]
+             (get-in (node-attrs (node-by-role tree "margin-rec-panel"))
+                     [:on :keydown]))))
     (testing "risk-mode control marks the active mode"
       (is (= "true" (:aria-pressed (node-attrs (node-by-role tree "margin-rec-risk-mode-balanced")))))
       (is (= "false" (:aria-pressed (node-attrs (node-by-role tree "margin-rec-risk-mode-conservative")))))

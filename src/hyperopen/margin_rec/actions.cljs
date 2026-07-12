@@ -72,6 +72,16 @@
                    position-key)]
     [[:effects/save margin-rec-state/panel-path next-key]]))
 
+(defn close-margin-rec-panel
+  [_state]
+  [[:effects/save margin-rec-state/panel-path nil]])
+
+(defn handle-margin-rec-panel-keydown
+  [state key]
+  (if (= key "Escape")
+    (close-margin-rec-panel state)
+    []))
+
 (defn- persist-trading-settings
   [state updates]
   (let [next-state (trading-settings/normalize-state

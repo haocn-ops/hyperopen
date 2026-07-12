@@ -100,8 +100,10 @@
                                                             read-only?
                                                             positions-state))
                   sorted-row-vms))
+       ;; Rendered as a fixed dialog overlay (see the panel ns) — this wrapper
+       ;; only gates it to desktop, where the row chip that opens it lives.
        (when margin-rec-panel-row-vm
-         [:div {:class ["hidden" "lg:block" "shrink-0" "overflow-y-auto" "max-h-[70%]"]}
+         [:div {:class ["hidden" "lg:block"]}
           (margin-rec-panel/margin-recommendation-panel
            {:position-key margin-rec-panel-key
             :rec (get-in margin-rec [:recs margin-rec-panel-key])

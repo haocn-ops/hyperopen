@@ -1,11 +1,18 @@
 (ns hyperopen.views.account-info.margin-recommendation-panel
-  "Expandable card under the positions table showing the modeled
-  isolated-margin recommendation for one position: how the number was built
-  (named buffers), the modeled liquidation probability before the next likely
-  intervention, and the actions (prefilled margin add, reduce instead,
-  risk-limit selection)."
+  "Centered modal overlay showing the modeled isolated-margin recommendation
+  for one position: how the number was built (named buffers), the modeled
+  liquidation probability before the next likely intervention, and the actions
+  (prefilled margin add, reduce instead, risk-limit selection).
+
+  Rendered as a fixed dialog over the whole trade/portfolio view rather than
+  inline under the positions table: the account panel region is short (it sits
+  below the chart on the trade route), and this card needs room to show every
+  tile and the full breakdown at once without the reader scrolling a cramped
+  strip. A user opening it is adjusting margin, not charting, so borrowing the
+  chart's real estate is the right trade."
   (:require [hyperopen.margin-rec.state :as margin-rec-state]
-            [hyperopen.views.account-info.shared :as shared]))
+            [hyperopen.views.account-info.shared :as shared]
+            [hyperopen.views.ui.dialog-focus :as dialog-focus]))
 
 (defn- fmt-usd
   [value]
@@ -133,26 +140,47 @@
          :data-role role}
    message])
 
+(def ^:private dialog-focus-on-render
+  (dialog-focus/dialog-focus-on-render
+   {:restore-selector "[data-role='margin-rec-risk-chip']"}))
+
 (defn- panel-shell
-  [coin-label on-close-key children]
-  (into [:div {:class ["mx-3" "mb-3" "rounded-lg" "border" "border-base-300"
-                       "bg-base-200" "p-4"]
-               :data-role "margin-rec-panel"}
-         [:div {:class ["mb-3" "flex" "items-center" "justify-between" "gap-3"]}
-          [:div {:class ["flex" "items-center" "gap-2"]}
-           [:span {:class ["text-sm" "font-semibold" "text-trading-text"]}
-            "Isolated margin recommendation"]
-           [:span {:class ["rounded" "border" "border-base-300" "px-1.5" "py-0.5"
-                           "text-xs" "font-medium" "text-trading-text-secondary"]}
-            coin-label]]
-          [:button {:type "button"
-                    :data-role "margin-rec-panel-close"
-                    :class ["bg-transparent" "p-0" "text-xs" "font-medium"
-                            "text-trading-text-secondary" "hover:text-trading-text"
-                            "focus:outline-none"]
-                    :on {:click [[:actions/toggle-margin-rec-panel on-close-key]]}}
-           "Hide details"]]]
-        children))
+  [coin-label children]
+  [:div {:class ["fixed" "inset-0" "z-[240]" "flex" "items-center" "justify-center" "p-4"]
+         :data-role "margin-rec-overlay"}
+   [:button {:type "button"
+             :class ["absolute" "inset-0" "bg-black/60" "backdrop-blur-[1px]"]
+             :aria-label "Close recommendation"
+             :data-role "margin-rec-backdrop"
+             :on {:click [[:actions/close-margin-rec-panel]]}}]
+   (into [:div {:class ["relative" "w-full" "max-w-5xl" "max-h-[88vh]" "overflow-y-auto"
+                        "rounded-xl" "border" "border-base-300" "bg-base-200" "p-5"
+                        "shadow-[0_24px_70px_rgba(0,0,0,0.55)]"]
+                :role "dialog"
+                :aria-modal "true"
+                :aria-label "Isolated margin recommendation"
+                :tabindex "-1"
+                :replicant/on-render dialog-focus-on-render
+                :on {:keydown [[:actions/handle-margin-rec-panel-keydown [:event/key]]]}
+                :data-role "margin-rec-panel"}
+          [:div {:class ["mb-4" "flex" "items-center" "justify-between" "gap-3"]}
+           [:div {:class ["flex" "items-center" "gap-2"]}
+            [:span {:class ["text-base" "font-semibold" "text-trading-text"]}
+             "Isolated margin recommendation"]
+            [:span {:class ["rounded" "border" "border-base-300" "px-1.5" "py-0.5"
+                            "text-xs" "font-medium" "text-trading-text-secondary"]}
+             coin-label]]
+           [:button {:type "button"
+                     :data-role "margin-rec-panel-close"
+                     :class ["inline-flex" "h-7" "items-center" "gap-1.5" "rounded-md"
+                             "border" "border-base-300" "px-2.5" "text-xs" "font-medium"
+                             "text-trading-text-secondary" "transition-colors"
+                             "hover:bg-base-300" "hover:text-trading-text"
+                             "focus:outline-none" "focus:ring-1"
+                             "focus:ring-ho-text-muted/40"]
+                     :on {:click [[:actions/close-margin-rec-panel]]}}
+            "Hide details ✕"]]]
+         children)])
 
 (defn- ready-panel
   [{:keys [position-key rec-result row-vm read-only? risk-mode]}]
@@ -166,7 +194,7 @@
                          (= :ok status)
                          (number? additional)
                          (>= additional 0.01))]
-    [[:div {:class ["grid" "grid-cols-2" "gap-2" "md:grid-cols-5"]}
+    [[:div {:class ["grid" "grid-cols-2" "gap-2" "md:grid-cols-4"]}
       (tile "margin-rec-tile-current"
             "Current isolated margin"
             (fmt-usd (:equity as-of))
@@ -230,7 +258,8 @@
                                  (assoc position-data
                                         :prefill-margin-mode :add
                                         :prefill-margin-amount additional)
-                                 :event.currentTarget/bounds]]}}
+                                 :event.currentTarget/bounds]
+                                [:actions/close-margin-rec-panel]]}}
           (str "Add recommended margin " (fmt-usd additional))])
        (when-not read-only?
          [:button {:type "button"
@@ -242,7 +271,8 @@
                            "focus:ring-ho-text-muted/40"]
                    :on {:click [[:actions/open-position-reduce-popover
                                  position-data
-                                 :event.currentTarget/bounds]]}}
+                                 :event.currentTarget/bounds]
+                                [:actions/close-margin-rec-panel]]}}
           "Reduce position instead"])
        [:div {:class ["text-xs" "leading-4" "text-trading-text-secondary"]}
         (str "Modeled probability of touching liquidation before your expected"
@@ -258,7 +288,6 @@
           coin-label (or (:coin-label row-vm) position-key)]
       (panel-shell
        coin-label
-       position-key
        (cond
          (nil? rec)
          [(status-note "Modeling liquidation risk in the background…"

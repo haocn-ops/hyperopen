@@ -2061,9 +2061,19 @@
     background-color: color-mix(in srgb, var(--optimizer-target) 78%, transparent);
   }
 
+  /* Diversification swatch tracks the bar's sign encoding: green removes
+     risk (negative effect, a diversifier), red adds it (positive effect,
+     concentration). Bare kind keeps the green default for any legacy use. */
   .portfolio-optimizer
-    .optimizer-risk-decomp-swatch[data-kind="diversification"] {
+    .optimizer-risk-decomp-swatch[data-kind="diversification"],
+  .portfolio-optimizer
+    .optimizer-risk-decomp-swatch[data-kind="diversification"][data-sign="negative"] {
     background-color: color-mix(in srgb, var(--optimizer-long) 82%, transparent);
+  }
+
+  .portfolio-optimizer
+    .optimizer-risk-decomp-swatch[data-kind="diversification"][data-sign="positive"] {
+    background-color: color-mix(in srgb, var(--optimizer-short) 82%, transparent);
   }
 
   .portfolio-optimizer .optimizer-risk-decomp-div-cell,

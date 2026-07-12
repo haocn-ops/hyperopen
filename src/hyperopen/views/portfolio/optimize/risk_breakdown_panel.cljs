@@ -142,8 +142,14 @@
      "Standalone risk"]
     [:span {:class ["optimizer-risk-balance-legend-item"]}
      [:span {:class ["optimizer-risk-decomp-swatch"]
-             :data-kind "diversification"}]
-     "Diversification effect"]
+             :data-kind "diversification"
+             :data-sign "negative"}]
+     "Reduces risk (diversifier)"]
+    [:span {:class ["optimizer-risk-balance-legend-item"]}
+     [:span {:class ["optimizer-risk-decomp-swatch"]
+             :data-kind "diversification"
+             :data-sign "positive"}]
+     "Adds risk (concentration)"]
     [:span {:class ["optimizer-risk-balance-legend-item"]}
      [:span {:class ["optimizer-risk-decomp-net"]}]
      "Net contribution"]
@@ -160,8 +166,9 @@
    [:span {:class ["optimizer-risk-balance-reading-label"]} "Reading this"]
    [:span {:class ["optimizer-risk-balance-reading-sep"]} "·"]
    (str "Standalone is the position's own-variance share; diversification is "
-        "what its correlations with the rest of the book add or remove. "
-        "They sum to the net contribution — the bar on the Risk "
+        "what its correlations with the rest of the book add or remove — "
+        "green removes risk (a diversifier), red adds it (moves with the "
+        "book). They sum to the net contribution — the bar on the Risk "
         "contribution tab.")])
 
 (defn breakdown-panel

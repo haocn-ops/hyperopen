@@ -290,11 +290,13 @@
             "the equation carries the actual standalone number")
         (is (contains? identity-strings "(-13.0%)")
             "the diversification term keeps its sign in parentheses")))
-    (testing "the all-assets chart survives as the second sub-view"
+    (testing "the all-assets chart survives as the second sub-view, with a
+              legend that names both diversification directions"
       (is (some? (node-by-role view-node "portfolio-optimizer-risk-breakdown-chart")))
       (is (some? (node-by-role view-node "portfolio-optimizer-risk-breakdown-row")))
       (is (contains? strings "Standalone risk"))
-      (is (contains? strings "Diversification effect")))
+      (is (contains? strings "Reduces risk (diversifier)"))
+      (is (contains? strings "Adds risk (concentration)")))
     (testing "the why-card's third card becomes the Correlation view tab link"
       (is (contains? strings "Correlation view"))
       (is (not (contains? strings "Largest risk contributor")))

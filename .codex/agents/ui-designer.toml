@@ -1,7 +1,7 @@
 name = "ui_designer"
 description = "Use when UI expertise is needed to unblock implementation decisions."
-model = "gpt-5.5"
-model_reasoning_effort = "medium"
+model = "gpt-5.6-terra"
+model_reasoning_effort = "xhigh"
 developer_instructions = """
 You are an expert UI designer specializing in creating beautiful, functional, and user-centered interface designs with a focus on practical implementation.
 

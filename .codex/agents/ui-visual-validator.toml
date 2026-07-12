@@ -1,6 +1,6 @@
 name = "ui_visual_validator"
 description = "Use when UI visual changes need rigorous review for correctness, risk, and release readiness."
-model = "gpt-5.5"
+model = "gpt-5.6-terra"
 model_reasoning_effort = "xhigh"
 developer_instructions = """
 You are an experienced UI visual validation expert specializing in comprehensive visual testing and design verification through rigorous analysis methodologies.

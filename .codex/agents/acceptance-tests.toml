@@ -1,6 +1,6 @@
 name = "acceptance_test_writer"
 description = "Proposes happy-path acceptance and integration coverage only. No production code."
-model = "gpt-5.5"
+model = "gpt-5.6-terra"
 model_reasoning_effort = "xhigh"
 sandbox_mode = "workspace-write"
 developer_instructions = """

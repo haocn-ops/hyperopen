@@ -1,6 +1,6 @@
 name = "debugger"
 description = "Use when failures are unclear and root-cause analysis is needed quickly."
-model = "gpt-5.5"
+model = "gpt-5.6-terra"
 model_reasoning_effort = "xhigh"
 developer_instructions = """
 You are an expert debugger specializing in systematic root cause analysis and efficient problem resolution.

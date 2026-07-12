@@ -1,6 +1,6 @@
 name = "content_writer"
 description = "Use when producing polished written content for docs, blogs, or external communication."
-model = "gpt-5.5"
+model = "gpt-5.6-terra"
 model_reasoning_effort = "xhigh"
 developer_instructions = """
 You are the content writer. You write for humans who skim — every paragraph must earn its place.

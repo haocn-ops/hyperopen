@@ -25,7 +25,7 @@ async function makeTempRepo({ configToml, files }) {
 const validRoleFiles = {
   ".codex/agents/spec-writer.toml": `name = "spec_writer"
 description = "Clarifies scope."
-model = "gpt-5.5"
+model = "gpt-5.6-terra"
 model_reasoning_effort = "xhigh"
 sandbox_mode = "workspace-write"
 developer_instructions = "Write the plan."
@@ -33,42 +33,42 @@ nickname_candidates = ["Atlas"]
 `,
   ".codex/agents/acceptance-tests.toml": `name = "acceptance_test_writer"
 description = "Writes acceptance tests."
-model = "gpt-5.5"
+model = "gpt-5.6-terra"
 model_reasoning_effort = "xhigh"
 sandbox_mode = "workspace-write"
 developer_instructions = "Write acceptance tests."
 `,
   ".codex/agents/edge-case-tests.toml": `name = "edge_case_test_writer"
 description = "Writes edge-case tests."
-model = "gpt-5.5"
+model = "gpt-5.6-terra"
 model_reasoning_effort = "xhigh"
 sandbox_mode = "workspace-write"
 developer_instructions = "Write edge-case tests."
 `,
   ".codex/agents/tdd_test_writer.toml": `name = "tdd_test_writer"
 description = "Writes RED-phase tests."
-model = "gpt-5.5"
+model = "gpt-5.6-terra"
 model_reasoning_effort = "xhigh"
 sandbox_mode = "workspace-write"
 developer_instructions = "Write failing tests."
 `,
   ".codex/agents/worker.toml": `name = "worker"
 description = "Implements the smallest change."
-model = "gpt-5.5"
+model = "gpt-5.6-terra"
 model_reasoning_effort = "xhigh"
 sandbox_mode = "workspace-write"
 developer_instructions = "Implement the fix."
 `,
   ".codex/agents/reviewer.toml": `name = "reviewer"
 description = "Read-only reviewer."
-model = "gpt-5.5"
+model = "gpt-5.6-terra"
 model_reasoning_effort = "xhigh"
 sandbox_mode = "read-only"
 developer_instructions = "Review the change."
 `,
   ".codex/agents/browser-debugger.toml": `name = "browser_debugger"
 description = "Browser debugger."
-model = "gpt-5.5"
+model = "gpt-5.6-terra"
 model_reasoning_effort = "xhigh"
 sandbox_mode = "workspace-write"
 developer_instructions = "Inspect the browser flow."
@@ -119,7 +119,7 @@ cwd = "."
 test("loadRoleConfig resolves manager roles through .codex/config.toml", async () => {
   const repoRoot = await makeTempRepo({ configToml: validProjectConfig, files: validRoleFiles });
   const roleConfig = await loadRoleConfig(repoRoot, "spec_writer");
-  assert.equal(roleConfig.model, "gpt-5.5");
+  assert.equal(roleConfig.model, "gpt-5.6-terra");
   assert.equal(roleConfig.model_reasoning_effort, "xhigh");
   assert.equal(roleConfig.sandbox_mode, "workspace-write");
   assert.equal(roleConfig.developer_instructions, "Write the plan.");
@@ -157,7 +157,7 @@ test("validateProjectConfig rejects role files whose custom-agent name does not 
       ...validRoleFiles,
       ".codex/agents/worker.toml": `name = "ui_fixer"
 description = "Wrong name."
-model = "gpt-5.5"
+model = "gpt-5.6-terra"
 model_reasoning_effort = "xhigh"
 sandbox_mode = "workspace-write"
 developer_instructions = "Implement the fix."
@@ -179,7 +179,7 @@ config_file = ".codex/agents/architect-review.toml"
       ...validRoleFiles,
       ".codex/agents/architect-review.toml": `name = "architect-review"
 description = "Wrong optional role name."
-model = "gpt-5.5"
+model = "gpt-5.6-terra"
 model_reasoning_effort = "xhigh"
 developer_instructions = "Review architecture."
 `

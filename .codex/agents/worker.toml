@@ -1,6 +1,6 @@
 name = "worker"
 description = "Implements the smallest defensible change that makes the approved tests pass."
-model = "gpt-5.5"
+model = "gpt-5.6-terra"
 model_reasoning_effort = "xhigh"
 sandbox_mode = "workspace-write"
 developer_instructions = """

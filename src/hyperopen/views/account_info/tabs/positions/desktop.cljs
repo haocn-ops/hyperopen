@@ -117,7 +117,7 @@
                                  "font-medium" "text-amber-300" "transition-colors"
                                  "hover:bg-amber-500/20" "focus:outline-none"
                                  "whitespace-nowrap"]
-                         :on {:click [[:actions/toggle-margin-rec-panel row-key]]}}
+                         :on {:click [[:actions/toggle-margin-rec-panel row-key :event.currentTarget/bounds]]}}
                 risk-chip-label]])]
            [:div {:class ["text-left" "relative" "min-w-0" "font-semibold" "num"]}
             [:div {:class ["inline-flex"
@@ -147,7 +147,7 @@
                          :class ["mt-0.5" "flex" "items-center" "gap-1" "bg-transparent"
                                  "p-0" "text-xs" "font-medium" "text-amber-300"
                                  "hover:text-amber-200" "focus:outline-none"]
-                         :on {:click [[:actions/toggle-margin-rec-panel row-key]]}}
+                         :on {:click [[:actions/toggle-margin-rec-panel row-key :event.currentTarget/bounds]]}}
                 [:span {:class ["inline-block" "h-1.5" "w-1.5" "rounded-full" "bg-amber-400"]}]
                 (str "Recommended: $" (shared/format-currency (:target rec-hint)))]])
             (when (and active-margin-modal?

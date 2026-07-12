@@ -100,8 +100,8 @@
                                                             read-only?
                                                             positions-state))
                   sorted-row-vms))
-       ;; Rendered as a fixed dialog overlay (see the panel ns) — this wrapper
-       ;; only gates it to desktop, where the row chip that opens it lives.
+       ;; Anchored popover (see the panel ns) — this wrapper only gates it to
+       ;; desktop, where the row chip that opens it lives.
        (when margin-rec-panel-row-vm
          [:div {:class ["hidden" "lg:block"]}
           (margin-rec-panel/margin-recommendation-panel
@@ -109,7 +109,8 @@
             :rec (get-in margin-rec [:recs margin-rec-panel-key])
             :row-vm margin-rec-panel-row-vm
             :read-only? read-only?
-            :risk-mode (:risk-mode margin-rec)})])
+            :risk-mode (:risk-mode margin-rec)
+            :anchor (:panel-anchor margin-rec)})])
        (into [:div {:class ["lg:hidden"
                             "flex-1"
                             "min-h-0"

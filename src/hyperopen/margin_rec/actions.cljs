@@ -14,6 +14,36 @@
   [state]
   (account-context/effective-account-address state))
 
+(def ^:private anchor-keys
+  [:left :right :top :bottom :width :height :viewport-width :viewport-height])
+
+(defn- anchor-number
+  [value]
+  (let [n (cond
+            (number? value) value
+            (string? value) (js/parseFloat value)
+            :else js/NaN)]
+    (when (and (number? n) (js/isFinite n))
+      n)))
+
+(defn- normalize-anchor
+  "Keep only the numeric geometry keys from a trigger's bounds, so the popover
+  can be positioned against it. Returns nil when no usable geometry is present."
+  [anchor]
+  (let [anchor* (cond
+                  (map? anchor) anchor
+                  (some? anchor) (js->clj anchor :keywordize-keys true)
+                  :else nil)]
+    (when (map? anchor*)
+      (let [normalized (reduce (fn [acc k]
+                                 (if-let [num (anchor-number (get anchor* k))]
+                                   (assoc acc k num)
+                                   acc))
+                               {}
+                               anchor-keys)]
+        (when (seq normalized)
+          normalized)))))
+
 (defn margin-rec-sync
   "Diff desired background work against state and emit the (idle/low-priority)
   fetch and compute effects. Dispatched by the store watcher, debounced."
@@ -65,16 +95,21 @@
                  job-effects))))
 
 (defn toggle-margin-rec-panel
-  [state position-key]
-  (let [current (get-in state margin-rec-state/panel-path)
-        next-key (when (and (some? position-key)
-                            (not= current position-key))
-                   position-key)]
-    [[:effects/save margin-rec-state/panel-path next-key]]))
+  ([state position-key]
+   (toggle-margin-rec-panel state position-key nil))
+  ([state position-key anchor]
+   (let [current (get-in state margin-rec-state/panel-path)
+         opening? (and (some? position-key)
+                       (not= current position-key))
+         next-key (when opening? position-key)]
+     [[:effects/save margin-rec-state/panel-path next-key]
+      [:effects/save margin-rec-state/panel-anchor-path
+       (when opening? (normalize-anchor anchor))]])))
 
 (defn close-margin-rec-panel
   [_state]
-  [[:effects/save margin-rec-state/panel-path nil]])
+  [[:effects/save margin-rec-state/panel-path nil]
+   [:effects/save margin-rec-state/panel-anchor-path nil]])
 
 (defn handle-margin-rec-panel-keydown
   [state key]

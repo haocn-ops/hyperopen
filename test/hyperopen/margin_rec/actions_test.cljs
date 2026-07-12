@@ -85,20 +85,37 @@
     (let [idle (assoc (base-state) :perp-dex-clearinghouse {})]
       (is (= [] (actions/margin-rec-sync idle now))))))
 
-(deftest toggle-panel-toggles-and-closes
-  (is (= [[:effects/save state/panel-path "xyz:TSM|xyz"]]
-         (actions/toggle-margin-rec-panel (base-state) "xyz:TSM|xyz")))
-  (let [open (assoc-in (base-state) state/panel-path "xyz:TSM|xyz")]
-    (is (= [[:effects/save state/panel-path nil]]
-           (actions/toggle-margin-rec-panel open "xyz:TSM|xyz")))
-    (is (= [[:effects/save state/panel-path "other"]]
-           (actions/toggle-margin-rec-panel open "other")))))
+(def anchor {:left 400 :right 460 :top 500 :bottom 520
+             :viewport-width 1440 :viewport-height 900})
+
+(deftest toggle-panel-stores-and-clears-anchor
+  (testing "opening stores the key and the normalized trigger anchor"
+    (is (= [[:effects/save state/panel-path "xyz:TSM|xyz"]
+            [:effects/save state/panel-anchor-path anchor]]
+           (actions/toggle-margin-rec-panel (base-state) "xyz:TSM|xyz" anchor))))
+  (let [open (-> (base-state)
+                 (assoc-in state/panel-path "xyz:TSM|xyz")
+                 (assoc-in state/panel-anchor-path anchor))]
+    (testing "re-triggering the open key closes and clears the anchor"
+      (is (= [[:effects/save state/panel-path nil]
+              [:effects/save state/panel-anchor-path nil]]
+             (actions/toggle-margin-rec-panel open "xyz:TSM|xyz" anchor))))
+    (testing "triggering another row re-anchors to it"
+      (is (= [[:effects/save state/panel-path "other"]
+              [:effects/save state/panel-anchor-path anchor]]
+             (actions/toggle-margin-rec-panel open "other" anchor)))))
+  (testing "non-map anchors normalize to nil (no geometry to position against)"
+    (is (= [[:effects/save state/panel-path "xyz:TSM|xyz"]
+            [:effects/save state/panel-anchor-path nil]]
+           (actions/toggle-margin-rec-panel (base-state) "xyz:TSM|xyz" nil)))))
 
 (deftest close-and-keydown-dismiss-panel
-  (is (= [[:effects/save state/panel-path nil]]
+  (is (= [[:effects/save state/panel-path nil]
+          [:effects/save state/panel-anchor-path nil]]
          (actions/close-margin-rec-panel (base-state))))
   (testing "Escape closes; other keys are inert"
-    (is (= [[:effects/save state/panel-path nil]]
+    (is (= [[:effects/save state/panel-path nil]
+            [:effects/save state/panel-anchor-path nil]]
            (actions/handle-margin-rec-panel-keydown (base-state) "Escape")))
     (is (= [] (actions/handle-margin-rec-panel-keydown (base-state) "Enter")))
     (is (= [] (actions/handle-margin-rec-panel-keydown (base-state) "Tab")))))

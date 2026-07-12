@@ -162,7 +162,9 @@
 (s/def ::action-id (s/and keyword?
                           #(= "actions" (namespace %))))
 (s/def ::margin-rec-now-args (s/tuple number?))
-(s/def ::margin-rec-panel-args (s/tuple (s/nilable ::common/non-empty-string)))
+(s/def ::margin-rec-panel-args
+  (s/cat :position-key (s/nilable ::common/non-empty-string)
+         :anchor (s/? (s/nilable map?))))
 (s/def ::margin-rec-risk-mode-args
   (s/tuple (s/or :keyword keyword? :string string?)))
 (def action-args-spec-by-id

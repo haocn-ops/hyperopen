@@ -85,7 +85,9 @@
            :rec rec-entry
            :row-vm row-vm
            :read-only? false
-           :risk-mode :balanced}
+           :risk-mode :balanced
+           :anchor {:left 400 :right 460 :top 500
+                    :viewport-width 1440 :viewport-height 900}}
           overrides)))
 
 (deftest panel-renders-tiles-breakdown-and-actions
@@ -95,28 +97,31 @@
     (testing "headline and tiles"
       (is (contains? strings "Isolated margin recommendation"))
       (doseq [role ["margin-rec-tile-current" "margin-rec-tile-distance"
-                    "margin-rec-tile-horizon" "margin-rec-tile-p-now"
-                    "margin-rec-tile-recommended" "margin-rec-tile-new-liq"
-                    "margin-rec-tile-p-after" "margin-rec-tile-leverage"]]
+                    "margin-rec-tile-horizon" "margin-rec-tile-recommended"
+                    "margin-rec-tile-new-liq" "margin-rec-tile-leverage"]]
         (is (some? (node-by-role tree role)) role))
       (is (contains? strings "$18.64"))
-      (is (contains? strings "14.6%"))
-      (is (contains? strings "2.1%"))
+      (testing "probabilities render (via the risk-compare block, not duplicate tiles)"
+        (is (contains? strings "14.6%"))
+        (is (contains? strings "2.1%"))
+        (is (nil? (node-by-role tree "margin-rec-tile-p-now")))
+        (is (nil? (node-by-role tree "margin-rec-tile-p-after"))))
       (is (contains? strings "0.74σ buffer"))
       (is (contains? strings "3 days"))
-      (is (contains? strings "based on 22 prior position episodes"))
-      (is (contains? strings "before next intervention")))
+      (is (contains? strings "based on 22 prior position episodes")))
     (testing "breakdown pins every named buffer"
       (is (some? (node-by-role tree "margin-rec-breakdown")))
       (doseq [label ["Maintenance requirement" "Adverse-path protection"
                      "Funding buffer (3d)" "Exit / slippage buffer (1.0% notional)"
                      "Model uncertainty buffer" "Total recommended margin"]]
         (is (contains? strings label) label)))
-    (testing "renders as a dismissable modal overlay"
-      (is (some? (node-by-role tree "margin-rec-overlay")))
-      (is (= [[:actions/close-margin-rec-panel]]
-             (click-actions (node-by-role tree "margin-rec-backdrop"))))
-      (is (= "dialog" (:role (node-attrs (node-by-role tree "margin-rec-panel"))))))
+    (testing "renders as an anchored popover positioned against the trigger"
+      (let [panel (node-by-role tree "margin-rec-panel")
+            style (:style (node-attrs panel))]
+        (is (= "dialog" (:role (node-attrs panel))))
+        (is (contains? style :left))
+        (is (contains? style :top))
+        (is (contains? style :width))))
     (testing "apply opens the prefilled margin modal then dismisses the panel"
       (let [apply-node (node-by-role tree "margin-rec-apply")
             [[action-id payload placeholder] close-action] (click-actions apply-node)]
@@ -171,8 +176,9 @@
         suggestion (node-by-role row "margin-rec-row-suggestion")]
     (is (some? chip))
     (is (contains? strings "Liq. risk high"))
-    (is (= [[:actions/toggle-margin-rec-panel "xyz:TSM|xyz"]]
-           (click-actions chip)))
+    (testing "chip opens the popover anchored to itself"
+      (is (= [[:actions/toggle-margin-rec-panel "xyz:TSM|xyz" :event.currentTarget/bounds]]
+             (click-actions chip))))
     (is (some? suggestion))
     (is (contains? strings "Recommended: $18.64"))
     (testing "no chip or suggestion without a recommendation"

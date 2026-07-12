@@ -21,6 +21,7 @@
 (def root-path [:margin-rec])
 (def recs-path (conj root-path :recs))
 (def panel-path (conj root-path :panel))
+(def panel-anchor-path (conj root-path :panel-anchor))
 (def intents-path (conj root-path :intents))
 (def fills-path (conj root-path :fills))
 (def computing-path (conj root-path :computing))
@@ -43,6 +44,7 @@
    :recs {}
    :computing nil
    :panel nil
+   :panel-anchor nil
    :candle-requests {}
    :intents {}})
 
@@ -460,6 +462,7 @@
   [state]
   {:recs (get-in state recs-path {})
    :panel (get-in state panel-path)
+   :panel-anchor (get-in state panel-anchor-path)
    :computing (get-in state computing-path)
    :risk-mode (risk-mode state)
    :auto-topup? (trading-settings/margin-rec-auto-topup? state)})

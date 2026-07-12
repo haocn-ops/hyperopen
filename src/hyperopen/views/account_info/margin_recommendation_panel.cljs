@@ -1,17 +1,18 @@
 (ns hyperopen.views.account-info.margin-recommendation-panel
-  "Centered modal overlay showing the modeled isolated-margin recommendation
-  for one position: how the number was built (named buffers), the modeled
-  liquidation probability before the next likely intervention, and the actions
-  (prefilled margin add, reduce instead, risk-limit selection).
+  "Anchored popover showing the modeled isolated-margin recommendation for one
+  position: how the number was built (named buffers), the modeled liquidation
+  probability before the next likely intervention, and the actions (prefilled
+  margin add, reduce instead, risk-limit selection).
 
-  Rendered as a fixed dialog over the whole trade/portfolio view rather than
-  inline under the positions table: the account panel region is short (it sits
-  below the chart on the trade route), and this card needs room to show every
-  tile and the full breakdown at once without the reader scrolling a cramped
-  strip. A user opening it is adjusting margin, not charting, so borrowing the
-  chart's real estate is the right trade."
+  This is a page-local, recoverable control, so per docs/FRONTEND.md it is an
+  anchored popover (like the sibling Reduce/Margin popovers in this table) —
+  not a full-screen modal. It floats from the risk chip that opens it, sized
+  and clamped to the viewport by hyperopen.views.ui.anchored-popover; the
+  content stacks vertically so the whole recommendation reads in one column
+  without the cramped strip the inline version forced."
   (:require [hyperopen.margin-rec.state :as margin-rec-state]
             [hyperopen.views.account-info.shared :as shared]
+            [hyperopen.views.ui.anchored-popover :as anchored-popover]
             [hyperopen.views.ui.dialog-focus :as dialog-focus]))
 
 (defn- fmt-usd
@@ -55,19 +56,19 @@
 
 (defn- tile
   [role label value sub]
-  [:div {:class ["min-w-0" "rounded-md" "bg-base-300/40" "px-3" "py-2"]
+  [:div {:class ["min-w-0" "rounded-md" "bg-base-300/40" "px-2.5" "py-1.5"]
          :data-role role}
    [:div {:class ["text-xs" "uppercase" "tracking-wide" "text-trading-text-secondary"]}
     label]
-   [:div {:class ["mt-0.5" "text-sm" "font-semibold" "num" "text-trading-text"]}
+   [:div {:class ["text-sm" "font-semibold" "num" "text-trading-text"]}
     value]
    (when sub
-     [:div {:class ["mt-0.5" "text-xs" "text-trading-text-secondary"]}
+     [:div {:class ["text-xs" "text-trading-text-secondary"]}
       sub])])
 
 (defn- breakdown-table
   [breakdown total]
-  [:div {:class ["rounded-md" "bg-base-300/40" "p-3"]
+  [:div {:class ["rounded-md" "bg-base-300/40" "p-2.5"]
          :data-role "margin-rec-breakdown"}
    [:div {:class ["mb-2" "text-xs" "font-semibold" "text-trading-text"]}
     "Recommended margin breakdown"]
@@ -85,7 +86,7 @@
 
 (defn- risk-compare
   [p-now p-after]
-  [:div {:class ["rounded-md" "bg-base-300/40" "p-3"]
+  [:div {:class ["rounded-md" "bg-base-300/40" "p-2.5"]
          :data-role "margin-rec-risk-compare"}
    [:div {:class ["mb-2" "text-xs" "font-semibold" "text-trading-text"]}
     "Modeled probability of liquidation (before next intervention)"]
@@ -109,7 +110,7 @@
 
 (defn- risk-mode-control
   [active-mode]
-  [:div {:class ["rounded-md" "bg-base-300/40" "p-3"]
+  [:div {:class ["rounded-md" "bg-base-300/40" "p-2.5"]
          :data-role "margin-rec-risk-mode"}
    [:div {:class ["mb-2" "text-xs" "font-semibold" "text-trading-text"]}
     "Target liquidation risk"]
@@ -145,42 +146,47 @@
    {:restore-selector "[data-role='margin-rec-risk-chip']"}))
 
 (defn- panel-shell
-  [coin-label children]
-  [:div {:class ["fixed" "inset-0" "z-[240]" "flex" "items-center" "justify-center" "p-4"]
-         :data-role "margin-rec-overlay"}
-   [:button {:type "button"
-             :class ["absolute" "inset-0" "bg-black/60" "backdrop-blur-[1px]"]
-             :aria-label "Close recommendation"
-             :data-role "margin-rec-backdrop"
-             :on {:click [[:actions/close-margin-rec-panel]]}}]
-   (into [:div {:class ["relative" "w-full" "max-w-5xl" "max-h-[88vh]" "overflow-y-auto"
-                        "rounded-xl" "border" "border-base-300" "bg-base-200" "p-5"
-                        "shadow-[0_24px_70px_rgba(0,0,0,0.55)]"]
-                :role "dialog"
-                :aria-modal "true"
-                :aria-label "Isolated margin recommendation"
-                :tabindex "-1"
-                :replicant/on-render dialog-focus-on-render
-                :on {:keydown [[:actions/handle-margin-rec-panel-keydown [:event/key]]]}
-                :data-role "margin-rec-panel"}
-          [:div {:class ["mb-4" "flex" "items-center" "justify-between" "gap-3"]}
-           [:div {:class ["flex" "items-center" "gap-2"]}
-            [:span {:class ["text-base" "font-semibold" "text-trading-text"]}
-             "Isolated margin recommendation"]
-            [:span {:class ["rounded" "border" "border-base-300" "px-1.5" "py-0.5"
-                            "text-xs" "font-medium" "text-trading-text-secondary"]}
-             coin-label]]
-           [:button {:type "button"
-                     :data-role "margin-rec-panel-close"
-                     :class ["inline-flex" "h-7" "items-center" "gap-1.5" "rounded-md"
-                             "border" "border-base-300" "px-2.5" "text-xs" "font-medium"
-                             "text-trading-text-secondary" "transition-colors"
-                             "hover:bg-base-300" "hover:text-trading-text"
-                             "focus:outline-none" "focus:ring-1"
-                             "focus:ring-ho-text-muted/40"]
-                     :on {:click [[:actions/close-margin-rec-panel]]}}
-            "Hide details ✕"]]]
-         children)])
+  [coin-label anchor children]
+  (let [layout-style (anchored-popover/anchored-popover-layout-style
+                      {:anchor anchor
+                       :preferred-width-px 460
+                       ;; Height estimate at/above the real content (~820px) so
+                       ;; the layout helper clamps `top` enough to keep the whole
+                       ;; card on-screen while still sitting near its trigger.
+                       ;; Short viewports fall back to top-margin + internal
+                       ;; scroll (max-h below), always within the viewport.
+                       :estimated-height-px 880})]
+    [:div {:class ["fixed" "z-[240]" "flex" "max-h-[calc(100vh-1.5rem)]" "flex-col"
+                   "overflow-hidden" "rounded-xl" "border" "border-base-300" "bg-base-200"
+                   "shadow-[0_24px_70px_rgba(0,0,0,0.55)]"]
+           :style layout-style
+           :role "dialog"
+           :aria-label "Isolated margin recommendation"
+           :tabindex "-1"
+           :replicant/on-render dialog-focus-on-render
+           :on {:keydown [[:actions/handle-margin-rec-panel-keydown [:event/key]]]}
+           :data-role "margin-rec-panel"}
+     [:div {:class ["flex" "shrink-0" "items-center" "justify-between" "gap-3"
+                    "border-b" "border-base-300" "px-4" "py-3"]}
+      [:div {:class ["flex" "min-w-0" "items-center" "gap-2"]}
+       [:span {:class ["truncate" "text-sm" "font-semibold" "text-trading-text"]}
+        "Isolated margin recommendation"]
+       [:span {:class ["shrink-0" "rounded" "border" "border-base-300" "px-1.5" "py-0.5"
+                       "text-xs" "font-medium" "text-trading-text-secondary"]}
+        coin-label]]
+      [:button {:type "button"
+                :data-role "margin-rec-panel-close"
+                :class ["inline-flex" "h-7" "w-7" "shrink-0" "items-center" "justify-center"
+                        "rounded-md" "border" "border-base-300" "text-sm"
+                        "text-trading-text-secondary" "transition-colors"
+                        "hover:bg-base-300" "hover:text-trading-text"
+                        "focus:outline-none" "focus:ring-1"
+                        "focus:ring-ho-text-muted/40"]
+                :aria-label "Hide recommendation"
+                :on {:click [[:actions/close-margin-rec-panel]]}}
+       "✕"]]
+     (into [:div {:class ["min-h-0" "space-y-2.5" "overflow-y-auto" "px-4" "py-3"]}]
+           children)]))
 
 (defn- ready-panel
   [{:keys [position-key rec-result row-vm read-only? risk-mode]}]
@@ -194,7 +200,7 @@
                          (= :ok status)
                          (number? additional)
                          (>= additional 0.01))]
-    [[:div {:class ["grid" "grid-cols-2" "gap-2" "md:grid-cols-4"]}
+    [[:div {:class ["grid" "grid-cols-2" "gap-2"]}
       (tile "margin-rec-tile-current"
             "Current isolated margin"
             (fmt-usd (:equity as-of))
@@ -210,10 +216,6 @@
             "Est. intervention horizon"
             (:duration horizon*)
             (:basis horizon*))
-      (tile "margin-rec-tile-p-now"
-            "Modeled liq. probability"
-            (fmt-probability p-now)
-            "before next intervention")
       (tile "margin-rec-tile-recommended"
             "Recommended isolated margin"
             (fmt-usd equity)
@@ -227,10 +229,6 @@
             (when (number? new-liq-change-frac)
               (str "≈ " (fmt-percent (js/Math.abs new-liq-change-frac) 1)
                    (if (pos? new-liq-change-frac) " lower" " higher"))))
-      (tile "margin-rec-tile-p-after"
-            "Modeled liq. probability (after)"
-            (fmt-probability p-after)
-            "at recommended margin")
       (tile "margin-rec-tile-leverage"
             "Recommended effective leverage"
             (if (number? effective-leverage)
@@ -238,14 +236,13 @@
               "--")
             (when-let [tier (:tier confidence)]
               (str "model confidence: " (name tier))))]
-     [:div {:class ["mt-3" "grid" "gap-2" "lg:grid-cols-3"]}
-      (breakdown-table breakdown equity)
-      (risk-compare p-now p-after)
-      [:div {:class ["flex" "flex-col" "gap-2"]}
-       (risk-mode-control risk-mode)
-       (when (= :within-target status)
-         (status-note "Current margin already meets the selected risk target."
-                      "margin-rec-within-target"))
+     (breakdown-table breakdown equity)
+     (risk-compare p-now p-after)
+     (risk-mode-control risk-mode)
+     (when (= :within-target status)
+       (status-note "Current margin already meets the selected risk target."
+                    "margin-rec-within-target"))
+     [:div {:class ["flex" "flex-col" "gap-2"]}
        (when actionable?
          [:button {:type "button"
                    :data-role "margin-rec-apply"
@@ -275,19 +272,20 @@
                                 [:actions/close-margin-rec-panel]]}}
           "Reduce position instead"])
        [:div {:class ["text-xs" "leading-4" "text-trading-text-secondary"]}
-        (str "Modeled probability of touching liquidation before your expected"
-             " next intervention, from a block bootstrap of recent hourly"
-             " moves. No auto-execution — you stay in control.")]]]]))
+        (str "Modeled from a block bootstrap of recent hourly moves."
+             " No auto-execution — you stay in control.")]]]))
 
 (defn margin-recommendation-panel
-  "options: {:position-key :rec :row-vm :read-only? :risk-mode}
-  `rec` is the [:margin-rec :recs <key>] entry."
-  [{:keys [position-key rec row-vm] :as options}]
+  "options: {:position-key :rec :row-vm :read-only? :risk-mode :anchor}
+  `rec` is the [:margin-rec :recs <key>] entry; `anchor` is the trigger's
+  bounds the popover is positioned against."
+  [{:keys [position-key rec row-vm anchor] :as options}]
   (when (and position-key row-vm)
     (let [{:keys [status result error]} rec
           coin-label (or (:coin-label row-vm) position-key)]
       (panel-shell
        coin-label
+       anchor
        (cond
          (nil? rec)
          [(status-note "Modeling liquidation risk in the background…"

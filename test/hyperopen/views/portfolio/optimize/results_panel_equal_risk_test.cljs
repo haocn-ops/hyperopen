@@ -73,8 +73,10 @@
       (is (nil? (node-by-role view-node "portfolio-optimizer-result-confidence-panel")))
       (is (nil? (node-by-role view-node "portfolio-optimizer-result-confidence-quality-panel"))
           "the frontier-quality/selection-stability/stop-reason detail is refinement-specific, not equal-risk's own confidence rail")
-      (is (nil? (node-by-role view-node "portfolio-optimizer-leverage-impact-slot"))
-          "the under-chart leverage-impact slot belongs to the frontier layout"))
+      (is (some? (node-by-role view-node "portfolio-optimizer-leverage-impact-slot"))
+          "the stable under-chart slot remains mounted when Equal Risk does not clear the leverage gate")
+      (is (nil? (node-by-role view-node "portfolio-optimizer-leverage-impact"))
+          "the unlevered Equal Risk result leaves its stable slot empty"))
     (testing "the diverging balance chart is the centerpiece"
       (is (some? (node-by-role view-node "portfolio-optimizer-risk-contributions")))
       (is (some? (node-by-role view-node "portfolio-optimizer-risk-contribution-chart")))
@@ -132,6 +134,29 @@
     (testing "the trust rail reads contributions, not weight-based effective N"
       (is (contains? strings "Negative contributors"))
       (is (not (contains? strings "Diversification"))))))
+
+(deftest results-panel-equal-risk-places-leverage-impact-below-risk-contributions-test
+  ;; The existing one-year modeled leverage-impact component belongs in Equal
+  ;; Risk's center column too: directly below the balance chart and above the
+  ;; Equal Risk explanation, with neither frontier machinery nor refinement.
+  (let [levered-result (assoc-in approximate-result [:diagnostics :gross-exposure] 2.0)
+        view-node (render levered-result)
+        order (data-role-order view-node)
+        leverage-slot (node-by-role view-node "portfolio-optimizer-leverage-impact-slot")
+        contributions-index (index-of order "portfolio-optimizer-risk-contributions")
+        leverage-index (index-of order "portfolio-optimizer-leverage-impact")
+        context-index (index-of order "portfolio-optimizer-equal-risk-context")]
+    (is (some? leverage-slot)
+        "the stable Equal Risk slot remains the leverage component's parent")
+    (is (some? (node-by-role leverage-slot "portfolio-optimizer-leverage-impact"))
+        "2.0x gross exposure clears the gate and renders the modeled panel inside its slot")
+    (is (and (some? contributions-index)
+             (some? leverage-index)
+             (some? context-index)
+             (< contributions-index leverage-index context-index))
+        "the center-column reading order is balance chart, leverage impact, then Equal Risk context")
+    (is (nil? (node-by-role view-node "portfolio-optimizer-frontier-panel")))
+    (is (nil? (node-by-role view-node "portfolio-optimizer-refinement-card")))))
 
 (deftest results-panel-equal-risk-places-quality-below-volatility-intuition-test
   (let [view-node (render approximate-result)

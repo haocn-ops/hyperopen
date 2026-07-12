@@ -1,8 +1,10 @@
 (ns hyperopen.views.portfolio.optimize.leverage-impact-panel
   "The ONE-YEAR MODELED LEVERAGE IMPACT panel (designer mockup, user-trimmed
-  2026-07-12): a full-width center-column card directly under the efficient
-  frontier translating the target's leverage into modeled one-year dollar
-  outcomes — median ending wealth current vs target, the median shortfall
+  2026-07-12): a full-width center-column card directly under the objective's
+  primary result visual — the efficient frontier for frontier objectives, or
+  Risk Contribution Balance for Equal Risk — translating the target's
+  leverage into modeled one-year dollar outcomes — median ending wealth
+  current vs target, the median shortfall
   headline, mean / 5th-percentile / loss-odds tiles, and the modeled
   ending-wealth distribution with 5th-percentile, median, and mean markers.
   The funding/execution cost tiles from the mockup are deliberately omitted

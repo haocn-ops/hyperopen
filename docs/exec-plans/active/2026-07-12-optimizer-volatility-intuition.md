@@ -316,6 +316,18 @@ engine paths, and the full existing optimizer test surface stays green.
   7/7, and all six governed browser-QA passes passed at 375, 768, 1280, and
   1440 with a supplemental 1920 capture confirming the three-column rail;
   browser cleanup succeeded.
+- [x] (2026-07-12) Follow-up: reuse the same One-year modeled leverage impact
+  component for Equal Risk. Its stable slot now follows either objective's
+  primary center visual: the efficient frontier for frontier objectives or
+  Risk Contribution Balance for Equal Risk. The component's existing
+  gross-at-least-2x / volatility-at-least-100% gate and all model semantics are
+  unchanged. RED coverage pins both the empty gated slot and the levered Equal
+  Risk order (`risk contributions -> leverage impact -> Equal Risk context`).
+  Final validation passed all 34 repository gates (6,265 tests, 33,471
+  assertions), the focused leverage/volatility Playwright spec passed 7/7,
+  and all six browser-QA passes passed at 375, 768, 1280, and 1440; a
+  supplemental 1920 capture verifies the full center panel below the balance
+  chart. Browser cleanup succeeded.
 - [x] (2026-07-12) Follow-up (direct user request, revisiting the mockup's
   ONE-YEAR MODELED LEVERAGE IMPACT component): the leverage-risk content was
   promoted from a right-rail card to its own full-width center-column panel
@@ -433,6 +445,11 @@ engine paths, and the full existing optimizer test surface stays green.
 
 ## Outcomes & Retrospective
 
+- (2026-07-12, Equal Risk leverage follow-up) Equal Risk now mounts the exact
+  same gated One-year modeled leverage impact component used by Minimum
+  Variance and Maximum Sharpe, directly below Risk Contribution Balance and
+  above Why this risk allocation. No duplicate model or objective-specific
+  variant was introduced.
 - (2026-07-12, Equal Risk hierarchy follow-up) The Equal Risk Result confidence
   header and From here lead stay above Volatility intuition, while its existing
   Fit, Allocation freedom, Solution stability, and Stop reason rows render in a

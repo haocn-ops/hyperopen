@@ -87,21 +87,21 @@
              (risk-contributions-card/risk-contributions-card
               result
               {:selected-risk-instrument selected-risk-instrument}))
-           (when equal-risk?
-             (summary/equal-risk-context-card result))
            (when-not equal-risk?
              (frontier-chart/frontier-chart
               draft
               result
               frontier-overlay-mode
               constrain-frontier?))
-           ;; The panel's slot wrapper always renders, so the gated
-           ;; leverage-impact panel appearing/disappearing across reruns can
-           ;; never shift the disclosure-holding cards below it.
-           (when-not equal-risk?
-             [:div {:replicant/key "optimizer-leverage-impact-slot"
-                    :data-role "portfolio-optimizer-leverage-impact-slot"}
-              (leverage-impact-panel/leverage-impact-panel result)])
+           ;; The shared slot always follows the center column's primary
+           ;; result visual. Its component keeps the gross/volatility gate,
+           ;; while the stable wrapper keeps context cards below it from
+           ;; shifting when that panel appears or disappears across reruns.
+           [:div {:replicant/key "optimizer-leverage-impact-slot"
+                  :data-role "portfolio-optimizer-leverage-impact-slot"}
+            (leverage-impact-panel/leverage-impact-panel result)]
+           (when equal-risk?
+             (summary/equal-risk-context-card result))
            ;; Decision-support before solver tuning: the engine-derived "why
            ;; this target" facts sit directly under the chart; the refinement
            ;; card below is compact with its options behind a disclosure.
@@ -124,8 +124,8 @@
           ;; Always-present wrapper: the volatility card is conditional (it
           ;; needs a solved σ), and without a stable slot its mounting would
           ;; shift the trust rail and views editor below — resetting open
-          ;; <details> state. (Leverage impact moved to the center column
-          ;; under the frontier chart, 2026-07-12 user request.)
+          ;; <details> state. (Leverage impact lives in the center column
+          ;; under each objective's primary result visual.)
           [:div {:replicant/key "optimizer-volatility-risk-cards"
                  :data-role "portfolio-optimizer-volatility-risk-cards"}
            (volatility-intuition-card/volatility-intuition-card result)]

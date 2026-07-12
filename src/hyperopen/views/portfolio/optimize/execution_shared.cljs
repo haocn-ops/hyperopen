@@ -52,41 +52,62 @@
 (def high-cost-crossing-bps execution-order-type/high-cost-crossing-bps)
 (def high-cost-crossing-row? execution-order-type/high-cost-crossing-row?)
 (def crossing-cost-bps execution-order-type/crossing-cost-bps)
+(def effective-crossing-cost execution-order-type/effective-crossing-cost)
+(def twap-suborder-count execution-order-type/twap-suborder-count)
 
 ;; ── live type-aware cost recompute ────────────────────────────────────────
+
+(defn effective-crossing-cost-bps
+  "The price-cost bps the row's EFFECTIVE type would pay (TWAP rows pay the sliced TWAP
+  model, not the one-shot walk) -- for the high-cost warning and the row cost cell.
+  nil for resting rows or rows with no finite estimate."
+  [model row]
+  (let [{:keys [crossing? slippage-bps]} (effective-crossing-cost model row)]
+    (when (and crossing? (finite slippage-bps))
+      (abs-num slippage-bps))))
+
+(defn floor-prefixed
+  "Prefixes a formatted cost with the lower-bound marker when the estimate carries
+  floor semantics (a depth-overrun estimate is a capped floor, not a point estimate)."
+  [floor? text]
+  (if floor? (str "≥ " text) text))
 
 (defn type-aware-costs
   "Recomputes price cost (spread + book impact) + fees from each row's LIVE effective order
   type so the KPI strip, health rail, and strategy tiles react to type changes without
-  re-staging. Crossing (market/twap) rows keep their spread + impact + taker fee; resting
-  (limit/passive) rows contribute no spread/impact and the maker fee. Returns the totals,
-  the spread/impact split, the maker/taker split, and the crossing-row price-cost bps
-  samples for the average."
+  re-staging. Market (and other one-shot crossing) rows pay their full spread + impact +
+  taker fee; :twap rows pay the sliced TWAP estimate (effective-crossing-cost) -- impact
+  divided across venue suborders with a permanent-impact residue -- plus the taker fee;
+  resting (limit/passive) rows contribute no spread/impact and the maker fee. Returns the
+  totals, the spread/impact split, the maker/taker split, the crossing-row price-cost bps
+  samples for the average, and :floor? true when any included crossing estimate is a
+  depth-overrun lower bound (surfaces render totals with a \"≥\" prefix)."
   [model rows]
   (reduce
    (fn [acc row]
-     (let [crossing? (crossing-type? (effective-type model row))
+     (let [{:keys [crossing? slippage-bps estimated-slippage-usd spread-usd impact-usd
+                   estimate-floor?]} (effective-crossing-cost model row)
            cost (:cost row)
-           slip-bps (:slippage-bps cost)
-           slip-usd (if crossing? (or (:estimated-slippage-usd cost) 0) 0)
-           has-split? (some? (:spread-usd cost))
-           spread-usd (if (and crossing? has-split?) (:spread-usd cost) 0)
+           slip-usd (if crossing? (or estimated-slippage-usd 0) 0)
+           has-split? (some? spread-usd)
+           spread-usd* (if (and crossing? has-split?) spread-usd 0)
            ;; Attribute an un-splittable crossing cost (flat fallback / no book) entirely to
            ;; impact so spread + impact always reconciles to the price-cost total.
-           impact-usd (cond (not crossing?) 0
-                            has-split? (or (:impact-usd cost) 0)
-                            :else slip-usd)]
+           impact-usd* (cond (not crossing?) 0
+                             has-split? (or impact-usd 0)
+                             :else slip-usd)]
        (cond-> acc
          true (update :slippage-usd + slip-usd)
-         true (update :spread-usd + spread-usd)
-         true (update :impact-usd + impact-usd)
+         true (update :spread-usd + spread-usd*)
+         true (update :impact-usd + impact-usd*)
          true (update :fees-usd + (if crossing?
                                     (or (:estimated-fee-usd cost) 0)
                                     (or (:maker-fee-usd cost) 0)))
          true (update (if crossing? :taker-count :maker-count) inc)
-         (and crossing? (finite slip-bps)) (update :slip-bps conj (abs-num slip-bps)))))
+         (and crossing? estimate-floor?) (assoc :floor? true)
+         (and crossing? (finite slippage-bps)) (update :slip-bps conj (abs-num slippage-bps)))))
    {:slippage-usd 0 :spread-usd 0 :impact-usd 0 :fees-usd 0
-    :taker-count 0 :maker-count 0 :slip-bps []}
+    :taker-count 0 :maker-count 0 :slip-bps [] :floor? false}
    rows))
 
 (defn fee-mix-label

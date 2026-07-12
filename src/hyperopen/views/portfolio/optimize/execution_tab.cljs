@@ -556,8 +556,9 @@
                        (if avg-bps (shared/format-bps avg-bps) "—"))})
        (kpi {:data-role "portfolio-optimizer-execution-kpi-price-cost"
              :label "Est. price cost"
-             :info "Price paid to execute = crossing the spread + walking the book (impact). Resting Limit/Passive orders pay neither."
-             :value (opt-format/format-usdc (:slippage-usd costs))
+             :info "Price paid to execute = crossing the spread + walking the book (impact). Resting Limit/Passive orders pay neither. \"≥\" marks a lower bound: part of an order exceeds the visible book, so its estimate is a capped floor."
+             :value (shared/floor-prefixed (:floor? costs)
+                                           (opt-format/format-usdc (:slippage-usd costs)))
              :sub (price-cost-sub costs avg-bps)}))
      (kpi {:data-role "portfolio-optimizer-execution-kpi-fees"
            :label "Est. fees"
@@ -567,7 +568,8 @@
      (kpi {:data-role "portfolio-optimizer-execution-kpi-all-in"
            :label (if show-realized? "Realized all-in" "Est. all-in cost")
            :info "Total cost to execute = price cost + fees."
-           :value (opt-format/format-usdc all-in-usd)
+           :value (shared/floor-prefixed (and (not show-realized?) (:floor? costs))
+                                         (opt-format/format-usdc all-in-usd))
            :sub "price cost + fees"})]))
 
 ;; ── Execution-health rail ───────────────────────────────────────────────
@@ -669,14 +671,16 @@
            (str (or (shared/type-mix-summary model (concat ready submitted resting)) "—")
                 " · " skipped-count " skipped · " blocked-count " blocked"))
      (diag "Est. price cost"
-           (opt-format/format-usdc (:slippage-usd costs))
+           (shared/floor-prefixed (:floor? costs)
+                                  (opt-format/format-usdc (:slippage-usd costs)))
            (or (not-empty (str/join " · " (remove nil? [(price-cost-split-text costs) sources])))
                "no ready rows sampled"))
      (diag "Est. fees"
            (opt-format/format-usdc (:fees-usd costs))
            (str (fee-mix-label costs) " on ready notional"))
      (diag "Est. all-in cost"
-           (opt-format/format-usdc (+ (:slippage-usd costs) (:fees-usd costs)))
+           (shared/floor-prefixed (:floor? costs)
+                                  (opt-format/format-usdc (+ (:slippage-usd costs) (:fees-usd costs))))
            "price cost + fees")
      (health-note model)]))
 

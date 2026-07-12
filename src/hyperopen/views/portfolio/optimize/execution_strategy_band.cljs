@@ -24,10 +24,19 @@
    :overrides (or (:overrides model) {})
    :params (or (:params model) {})})
 
-(defn- projected-all-in-usd
+(defn- projected-costs
   [model strategy rows]
-  (let [costs (shared/type-aware-costs (selections-for model strategy) rows)]
-    (+ (:slippage-usd costs) (:fees-usd costs))))
+  (shared/type-aware-costs (selections-for model strategy) rows))
+
+(defn- all-in-usd
+  [costs]
+  (+ (:slippage-usd costs) (:fees-usd costs)))
+
+(defn- all-in-label
+  ;; "≥" when any crossing estimate in the projection is a depth-overrun floor — a
+  ;; capped lower bound, not a point estimate.
+  [costs]
+  (shared/floor-prefixed (:floor? costs) (opt-format/format-usdc (all-in-usd costs))))
 
 (def ^:private strategies
   [{:id :recommended
@@ -70,8 +79,8 @@
   Recommended so 'the algo picks' is inspectable at a glance. nil with no ready rows."
   [model strategy sendable]
   (when (seq sendable)
-    (let [all-in (projected-all-in-usd model strategy sendable)
-          cost-text (str "est. all-in " (opt-format/format-usdc all-in))]
+    (let [costs (projected-costs model strategy sendable)
+          cost-text (str "est. all-in " (all-in-label costs))]
       (if (= :recommended strategy)
         (let [mix (shared/type-mix-summary (selections-for model :recommended) sendable)]
           (if mix (str mix " · " cost-text) cost-text))
@@ -81,13 +90,15 @@
 
 (defn high-cost-crossing-rows
   "Ready rows whose EFFECTIVE type under the current selections crosses the book at a
-  high estimated cost (>= shared/high-cost-crossing-bps). These are the rows the trader
-  is about to pay real spread on — under Recommended they route passive, so this is
-  non-empty only when a bulk Market/TWAP default or per-row overrides expose them."
+  high estimated cost (>= shared/high-cost-crossing-bps). Costs are effective-type
+  aware: a TWAP row is judged on its sliced TWAP estimate, so working a clip over time
+  can legitimately take it under the bar. These are the rows the trader is about to pay
+  real spread on — under Recommended they route passive, so this is non-empty only when
+  a bulk Market/TWAP default or per-row overrides expose them."
   [model rows]
   (filterv (fn [row]
-             (and (shared/crossing-type? (shared/effective-type model row))
-                  (shared/high-cost-crossing-row? row)))
+             (when-let [bps (shared/effective-crossing-cost-bps model row)]
+               (>= bps shared/high-cost-crossing-bps)))
            (ready-rows rows)))
 
 (defn- rest-passively-actions
@@ -101,7 +112,7 @@
   (let [flagged (high-cost-crossing-rows model rows)]
     (when (seq flagged)
       (let [sendable (ready-rows rows)
-            current (projected-all-in-usd model (or (:default-order-type model) :recommended) sendable)
+            current (projected-costs model (or (:default-order-type model) :recommended) sendable)
             ;; Projection of the one-click fix: the flagged rows overridden passive,
             ;; everything else unchanged.
             fixed-model (update model :overrides
@@ -109,11 +120,13 @@
                                   (reduce #(assoc %1 (:row-id %2) :passive)
                                           (or overrides {})
                                           flagged)))
-            fixed (projected-all-in-usd fixed-model (or (:default-order-type model) :recommended) sendable)
+            fixed (projected-costs fixed-model (or (:default-order-type model) :recommended) sendable)
+            ;; Each flagged row is listed at its EFFECTIVE-type cost (a TWAP row shows
+            ;; its sliced estimate, not the one-shot walk it will never pay).
             listed (->> flagged
-                        (sort-by #(- (or (shared/crossing-cost-bps %) 0)))
+                        (sort-by #(- (or (shared/effective-crossing-cost-bps model %) 0)))
                         (map #(str (:instrument-label %) " "
-                                   (shared/format-bps (shared/crossing-cost-bps %))))
+                                   (shared/format-bps (shared/effective-crossing-cost-bps model %))))
                         (take 6))
             more (- (count flagged) (count listed))]
         [:div {:class ["flex" "flex-wrap" "items-center" "gap-3" "border-t" "border-base-300"
@@ -131,7 +144,7 @@
           [:p {:class ["mt-0.5" "font-mono" "text-[0.68rem]" "tabular-nums" "text-trading-muted"]}
            (str "Resting " (if (= 1 (count flagged)) "it as a passive maker order" "them as passive maker orders")
                 " cuts est. all-in cost from "
-                (opt-format/format-usdc current) " to " (opt-format/format-usdc fixed)
+                (all-in-label current) " to " (all-in-label fixed)
                 (if (= 1 (count flagged)) " — but it may not fill." " — but they may not fill."))]]
          [:span {:class ["flex-1"]}]
          ;; A cost-simulation shortcut — overrides the flagged rows to passive so the KPI strip

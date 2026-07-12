@@ -276,6 +276,56 @@
     (is (str/includes? (kpi limit "all-in") "2"))
     (is (not (str/includes? (kpi limit "all-in") "18")))))
 
+(deftest execution-tab-twap-override-slices-the-price-cost-kpi-test
+  ;; The motivating fix: TWAP used to project the SAME price cost as Market. A $100k
+  ;; splittable row (2 bp spread + 100 bp impact = $1,020 one-shot) worked as its
+  ;; default 20-minute TWAP (41 venue clips) prices at
+  ;; 2 + 100/41 + 0.3*100*40/82 = 19.07 bp ≈ $190.73.
+  (let [plan (-> staged-plan
+                 (assoc-in [:rows 0 :delta-notional-usd] 100000)
+                 (assoc-in [:rows 0 :cost]
+                           {:source :snapshot :slippage-bps 102 :estimated-slippage-usd 1020
+                            :spread-bps 2 :spread-usd 20 :impact-bps 100 :impact-usd 1000
+                            :notional-usd 100000
+                            :fee-bps 4 :estimated-fee-usd 40
+                            :maker-fee-bps 1 :maker-fee-usd 10}))
+        view (fn [overrides]
+               (scenario-view :execution
+                              {:execution {:status :idle :history []}
+                               :execution-modal {:open? true :phase :staged :plan plan
+                                                 :overrides overrides}}))
+        kpi (fn [v role] (node-text (node-by-role v (str "portfolio-optimizer-execution-kpi-" role))))
+        market (view {"perp:BTC" :market})
+        twap (view {"perp:BTC" :twap})]
+    (is (str/includes? (kpi market "price-cost") "1,020"))
+    (is (str/includes? (kpi market "all-in") "1,060"))
+    (is (str/includes? (kpi twap "price-cost") "190.73"))
+    (is (not (str/includes? (kpi twap "price-cost") "1,020")))
+    (is (str/includes? (kpi twap "all-in") "230.73"))))
+
+(deftest execution-tab-depth-floor-estimates-render-lower-bound-marker-test
+  ;; A depth-overrun estimate is a capped floor: the KPI strip totals and the row's
+  ;; cost cell must read "≥", never a precise-looking point figure.
+  (let [plan (assoc-in staged-plan [:rows 0 :cost]
+                       {:source :depth-extrapolated :slippage-bps 999.1
+                        :estimated-slippage-usd 99.91
+                        :spread-bps 10 :spread-usd 1 :impact-bps 989.1 :impact-usd 98.91
+                        :notional-usd 1000
+                        :depth-status :insufficient-visible-depth
+                        :estimate-floor? true :depth-overrun 409 :depth-coverage 0.0024
+                        :fee-bps 4 :estimated-fee-usd 0.4
+                        :maker-fee-bps 1 :maker-fee-usd 0.1})
+        view-node (scenario-view :execution
+                                 {:execution {:status :idle :history []}
+                                  :execution-modal {:open? true :phase :staged :plan plan
+                                                    :overrides {"perp:BTC" :market}}})
+        price (node-text (node-by-role view-node "portfolio-optimizer-execution-kpi-price-cost"))
+        all-in (node-text (node-by-role view-node "portfolio-optimizer-execution-kpi-all-in"))
+        row (node-by-role view-node "portfolio-optimizer-execution-order-row-perp-BTC")]
+    (is (str/includes? price "≥"))
+    (is (str/includes? all-in "≥"))
+    (is (str/includes? (node-text row) "≥"))))
+
 (deftest execution-tab-row-expansion-shows-cost-breakdown-test
   ;; Expanding a market row reveals the execution-cost breakdown: spread crossing + book
   ;; impact = price cost, + fees = all-in. all-in = price cost $0.68 + fees $0.23 = $0.91.

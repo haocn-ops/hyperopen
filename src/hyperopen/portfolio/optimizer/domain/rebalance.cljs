@@ -4,6 +4,32 @@
 (def default-fallback-slippage-bps
   25)
 
+(def max-extrapolated-slippage-bps
+  ;; Hard cap (10%) on the penalty charged to the portion of an order that overruns the
+  ;; visible book. Beyond the visible levels any point estimate is fiction: the previous
+  ;; unbounded fallback-x-overrun penalty produced >10,000 bp "estimates" on thin HIP-3
+  ;; books (a sell filling below zero). A capped estimate is an explicit LOWER BOUND --
+  ;; the cost map is flagged :estimate-floor? true so surfaces render it as ">= X".
+  1000)
+
+(def twap-permanent-impact-fraction
+  ;; Fraction of one TWAP clip's book impact assumed PERMANENT (not recovered by book
+  ;; replenishment before the next suborder). 0.3 = 30% permanent / 70% temporary. Sets
+  ;; the TWAP model's asymptote: an infinitely sliced order still pays the spread plus
+  ;; half the permanent share (0.15x) of the one-shot impact.
+  0.3)
+
+(def twap-suborder-interval-seconds
+  ;; Venue TWAP cadence: Hyperliquid works a twapOrder as one suborder each 30 seconds.
+  ;; Mirrors hyperopen.domain.trading.core/twap-frequency-seconds; kept local (like
+  ;; min-order-notional-usd below) so the optimizer domain stays decoupled from the
+  ;; scale/TWAP trading domain.
+  30)
+
+(def twap-min-runtime-minutes
+  ;; Venue floor on TWAP runtime (the submit path clamps to (max 5 twap-min) as well).
+  5)
+
 (def ^:private max-favorable-fill-deviation
   ;; A marketable taker fill cannot beat the reference price by a wide margin. When an
   ;; orderbook snapshot implies one (a stale or coin-mismatched book), the favorable
@@ -109,6 +135,7 @@
     (loop [remaining quantity
            notional 0
            filled 0
+           worst-price nil
            levels* (seq levels)]
       (if (or (not (pos? remaining))
               (nil? levels*))
@@ -116,8 +143,11 @@
           (if (not (pos? remaining))
             {:estimated-fill-price (/ notional filled)
              :depth-status :full-visible-depth}
+            ;; :worst-price = the marginal price where visibility ended (the last
+            ;; consumable level) -- the depth-limited penalty extrapolates from it.
             {:visible-size filled
              :visible-notional notional
+             :worst-price worst-price
              :depth-status :insufficient-visible-depth}))
         (let [level (first levels*)
               price (level-price level)
@@ -128,10 +158,12 @@
               (recur (- remaining fill-size)
                      (+ notional (* fill-size price))
                      (+ filled fill-size)
+                     price
                      (next levels*)))
             (recur remaining
                    notional
                    filled
+                   worst-price
                    (next levels*))))))))
 
 (defn- orderbook-fill-price
@@ -149,14 +181,19 @@
       (slippage-bps-from-fill-price side reference-price fill-price))))
 
 (defn- depth-limited-slippage-bps
-  "Conservative slippage for an order whose size exceeds the visible book. Charges
-   the real VWAP slippage on the visible (consumed) portion, plus a penalty on the
-   unfilled remainder that scales with how far the order overruns the book
-   (shortfall multiple = quantity / visible-size). Floored at the flat fallback so
-   it never under-charges relative to the prior flat assumption. We cannot see past
-   the visible book, so the remainder penalty is an explicit assumption rather than
-   a fabricated deep-book fill."
-  [side reference-price quantity {:keys [visible-size visible-notional]} fallback]
+  "Bounded, floor-semantics slippage for an order whose size exceeds the visible book.
+   The visible (consumable) portion is charged its real VWAP slippage. The unfilled
+   remainder is charged from the book-EDGE marginal price (the worst visible level --
+   the invisible book cannot be better than where visibility ended), scaled by the
+   overrun multiple (on a uniform-density ladder average slippage grows ~linearly with
+   size, so the shape is right) and HARD-CAPPED at max-extrapolated-slippage-bps:
+   beyond the visible book any point estimate is fiction, so the result is an explicit
+   lower bound (:estimate-floor? on the cost map), never a precise-looking blowup --
+   the previous uncapped fallback-x-overrun penalty read >100% of notional on thin
+   books. Floored at the flat fallback so it never under-charges relative to the prior
+   flat assumption. A sell can no longer imply a fill below zero: its visible VWAP
+   slippage is physically < 10,000 bp and the remainder is capped at 1,000."
+  [side reference-price quantity {:keys [visible-size visible-notional worst-price]} fallback]
   (if (and (finite-positive? visible-size)
            (finite-positive? visible-notional)
            (finite-positive? quantity))
@@ -165,9 +202,14 @@
                                                          reference-price
                                                          visible-vwap)
                            fallback)
+          edge-slip (or (slippage-bps-from-fill-price side
+                                                      reference-price
+                                                      worst-price)
+                        visible-slip)
           depth-ratio (min 1 (/ visible-size quantity))
-          shortfall-mult (max 1 (/ quantity visible-size))
-          remainder-bps (* fallback shortfall-mult)
+          overrun (max 1 (/ quantity visible-size))
+          remainder-bps (min (* (max edge-slip fallback) overrun)
+                             max-extrapolated-slippage-bps)
           blended (+ (* depth-ratio visible-slip)
                      (* (- 1 depth-ratio) remainder-bps))]
       (max fallback blended))
@@ -275,17 +317,29 @@
                   :depth-status :full-visible-depth})))
 
       (= :insufficient-visible-depth (:depth-status snapshot-fill))
-      (merge metadata
-             {:source :depth-extrapolated
-              :estimated-fill-price reference-price
-              :touch-price (side-touch-price context side)
-              :slippage-bps (depth-limited-slippage-bps side
-                                                        reference-price
-                                                        quantity
-                                                        snapshot-fill
-                                                        fallback)
-              :depth-status :insufficient-visible-depth
-              :fallback-reason :snapshot-depth-limited})
+      ;; Overrun estimates are FLOORS, not point estimates: the penalty on the portion
+      ;; beyond the visible book is capped (see depth-limited-slippage-bps), so the
+      ;; number is a lower bound. :depth-overrun/:depth-coverage let surfaces disclose
+      ;; how much of the order the visible book actually covers.
+      (let [{:keys [visible-size visible-notional]} snapshot-fill
+            overrun (when (and (finite-positive? quantity)
+                               (finite-positive? visible-size))
+                      (/ quantity visible-size))]
+        (merge metadata
+               {:source :depth-extrapolated
+                :estimated-fill-price reference-price
+                :touch-price (side-touch-price context side)
+                :slippage-bps (depth-limited-slippage-bps side
+                                                          reference-price
+                                                          quantity
+                                                          snapshot-fill
+                                                          fallback)
+                :depth-status :insufficient-visible-depth
+                :fallback-reason :snapshot-depth-limited
+                :estimate-floor? true
+                :visible-notional-usd visible-notional
+                :depth-overrun overrun
+                :depth-coverage (when overrun (/ 1 overrun))}))
 
       (implausible-favorable-fill? side reference-price fill-price)
       (untrusted-fill-cost metadata reference-price fallback)
@@ -331,6 +385,72 @@
                                 :impact-bps impact-bps
                                 :spread-usd (* notional (/ spread-bps 10000))
                                 :impact-usd (* notional (/ impact-bps 10000))))))
+
+;; ── TWAP cost model ───────────────────────────────────────────────────────
+;; A TWAP order slices a parent order into suborders spaced over time, letting the
+;; book refill between clips -- so its estimated book impact must sit well below a
+;; single full-size market order. These are the pure estimate-side counterparts of
+;; the venue mechanics in hyperopen.domain.trading.core (one suborder each 30s).
+
+(defn twap-suborder-count
+  "Number of venue suborders a TWAP of the given duration executes: one clip per
+   twap-suborder-interval-seconds plus the initial clip, runtime floored at the venue
+   minimum. Mirrors hyperopen.domain.trading.core/twap-suborder-count."
+  [minutes]
+  (let [m (max twap-min-runtime-minutes
+               (js/Math.floor (if (finite-positive? minutes) minutes 0)))]
+    (inc (js/Math.round (/ (* 60 m) twap-suborder-interval-seconds)))))
+
+(defn twap-cost
+  "Sliced-execution price-cost estimate for working a row's order as a venue TWAP over
+   `minutes`, derived from the row's one-shot cost map (the full-size book-walk figures
+   stamped by cost-estimate). Model: the order splits into n suborders; the book
+   REFILLS between 30s clips, so each clip pays ~1/n of the one-shot book impact
+   (linear-ladder approximation: walking 1/n of the size costs ~1/n the average
+   impact), but twap-permanent-impact-fraction of every clip's impact is permanent and
+   accumulates against later clips (a clip absorbs on average (n-1)/2 prior shifts):
+
+     twap-impact = impact/n + phi * impact * (n-1) / (2n)   (never above the one-shot)
+     twap-slip   = spread + twap-impact                     (every clip crosses the spread)
+
+   Continuity: n=1 reproduces the one-shot cost; the n->inf asymptote is
+   spread + phi/2 * impact. A cost with no spread/impact split (flat fallback,
+   prebaked bps, untrusted snapshot) returns unchanged with :twap-adjusted? false -- a
+   flat assumption has no impact component to slice, and discounting it would
+   fabricate precision. Floor semantics (:estimate-floor?) are inherited, and when one
+   clip's notional still exceeds the visible book the result is additionally flagged
+   :slice-exceeds-visible-depth? true (even sliced, each clip overruns the book)."
+  [cost minutes]
+  (let [{:keys [spread-bps impact-bps notional-usd visible-notional-usd
+                slippage-bps estimated-slippage-usd estimate-floor?]} cost
+        n (twap-suborder-count minutes)]
+    (if-not (and (finite-number? spread-bps)
+                 (finite-number? impact-bps))
+      {:twap-adjusted? false
+       :suborders n
+       :slippage-bps slippage-bps
+       :estimated-slippage-usd estimated-slippage-usd
+       :estimate-floor? (boolean estimate-floor?)}
+      (let [phi twap-permanent-impact-fraction
+            twap-impact (min impact-bps
+                             (+ (/ impact-bps n)
+                                (/ (* phi impact-bps (dec n)) (* 2 n))))
+            twap-slip (+ spread-bps twap-impact)
+            notional (or notional-usd 0)
+            slice-notional (/ notional n)
+            slice-overrun? (boolean (and (finite-positive? visible-notional-usd)
+                                         (finite-positive? slice-notional)
+                                         (> slice-notional visible-notional-usd)))]
+        {:twap-adjusted? true
+         :suborders n
+         :slippage-bps twap-slip
+         :estimated-slippage-usd (* notional (/ twap-slip 10000))
+         :spread-bps spread-bps
+         :spread-usd (* notional (/ spread-bps 10000))
+         :impact-bps twap-impact
+         :impact-usd (* notional (/ twap-impact 10000))
+         :estimate-floor? (boolean estimate-floor?)
+         :slice-exceeds-visible-depth? slice-overrun?}))))
 
 (defn- row-status
   [{:keys [rebalance-tolerance]} instrument price capital-usd delta-weight delta-notional-usd quantity]

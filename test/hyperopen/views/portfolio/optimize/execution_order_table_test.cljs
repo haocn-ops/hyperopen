@@ -116,3 +116,51 @@
            (get-in ewz [1 :on :click]))
         "the row is clickable to open its type editor")
     (is (str/includes? (h/node-text order-list) "Click any order to change its type"))))
+
+(deftest twap-row-breakdown-shows-worked-clips-and-sliced-figures-test
+  ;; A TWAP-typed row's cost equation shows the SLICED estimate (impact spread across
+  ;; the venue's 30s clips + permanent residue), says how it is worked, and the editor's
+  ;; clip count matches the venue cadence (the old copy claimed minutes÷2 "slices").
+  ;; $100k at 2 bp spread + 100 bp impact, 20 minutes = 41 clips:
+  ;; price cost 19.07 bp ≈ $190.73 (never the one-shot $1,020).
+  (let [split-cost {:source :snapshot :slippage-bps 102 :estimated-slippage-usd 1020
+                    :spread-bps 2 :spread-usd 20 :impact-bps 100 :impact-usd 1000
+                    :notional-usd 100000
+                    :fee-bps 4 :estimated-fee-usd 40
+                    :maker-fee-bps 1 :maker-fee-usd 10}
+        plan* (-> plan
+                  (assoc-in [:rows 0 :delta-notional-usd] 100000)
+                  (assoc-in [:rows 0 :cost] split-cost))
+        node (view {:plan plan* :overrides {"perp:EWZ" :twap} :open-row "perp:EWZ"})
+        editor (h/find-by-data-role node "portfolio-optimizer-execution-order-editor-perp-EWZ")
+        breakdown (h/find-by-data-role node "portfolio-optimizer-execution-cost-breakdown")
+        text (h/node-text breakdown)]
+    (is (some? breakdown))
+    (is (str/includes? text "Book impact (worked)"))
+    (is (str/includes? text "worked as 41 clips over 20m"))
+    (is (str/includes? text "190.73"))
+    (is (not (str/includes? text "1,020")))
+    (is (str/includes? (h/node-text editor) "41 clips · one every 30s"))))
+
+(deftest depth-floor-row-disclosure-test
+  ;; A depth-overrun row must read as a lower bound everywhere: "≥" on the row's cost
+  ;; cell, the coverage disclosure in the editor's cost-basis line, and the floor note
+  ;; under the breakdown equation.
+  (let [floor-cost {:source :depth-extrapolated :slippage-bps 999.1
+                    :estimated-slippage-usd 819
+                    :spread-bps 10 :spread-usd 8.2 :impact-bps 989.1 :impact-usd 810.8
+                    :notional-usd 8200
+                    :depth-status :insufficient-visible-depth
+                    :estimate-floor? true :depth-overrun 409 :depth-coverage 0.002445
+                    :visible-notional-usd 20
+                    :fee-bps 4.5 :estimated-fee-usd 3.7
+                    :maker-fee-bps 1.5 :maker-fee-usd 1.2}
+        plan* (assoc-in plan [:rows 0 :cost] floor-cost)
+        node (view {:plan plan* :overrides {"perp:EWZ" :market} :open-row "perp:EWZ"})
+        ewz (h/find-by-data-role node "portfolio-optimizer-execution-order-row-perp-EWZ")
+        editor (h/find-by-data-role node "portfolio-optimizer-execution-order-editor-perp-EWZ")
+        note (h/find-by-data-role node "portfolio-optimizer-execution-cost-note")]
+    (is (str/includes? (h/node-text ewz) "≥"))
+    (is (str/includes? (h/node-text editor) "book covers 0.2% of order"))
+    (is (some? note))
+    (is (str/includes? (h/node-text note) "floor"))))

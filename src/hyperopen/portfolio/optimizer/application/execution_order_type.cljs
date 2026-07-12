@@ -6,9 +6,15 @@
 
   The four user-facing types map onto the order gateway as: :market -> marketable IOC,
   :limit -> resting GTC at mark +/- limit-bps, :passive -> post-only (ALO) limit that
-  never crosses, :twap -> twapOrder sliced over twap-min minutes.")
+  never crosses, :twap -> twapOrder sliced over twap-min minutes."
+  (:require [hyperopen.portfolio.optimizer.domain.rebalance :as rebalance]))
 
 (defn- abs-num [value] (if (number? value) (js/Math.abs value) 0))
+
+(def resting-types
+  "Order types that rest at a price instead of crossing the book: they pay no
+  spread/impact price cost and earn the maker fee."
+  #{:limit :passive})
 
 (def high-cost-crossing-bps
   "Estimated crossing cost (spread + book impact, in bps) at or above which a market
@@ -69,3 +75,43 @@
   (merge {:limit-bps (if (= :buy (:side row)) -2 2)
           :twap-min (if (>= (abs-num (:delta-notional-usd row)) 70000) 20 10)}
          (get params (:row-id row))))
+
+(def twap-suborder-count rebalance/twap-suborder-count)
+
+(defn effective-crossing-cost
+  "The price-cost figures the row's EFFECTIVE order type would actually pay, for every
+  staged cost projection (KPI strip, strategy tiles, high-cost warning, per-row cost
+  equation). A resting type (:limit/:passive) pays no price cost. A :twap row pays the
+  sliced TWAP model (rebalance/twap-cost) at its live per-row duration -- this is what
+  makes the TWAP strategy project below Market instead of identical to it. Any other
+  crossing type pays the row's one-shot figures. Returns
+  {:crossing? bool
+   :slippage-bps / :estimated-slippage-usd   price-cost total
+   :spread-bps/:spread-usd/:impact-bps/:impact-usd   nil when the cost can't be split
+   :estimate-floor? bool   lower-bound semantics (depth-overrun estimates)
+   :twap-adjusted? / :suborders / :slice-exceeds-visible-depth?   TWAP metadata}.
+
+  The routing policy (recommend-exec-type / high-cost-crossing-row?) intentionally
+  keeps using the ONE-SHOT crossing cost: the routing question is \"would crossing be
+  expensive?\" -- discounting it by the TWAP model would let huge clips route as cheap
+  crossers."
+  [selections row]
+  (let [order-type (effective-type selections row)
+        cost (:cost row)]
+    (cond
+      (contains? resting-types order-type)
+      {:crossing? false}
+
+      (= :twap order-type)
+      (merge {:crossing? true}
+             (rebalance/twap-cost cost (:twap-min (row-params selections row))))
+
+      :else
+      {:crossing? true
+       :slippage-bps (:slippage-bps cost)
+       :estimated-slippage-usd (:estimated-slippage-usd cost)
+       :spread-bps (:spread-bps cost)
+       :spread-usd (:spread-usd cost)
+       :impact-bps (:impact-bps cost)
+       :impact-usd (:impact-usd cost)
+       :estimate-floor? (boolean (:estimate-floor? cost))})))

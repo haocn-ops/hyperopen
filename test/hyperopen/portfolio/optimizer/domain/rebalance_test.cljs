@@ -303,11 +303,13 @@
     (is (= :full-visible-depth (:depth-status cost)))))
 
 (deftest build-rebalance-preview-extrapolates-when-snapshot-depth-is-insufficient-test
-  ;; Order (qty 3) exceeds the single visible ask level (sz 1). Slippage is the
-  ;; real VWAP on the visible portion blended with a shortfall-scaled penalty on
-  ;; the unfilled remainder, never below the flat fallback. visible-vwap=101 ->
-  ;; visible-slip=100 bps; depth-ratio=1/3; shortfall=3 -> remainder=25*3=75;
-  ;; blended=(1/3*100)+(2/3*75)=83.333 bps; slip-usd=300*83.333/10000=2.5.
+  ;; Order (qty 3) exceeds the single visible ask level (sz 1). Slippage is the real
+  ;; VWAP on the visible portion blended with a remainder charged from the book-EDGE
+  ;; marginal price scaled by the overrun, never below the flat fallback and never
+  ;; above the extrapolation cap. visible-vwap=101 -> visible-slip=100 bps;
+  ;; edge-slip=100 bps (worst level 101); overrun=3 -> remainder=min(100*3,1000)=300;
+  ;; blended=(1/3*100)+(2/3*300)=233.333 bps; slip-usd=300*233.333/10000=7.0.
+  ;; The estimate is an explicit FLOOR (part of the order is beyond the visible book).
   (let [preview (rebalance/build-rebalance-preview
                  {:capital-usd 300
                   :rebalance-tolerance 0.0
@@ -325,13 +327,116 @@
         cost (get-in preview [:rows 0 :cost])]
     (is (= :ready (get-in preview [:rows 0 :status])))
     (is (= :depth-extrapolated (:source cost)))
-    (is (near? 83.33333333333333 (:slippage-bps cost)))
-    (is (near? 2.5 (:estimated-slippage-usd cost)))
+    (is (near? 233.33333333333334 (:slippage-bps cost)))
+    (is (near? 7.0 (:estimated-slippage-usd cost)))
     (is (= :insufficient-visible-depth (:depth-status cost)))
     (is (= :snapshot-depth-limited (:fallback-reason cost)))
     (is (= 5000 (:age-ms cost)))
+    ;; floor semantics + coverage disclosure for the surfaces
+    (is (true? (:estimate-floor? cost)))
+    (is (near? 3 (:depth-overrun cost)))
+    (is (near? (/ 1 3) (:depth-coverage cost)))
+    (is (near? 101 (:visible-notional-usd cost)))
     ;; never under-charges relative to the old flat fallback
     (is (>= (:slippage-bps cost) 25))))
+
+(deftest depth-extrapolation-is-capped-not-unbounded-test
+  ;; The motivating bug: a $16.8M sell against ~$41k of visible bids used to read
+  ;; 10,225 bp (a fill below zero -- impossible). An order 1000x the visible book must
+  ;; now blend toward the extrapolation cap (1,000 bp), not fallback*overrun=25,000 bp.
+  ;; Here: visible-slip=100, edge=100, overrun=1000 -> remainder=min(100*1000,1000)=1000;
+  ;; depth-ratio=0.001 -> blended=0.1+0.999*1000=999.1 bp.
+  (let [preview (rebalance/build-rebalance-preview
+                 {:capital-usd 100000
+                  :rebalance-tolerance 0.0
+                  :fallback-slippage-bps 25
+                  :instrument-ids ["perp:THIN"]
+                  :current-weights [1.0]
+                  :target-weights [0.0]
+                  :instruments-by-id {"perp:THIN" {:instrument-type :perp
+                                                   :coin "THIN"}}
+                  :prices-by-id {"perp:THIN" 100}
+                  :cost-contexts-by-id {"perp:THIN" {:source :snapshot
+                                                     :bids [{:px "99" :sz "1"}]
+                                                     :stale? false
+                                                     :age-ms 0}}})
+        cost (get-in preview [:rows 0 :cost])]
+    (is (= :sell (get-in preview [:rows 0 :side])))
+    (is (near? 999.1 (:slippage-bps cost)))
+    (is (<= (:slippage-bps cost) (+ rebalance/max-extrapolated-slippage-bps 1)))
+    ;; a sell's average slippage can never reach 10,000 bp (a fill at/below zero)
+    (is (< (:slippage-bps cost) 10000))
+    (is (true? (:estimate-floor? cost)))
+    (is (near? 1000 (:depth-overrun cost)))))
+
+(deftest twap-suborder-count-mirrors-venue-cadence-test
+  ;; One suborder each 30s plus the initial clip, runtime floored at the venue's
+  ;; 5-minute minimum — must agree with hyperopen.domain.trading.core.
+  (is (= 21 (rebalance/twap-suborder-count 10)))
+  (is (= 41 (rebalance/twap-suborder-count 20)))
+  (is (= 11 (rebalance/twap-suborder-count 5)))
+  (is (= 11 (rebalance/twap-suborder-count 3)))
+  (is (= 11 (rebalance/twap-suborder-count nil)))
+  (is (= (rebalance/twap-suborder-count 20)
+         (trading-core/twap-suborder-count 20))))
+
+(def ^:private one-shot-cost
+  ;; A splittable one-shot cost map as cost-estimate stamps it: spread 2 bp + impact
+  ;; 100 bp = 102 bp on $10,000 notional.
+  {:spread-bps 2 :impact-bps 100
+   :slippage-bps 102 :estimated-slippage-usd 102
+   :notional-usd 10000})
+
+(deftest twap-cost-slices-impact-below-the-one-shot-walk-test
+  ;; 10 minutes = 21 suborders. Temporary impact 100/21 = 4.7619; permanent residue
+  ;; 0.3*100*20/42 = 14.2857; twap impact 19.0476 vs 100 one-shot. Spread is still
+  ;; paid in full (every clip crosses): total 21.0476 bp vs 102 one-shot.
+  (let [twap (rebalance/twap-cost one-shot-cost 10)]
+    (is (true? (:twap-adjusted? twap)))
+    (is (= 21 (:suborders twap)))
+    (is (near? 19.047619047619047 (:impact-bps twap)))
+    (is (near? 21.047619047619047 (:slippage-bps twap)))
+    (is (near? 21.047619047619047 (:estimated-slippage-usd twap)))
+    (is (near? 2 (:spread-bps twap)))
+    (is (near? 2 (:spread-usd twap)))
+    (is (near? 19.047619047619047 (:impact-usd twap)))
+    (is (< (:slippage-bps twap) (:slippage-bps one-shot-cost)))))
+
+(deftest twap-cost-monotone-in-duration-with-permanent-floor-test
+  ;; Longer working time -> smaller estimate, but never below the permanent-impact
+  ;; asymptote: spread + phi/2 * impact = 2 + 15 = 17 bp.
+  (let [at (fn [minutes] (:slippage-bps (rebalance/twap-cost one-shot-cost minutes)))]
+    (is (> (at 5) (at 10)))
+    (is (> (at 10) (at 20)))
+    (is (> (at 20) (at 1440)))
+    (is (> (at 1440) 17))
+    (is (< (at 5) 102))))
+
+(deftest twap-cost-passes-flat-estimates-through-unadjusted-test
+  ;; A flat fallback / prebaked estimate has no impact component to slice — slicing a
+  ;; flat 25 bp assumption into 21 clips of 25 bp would fabricate precision.
+  (let [twap (rebalance/twap-cost {:slippage-bps 25 :estimated-slippage-usd 0.75} 10)]
+    (is (false? (:twap-adjusted? twap)))
+    (is (= 25 (:slippage-bps twap)))
+    (is (= 0.75 (:estimated-slippage-usd twap)))
+    (is (nil? (:spread-bps twap)))))
+
+(deftest twap-cost-flags-clips-that-still-exceed-visible-depth-test
+  ;; $1M worked over 5 minutes = 11 clips of ~$90.9k, against a $500 visible book:
+  ;; even sliced, every clip overruns the book — flag it and inherit floor semantics.
+  (let [twap (rebalance/twap-cost {:spread-bps 5 :impact-bps 500
+                                   :slippage-bps 505 :estimated-slippage-usd 50500
+                                   :notional-usd 1000000
+                                   :visible-notional-usd 500
+                                   :estimate-floor? true}
+                                  5)]
+    (is (true? (:twap-adjusted? twap)))
+    (is (true? (:slice-exceeds-visible-depth? twap)))
+    (is (true? (:estimate-floor? twap)))
+    (is (< (:slippage-bps twap) 505)))
+  ;; ...and stays quiet when a clip fits the visible book.
+  (let [twap (rebalance/twap-cost (assoc one-shot-cost :visible-notional-usd 5000) 10)]
+    (is (false? (:slice-exceeds-visible-depth? twap)))))
 
 (deftest depth-limited-slippage-grows-with-order-size-test
   ;; Monotonicity: a larger order that overruns the same visible book by more

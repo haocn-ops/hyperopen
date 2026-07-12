@@ -64,3 +64,54 @@
       (is (= :twap (order-type/effective-type
                     {:default-order-type :twap :overrides {}}
                     row))))))
+
+(def ^:private splittable-row
+  ;; A large row with a real spread/impact split, as the rebalance preview stamps it:
+  ;; one-shot 102 bp (2 spread + 100 impact) on $100k.
+  {:row-id "perp:BIG"
+   :instrument-id "perp:BIG"
+   :instrument-type :perp
+   :side :buy
+   :delta-notional-usd 100000
+   :cost {:slippage-bps 102 :estimated-slippage-usd 1020
+          :spread-bps 2 :spread-usd 20
+          :impact-bps 100 :impact-usd 1000
+          :notional-usd 100000}})
+
+(deftest effective-crossing-cost-is-type-aware-test
+  (testing "a market override pays the full one-shot walk"
+    (let [c (order-type/effective-crossing-cost
+             {:default-order-type :market :overrides {} :params {}}
+             splittable-row)]
+      (is (true? (:crossing? c)))
+      (is (= 102 (:slippage-bps c)))
+      (is (= 1020 (:estimated-slippage-usd c)))))
+  (testing "a resting type pays no price cost"
+    (is (= {:crossing? false}
+           (order-type/effective-crossing-cost
+            {:default-order-type :passive :overrides {} :params {}}
+            splittable-row))))
+  (testing "a TWAP row pays the sliced model at its live per-row duration — the fix
+            for TWAP projecting identical to Market"
+    (let [selections {:default-order-type :twap :overrides {} :params {}}
+          c (order-type/effective-crossing-cost selections splittable-row)]
+      (is (true? (:crossing? c)))
+      (is (true? (:twap-adjusted? c)))
+      ;; $100k defaults to 20 minutes = 41 clips: impact 100/41 + 0.3*100*40/82
+      ;; = 17.0732; + spread 2 = 19.0732 bp, far below the 102 bp one-shot.
+      (is (= 41 (:suborders c)))
+      (is (< 19 (:slippage-bps c) 20))
+      (is (< (:slippage-bps c) 102))
+      ;; a shorter per-row duration override re-prices the same row upward
+      (let [shorter (order-type/effective-crossing-cost
+                     (assoc selections :params {"perp:BIG" {:twap-min 5}})
+                     splittable-row)]
+        (is (= 11 (:suborders shorter)))
+        (is (> (:slippage-bps shorter) (:slippage-bps c))))))
+  (testing "TWAP on a flat (unsplittable) estimate passes through unadjusted"
+    (let [c (order-type/effective-crossing-cost
+             {:default-order-type :twap :overrides {} :params {}}
+             (perp-buy 87 25))]
+      (is (true? (:crossing? c)))
+      (is (false? (:twap-adjusted? c)))
+      (is (= 25 (:slippage-bps c))))))

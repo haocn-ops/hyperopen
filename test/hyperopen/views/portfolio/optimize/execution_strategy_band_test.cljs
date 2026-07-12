@@ -147,3 +147,77 @@
     (is (some? fix))
     (is (= [[:actions/set-portfolio-optimizer-execution-row-order-type "perp:EWZ" :passive]]
            (get-in fix [1 :on :click])))))
+
+;; ── TWAP cost model + depth-floor honesty on the strategy tiles ────────────
+
+(def ^:private depth-labels {"perp:BIG" "BIG"})
+
+(def ^:private depth-plan
+  ;; One $100k sell with a REAL spread/impact split (2 bp spread + 100 bp impact =
+  ;; 102 bp / $1,020 one-shot; taker fee $40, maker $10). Worked as its default
+  ;; 20-minute TWAP (41 venue clips) the sliced model prices
+  ;; 2 + 100/41 + 0.3*100*40/82 = 19.07 bp ≈ $190.73 — so the tiles must diverge.
+  {:status :ready
+   :execution-disabled? false
+   :summary {:ready-count 1 :blocked-count 0 :skipped-count 0
+             :gross-ready-notional-usd 100000
+             :margin {:after-utilization 0.1 :after-gross-leverage 1.1
+                      :before-gross-leverage 1.0 :free-margin-usd 300
+                      :capital-usd 320 :warning :none}}
+   :rows [{:row-id "perp:BIG" :instrument-id "perp:BIG" :instrument-type :perp
+           :status :ready :side :sell :quantity 1000 :order-type :market
+           :delta-notional-usd -100000
+           :cost {:source :snapshot :slippage-bps 102 :estimated-slippage-usd 1020
+                  :spread-bps 2 :spread-usd 20 :impact-bps 100 :impact-usd 1000
+                  :notional-usd 100000
+                  :fee-bps 4 :estimated-fee-usd 40
+                  :maker-fee-bps 1 :maker-fee-usd 10}}]})
+
+(defn- depth-view
+  [modal-overrides]
+  (execution-tab/execution-tab
+   {:portfolio {:optimizer
+                {:last-successful-run {:result {:labels-by-instrument depth-labels}}
+                 :execution-modal (merge {:open? true :plan depth-plan :phase :staged
+                                          :default-order-type :recommended
+                                          :overrides {} :params {}}
+                                         modal-overrides)
+                 :execution {:status :idle :history []}}}}))
+
+(deftest twap-tile-projects-below-market-on-splittable-books-test
+  ;; THE motivating fix: before the TWAP cost model existed, Market and TWAP both
+  ;; projected the identical one-shot walk ($1,060 all-in here) — making the strategy
+  ;; comparison meaningless. TWAP must now price the sliced estimate.
+  (let [node (depth-view nil)
+        consequence (fn [id]
+                      (h/node-text
+                       (h/find-by-data-role
+                        node (str "portfolio-optimizer-execution-mode-" id "-consequence"))))]
+    (is (str/includes? (consequence "market") "$1,060"))
+    (is (str/includes? (consequence "twap") "$230.73"))
+    (is (not (str/includes? (consequence "twap") "$1,060")))))
+
+(deftest high-cost-warning-judges-twap-rows-on-the-sliced-cost-test
+  ;; Under a bulk Market default the 102 bp crossing is flagged; under TWAP the same
+  ;; row works at 19.07 bp — below the 20 bp bar, so there is nothing to warn about.
+  (is (some? (h/find-by-data-role (depth-view {:default-order-type :market})
+                                  "portfolio-optimizer-execution-high-cost-warning")))
+  (is (nil? (h/find-by-data-role (depth-view {:default-order-type :twap})
+                                 "portfolio-optimizer-execution-high-cost-warning"))))
+
+(deftest floor-estimates-mark-tiles-as-lower-bounds-test
+  ;; A depth-overrun estimate is a capped floor, not a point estimate — every tile
+  ;; projecting from it must carry the "≥" lower-bound marker.
+  (let [floor-plan (update-in depth-plan [:rows 0 :cost] merge
+                              {:estimate-floor? true
+                               :depth-status :insufficient-visible-depth
+                               :depth-overrun 409
+                               :depth-coverage 0.0024
+                               :visible-notional-usd 244})
+        node (depth-view {:plan floor-plan})
+        consequence (fn [id]
+                      (h/node-text
+                       (h/find-by-data-role
+                        node (str "portfolio-optimizer-execution-mode-" id "-consequence"))))]
+    (is (str/includes? (consequence "market") "≥ $1,060"))
+    (is (str/includes? (consequence "twap") "≥ $"))))

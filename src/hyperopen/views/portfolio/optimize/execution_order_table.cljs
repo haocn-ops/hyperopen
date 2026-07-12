@@ -86,10 +86,18 @@
 
 (defn- cost-source-label
   [row]
-  (let [cost (:cost row)]
+  (let [cost (:cost row)
+        coverage (:depth-coverage cost)]
     (->> [(when-let [source (:source cost)] (opt-format/keyword-label source))
           (case (:depth-status cost)
-            :insufficient-visible-depth "depth limited"
+            ;; Disclose HOW limited: the share of the order the visible book covers is
+            ;; the difference between "slightly beyond the book" and "409× the book".
+            :insufficient-visible-depth
+            (if (and (number? coverage) (pos? coverage))
+              (str "book covers "
+                   (opt-format/format-decimal (* 100 coverage) {:maximum-fraction-digits 1})
+                   "% of order — estimate is a floor")
+              "depth limited")
             nil)]
          (remove nil?)
          (str/join " · ")
@@ -165,26 +173,33 @@
   [:span {:class ["optimizer-exec-cost-op"]} glyph])
 
 (defn- cost-breakdown
-  "Per-row execution-cost components for the row's effective type. Crossing (market/twap):
-  spread crossing + book impact = price cost, + taker fee = all-in. Resting (limit/passive):
-  no spread/impact (rests), + maker fee = all-in. A crossing row whose book can't be split
-  (untrusted snapshot / flat fallback / prebaked) is `splittable?`=false: spread/impact are
-  unknown (nil, not a deceptive 0), and the strip collapses them into a single honest note."
+  "Per-row execution-cost components for the row's effective type, via the type-aware
+  effective-crossing-cost: Market crosses at the one-shot walk; TWAP pays the sliced
+  model (impact spread across venue suborders + permanent-impact residue); resting
+  Limit/Passive pay neither, + maker fee. A crossing row whose book can't be split
+  (untrusted snapshot / flat fallback / prebaked) is `splittable?`=false: spread/impact
+  are unknown (nil, not a deceptive 0), and the strip collapses them into a single
+  honest note. `floor?` marks depth-overrun estimates (capped lower bounds)."
   [model row]
-  (let [t (shared/effective-type model row)
-        crossing? (shared/crossing-type? t)
+  (let [{:keys [crossing? slippage-bps estimated-slippage-usd spread-bps spread-usd
+                impact-bps impact-usd estimate-floor? twap-adjusted? suborders
+                slice-exceeds-visible-depth?]} (shared/effective-crossing-cost model row)
         cost (:cost row)
-        splittable? (and crossing? (some? (:spread-usd cost)))
-        price-cost-usd (if crossing? (or (:estimated-slippage-usd cost) 0) 0)
-        price-cost-bps (if crossing? (or (:slippage-bps cost) 0) 0)
+        splittable? (and crossing? (some? spread-usd))
+        price-cost-usd (if crossing? (or estimated-slippage-usd 0) 0)
+        price-cost-bps (if crossing? (or slippage-bps 0) 0)
         fee-usd (if crossing? (or (:estimated-fee-usd cost) 0) (or (:maker-fee-usd cost) 0))
         fee-bps (if crossing? (or (:fee-bps cost) 0) (or (:maker-fee-bps cost) 0))]
     {:crossing? crossing?
      :splittable? splittable?
-     :spread-bps (when splittable? (:spread-bps cost))
-     :spread-usd (when splittable? (:spread-usd cost))
-     :impact-bps (when splittable? (:impact-bps cost))
-     :impact-usd (when splittable? (:impact-usd cost))
+     :floor? (boolean (and crossing? estimate-floor?))
+     :twap-adjusted? (boolean twap-adjusted?)
+     :suborders suborders
+     :slice-exceeds-visible-depth? (boolean slice-exceeds-visible-depth?)
+     :spread-bps (when splittable? spread-bps)
+     :spread-usd (when splittable? spread-usd)
+     :impact-bps (when splittable? impact-bps)
+     :impact-usd (when splittable? impact-usd)
      :price-cost-bps price-cost-bps :price-cost-usd price-cost-usd
      :fee-bps fee-bps :fee-usd fee-usd
      :all-in-bps (+ price-cost-bps fee-bps) :all-in-usd (+ price-cost-usd fee-usd)}))
@@ -193,11 +208,22 @@
   "The right-hand column of the expanded editor: the execution-cost equation laid out across
   the full width — spread crossing + book impact = price cost, + fees = all-in (each in bp and
   $). A resting Limit/Passive row pays neither spread nor impact, so those two terms collapse
-  into a single \"rests\" note and the price cost reads ~0."
+  into a single \"rests\" note and the price cost reads ~0. A TWAP row's impact term is the
+  sliced estimate and the strip says how it is worked; a depth-overrun (floor) estimate is
+  labeled as a lower bound."
   [model row]
-  (let [{:keys [crossing? splittable? spread-bps spread-usd impact-bps impact-usd
+  (let [{:keys [crossing? splittable? floor? twap-adjusted? suborders
+                slice-exceeds-visible-depth? spread-bps spread-usd impact-bps impact-usd
                 price-cost-bps price-cost-usd fee-bps fee-usd all-in-bps all-in-usd]}
-        (cost-breakdown model row)]
+        (cost-breakdown model row)
+        twap-note (when twap-adjusted?
+                    (str "worked as " suborders " clips over "
+                         (:twap-min (shared/row-params model row))
+                         "m — book refills between clips"
+                         (when slice-exceeds-visible-depth?
+                           " · each clip still exceeds the visible book")))
+        floor-note (when floor?
+                     "order exceeds visible book depth — price cost is a floor (≥), not a point estimate")]
     [:div {:class ["optimizer-exec-cost-panel"]
            :data-role "portfolio-optimizer-execution-cost-breakdown"}
      [:p {:class ["optimizer-exec-cost-head"]}
@@ -205,7 +231,9 @@
       [:span {:class ["optimizer-exec-cost-info"]
               :title (str "Price cost = crossing the spread + walking the book (impact). "
                           "All-in adds exchange fees. Resting Limit/Passive orders pay "
-                          "neither spread nor impact and earn the lower maker fee.")}
+                          "neither spread nor impact and earn the lower maker fee. "
+                          "TWAP works the order as venue suborders every 30s, so its "
+                          "impact estimate is the sliced cost, not one full-size walk.")}
        "ⓘ"]]
      [:div {:class ["optimizer-exec-cost-eq"]}
       (cond
@@ -213,7 +241,8 @@
         splittable?
         (list (cost-stat "Spread crossing" spread-bps spread-usd :input)
               (cost-op "+")
-              (cost-stat "Book impact" impact-bps impact-usd :input))
+              (cost-stat (if twap-adjusted? "Book impact (worked)" "Book impact")
+                         impact-bps impact-usd :input))
 
         ;; A crossing row whose book can't be split (untrusted snapshot / flat fallback):
         ;; the spread is unknown — say so honestly instead of rendering a deceptive 0 bp.
@@ -234,7 +263,11 @@
       (cost-op "+")
       (cost-stat "Fees" fee-bps fee-usd :input)
       (cost-op "=")
-      (cost-stat "All-in" all-in-bps all-in-usd :allin)]]))
+      (cost-stat "All-in" all-in-bps all-in-usd :allin)]
+     (when (or twap-note floor-note)
+       [:p {:class ["mt-1" "font-mono" "text-[0.62rem]" "text-trading-muted/80"]
+            :data-role "portfolio-optimizer-execution-cost-note"}
+        (str/join " · " (remove nil? [twap-note floor-note]))])]))
 
 (defn- order-editor-row
   [model row colspan]
@@ -295,8 +328,11 @@
                                  (= (:twap-min params) m) (conj "optimizer-primary-action" "font-semibold"))
                         :on {:click [[:actions/set-portfolio-optimizer-execution-row-param row-id :twap-min m]]}}
                (str m " min")])
+            ;; Clip count from the venue's real cadence (one suborder each 30s) — the
+            ;; prior minutes÷2 copy claimed 10 slices for a 20-minute TWAP that actually
+            ;; executes 41, and the cost model prices the real count.
             [:span {:class ["font-mono" "text-trading-muted/70"]}
-             (str (max 2 (js/Math.round (/ (:twap-min params) 2))) " slices · even spacing")]]
+             (str (shared/twap-suborder-count (:twap-min params)) " clips · one every 30s")]]
            [:span "Post-only at the best price — never crosses the spread, re-pegs as the book moves."])]
         [:p {:class ["font-mono" "text-[0.65rem]" "text-trading-muted/70"]}
          (str "Recommended: " (shared/order-type-labels rec) " — " rec-reason-text)]
@@ -408,8 +444,10 @@
   "Type-aware slippage display. After a fill the realized slippage (vs the same mark the
   estimate used) takes over. Pre-fill: resting orders (limit/passive) read \"rests\" rather
   than the book-crossing market-impact estimate — which would badly overstate their cost;
-  crossing orders (market/twap) show the impact estimate; non-ready rows show \"—\"."
-  [order-type status est-slip realized-slip]
+  crossing orders show their EFFECTIVE-type estimate (a TWAP row shows the sliced TWAP
+  figure, not the one-shot walk it will never pay), prefixed \"≥\" when the estimate is a
+  depth-overrun floor; non-ready rows show \"—\"."
+  [model row order-type status realized-slip]
   (cond
     (shared/finite realized-slip)
     [:span {:title "Realized fill vs the mark the estimate used."} (shared/format-bps realized-slip)]
@@ -418,7 +456,14 @@
     [:span {:title "Resting order — pays the spread/offset, not market impact; may not fully fill."}
      "rests"]
 
-    :else (shared/format-bps est-slip)))
+    :else
+    (let [{:keys [crossing? slippage-bps estimate-floor?]}
+          (shared/effective-crossing-cost model row)
+          bps (if crossing? slippage-bps (get-in row [:cost :slippage-bps]))]
+      (if (and crossing? estimate-floor?)
+        [:span {:title "Order exceeds visible book depth — capped lower bound, not a point estimate."}
+         (shared/floor-prefixed true (shared/format-bps bps))]
+        (shared/format-bps bps)))))
 
 (defn- order-row
   [{:keys [open-row] :as model} index row]
@@ -470,7 +515,7 @@
                :title "Order notional"}
           (str (if buy? "+" "−") (opt-format/format-usdc (shared/abs-num notional)))]
          [:td {:class ["num" "right" "text-trading-muted"]}
-          (slip-cell t (:status row) (get-in row [:cost :slippage-bps]) (get-in row [:realized :slippage-bps]))]
+          (slip-cell model row t (:status row) (get-in row [:realized :slippage-bps]))]
          [:td {:class ["text-[0.7rem]"]} (state-cell display-state row)]]]
     (if open?
       [row-tr (if amendable

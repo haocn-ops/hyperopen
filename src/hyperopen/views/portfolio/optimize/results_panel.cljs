@@ -46,7 +46,8 @@
                                :or {frontier-overlay-mode :standalone}}]
    (let [result (results-model/enrich-result-labels (:result last-successful-run) draft)
          selected-risk-instrument (get-in state
-                                          contracts/ui-selected-risk-instrument-path)]
+                                          contracts/ui-selected-risk-instrument-path)
+         equal-risk? (= :equal-risk (get-in result [:solver :objective-kind]))]
      (when (= :solved (:status result))
        [:section {:class ["optimizer-results-surface" "space-y-0" "leading-4"]
                   :replicant/key "optimizer-results-surface"
@@ -76,39 +77,39 @@
           ;; as its second DOM-state tab, the why-card speaks in risk
           ;; contributions, and the frontier-density refinement card
           ;; disappears — there is no sweep to refine.
-          (let [equal-risk? (= :equal-risk (get-in result [:solver :objective-kind]))]
-            ;; Plain conditional siblings, never a list-as-one-child (Replicant
-            ;; stringifies those); the whole set only toggles when the solved
-            ;; objective itself changes.
-            [:div {:class ["space-y-4"]
-                   :replicant/key (if equal-risk? "equal-risk-center" "frontier-center")}
-             (when equal-risk?
-               (risk-contributions-card/risk-contributions-card
-                result
-                {:selected-risk-instrument selected-risk-instrument}))
-             (when equal-risk?
-               (summary/equal-risk-context-card result))
-             (when-not equal-risk?
-               (frontier-chart/frontier-chart
-                draft
-                result
-                frontier-overlay-mode
-                constrain-frontier?))
-             ;; The strip's slot wrapper always renders, so the insight
-             ;; appearing/disappearing across reruns can never shift the
-             ;; disclosure-holding cards below it.
-             (when-not equal-risk?
-               (volatility-intuition-card/insight-strip result))
-             ;; Decision-support before solver tuning: the engine-derived "why
-             ;; this target" facts sit directly under the chart; the refinement
-             ;; card below is compact with its options behind a disclosure.
-             (when-not equal-risk?
-               (summary/target-context-card result))
-             (when-not equal-risk?
-               (refinement-card/refinement-status-card refinement))])]
-         ;; Rail order is review-first: confidence (leads with the next-step row),
-         ;; then trust diagnostics, then the collapsed views editor — input editing
-         ;; is the by-exception task on this page.
+          ;; Plain conditional siblings, never a list-as-one-child (Replicant
+          ;; stringifies those); the whole set only toggles when the solved
+          ;; objective itself changes.
+          [:div {:class ["space-y-4"]
+                 :replicant/key (if equal-risk? "equal-risk-center" "frontier-center")}
+           (when equal-risk?
+             (risk-contributions-card/risk-contributions-card
+              result
+              {:selected-risk-instrument selected-risk-instrument}))
+           (when equal-risk?
+             (summary/equal-risk-context-card result))
+           (when-not equal-risk?
+             (frontier-chart/frontier-chart
+              draft
+              result
+              frontier-overlay-mode
+              constrain-frontier?))
+           ;; The strip's slot wrapper always renders, so the insight
+           ;; appearing/disappearing across reruns can never shift the
+           ;; disclosure-holding cards below it.
+           (when-not equal-risk?
+             (volatility-intuition-card/insight-strip result))
+           ;; Decision-support before solver tuning: the engine-derived "why
+           ;; this target" facts sit directly under the chart; the refinement
+           ;; card below is compact with its options behind a disclosure.
+           (when-not equal-risk?
+             (summary/target-context-card result))
+           (when-not equal-risk?
+             (refinement-card/refinement-status-card refinement))]]
+         ;; Rail order is review-first: the next-step row leads, then
+         ;; volatility/leverage-risk context, then frontier solve-quality
+         ;; detail, then trust diagnostics, then the collapsed views editor —
+         ;; input editing is the by-exception task on this page.
          [:div {:class ["optimizer-results-right-panel" "min-h-0"
                         "xl:col-span-2" "2xl:col-span-1"]
                 :data-role "portfolio-optimizer-results-right-panel"}
@@ -125,5 +126,12 @@
                  :data-role "portfolio-optimizer-volatility-risk-cards"}
            (volatility-intuition-card/volatility-intuition-card result)
            (leverage-risk-card/leverage-risk-card result)]
+          ;; Frontier quality / selection stability / stop reason (2026-07-12
+          ;; user request): relocated below the volatility/leverage-risk cards
+          ;; instead of leading the rail — the next-step row above is the
+          ;; higher-priority lead and stays put. Equal Risk already carries its
+          ;; analogous rows in equal-risk-confidence-rail's single card.
+          (when-not equal-risk?
+            (diagnostics-rail/result-confidence-quality-rail refinement))
           (diagnostics-rail/trust-diagnostics-rail result)
           (active-views-editor state draft result readiness)]]]))))

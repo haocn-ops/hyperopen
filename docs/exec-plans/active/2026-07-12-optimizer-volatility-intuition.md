@@ -290,6 +290,19 @@ engine paths, and the full existing optimizer test surface stays green.
   33294 assertions across check + npm test + websocket; first run failed only
   `lint:docs` because this plan lacked an explicit `## Validation` heading —
   added, re-run all-PASS). Focused Playwright workbench spec 5/5.
+- [x] (2026-07-12) Follow-up: relocated the Frontier quality / Selection
+  stability / Stop reason rows (direct user request) from leading the right
+  rail to trailing the volatility-intuition and leverage-risk cards.
+  `result-confidence-rail` now renders only the "Result confidence" header +
+  next-step row; a new `result-confidence-quality-rail` (titled "Solve
+  quality" to avoid a duplicate header once the two cards are no longer
+  adjacent) carries the three relocated rows and mounts right after the
+  always-present `optimizer-volatility-risk-cards` wrapper, so the ordering
+  vs. the leverage-risk card is a structural guarantee, not a conditional one.
+  Equal Risk's own confidence rail is untouched (different content, not shown
+  in the request). Full suite 5548/5548 green; `npm run gates` 34/34 PASS;
+  browser-verified on the workbench build (screenshot showed the
+  duplicate-header rough edge, which prompted the "Solve quality" rename).
 - [ ] Post-merge follow-up (optional, deferred): empirical short-horizon
   intuition (historical percentile one-day/one-week moves) fed from the
   history store, labeled "Historical" vs the model-scaled values per the
@@ -349,6 +362,11 @@ engine paths, and the full existing optimizer test surface stays green.
   strip at σ ≥ 100%; severity tiers 50/100/200% per the designer prompt.
 - New view namespaces instead of growing `results_diagnostics_rail.cljs`
   (already 503 lines, near the 500-line size gate).
+- Relocated confidence-quality card titled "Solve quality" rather than
+  reusing "Result confidence": the split moved it two cards away from its
+  former sibling, so an identical header would read as an accidental
+  duplicate rather than a continuation. Verified live in the browser before
+  and after the rename.
 
 ## Outcomes & Retrospective
 

@@ -69,7 +69,9 @@
     (testing "no frontier machinery renders for equal-risk"
       (is (nil? (node-by-role view-node "portfolio-optimizer-frontier-panel")))
       (is (nil? (node-by-role view-node "portfolio-optimizer-refinement-card")))
-      (is (nil? (node-by-role view-node "portfolio-optimizer-result-confidence-panel"))))
+      (is (nil? (node-by-role view-node "portfolio-optimizer-result-confidence-panel")))
+      (is (nil? (node-by-role view-node "portfolio-optimizer-result-confidence-quality-panel"))
+          "the frontier-quality/selection-stability/stop-reason detail is refinement-specific, not equal-risk's own confidence rail"))
     (testing "the diverging balance chart is the centerpiece"
       (is (some? (node-by-role view-node "portfolio-optimizer-risk-contributions")))
       (is (some? (node-by-role view-node "portfolio-optimizer-risk-contribution-chart")))

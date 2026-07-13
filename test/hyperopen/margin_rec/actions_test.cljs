@@ -241,6 +241,14 @@
   (assoc-in state (conj state/recs-path "xyz:TSM|xyz")
             {:status :ok :result high-risk-result}))
 
+(defn- with-agent-status
+  [state status]
+  (assoc-in state [:wallet :agent :status] status))
+
+(defn- ready-batch-state
+  []
+  (-> (base-state) with-high-risk-rec (with-agent-status :ready)))
+
 (deftest batch-toggle-arg-spec-accepts-dispatch-payloads
   ;; Raw dispatch args are validated before placeholders resolve, so the
   ;; toolbar trigger's payload carries the literal bounds keyword.
@@ -275,8 +283,7 @@
       (is (= #{} (:deselected batch*))))))
 
 (deftest apply-batch-closes-panel-then-submits-per-position
-  (let [state (with-high-risk-rec (base-state))
-        effects (actions/apply-margin-rec-batch state)]
+  (let [effects (actions/apply-margin-rec-batch (ready-batch-state))]
     (assert-save-effects-valid! effects)
     (is (= [:effects/save :effects/api-submit-position-margin]
            (mapv first effects)))
@@ -292,28 +299,64 @@
 
 (deftest apply-batch-guards
   (testing "deselected positions are not submitted"
-    (let [state (-> (base-state)
-                    with-high-risk-rec
+    (let [state (-> (ready-batch-state)
                     (assoc-in state/batch-path
                               {:open? true :anchor nil
                                :deselected #{"xyz:TSM|xyz"}}))
           effects (actions/apply-margin-rec-batch state)]
       (is (= [:effects/save] (mapv first effects)))))
   (testing "top-up is capped at the dex's available collateral"
-    (let [state (-> (base-state)
-                    with-high-risk-rec
+    (let [state (-> (ready-batch-state)
                     (assoc-in [:perp-dex-clearinghouse "xyz" :withdrawable] "5"))
           [_ submit] (actions/apply-margin-rec-batch state)]
       (is (= 5000000 (get-in (second submit) [:action :ntli])))))
   (testing "sub-dollar affordable amounts are skipped entirely"
-    (let [state (-> (base-state)
-                    with-high-risk-rec
+    (let [state (-> (ready-batch-state)
                     (assoc-in [:perp-dex-clearinghouse "xyz" :withdrawable] "0.4"))
           effects (actions/apply-margin-rec-batch state)]
       (is (= [:effects/save] (mapv first effects)))))
   (testing "no candidates -> panel just closes"
     (is (= [:effects/save]
-           (mapv first (actions/apply-margin-rec-batch (base-state)))))))
+           (mapv first (actions/apply-margin-rec-batch
+                        (with-agent-status (base-state) :ready)))))))
+
+(deftest apply-batch-locked-prompts-unlock-and-replays
+  ;; Locked trading must surface the passkey unlock and replay the batch on
+  ;; success — never dead-end each position on a "Unlock trading…" error toast.
+  (let [state (-> (base-state) with-high-risk-rec (with-agent-status :locked))
+        effects (actions/apply-margin-rec-batch state)]
+    (is (= [:effects/save-many :effects/unlock-agent-trading]
+           (mapv first effects)))
+    (testing "projection flips status to :unlocking and clears the error"
+      (is (= [:effects/save-many [[[:wallet :agent :status] :unlocking]
+                                  [[:wallet :agent :error] nil]]]
+             (first effects))))
+    (testing "unlock replays this action on success (not a per-position submit)"
+      (is (= [:effects/unlock-agent-trading
+              {:after-success-actions [[:actions/apply-margin-rec-batch]]}]
+             (second effects))))
+    (testing "the panel is left open so the replay re-plans from intact selections"
+      (is (not-any? (fn [[_ path]] (= state/batch-path path))
+                    (filter #(= :effects/save (first %)) effects))))
+    (testing "the replay payload satisfies the unlock arg contract"
+      (is (s/valid? ::common/unlock-agent-trading-args
+                    [(second (second effects))])))))
+
+(deftest apply-batch-unlocking-holds-without-submitting
+  ;; A passkey prompt is already in flight; a second click must not re-prompt.
+  (let [state (-> (base-state) with-high-risk-rec (with-agent-status :unlocking))]
+    (is (= [] (actions/apply-margin-rec-batch state)))))
+
+(deftest apply-batch-not-enabled-opens-recovery
+  ;; Agent trading never enabled: open the enable-trading recovery modal (the
+  ;; same prompt manual order entry shows), not N rejected submits.
+  (let [state (with-high-risk-rec (base-state))]
+    (is (= [[:effects/save [:wallet :agent :recovery-modal-open?] true]]
+           (actions/apply-margin-rec-batch state))))
+  (testing "nothing fundable short-circuits to a panel close even when locked"
+    (let [state (with-agent-status (base-state) :locked)]
+      (is (= [:effects/save]
+             (mapv first (actions/apply-margin-rec-batch state)))))))
 
 (deftest batch-plan-reports-skips
   (let [state (-> (base-state)

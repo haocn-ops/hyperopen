@@ -195,14 +195,58 @@
 
 (defn apply-margin-rec-batch
   "Submit the recommended top-up for every selected at-risk position in one
-  action: close the panel (projection first), then one updateIsolatedMargin
-  request per fundable position."
+  action.
+
+  Trading must be ready before any margin request is sent — mirror manual
+  order entry (order/actions.cljs submit-order) and optimizer execution
+  (confirm-portfolio-optimizer-execution), which route every non-ready agent
+  status instead of submitting. Without this the per-position
+  `:effects/api-submit-position-margin` effects each dead-end on a
+  \"Unlock trading…\" rejection with an error toast per position — the
+  anti-pattern this branch replaces.
+
+  A locked agent prompts the passkey unlock and replays THIS action on
+  success. An action can only EMIT effects (`effects/*`) — it cannot return
+  `[:actions/...]` (that fails the effect-id schema) — so we inline what
+  `:actions/unlock-agent-trading` itself emits: flip the status to
+  `:unlocking` (so a second click can't double-prompt the passkey) and run
+  the unlock effect with this action queued as the replay. The panel is left
+  open on the locked pass so the replay re-plans from intact selections; it
+  closes only on the ready pass that actually submits."
   [state]
-  (let [{:keys [submits]} (margin-rec-batch-plan state)]
-    (vec (concat (close-margin-rec-batch-panel state)
-                 (map (fn [{:keys [request]}]
-                        [:effects/api-submit-position-margin request])
-                      submits)))))
+  (let [{:keys [submits]} (margin-rec-batch-plan state)
+        agent-status (get-in state [:wallet :agent :status])]
+    (cond
+      ;; Nothing fundable — just close the panel.
+      (empty? submits)
+      (close-margin-rec-batch-panel state)
+
+      ;; Trading ready: close the panel, then one updateIsolatedMargin per
+      ;; fundable position.
+      (= :ready agent-status)
+      (vec (concat (close-margin-rec-batch-panel state)
+                   (map (fn [{:keys [request]}]
+                          [:effects/api-submit-position-margin request])
+                        submits)))
+
+      ;; Locked: surface the passkey unlock and replay this action on success.
+      (= :locked agent-status)
+      [[:effects/save-many [[[:wallet :agent :status] :unlocking]
+                            [[:wallet :agent :error] nil]]]
+       [:effects/unlock-agent-trading
+        {:after-success-actions [[:actions/apply-margin-rec-batch]]}]]
+
+      ;; Unlock already in flight (awaiting passkey): hold without submitting,
+      ;; so a second click can't double-prompt.
+      (= :unlocking agent-status)
+      []
+
+      ;; Trading not enabled yet (default :not-ready, plus :approving/:error):
+      ;; open the enable-trading recovery modal — the same prompt manual order
+      ;; entry shows — instead of submitting requests that would each be
+      ;; rejected with "Enable trading first".
+      :else
+      [[:effects/save [:wallet :agent :recovery-modal-open?] true]])))
 
 (defn- persist-trading-settings
   [state updates]

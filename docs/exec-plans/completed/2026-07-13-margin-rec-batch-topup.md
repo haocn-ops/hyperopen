@@ -105,3 +105,38 @@ row, and applying — one `updateIsolatedMargin` request per selected position.
 - Follow-up candidates: mobile entry point; a post-apply toast summarizing
   submitted/skipped positions (today each submit surfaces through the existing
   order-response path).
+
+### Locked-agent unlock-and-replay (2026-07-13 follow-up)
+
+- Gap: `apply-margin-rec-batch` originally fanned out N
+  `:effects/api-submit-position-margin` effects unconditionally. When agent
+  trading is locked, each effect independently hits the error branch in
+  `order/effects.cljs api-submit-position-margin` → N "Unlock trading…" error
+  toasts and no unlock prompt. This is the anti-pattern the codebase forbids
+  (the single-position margin modal has the same latent gap — it errors rather
+  than prompting; the batch layer now guards ahead of it).
+- Fix: `apply-margin-rec-batch` now branches on `[:wallet :agent :status]`,
+  mirroring `order/actions.cljs submit-order` and
+  `confirm-portfolio-optimizer-execution`:
+  - `:ready` → close panel + N submits (unchanged);
+  - `:locked` → flip status to `:unlocking`, clear the agent error, emit
+    `:effects/unlock-agent-trading` with `:after-success-actions
+    [[:actions/apply-margin-rec-batch]]` — the passkey prompt shows and the
+    batch replays itself on success. The panel is left OPEN on the locked pass
+    so the replay re-plans from intact selections; it closes only on the
+    `:ready` pass that submits;
+  - `:unlocking` → `[]` (a prompt is already in flight; don't double-prompt);
+  - not enabled (`nil`/`:approving`/`:error`) → open the enable-trading
+    recovery modal, same as manual order entry.
+- No new action/registration/contract/Lean changes were required:
+  `:effects/unlock-agent-trading` classifies as `:other` in the effect-order
+  validator (not in any policy's `:heavy-effect-ids`), so it is ignored by the
+  phase-order/duplicate checks — exactly why `submit-order`'s locked branch
+  passes with an unchanged policy. Replaying the action ITSELF (not a new
+  `submit-unlocked-*` action) sidesteps the deselection-reset problem because
+  the panel is not closed on the locked pass.
+- Tests: `apply-batch-locked-prompts-unlock-and-replays`,
+  `apply-batch-unlocking-holds-without-submitting`,
+  `apply-batch-not-enabled-opens-recovery` in
+  `test/hyperopen/margin_rec/actions_test.cljs`; existing ready-path tests now
+  set `[:wallet :agent :status] :ready`. All gates re-run 34/34.

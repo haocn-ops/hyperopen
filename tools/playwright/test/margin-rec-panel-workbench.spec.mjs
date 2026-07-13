@@ -137,6 +137,27 @@ test.describe("margin recommendation panel (workbench scenes)", () => {
       .toBe(1);
   });
 
+  test("clickable buttons delay their tooltip (no flash while moving to click)", async ({
+    page
+  }) => {
+    // Tall viewport so the action button at the bottom of the panel is in view.
+    await page.setViewportSize({ width: 1440, height: 1200 });
+    const frame = await openScene(page, "elevated-risk-recommendation");
+    const shown = () =>
+      frame
+        .locator("[role='tooltip']")
+        .evaluateAll(
+          (els) => els.filter((e) => getComputedStyle(e).opacity !== "0").length
+        );
+
+    await frame.locator(role("margin-rec-apply")).hover();
+    // Still hidden shortly after hover (the delay hasn't elapsed).
+    await page.waitForTimeout(500);
+    expect(await shown()).toBe(0);
+    // Appears once the ~2s delay passes.
+    await expect.poll(async () => await shown(), { timeout: 3000 }).toBe(1);
+  });
+
   test("the chart is the full-width centrepiece", async ({ page }) => {
     const frame = await openScene(page, "elevated-risk-recommendation");
     const panel = await frame.locator(role("margin-rec-panel")).boundingBox();

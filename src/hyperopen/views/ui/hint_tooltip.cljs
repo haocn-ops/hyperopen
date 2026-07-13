@@ -34,10 +34,15 @@
     ["top-[calc(100%+6px)]" "left-0"]))
 
 (defn hint-span
-  [text placement]
-  [:span {:class (into panel-classes (placement-classes placement))
-          :role "tooltip"}
-   text])
+  ([text placement] (hint-span text placement false))
+  ([text placement delay?]
+   ;; The delay is applied only in the hovered state, so the tooltip waits
+   ;; ~2s to appear (long enough not to flash while moving to click a button)
+   ;; but still fades out immediately when the pointer leaves.
+   [:span {:class (cond-> (into panel-classes (placement-classes placement))
+                    delay? (conj "group-hover/hint:delay-[2000ms]"))
+           :role "tooltip"}
+    text]))
 
 (defn attach
   "Return `element` ([tag attrs & children]) marked as a tooltip trigger with a
@@ -45,12 +50,15 @@
     :placement — :bottom-start (default) | :bottom | :bottom-end | :top-start
                  | :top | :top-end
     :cursor?   — add `cursor-help` (default true; pass false for buttons).
+    :delay?    — wait ~2s before showing (use for clickable buttons so the tip
+                 does not flash while the pointer passes over on the way to a
+                 click; default false = instant).
   No-ops (returns the element unchanged) when `text` is blank."
   ([text element] (attach text element {}))
-  ([text element {:keys [placement cursor?] :or {cursor? true}}]
+  ([text element {:keys [placement cursor? delay?] :or {cursor? true}}]
    (if (and (string? text) (not (str/blank? text)) (vector? element))
      (let [[tag attrs & children] element
            extra (cond-> ["group/hint" "relative"] cursor? (conj "cursor-help"))
            attrs (update attrs :class #(into extra (or % [])))]
-       (into [tag attrs] (concat children [(hint-span text placement)])))
+       (into [tag attrs] (concat children [(hint-span text placement delay?)])))
      element)))

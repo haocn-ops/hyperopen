@@ -247,7 +247,7 @@
                              :on {:click [[:actions/set-margin-rec-risk-mode mode]]}}
                     [:span {:class ["block"]} label]
                     [:span {:class ["block" "text-xs" "text-trading-text-secondary"]} sub]]
-                   {:placement placement :cursor? false})))
+                   {:placement placement :cursor? false :delay? true})))
               risk-mode-options))
    (hint/attach (copy/tip :settings-note)
                 [:div {:class ["mt-1.5" "text-center" "text-xs"
@@ -345,7 +345,7 @@
                  :aria-label (copy/tip :close)
                  :on {:click [[:actions/close-margin-rec-panel]]}}
         "✕"]
-       {:placement :bottom-end :cursor? false})]
+       {:placement :bottom-end :cursor? false :delay? true})]
      (into [:div {:class ["min-h-0" "space-y-3" "overflow-y-auto" "px-4" "py-3"]}]
            children)]))
 
@@ -368,7 +368,7 @@
                            :event.currentTarget/bounds]
                           [:actions/close-margin-rec-panel]]}}
     "Apply recommendation"]
-   {:placement placement :cursor? false}))
+   {:placement placement :cursor? false :delay? true}))
 
 (defn- custom-button
   [position-data placement]
@@ -387,7 +387,7 @@
                            :event.currentTarget/bounds]
                           [:actions/close-margin-rec-panel]]}}
     "Set custom margin"]
-   {:placement placement :cursor? false}))
+   {:placement placement :cursor? false :delay? true}))
 
 (defn- ready-panel
   [{:keys [rec-result row-vm read-only? risk-mode]}]

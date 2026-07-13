@@ -64,6 +64,15 @@ Validation: `npm run gates` 34/34 PASS (6311 tests / 33977 assertions); new curv
 
 Deliberate departures from the mockup, recorded in the Decision Log: real path count instead of "10,000 paths"; buffers list omits the maintenance row (not a buffer); "Reduce position instead" replaced by the mockup's "Set custom margin" (reduce stays on the row); anchored popover retained instead of a modal.
 
+### Follow-up (2026-07-12, same session): wide layout + de-duplication
+
+Owner reviewed the live popover and asked for it to be wider and shorter so it covers only the chart rather than spanning the UI from the positions table to the nav bar, removing any duplicated informational value. Reworked the internal layout without touching the engine:
+
+- **Two-column body**: the curve card (left) beside a `recommendation-summary` (right). Header went inline (title · coin · leverage on one row). Actions (`Apply` / `Set custom`) sit side by side. Net dimensions ~780×~590 (was ~480×~960).
+- **Removed as duplicative of the chart's own markers**: the standalone `Current margin`, `Current liq. price`, `Distance to liq. (σ)`, `Modeled liq. probability (current)`, and `New modeled liq. probability` stat cells. The current/recommended margin and both probabilities are already read off the chart. The summary keeps only the recommended-margin headline, an `Add $X to your current $Y` line, one before→after probability line (`14.6% → 2.1%`), and the resulting liquidation price. The intervention horizon moved into "How we estimated this" (its episode basis is now a hover title), where it had already partly duplicated.
+- **Positioning**: new `anchored-popover/centered-overlay-layout-style` — the panel now centres horizontally and biases into the upper third of the viewport (over the chart) instead of hugging the low positions-row trigger, which was what forced the full-height footprint. The prior anchored helper is unchanged and still used by the sibling reduce/margin popovers.
+- Validation: `npm run gates` 34/34; `margin-rec-panel-workbench.spec.mjs` now 6/6 (added footprint-aspect and dedup-absence assertions); new `centered-overlay-*` unit tests in `anchored_popover_test.cljs`.
+
 ## Context and Orientation
 
 The panel is opened from the positions-row risk chip (`:actions/toggle-margin-rec-panel`), receives `{:position-key :rec :row-vm :read-only? :risk-mode :anchor}` from `tabs/positions/desktop.cljs`, and renders `rec`'s `[:margin-rec :recs <key>]` entry. `rec-result` is the `finalize` output documented in the parent plan. The apply action opens the existing Adjust Margin modal prefilled (`:actions/open-position-margin-modal` with `:prefill-margin-amount`); this stays byte-identical. Leverage for the header row comes from the row position map (`[:leverage :value]` + margin-mode label, e.g. "10x isolated").

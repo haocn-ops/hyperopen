@@ -24,7 +24,7 @@ async function openScene(page, scene) {
 }
 
 test.describe("margin recommendation panel (workbench scenes)", () => {
-  test("elevated-risk scene renders the designer card end to end", async ({
+  test("elevated-risk scene renders the wide card end to end", async ({
     page
   }) => {
     const frame = await openScene(page, "elevated-risk-recommendation");
@@ -36,12 +36,8 @@ test.describe("margin recommendation panel (workbench scenes)", () => {
       "10x isolated"
     );
 
-    await expect(panel.locator(role("margin-rec-stat-current"))).toContainText(
-      "$12.42 USDC"
-    );
-    await expect(panel.locator(role("margin-rec-stat-p-now"))).toContainText(
-      "14.6%"
-    );
+    // Recommendation headline + the amount-to-add line (which now carries the
+    // current margin instead of a duplicate stat cell).
     await expect(panel.locator(role("margin-rec-recommended"))).toContainText(
       "$18.64 USDC"
     );
@@ -49,8 +45,25 @@ test.describe("margin recommendation panel (workbench scenes)", () => {
       "+50.1% vs current"
     );
     await expect(panel.locator(role("margin-rec-additional"))).toContainText(
-      "$6.22 USDC"
+      "Add $6.22 USDC to your current $12.42"
     );
+
+    // One before/after probability line replaces the two separate cells.
+    await expect(panel.locator(role("margin-rec-risk-delta"))).toContainText(
+      "14.6%"
+    );
+    await expect(panel.locator(role("margin-rec-risk-delta"))).toContainText(
+      "2.1%"
+    );
+    await expect(panel.locator(role("margin-rec-new-liq"))).toContainText(
+      "$403.10"
+    );
+
+    // The old duplicated stat cells are gone.
+    await expect(
+      panel.locator(role("margin-rec-current-stats"))
+    ).toHaveCount(0);
+    await expect(panel.locator(role("margin-rec-stat-p-now"))).toHaveCount(0);
 
     await expect(panel.locator(role("margin-rec-buffers"))).toContainText(
       "Adverse-path protection"
@@ -68,6 +81,17 @@ test.describe("margin recommendation panel (workbench scenes)", () => {
     await expect(panel.locator(role("margin-rec-custom"))).toHaveText(
       "Set custom margin"
     );
+  });
+
+  test("panel is wider than it is tall so it covers the chart, not the whole UI", async ({
+    page
+  }) => {
+    const frame = await openScene(page, "elevated-risk-recommendation");
+    const box = await frame.locator(role("margin-rec-panel")).boundingBox();
+    expect(box.width).toBeGreaterThan(700);
+    // Half-ish the old ~960px tall stack; wider than tall.
+    expect(box.height).toBeLessThan(box.width);
+    expect(box.height).toBeLessThan(680);
   });
 
   test("curve renders with the current marker left of the recommended marker", async ({
@@ -142,7 +166,7 @@ test.describe("margin recommendation panel (workbench scenes)", () => {
     const frame = await openScene(page, "cached-result-without-curve");
     const panel = frame.locator(role("margin-rec-panel"));
 
-    await expect(panel.locator(role("margin-rec-recommendation"))).toBeVisible();
+    await expect(panel.locator(role("margin-rec-summary"))).toBeVisible();
     await expect(panel.locator(role("margin-rec-curve-card"))).toHaveCount(0);
     await expect(panel.locator(role("margin-rec-buffers"))).toBeVisible();
   });

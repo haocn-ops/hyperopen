@@ -66,3 +66,33 @@
     {:left (str left "px")
      :top (str top "px")
      :width (str panel-width "px")}))
+
+(defn centered-overlay-layout-style
+  "Layout for a large, wide popover that should sit centred over the main
+  content area rather than hugging a small trigger. It centres horizontally and
+  biases the top toward the upper third of the viewport (`vertical-bias`, a
+  fraction of viewport height) so the panel covers the chart region instead of
+  the panels above and below it. Clamped within the viewport; on a viewport too
+  short for the estimated height it pins to the top margin and relies on the
+  panel's own internal scroll."
+  [{:keys [anchor preferred-width-px preferred-height-px vertical-bias]
+    :or {preferred-width-px 780
+         preferred-height-px 560
+         vertical-bias 0.16}}]
+  (let [anchor* (if (map? anchor) anchor {})
+        viewport-width (max 320
+                            (anchor-number anchor* :viewport-width fallback-viewport-width))
+        viewport-height (max 320
+                             (anchor-number anchor* :viewport-height fallback-viewport-height))
+        available-width (max 0 (- viewport-width (* 2 panel-margin-px)))
+        panel-width (min preferred-width-px available-width)
+        left (clamp (/ (- viewport-width panel-width) 2)
+                    panel-margin-px
+                    (max panel-margin-px (- viewport-width panel-width panel-margin-px)))
+        max-top (- viewport-height preferred-height-px panel-margin-px)
+        top (if (> max-top panel-margin-px)
+              (clamp (* vertical-bias viewport-height) panel-margin-px max-top)
+              panel-margin-px)]
+    {:left (str (js/Math.round left) "px")
+     :top (str (js/Math.round top) "px")
+     :width (str (js/Math.round panel-width) "px")}))

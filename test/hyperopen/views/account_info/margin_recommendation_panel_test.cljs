@@ -98,38 +98,38 @@
                     :viewport-width 1440 :viewport-height 900}}
           overrides)))
 
-(deftest panel-renders-designer-card
+(deftest panel-renders-wide-card
   (let [tree (render-panel)
         strings (collect-strings tree)]
     (is (some? (node-by-role tree "margin-rec-panel")))
-    (testing "header: title, coin badge, leverage line"
+    (testing "header: title, coin badge, leverage inline"
       (is (contains? strings "Margin recommendation"))
       (is (some? (node-by-role tree "margin-rec-coin")))
       (is (= "10x isolated"
              (last (node-by-role tree "margin-rec-leverage")))))
-    (testing "current-state stat grid"
-      (is (some? (node-by-role tree "margin-rec-current-stats")))
-      (doseq [role ["margin-rec-stat-current" "margin-rec-stat-liq"
-                    "margin-rec-stat-distance" "margin-rec-stat-horizon"
-                    "margin-rec-stat-p-now"]]
-        (is (some? (node-by-role tree role)) role))
-      (is (contains? strings "$12.42 USDC"))
-      (is (contains? strings "$424.20"))
-      (is (contains? strings "0.74σ buffer"))
-      (is (contains? strings "≈ 3.0% adverse move"))
-      (is (contains? strings "3 days"))
-      (is (contains? strings "inferred from 22 similar position episodes"))
-      (is (contains? strings "14.6%"))
-      (is (contains? strings "before next intervention")))
-    (testing "recommendation block"
-      (is (some? (node-by-role tree "margin-rec-recommendation")))
+    (testing "recommendation summary: headline, amount-to-add, before/after, new liq"
+      (is (some? (node-by-role tree "margin-rec-summary")))
+      (is (some? (node-by-role tree "margin-rec-recommended")))
       (is (contains? strings "$18.64 USDC"))
       (is (contains? strings "+50.1% vs current"))
-      (is (contains? strings "$6.22 USDC"))
-      (is (contains? strings "$403.10"))
-      (is (contains? strings "≈ 5.0% lower"))
-      (is (contains? strings "2.1%"))
-      (is (contains? strings "after recommendation")))
+      (testing "amount-to-add references the current margin instead of a duplicate cell"
+        (is (some? (node-by-role tree "margin-rec-additional")))
+        (is (contains? strings "Add $6.22 USDC to your current $12.42")))
+      (testing "one before/after probability line, not separate current/after cells"
+        (is (some? (node-by-role tree "margin-rec-risk-delta")))
+        (is (contains? strings "Modeled liq. probability (before next intervention)"))
+        (is (contains? strings "14.6%"))
+        (is (contains? strings "2.1%")))
+      (testing "resulting liquidation price with its improvement"
+        (is (some? (node-by-role tree "margin-rec-new-liq")))
+        (is (contains? strings "$403.10"))
+        (is (contains? strings "(5.0% lower)"))))
+    (testing "the duplicated stat cells were removed (the chart carries these)"
+      (doseq [role ["margin-rec-current-stats" "margin-rec-stat-current"
+                    "margin-rec-stat-liq" "margin-rec-stat-distance"
+                    "margin-rec-stat-horizon" "margin-rec-stat-p-now"
+                    "margin-rec-p-after" "margin-rec-recommendation"]]
+        (is (nil? (node-by-role tree role)) role)))
     (testing "probability-vs-collateral chart with both markers"
       (is (some? (node-by-role tree "margin-rec-curve-card")))
       (is (some? (node-by-role tree "margin-rec-curve")))
@@ -137,7 +137,7 @@
       (is (some? (node-by-role tree "margin-rec-curve-recommended")))
       (is (contains? strings "Modeled probability of liquidation vs. collateral"))
       (is (contains? strings "Isolated margin (USDC)")))
-    (testing "how-we-estimated column reflects real model quantities"
+    (testing "how-we-estimated column reflects real model quantities incl. horizon"
       (is (some? (node-by-role tree "margin-rec-methods")))
       (is (contains? strings "365-day crypto volatility convention"))
       (is (contains? strings "Applied"))
@@ -145,7 +145,8 @@
       (is (contains? strings "87%"))
       (is (contains? strings "Scenario simulation (4,000 paths)"))
       (is (contains? strings "Monte Carlo"))
-      (is (contains? strings "Trade-history-derived horizon")))
+      (is (contains? strings "Trade-history-derived horizon"))
+      (is (contains? strings "3 days")))
     (testing "buffers column shows the four buffers with share of total"
       (is (some? (node-by-role tree "margin-rec-buffers")))
       (is (nil? (node-by-role tree "margin-rec-buffer-maintenance")))
@@ -153,7 +154,7 @@
       (is (contains? strings "$2.08 (11%)"))
       (is (contains? strings "$1.82 (10%)"))
       (is (contains? strings "$1.46 (8%)")))
-    (testing "renders as an anchored popover positioned against the trigger"
+    (testing "renders as a centred overlay with a computed layout style"
       (let [panel (node-by-role tree "margin-rec-panel")
             style (:style (node-attrs panel))]
         (is (= "dialog" (:role (node-attrs panel))))
@@ -196,7 +197,7 @@
   (let [tree (render-panel {:rec {:status :ok
                                   :result (dissoc rec-result :curve)
                                   :computed-at 1}})]
-    (is (some? (node-by-role tree "margin-rec-recommendation")))
+    (is (some? (node-by-role tree "margin-rec-summary")))
     (is (nil? (node-by-role tree "margin-rec-curve-card")))
     (is (nil? (node-by-role tree "margin-rec-curve")))))
 

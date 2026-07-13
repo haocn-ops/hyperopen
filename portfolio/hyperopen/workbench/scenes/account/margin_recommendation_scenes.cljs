@@ -69,8 +69,8 @@
    :confidence {:tier :high :n-bars 1080}})
 
 (def ^:private anchor
-  {:left 620 :right 680 :top 90
-   :viewport-width 1240 :viewport-height 1160})
+  {:left 620 :right 680 :top 900
+   :viewport-width 1440 :viewport-height 960})
 
 (defn- scene-shell
   [rec-entry & [overrides]]
@@ -95,10 +95,17 @@
 
 (portfolio/defscene within-target
   []
+  ;; Already safe: recommended ≈ current, nothing to add, probability already
+  ;; under the target on both sides.
   (scene-shell {:status :ok
                 :result (-> rec-result
-                            (assoc :status :within-target :p-now 0.008)
-                            (assoc-in [:recommended :additional] 0))
+                            (assoc :status :within-target :p-now 0.008 :p-after 0.006)
+                            (assoc-in [:as-of :equity] 18.64)
+                            (assoc :recommended {:equity 18.64
+                                                 :additional 0
+                                                 :new-liquidation-px 403.1
+                                                 :new-liq-change-frac 0.0497
+                                                 :effective-leverage 8.4}))
                 :computed-at 1}))
 
 (portfolio/defscene cached-result-without-curve

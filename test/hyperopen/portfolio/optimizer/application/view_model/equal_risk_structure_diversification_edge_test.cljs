@@ -26,6 +26,10 @@
                      (some? current) (assoc :current-diversification current)
                      (some? target) (assoc :target-diversification target))})
 
+(defn- rows-by-key
+  [rows]
+  (into {} (map (juxt :key identity)) rows))
+
 (deftest comparison-markers-use-one-absolute-volatility-domain-test
   (let [{:keys [cards scale-max]}
         (structure-model/diversification-comparison-model
@@ -54,6 +58,119 @@
         (is (not-any? #(or (js/isNaN %) (= js/Infinity %))
                       (mapcat vals
                               (keep :positions (:cards model)))))))))
+
+(deftest shared-benchmark-rows-use-one-absolute-domain-test
+  (let [{:keys [benchmark-rows]} (structure-model/diversification-comparison-model
+                                  (result-with current-summary target-summary))
+        by-key (rows-by-key benchmark-rows)
+        modeled (by-key :modeled)]
+    (is (= [:all-move-together :zero-correlation :modeled]
+           (mapv :key benchmark-rows)))
+    (is (= 0.20 (:current-value modeled)))
+    (is (= 0.40 (:recommended-value modeled)))
+    (is (= 25.0 (:current-position modeled)))
+    (is (= 50.0 (:recommended-position modeled)))
+    (is (= {:start 25.0 :end 50.0} (:connector modeled)))
+    (is (= 0.20 (:change modeled)))
+    (is (= 1 (:relative-change modeled)))
+    (is (= :rises (:direction modeled)))
+    (is (= :unfavorable (:tone modeled)))
+    (doseq [{:keys [current-position recommended-position connector]}
+            benchmark-rows]
+      (is (= {:start current-position :end recommended-position} connector)))))
+
+(deftest shared-benchmark-rows-expose-marker-overlap-test
+  (doseq [[label target-modeled expected]
+          [["exact overlap" 0.20 true]
+           ["three-position-point overlap" 0.224 true]
+           ["separated markers" 0.40 false]]]
+    (testing label
+      (let [target (assoc target-summary :modeled-volatility target-modeled)
+            {:keys [benchmark-rows]}
+            (structure-model/diversification-comparison-model
+             (result-with current-summary target))
+            modeled ((rows-by-key benchmark-rows) :modeled)]
+        (is (= expected (:marker-overlap? modeled)))))))
+
+(deftest target-only-shared-rows-never-fabricate-current-comparisons-test
+  (doseq [[label current]
+          [["missing" nil]
+           ["explicit unavailable" {:status :unavailable}]
+           ["partial" (dissoc current-summary :modeled-volatility)]
+           ["NaN" (assoc current-summary :modeled-volatility js/NaN)]
+           ["Infinity" (assoc current-summary
+                               :modeled-volatility js/Infinity)]]]
+    (testing label
+      (let [{:keys [benchmark-rows outcome-rows decision-summary]}
+            (structure-model/diversification-comparison-model
+             (result-with current target-summary))
+            rows (concat benchmark-rows outcome-rows)]
+        (is (= [:all-move-together :zero-correlation :modeled]
+               (mapv :key benchmark-rows)))
+        (is (= [:diversification-benefit :correlation-effect]
+               (mapv :key outcome-rows)))
+        (is (every? number? (map :recommended-value rows)))
+        (doseq [row rows]
+          (is (nil? (:current-value row)))
+          (is (nil? (:change row)))
+          (is (nil? (:relative-change row)))
+          (is (= :unavailable (:direction row)))
+          (is (= :unavailable (:tone row))))
+        (doseq [row benchmark-rows]
+          (is (nil? (:current-position row)))
+          (is (number? (:recommended-position row)))
+          (is (nil? (:connector row))))
+        (is (= :target-only (:status decision-summary)))
+        (is (false? (:current-available? decision-summary)))
+        (is (= :unavailable (:modeled-direction decision-summary)))
+        (is (= :unavailable (:stress-direction decision-summary)))))))
+
+(deftest decision-directions-report-modeled-and-stress-changes-independently-test
+  (doseq [[label current target modeled-direction stress-direction]
+          [["modeled falls while stress rises"
+            (assoc current-summary
+                   :modeled-volatility 0.40
+                   :all-move-together-volatility 0.60)
+            (assoc target-summary
+                   :modeled-volatility 0.30
+                   :all-move-together-volatility 0.80)
+            :falls :rises]
+           ["modeled rises while stress falls"
+            (assoc current-summary
+                   :modeled-volatility 0.20
+                   :all-move-together-volatility 0.90)
+            (assoc target-summary
+                   :modeled-volatility 0.30
+                   :all-move-together-volatility 0.70)
+            :rises :falls]
+           ["both unchanged"
+            current-summary current-summary :unchanged :unchanged]]]
+    (testing label
+      (let [{:keys [decision-summary]}
+            (structure-model/diversification-comparison-model
+             (result-with current target))]
+        (is (= :comparison (:status decision-summary)))
+        (is (true? (:current-available? decision-summary)))
+        (is (= modeled-direction (:modeled-direction decision-summary)))
+        (is (= stress-direction (:stress-direction decision-summary))))))
+  (testing "zero denominators fail closed instead of yielding NaN or Infinity"
+    (let [zero-current (assoc current-summary
+                              :modeled-volatility 0
+                              :all-move-together-volatility 0
+                              :reduction-ratio-vs-all-move-together 0
+                              :modeled-minus-zero-correlation 0)
+          {:keys [benchmark-rows outcome-rows]}
+          (structure-model/diversification-comparison-model
+           (result-with zero-current target-summary))
+          benchmark-by-key (rows-by-key benchmark-rows)
+          outcome-by-key (rows-by-key outcome-rows)]
+      (is (nil? (:relative-change (benchmark-by-key :modeled))))
+      (is (nil? (:relative-change
+                 (benchmark-by-key :all-move-together))))
+      (is (nil? (:relative-change
+                 (outcome-by-key :diversification-benefit))))
+      (is (nil? (:relative-change
+                 (outcome-by-key :correlation-effect)))))))
 
 (deftest current-only-summary-cannot-render-without-target-test
   (is (nil? (structure-model/diversification-comparison-model

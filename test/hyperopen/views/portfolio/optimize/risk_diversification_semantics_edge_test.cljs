@@ -54,6 +54,236 @@
                    (get-in % [1 :data-role]))
                 (= instrument-id (get-in % [1 :data-instrument-id]))))))
 
+(defn- comparison-row
+  [view role attr value]
+  (first (collect-nodes
+          view
+          #(and (= role (get-in % [1 :data-role]))
+                (= value (get-in % [1 attr]))))))
+
+(defn- nodes-with-class
+  [view class-name]
+  (collect-nodes view #(some #{class-name} (get-in % [1 :class]))))
+
+(defn- render-comparison
+  [current target]
+  (render (-> base-result
+              (assoc-in [:risk-structure :current-diversification] current)
+              (assoc-in [:risk-structure :target-diversification] target))))
+
+(deftest diversification-uses-one-shared-matrix-with-semantic-row-tones-test
+  (let [current {:modeled-volatility 0.4
+                 :all-move-together-volatility 0.6
+                 :zero-correlation-volatility 0.4
+                 :reduction-vs-all-move-together 0.2
+                 :reduction-ratio-vs-all-move-together (/ 1 3)
+                 :modeled-minus-zero-correlation 0.0}
+        target {:modeled-volatility 0.4
+                :all-move-together-volatility 0.8
+                :zero-correlation-volatility 0.3
+                :reduction-vs-all-move-together 0.4
+                :reduction-ratio-vs-all-move-together 0.5
+                :modeled-minus-zero-correlation 0.1}
+        view (render (-> base-result
+                         (assoc-in [:risk-structure :current-diversification]
+                                   current)
+                         (assoc-in [:risk-structure :target-diversification]
+                                   target)))
+        matrices (collect-nodes
+                  view
+                  #(= "portfolio-optimizer-risk-diversification-matrix"
+                      (get-in % [1 :data-role])))
+        matrix (first matrices)
+        benchmark-rows (collect-nodes
+                        matrix
+                        #(= "portfolio-optimizer-risk-diversification-benchmark-row"
+                            (get-in % [1 :data-role])))
+        outcome-rows (collect-nodes
+                      matrix
+                      #(= "portfolio-optimizer-risk-diversification-outcome-row"
+                          (get-in % [1 :data-role])))
+        all-move (comparison-row matrix
+                                 "portfolio-optimizer-risk-diversification-benchmark-row"
+                                 :data-benchmark "all-move-together")
+        zero-corr (comparison-row matrix
+                                  "portfolio-optimizer-risk-diversification-benchmark-row"
+                                  :data-benchmark "zero-correlation")
+        modeled (comparison-row matrix
+                                "portfolio-optimizer-risk-diversification-benchmark-row"
+                                :data-benchmark "modeled")
+        benefit (comparison-row matrix
+                                "portfolio-optimizer-risk-diversification-outcome-row"
+                                :data-outcome "diversification-benefit")
+        effect (comparison-row matrix
+                               "portfolio-optimizer-risk-diversification-outcome-row"
+                               :data-outcome "correlation-effect")
+        current-markers (collect-nodes
+                         matrix
+                         #(= "portfolio-optimizer-risk-diversification-current-marker"
+                             (get-in % [1 :data-role])))
+        recommended-markers (collect-nodes
+                             matrix
+                             #(= "portfolio-optimizer-risk-diversification-recommended-marker"
+                                 (get-in % [1 :data-role])))]
+    (is (= 1 (count matrices)))
+    (is (= 3 (count benchmark-rows)))
+    (is (= 2 (count outcome-rows)))
+    (is (nil? (node-by-role view
+                            "portfolio-optimizer-risk-diversification-current")))
+    (is (nil? (node-by-role view
+                            "portfolio-optimizer-risk-diversification-target")))
+    (is (= ["rises" "falls" "unchanged" "rises" "rises"]
+           (mapv #(get-in % [1 :data-direction])
+                 [all-move zero-corr modeled benefit effect])))
+    (is (= ["unfavorable" "favorable" "neutral" "favorable" "unfavorable"]
+           (mapv #(get-in % [1 :data-tone])
+                 [all-move zero-corr modeled benefit effect])))
+    (is (= 3 (count current-markers)))
+    (is (= 3 (count recommended-markers)))
+    (is (every? #(= "neutral" (get-in % [1 :data-tone])) current-markers))
+    (is (every? #(= "recommended" (get-in % [1 :data-tone]))
+                recommended-markers))
+    (is (some #(str/includes? % "larger diversification benefit")
+              (collect-strings benefit)))
+    (is (some #(str/includes? % "more amplifying")
+              (collect-strings effect)))))
+
+(deftest shared-matrix-exposes-complete-table-semantics-test
+  (let [current {:modeled-volatility 0.4
+                 :all-move-together-volatility 0.6
+                 :zero-correlation-volatility 0.3
+                 :reduction-vs-all-move-together 0.2
+                 :reduction-ratio-vs-all-move-together (/ 1 3)
+                 :modeled-minus-zero-correlation 0.1}
+        view (render-comparison current
+                                (assoc current :modeled-volatility 0.35))
+        matrix (node-by-role
+                view "portfolio-optimizer-risk-diversification-matrix")
+        nodes-for-role (fn [role]
+                         (collect-nodes matrix #(= role (get-in % [1 :role]))))
+        rows (nodes-for-role "row")
+        data-rows (filterv #(some #{"rowheader"}
+                                  (map (fn [child]
+                                         (get-in child [1 :role]))
+                                       (drop 2 %)))
+                           rows)
+        lanes (nodes-with-class matrix "optimizer-risk-diversification-lane")
+        rails (nodes-with-class matrix "optimizer-risk-diversification-rail")
+        connectors (nodes-with-class
+                    matrix "optimizer-risk-diversification-connector")
+        markers (nodes-with-class matrix "optimizer-risk-diversification-marker")]
+    (is (= "table" (get-in matrix [1 :role])))
+    (is (= 3 (count (nodes-for-role "rowgroup"))))
+    (is (= 6 (count rows)))
+    (is (= 5 (count (nodes-for-role "columnheader"))))
+    (is (some #{"Shared scale"}
+              (mapcat collect-strings (nodes-for-role "columnheader"))))
+    (is (= 5 (count (nodes-for-role "rowheader"))))
+    (is (= 20 (count (nodes-for-role "cell"))))
+    (is (= 5 (count data-rows)))
+    (is (every? #(= ["rowheader" "cell" "cell" "cell" "cell"]
+                    (mapv (fn [child] (get-in child [1 :role]))
+                          (drop 2 %)))
+                data-rows))
+    (is (= 3 (count lanes)))
+    (is (every? #(= "cell" (get-in % [1 :role])) lanes))
+    (doseq [lane lanes]
+      (let [graphics (collect-nodes lane #(= "img" (get-in % [1 :role])))
+            graphic (first graphics)]
+        (is (= 1 (count graphics)))
+        (is (string? (get-in graphic [1 :aria-label])))
+        (is (str/includes? (get-in graphic [1 :aria-label]) "Current"))
+        (is (str/includes? (get-in graphic [1 :aria-label]) "Recommended"))))
+    (is (every? #(= "cell" (get-in % [1 :role]))
+                (nodes-with-class
+                 matrix "optimizer-risk-diversification-outcome-spacer")))
+    (is (every? true? (map #(get-in % [1 :aria-hidden])
+                           (concat rails connectors markers))))))
+
+(deftest visible-changes-use-signed-points-and-match-rounded-direction-test
+  (let [current {:modeled-volatility 0.4
+                 :all-move-together-volatility 0.6
+                 :zero-correlation-volatility 0.3
+                 :reduction-vs-all-move-together 0.2
+                 :reduction-ratio-vs-all-move-together 0.5
+                 :modeled-minus-zero-correlation 0.1}
+        below-threshold (assoc current
+                               :modeled-volatility 0.40049
+                               :all-move-together-volatility 0.7
+                               :zero-correlation-volatility 0.2
+                               :reduction-ratio-vs-all-move-together 0.6
+                               :modeled-minus-zero-correlation 0.05)
+        above-threshold (assoc below-threshold :modeled-volatility 0.40051)
+        below-view (render-comparison current below-threshold)
+        above-view (render-comparison current above-threshold)
+        below-matrix (node-by-role
+                      below-view "portfolio-optimizer-risk-diversification-matrix")
+        modeled-below (comparison-row
+                       below-matrix
+                       "portfolio-optimizer-risk-diversification-benchmark-row"
+                       :data-benchmark "modeled")
+        modeled-above (comparison-row
+                       above-view
+                       "portfolio-optimizer-risk-diversification-benchmark-row"
+                       :data-benchmark "modeled")
+        change-cells (nodes-with-class
+                      below-matrix "optimizer-risk-diversification-change")
+        numeric-change-strings (mapv (comp first collect-strings) change-cells)]
+    (is (= ["+10.0 pts" "-10.0 pts" "0.0 pts" "+10.0 pts" "-5.0 pts"]
+           numeric-change-strings))
+    (is (not-any? #(str/includes? % "%") numeric-change-strings))
+    (is (= "unchanged" (get-in modeled-below [1 :data-direction])))
+    (is (some #{"0.0 pts"} (collect-strings modeled-below)))
+    (is (= "rises" (get-in modeled-above [1 :data-direction])))
+    (is (some #{"+0.1 pts"} (collect-strings modeled-above)))))
+
+(deftest correlation-effect-copy-respects-sign-and-zero-crossings-test
+  (let [summary {:modeled-volatility 0.4
+                 :all-move-together-volatility 0.6
+                 :zero-correlation-volatility 0.3
+                 :reduction-vs-all-move-together 0.2
+                 :reduction-ratio-vs-all-move-together (/ 1 3)
+                 :modeled-minus-zero-correlation 0.1}]
+    (doseq [[label current-effect recommended-effect expected]
+            [["positive becomes less positive" 0.10 0.05 "less amplifying"]
+             ["negative becomes more negative" -0.05 -0.10 "more offsetting"]
+             ["positive crosses below zero" 0.05 -0.05 "turns offsetting"]
+             ["negative crosses above zero" -0.05 0.05 "turns amplifying"]]]
+      (testing label
+        (let [view (render-comparison
+                    (assoc summary :modeled-minus-zero-correlation current-effect)
+                    (assoc summary :modeled-minus-zero-correlation
+                           recommended-effect))
+              effect (comparison-row
+                      view
+                      "portfolio-optimizer-risk-diversification-outcome-row"
+                      :data-outcome "correlation-effect")]
+          (is (some #(str/includes? % expected) (collect-strings effect))))))))
+
+(deftest target-only-matrix-renders-unavailable-comparison-without-fake-marks-test
+  (let [view (render base-result)
+        matrix (node-by-role
+                view "portfolio-optimizer-risk-diversification-matrix")
+        current-markers (collect-nodes
+                         matrix
+                         #(= "portfolio-optimizer-risk-diversification-current-marker"
+                             (get-in % [1 :data-role])))
+        recommended-markers (collect-nodes
+                             matrix
+                             #(= "portfolio-optimizer-risk-diversification-recommended-marker"
+                                 (get-in % [1 :data-role])))
+        connectors (nodes-with-class
+                    matrix "optimizer-risk-diversification-connector")
+        summary (node-by-role
+                 matrix "portfolio-optimizer-risk-diversification-decision-summary")
+        em-dashes (filter #{"—"} (collect-strings matrix))]
+    (is (= 0 (count current-markers)))
+    (is (= 0 (count connectors)))
+    (is (= 3 (count recommended-markers)))
+    (is (= 10 (count em-dashes)))
+    (is (some #(str/includes? (str/lower-case %) "unavailable")
+              (collect-strings summary)))))
+
 (deftest risk-card-separates-balance-diversification-and-attribution-test
   (let [result (assoc-in base-result
                          [:risk-structure :current-diversification]

@@ -55,28 +55,38 @@ test.describe("equal risk correlation view (workbench scenes)", () => {
     const comparison = frame.locator(
       role("portfolio-optimizer-risk-diversification-comparison")
     );
-    await expect(comparison).toBeVisible();
+    const matrix = comparison.locator(
+      role("portfolio-optimizer-risk-diversification-matrix")
+    );
+    await expect(matrix).toBeVisible();
     await expect(
       comparison.locator(role("portfolio-optimizer-risk-diversification-current"))
-    ).toContainText("Current");
+    ).toHaveCount(0);
     await expect(
       comparison.locator(role("portfolio-optimizer-risk-diversification-target"))
-    ).toContainText("Recommended");
-    await expect(comparison).toContainText("All move together");
-    await expect(comparison).toContainText("Zero correlation");
-    await expect(comparison).toContainText("Modeled");
+    ).toHaveCount(0);
 
-    const currentModeled = comparison.locator(
-      `${role("portfolio-optimizer-risk-diversification-current")} ${role("portfolio-optimizer-risk-diversification-modeled")}`
+    const modeledRow = matrix.locator(
+      `${role("portfolio-optimizer-risk-diversification-benchmark-row")}[data-benchmark='modeled']`
     );
-    const targetModeled = comparison.locator(
-      `${role("portfolio-optimizer-risk-diversification-target")} ${role("portfolio-optimizer-risk-diversification-modeled")}`
+    const currentModeled = modeledRow.locator(
+      role("portfolio-optimizer-risk-diversification-current-marker")
     );
+    const recommendedModeled = modeledRow.locator(
+      role("portfolio-optimizer-risk-diversification-recommended-marker")
+    );
+    await expect(currentModeled).toHaveCount(1);
+    await expect(recommendedModeled).toHaveCount(1);
     const currentPosition = Number(await currentModeled.getAttribute("data-position"));
-    const targetPosition = Number(await targetModeled.getAttribute("data-position"));
+    const targetPosition = Number(await recommendedModeled.getAttribute("data-position"));
     expect(Number.isFinite(currentPosition)).toBe(true);
     expect(Number.isFinite(targetPosition)).toBe(true);
-    expect(targetPosition).toBeGreaterThan(currentPosition);
+    expect(targetPosition).toBeLessThan(currentPosition);
+    const decision = comparison.locator(
+      role("portfolio-optimizer-risk-diversification-decision-summary")
+    );
+    await expect(decision).toContainText(/Modeled volatility falls/i);
+    await expect(decision).toContainText(/all-move-together stress rises/i);
 
     const selected = frame.locator(
       role("portfolio-optimizer-risk-selected-breakdown")
@@ -122,8 +132,24 @@ test.describe("equal risk correlation view (workbench scenes)", () => {
         .locator(role("portfolio-optimizer-risk-view-tab-breakdown"))
         .click();
       await expect(
-        frame.locator(role("portfolio-optimizer-risk-diversification-comparison"))
+        frame.locator(role("portfolio-optimizer-risk-diversification-matrix"))
       ).toBeVisible();
+      const matrix = frame.locator(
+        role("portfolio-optimizer-risk-diversification-matrix")
+      );
+      await expect(
+        matrix.locator(role("portfolio-optimizer-risk-diversification-benchmark-row"))
+      ).toHaveCount(3);
+      for (const row of await matrix
+        .locator(role("portfolio-optimizer-risk-diversification-benchmark-row"))
+        .all()) {
+        await expect(
+          row.locator(role("portfolio-optimizer-risk-diversification-current-marker"))
+        ).toHaveCount(1);
+        await expect(
+          row.locator(role("portfolio-optimizer-risk-diversification-recommended-marker"))
+        ).toHaveCount(1);
+      }
       const bounds = await card.evaluate((element) => {
         const rect = element.getBoundingClientRect();
         return {

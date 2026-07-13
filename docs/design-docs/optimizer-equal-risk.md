@@ -114,16 +114,31 @@ stable DOM-state identities: RISK BALANCE | DIVERSIFICATION | CORRELATION
 DRIVERS | RISK / RETURN. Visually-hidden radio inputs are toggled by scoped
 `:has()` CSS, so tab state remains in the DOM rather than application state.
 
-DIVERSIFICATION first shows current and recommended books on one absolute
-annualized-volatility scale. For each book it compares the modeled volatility
-`sqrt(w' Sigma w)` with the zero-correlation benchmark
-`sqrt(sum_i w_i^2 Sigma_ii)` and the all-held-position-profit-and-loss-streams
-moving-together benchmark `sum_i abs(w_i) sqrt(Sigma_ii)`. The displayed
-diversification benefit is the reduction from the moving-together benchmark;
-the separate signed modeled-minus-zero-correlation value explains whether
-correlations amplify or offset risk versus independent positions. This makes
-it explicit that positive cross-covariance can coexist with genuine
-diversification versus perfect comovement.
+DIVERSIFICATION aligns current and recommended books in one cardless comparison
+matrix. All move together, Zero correlation, and Modeled each get one common
+absolute annualized-volatility rail with an outlined gray Current marker, a
+filled purple Recommended marker, and a neutral connector. Their numeric values
+and signed percentage-point changes share the same columns, so the user does
+not have to compare separate cards or remember a value while scanning. Exact
+or near-equal markers split vertically at their exact horizontal positions so
+both portfolio identities remain visible. The matrix exposes table, row, and
+header semantics to assistive technology while its rails and markers remain
+one concisely labeled comparison image per benchmark. The modeled volatility is
+`sqrt(w' Sigma w)`, the zero-correlation benchmark is
+`sqrt(sum_i w_i^2 Sigma_ii)`, and the all-held-position-profit-and-loss-streams
+moving-together benchmark is `sum_i abs(w_i) sqrt(Sigma_ii)`.
+
+Two aligned outcome rows then show the diversification benefit relative to
+all-move-together and the signed modeled-minus-zero-correlation effect without
+placing those different quantities on the absolute-volatility rail. Green/red
+is reserved for the economic meaning of the Change cell: lower benchmark
+volatility is favorable, a larger diversification benefit is favorable, and a
+more-negative correlation effect is more offsetting. Current remains gray and
+Recommended remains purple regardless of outcome. A final sentence reports the
+modeled-volatility direction and the all-move-together stress direction
+independently, so a lower modeled result never hides a higher stress benchmark.
+Target-only results show em dashes for unavailable Current and Change values and
+never fabricate a zero marker or relative change.
 
 Below that summary, `risk_breakdown_panel.cljs` attributes each charted asset's
 signed net share to an always-positive **Own-variance term** plus a signed

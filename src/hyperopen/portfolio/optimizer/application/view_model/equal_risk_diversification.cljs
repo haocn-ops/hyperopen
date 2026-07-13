@@ -5,6 +5,8 @@
 
 (def cross-effect-neutral-threshold 0.0005)
 
+(def ^:private marker-overlap-position-threshold 6.0)
+
 (defn cross-effect-direction
   [effect]
   (cond
@@ -29,23 +31,147 @@
   [value]
   (str (.toFixed (* 100 value) 1) "%"))
 
+(defn- displayed-point-tenths
+  [value]
+  (when (coercion/finite-number? value)
+    (let [magnitude (js/Math.floor
+                     (+ (* (js/Math.abs value) 1000) 0.5))]
+      (cond
+        (zero? magnitude) 0
+        (neg? value) (- magnitude)
+        :else magnitude))))
+
+(defn- displayed-points
+  [value]
+  (some-> (displayed-point-tenths value) (/ 10)))
+
+(defn- comparison-direction
+  [change-points]
+  (cond
+    (not (coercion/finite-number? change-points)) :unavailable
+    (zero? change-points) :unchanged
+    (neg? change-points) :falls
+    :else :rises))
+
+(defn- effect-polarity
+  [effect]
+  (if-let [points (displayed-points effect)]
+    (cond
+      (zero? points) :neutral
+      (neg? points) :offsetting
+      :else :amplifying)
+    :unavailable))
+
+(defn- comparison-tone
+  [direction favorable-direction]
+  (case direction
+    :unavailable :unavailable
+    :unchanged :neutral
+    (if (= direction favorable-direction) :favorable :unfavorable)))
+
+(defn- relative-change
+  [current change]
+  (when (and (coercion/finite-number? current)
+             (not (zero? current))
+             (coercion/finite-number? change))
+    (/ change current)))
+
+(defn- shared-row
+  [{:keys [key label current recommended current-position
+           recommended-position favorable-direction]}]
+  (let [comparable? (and (coercion/finite-number? current)
+                         (coercion/finite-number? recommended))
+        change (when comparable? (- recommended current))
+        current-point-tenths (displayed-point-tenths current)
+        recommended-point-tenths (displayed-point-tenths recommended)
+        change-points (when comparable?
+                        (/ (- recommended-point-tenths current-point-tenths)
+                           10))
+        direction (comparison-direction change-points)
+        marker-overlap? (and comparable?
+                             (coercion/finite-number? current-position)
+                             (coercion/finite-number? recommended-position)
+                             (<= (js/Math.abs
+                                  (- recommended-position current-position))
+                                 marker-overlap-position-threshold))]
+    {:key key
+     :label label
+     :current-value (when comparable? current)
+     :recommended-value recommended
+     :current-position (when comparable? current-position)
+     :recommended-position recommended-position
+     :marker-overlap? (boolean marker-overlap?)
+     :connector (when (and comparable?
+                           (coercion/finite-number? current-position)
+                           (coercion/finite-number? recommended-position))
+                  {:start current-position :end recommended-position})
+     :change change
+     :change-points change-points
+     :relative-change (relative-change current change)
+     :direction direction
+     :tone (comparison-tone direction favorable-direction)}))
+
 (defn comparison-model
   [result]
   (let [structure (:risk-structure result)
-        target (:target-diversification structure)]
+        target (:target-diversification structure)
+        current-summary (:current-diversification structure)]
     (when (valid-summary? target)
-      (let [source (keep (fn [[key label summary]]
-                           (when (valid-summary? summary)
+      (let [current (when (valid-summary? current-summary) current-summary)
+            source (keep (fn [[key label summary]]
+                           (when summary
                              {:key key :label label :summary summary}))
-                         [[:current "Current" (:current-diversification structure)]
-                          [:target "Recommended" target]])]
-      (let [scale-max (reduce max 0
+                         [[:current "Current" current]
+                          [:target "Recommended" target]])
+            scale-max (reduce max 0
                               (mapcat (fn [{:keys [summary]}]
                                         [(:modeled-volatility summary)
                                          (:all-move-together-volatility summary)
                                          (:zero-correlation-volatility summary)])
                                       source))
-            position #(if (pos? scale-max) (* 100 (/ % scale-max)) 0)]
+            position #(if (pos? scale-max) (* 100 (/ % scale-max)) 0)
+            benchmark-specs
+            [[:all-move-together "All move together"
+              :all-move-together-volatility]
+             [:zero-correlation "Zero correlation"
+              :zero-correlation-volatility]
+             [:modeled "Modeled" :modeled-volatility]]
+            benchmark-rows
+            (mapv (fn [[key label value-key]]
+                    (shared-row
+                     {:key key
+                      :label label
+                      :current (get current value-key)
+                      :recommended (get target value-key)
+                      :current-position (some-> (get current value-key)
+                                                position)
+                      :recommended-position (position (get target value-key))
+                      :favorable-direction :falls}))
+                  benchmark-specs)
+            outcome-rows
+            [(shared-row
+              {:key :diversification-benefit
+               :label "Diversification versus all-move-together"
+               :current (get current :reduction-ratio-vs-all-move-together)
+               :recommended (:reduction-ratio-vs-all-move-together target)
+               :favorable-direction :rises})
+             (let [current-effect
+                   (get current :modeled-minus-zero-correlation)
+                   recommended-effect
+                   (:modeled-minus-zero-correlation target)]
+               (assoc
+                (shared-row
+                 {:key :correlation-effect
+                  :label "Correlation effect versus zero"
+                  :current current-effect
+                  :recommended recommended-effect
+                  :favorable-direction :falls})
+                :current-polarity (effect-polarity current-effect)
+                :recommended-polarity
+                (effect-polarity recommended-effect)))]
+            rows-by-key (into {} (map (juxt :key identity)) benchmark-rows)
+            modeled (rows-by-key :modeled)
+            stress (rows-by-key :all-move-together)]
         {:scale-max scale-max
          :cards
          (mapv
@@ -79,7 +205,18 @@
                  :offsets "Correlations offset risk vs zero correlation"
                  :amplifies "Correlations amplify risk vs zero correlation"
                  "Correlations are neutral vs zero correlation")}))
-          source)})))))
+          source)
+         :benchmark-rows benchmark-rows
+         :outcome-rows outcome-rows
+         :decision-summary
+         {:status (if current :comparison :target-only)
+          :current-available? (boolean current)
+          :modeled-direction (:direction modeled)
+          :stress-direction (:direction stress)
+          :modeled-current-value (:current-value modeled)
+          :modeled-recommended-value (:recommended-value modeled)
+          :stress-current-value (:current-value stress)
+          :stress-recommended-value (:recommended-value stress)}}))))
 
 (defn bridge-model
   [fit-scale rows]

@@ -58,15 +58,17 @@
   "Solved-result fixture whose contribution + structure sections come from the
   real domain namespaces. `assets` are [symbol weight vol] rows; `rho` is the
   sparse underlying-correlation map."
-  [{:keys [assets rho rho-fallback correlation-cap]
+  [{:keys [assets rho rho-fallback correlation-cap current-weights]
     :or {rho-fallback 0.25}}]
   (let [symbols (mapv first assets)
         ids (mapv (comp instrument-id first) assets)
         weights (mapv second assets)
-        current-weights (mapv (fn [idx weight]
-                                (* weight (+ 0.45 (* 0.1 (mod idx 4)))))
-                              (range)
-                              weights)
+        current-weights* (or current-weights
+                             (mapv (fn [idx weight]
+                                     (* weight
+                                        (+ 0.45 (* 0.1 (mod idx 4)))))
+                                   (range)
+                                   weights))
         vols (mapv #(nth % 2) assets)
         n (count ids)
         targets (vec (repeat n (/ 1 n)))
@@ -84,7 +86,7 @@
         target-diversification (risk-structure/portfolio-diversification-summary
                                 covariance weights)
         current-diversification (risk-structure/portfolio-diversification-summary
-                                 covariance current-weights)
+                                 covariance current-weights*)
         structure* (cond-> (dissoc structure :status)
                      (= :ok (:status target-diversification))
                      (assoc :target-diversification
@@ -99,7 +101,7 @@
      :instrument-ids ids
      :labels-by-instrument (zipmap ids symbols)
      :target-weights-by-instrument (zipmap ids weights)
-     :current-weights-by-instrument (zipmap ids current-weights)
+     :current-weights-by-instrument (zipmap ids current-weights*)
      :expected-return 0.11
      :volatility (:portfolio-volatility structure)
      :performance {:in-sample-sharpe 0.52}
@@ -148,6 +150,11 @@
              ["SP500" 0.452 0.18]
              ["MSTR" -0.157 0.85]
              ["SOL" -0.11 0.90]]
+    ;; The current book is smaller but concentrated in the highly correlated
+    ;; BTC/ETH pair. The recommendation adds gross stress while its long/short
+    ;; offsets lower modeled volatility, preserving the intended tradeoff with
+    ;; summaries computed by the real domain math.
+    :current-weights [0.25 0.25 0.0 0.0 0.0]
     :rho {[0 1] 0.68 [0 2] 0.42 [0 3] 0.28 [0 4] 0.21
           [1 2] 0.51 [1 3] 0.35 [1 4] 0.18
           [2 3] 0.22 [2 4] 0.05

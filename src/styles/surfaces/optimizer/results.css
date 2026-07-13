@@ -1540,10 +1540,9 @@
     color: var(--optimizer-text-3);
   }
 
-  /* Portfolio-level diversification comparison. Both cards share one
-     absolute volatility domain supplied by the read model, so a riskier
-     recommendation cannot look smaller merely because its percentage benefit
-     is better. */
+  /* Portfolio-level diversification comparison. Current and recommended
+     markers share one rail per benchmark; green/red belongs only to the
+     economic direction of the Change column. */
   .portfolio-optimizer .optimizer-risk-diversification-summary,
   .portfolio-optimizer .optimizer-risk-diversification-unavailable {
     margin-top: 12px;
@@ -1568,75 +1567,113 @@
     color: var(--optimizer-text-3);
   }
 
-  .portfolio-optimizer .optimizer-risk-diversification-scale-note {
+  .portfolio-optimizer .optimizer-risk-diversification-legend {
     flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 10px;
+    color: var(--optimizer-text-3);
+  }
+
+  .portfolio-optimizer .optimizer-risk-diversification-legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .portfolio-optimizer .optimizer-risk-diversification-legend-marker {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+  }
+
+  .portfolio-optimizer .optimizer-risk-diversification-legend-marker--current {
+    border: 1.5px solid var(--optimizer-text-3);
+    background-color: var(--optimizer-bg);
+  }
+
+  .portfolio-optimizer .optimizer-risk-diversification-legend-marker--recommended {
+    border: 1px solid var(--optimizer-target);
+    background-color: var(--optimizer-target);
+  }
+
+  .portfolio-optimizer .optimizer-risk-diversification-matrix {
+    min-width: 0;
+    margin-top: 12px;
+    border: 1px solid var(--optimizer-border);
+    background-color: var(--optimizer-surface);
+  }
+
+  .portfolio-optimizer .optimizer-risk-diversification-header,
+  .portfolio-optimizer .optimizer-risk-diversification-row {
+    display: grid;
+    grid-template-columns:
+      minmax(9.5rem, 1.15fr)
+      minmax(9rem, 1fr)
+      minmax(4.5rem, 0.5fr)
+      minmax(5.75rem, 0.6fr)
+      minmax(7rem, 0.75fr);
+    align-items: center;
+    gap: 9px;
+  }
+
+  .portfolio-optimizer .optimizer-risk-diversification-header {
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--optimizer-border);
     font-family: "JetBrains Mono", var(--font-mono);
     font-size: 9px;
+    font-weight: 650;
     letter-spacing: 0.07em;
     text-transform: uppercase;
     color: var(--optimizer-text-3);
   }
 
-  .portfolio-optimizer .optimizer-risk-diversification-cards {
+  .portfolio-optimizer .optimizer-risk-diversification-header > span:nth-last-child(-n + 3) {
+    text-align: right;
+  }
+
+  .portfolio-optimizer .optimizer-risk-diversification-row-group--outcomes {
+    border-top: 1px solid var(--optimizer-border);
+  }
+
+  .portfolio-optimizer .optimizer-risk-diversification-row {
+    min-width: 0;
+    padding: 9px 10px;
+  }
+
+  .portfolio-optimizer .optimizer-risk-diversification-row +
+  .optimizer-risk-diversification-row {
+    border-top: 1px solid color-mix(in srgb, var(--optimizer-border) 70%, transparent);
+  }
+
+  .portfolio-optimizer .optimizer-risk-diversification-row-label {
+    min-width: 0;
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 21rem), 1fr));
-    gap: 10px;
-    margin-top: 12px;
-  }
-
-  .portfolio-optimizer .optimizer-risk-diversification-card {
-    border: 1px solid var(--optimizer-border);
-    background-color: var(--optimizer-surface);
-    padding: 10px 12px;
-  }
-
-  .portfolio-optimizer .optimizer-risk-diversification-card-head {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 8px;
-  }
-
-  .portfolio-optimizer .optimizer-risk-diversification-card-label {
-    font-family: "JetBrains Mono", var(--font-mono);
-    font-size: 10px;
-    font-weight: 650;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--optimizer-text);
-  }
-
-  .portfolio-optimizer .optimizer-risk-diversification-benefit {
-    font-size: 11px;
-    color: var(--optimizer-target);
-  }
-
-  .portfolio-optimizer .optimizer-risk-diversification-benchmarks {
-    display: grid;
-    gap: 7px;
-    margin-top: 10px;
-  }
-
-  .portfolio-optimizer .optimizer-risk-diversification-benchmark {
-    display: grid;
-    grid-template-columns: minmax(7.5rem, auto) minmax(5rem, 1fr) 3.5rem;
-    align-items: center;
-    gap: 8px;
-  }
-
-  .portfolio-optimizer .optimizer-risk-diversification-benchmark-label,
-  .portfolio-optimizer .optimizer-risk-diversification-value {
+    gap: 2px;
     font-size: 10.5px;
     color: var(--optimizer-text-2);
   }
 
-  .portfolio-optimizer .optimizer-risk-diversification-value {
-    text-align: right;
+  .portfolio-optimizer .optimizer-risk-diversification-row-kind {
+    font-size: 9px;
+    line-height: 1.3;
+    color: var(--optimizer-text-3);
   }
 
-  .portfolio-optimizer .optimizer-risk-diversification-lane {
+  .portfolio-optimizer .optimizer-risk-diversification-lane-cell {
+    min-width: 0;
+  }
+
+  .portfolio-optimizer .optimizer-risk-diversification-lane-graphic {
     position: relative;
-    height: 12px;
+    width: 100%;
+    height: 16px;
+  }
+
+  .portfolio-optimizer .optimizer-risk-diversification-row[data-overlap="true"]
+  .optimizer-risk-diversification-lane-graphic {
+    height: 22px;
   }
 
   .portfolio-optimizer .optimizer-risk-diversification-rail {
@@ -1647,67 +1684,151 @@
     border-top: 1px solid var(--optimizer-border-strong);
   }
 
+  .portfolio-optimizer .optimizer-risk-diversification-connector {
+    position: absolute;
+    top: 50%;
+    min-width: 1px;
+    border-top: 2px solid var(--optimizer-text-3);
+    opacity: 0.62;
+    transform: translateY(-50%);
+  }
+
   .portfolio-optimizer .optimizer-risk-diversification-marker {
     position: absolute;
     top: 50%;
-    width: 7px;
-    height: 7px;
-    border: 1px solid var(--optimizer-bg);
+    z-index: 1;
+    width: 8px;
+    height: 8px;
     border-radius: 50%;
-    background-color: var(--optimizer-target);
     transform: translate(-50%, -50%);
   }
 
-  .portfolio-optimizer .optimizer-risk-diversification-correlation {
-    margin-top: 10px;
+  .portfolio-optimizer .optimizer-risk-diversification-marker--current {
+    border: 1.5px solid var(--optimizer-text-3);
+    background-color: var(--optimizer-surface);
+  }
+
+  .portfolio-optimizer .optimizer-risk-diversification-marker--recommended {
+    border: 1px solid var(--optimizer-surface);
+    background-color: var(--optimizer-target);
+    box-shadow: 0 0 0 1px var(--optimizer-target);
+  }
+
+  .portfolio-optimizer .optimizer-risk-diversification-row[data-overlap="true"]
+  .optimizer-risk-diversification-marker--current {
+    top: 30%;
+  }
+
+  .portfolio-optimizer .optimizer-risk-diversification-row[data-overlap="true"]
+  .optimizer-risk-diversification-marker--recommended {
+    top: 70%;
+  }
+
+  .portfolio-optimizer .optimizer-risk-diversification-cell-value {
+    min-width: 0;
     font-size: 10.5px;
+    text-align: right;
     color: var(--optimizer-text-2);
   }
 
-  .portfolio-optimizer .optimizer-risk-diversification-correlation[data-effect="offsets"] {
+  .portfolio-optimizer .optimizer-risk-diversification-change {
+    min-width: 0;
+    display: grid;
+    justify-items: end;
+    gap: 1px;
+  }
+
+  .portfolio-optimizer .optimizer-risk-diversification-direction-copy {
+    min-width: 0;
+    font-size: 9px;
+    line-height: 1.25;
+    text-align: right;
+    color: var(--optimizer-text-3);
+  }
+
+  .portfolio-optimizer .optimizer-risk-diversification-row[data-tone="favorable"]
+  .optimizer-risk-diversification-change > * {
     color: var(--optimizer-long);
   }
 
-  .portfolio-optimizer .optimizer-risk-diversification-correlation[data-effect="amplifies"] {
+  .portfolio-optimizer .optimizer-risk-diversification-row[data-tone="unfavorable"]
+  .optimizer-risk-diversification-change > * {
     color: var(--optimizer-short);
   }
 
-  @media (max-width: 639px) {
-    .portfolio-optimizer .optimizer-risk-diversification-intro,
-    .portfolio-optimizer .optimizer-risk-diversification-card-head {
+  .portfolio-optimizer .optimizer-risk-diversification-decision {
+    margin: 0;
+    padding: 9px 10px;
+    border-top: 1px solid var(--optimizer-border);
+    font-size: 10.5px;
+    line-height: 1.45;
+    color: var(--optimizer-text-2);
+  }
+
+  @media (max-width: 719px) {
+    .portfolio-optimizer .optimizer-risk-diversification-intro {
       min-width: 0;
       flex-direction: column;
       align-items: flex-start;
     }
 
-    .portfolio-optimizer .optimizer-risk-diversification-scale-note,
-    .portfolio-optimizer .optimizer-risk-diversification-benefit {
+    .portfolio-optimizer .optimizer-risk-diversification-legend {
       max-width: 100%;
-      white-space: normal;
-      overflow-wrap: anywhere;
+      flex-wrap: wrap;
     }
 
-    .portfolio-optimizer .optimizer-risk-diversification-benchmark {
+    .portfolio-optimizer .optimizer-risk-diversification-header {
       min-width: 0;
-      grid-template-columns: minmax(0, 1fr) auto;
-      grid-template-areas:
-        "label value"
-        "lane lane";
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 6px;
     }
 
-    .portfolio-optimizer .optimizer-risk-diversification-benchmark-label {
+    .portfolio-optimizer .optimizer-risk-diversification-header > span:first-child {
+      display: none;
+    }
+
+    .portfolio-optimizer .optimizer-risk-diversification-rail-header {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    .portfolio-optimizer .optimizer-risk-diversification-row {
       min-width: 0;
-      grid-area: label;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 6px;
+      padding-block: 10px;
+    }
+
+    .portfolio-optimizer .optimizer-risk-diversification-row-label,
+    .portfolio-optimizer .optimizer-risk-diversification-lane {
+      grid-column: 1 / -1;
     }
 
     .portfolio-optimizer .optimizer-risk-diversification-lane {
-      min-width: 0;
       width: 100%;
-      grid-area: lane;
+      margin: 2px 0;
     }
 
-    .portfolio-optimizer .optimizer-risk-diversification-value {
-      grid-area: value;
+    .portfolio-optimizer .optimizer-risk-diversification-outcome-spacer {
+      grid-column: 1 / -1;
+      height: 0;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .portfolio-optimizer .optimizer-risk-diversification-cell-value,
+    .portfolio-optimizer .optimizer-risk-diversification-change {
+      text-align: right;
+    }
+
+    .portfolio-optimizer .optimizer-risk-diversification-direction-copy {
+      overflow-wrap: anywhere;
     }
   }
 

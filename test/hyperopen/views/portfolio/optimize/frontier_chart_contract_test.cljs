@@ -165,7 +165,7 @@
     (is (= "url(#portfolioOptimizerTargetRingGradient)"
            (node-attr target-ring :stroke)))
     (is (= 11.5 (node-attr target-ring :r)))
-    (is (= 1.15 (node-attr target-ring :strokeWidth)))
+    (is (= 1.15 (node-attr target-ring :stroke-width)))
     (is (= 0.74 (node-attr target-ring :opacity)))
     (is (some? target-highlight))
     (is (some? target-label))

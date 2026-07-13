@@ -250,7 +250,7 @@
     (is (= 22 (node-attr standalone-label-bg :height)))
     (is (= 4 (node-attr standalone-label-bg :rx)))
     (is (= "transparent" (node-attr standalone-label-bg :fill)))
-    (is (= 12 (node-attr standalone-code :fontSize)))
+    (is (= 12 (node-attr standalone-code :font-size)))
     (is (= 0 (node-attr standalone-code :y)))
     (is (= "middle" (node-attr standalone-code :dominant-baseline)))
     (is (= "middle" (node-attr standalone-code :alignment-baseline)))

@@ -155,18 +155,18 @@
               :y1 (- row-y 4)
               :y2 (- row-y 4)
               :stroke "rgba(255, 255, 255, 0.08)"
-              :strokeWidth 1}]
+              :stroke-width 1}]
       [:g {:key (str "blended-metric-row-" idx)}
        [:text {:x 10
                :y row-y
                :fill "var(--optimizer-text-2)"
-               :fontSize 10}
+               :font-size 10}
         (metric-label label)]
        [:text {:x (- callout-width 10)
                :y row-y
                :fill "var(--optimizer-text)"
-               :fontSize 10
-               :fontWeight 700
+               :font-size 10
+               :font-weight 700
                :text-anchor "end"}
         value]])))
 
@@ -228,7 +228,7 @@
               :height 6
               :fill "rgba(53, 215, 199, 0.16)"
               :stroke "rgba(143, 252, 241, 0.78)"
-              :strokeWidth 1
+              :stroke-width 1
               :transform (str "rotate(45 13 " dot-y ")")
               :data-role (str "portfolio-optimizer-frontier-callout-allocation-vault-diamond-"
                               idx)}]
@@ -262,8 +262,8 @@
      [:text {:x 22
              :y row-y
              :fill "var(--optimizer-text)"
-             :fontSize 10
-             :fontWeight 700
+             :font-size 10
+             :font-weight 700
              :data-role (str "portfolio-optimizer-frontier-callout-allocation-label-"
                              idx)
              :data-full-label label}
@@ -271,8 +271,8 @@
      [:text {:x (- callout-width 10)
              :y row-y
              :fill "var(--optimizer-text)"
-             :fontSize 10
-             :fontWeight 700
+             :font-size 10
+             :font-weight 700
              :text-anchor "end"}
       value]]))
 
@@ -290,15 +290,15 @@
       [:text {:x 24
               :y 18
               :fill "var(--optimizer-text)"
-              :fontSize 11
-              :fontWeight 700}
+              :font-size 11
+              :font-weight 700}
        (str/upper-case (str label))]
       [:text {:x (- callout-width 10)
               :y 18
               :fill "var(--optimizer-text-3)"
-              :fontSize 9
-              :fontWeight 700
-              :letterSpacing "0.12em"
+              :font-size 9
+              :font-weight 700
+              :letter-spacing "0.12em"
               :text-anchor "end"}
        "PORTFOLIO"]]
      (map-indexed #(metric-row metric-start-y %1 %2) rows)
@@ -306,9 +306,9 @@
       [:text {:x 10
               :y section-y
               :fill "var(--optimizer-text-3)"
-              :fontSize 9.5
-              :fontWeight 700
-              :letterSpacing "0.08em"}
+              :font-size 9.5
+              :font-weight 700
+              :letter-spacing "0.08em"}
        "IMPLIED ALLOCATION"]]
      (map-indexed #(allocation-row %1 allocation-start-y %2)
                   visible-rows)
@@ -316,7 +316,7 @@
        [[:text {:x 22
                 :y overflow-y
                 :fill "var(--optimizer-text-3)"
-                :fontSize 10}
+                :font-size 10}
          (str "+" overflow-count " more")]]))))
 
 (defn callout
@@ -340,6 +340,6 @@
               :rx 0
               :fill "rgba(6, 10, 13, 0.98)"
               :stroke "var(--optimizer-border-strong)"
-              :strokeWidth 1
+              :stroke-width 1
               :data-role "portfolio-optimizer-frontier-callout-card"}]]
      (content label rows* allocation-rows))))

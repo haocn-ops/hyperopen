@@ -135,7 +135,7 @@
    [:text {:x model/plot-center-x
            :y (- model/chart-height 10)
            :fill "currentColor"
-           :fontSize 11
+           :font-size 11
            :opacity 0.78
            :text-anchor "middle"
            :dominant-baseline "middle"
@@ -144,7 +144,7 @@
    [:text {:x 14
            :y model/plot-center-y
            :fill "currentColor"
-           :fontSize 11
+           :font-size 11
            :opacity 0.78
            :text-anchor "middle"
            :dominant-baseline "middle"
@@ -163,7 +163,7 @@
               :y1 (chart-axes/y-tick-position model/plot-geometry y-domain 0)
               :y2 (chart-axes/y-tick-position model/plot-geometry y-domain 0)
               :stroke guide-color
-              :strokeWidth 1
+              :stroke-width 1
               :stroke-dasharray "4 4"
               :opacity 0.65
               :data-role "portfolio-optimizer-risk-return-zero-line"}])))
@@ -180,7 +180,7 @@
               :y1 model/chart-plot-top
               :y2 model/plot-bottom
               :stroke guide-color
-              :strokeWidth 1
+              :stroke-width 1
               :stroke-dasharray "4 4"
               :opacity 0.65
               :data-role "portfolio-optimizer-risk-return-crosshair"}])))
@@ -204,7 +204,7 @@
                 :x2 x2
                 :y2 y2
                 :stroke guide-color
-                :strokeWidth 1
+                :stroke-width 1
                 :opacity 0.6
                 :data-role "portfolio-optimizer-risk-return-connector"}]))))
 
@@ -217,8 +217,8 @@
     [:text {:x (+ x 13)
             :y (+ y 3.5)
             :fill current-muted
-            :fontSize 9
-            :fontWeight 600
+            :font-size 9
+            :font-weight 600
             :class "portfolio-frontier-symbol-marker"
             :data-role (str "portfolio-optimizer-risk-return-asset-label-"
                             (:instrument-id point))}
@@ -248,7 +248,7 @@
              :fill marker-fill
              :fill-opacity 0.85
              :stroke color
-             :strokeWidth 1.3}]
+             :stroke-width 1.3}]
    [:circle {:cx x
              :cy y
              :r 2.6
@@ -279,7 +279,7 @@
                :x2 (+ x (if flip? -13 13))
                :y2 (- y 13)
                :stroke color
-               :strokeWidth 1
+               :stroke-width 1
                :opacity 0.55
                :data-role (str data-role "-leader")}])
      (ring-marker x y color)
@@ -289,8 +289,8 @@
                   below? (+ y 21)
                   :else (- y 16))
              :fill (or label-color color)
-             :fontSize 10
-             :fontWeight 650
+             :font-size 10
+             :font-weight 650
              :text-anchor (cond
                             below? "middle"
                             flip? "end"

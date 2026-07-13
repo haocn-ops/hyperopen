@@ -277,7 +277,7 @@
            :stroke (if emphasis?
                      "var(--optimizer-target-border)"
                      "rgba(255, 255, 255, 0.14)")
-           :strokeWidth 1
+           :stroke-width 1
            :stroke-dasharray "3 3"}]
    [:circle {:cx x
              :cy dist-baseline-y
@@ -286,14 +286,14 @@
    [:text {:x label-x
            :y 118
            :fill "var(--optimizer-text-3)"
-           :fontSize 9.5
+           :font-size 9.5
            :text-anchor "middle"}
     name]
    [:text {:x label-x
            :y 133
            :fill "var(--optimizer-text)"
-           :fontSize 11.5
-           :fontWeight 700
+           :font-size 11.5
+           :font-weight 700
            :text-anchor "middle"
            :class ["font-mono"]}
     value]])
@@ -359,14 +359,14 @@
         [:path {:d path
                 :fill "var(--optimizer-target-soft)"
                 :stroke "var(--optimizer-target-border)"
-                :strokeWidth 1
+                :stroke-width 1
                 :data-role "portfolio-optimizer-leverage-impact-dist-curve"}]
         [:line {:x1 dist-pad-x
                 :x2 (- dist-width dist-pad-x)
                 :y1 dist-baseline-y
                 :y2 dist-baseline-y
                 :stroke "var(--optimizer-border-strong)"
-                :strokeWidth 1}]
+                :stroke-width 1}]
         (distribution-marker {:key "p5"
                               :x (nth marker-xs 0)
                               :label-x (nth label-xs 0)
@@ -386,12 +386,12 @@
         [:text {:x dist-pad-x
                 :y 147
                 :fill "var(--optimizer-text-3)"
-                :fontSize 9}
+                :font-size 9}
          "Lower"]
         [:text {:x (- dist-width dist-pad-x)
                 :y 147
                 :fill "var(--optimizer-text-3)"
-                :fontSize 9
+                :font-size 9
                 :text-anchor "end"}
          "Higher"]]])))
 

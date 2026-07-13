@@ -64,7 +64,7 @@
              :x2 label-x
              :y2 (+ label-y 10)
              :stroke "rgba(47, 155, 255, 0.50)"
-             :strokeWidth 1
+             :stroke-width 1
              :stroke-dasharray "2 3"
              :data-role "portfolio-optimizer-frontier-current-leader-line"}]
      [:circle {:cx x
@@ -78,7 +78,7 @@
                :r 8.5
                :fill "rgba(7, 18, 21, 0.94)"
                :stroke current-stroke
-               :strokeWidth 1.2
+               :stroke-width 1.2
                :data-role "portfolio-optimizer-frontier-current-ring"}]
      [:circle {:cx x
                :cy y
@@ -98,8 +98,8 @@
       [:text {:x 28
               :y 11
               :fill "#e3f5ff"
-              :fontSize 11
-              :fontWeight 650
+              :font-size 11
+              :font-weight 650
               :text-anchor "middle"
               :dominant-baseline "middle"}
        "Current"]]

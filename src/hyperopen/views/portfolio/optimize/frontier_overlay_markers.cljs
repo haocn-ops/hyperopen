@@ -38,8 +38,8 @@
   [:text {:x x
           :y (+ y 3)
           :fill color
-          :fontSize 9
-          :fontWeight 700
+          :font-size 9
+          :font-weight 700
           :text-anchor "middle"
           :class "portfolio-frontier-symbol-marker"
           :data-role data-role}
@@ -63,8 +63,8 @@
              :y2 0
              :class "portfolio-frontier-vault-leader"
              :stroke vault-markers/border
-             :strokeWidth 1
-             :strokeLinecap "round"}]
+             :stroke-width 1
+             :stroke-linecap "round"}]
      [:rect {:x label-x
              :y (- label-half)
              :width label-width
@@ -73,14 +73,14 @@
              :class "portfolio-frontier-vault-label"
              :fill "transparent"
              :stroke vault-markers/border
-             :strokeWidth 1
+             :stroke-width 1
              :style {:filter "drop-shadow(0 0 4px rgba(53, 215, 199, 0.18))"}}]
      [:text {:x (+ label-x (/ label-width 2))
              :y 0
              :fill vault-markers/text
-             :fontSize 12
-             :fontWeight 600
-             :letterSpacing "0.02em"
+             :font-size 12
+             :font-weight 600
+             :letter-spacing "0.02em"
              :dominant-baseline "middle"
              :alignment-baseline "middle"
              :text-anchor "middle"
@@ -115,7 +115,7 @@
                        :r 9
                        :fill "var(--optimizer-surface)"
                        :stroke color
-                       :strokeWidth 1
+                       :stroke-width 1
                        :opacity 0.9}]
              [:image {:x (- x icon-half)
                       :y (- y icon-half)

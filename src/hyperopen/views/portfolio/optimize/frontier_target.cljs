@@ -129,7 +129,7 @@
              :x2 label-x
              :y2 (+ label-y 11)
              :stroke "rgba(181, 76, 255, 0.50)"
-             :strokeWidth 1
+             :stroke-width 1
              :stroke-dasharray "3 3"
              :filter "drop-shadow(0 0 2px rgba(139, 92, 255, 0.16))"
              :data-role "portfolio-optimizer-frontier-target-leader-line"}]
@@ -144,7 +144,7 @@
                :r 11.5
                :fill "none"
                :stroke target-ring-gradient
-               :strokeWidth 1.15
+               :stroke-width 1.15
                :opacity 0.74
                :data-role "portfolio-optimizer-frontier-target-ring"}]
      [:circle {:cx x
@@ -152,7 +152,7 @@
                :r 8
                :fill target-orb-gradient
                :stroke "rgba(246, 235, 255, 0.58)"
-               :strokeWidth 0.85
+               :stroke-width 0.85
                :filter "url(#portfolioOptimizerTargetSoftGlow)"
                :data-role "portfolio-optimizer-frontier-target-core"}]
      [:circle {:cx (- x 2.2)
@@ -178,8 +178,8 @@
       [:text {:x 25
               :y 12
               :fill "#f3ecff"
-              :fontSize 12
-              :fontWeight 600
+              :font-size 12
+              :font-weight 600
               :text-anchor "middle"
               :dominant-baseline "middle"}
        "Target"]]

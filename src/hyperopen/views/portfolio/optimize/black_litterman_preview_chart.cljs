@@ -123,7 +123,7 @@
                 :x (group-center-x row-count idx)
                 :y (max 12 (- value-y 9))
                 :fill "currentColor"
-                :fontSize 9
+                :font-size 9
                 :opacity 0.66
                 :text-anchor "middle"
                 :data-role (str "portfolio-optimizer-black-litterman-preview-view-delta-"
@@ -137,7 +137,7 @@
             :x (- chart-plot-left 10)
             :y (+ y 4)
             :fill "currentColor"
-            :fontSize 9
+            :font-size 9
             :opacity 0.58
             :text-anchor "end"
             :data-role (str "portfolio-optimizer-black-litterman-preview-y-tick-" idx)}
@@ -155,7 +155,7 @@
           :x (group-center-x row-count idx)
           :y (+ chart-plot-bottom 24)
           :fill "currentColor"
-          :fontSize 10
+          :font-size 10
           :opacity 0.72
           :text-anchor "middle"
           :data-role (str "portfolio-optimizer-black-litterman-preview-x-label-"
@@ -187,16 +187,16 @@
    [:text {:x -60
            :y -4
            :fill "currentColor"
-           :fontSize 12
-           :letterSpacing 2.4
+           :font-size 12
+           :letter-spacing 2.4
            :opacity 0.72
            :text-anchor "start"}
     label]
    [:text {:x -60
            :y 18
            :fill "currentColor"
-           :fontSize 12
-           :letterSpacing 2.4
+           :font-size 12
+           :letter-spacing 2.4
            :opacity 0.72
            :text-anchor "start"}
     qualifier]])

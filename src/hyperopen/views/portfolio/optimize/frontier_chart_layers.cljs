@@ -200,7 +200,7 @@
    [:text {:x model/plot-center-x
            :y (- model/chart-height 10)
            :fill "currentColor"
-           :fontSize 11
+           :font-size 11
            :opacity 0.78
            :text-anchor "middle"
            :dominant-baseline "middle"
@@ -209,7 +209,7 @@
    [:text {:x 14
            :y model/plot-center-y
            :fill "currentColor"
-           :fontSize 11
+           :font-size 11
            :opacity 0.78
            :text-anchor "middle"
            :dominant-baseline "middle"
@@ -219,9 +219,9 @@
    [:path {:d (model/path-data positions)
            :fill "none"
            :stroke model/frontier-color
-           :strokeWidth 2.5
-           :strokeLinecap "round"
-           :strokeLinejoin "round"
+           :stroke-width 2.5
+           :stroke-linecap "round"
+           :stroke-linejoin "round"
            :data-role "portfolio-optimizer-frontier-path"}]
    (map-indexed (fn [idx point]
                   (frontier-point draft idx point x-domain y-domain))
@@ -253,7 +253,7 @@
    [:text {:x model/plot-right
            :y (- model/chart-plot-top 12)
            :fill "currentColor"
-           :fontSize 10
+           :font-size 10
            :opacity 0.58
            :text-anchor "end"}
     (str x-axis-prefix " / " y-axis-prefix)]

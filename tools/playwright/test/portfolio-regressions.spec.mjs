@@ -2597,7 +2597,7 @@ test("portfolio optimizer recommendation chart shows minimum variance frontier o
   await expect(targetHalo).toHaveAttribute("r", "17");
   await expect(targetHalo).toHaveAttribute("opacity", "0.52");
   await expect(targetRing).toHaveAttribute("stroke", "url(#portfolioOptimizerTargetRingGradient)");
-  await expect(targetRing).toHaveAttribute("strokeWidth", "1.15");
+  await expect(targetRing).toHaveAttribute("stroke-width", "1.15");
   await expect(targetRing).toHaveAttribute("opacity", "0.74");
   await expect(targetLabel).toBeVisible();
   await expect(targetLeaderLine).toHaveAttribute("stroke-dasharray", "3 3");

@@ -235,8 +235,8 @@
    [:text (cond-> {:x x
                    :y y
                    :fill fill
-                   :fontSize font-size
-                   :fontWeight font-weight}
+                   :font-size font-size
+                   :font-weight font-weight}
             data-role (assoc :data-role data-role))]
    (map-indexed
     (fn [idx line]
@@ -282,18 +282,18 @@
                  :y1 (- row-y 4)
                  :y2 (- row-y 4)
                  :stroke "rgba(255, 255, 255, 0.08)"
-                 :strokeWidth 1}]
+                 :stroke-width 1}]
          [:g {:key (str "row-" idx)}
           [:text {:x 10
                   :y row-y
                   :fill "var(--optimizer-text-2)"
-                  :fontSize 10}
+                  :font-size 10}
            label]
           [:text {:x (- width* 10)
                   :y row-y
                   :fill "var(--optimizer-text)"
-                  :fontSize 10
-                  :fontWeight 700
+                  :font-size 10
+                  :font-weight 700
                   :text-anchor "end"}
            value]])))
    rows))
@@ -343,7 +343,7 @@
               :y1 (- header-height* 13)
               :y2 (- header-height* 13)
               :stroke "rgba(255, 255, 255, 0.08)"
-              :strokeWidth 1}]]
+              :stroke-width 1}]]
      (row-nodes rows* width* header-height*))))
 
 (defn callout
@@ -377,7 +377,7 @@
                     :rx 2
                     :fill "var(--optimizer-surface-2)"
                     :stroke "none"
-                    :strokeWidth 0}]
+                    :stroke-width 0}]
             (title-text-node
              {:lines title-lines*
               :x 10
@@ -390,6 +390,6 @@
                     :y1 (- header-height* 12)
                     :y2 (- header-height* 12)
                     :stroke "var(--optimizer-border)"
-                    :strokeWidth 1
+                    :stroke-width 1
                     :opacity 0.8}]]
            (row-nodes rows* callout-width header-height*)))))))

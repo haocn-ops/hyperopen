@@ -69,7 +69,7 @@
             :x position
             :y (+ bottom 22)
             :fill "currentColor"
-            :fontSize 10
+            :font-size 10
             :opacity 0.72
             :text-anchor "middle"
             :data-role (str "portfolio-optimizer-frontier-x-tick-" idx)}
@@ -78,7 +78,7 @@
             :x (- left 8)
             :y (+ position 4)
             :fill "currentColor"
-            :fontSize 10
+            :font-size 10
             :opacity 0.72
             :text-anchor "end"
             :data-role (str "portfolio-optimizer-frontier-y-tick-" idx)}

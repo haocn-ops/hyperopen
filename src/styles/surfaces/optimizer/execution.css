@@ -289,6 +289,10 @@
     background: color-mix(in srgb, var(--optimizer-short) 8%, transparent);
     border-top: 1px solid var(--optimizer-short);
   }
+  .portfolio-optimizer .optimizer-exec-band.is-partial {
+    background: color-mix(in srgb, var(--optimizer-warn) 7%, transparent);
+    border-top: 1px solid var(--optimizer-warn);
+  }
   .portfolio-optimizer .optimizer-exec-band.is-done {
     background: color-mix(in srgb, var(--optimizer-long) 6%, transparent);
     border-top: 1px solid var(--optimizer-long);
@@ -312,6 +316,9 @@
   }
   .portfolio-optimizer .optimizer-exec-progress[data-phase="halted"] .optimizer-exec-progress-fill {
     background: var(--optimizer-short);
+  }
+  .portfolio-optimizer .optimizer-exec-progress[data-phase="partial"] .optimizer-exec-progress-fill {
+    background: var(--optimizer-warn);
   }
   .portfolio-optimizer .optimizer-exec-progress[data-phase="done"] .optimizer-exec-progress-fill {
     background: var(--optimizer-long);

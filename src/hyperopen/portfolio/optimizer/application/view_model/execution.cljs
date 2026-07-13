@@ -151,13 +151,17 @@
 
 (defn- derive-phase
   "Folds the thin engine state (submitting? + run :status) and the cosmetic pre-submit
-  UI phase into the five v4 display phases."
-  [{:keys [submitting? ui-phase status]}]
+  UI phase into the six v4 display phases."
+  [{:keys [submitting? ui-phase status live-resting?]}]
   (cond
     submitting? :running
     (= :executed status) :done
     ;; Orders accepted and live (open) on the book, none rejected — terminal, but not a fill.
     (= :resting status) :resting
+    ;; A rejection stopped the release loop, but earlier passive orders are still live
+    ;; (open) on the book and keep filling — the run is partial, not halted. It falls back
+    ;; to :halted once the resting rows resolve (fill or leave the book).
+    (and (terminal-run-statuses status) live-resting?) :partial
     (terminal-run-statuses status) :halted
     (= :armed ui-phase) :armed
     :else :staged))
@@ -216,7 +220,12 @@
         reconciled-status (if (= :resting status)
                             (execution/final-ledger-status reconciled-rows)
                             status)
-        phase (derive-phase {:submitting? submitting? :ui-phase ui-phase :status reconciled-status})
+        ;; Rows still :resting AFTER reconciliation are live (open) on the book right now,
+        ;; so a rejected-alongside-resting run reads :partial (still working), not :halted.
+        live-resting? (and terminal?
+                           (boolean (some #(= :resting (:status %)) reconciled-rows)))
+        phase (derive-phase {:submitting? submitting? :ui-phase ui-phase
+                             :status reconciled-status :live-resting? live-resting?})
         ready? (pos? (or (:ready-count summary) 0))
         execution-disabled? (boolean (:execution-disabled? plan))
         ;; Inputs edited since the solve => the staged plan no longer reflects intent. The entry

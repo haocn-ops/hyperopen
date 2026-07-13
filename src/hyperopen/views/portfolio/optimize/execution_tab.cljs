@@ -1,7 +1,7 @@
 (ns hyperopen.views.portfolio.optimize.execution-tab
   "Execution surface — where a solved rebalance is staged for review and commit. The
   standalone Rebalance preview tab was retired; \"Rebalance\" CTAs open this tab directly.
-  A dense, phase-aware order list (staged → armed → running → done | halted | resting) with
+  A dense, phase-aware order list (staged → armed → running → done | halted | partial | resting) with
   a Buys/Sells flow summary, a per-order type editor and an Execution-health diagnostics rail.
 
   This namespace holds the header, phase control bands, the KPI strip, the health rail,
@@ -77,6 +77,7 @@
                        :done ["complete" :long]
                        :resting ["resting" :info]
                        :halted ["halted" :short]
+                       :partial ["partial" :warn]
                        :running ["executing" :live]
                        :armed ["armed" :warn]
                        ["staged" :accent])]
@@ -90,6 +91,7 @@
     :done "· all orders filled"
     :resting "· orders resting on the book"
     :halted "· halted — partial fills sent"
+    :partial "· partial — resting orders still working"
     :running "· sending live orders"
     :armed "· armed — confirm to send"
     "· staged from the rebalance"))
@@ -315,26 +317,35 @@
       "View tracking →"]]))
 
 (defn- halted-band
-  [{:keys [error confirm-disabled?] :as _model} rows]
+  "Attention band for a run stopped by a rejection. `phase` is :halted (nothing live any
+  more) or :partial (rejected rows halted the release loop, but earlier resting orders are
+  still live on the book and keep filling) — same recovery actions, honest headline."
+  [{:keys [error confirm-disabled?] :as _model} rows phase]
   (let [{:keys [filled resting failed]} (fill-counts rows)
+        partial? (= :partial phase)
         ;; Reference the ledger order number (:order-no) of the first failed row, not the
         ;; sorted display position, so "Resume from #N" stays consistent with the # column.
         resume-from (when-let [nos (seq (keep :order-no (filter #(= :failed (:status %)) rows)))]
                       (apply min nos))]
-    [:div {:class ["optimizer-exec-band" "is-halted" "flex" "items-center" "gap-4"
+    [:div {:class ["optimizer-exec-band" (if partial? "is-partial" "is-halted")
+                   "flex" "items-center" "gap-4"
                    "border-b" "border-base-300" "px-5" "py-3"]
            :data-role "portfolio-optimizer-execution-control-band"
-           :data-phase "halted"
+           :data-phase (name phase)
            :role "alert"
            :aria-live "assertive"}
-     (shared/chip "halted" :short)
+     (shared/chip (if partial? "partial" "halted") (if partial? :warn :short))
      [:div {:class ["min-w-0"]}
       [:p {:class ["text-[0.8125rem]" "font-medium" "text-trading-text"]}
-       (str "Execution halted — " filled " filled · "
+       (str (if partial? "Execution partial — " "Execution halted — ")
+            filled " filled · "
             (when (pos? resting) (str resting " resting · "))
             failed " failed")]
       [:p {:class ["mt-0.5" "font-mono" "text-[0.65rem]" "text-trading-muted"]}
-       (or error "One or more orders were rejected. Subsequent orders are never auto-retried.")]]
+       (or error
+           (if partial?
+             "One or more orders were rejected — no further orders will be released. Resting orders stay live on the book and keep filling."
+             "One or more orders were rejected. Subsequent orders are never auto-retried."))]]
      [:span {:class ["flex-1"]}]
      [:button {:type "button"
                :class ["border" "border-trading-red/60" "px-3" "py-2" "text-sm" "font-medium" "text-trading-red"
@@ -457,7 +468,8 @@
     :running (running-band model rows)
     :done (done-band rows)
     :resting (resting-band model rows)
-    :halted (halted-band model rows)
+    :halted (halted-band model rows :halted)
+    :partial (halted-band model rows :partial)
     (strategy-band/staged-band model rows)))
 
 ;; ── KPI strip ───────────────────────────────────────────────────────────
@@ -517,7 +529,7 @@
                   (/ (reduce + 0 slip-bps-samples) (count slip-bps-samples)))
         ;; Realized slippage is recoverable only post-run, off filled rows (the effect
         ;; stamps :realized; resting/unfilled rows have none). Never relabel the estimate.
-        post-run? (contains? #{:done :resting :halted} phase)
+        post-run? (contains? #{:done :resting :halted :partial} phase)
         realized-rows (filter #(get-in % [:realized :slippage-bps]) submitted)
         realized-bps (when (seq realized-rows)
                        (/ (reduce + 0 (map #(get-in % [:realized :slippage-bps]) realized-rows))
@@ -537,6 +549,7 @@
            :label "Orders filled"
            :value orders-value
            :value-class (cond (= :halted phase) "text-trading-red"
+                              (= :partial phase) "text-warning"
                               (= :done phase) "text-trading-green"
                               (= :resting phase) "text-info"
                               :else "text-trading-text")
@@ -612,6 +625,11 @@
                                              "Re-stage smaller re-stages the unfilled rows at half size for a fresh arm."
                                              "Revert filled sends NEW reduce-only market orders to unwind the fills — it pays spread, impact, and fees a second time."]
                                             "text-trading-red"]
+                                   :partial ["Partial — resting orders still working"
+                                             ["A rejection stopped new orders from being released — nothing else is sent automatically."
+                                              "Your resting orders stay live on the book and keep filling as the market reaches your price."
+                                              "Resume retries only the failed rows; Revert filled unwinds fills with new reduce-only market orders (paying costs again)."]
+                                             "text-warning"]
                                    :done ["Execution complete"
                                           ["All ready orders were acknowledged by Hyperliquid."
                                            "Tracking has started against the recommendation."]
@@ -674,8 +692,8 @@
                   :aria-valuenow (str (js/Math.round (* 100 pct)))}
             [:div {:class ["optimizer-exec-progress-fill"]
                    :style {:width (str (* 100 pct) "%")}}]]
-           (case phase :done "complete" :resting "resting" :halted "halted" :running "live" "staged")
-           (case phase :halted "text-trading-red" :running "text-warning" :resting "text-info" nil))
+           (case phase :done "complete" :resting "resting" :halted "halted" :partial "partial" :running "live" "staged")
+           (case phase :halted "text-trading-red" :partial "text-warning" :running "text-warning" :resting "text-info" nil))
      (diag "Gross leverage after"
            (shared/leverage-after-label margin)
            (shared/leverage-headroom-sub margin true)
@@ -707,7 +725,7 @@
 
 (defn- latest-attempt-panel
   [{:keys [latest-attempt phase]}]
-  (when (and (contains? #{:halted :done :resting} phase) (seq (:rows latest-attempt)))
+  (when (and (contains? #{:halted :partial :done :resting} phase) (seq (:rows latest-attempt)))
     [:section {:class ["border-t" "border-base-300" "bg-base-200/20" "px-4" "py-4"]
                :data-role "portfolio-optimizer-execution-latest-attempt"}
      [:div {:class ["flex" "items-start" "justify-between" "gap-3"]}

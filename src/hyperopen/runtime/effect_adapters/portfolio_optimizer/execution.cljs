@@ -20,9 +20,15 @@
         blocked (get by :blocked 0)
         blocked-note (when (pos? blocked) (str " · " blocked " below minimum"))]
     (cond
+      ;; Rejection with orders still live on the book: the release loop stopped, but the
+      ;; resting orders keep working — announce "partial", never "halted".
+      (and (pos? failed) (pos? resting))
+      [:error {:headline "Execution partial"
+               :subline (str filled " filled · " resting " resting · " failed
+                             " failed — resting orders keep working; review from the Execution tab.")}]
       (pos? failed)
       [:error {:headline "Execution halted"
-               :subline (str filled " filled · " resting " resting · " failed
+               :subline (str filled " filled · " failed
                              " failed — review and resume from the Execution tab.")}]
       (pos? resting)
       [:info {:headline "Orders resting on the book"

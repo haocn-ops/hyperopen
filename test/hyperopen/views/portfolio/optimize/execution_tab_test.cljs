@@ -464,6 +464,35 @@
     (is (contains? strings "Order must have minimum value of $10. asset=110023"))
     (is (some? (node-by-role view-node "portfolio-optimizer-execution-resume")))))
 
+(deftest execution-tab-partial-when-resting-orders-still-live-test
+  ;; A rejection alongside orders still LIVE (resting) on the book must NOT read "halted" —
+  ;; the resting passive orders keep filling. The band reads "partial" and keeps the same
+  ;; recovery actions; :halted is reserved for a run with nothing live any more.
+  (let [view-node (scenario-view :execution
+                                 {:execution {:status :partially-executed
+                                              :history [{:attempt-id "exec_3000"
+                                                         :status :partially-executed
+                                                         :rows [{:instrument-id "perp:BTC"
+                                                                 :status :failed
+                                                                 :side :buy
+                                                                 :delta-notional-usd 1000
+                                                                 :error {:message "Order must have minimum value of $10. asset=197"}}
+                                                                {:instrument-id "perp:ETH"
+                                                                 :status :resting
+                                                                 :side :sell
+                                                                 :delta-notional-usd -500}]}]}
+                                  :execution-modal {:open? true :phase :staged
+                                                    :plan staged-plan}})
+        band (node-by-role view-node "portfolio-optimizer-execution-control-band")
+        strings (set (collect-strings view-node))]
+    (is (= "partial" (get-in band [1 :data-phase]))
+        "live resting rows alongside a rejection drive the partial band, not halted")
+    (is (not (contains? strings "Execution halted — 0 filled · 1 resting · 1 failed"))
+        "no headline claims the run halted while orders are still working")
+    (is (contains? strings "Execution partial — 0 filled · 1 resting · 1 failed"))
+    (is (some? (node-by-role view-node "portfolio-optimizer-execution-resume"))
+        "the recovery actions stay available while resting orders work")))
+
 (deftest execution-tab-read-only-disables-arm-and-shows-message-test
   (let [message "Spectate Mode is read-only. Stop Spectate Mode to place trades or move funds."
         view-node (scenario-view :execution

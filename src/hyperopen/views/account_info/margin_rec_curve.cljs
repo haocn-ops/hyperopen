@@ -9,7 +9,8 @@
   callouts are comfortably legible."
   (:require [clojure.string :as str]
             [hyperopen.views.account-info.margin-rec-copy :as copy]
-            [hyperopen.views.account-info.shared :as shared]))
+            [hyperopen.views.account-info.shared :as shared]
+            [hyperopen.views.ui.hint-tooltip :as hint]))
 
 (defn- fmt-usd
   [value]
@@ -200,11 +201,12 @@
   (when (seq (:points curve))
     [:div {:class ["rounded-lg" "bg-base-300/40" "p-3"]
            :data-role "margin-rec-curve-card"}
-     [:div {:class ["mb-1.5" "flex" "items-center" "gap-1.5" "text-sm" "font-semibold"
-                    "text-trading-text"]}
-      [:span {:class ["cursor-help"] :title (copy/tip :chart)}
-       "Modeled probability of liquidation vs. collateral"]
-      [:span {:class ["cursor-help" "text-xs" "font-normal" "text-trading-text-secondary"]
-              :title (copy/tip :chart)}
-       "ⓘ"]]
+     (hint/attach
+      (copy/tip :chart)
+      [:div {:class ["mb-1.5" "inline-flex" "items-center" "gap-1.5" "text-sm"
+                     "font-semibold" "text-trading-text"]}
+       [:span "Modeled probability of liquidation vs. collateral"]
+       [:span {:class ["text-xs" "font-normal" "text-trading-text-secondary"]}
+        "ⓘ"]]
+      {:placement :bottom-start})
      (curve-chart curve current-e p-now rec-e p-after)]))

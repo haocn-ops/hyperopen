@@ -15,7 +15,8 @@
             [hyperopen.views.account-info.margin-rec-curve :as margin-rec-curve]
             [hyperopen.views.account-info.shared :as shared]
             [hyperopen.views.ui.anchored-popover :as anchored-popover]
-            [hyperopen.views.ui.dialog-focus :as dialog-focus]))
+            [hyperopen.views.ui.dialog-focus :as dialog-focus]
+            [hyperopen.views.ui.hint-tooltip :as hint]))
 
 (defn- fmt-usd
   [value]
@@ -83,46 +84,58 @@
                               (pos? current-equity)
                               (>= additional 0.01))
                      (/ additional current-equity))]
-    [:div {:class ["overflow-hidden" "rounded-lg" "border" "border-trading-green/30"]
+    ;; No overflow-hidden here: it would clip the hover tooltips. The rounded
+    ;; corners come from the strip's own bg; cells are transparent with
+    ;; divide-x separators.
+    [:div {:class ["rounded-lg" "border" "border-trading-green/30" "bg-base-200"]
            :data-role "margin-rec-summary"}
-     [:div {:class ["grid" "gap-px" "bg-base-300" "sm:grid-cols-3"]}
-      [:div {:class ["bg-base-200" "px-3" "py-2.5"]
+     [:div {:class ["grid" "divide-x" "divide-base-300" "sm:grid-cols-3"]}
+      [:div {:class ["px-3" "py-2.5"]
              :data-role "margin-rec-recommended"}
-       [:div {:class ["cursor-help" "text-xs" "text-trading-text-secondary"]
-              :title (copy/tip :recommended-margin)}
-        "Recommended isolated margin"]
+       (hint/attach (copy/tip :recommended-margin)
+                    [:div {:class ["inline-block" "text-xs" "text-trading-text-secondary"]}
+                     "Recommended isolated margin"]
+                    {:placement :bottom-start})
        [:div {:class ["mt-0.5" "flex" "flex-wrap" "items-baseline" "gap-x-2" "gap-y-1"]}
         [:span {:class ["text-xl" "font-semibold" "num" "text-trading-green"]}
          (fmt-usdc equity)]
         (when vs-current
-          [:span {:class ["cursor-help" "rounded" "bg-trading-green/15" "px-1.5"
-                          "py-0.5" "text-xs" "font-medium" "text-trading-green"]
-                  :title (copy/tip :vs-current)}
-           (str "+" (fmt-percent vs-current 1) " vs current")])]
+          (hint/attach (copy/tip :vs-current)
+                       [:span {:class ["rounded" "bg-trading-green/15" "px-1.5"
+                                       "py-0.5" "text-xs" "font-medium"
+                                       "text-trading-green"]}
+                        (str "+" (fmt-percent vs-current 1) " vs current")]
+                       {:placement :bottom-start}))]
        (when (and (number? additional) (>= additional 0.01))
-         [:div {:class ["mt-0.5" "cursor-help" "text-xs" "text-trading-text-secondary"]
-                :data-role "margin-rec-additional"
-                :title (copy/tip :additional)}
-          (str "Add " (fmt-usdc additional) " to your current " (fmt-usd current-equity))])]
-      [:div {:class ["bg-base-200" "px-3" "py-2.5"]
+         (hint/attach (copy/tip :additional)
+                      [:div {:class ["mt-0.5" "inline-block" "text-xs"
+                                     "text-trading-text-secondary"]
+                             :data-role "margin-rec-additional"}
+                       (str "Add " (fmt-usdc additional) " to your current "
+                            (fmt-usd current-equity))]
+                      {:placement :bottom-start}))]
+      [:div {:class ["px-3" "py-2.5"]
              :data-role "margin-rec-risk-delta"}
-       [:div {:class ["cursor-help" "text-xs" "text-trading-text-secondary"]
-              :title (copy/tip :liq-probability)}
-        "Modeled liq. probability"]
+       (hint/attach (copy/tip :liq-probability)
+                    [:div {:class ["inline-block" "text-xs" "text-trading-text-secondary"]}
+                     "Modeled liq. probability"]
+                    {:placement :bottom-start})
        [:div {:class ["mt-0.5" "flex" "items-center" "gap-2"]}
         [:span {:class ["text-lg" "font-semibold" "num" "text-amber-300"]}
          (fmt-probability p-now)]
         [:span {:class ["text-sm" "text-trading-text-secondary"]} "→"]
         [:span {:class ["text-lg" "font-semibold" "num" "text-trading-green"]}
          (fmt-probability p-after)]]
-       [:div {:class ["cursor-help" "text-xs" "text-trading-text-secondary"]
-              :title (copy/tip :horizon-scope)}
-        "before next intervention"]]
-      [:div {:class ["bg-base-200" "px-3" "py-2.5"]
+       (hint/attach (copy/tip :horizon-scope)
+                    [:div {:class ["inline-block" "text-xs" "text-trading-text-secondary"]}
+                     "before next intervention"]
+                    {:placement :bottom-start})]
+      [:div {:class ["px-3" "py-2.5"]
              :data-role "margin-rec-new-liq"}
-       [:div {:class ["cursor-help" "text-xs" "text-trading-text-secondary"]
-              :title (copy/tip :new-liq)}
-        "New liquidation price (est.)"]
+       (hint/attach (copy/tip :new-liq)
+                    [:div {:class ["inline-block" "text-xs" "text-trading-text-secondary"]}
+                     "New liquidation price (est.)"]
+                    {:placement :bottom-end})
        [:div {:class ["mt-0.5" "text-lg" "font-semibold" "num" "text-trading-text"]}
         (fmt-price new-liquidation-px)]
        (when (number? new-liq-change-frac)
@@ -135,15 +148,16 @@
 
 (defn- method-row
   ([label value] (method-row label value nil))
-  ([label value title]
-   [:div {:class (cond-> ["flex" "items-baseline" "justify-between" "gap-2" "text-xs"]
-                   title (conj "cursor-help"))
-          :title title}
-    [:span {:class ["flex" "min-w-0" "items-baseline" "gap-1.5"
-                    "text-trading-text-secondary"]}
-     [:span {:class ["shrink-0" "text-trading-green"]} "✓"]
-     [:span {:class ["min-w-0"]} label]]
-    [:span {:class ["shrink-0" "num" "text-trading-text"]} value]]))
+  ([label value hint-text]
+   (hint/attach hint-text
+                [:div {:class ["flex" "items-baseline" "justify-between" "gap-2"
+                               "text-xs"]}
+                 [:span {:class ["flex" "min-w-0" "items-baseline" "gap-1.5"
+                                 "text-trading-text-secondary"]}
+                  [:span {:class ["shrink-0" "text-trading-green"]} "✓"]
+                  [:span {:class ["min-w-0"]} label]]
+                 [:span {:class ["shrink-0" "num" "text-trading-text"]} value]]
+                {:placement :top-start})))
 
 (defn- methods-column
   [{:keys [sigma horizon paths-count]} coin-label]
@@ -175,63 +189,71 @@
   (let [total (:equity recommended)]
     (into [:div {:class ["min-w-0" "space-y-1.5"]
                  :data-role "margin-rec-buffers"}
-           [:div {:class ["cursor-help" "text-xs" "font-semibold" "text-trading-text"]
-                  :title (copy/tip :buffers-section)}
-            "Recommended margin components"]]
+           (hint/attach (copy/tip :buffers-section)
+                        [:div {:class ["inline-block" "text-xs" "font-semibold"
+                                       "text-trading-text"]}
+                         "Recommended margin components"]
+                        {:placement :top-end})]
           ;; Every component, maintenance included, so the amounts sum to the
           ;; recommended total (the engine guarantees the sum is exact).
           (map (fn [{:keys [key label amount]}]
-                 [:div {:key (name key)
-                        :class ["flex" "cursor-help" "items-baseline" "justify-between"
-                                "gap-2" "text-xs"]
-                        :data-role (str "margin-rec-buffer-" (name key))
-                        :title (get copy/buffer-tips key)}
-                  [:span {:class ["min-w-0" "text-trading-text-secondary"]} label]
-                  [:span {:class ["shrink-0" "num" "text-trading-text"]}
-                   (str (fmt-usd amount)
-                        (when (and (number? amount) (number? total) (pos? total))
-                          (str " (" (js/Math.round (* 100 (/ amount total))) "%)")))]])
+                 (hint/attach (get copy/buffer-tips key)
+                              [:div {:class ["flex" "items-baseline" "justify-between"
+                                             "gap-2" "text-xs"]
+                                     :replicant/key (str "margin-rec-buffer-" (name key))
+                                     :data-role (str "margin-rec-buffer-" (name key))}
+                               [:span {:class ["min-w-0" "text-trading-text-secondary"]} label]
+                               [:span {:class ["shrink-0" "num" "text-trading-text"]}
+                                (str (fmt-usd amount)
+                                     (when (and (number? amount) (number? total) (pos? total))
+                                       (str " (" (js/Math.round (* 100 (/ amount total))) "%)")))]]
+                              {:placement :top-end}))
                breakdown))))
 
 ;; --- risk mode ---------------------------------------------------------------
 
 (def risk-mode-options
-  [[:conservative "Conservative" "~1% risk" :risk-conservative]
-   [:balanced "Balanced" "~2% risk" :risk-balanced]
-   [:capital-efficient "Capital efficient" "~5% risk" :risk-capital-efficient]])
+  [[:conservative "Conservative" "~1% risk" :risk-conservative :top-start]
+   [:balanced "Balanced" "~2% risk" :risk-balanced :top]
+   [:capital-efficient "Capital efficient" "~5% risk" :risk-capital-efficient :top-end]])
 
 (defn- risk-mode-control
   [active-mode]
   [:div {:data-role "margin-rec-risk-mode"}
-   [:div {:class ["mb-1.5" "cursor-help" "inline-block" "text-xs"
-                  "text-trading-text-secondary"]
-          :title (copy/tip :risk-target)}
-    "Target liquidation risk"]
+   (hint/attach (copy/tip :risk-target)
+                [:div {:class ["mb-1.5" "inline-block" "text-xs"
+                               "text-trading-text-secondary"]}
+                 "Target liquidation risk"]
+                {:placement :top-start})
    (into [:div {:class ["grid" "grid-cols-3" "gap-1.5"]}]
-         (map (fn [[mode label sub tip-key]]
+         (map (fn [[mode label sub tip-key placement]]
                 (let [active? (= mode active-mode)]
-                  [:button {:type "button"
-                            :aria-pressed (if active? "true" "false")
-                            :data-role (str "margin-rec-risk-mode-" (name mode))
-                            :title (copy/tip tip-key)
-                            :class (into ["rounded-md" "border" "px-2" "py-2"
-                                          "text-center" "text-xs" "font-medium"
-                                          "transition-colors" "focus:outline-none"
-                                          "focus:ring-1" "focus:ring-ho-text-muted/40"]
-                                         (if active?
-                                           ["border-trading-green" "bg-trading-green/10"
-                                            "text-trading-text"]
-                                           ["border-base-300" "bg-transparent"
-                                            "text-trading-text-secondary"
-                                            "hover:text-trading-text"]))
-                            :on {:click [[:actions/set-margin-rec-risk-mode mode]]}}
-                   [:span {:class ["block"]} label]
-                   [:span {:class ["block" "text-xs" "text-trading-text-secondary"]} sub]]))
+                  (hint/attach
+                   (copy/tip tip-key)
+                   [:button {:type "button"
+                             :aria-pressed (if active? "true" "false")
+                             :aria-label (str label " (" sub " target)")
+                             :data-role (str "margin-rec-risk-mode-" (name mode))
+                             :class (into ["rounded-md" "border" "px-2" "py-2"
+                                           "text-center" "text-xs" "font-medium"
+                                           "transition-colors" "focus:outline-none"
+                                           "focus:ring-1" "focus:ring-ho-text-muted/40"]
+                                          (if active?
+                                            ["border-trading-green" "bg-trading-green/10"
+                                             "text-trading-text"]
+                                            ["border-base-300" "bg-transparent"
+                                             "text-trading-text-secondary"
+                                             "hover:text-trading-text"]))
+                             :on {:click [[:actions/set-margin-rec-risk-mode mode]]}}
+                    [:span {:class ["block"]} label]
+                    [:span {:class ["block" "text-xs" "text-trading-text-secondary"]} sub]]
+                   {:placement placement :cursor? false})))
               risk-mode-options))
-   [:div {:class ["mt-1.5" "cursor-help" "text-center" "text-xs"
-                  "text-trading-text-secondary"]
-          :title (copy/tip :settings-note)}
-    "You can adjust this anytime in Settings."]])
+   (hint/attach (copy/tip :settings-note)
+                [:div {:class ["mt-1.5" "text-center" "text-xs"
+                               "text-trading-text-secondary"]}
+                 "You can adjust this anytime in Settings."]
+                {:placement :top})])
 
 (defn- advanced-details
   "Collapsible disclosure holding the supplementary methodology and buffer
@@ -239,13 +261,15 @@
   the content in the DOM and needs no app state; a stable :replicant/key stops
   a re-render from recreating the element and closing it."
   [rec-result coin-label]
-  [:details {:class ["group" "overflow-hidden" "rounded-lg" "border" "border-base-300"
-                     "bg-base-300/20"]
+  ;; No overflow-hidden (it would clip the row tooltips). Round the summary's
+  ;; own corners so its hover background matches the border radius.
+  [:details {:class ["group" "rounded-lg" "border" "border-base-300" "bg-base-300/20"]
              :replicant/key "margin-rec-advanced"
              :data-role "margin-rec-advanced"}
    [:summary {:class ["flex" "cursor-pointer" "list-none" "items-center" "justify-between"
-                      "gap-2" "px-3" "py-2" "text-xs" "font-medium" "text-trading-text"
-                      "transition-colors" "hover:bg-base-300/50"
+                      "gap-2" "rounded-lg" "px-3" "py-2" "text-xs" "font-medium"
+                      "text-trading-text" "transition-colors" "hover:bg-base-300/50"
+                      "group-open:rounded-b-none"
                       "focus:outline-none" "focus-visible:ring-1"
                       "focus-visible:ring-ho-text-muted/40"]}
     [:span "How we estimated this & the margin breakdown"]
@@ -292,67 +316,78 @@
      [:div {:class ["flex" "shrink-0" "items-center" "gap-3" "border-b"
                     "border-base-300" "px-4" "py-3"]}
       [:div {:class ["flex" "min-w-0" "flex-wrap" "items-center" "gap-2"]}
-       [:span {:class ["cursor-help" "text-base" "font-semibold" "text-trading-text"]
-               :title (copy/tip :header)}
-        "Margin recommendation"]
-       [:span {:class ["cursor-help" "rounded" "bg-trading-green/15" "px-1.5" "py-0.5"
-                       "text-xs" "font-semibold" "text-trading-green"]
-               :data-role "margin-rec-coin"
-               :title (copy/tip :coin)}
-        coin-label]
+       (hint/attach (copy/tip :header)
+                    [:span {:class ["text-base" "font-semibold" "text-trading-text"]}
+                     "Margin recommendation"]
+                    {:placement :bottom-start})
+       (hint/attach (copy/tip :coin)
+                    [:span {:class ["rounded" "bg-trading-green/15" "px-1.5" "py-0.5"
+                                    "text-xs" "font-semibold" "text-trading-green"]
+                            :data-role "margin-rec-coin"}
+                     coin-label]
+                    {:placement :bottom-start})
        (when leverage-label
-         [:span {:class ["cursor-help" "text-xs" "text-trading-text-secondary"]
-                 :data-role "margin-rec-leverage"
-                 :title (copy/tip :leverage)}
-          leverage-label])]
-      [:button {:type "button"
-                :data-role "margin-rec-panel-close"
-                :class ["ml-auto" "inline-flex" "h-7" "w-7" "shrink-0" "items-center"
-                        "justify-center" "rounded-md" "text-sm"
-                        "text-trading-text-secondary" "transition-colors"
-                        "hover:bg-base-300" "hover:text-trading-text"
-                        "focus:outline-none" "focus:ring-1"
-                        "focus:ring-ho-text-muted/40"]
-                :aria-label (copy/tip :close)
-                :title (copy/tip :close)
-                :on {:click [[:actions/close-margin-rec-panel]]}}
-       "✕"]]
+         (hint/attach (copy/tip :leverage)
+                      [:span {:class ["text-xs" "text-trading-text-secondary"]
+                              :data-role "margin-rec-leverage"}
+                       leverage-label]
+                      {:placement :bottom-start}))]
+      (hint/attach
+       (copy/tip :close)
+       [:button {:type "button"
+                 :data-role "margin-rec-panel-close"
+                 :class ["ml-auto" "inline-flex" "h-7" "w-7" "shrink-0" "items-center"
+                         "justify-center" "rounded-md" "text-sm"
+                         "text-trading-text-secondary" "transition-colors"
+                         "hover:bg-base-300" "hover:text-trading-text"
+                         "focus:outline-none" "focus:ring-1"
+                         "focus:ring-ho-text-muted/40"]
+                 :aria-label (copy/tip :close)
+                 :on {:click [[:actions/close-margin-rec-panel]]}}
+        "✕"]
+       {:placement :bottom-end :cursor? false})]
      (into [:div {:class ["min-h-0" "space-y-3" "overflow-y-auto" "px-4" "py-3"]}]
            children)]))
 
 (defn- apply-button
-  [position-data additional]
-  [:button {:type "button"
-            :data-role "margin-rec-apply"
-            :title (copy/tip :apply)
-            :class ["h-10" "w-full" "rounded-md" "bg-trading-green" "px-3"
-                    "text-sm" "font-semibold" "text-base-100"
-                    "transition-colors" "hover:bg-trading-green/90"
-                    "focus:outline-none" "focus:ring-1"
-                    "focus:ring-trading-green/40"]
-            :on {:click [[:actions/open-position-margin-modal
-                          (assoc position-data
-                                 :prefill-margin-mode :add
-                                 :prefill-margin-amount additional)
-                          :event.currentTarget/bounds]
-                         [:actions/close-margin-rec-panel]]}}
-   "Apply recommendation"])
+  [position-data additional placement]
+  (hint/attach
+   (copy/tip :apply)
+   [:button {:type "button"
+             :data-role "margin-rec-apply"
+             :aria-label "Apply recommendation"
+             :class ["h-10" "w-full" "rounded-md" "bg-trading-green" "px-3"
+                     "text-sm" "font-semibold" "text-base-100"
+                     "transition-colors" "hover:bg-trading-green/90"
+                     "focus:outline-none" "focus:ring-1"
+                     "focus:ring-trading-green/40"]
+             :on {:click [[:actions/open-position-margin-modal
+                           (assoc position-data
+                                  :prefill-margin-mode :add
+                                  :prefill-margin-amount additional)
+                           :event.currentTarget/bounds]
+                          [:actions/close-margin-rec-panel]]}}
+    "Apply recommendation"]
+   {:placement placement :cursor? false}))
 
 (defn- custom-button
-  [position-data]
-  [:button {:type "button"
-            :data-role "margin-rec-custom"
-            :title (copy/tip :custom)
-            :class ["h-10" "w-full" "rounded-md" "border" "border-base-300"
-                    "px-3" "text-sm" "font-medium" "text-trading-text"
-                    "transition-colors" "hover:bg-base-300"
-                    "focus:outline-none" "focus:ring-1"
-                    "focus:ring-ho-text-muted/40"]
-            :on {:click [[:actions/open-position-margin-modal
-                          position-data
-                          :event.currentTarget/bounds]
-                         [:actions/close-margin-rec-panel]]}}
-   "Set custom margin"])
+  [position-data placement]
+  (hint/attach
+   (copy/tip :custom)
+   [:button {:type "button"
+             :data-role "margin-rec-custom"
+             :aria-label "Set custom margin"
+             :class ["h-10" "w-full" "rounded-md" "border" "border-base-300"
+                     "px-3" "text-sm" "font-medium" "text-trading-text"
+                     "transition-colors" "hover:bg-base-300"
+                     "focus:outline-none" "focus:ring-1"
+                     "focus:ring-ho-text-muted/40"]
+             :on {:click [[:actions/open-position-margin-modal
+                           position-data
+                           :event.currentTarget/bounds]
+                          [:actions/close-margin-rec-panel]]}}
+    "Set custom margin"]
+   {:placement placement :cursor? false}))
 
 (defn- ready-panel
   [{:keys [rec-result row-vm read-only? risk-mode]}]
@@ -379,9 +414,9 @@
      (cond
        read-only? nil
        actionable? [:div {:class ["grid" "grid-cols-1" "gap-2" "sm:grid-cols-2"]}
-                    (apply-button position-data additional)
-                    (custom-button position-data)]
-       :else (custom-button position-data))
+                    (apply-button position-data additional :top-start)
+                    (custom-button position-data :top-end)]
+       :else (custom-button position-data :top))
      ;; Always-visible honesty disclosure — never buried only in a tooltip.
      (when-not read-only?
        [:div {:class ["text-xs" "leading-relaxed" "text-trading-text-secondary"]

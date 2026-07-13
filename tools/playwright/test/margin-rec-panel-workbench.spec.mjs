@@ -31,8 +31,8 @@ test.describe("margin recommendation panel (workbench scenes)", () => {
     const panel = frame.locator(role("margin-rec-panel"));
 
     await expect(panel).toContainText("Margin recommendation");
-    await expect(panel.locator(role("margin-rec-coin"))).toHaveText("TSM");
-    await expect(panel.locator(role("margin-rec-leverage"))).toHaveText(
+    await expect(panel.locator(role("margin-rec-coin"))).toContainText("TSM");
+    await expect(panel.locator(role("margin-rec-leverage"))).toContainText(
       "10x isolated"
     );
 
@@ -75,10 +75,10 @@ test.describe("margin recommendation panel (workbench scenes)", () => {
       "Scenario simulation (4,000 paths)"
     );
 
-    await expect(panel.locator(role("margin-rec-apply"))).toHaveText(
+    await expect(panel.locator(role("margin-rec-apply"))).toContainText(
       "Apply recommendation"
     );
-    await expect(panel.locator(role("margin-rec-custom"))).toHaveText(
+    await expect(panel.locator(role("margin-rec-custom"))).toContainText(
       "Set custom margin"
     );
   });
@@ -106,6 +106,35 @@ test.describe("margin recommendation panel (workbench scenes)", () => {
     await expect(
       efficient.locator(role("margin-rec-risk-mode-capital-efficient"))
     ).toHaveAttribute("aria-pressed", "true");
+  });
+
+  test("help tooltips are styled and appear instantly on hover (not native title)", async ({
+    page
+  }) => {
+    const frame = await openScene(page, "elevated-risk-recommendation");
+    const panel = frame.locator(role("margin-rec-panel"));
+
+    // No native title attributes anywhere in the panel.
+    await expect(panel.locator("[title]")).toHaveCount(0);
+
+    const visibleTips = () =>
+      frame
+        .locator("[role='tooltip']")
+        .evaluateAll(
+          (els) => els.filter((e) => getComputedStyle(e).opacity === "1").length
+        );
+
+    // Nothing shown until hover (no focus-within artifact on open).
+    await page.mouse.move(5, 5);
+    expect(await visibleTips()).toBe(0);
+
+    // Hovering one label reveals exactly its tooltip, fully opaque.
+    await frame
+      .locator(`${role("margin-rec-risk-delta")} >> text=Modeled liq. probability`)
+      .hover();
+    await expect
+      .poll(async () => await visibleTips(), { timeout: 1000 })
+      .toBe(1);
   });
 
   test("the chart is the full-width centrepiece", async ({ page }) => {

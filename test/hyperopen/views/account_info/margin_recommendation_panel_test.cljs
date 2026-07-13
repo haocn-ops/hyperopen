@@ -106,8 +106,8 @@
     (testing "header: title, coin badge, leverage inline"
       (is (contains? strings "Margin recommendation"))
       (is (some? (node-by-role tree "margin-rec-coin")))
-      (is (= "10x isolated"
-             (last (node-by-role tree "margin-rec-leverage")))))
+      (is (contains? (collect-strings (node-by-role tree "margin-rec-leverage"))
+                     "10x isolated")))
     (testing "recommendation summary: headline, amount-to-add, before/after, new liq"
       (is (some? (node-by-role tree "margin-rec-summary")))
       (is (some? (node-by-role tree "margin-rec-recommended")))
@@ -166,14 +166,16 @@
       (is (contains? strings "$2.08 (11%)"))
       (is (contains? strings "$1.82 (10%)"))
       (is (contains? strings "$1.46 (8%)")))
-    (testing "key elements carry help tooltips and an always-visible disclaimer"
-      (let [titles (set (keep #(when (vector? %) (:title (node-attrs %)))
-                              (all-nodes tree)))]
-        (is (contains? titles (copy/tip :liq-probability)))
-        (is (contains? titles (copy/tip :recommended-margin)))
-        (is (contains? titles (copy/tip :risk-target))))
-      (is (some? (:title (node-attrs (node-by-role tree "margin-rec-apply")))))
-      (is (some? (:title (node-attrs (node-by-role tree "margin-rec-risk-mode-conservative")))))
+    (testing "key elements carry styled help tooltips + an always-visible disclaimer"
+      ;; Instant, app-styled tooltips (role=tooltip spans), not native `title`.
+      (is (some #(and (vector? %) (= "tooltip" (:role (node-attrs %))))
+                (all-nodes tree)))
+      (is (not-any? #(and (vector? %) (:title (node-attrs %))) (all-nodes tree)))
+      (is (contains? strings (copy/tip :liq-probability)))
+      (is (contains? strings (copy/tip :recommended-margin)))
+      (is (contains? strings (copy/tip :risk-target)))
+      (is (contains? (collect-strings (node-by-role tree "margin-rec-apply"))
+                     (copy/tip :apply)))
       (is (some? (node-by-role tree "margin-rec-disclaimer"))))
     (testing "renders as a centred overlay with a computed layout style"
       (let [panel (node-by-role tree "margin-rec-panel")

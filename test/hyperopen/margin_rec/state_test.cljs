@@ -252,3 +252,96 @@
                                [:trading-settings :margin-rec-risk-mode]
                                :conservative)]
     (is (= 21.0 (state/ready-recommended-equity conservative "xyz:TSM|xyz")))))
+
+(def high-risk-result
+  {:status :ok
+   :risk-level :high
+   :p-now 0.14
+   :p-after 0.02
+   :recommended {:equity 18.64 :additional 6.22 :new-liquidation-px 400.0}})
+
+(defn- with-rec
+  [state key rec]
+  (assoc-in state (conj state/recs-path key) rec))
+
+(deftest batch-candidates-filters-and-sorts
+  (testing "only :ok recs with high/elevated risk and an actionable top-up"
+    (let [state (with-rec (base-state) "xyz:TSM|xyz"
+                          {:status :ok :result high-risk-result})
+          [candidate :as candidates] (state/batch-candidates state :balanced)]
+      (is (= 1 (count candidates)))
+      (is (= "xyz:TSM|xyz" (:position-key candidate)))
+      (is (= "xyz" (:dex candidate)))
+      (is (= 6.22 (:additional candidate)))
+      (is (= 18.64 (:target-equity candidate)))
+      (is (= 0.14 (:p-now candidate)))
+      (is (= :high (:risk-level candidate)))
+      (is (map? (:position-data candidate)))))
+  (testing "normal risk, non-ok status, and dust top-ups are excluded"
+    (let [normal (with-rec (base-state) "xyz:TSM|xyz"
+                           {:status :ok
+                            :result (assoc high-risk-result :risk-level :normal)})
+          computing (with-rec (base-state) "xyz:TSM|xyz"
+                              {:status :computing :result nil})
+          dust (with-rec (base-state) "xyz:TSM|xyz"
+                         {:status :ok
+                          :result (assoc-in high-risk-result
+                                            [:recommended :additional] 0.005)})]
+      (is (empty? (state/batch-candidates normal :balanced)))
+      (is (empty? (state/batch-candidates computing :balanced)))
+      (is (empty? (state/batch-candidates dust :balanced)))))
+  (testing "amounts follow the requested risk mode via :by-risk-mode"
+    (let [result (assoc high-risk-result
+                        :by-risk-mode
+                        {:conservative {:status :ok
+                                        :p-after 0.01
+                                        :recommended {:equity 21.0 :additional 8.58}}
+                         :balanced {:status :ok
+                                    :p-after 0.02
+                                    :recommended {:equity 18.64 :additional 6.22}}})
+          state (with-rec (base-state) "xyz:TSM|xyz" {:status :ok :result result})]
+      (is (= 8.58 (:additional (first (state/batch-candidates state :conservative)))))
+      (is (= 6.22 (:additional (first (state/batch-candidates state :balanced))))))))
+
+(deftest batch-computing-count-counts-unresolved-recs
+  (is (= 1 (state/batch-computing-count (base-state))))
+  (is (= 1 (state/batch-computing-count
+            (with-rec (base-state) "xyz:TSM|xyz" {:status :computing}))))
+  (is (zero? (state/batch-computing-count
+              (with-rec (base-state) "xyz:TSM|xyz"
+                        {:status :ok :result high-risk-result})))))
+
+(deftest batch-available-pools-one-pool-per-dex
+  (let [state (with-rec (base-state) "xyz:TSM|xyz"
+                        {:status :ok :result high-risk-result})
+        candidates (state/batch-candidates state :balanced)]
+    (is (= {"xyz" 500} (state/batch-available-pools state candidates)))))
+
+(deftest batch-coverage-drains-pools-most-severe-first
+  (let [worse {:position-key "a" :dex "xyz" :additional 6 :p-now 0.2}
+        better {:position-key "b" :dex "xyz" :additional 5 :p-now 0.1}]
+    (testing "pool covers everything"
+      (is (= {:total 11 :covered 11 :fundable-count 2 :skipped-count 0}
+             (dissoc (state/batch-coverage [worse better] {"xyz" 500}) :pools))))
+    (testing "short pool funds the earlier (worse) candidate first"
+      (let [{:keys [total covered fundable-count skipped-count]}
+            (state/batch-coverage [worse better] {"xyz" 6.5})]
+        (is (= 11 total))
+        (is (= 6 covered))
+        (is (= 1 fundable-count))
+        (is (= 1 skipped-count))))
+    (testing "sub-dollar remainders are skipped, not submitted"
+      (let [{:keys [covered fundable-count skipped-count]}
+            (state/batch-coverage [worse better] {"xyz" 6.4})]
+        (is (= 6 covered))
+        (is (= 1 fundable-count))
+        (is (= 1 skipped-count))))))
+
+(deftest batch-ui-slice-carries-batch-fields
+  (let [state (with-rec (base-state) "xyz:TSM|xyz"
+                        {:status :ok :result high-risk-result})
+        slice (state/ui-slice state)]
+    (is (= {:open? false :anchor nil :deselected #{}} (:batch slice)))
+    (is (= 1 (count (:batch-candidates slice))))
+    (is (zero? (:batch-computing-count slice)))
+    (is (= {"xyz" 500} (:batch-available-pools slice)))))

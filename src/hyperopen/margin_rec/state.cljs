@@ -16,6 +16,7 @@
      :intents {position-key intent}}"
   (:require [clojure.string :as str]
             [hyperopen.account.history.position-identity :as position-identity]
+            [hyperopen.account.history.position-margin :as position-margin]
             [hyperopen.trading-settings :as trading-settings]))
 
 (def root-path [:margin-rec])
@@ -23,6 +24,7 @@
 (def panel-path (conj root-path :panel))
 (def panel-anchor-path (conj root-path :panel-anchor))
 (def intents-path (conj root-path :intents))
+(def batch-path (conj root-path :batch))
 (def fills-path (conj root-path :fills))
 (def computing-path (conj root-path :computing))
 (def candle-requests-path (conj root-path :candle-requests))
@@ -46,7 +48,8 @@
    :panel nil
    :panel-anchor nil
    :candle-requests {}
-   :intents {}})
+   :intents {}
+   :batch {:open? false :anchor nil :deselected #{}}})
 
 (defn- parse-num
   [value]
@@ -474,15 +477,102 @@
       (get-in (select-risk-mode result (risk-mode state))
               [:recommended :equity]))))
 
+(def batch-risk-levels
+  "Risk levels that count as \"facing liquidation\" for the batch top-up."
+  #{:high :elevated})
+
+(defn batch-candidates
+  "Isolated positions currently facing high/elevated modeled liquidation risk
+  with an actionable recommended top-up under `mode`, sorted most-at-risk
+  (highest p-now) first."
+  [state mode]
+  (->> (isolated-positions state)
+       (keep (fn [{:keys [position-key] :as entry}]
+               (let [{:keys [status result]} (rec-for state position-key)
+                     selected (select-risk-mode result mode)
+                     additional (get-in selected [:recommended :additional])]
+                 (when (and (= :ok status)
+                            (contains? batch-risk-levels (:risk-level result))
+                            (number? additional)
+                            (>= additional 0.01))
+                   {:position-key position-key
+                    :coin (:coin entry)
+                    :dex (:dex entry)
+                    :position-data (:position-data entry)
+                    :equity (:equity entry)
+                    :additional additional
+                    :target-equity (get-in selected [:recommended :equity])
+                    :new-liquidation-px (get-in selected [:recommended :new-liquidation-px])
+                    :p-now (:p-now selected)
+                    :p-after (:p-after selected)
+                    :risk-level (:risk-level result)}))))
+       (sort-by (fn [{:keys [p-now]}] (- (or p-now 0))))
+       vec))
+
+(defn batch-computing-count
+  "Isolated positions whose recommendation has not resolved yet — shown in the
+  batch panel so a partial list is never mistaken for the full picture."
+  [state]
+  (->> (isolated-positions state)
+       (filter (fn [{:keys [position-key]}]
+                 (let [{:keys [status]} (rec-for state position-key)]
+                   (or (nil? status) (= :computing status)))))
+       count))
+
+(defn batch-ui
+  [state]
+  (merge {:open? false :anchor nil :deselected #{}}
+         (get-in state batch-path)))
+
+(defn batch-available-pools
+  "Available collateral per dex pool for the given candidates. Named-dex
+  clearinghouses are separate pools; the default/unified pool is shared."
+  [state candidates]
+  (reduce (fn [pools {:keys [dex position-data]}]
+            (let [pool-key (or dex "")]
+              (if (contains? pools pool-key)
+                pools
+                (assoc pools pool-key
+                       (or (:available-to-add
+                            (position-margin/from-position-row state position-data))
+                           0)))))
+          {}
+          candidates))
+
+(defn batch-coverage
+  "How much of the selected candidates' total top-up the per-dex pools cover
+  when drained in candidate order (most-severe-first). Returns
+  {:total :covered :fundable-count :skipped-count}."
+  [candidates pools]
+  (reduce (fn [acc {:keys [dex additional]}]
+            (let [pool-key (or dex "")
+                  available (get-in acc [:pools pool-key] 0)
+                  amount (min additional available)
+                  fundable? (>= amount intent-min-topup-usd)]
+              (-> acc
+                  (update :total + additional)
+                  (cond->
+                   fundable? (-> (update :covered + amount)
+                                 (update :fundable-count inc)
+                                 (assoc-in [:pools pool-key] (- available amount)))
+                   (not fundable?) (update :skipped-count inc)))))
+          {:total 0 :covered 0 :fundable-count 0 :skipped-count 0 :pools pools}
+          candidates))
+
 (defn ui-slice
   "The margin-rec slice the positions view model consumes."
   [state]
-  {:recs (get-in state recs-path {})
-   :panel (get-in state panel-path)
-   :panel-anchor (get-in state panel-anchor-path)
-   :computing (get-in state computing-path)
-   :risk-mode (risk-mode state)
-   :auto-topup? (trading-settings/margin-rec-auto-topup? state)})
+  (let [candidates (batch-candidates state (risk-mode state))]
+    {:recs (get-in state recs-path {})
+     :panel (get-in state panel-path)
+     :panel-anchor (get-in state panel-anchor-path)
+     :computing (get-in state computing-path)
+     :risk-mode (risk-mode state)
+     :auto-topup? (trading-settings/margin-rec-auto-topup? state)
+     :batch (batch-ui state)
+     :batch-candidates candidates
+     :batch-computing-count (batch-computing-count state)
+     :batch-available-pools (batch-available-pools state candidates)}))
 
 (defn modal-hint
   "Prefill hint for the Adjust Margin modal: the recommended top-up for the

@@ -117,6 +117,93 @@
     (close-margin-rec-panel state)
     []))
 
+;; --- batch top-up panel ------------------------------------------------------
+
+(def ^:private closed-batch
+  {:open? false :anchor nil :deselected #{}})
+
+(defn toggle-margin-rec-batch-panel
+  ([state]
+   (toggle-margin-rec-batch-panel state nil))
+  ([state anchor]
+   (let [open? (boolean (get-in state (conj margin-rec-state/batch-path :open?)))]
+     [[:effects/save margin-rec-state/batch-path
+       (if open?
+         closed-batch
+         {:open? true
+          :anchor (normalize-anchor anchor)
+          :deselected #{}})]])))
+
+(defn close-margin-rec-batch-panel
+  [_state]
+  [[:effects/save margin-rec-state/batch-path closed-batch]])
+
+(defn handle-margin-rec-batch-keydown
+  [state key]
+  (if (= key "Escape")
+    (close-margin-rec-batch-panel state)
+    []))
+
+(defn toggle-margin-rec-batch-selection
+  [state position-key]
+  (let [batch (margin-rec-state/batch-ui state)
+        deselected (set (:deselected batch))
+        next-deselected (if (contains? deselected position-key)
+                          (disj deselected position-key)
+                          (conj deselected position-key))]
+    [[:effects/save margin-rec-state/batch-path
+      (assoc batch :deselected next-deselected)]]))
+
+(declare submit-for-intent)
+
+(defn margin-rec-batch-plan
+  "Plan the one-action batch top-up over the current at-risk candidates:
+  selected candidates drain their dex's available-collateral pool
+  most-severe-first. Returns {:submits [{:candidate :amount :request}]
+                              :skipped [{:candidate :skip-reason}]}."
+  [state]
+  (let [mode (margin-rec-state/risk-mode state)
+        deselected (set (:deselected (margin-rec-state/batch-ui state)))
+        candidates (->> (margin-rec-state/batch-candidates state mode)
+                        (remove (comp deselected :position-key)))
+        pools (margin-rec-state/batch-available-pools state candidates)]
+    (loop [candidates candidates
+           pools pools
+           submits []
+           skipped []]
+      (if-let [{:keys [dex additional position-data] :as candidate} (first candidates)]
+        (let [pool-key (or dex "")
+              available (get pools pool-key 0)
+              amount (min additional available)]
+          (if (< amount margin-rec-state/intent-min-topup-usd)
+            (recur (rest candidates) pools submits
+                   (conj skipped {:candidate candidate
+                                  :skip-reason :insufficient-available}))
+            (if-let [request (submit-for-intent state
+                                                {:position-data position-data}
+                                                amount)]
+              (recur (rest candidates)
+                     (assoc pools pool-key (- available amount))
+                     (conj submits {:candidate candidate
+                                    :amount amount
+                                    :request request})
+                     skipped)
+              (recur (rest candidates) pools submits
+                     (conj skipped {:candidate candidate
+                                    :skip-reason :request-invalid})))))
+        {:submits submits :skipped skipped}))))
+
+(defn apply-margin-rec-batch
+  "Submit the recommended top-up for every selected at-risk position in one
+  action: close the panel (projection first), then one updateIsolatedMargin
+  request per fundable position."
+  [state]
+  (let [{:keys [submits]} (margin-rec-batch-plan state)]
+    (vec (concat (close-margin-rec-batch-panel state)
+                 (map (fn [{:keys [request]}]
+                        [:effects/api-submit-position-margin request])
+                      submits)))))
+
 (defn- persist-trading-settings
   [state updates]
   (let [next-state (trading-settings/normalize-state

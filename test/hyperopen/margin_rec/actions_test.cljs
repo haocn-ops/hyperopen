@@ -228,3 +228,97 @@
         (is (= 2 (count effects)))
         (is (= 8000000 (get-in (second (second effects))
                                [:action :ntli])))))))
+
+(def high-risk-result
+  {:status :ok
+   :risk-level :high
+   :p-now 0.14
+   :p-after 0.02
+   :recommended {:equity 18.64 :additional 6.22 :new-liquidation-px 400.0}})
+
+(defn- with-high-risk-rec
+  [state]
+  (assoc-in state (conj state/recs-path "xyz:TSM|xyz")
+            {:status :ok :result high-risk-result}))
+
+(deftest batch-toggle-arg-spec-accepts-dispatch-payloads
+  ;; Raw dispatch args are validated before placeholders resolve, so the
+  ;; toolbar trigger's payload carries the literal bounds keyword.
+  (is (s/valid? ::action-args/margin-rec-batch-toggle-args
+                [:event.currentTarget/bounds]))
+  (is (s/valid? ::action-args/margin-rec-batch-toggle-args []))
+  (is (s/valid? ::action-args/margin-rec-batch-toggle-args [{:left 1 :top 2}])))
+
+(deftest batch-panel-toggle-and-dismiss
+  (testing "opening stores the normalized anchor and a fresh selection"
+    (is (= [[:effects/save state/batch-path
+             {:open? true :anchor anchor :deselected #{}}]]
+           (actions/toggle-margin-rec-batch-panel (base-state) anchor))))
+  (testing "toggling while open closes"
+    (let [open (assoc-in (base-state) (conj state/batch-path :open?) true)]
+      (is (= [[:effects/save state/batch-path
+               {:open? false :anchor nil :deselected #{}}]]
+             (actions/toggle-margin-rec-batch-panel open anchor)))))
+  (testing "Escape closes; other keys are inert"
+    (is (= [[:effects/save state/batch-path
+             {:open? false :anchor nil :deselected #{}}]]
+           (actions/handle-margin-rec-batch-keydown (base-state) "Escape")))
+    (is (= [] (actions/handle-margin-rec-batch-keydown (base-state) "Enter")))))
+
+(deftest batch-selection-toggles-per-position
+  (let [[[_ _ batch]] (actions/toggle-margin-rec-batch-selection
+                       (base-state) "xyz:TSM|xyz")]
+    (is (= #{"xyz:TSM|xyz"} (:deselected batch)))
+    (let [reselected (assoc-in (base-state) state/batch-path batch)
+          [[_ _ batch*]] (actions/toggle-margin-rec-batch-selection
+                          reselected "xyz:TSM|xyz")]
+      (is (= #{} (:deselected batch*))))))
+
+(deftest apply-batch-closes-panel-then-submits-per-position
+  (let [state (with-high-risk-rec (base-state))
+        effects (actions/apply-margin-rec-batch state)]
+    (assert-save-effects-valid! effects)
+    (is (= [:effects/save :effects/api-submit-position-margin]
+           (mapv first effects)))
+    (testing "projection closes the panel before the heavy submit"
+      (is (= [:effects/save state/batch-path
+              {:open? false :anchor nil :deselected #{}}]
+             (first effects))))
+    (is (= {:action {:type "updateIsolatedMargin"
+                     :asset 100001
+                     :isBuy true
+                     :ntli 6220000}}
+           (second (second effects))))))
+
+(deftest apply-batch-guards
+  (testing "deselected positions are not submitted"
+    (let [state (-> (base-state)
+                    with-high-risk-rec
+                    (assoc-in state/batch-path
+                              {:open? true :anchor nil
+                               :deselected #{"xyz:TSM|xyz"}}))
+          effects (actions/apply-margin-rec-batch state)]
+      (is (= [:effects/save] (mapv first effects)))))
+  (testing "top-up is capped at the dex's available collateral"
+    (let [state (-> (base-state)
+                    with-high-risk-rec
+                    (assoc-in [:perp-dex-clearinghouse "xyz" :withdrawable] "5"))
+          [_ submit] (actions/apply-margin-rec-batch state)]
+      (is (= 5000000 (get-in (second submit) [:action :ntli])))))
+  (testing "sub-dollar affordable amounts are skipped entirely"
+    (let [state (-> (base-state)
+                    with-high-risk-rec
+                    (assoc-in [:perp-dex-clearinghouse "xyz" :withdrawable] "0.4"))
+          effects (actions/apply-margin-rec-batch state)]
+      (is (= [:effects/save] (mapv first effects)))))
+  (testing "no candidates -> panel just closes"
+    (is (= [:effects/save]
+           (mapv first (actions/apply-margin-rec-batch (base-state)))))))
+
+(deftest batch-plan-reports-skips
+  (let [state (-> (base-state)
+                  with-high-risk-rec
+                  (assoc-in [:perp-dex-clearinghouse "xyz" :withdrawable] "0.4"))
+        {:keys [submits skipped]} (actions/margin-rec-batch-plan state)]
+    (is (empty? submits))
+    (is (= [:insufficient-available] (mapv :skip-reason skipped)))))

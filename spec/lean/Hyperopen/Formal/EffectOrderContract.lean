@@ -71,6 +71,7 @@ def heavyOnlyPolicy (allowDuplicateHeavyEffects : Bool) (heavyEffectIds : List S
 
 def policyCorpus : List (String × Policy) :=
   [("actions/apply-funding-history-filters", defaultPolicy false ["effects/api-fetch-user-funding-history"])
+  ,("actions/apply-margin-rec-batch", defaultPolicy true ["effects/api-submit-position-margin"])
   ,("actions/cancel-order", defaultPolicy false ["effects/api-cancel-order"])
   ,("actions/cancel-twap", defaultPolicy false ["effects/api-cancel-order"])
   ,("actions/cancel-visible-open-orders", defaultPolicy false ["effects/api-cancel-order"])

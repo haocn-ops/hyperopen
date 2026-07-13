@@ -167,6 +167,13 @@
     :allow-duplicate-heavy-effects? true
     :heavy-effect-ids #{:effects/api-submit-position-margin}}
 
+   ;; Batch top-up submits one updateIsolatedMargin per selected position.
+   :actions/apply-margin-rec-batch
+   {:required-phase-order [:projection :persistence :heavy-io]
+    :require-projection-before-heavy? true
+    :allow-duplicate-heavy-effects? true
+    :heavy-effect-ids #{:effects/api-submit-position-margin}}
+
    :actions/submit-vault-transfer
    {:required-phase-order [:projection :persistence :heavy-io]
     :require-projection-before-heavy? true

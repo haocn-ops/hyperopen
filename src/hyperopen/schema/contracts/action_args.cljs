@@ -170,6 +170,11 @@
         :key-and-anchor (s/tuple (s/nilable ::common/non-empty-string) any?)))
 (s/def ::margin-rec-risk-mode-args
   (s/tuple (s/or :keyword keyword? :string string?)))
+;; Anchor slot carries the raw :event.currentTarget/bounds placeholder at
+;; dispatch-validation time, so it must accept `any?`.
+(s/def ::margin-rec-batch-toggle-args
+  (s/or :none ::common/no-args
+        :anchor-only (s/tuple any?)))
 (def action-args-spec-by-id
   {:actions/init-websockets ::common/no-args
    :actions/margin-rec-sync ::margin-rec-now-args
@@ -179,6 +184,11 @@
    :actions/handle-margin-rec-panel-keydown ::common/key-args
    :actions/set-margin-rec-risk-mode ::margin-rec-risk-mode-args
    :actions/set-margin-rec-auto-topup ::common/boolean-args
+   :actions/toggle-margin-rec-batch-panel ::margin-rec-batch-toggle-args
+   :actions/close-margin-rec-batch-panel ::common/no-args
+   :actions/handle-margin-rec-batch-keydown ::common/key-args
+   :actions/toggle-margin-rec-batch-selection ::common/key-args
+   :actions/apply-margin-rec-batch ::common/no-args
    :actions/subscribe-to-asset ::common/coin-args
    :actions/subscribe-to-webdata2 ::common/address-args
    :actions/connect-wallet ::common/optional-string-args

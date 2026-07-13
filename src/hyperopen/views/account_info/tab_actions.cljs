@@ -1,5 +1,6 @@
 (ns hyperopen.views.account-info.tab-actions
   (:require [hyperopen.ui.fonts :as fonts]
+            [hyperopen.views.account-info.margin-rec-batch-panel :as margin-rec-batch-panel]
             [hyperopen.views.account-info.tab-registry :as tab-registry]
             [hyperopen.views.account-info.tab-filters :as tab-filters]))
 
@@ -269,6 +270,8 @@
         coin-search (:coin-search positions-state "")]
     [:div {:class ["ml-auto" "relative" "flex" "items-center" "justify-end" "gap-2" "px-4" "py-2" "md:min-h-12" "md:py-0"]
            :data-role "account-info-tab-actions-shell"}
+     (margin-rec-batch-panel/batch-trigger (:margin-rec positions-state)
+                                           (:read-only? positions-state))
      (when (map? freshness-cue)
        [:div {:class ["px-1" "py-1"]
               :data-role "account-tab-freshness-cue"}

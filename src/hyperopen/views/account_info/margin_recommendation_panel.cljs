@@ -85,7 +85,7 @@
     [:div {:class ["overflow-hidden" "rounded-lg" "border" "border-trading-green/30"]
            :data-role "margin-rec-summary"}
      [:div {:class ["grid" "gap-px" "bg-base-300" "sm:grid-cols-3"]}
-      [:div {:class ["bg-trading-green/5" "px-3" "py-2.5"]
+      [:div {:class ["bg-base-200" "px-3" "py-2.5"]
              :data-role "margin-rec-recommended"}
        [:div {:class ["text-xs" "text-trading-text-secondary"]}
         "Recommended isolated margin"]

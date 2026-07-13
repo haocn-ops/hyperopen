@@ -13,6 +13,61 @@
     :unchanged "is unchanged"
     "is unavailable"))
 
+(def ^:private help-copy
+  {:overview
+   "Current and Recommended share one annualized-volatility scale; Change is Recommended minus Current in percentage points."
+   :all-move-together
+   "hypothetical volatility if all held position P&L streams moved together; a stress benchmark, not a forecast."
+   :zero-correlation
+   "hypothetical volatility if held position P&L streams moved independently."
+   :modeled
+   "estimated portfolio volatility using the modeled relationships between positions."
+   :diversification-benefit
+   "how far modeled volatility is below the all-move-together benchmark; a larger benefit does not necessarily mean lower absolute risk."
+   :correlation-effect
+   "modeled volatility minus zero-correlation volatility; negative offsets risk and positive amplifies it."})
+
+(defn- help-id
+  [prefix key]
+  (str prefix "-" (name key)))
+
+(defn- help-shell-from-event
+  [event]
+  (some-> event
+          .-currentTarget
+          (.closest ".optimizer-risk-diversification-help")))
+
+(defn- clear-help-dismissal!
+  [event]
+  (when-let [shell (help-shell-from-event event)]
+    (.removeAttribute shell "data-dismissed")))
+
+(defn- dismiss-help-on-escape!
+  [event]
+  (when (= "Escape" (.-key event))
+    (.preventDefault event)
+    (.stopPropagation event)
+    (when-let [shell (help-shell-from-event event)]
+      (.setAttribute shell "data-dismissed" "true"))))
+
+(defn- help-disclosure
+  [prefix key accessible-label]
+  (let [id (help-id prefix key)]
+    [:span {:class ["optimizer-risk-diversification-help"]}
+     [:button {:class ["optimizer-risk-diversification-help-trigger"]
+               :data-role "portfolio-optimizer-risk-diversification-help-trigger"
+               :type "button"
+               :aria-label accessible-label
+               :aria-describedby id
+               :on {:focus clear-help-dismissal!
+                    :blur clear-help-dismissal!
+                    :keydown dismiss-help-on-escape!}}
+      "?"]
+     [:span {:class ["optimizer-risk-diversification-tooltip"]
+             :id id
+             :role "tooltip"}
+      (help-copy key)]]))
+
 (defn- correlation-direction-copy
   [{:keys [current-polarity recommended-polarity direction]}]
   (case [current-polarity recommended-polarity]
@@ -75,7 +130,7 @@
       direction-copy])])
 
 (defn- benchmark-row
-  [{:keys [key label current-value recommended-value current-position
+  [help-prefix {:keys [key label current-value recommended-value current-position
            recommended-position connector marker-overlap? direction tone]
     :as row}]
   [:div {:class ["optimizer-risk-diversification-row"
@@ -87,8 +142,11 @@
          :data-direction (name direction)
          :data-tone (name tone)}
    [:div {:class ["optimizer-risk-diversification-row-label"]
-          :role "rowheader"}
-    [:span label]
+          :role "rowheader"
+          :aria-label label}
+    [:span {:class ["optimizer-risk-diversification-row-label-primary"]}
+     [:span label]
+     (help-disclosure help-prefix key (str "Explain " label))]
     [:span {:class ["optimizer-risk-diversification-row-kind"]}
      "Annualized volatility"]]
    [:div {:class ["optimizer-risk-diversification-lane"
@@ -130,8 +188,17 @@
    (change-cell row (direction-word direction))])
 
 (defn- outcome-row
-  [{:keys [key label current-value recommended-value direction tone] :as row}]
-  [:div {:class ["optimizer-risk-diversification-row"
+  [help-prefix {:keys [key current-value recommended-value direction tone]
+                :as row}]
+  (let [label (case key
+                :diversification-benefit "Diversification benefit"
+                :correlation-effect "Correlation effect"
+                (name key))
+        baseline (case key
+                   :diversification-benefit "vs all-move-together"
+                   :correlation-effect "vs zero correlation"
+                   "Portfolio outcome")]
+    [:div {:class ["optimizer-risk-diversification-row"
                  "optimizer-risk-diversification-row--outcome"]
          :role "row"
          :data-role "portfolio-optimizer-risk-diversification-outcome-row"
@@ -139,18 +206,18 @@
          :data-direction (name direction)
          :data-tone (name tone)}
    [:div {:class ["optimizer-risk-diversification-row-label"]
-          :role "rowheader"}
-    [:span label]
+          :role "rowheader"
+          :aria-label (str label ", " baseline)}
+    [:span {:class ["optimizer-risk-diversification-row-label-primary"]}
+     [:span label]
+     (help-disclosure help-prefix key (str "Explain " label))]
     [:span {:class ["optimizer-risk-diversification-row-kind"]}
-     (case key
-       :diversification-benefit "Reduction from all-move-together"
-       :correlation-effect "Modeled minus zero correlation"
-       "Portfolio outcome")]]
+     baseline]]
    [:span {:class ["optimizer-risk-diversification-outcome-spacer"]
            :role "cell"}]
    (comparison-value current-value)
    (comparison-value recommended-value)
-   (change-cell row (outcome-direction-copy row))])
+   (change-cell row (outcome-direction-copy row))]))
 
 (defn- render-decision-summary
   [{:keys [status modeled-direction stress-direction
@@ -172,7 +239,7 @@
           (structure-model/format-pct stress-recommended-value) "."))])
 
 (defn- comparison-matrix
-  [{:keys [benchmark-rows outcome-rows decision-summary]}]
+  [{:keys [benchmark-rows outcome-rows decision-summary help-prefix]}]
   [:div {:class ["optimizer-risk-diversification-matrix"]
          :data-role "portfolio-optimizer-risk-diversification-matrix"
          :role "table"
@@ -190,47 +257,60 @@
      [:span {:role "columnheader"} "Change"]]]
    (into [:div {:class ["optimizer-risk-diversification-row-group"]
                 :role "rowgroup"}]
-         (map benchmark-row)
+         (map (partial benchmark-row help-prefix))
          benchmark-rows)
    (into [:div {:class ["optimizer-risk-diversification-row-group"
                         "optimizer-risk-diversification-row-group--outcomes"]
                 :role "rowgroup"}]
-         (map outcome-row)
+         (map (partial outcome-row help-prefix))
          outcome-rows)
    (render-decision-summary decision-summary)])
 
 (defn diversification-summary
   "Renders one current/recommended comparison matrix when a valid target
-  summary exists. Legacy results get an explicit re-run note while their
-  existing final-weight attribution remains available below."
-  [result]
-  (if-let [model (structure-model/diversification-comparison-model result)]
-    [:section {:class ["optimizer-risk-diversification-summary"]
-               :data-role "portfolio-optimizer-risk-diversification-comparison"}
-     [:div {:class ["optimizer-risk-diversification-intro"]}
-      [:div
-       [:p {:class ["optimizer-risk-corr-title"]}
-        "Portfolio diversification"]
-       [:p {:class ["optimizer-risk-diversification-explainer"]}
-        (str "Equal Risk balances risk ownership; it does not minimize total "
-             "volatility. These benchmarks compare both books on one "
-             "absolute annualized-volatility scale.")]]
-      [:div {:class ["optimizer-risk-diversification-legend"]
-             :aria-label "Portfolio marker legend"}
-       [:span {:class ["optimizer-risk-diversification-legend-item"]}
-       [:span {:class ["optimizer-risk-diversification-legend-marker"
-                        "optimizer-risk-diversification-legend-marker--current"]
-                :aria-hidden true}]
-        "Current"]
-       [:span {:class ["optimizer-risk-diversification-legend-item"]}
-       [:span {:class ["optimizer-risk-diversification-legend-marker"
-                        "optimizer-risk-diversification-legend-marker--recommended"]
-                :aria-hidden true}]
-        "Recommended"]]]
-     (comparison-matrix model)]
-    [:div {:class ["optimizer-risk-diversification-unavailable"]
-           :data-role "portfolio-optimizer-risk-diversification-unavailable"}
-     [:p {:class ["optimizer-risk-corr-title"]}
-      "Portfolio diversification unavailable"]
-     [:p
-      "Re-run this saved Equal Risk scenario to add the portfolio benchmarks. Final-weight attribution remains available below."]]))
+  summary exists. Callers that can co-render results may supply a distinct
+  :help-id-prefix; the one-argument form retains a stable result-derived
+  prefix. Legacy results get an explicit re-run note while their existing
+  final-weight attribution remains available below."
+  ([result]
+   (diversification-summary
+    result
+    {:help-id-prefix (str "optimizer-risk-diversification-help-"
+                          (or (:as-of-ms result) "result"))}))
+  ([result {:keys [help-id-prefix]}]
+   (if-let [model (structure-model/diversification-comparison-model result)]
+     (let [help-prefix (or help-id-prefix
+                           (str "optimizer-risk-diversification-help-"
+                                (or (:as-of-ms result) "result")))]
+       [:section {:class ["optimizer-risk-diversification-summary"]
+                  :data-role "portfolio-optimizer-risk-diversification-comparison"}
+        [:div {:class ["optimizer-risk-diversification-intro"]}
+         [:div
+          [:p {:class ["optimizer-risk-corr-title"
+                       "optimizer-risk-diversification-title-with-help"]}
+           [:span "Portfolio diversification"]
+           (help-disclosure help-prefix :overview
+                            "Explain how to read this comparison")]
+          [:p {:class ["optimizer-risk-diversification-explainer"]}
+           (str "Equal Risk balances risk ownership; it does not minimize total "
+                "volatility. These benchmarks compare both books on one "
+                "absolute annualized-volatility scale.")]]
+         [:div {:class ["optimizer-risk-diversification-legend"]
+                :aria-label "Portfolio marker legend"}
+          [:span {:class ["optimizer-risk-diversification-legend-item"]}
+           [:span {:class ["optimizer-risk-diversification-legend-marker"
+                           "optimizer-risk-diversification-legend-marker--current"]
+                   :aria-hidden true}]
+           "Current"]
+          [:span {:class ["optimizer-risk-diversification-legend-item"]}
+           [:span {:class ["optimizer-risk-diversification-legend-marker"
+                           "optimizer-risk-diversification-legend-marker--recommended"]
+                   :aria-hidden true}]
+           "Recommended"]]]
+        (comparison-matrix (assoc model :help-prefix help-prefix))])
+     [:div {:class ["optimizer-risk-diversification-unavailable"]
+            :data-role "portfolio-optimizer-risk-diversification-unavailable"}
+      [:p {:class ["optimizer-risk-corr-title"]}
+       "Portfolio diversification unavailable"]
+      [:p
+       "Re-run this saved Equal Risk scenario to add the portfolio benchmarks. Final-weight attribution remains available below."]])))

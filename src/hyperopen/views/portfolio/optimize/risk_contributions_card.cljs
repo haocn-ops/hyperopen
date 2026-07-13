@@ -446,7 +446,11 @@
         (when breakdown-body
           [:div {:class ["optimizer-risk-balance-panel"
                          "optimizer-risk-balance-panel--breakdown"]}
-           (diversification-summary/diversification-summary result)
+           (diversification-summary/diversification-summary
+            result
+            {:help-id-prefix
+             (str (structure-model/risk-view-radio-name result)
+                  "-diversification-help")})
            breakdown-body])
         (when correlation-body
           [:div {:class ["optimizer-risk-balance-panel"

@@ -119,6 +119,77 @@ test.describe("equal risk correlation view (workbench scenes)", () => {
     ).toHaveAttribute("data-selected", "true");
   });
 
+  test("diversification help reveals exact overview and row copy on keyboard focus", async ({
+    page
+  }) => {
+    const frame = await openScene(page, "correlation-designer-parity");
+    await frame
+      .locator(role("portfolio-optimizer-risk-view-tab-breakdown"))
+      .click();
+
+    const comparison = frame.locator(
+      role("portfolio-optimizer-risk-diversification-comparison")
+    );
+    const triggers = comparison.locator(
+      role("portfolio-optimizer-risk-diversification-help-trigger")
+    );
+    await expect(triggers).toHaveCount(6);
+
+    const cases = [
+      {
+        trigger: triggers.first(),
+        copy: "Current and Recommended share one annualized-volatility scale; Change is Recommended minus Current in percentage points."
+      },
+      {
+        trigger: comparison
+          .locator(
+            `${role("portfolio-optimizer-risk-diversification-outcome-row")}[data-outcome='correlation-effect']`
+          )
+          .locator(role("portfolio-optimizer-risk-diversification-help-trigger")),
+        copy: "modeled volatility minus zero-correlation volatility; negative offsets risk and positive amplifies it."
+      }
+    ];
+
+    for (const { trigger, copy } of cases) {
+      const tooltipId = await trigger.getAttribute("aria-describedby");
+      expect(tooltipId).toBeTruthy();
+      const tooltip = frame.locator(`[id='${tooltipId}']`);
+      await expect(tooltip).toHaveAttribute("role", "tooltip");
+      await expect(tooltip).toHaveText(copy);
+      await expect
+        .poll(() => tooltip.evaluate((element) => getComputedStyle(element).opacity))
+        .toBe("0");
+      await trigger.focus();
+      await expect
+        .poll(() => tooltip.evaluate((element) => getComputedStyle(element).opacity))
+        .toBe("1");
+      await trigger.hover();
+      await trigger.press("Escape");
+      await expect(trigger).toBeFocused();
+      expect(await trigger.evaluate((element) => element.matches(":hover"))).toBe(
+        true
+      );
+      await expect
+        .poll(() => tooltip.evaluate((element) => getComputedStyle(element).opacity))
+        .toBe("0");
+      await comparison
+        .locator(role("portfolio-optimizer-risk-diversification-decision-summary"))
+        .hover();
+      await expect(trigger).toBeFocused();
+      await expect
+        .poll(() => tooltip.evaluate((element) => getComputedStyle(element).opacity))
+        .toBe("0");
+      await frame
+        .locator(role("portfolio-optimizer-risk-view-tab-breakdown"))
+        .focus();
+      await expect(trigger).not.toBeFocused();
+      await trigger.focus();
+      await expect
+        .poll(() => tooltip.evaluate((element) => getComputedStyle(element).opacity))
+        .toBe("1");
+    }
+  });
+
   test("the parity scene and risk card stay within every governed viewport", async ({
     page
   }) => {
@@ -149,6 +220,48 @@ test.describe("equal risk correlation view (workbench scenes)", () => {
         await expect(
           row.locator(role("portfolio-optimizer-risk-diversification-recommended-marker"))
         ).toHaveCount(1);
+      }
+      const helpTriggers = frame.locator(
+        role("portfolio-optimizer-risk-diversification-help-trigger")
+      );
+      await expect(helpTriggers).toHaveCount(6);
+      for (let index = 0; index < 6; index += 1) {
+        const trigger = helpTriggers.nth(index);
+        const tooltipId = await trigger.getAttribute("aria-describedby");
+        expect(tooltipId, `${width}px trigger ${index} description`).toBeTruthy();
+        const tooltip = frame.locator(`[id='${tooltipId}']`);
+        await trigger.focus();
+        await expect
+          .poll(() => tooltip.evaluate((element) => getComputedStyle(element).opacity))
+          .toBe("1");
+        const tooltipBounds = await tooltip.evaluate((element) => {
+          const rect = element.getBoundingClientRect();
+          return {
+            left: rect.left,
+            right: rect.right,
+            top: rect.top + window.scrollY,
+            bottom: rect.bottom + window.scrollY,
+            documentWidth: document.documentElement.clientWidth,
+            documentHeight: document.documentElement.scrollHeight
+          };
+        });
+        expect(
+          tooltipBounds.left,
+          `${width}px tooltip ${index} left edge`
+        ).toBeGreaterThanOrEqual(-1);
+        expect(
+          tooltipBounds.right,
+          `${width}px tooltip ${index} right edge`
+        ).toBeLessThanOrEqual(tooltipBounds.documentWidth + 1);
+        expect(
+          tooltipBounds.top,
+          `${width}px tooltip ${index} top edge`
+        ).toBeGreaterThanOrEqual(-1);
+        expect(
+          tooltipBounds.bottom,
+          `${width}px tooltip ${index} bottom edge`
+        ).toBeLessThanOrEqual(tooltipBounds.documentHeight + 1);
+        await trigger.evaluate((element) => element.blur());
       }
       const bounds = await card.evaluate((element) => {
         const rect = element.getBoundingClientRect();

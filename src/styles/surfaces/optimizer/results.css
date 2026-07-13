@@ -1558,12 +1558,22 @@
     gap: 12px;
   }
 
+  .portfolio-optimizer
+  .optimizer-risk-corr-title.optimizer-risk-diversification-title-with-help {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    line-height: 1.35;
+  }
+
   .portfolio-optimizer .optimizer-risk-diversification-explainer,
   .portfolio-optimizer .optimizer-risk-diversification-unavailable > p:last-child {
     margin-top: 4px;
     max-width: 72ch;
-    font-size: 11px;
-    line-height: 1.5;
+    font-size: 11.5px;
+    line-height: 1.55;
     color: var(--optimizer-text-3);
   }
 
@@ -1572,7 +1582,7 @@
     display: flex;
     align-items: center;
     gap: 12px;
-    font-size: 10px;
+    font-size: 10.5px;
     color: var(--optimizer-text-3);
   }
 
@@ -1596,6 +1606,92 @@
   .portfolio-optimizer .optimizer-risk-diversification-legend-marker--recommended {
     border: 1px solid var(--optimizer-target);
     background-color: var(--optimizer-target);
+  }
+
+  .portfolio-optimizer .optimizer-risk-diversification-help {
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .portfolio-optimizer .optimizer-risk-diversification-help-trigger {
+    display: inline-grid;
+    place-items: center;
+    flex: 0 0 24px;
+    width: 24px;
+    min-width: 24px;
+    height: 24px;
+    min-height: 24px;
+    padding: 0;
+    border: 1px solid var(--optimizer-border-strong);
+    border-radius: 50%;
+    background: var(--optimizer-bg);
+    font-family: "JetBrains Mono", var(--font-mono);
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 1;
+    color: var(--optimizer-text-2);
+    cursor: help;
+  }
+
+  .portfolio-optimizer .optimizer-risk-diversification-help-trigger:hover {
+    border-color: var(--optimizer-text-3);
+    color: var(--optimizer-text);
+  }
+
+  .portfolio-optimizer .optimizer-risk-diversification-help-trigger:focus-visible {
+    outline: 2px solid var(--optimizer-target);
+    outline-offset: 2px;
+  }
+
+  .portfolio-optimizer .optimizer-risk-diversification-tooltip {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    z-index: 30;
+    width: min(18rem, calc(100vw - 96px));
+    max-width: calc(100vw - 96px);
+    padding: 8px 10px;
+    border: 1px solid var(--optimizer-border-strong);
+    background: var(--optimizer-bg);
+    box-shadow: 0 8px 20px rgb(0 0 0 / 22%);
+    font-family: "Inter Variable", var(--font-ui-system);
+    font-size: 11px;
+    font-weight: 400;
+    line-height: 1.45;
+    letter-spacing: normal;
+    text-align: left;
+    text-transform: none;
+    color: var(--optimizer-text-2);
+    white-space: normal;
+    overflow-wrap: anywhere;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity 120ms ease;
+  }
+
+  .portfolio-optimizer .optimizer-risk-diversification-help:focus-within
+  .optimizer-risk-diversification-tooltip {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+  }
+
+  @media (hover: hover) {
+    .portfolio-optimizer .optimizer-risk-diversification-help:hover
+    .optimizer-risk-diversification-tooltip {
+      opacity: 1;
+      visibility: visible;
+      pointer-events: auto;
+    }
+  }
+
+  .portfolio-optimizer
+  .optimizer-risk-diversification-help[data-dismissed="true"]
+  .optimizer-risk-diversification-tooltip {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
   }
 
   .portfolio-optimizer .optimizer-risk-diversification-matrix {
@@ -1622,7 +1718,7 @@
     padding: 8px 10px;
     border-bottom: 1px solid var(--optimizer-border);
     font-family: "JetBrains Mono", var(--font-mono);
-    font-size: 9px;
+    font-size: 10px;
     font-weight: 650;
     letter-spacing: 0.07em;
     text-transform: uppercase;
@@ -1639,7 +1735,7 @@
 
   .portfolio-optimizer .optimizer-risk-diversification-row {
     min-width: 0;
-    padding: 9px 10px;
+    padding: 10px;
   }
 
   .portfolio-optimizer .optimizer-risk-diversification-row +
@@ -1648,16 +1744,25 @@
   }
 
   .portfolio-optimizer .optimizer-risk-diversification-row-label {
+    position: relative;
     min-width: 0;
     display: grid;
-    gap: 2px;
-    font-size: 10.5px;
+    gap: 3px;
+    font-size: 12px;
+    line-height: 1.3;
     color: var(--optimizer-text-2);
   }
 
+  .portfolio-optimizer .optimizer-risk-diversification-row-label-primary {
+    min-width: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+  }
+
   .portfolio-optimizer .optimizer-risk-diversification-row-kind {
-    font-size: 9px;
-    line-height: 1.3;
+    font-size: 10px;
+    line-height: 1.4;
     color: var(--optimizer-text-3);
   }
 
@@ -1726,7 +1831,7 @@
 
   .portfolio-optimizer .optimizer-risk-diversification-cell-value {
     min-width: 0;
-    font-size: 10.5px;
+    font-size: 12px;
     text-align: right;
     color: var(--optimizer-text-2);
   }
@@ -1740,8 +1845,8 @@
 
   .portfolio-optimizer .optimizer-risk-diversification-direction-copy {
     min-width: 0;
-    font-size: 9px;
-    line-height: 1.25;
+    font-size: 10px;
+    line-height: 1.35;
     text-align: right;
     color: var(--optimizer-text-3);
   }
@@ -1758,10 +1863,10 @@
 
   .portfolio-optimizer .optimizer-risk-diversification-decision {
     margin: 0;
-    padding: 9px 10px;
+    padding: 10px;
     border-top: 1px solid var(--optimizer-border);
-    font-size: 10.5px;
-    line-height: 1.45;
+    font-size: 11.5px;
+    line-height: 1.5;
     color: var(--optimizer-text-2);
   }
 

@@ -629,6 +629,7 @@
             [hyperopen.views.portfolio.optimize.results-panel-hierarchy-test]
             [hyperopen.views.portfolio.optimize.results-panel-test]
             [hyperopen.views.portfolio.optimize.return-views-io-panel-test]
+            [hyperopen.views.portfolio.optimize.risk-diversification-help-edge-test]
             [hyperopen.views.portfolio.optimize.risk-diversification-semantics-edge-test]
             [hyperopen.views.portfolio.optimize.risk-return-context-test]
             [hyperopen.views.portfolio.optimize.run-status-banner-test]
@@ -1462,6 +1463,7 @@
              'hyperopen.views.portfolio.optimize.results-panel-hierarchy-test
              'hyperopen.views.portfolio.optimize.results-panel-test
              'hyperopen.views.portfolio.optimize.return-views-io-panel-test
+             'hyperopen.views.portfolio.optimize.risk-diversification-help-edge-test
              'hyperopen.views.portfolio.optimize.risk-diversification-semantics-edge-test
              'hyperopen.views.portfolio.optimize.risk-return-context-test
              'hyperopen.views.portfolio.optimize.run-status-banner-test

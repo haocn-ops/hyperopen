@@ -100,6 +100,31 @@ test.describe("margin recommendation panel (workbench scenes)", () => {
     ).toContainText("Recommended");
   });
 
+  test("curve is stroked with an amber-to-green gradient across the marker band", async ({
+    page
+  }) => {
+    const frame = await openScene(page, "elevated-risk-recommendation");
+    const polyline = frame.locator(role("margin-rec-curve") + " polyline");
+    await expect(polyline).toHaveAttribute(
+      "stroke",
+      "url(#margin-rec-curve-gradient)"
+    );
+
+    const stops = frame.locator("#margin-rec-curve-gradient stop");
+    await expect(stops).toHaveCount(4);
+
+    // Amber holds to the current marker, green from the recommended marker on,
+    // so the interior two stops carry the blend and stay ordered left→right.
+    const offsets = await stops.evaluateAll((els) =>
+      els.map((el) => parseFloat(el.getAttribute("offset")))
+    );
+    expect(offsets[0]).toBe(0);
+    expect(offsets[3]).toBe(100);
+    expect(offsets[1]).toBeGreaterThan(offsets[0]);
+    expect(offsets[2]).toBeGreaterThan(offsets[1]);
+    expect(offsets[3]).toBeGreaterThan(offsets[2]);
+  });
+
   test("within-target scene hides apply but keeps custom margin", async ({
     page
   }) => {

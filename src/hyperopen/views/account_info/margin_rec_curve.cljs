@@ -26,7 +26,13 @@
 (def ^:private plot-top 22)
 (def ^:private plot-bottom 168)
 (def ^:private grid-stroke "rgb(var(--ho-text-muted) / 0.25)")
+;; The curve is stroked with a horizontal gradient: amber where collateral is
+;; low (liquidation likely) on the left, green where it is high (safe) on the
+;; right, blending across the band between the current and recommended markers.
+;; `curve-stroke` doubles as the solid fallback when a marker is missing.
 (def ^:private curve-stroke "rgb(var(--ho-warn))")
+(def ^:private curve-stroke-safe "rgb(var(--ho-buy))")
+(def ^:private curve-gradient-id "margin-rec-curve-gradient")
 (def ^:private label-box-fill "rgb(var(--ho-bg-deep) / 0.92)")
 (def ^:private label-title-fill "rgb(var(--ho-text) / 0.92)")
 (def ^:private label-box-top 26)
@@ -103,6 +109,16 @@
                                     points))
         cur-x (when (number? current-e) (chart-x x-max current-e))
         rec-x (when (number? rec-e) (chart-x x-max rec-e))
+        plot-width (- plot-right plot-left)
+        marker-frac (fn [x] (-> (/ (- x plot-left) plot-width) (max 0) (min 1)))
+        cur-frac (when cur-x (marker-frac cur-x))
+        ;; Recommended sits at or right of current in normal cases; clamp so the
+        ;; gradient stops stay ordered even in the within-target edge case.
+        rec-frac (when rec-x (max (marker-frac rec-x) (or cur-frac 0)))
+        gradient? (and cur-frac rec-frac)
+        curve-paint (if gradient?
+                      (str "url(#" curve-gradient-id ")")
+                      curve-stroke)
         half-box (/ label-box-width 2)
         cur-label-x (when cur-x
                       (-> cur-x
@@ -145,7 +161,17 @@
                                :text-anchor "middle"}
                         (axis-usd value)]))
                    (range 5)))
-        (conj [:text {:x (/ (+ plot-left plot-right) 2)
+        (conj (when gradient?
+                [:defs
+                 [:linearGradient {:id curve-gradient-id
+                                   :x1 "0%" :y1 "0%" :x2 "100%" :y2 "0%"}
+                  [:stop {:offset "0%" :stop-color curve-stroke}]
+                  [:stop {:offset (str (.toFixed (* 100 cur-frac) 2) "%")
+                          :stop-color curve-stroke}]
+                  [:stop {:offset (str (.toFixed (* 100 rec-frac) 2) "%")
+                          :stop-color curve-stroke-safe}]
+                  [:stop {:offset "100%" :stop-color curve-stroke-safe}]]])
+              [:text {:x (/ (+ plot-left plot-right) 2)
                       :y (+ plot-bottom 30)
                       :fill "currentColor"
                       :font-size 9
@@ -154,7 +180,7 @@
                "Isolated margin (USDC)"]
               [:polyline {:points polyline
                           :fill "none"
-                          :stroke curve-stroke
+                          :stroke curve-paint
                           :stroke-width 2
                           :stroke-linejoin "round"}]
               (when (and cur-x (number? p-now))

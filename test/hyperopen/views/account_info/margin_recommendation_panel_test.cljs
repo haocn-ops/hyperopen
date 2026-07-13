@@ -1,5 +1,6 @@
 (ns hyperopen.views.account-info.margin-recommendation-panel-test
   (:require [cljs.test :refer-macros [deftest is testing]]
+            [clojure.string :as str]
             [hyperopen.views.account-info.margin-rec-copy :as copy]
             [hyperopen.views.account-info.margin-recommendation-panel :as panel]
             [hyperopen.views.account-info.positions-vm :as positions-vm]
@@ -215,6 +216,20 @@
       (is (= [[:actions/set-margin-rec-risk-mode :conservative]]
              (click-actions (node-by-role tree "margin-rec-risk-mode-conservative"))))
       (is (contains? strings "You can adjust this anytime in Settings.")))))
+
+(deftest new-liquidation-price-always-shows-two-decimals
+  ;; Regression: a computed liquidation price carries floating-point noise
+  ;; (e.g. 367.15550076) rather than exchange tick-size precision. The old
+  ;; formatter treated that noisy float as its own "raw" reference and
+  ;; preserved every fractional digit; it must always round to 2 decimals.
+  (let [noisy-result (assoc-in rec-result
+                               [:recommended :new-liquidation-px]
+                               367.15550076)
+        strings (collect-strings (render-panel {:rec {:status :ok
+                                                       :result noisy-result
+                                                       :computed-at 1}}))]
+    (is (contains? strings "$367.16"))
+    (is (not-any? #(and (string? %) (str/includes? % "367.1555")) strings))))
 
 (deftest panel-tolerates-cached-results-without-curve
   (let [tree (render-panel {:rec {:status :ok

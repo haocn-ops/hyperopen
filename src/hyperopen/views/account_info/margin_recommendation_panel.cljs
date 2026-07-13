@@ -31,9 +31,13 @@
     "--"))
 
 (defn- fmt-price
+  "New-liquidation-price is a computed estimate, not an exchange tick-size
+  price string, so it is always shown to 2 decimal places — unlike
+  `shared/format-trade-price`, which (lacking a raw reference) preserves
+  however many fractional digits the float's own noise happens to produce."
   [value]
   (if (number? value)
-    (shared/format-trade-price value)
+    (str "$" (shared/format-currency value))
     "--"))
 
 (defn- fmt-probability

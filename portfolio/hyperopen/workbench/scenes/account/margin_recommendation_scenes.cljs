@@ -40,33 +40,48 @@
                                            (- (js/Math.pow (/ e 7.2) 1.35)))))}))
                    (range n))}))
 
-(def ^:private rec-result
-  {:status :ok
-   :coin "xyz:TSM"
-   :dex "xyz"
-   :risk-mode :balanced
-   :alpha 0.02
-   :horizon {:hours 72 :source :per-coin :samples 22 :bars 72}
-   :as-of {:mark 437.51 :equity 12.42 :liquidation-px 424.2
-           :notional 157.5 :side :long}
-   :sigma {:hourly 0.0093 :daily 0.0456 :annualized 0.87
-           :distance-frac 0.082 :buffer-sigmas 0.74}
-   :p-now 0.146
-   :p-after 0.021
-   :paths-count 4000
-   :curve (fixture-curve)
-   :risk-level :high
-   :recommended {:equity 18.64
-                 :additional 6.22
-                 :new-liquidation-px 403.1
-                 :new-liq-change-frac 0.0497
-                 :effective-leverage 8.4}
+(defn- mode-rec
+  [risk-mode equity p-after new-liq change-frac adverse model]
+  {:risk-mode risk-mode
+   :status :ok
+   :p-after p-after
+   :recommended {:equity equity
+                 :additional (js/Math.round (* 100 (- equity 12.42)))
+                 :new-liquidation-px new-liq
+                 :new-liq-change-frac change-frac
+                 :effective-leverage (/ 157.5 equity)}
    :breakdown [{:key :maintenance :label "Maintenance requirement" :amount 5.41}
-               {:key :adverse-path :label "Adverse-path protection" :amount 7.87}
+               {:key :adverse-path :label "Adverse-path protection" :amount adverse}
                {:key :funding :label "Funding buffer (3d)" :amount 2.08}
                {:key :exit :label "Exit / slippage buffer (1.0% notional)" :amount 1.82}
-               {:key :model :label "Model uncertainty buffer" :amount 1.46}]
-   :confidence {:tier :high :n-bars 1080}})
+               {:key :model :label "Model uncertainty buffer" :amount model}]})
+
+;; additional (equity - current 12.42) fixed up to be coherent per mode.
+(def ^:private by-risk-mode
+  {:conservative (assoc-in (mode-rec :conservative 21.4 0.009 398.0 0.0617 9.55 1.72)
+                           [:recommended :additional] 8.98)
+   :balanced (assoc-in (mode-rec :balanced 18.64 0.021 403.1 0.0497 7.87 1.46)
+                       [:recommended :additional] 6.22)
+   :capital-efficient (assoc-in (mode-rec :capital-efficient 15.9 0.049 408.5 0.0352 5.62 1.05)
+                                [:recommended :additional] 3.48)})
+
+(def ^:private rec-result
+  (merge
+   {:coin "xyz:TSM"
+    :dex "xyz"
+    :horizon {:hours 72 :source :per-coin :samples 22 :bars 72}
+    :as-of {:mark 437.51 :equity 12.42 :liquidation-px 424.2
+            :notional 157.5 :side :long}
+    :sigma {:hourly 0.0093 :daily 0.0456 :annualized 0.87
+            :distance-frac 0.082 :buffer-sigmas 0.74}
+    :p-now 0.146
+    :paths-count 4000
+    :curve (fixture-curve)
+    :risk-level :high
+    :confidence {:tier :high :n-bars 1080}
+    :by-risk-mode by-risk-mode}
+   ;; top-level mirrors the compute-time active mode (balanced), as the engine does.
+   (:balanced by-risk-mode)))
 
 (def ^:private anchor
   {:left 620 :right 680 :top 900
@@ -93,12 +108,22 @@
   []
   (scene-shell {:status :ok :result rec-result :computed-at 1}))
 
+(portfolio/defscene capital-efficient-selected
+  []
+  ;; Same computed result, capital-efficient selected — the panel reads that
+  ;; mode's precomputed recommendation from :by-risk-mode (no recompute).
+  (scene-shell {:status :ok :result rec-result :computed-at 1}
+               {:risk-mode :capital-efficient}))
+
 (portfolio/defscene within-target
   []
   ;; Already safe: recommended ≈ current, nothing to add, probability already
-  ;; under the target on both sides.
+  ;; under the target on both sides. Drop :by-risk-mode so the single
+  ;; within-target result renders directly (this scene is about that state,
+  ;; not mode selection).
   (scene-shell {:status :ok
                 :result (-> rec-result
+                            (dissoc :by-risk-mode)
                             (assoc :status :within-target :p-now 0.008 :p-after 0.006)
                             (assoc-in [:as-of :equity] 18.64)
                             (assoc :recommended {:equity 18.64

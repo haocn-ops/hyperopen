@@ -10,6 +10,7 @@
   not a full-screen modal. It floats from the risk chip that opens it, sized
   and clamped to the viewport by hyperopen.views.ui.anchored-popover."
   (:require [clojure.string :as str]
+            [hyperopen.margin-rec.state :as margin-rec-state]
             [hyperopen.views.account-info.margin-rec-curve :as margin-rec-curve]
             [hyperopen.views.account-info.shared :as shared]
             [hyperopen.views.ui.anchored-popover :as anchored-popover]
@@ -297,7 +298,10 @@
 
 (defn- ready-panel
   [{:keys [rec-result row-vm read-only? risk-mode]}]
-  (let [{:keys [as-of p-now p-after recommended curve status]} rec-result
+  ;; Show the selected risk mode's recommendation, read from the precomputed
+  ;; per-mode table so clicking a mode updates instantly without a recompute.
+  (let [rec-result (margin-rec-state/select-risk-mode rec-result risk-mode)
+        {:keys [as-of p-now p-after recommended curve status]} rec-result
         {:keys [additional]} recommended
         position-data (:row-data row-vm)
         actionable? (and (not read-only?)

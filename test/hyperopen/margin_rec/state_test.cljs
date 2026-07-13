@@ -71,12 +71,10 @@
   (let [entry (first (state/isolated-positions (base-state)))
         tiny-move (assoc entry :mark (* (:mark entry) 0.9995))
         big-move (assoc entry :mark (* (:mark entry) 1.02))]
-    (is (= (state/input-sig entry :balanced 123)
-           (state/input-sig tiny-move :balanced 123)))
-    (is (not= (state/input-sig entry :balanced 123)
-              (state/input-sig big-move :balanced 123)))
-    (is (not= (state/input-sig entry :balanced 123)
-              (state/input-sig entry :conservative 123)))))
+    (is (= (state/input-sig entry 123)
+           (state/input-sig tiny-move 123)))
+    (is (not= (state/input-sig entry 123)
+              (state/input-sig big-move 123)))))
 
 (deftest plan-work-fetches-then-computes
   (testing "no isolated positions -> nothing to do"
@@ -122,7 +120,7 @@
           ready (assoc-in (base-state)
                           [:candles "xyz:TSM" state/candle-interval]
                           (fresh-candles 80))
-          sig (state/input-sig entry :balanced 0)
+          sig (state/input-sig entry 0)
           with-recent (assoc-in ready
                                 (conj state/recs-path "xyz:TSM|xyz")
                                 {:status :ok
@@ -210,3 +208,47 @@
                             :result {:recommended {:equity 18.64}}})]
     (is (= 18.64 (state/ready-recommended-equity with-rec "xyz:TSM|xyz")))
     (is (nil? (state/ready-recommended-equity with-rec "missing")))))
+
+(def ^:private by-mode-result
+  {:p-now 0.146
+   :risk-level :high
+   :recommended {:equity 18.64 :additional 6.22}
+   :status :ok
+   :by-risk-mode {:conservative {:status :ok
+                                 :p-after 0.01
+                                 :recommended {:equity 21.0 :additional 8.58}}
+                  :balanced {:status :ok
+                             :p-after 0.021
+                             :recommended {:equity 18.64 :additional 6.22}}
+                  :capital-efficient {:status :within-target
+                                      :p-after 0.05
+                                      :recommended {:equity 15.1 :additional 2.68}}}})
+
+(deftest select-risk-mode-projects-onto-precomputed-mode
+  (testing "each mode reads its own alpha-dependent fields, shared fields stay"
+    (is (= 21.0 (get-in (state/select-risk-mode by-mode-result :conservative)
+                        [:recommended :equity])))
+    (is (= 15.1 (get-in (state/select-risk-mode by-mode-result :capital-efficient)
+                        [:recommended :equity])))
+    (is (= :within-target
+           (:status (state/select-risk-mode by-mode-result :capital-efficient))))
+    (is (= 0.146 (:p-now (state/select-risk-mode by-mode-result :conservative))))
+    (is (= :high (:risk-level (state/select-risk-mode by-mode-result :conservative)))))
+  (testing "conservative demands more collateral than capital-efficient"
+    (is (> (get-in (state/select-risk-mode by-mode-result :conservative)
+                   [:recommended :equity])
+           (get-in (state/select-risk-mode by-mode-result :capital-efficient)
+                   [:recommended :equity]))))
+  (testing "falls back to the stored active mode when the table is absent"
+    (let [legacy {:recommended {:equity 9.0} :status :ok}]
+      (is (= 9.0 (get-in (state/select-risk-mode legacy :conservative)
+                         [:recommended :equity]))))))
+
+(deftest ready-recommended-equity-honors-active-mode
+  (let [with-rec (assoc-in (base-state)
+                           (conj state/recs-path "xyz:TSM|xyz")
+                           {:status :ok :result by-mode-result})
+        conservative (assoc-in with-rec
+                               [:trading-settings :margin-rec-risk-mode]
+                               :conservative)]
+    (is (= 21.0 (state/ready-recommended-equity conservative "xyz:TSM|xyz")))))

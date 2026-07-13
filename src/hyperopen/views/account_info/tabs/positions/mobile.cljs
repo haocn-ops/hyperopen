@@ -246,7 +246,8 @@
          margin-modal*
          {:recommendation (margin-rec-state/modal-hint
                            (:recs margin-rec)
-                           (:position-key margin-modal*))})
+                           (:position-key margin-modal*)
+                           (:risk-mode margin-rec))})
 
         (and (position-reduce/open? reduce-popover*)
              (active-position-key-visible? visible-row-keys reduce-popover*))

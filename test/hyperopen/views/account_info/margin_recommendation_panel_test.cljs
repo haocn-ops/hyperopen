@@ -201,6 +201,32 @@
     (is (nil? (node-by-role tree "margin-rec-curve-card")))
     (is (nil? (node-by-role tree "margin-rec-curve")))))
 
+(def by-mode-rec-result
+  (assoc rec-result
+         :by-risk-mode
+         {:balanced {:risk-mode :balanced :status :ok :p-after 0.021
+                     :recommended {:equity 18.64 :additional 6.22
+                                   :new-liquidation-px 403.1 :new-liq-change-frac 0.0497}}
+          :capital-efficient {:risk-mode :capital-efficient :status :ok :p-after 0.049
+                              :recommended {:equity 15.9 :additional 3.48
+                                            :new-liquidation-px 408.5 :new-liq-change-frac 0.035}}}))
+
+(deftest panel-shows-the-selected-risk-mode
+  (testing "capital-efficient selection reads that mode's precomputed numbers"
+    (let [tree (render-panel {:rec {:status :ok :result by-mode-rec-result :computed-at 1}
+                              :risk-mode :capital-efficient})
+          strings (collect-strings tree)]
+      (is (contains? strings "$15.90 USDC"))
+      (is (contains? strings "Add $3.48 USDC to your current $12.42"))
+      (is (= "true" (:aria-pressed (node-attrs (node-by-role tree "margin-rec-risk-mode-capital-efficient")))))
+      (is (not (contains? strings "$18.64 USDC")))))
+  (testing "balanced selection reads the balanced numbers from the same result"
+    (let [strings (collect-strings
+                   (render-panel {:rec {:status :ok :result by-mode-rec-result :computed-at 1}
+                                  :risk-mode :balanced}))]
+      (is (contains? strings "$18.64 USDC"))
+      (is (not (contains? strings "$15.90 USDC"))))))
+
 (deftest panel-read-only-hides-actions
   (let [tree (render-panel {:read-only? true})]
     (is (nil? (node-by-role tree "margin-rec-apply")))

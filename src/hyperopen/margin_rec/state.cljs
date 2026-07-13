@@ -162,12 +162,15 @@
    (js/Math.round (* 100 equity))])
 
 (defn input-sig
-  [{:keys [coin dex szi equity mark] :as entry} risk-mode candle-last-t]
+  ;; The risk mode is deliberately NOT part of the signature: the simulated
+  ;; distribution is mode-independent, so finalize precomputes every mode
+  ;; (:by-risk-mode) in one pass and switching modes is a pure view selection
+  ;; (select-risk-mode) that must never force a recompute.
+  [{:keys [coin dex szi equity mark] :as entry} candle-last-t]
   [coin
    (or dex "")
    (structural-sig entry)
    (mark-bucket mark)
-   risk-mode
    candle-last-t])
 
 (defn risk-mode
@@ -237,7 +240,7 @@
                (keep (fn [entry]
                        (let [rows (candle-rows state (:coin entry))]
                          (when (candles-ready? rows now-ms)
-                           (let [sig (input-sig entry mode (candle-last-t rows))
+                           (let [sig (input-sig entry (candle-last-t rows))
                                  rec (rec-for state (:position-key entry))]
                              (when (compute-needed? rec sig (structural-sig entry) now-ms)
                                {:entry entry
@@ -450,12 +453,26 @@
               expected-size)
            intent-size-tolerance)))
 
+(defn select-risk-mode
+  "Project a recommendation result onto one risk mode: the alpha-dependent
+  fields (`:recommended`, `:p-after`, `:status`, `:breakdown`,
+  `:reduce-suggestion`, `:alpha`, `:risk-mode`) come from the precomputed
+  `:by-risk-mode` table, the alpha-independent fields stay as they are. Falls
+  back to the stored active mode when the table or the requested mode is absent
+  (older cached results, or a not-yet-recomputed entry)."
+  [result mode]
+  (if-let [per-mode (get-in result [:by-risk-mode mode])]
+    (merge result per-mode)
+    result))
+
 (defn ready-recommended-equity
-  "Recommended equity from a completed recommendation, when available."
+  "Recommended equity from a completed recommendation for the active risk mode,
+  when available."
   [state position-key]
   (let [{:keys [status result]} (rec-for state position-key)]
     (when (contains? #{:ok :within-target} status)
-      (get-in result [:recommended :equity]))))
+      (get-in (select-risk-mode result (risk-mode state))
+              [:recommended :equity]))))
 
 (defn ui-slice
   "The margin-rec slice the positions view model consumes."
@@ -469,9 +486,10 @@
 
 (defn modal-hint
   "Prefill hint for the Adjust Margin modal: the recommended top-up for the
-  position, when one is actionable."
-  [recs position-key]
-  (let [{:keys [status result]} (get recs position-key)]
+  position under the active risk mode, when one is actionable."
+  [recs position-key mode]
+  (let [{:keys [status result]} (get recs position-key)
+        result (select-risk-mode result mode)]
     (when (= :ok status)
       (let [additional (get-in result [:recommended :additional])]
         (when (and (number? additional)

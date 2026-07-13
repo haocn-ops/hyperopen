@@ -85,8 +85,10 @@
   (-> value (max lo) (min hi)))
 
 (defn- seed-for
-  [{:keys [coin risk-mode]} q horizon-bars n-bars last-t]
-  (hash [coin (pos? q) horizon-bars n-bars risk-mode last-t]))
+  ;; The simulated distribution does not depend on the risk mode (that only
+  ;; selects a quantile in finalize), so the seed must not either.
+  [{:keys [coin]} q horizon-bars n-bars last-t]
+  (hash [coin (pos? q) horizon-bars n-bars last-t]))
 
 (defn prepare
   "Build the simulation context from resolved inputs:
@@ -148,7 +150,7 @@
                           :min-bars min-bars}
               :else
               (let [risk-mode* (normalize-risk-mode risk-mode)
-                    seed (seed-for {:coin coin :risk-mode risk-mode*}
+                    seed (seed-for {:coin coin}
                                    q horizon-bars n-bars (:last-t bars))
                     paths-count (path-count horizon-bars)]
                 {:status :ready
@@ -243,58 +245,25 @@
     (and (>= n-bars 720) (not= :default horizon-source)) :high
     :else :medium))
 
-(defn finalize
-  "Turn the sorted required-equity distribution into the recommendation."
-  [{:keys [meta] :as _ctx} sorted-required]
-  (let [{:keys [q mark equity notional liquidation-px schedule alpha
-                funding-rate-hourly horizon sigma-hourly]} meta
-        c-star (paths/quantile-of-sorted sorted-required (- 1 alpha))
-        mm0 (tiers/maintenance-margin schedule (* (js/Math.abs q) mark))
-        horizon-hours (:hours horizon)
-        funding-buffer (* (adverse-funding-rate q funding-rate-hourly)
-                          horizon-hours
-                          notional)
-        exit-buffer (* (if (seq (:dex meta))
-                         exit-fraction-named-dex
-                         exit-fraction-main-dex)
-                       notional)
-        model-u (model-uncertainty-fraction meta)
+(defn- mode-recommendation
+  "The alpha-dependent part of a recommendation, read off the shared sorted
+  distribution for one risk mode. The maintenance/funding/exit buffers are
+  alpha-independent and passed in; only C*(alpha), the model buffer, and every
+  quantity derived from the resulting equity change with the mode."
+  [{:keys [q mark equity notional liquidation-px schedule] :as meta}
+   {:keys [sorted mm0 funding-buffer exit-buffer exit-fraction model-u
+           horizon-hours]}
+   risk-mode alpha]
+  (let [c-star (paths/quantile-of-sorted sorted (- 1 alpha))
         model-buffer (* model-u (max 0 (- c-star mm0)))
         e-rec (+ c-star funding-buffer exit-buffer model-buffer)
         additional (max 0 (- e-rec equity))
-        p-now (paths/prob-above sorted-required equity)
-        p-after (paths/prob-above sorted-required e-rec)
-        new-liq (tiers/liquidation-price schedule q mark e-rec)
-        sigma-daily (when (finite-pos? sigma-hourly)
-                      (* sigma-hourly (js/Math.sqrt 24)))
-        distance-frac (when (finite-pos? liquidation-px)
-                        (/ (js/Math.abs (- mark liquidation-px)) mark))
-        buffer-sigmas (when (and distance-frac (finite-pos? sigma-daily))
-                        (/ distance-frac sigma-daily))]
-    {:status (if (<= additional 0.005) :within-target :ok)
-     :coin (:coin meta)
-     :dex (:dex meta)
-     :risk-mode (:risk-mode meta)
+        p-after (paths/prob-above sorted e-rec)
+        new-liq (tiers/liquidation-price schedule q mark e-rec)]
+    {:risk-mode risk-mode
      :alpha alpha
-     :horizon horizon
-     :as-of {:mark mark
-             :equity equity
-             :liquidation-px liquidation-px
-             :notional notional
-             :side (if (pos? q) :long :short)}
-     :sigma {:hourly sigma-hourly
-             :daily sigma-daily
-             ;; 365-day calendar convention, same basis as the optimizer's
-             ;; volatility card (sqrt(24 * 365) hours).
-             :annualized (when (finite-pos? sigma-hourly)
-                           (* sigma-hourly (js/Math.sqrt 8760)))
-             :distance-frac distance-frac
-             :buffer-sigmas buffer-sigmas}
-     :p-now p-now
+     :status (if (<= additional 0.005) :within-target :ok)
      :p-after p-after
-     :paths-count (alength sorted-required)
-     :curve (probability-curve sorted-required e-rec)
-     :risk-level (risk-level p-now)
      :recommended {:equity e-rec
                    :additional additional
                    :new-liquidation-px new-liq
@@ -313,23 +282,88 @@
                   :amount funding-buffer}
                  {:key :exit
                   :label (str "Exit / slippage buffer ("
-                              (.toFixed (* 100 (if (seq (:dex meta))
-                                                 exit-fraction-named-dex
-                                                 exit-fraction-main-dex)) 1)
+                              (.toFixed (* 100 exit-fraction) 1)
                               "% notional)")
                   :amount exit-buffer}
                  {:key :model
                   :label "Model uncertainty buffer"
                   :amount model-buffer}]
-     :confidence {:tier (confidence-tier meta (:source horizon))
-                  :n-bars (:n-bars meta)
-                  :rho-clamped? (:rho-clamped? meta)
-                  :calibrated? (:calibrated? meta)
-                  :calibration-mismatch? (:calibration-mismatch? meta)}
      :reduce-suggestion (when (and (pos? e-rec) (> e-rec equity))
                           (let [fraction (clamp (- 1 (/ equity e-rec)) 0 0.95)]
                             {:fraction fraction
                              :notional (* fraction notional)}))}))
+
+(defn finalize
+  "Turn the sorted required-equity distribution into the recommendation.
+
+  The distribution is independent of the risk target, so every preset mode's
+  recommendation is read off it in this single pass and returned under
+  `:by-risk-mode`; the top-level keys mirror the compute-time active mode so
+  older consumers keep working. Switching the risk mode is then a pure view
+  selection (see hyperopen.margin-rec.state/select-risk-mode) with no
+  recompute."
+  [{:keys [meta] :as _ctx} sorted-required]
+  (let [{:keys [q mark equity notional liquidation-px schedule
+                funding-rate-hourly horizon sigma-hourly]} meta
+        active-mode (:risk-mode meta)
+        mm0 (tiers/maintenance-margin schedule (* (js/Math.abs q) mark))
+        horizon-hours (:hours horizon)
+        exit-fraction (if (seq (:dex meta))
+                        exit-fraction-named-dex
+                        exit-fraction-main-dex)
+        shared {:sorted sorted-required
+                :mm0 mm0
+                :funding-buffer (* (adverse-funding-rate q funding-rate-hourly)
+                                   horizon-hours
+                                   notional)
+                :exit-buffer (* exit-fraction notional)
+                :exit-fraction exit-fraction
+                :model-u (model-uncertainty-fraction meta)
+                :horizon-hours horizon-hours}
+        by-risk-mode (reduce-kv (fn [acc mode alpha]
+                                  (assoc acc mode
+                                         (mode-recommendation meta shared mode alpha)))
+                                {}
+                                risk-mode-alphas)
+        active (get by-risk-mode active-mode)
+        p-now (paths/prob-above sorted-required equity)
+        sigma-daily (when (finite-pos? sigma-hourly)
+                      (* sigma-hourly (js/Math.sqrt 24)))
+        distance-frac (when (finite-pos? liquidation-px)
+                        (/ (js/Math.abs (- mark liquidation-px)) mark))
+        buffer-sigmas (when (and distance-frac (finite-pos? sigma-daily))
+                        (/ distance-frac sigma-daily))]
+    (merge
+     {:coin (:coin meta)
+      :dex (:dex meta)
+      :horizon horizon
+      :as-of {:mark mark
+              :equity equity
+              :liquidation-px liquidation-px
+              :notional notional
+              :side (if (pos? q) :long :short)}
+      :sigma {:hourly sigma-hourly
+              :daily sigma-daily
+              ;; 365-day calendar convention, same basis as the optimizer's
+              ;; volatility card (sqrt(24 * 365) hours).
+              :annualized (when (finite-pos? sigma-hourly)
+                            (* sigma-hourly (js/Math.sqrt 8760)))
+              :distance-frac distance-frac
+              :buffer-sigmas buffer-sigmas}
+      :p-now p-now
+      :paths-count (alength sorted-required)
+      ;; The curve (p_liq vs collateral) is alpha-independent; only the
+      ;; Recommended marker (at e-rec) moves per mode.
+      :curve (probability-curve sorted-required
+                                (get-in active [:recommended :equity]))
+      :risk-level (risk-level p-now)
+      :confidence {:tier (confidence-tier meta (:source horizon))
+                   :n-bars (:n-bars meta)
+                   :rho-clamped? (:rho-clamped? meta)
+                   :calibrated? (:calibrated? meta)
+                   :calibration-mismatch? (:calibration-mismatch? meta)}
+      :by-risk-mode by-risk-mode}
+     active)))
 
 (defn recommend-sync
   "Single-shot pipeline: prepare, simulate every path, finalize. Terminal

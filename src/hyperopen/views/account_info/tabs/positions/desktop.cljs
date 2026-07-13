@@ -65,7 +65,8 @@
                             :high "Liq. risk high"
                             :elevated "Liq. risk elevated"
                             nil))
-        rec-hint (margin-rec-state/modal-hint (:recs margin-rec) row-key)]
+        rec-hint (margin-rec-state/modal-hint (:recs margin-rec) row-key
+                                              (:risk-mode margin-rec))]
     (into [:div {:class ["account-table-row"
                          "grid"
                          (positions-layout/positions-grid-template-class read-only?)

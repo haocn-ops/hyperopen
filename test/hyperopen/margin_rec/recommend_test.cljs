@@ -115,6 +115,31 @@
     (is (>= conservative balanced))
     (is (>= balanced efficient))))
 
+(deftest every-mode-precomputed-in-one-pass
+  (let [result (recommend/recommend-sync (base-inputs))
+        by-mode (:by-risk-mode result)]
+    (testing "one pass yields all three preset modes"
+      (is (= #{:conservative :balanced :capital-efficient}
+             (set (keys by-mode)))))
+    (testing "each mode carries its own alpha-dependent fields"
+      (doseq [mode (keys by-mode)]
+        (is (number? (get-in by-mode [mode :recommended :equity])) mode)
+        (is (contains? #{:ok :within-target} (get-in by-mode [mode :status])) mode)
+        (is (= mode (get-in by-mode [mode :risk-mode])) mode)))
+    (testing "the tighter target never asks for less collateral (same distribution)"
+      (is (>= (get-in by-mode [:conservative :recommended :equity])
+              (get-in by-mode [:balanced :recommended :equity])))
+      (is (>= (get-in by-mode [:balanced :recommended :equity])
+              (get-in by-mode [:capital-efficient :recommended :equity]))))
+    (testing "top-level mirrors the compute-time active mode"
+      (is (= (get-in by-mode [:balanced :recommended :equity])
+             (get-in result [:recommended :equity]))))
+    (testing "the alpha-independent distribution is shared across modes"
+      (is (= (:p-now result) (:p-now result)))
+      (is (some? (:curve result)))
+      (is (= (:paths-count result)
+             (recommend/path-count (get-in result [:horizon :bars])))))))
+
 (deftest terminal-statuses
   (testing "flat position is invalid"
     (is (= :invalid (:status (recommend/recommend-sync (base-inputs {:szi 0}))))))

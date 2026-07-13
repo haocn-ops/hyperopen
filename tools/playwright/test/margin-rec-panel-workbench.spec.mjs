@@ -83,6 +83,31 @@ test.describe("margin recommendation panel (workbench scenes)", () => {
     );
   });
 
+  test("selecting a risk mode shows that mode's precomputed recommendation", async ({
+    page
+  }) => {
+    // Balanced (default) vs Capital efficient render different recommended
+    // margins from the same computed result — no recompute needed.
+    const balanced = await openScene(page, "elevated-risk-recommendation");
+    await expect(
+      balanced.locator(role("margin-rec-recommended"))
+    ).toContainText("$18.64 USDC");
+    await expect(
+      balanced.locator(role("margin-rec-risk-mode-balanced"))
+    ).toHaveAttribute("aria-pressed", "true");
+
+    const efficient = await openScene(page, "capital-efficient-selected");
+    await expect(
+      efficient.locator(role("margin-rec-recommended"))
+    ).toContainText("$15.90 USDC");
+    await expect(
+      efficient.locator(role("margin-rec-additional"))
+    ).toContainText("Add $3.48 USDC to your current $12.42");
+    await expect(
+      efficient.locator(role("margin-rec-risk-mode-capital-efficient"))
+    ).toHaveAttribute("aria-pressed", "true");
+  });
+
   test("panel is wider than it is tall so it covers the chart, not the whole UI", async ({
     page
   }) => {

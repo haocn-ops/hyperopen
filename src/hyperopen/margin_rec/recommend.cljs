@@ -202,6 +202,33 @@
       (max rate 0)
       (max (- rate) 0))))
 
+(def ^:private curve-sample-count
+  "Points sampled from the required-equity distribution for the
+  probability-vs-collateral chart."
+  50)
+
+(defn- nice-ceiling
+  "Smallest 1/2/5 x 10^k value >= x, for round chart axis maxima."
+  [x]
+  (if (finite-pos? x)
+    (let [base (js/Math.pow 10 (js/Math.floor (js/Math.log10 x)))
+          m (/ x base)]
+      (* base (cond (<= m 1) 1 (<= m 2) 2 (<= m 5) 5 :else 10)))
+    1))
+
+(defn- probability-curve
+  "Sampled p_liq(E) over [0, nice(2 x recommended equity)] so the panel can
+  draw the liquidation-probability-vs-collateral curve without shipping the
+  full distribution."
+  [sorted-required e-rec]
+  (let [x-max (nice-ceiling (* 2 e-rec))
+        step (/ x-max (dec curve-sample-count))]
+    {:x-max x-max
+     :points (mapv (fn [i]
+                     (let [e (* step i)]
+                       {:e e :p (paths/prob-above sorted-required e)}))
+                   (range curve-sample-count))}))
+
 (defn- risk-level
   [p-now]
   (cond
@@ -257,10 +284,16 @@
              :side (if (pos? q) :long :short)}
      :sigma {:hourly sigma-hourly
              :daily sigma-daily
+             ;; 365-day calendar convention, same basis as the optimizer's
+             ;; volatility card (sqrt(24 * 365) hours).
+             :annualized (when (finite-pos? sigma-hourly)
+                           (* sigma-hourly (js/Math.sqrt 8760)))
              :distance-frac distance-frac
              :buffer-sigmas buffer-sigmas}
      :p-now p-now
      :p-after p-after
+     :paths-count (alength sorted-required)
+     :curve (probability-curve sorted-required e-rec)
      :risk-level (risk-level p-now)
      :recommended {:equity e-rec
                    :additional additional

@@ -43,9 +43,17 @@
    :horizon {:hours 72 :source :per-coin :samples 22 :bars 72}
    :as-of {:mark 437.51 :equity 12.42 :liquidation-px 424.2
            :notional 157.5 :side :long}
-   :sigma {:hourly 0.017 :daily 0.083 :distance-frac 0.0304 :buffer-sigmas 0.74}
+   :sigma {:hourly 0.017 :daily 0.083 :annualized 0.87
+           :distance-frac 0.0304 :buffer-sigmas 0.74}
    :p-now 0.146
    :p-after 0.021
+   :paths-count 4000
+   :curve {:x-max 40
+           :points [{:e 0 :p 1.0}
+                    {:e 10 :p 0.35}
+                    {:e 20 :p 0.02}
+                    {:e 30 :p 0.005}
+                    {:e 40 :p 0.001}]}
    :risk-level :high
    :recommended {:equity 18.64
                  :additional 6.22
@@ -90,31 +98,61 @@
                     :viewport-width 1440 :viewport-height 900}}
           overrides)))
 
-(deftest panel-renders-tiles-breakdown-and-actions
+(deftest panel-renders-designer-card
   (let [tree (render-panel)
         strings (collect-strings tree)]
     (is (some? (node-by-role tree "margin-rec-panel")))
-    (testing "headline and tiles"
-      (is (contains? strings "Isolated margin recommendation"))
-      (doseq [role ["margin-rec-tile-current" "margin-rec-tile-distance"
-                    "margin-rec-tile-horizon" "margin-rec-tile-recommended"
-                    "margin-rec-tile-new-liq" "margin-rec-tile-leverage"]]
+    (testing "header: title, coin badge, leverage line"
+      (is (contains? strings "Margin recommendation"))
+      (is (some? (node-by-role tree "margin-rec-coin")))
+      (is (= "10x isolated"
+             (last (node-by-role tree "margin-rec-leverage")))))
+    (testing "current-state stat grid"
+      (is (some? (node-by-role tree "margin-rec-current-stats")))
+      (doseq [role ["margin-rec-stat-current" "margin-rec-stat-liq"
+                    "margin-rec-stat-distance" "margin-rec-stat-horizon"
+                    "margin-rec-stat-p-now"]]
         (is (some? (node-by-role tree role)) role))
-      (is (contains? strings "$18.64"))
-      (testing "probabilities render (via the risk-compare block, not duplicate tiles)"
-        (is (contains? strings "14.6%"))
-        (is (contains? strings "2.1%"))
-        (is (nil? (node-by-role tree "margin-rec-tile-p-now")))
-        (is (nil? (node-by-role tree "margin-rec-tile-p-after"))))
+      (is (contains? strings "$12.42 USDC"))
+      (is (contains? strings "$424.20"))
       (is (contains? strings "0.74σ buffer"))
+      (is (contains? strings "≈ 3.0% adverse move"))
       (is (contains? strings "3 days"))
-      (is (contains? strings "based on 22 prior position episodes")))
-    (testing "breakdown pins every named buffer"
-      (is (some? (node-by-role tree "margin-rec-breakdown")))
-      (doseq [label ["Maintenance requirement" "Adverse-path protection"
-                     "Funding buffer (3d)" "Exit / slippage buffer (1.0% notional)"
-                     "Model uncertainty buffer" "Total recommended margin"]]
-        (is (contains? strings label) label)))
+      (is (contains? strings "inferred from 22 similar position episodes"))
+      (is (contains? strings "14.6%"))
+      (is (contains? strings "before next intervention")))
+    (testing "recommendation block"
+      (is (some? (node-by-role tree "margin-rec-recommendation")))
+      (is (contains? strings "$18.64 USDC"))
+      (is (contains? strings "+50.1% vs current"))
+      (is (contains? strings "$6.22 USDC"))
+      (is (contains? strings "$403.10"))
+      (is (contains? strings "≈ 5.0% lower"))
+      (is (contains? strings "2.1%"))
+      (is (contains? strings "after recommendation")))
+    (testing "probability-vs-collateral chart with both markers"
+      (is (some? (node-by-role tree "margin-rec-curve-card")))
+      (is (some? (node-by-role tree "margin-rec-curve")))
+      (is (some? (node-by-role tree "margin-rec-curve-current")))
+      (is (some? (node-by-role tree "margin-rec-curve-recommended")))
+      (is (contains? strings "Modeled probability of liquidation vs. collateral"))
+      (is (contains? strings "Isolated margin (USDC)")))
+    (testing "how-we-estimated column reflects real model quantities"
+      (is (some? (node-by-role tree "margin-rec-methods")))
+      (is (contains? strings "365-day crypto volatility convention"))
+      (is (contains? strings "Applied"))
+      (is (contains? strings "Recent realized volatility (TSM)"))
+      (is (contains? strings "87%"))
+      (is (contains? strings "Scenario simulation (4,000 paths)"))
+      (is (contains? strings "Monte Carlo"))
+      (is (contains? strings "Trade-history-derived horizon")))
+    (testing "buffers column shows the four buffers with share of total"
+      (is (some? (node-by-role tree "margin-rec-buffers")))
+      (is (nil? (node-by-role tree "margin-rec-buffer-maintenance")))
+      (is (contains? strings "$7.87 (42%)"))
+      (is (contains? strings "$2.08 (11%)"))
+      (is (contains? strings "$1.82 (10%)"))
+      (is (contains? strings "$1.46 (8%)")))
     (testing "renders as an anchored popover positioned against the trigger"
       (let [panel (node-by-role tree "margin-rec-panel")
             style (:style (node-attrs panel))]
@@ -125,34 +163,57 @@
     (testing "apply opens the prefilled margin modal then dismisses the panel"
       (let [apply-node (node-by-role tree "margin-rec-apply")
             [[action-id payload placeholder] close-action] (click-actions apply-node)]
-        (is (contains? strings "Add recommended margin $6.22"))
+        (is (contains? strings "Apply recommendation"))
         (is (= :actions/open-position-margin-modal action-id))
         (is (= 6.22 (:prefill-margin-amount payload)))
         (is (= :add (:prefill-margin-mode payload)))
         (is (= xyz-position (:position payload)))
         (is (= :event.currentTarget/bounds placeholder))
         (is (= [:actions/close-margin-rec-panel] close-action))))
-    (testing "reduce dismisses the panel; close button and Escape close it"
-      (is (= [[:actions/open-position-reduce-popover position-data
-               :event.currentTarget/bounds]
-              [:actions/close-margin-rec-panel]]
-             (click-actions (node-by-role tree "margin-rec-reduce"))))
+    (testing "set custom margin opens the plain margin modal, no prefill"
+      (let [custom-node (node-by-role tree "margin-rec-custom")
+            [[action-id payload placeholder] close-action] (click-actions custom-node)]
+        (is (contains? strings "Set custom margin"))
+        (is (= :actions/open-position-margin-modal action-id))
+        (is (nil? (:prefill-margin-amount payload)))
+        (is (= xyz-position (:position payload)))
+        (is (= :event.currentTarget/bounds placeholder))
+        (is (= [:actions/close-margin-rec-panel] close-action))))
+    (testing "close button and Escape close the panel"
       (is (= [[:actions/close-margin-rec-panel]]
              (click-actions (node-by-role tree "margin-rec-panel-close"))))
       (is (= [[:actions/handle-margin-rec-panel-keydown [:event/key]]]
              (get-in (node-attrs (node-by-role tree "margin-rec-panel"))
                      [:on :keydown]))))
-    (testing "risk-mode control marks the active mode"
+    (testing "risk-mode control marks the active mode and cites Settings"
       (is (= "true" (:aria-pressed (node-attrs (node-by-role tree "margin-rec-risk-mode-balanced")))))
       (is (= "false" (:aria-pressed (node-attrs (node-by-role tree "margin-rec-risk-mode-conservative")))))
       (is (= [[:actions/set-margin-rec-risk-mode :conservative]]
-             (click-actions (node-by-role tree "margin-rec-risk-mode-conservative")))))))
+             (click-actions (node-by-role tree "margin-rec-risk-mode-conservative"))))
+      (is (contains? strings "You can adjust this anytime in Settings.")))))
+
+(deftest panel-tolerates-cached-results-without-curve
+  (let [tree (render-panel {:rec {:status :ok
+                                  :result (dissoc rec-result :curve)
+                                  :computed-at 1}})]
+    (is (some? (node-by-role tree "margin-rec-recommendation")))
+    (is (nil? (node-by-role tree "margin-rec-curve-card")))
+    (is (nil? (node-by-role tree "margin-rec-curve")))))
 
 (deftest panel-read-only-hides-actions
   (let [tree (render-panel {:read-only? true})]
     (is (nil? (node-by-role tree "margin-rec-apply")))
-    (is (nil? (node-by-role tree "margin-rec-reduce")))
-    (is (some? (node-by-role tree "margin-rec-breakdown")))))
+    (is (nil? (node-by-role tree "margin-rec-custom")))
+    (is (some? (node-by-role tree "margin-rec-buffers")))))
+
+(deftest panel-within-target-hides-apply
+  (let [result (-> rec-result
+                   (assoc :status :within-target)
+                   (assoc-in [:recommended :additional] 0))
+        tree (render-panel {:rec {:status :ok :result result :computed-at 1}})]
+    (is (some? (node-by-role tree "margin-rec-within-target")))
+    (is (nil? (node-by-role tree "margin-rec-apply")))
+    (is (some? (node-by-role tree "margin-rec-custom")))))
 
 (deftest panel-terminal-states
   (testing "insufficient history"

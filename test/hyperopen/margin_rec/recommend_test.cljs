@@ -73,6 +73,31 @@
       (is (= :default (get-in result [:horizon :source])))
       (is (= 72 (get-in result [:horizon :hours]))))))
 
+(deftest curve-and-presentation-outputs
+  (let [result (recommend/recommend-sync (base-inputs))
+        {:keys [x-max points]} (:curve result)
+        e-rec (get-in result [:recommended :equity])]
+    (testing "curve samples cover 0 through a nice ceiling of 2x the recommendation"
+      (is (= 50 (count points)))
+      (is (zero? (:e (first points))))
+      (is (< (js/Math.abs (- x-max (:e (last points)))) 1e-9))
+      (is (>= x-max (* 2 e-rec)))
+      (let [base (js/Math.pow 10 (js/Math.floor (js/Math.log10 x-max)))
+            mantissa (/ x-max base)]
+        (is (some #(< (js/Math.abs (- mantissa %)) 1e-9) [1 2 5]) mantissa)))
+    (testing "probability is a valid non-increasing function of collateral"
+      (is (every? #(<= 0 (:p %) 1) points))
+      (is (every? (fn [[a b]] (>= (:p a) (:p b)))
+                  (partition 2 1 points))))
+    (testing "path count and annualized volatility surface for the panel"
+      (is (= (recommend/path-count (get-in result [:horizon :bars]))
+             (:paths-count result)))
+      (is (pos? (get-in result [:sigma :annualized])))
+      (is (< (js/Math.abs (- (get-in result [:sigma :annualized])
+                             (* (get-in result [:sigma :hourly])
+                                (js/Math.sqrt 8760))))
+             1e-12)))))
+
 (deftest determinism
   (let [a (recommend/recommend-sync (base-inputs))
         b (recommend/recommend-sync (base-inputs))]

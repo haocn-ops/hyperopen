@@ -35,7 +35,7 @@ This work was initiated by a direct user request (product owner) accompanied by 
 - [x] (2026-07-12) Browser QA on the worktree build: seeded fixture position drove the real watcher -> sync -> lazy module -> batched simulation loop in the browser (p_liq 34% -> chip + panel), screenshots captured.
 - [ ] Fills fetch retry-on-error with cooldown (an errored fills fetch currently stays errored for the session; the horizon falls back to the 72 h default, which is safe but loses personalization).
 - [ ] Mobile positions card: compact recommendation line inside the expanded card (the shared margin-modal hint already covers the mobile add flow).
-- [ ] Probability-vs-collateral curve in a side drawer (the sorted required-equity distribution already computes it; only presentation is missing).
+- [x] (2026-07-12) Probability-vs-collateral curve — delivered inside the redesigned recommendation panel (not a separate drawer) by `docs/exec-plans/active/2026-07-12-margin-rec-panel-design-fidelity.md`; `finalize` now emits sampled `:curve` points.
 - [ ] Persist fills to IndexedDB for long-horizon behavior modeling (BROWSER_STORAGE-governed store; today's session-only fetch covers ~2000 recent fills).
 
 ## Surprises & Discoveries

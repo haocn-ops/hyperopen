@@ -8,6 +8,7 @@
   viewBox is sized so that at the panel width the axis labels and marker
   callouts are comfortably legible."
   (:require [clojure.string :as str]
+            [hyperopen.views.account-info.margin-rec-copy :as copy]
             [hyperopen.views.account-info.shared :as shared]))
 
 (defn- fmt-usd
@@ -201,11 +202,9 @@
            :data-role "margin-rec-curve-card"}
      [:div {:class ["mb-1.5" "flex" "items-center" "gap-1.5" "text-sm" "font-semibold"
                     "text-trading-text"]}
-      "Modeled probability of liquidation vs. collateral"
+      [:span {:class ["cursor-help"] :title (copy/tip :chart)}
+       "Modeled probability of liquidation vs. collateral"]
       [:span {:class ["cursor-help" "text-xs" "font-normal" "text-trading-text-secondary"]
-              :title (str "Each point is the modeled probability that this position"
-                          " would be liquidated before your next likely intervention,"
-                          " at that level of isolated margin. The markers show where"
-                          " your current and recommended margin sit on the curve.")}
+              :title (copy/tip :chart)}
        "ⓘ"]]
      (curve-chart curve current-e p-now rec-e p-after)]))

@@ -1,5 +1,6 @@
 (ns hyperopen.views.account-info.margin-recommendation-panel-test
   (:require [cljs.test :refer-macros [deftest is testing]]
+            [hyperopen.views.account-info.margin-rec-copy :as copy]
             [hyperopen.views.account-info.margin-recommendation-panel :as panel]
             [hyperopen.views.account-info.positions-vm :as positions-vm]
             [hyperopen.views.account-info.tabs.positions.desktop :as positions-desktop]))
@@ -121,10 +122,10 @@
         (is (contains? strings "before next intervention"))
         (is (contains? strings "14.6%"))
         (is (contains? strings "2.1%")))
-      (testing "resulting liquidation price with its improvement"
+      (testing "resulting liquidation price, with an unambiguous comparison base"
         (is (some? (node-by-role tree "margin-rec-new-liq")))
         (is (contains? strings "$403.10"))
-        (is (contains? strings "≈ 5.0% lower"))))
+        (is (contains? strings "≈ 5.0% below current liq. price"))))
     (testing "the duplicated stat cells were removed (the chart carries these)"
       (doseq [role ["margin-rec-current-stats" "margin-rec-stat-current"
                     "margin-rec-stat-liq" "margin-rec-stat-distance"
@@ -145,7 +146,7 @@
         (is (some? (node-by-role advanced "margin-rec-methods")))
         (is (some? (node-by-role advanced "margin-rec-buffers")))
         (is (contains? (collect-strings advanced)
-                       "How we estimated this & the buffers included"))))
+                       "How we estimated this & the margin breakdown"))))
     (testing "how-we-estimated column reflects real model quantities incl. horizon"
       (is (some? (node-by-role tree "margin-rec-methods")))
       (is (contains? strings "365-day crypto volatility convention"))
@@ -156,13 +157,24 @@
       (is (contains? strings "Monte Carlo"))
       (is (contains? strings "Trade-history-derived horizon"))
       (is (contains? strings "3 days")))
-    (testing "buffers column shows the four buffers with share of total"
+    (testing "components column now includes maintenance so amounts sum to total"
       (is (some? (node-by-role tree "margin-rec-buffers")))
-      (is (nil? (node-by-role tree "margin-rec-buffer-maintenance")))
+      (is (some? (node-by-role tree "margin-rec-buffer-maintenance")))
+      (is (contains? strings "Recommended margin components"))
+      (is (contains? strings "$5.41 (29%)"))
       (is (contains? strings "$7.87 (42%)"))
       (is (contains? strings "$2.08 (11%)"))
       (is (contains? strings "$1.82 (10%)"))
       (is (contains? strings "$1.46 (8%)")))
+    (testing "key elements carry help tooltips and an always-visible disclaimer"
+      (let [titles (set (keep #(when (vector? %) (:title (node-attrs %)))
+                              (all-nodes tree)))]
+        (is (contains? titles (copy/tip :liq-probability)))
+        (is (contains? titles (copy/tip :recommended-margin)))
+        (is (contains? titles (copy/tip :risk-target))))
+      (is (some? (:title (node-attrs (node-by-role tree "margin-rec-apply")))))
+      (is (some? (:title (node-attrs (node-by-role tree "margin-rec-risk-mode-conservative")))))
+      (is (some? (node-by-role tree "margin-rec-disclaimer"))))
     (testing "renders as a centred overlay with a computed layout style"
       (let [panel (node-by-role tree "margin-rec-panel")
             style (:style (node-attrs panel))]

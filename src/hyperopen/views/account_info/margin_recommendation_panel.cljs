@@ -11,6 +11,7 @@
   and clamped to the viewport by hyperopen.views.ui.anchored-popover."
   (:require [clojure.string :as str]
             [hyperopen.margin-rec.state :as margin-rec-state]
+            [hyperopen.views.account-info.margin-rec-copy :as copy]
             [hyperopen.views.account-info.margin-rec-curve :as margin-rec-curve]
             [hyperopen.views.account-info.shared :as shared]
             [hyperopen.views.ui.anchored-popover :as anchored-popover]
@@ -87,22 +88,26 @@
      [:div {:class ["grid" "gap-px" "bg-base-300" "sm:grid-cols-3"]}
       [:div {:class ["bg-base-200" "px-3" "py-2.5"]
              :data-role "margin-rec-recommended"}
-       [:div {:class ["text-xs" "text-trading-text-secondary"]}
+       [:div {:class ["cursor-help" "text-xs" "text-trading-text-secondary"]
+              :title (copy/tip :recommended-margin)}
         "Recommended isolated margin"]
        [:div {:class ["mt-0.5" "flex" "flex-wrap" "items-baseline" "gap-x-2" "gap-y-1"]}
         [:span {:class ["text-xl" "font-semibold" "num" "text-trading-green"]}
          (fmt-usdc equity)]
         (when vs-current
-          [:span {:class ["rounded" "bg-trading-green/15" "px-1.5" "py-0.5" "text-xs"
-                          "font-medium" "text-trading-green"]}
+          [:span {:class ["cursor-help" "rounded" "bg-trading-green/15" "px-1.5"
+                          "py-0.5" "text-xs" "font-medium" "text-trading-green"]
+                  :title (copy/tip :vs-current)}
            (str "+" (fmt-percent vs-current 1) " vs current")])]
        (when (and (number? additional) (>= additional 0.01))
-         [:div {:class ["mt-0.5" "text-xs" "text-trading-text-secondary"]
-                :data-role "margin-rec-additional"}
+         [:div {:class ["mt-0.5" "cursor-help" "text-xs" "text-trading-text-secondary"]
+                :data-role "margin-rec-additional"
+                :title (copy/tip :additional)}
           (str "Add " (fmt-usdc additional) " to your current " (fmt-usd current-equity))])]
       [:div {:class ["bg-base-200" "px-3" "py-2.5"]
              :data-role "margin-rec-risk-delta"}
-       [:div {:class ["text-xs" "text-trading-text-secondary"]}
+       [:div {:class ["cursor-help" "text-xs" "text-trading-text-secondary"]
+              :title (copy/tip :liq-probability)}
         "Modeled liq. probability"]
        [:div {:class ["mt-0.5" "flex" "items-center" "gap-2"]}
         [:span {:class ["text-lg" "font-semibold" "num" "text-amber-300"]}
@@ -110,25 +115,29 @@
         [:span {:class ["text-sm" "text-trading-text-secondary"]} "→"]
         [:span {:class ["text-lg" "font-semibold" "num" "text-trading-green"]}
          (fmt-probability p-after)]]
-       [:div {:class ["text-xs" "text-trading-text-secondary"]}
+       [:div {:class ["cursor-help" "text-xs" "text-trading-text-secondary"]
+              :title (copy/tip :horizon-scope)}
         "before next intervention"]]
       [:div {:class ["bg-base-200" "px-3" "py-2.5"]
              :data-role "margin-rec-new-liq"}
-       [:div {:class ["text-xs" "text-trading-text-secondary"]}
+       [:div {:class ["cursor-help" "text-xs" "text-trading-text-secondary"]
+              :title (copy/tip :new-liq)}
         "New liquidation price (est.)"]
        [:div {:class ["mt-0.5" "text-lg" "font-semibold" "num" "text-trading-text"]}
         (fmt-price new-liquidation-px)]
        (when (number? new-liq-change-frac)
          [:div {:class ["text-xs" "text-trading-text-secondary"]}
           (str "≈ " (fmt-percent (js/Math.abs new-liq-change-frac) 1)
-               (if (pos? new-liq-change-frac) " lower" " higher"))])]]]))
+               (if (pos? new-liq-change-frac) " below" " above")
+               " current liq. price")])]]]))
 
 ;; --- methods + buffers -------------------------------------------------------
 
 (defn- method-row
   ([label value] (method-row label value nil))
   ([label value title]
-   [:div {:class ["flex" "items-baseline" "justify-between" "gap-2" "text-xs"]
+   [:div {:class (cond-> ["flex" "items-baseline" "justify-between" "gap-2" "text-xs"]
+                   title (conj "cursor-help"))
           :title title}
     [:span {:class ["flex" "min-w-0" "items-baseline" "gap-1.5"
                     "text-trading-text-secondary"]}
@@ -143,57 +152,68 @@
            :data-role "margin-rec-methods"}
      [:div {:class ["text-xs" "font-semibold" "text-trading-text"]}
       "How we estimated this"]
-     (method-row "365-day crypto volatility convention" "Applied")
+     (method-row "365-day crypto volatility convention" "Applied"
+                 (copy/tip :vol-convention))
      (method-row (str "Recent realized volatility (" coin-label ")")
-                 (fmt-percent (:annualized sigma) 0))
+                 (fmt-percent (:annualized sigma) 0)
+                 (copy/tip :realized-vol))
      (method-row (if (number? paths-count)
                    (str "Scenario simulation ("
                         (.toLocaleString paths-count "en-US") " paths)")
                    "Scenario simulation")
-                 "Monte Carlo")
+                 "Monte Carlo"
+                 (copy/simulation-tip paths-count))
      ;; The intervention horizon lives here now (it used to also be a top-level
-     ;; stat cell); the episode basis is preserved as a hover title.
+     ;; stat cell); the conceptual tip plus its episode/market basis are the
+     ;; hover title.
      (method-row "Trade-history-derived horizon"
                  (:duration horizon*)
-                 (:basis horizon*))]))
+                 (copy/horizon-tip (:basis horizon*)))]))
 
 (defn- buffers-column
   [{:keys [breakdown recommended]}]
-  (let [total (:equity recommended)
-        buffers (remove #(= :maintenance (:key %)) breakdown)]
+  (let [total (:equity recommended)]
     (into [:div {:class ["min-w-0" "space-y-1.5"]
                  :data-role "margin-rec-buffers"}
-           [:div {:class ["text-xs" "font-semibold" "text-trading-text"]}
-            "Buffers included"]]
+           [:div {:class ["cursor-help" "text-xs" "font-semibold" "text-trading-text"]
+                  :title (copy/tip :buffers-section)}
+            "Recommended margin components"]]
+          ;; Every component, maintenance included, so the amounts sum to the
+          ;; recommended total (the engine guarantees the sum is exact).
           (map (fn [{:keys [key label amount]}]
                  [:div {:key (name key)
-                        :class ["flex" "items-baseline" "justify-between" "gap-2" "text-xs"]
-                        :data-role (str "margin-rec-buffer-" (name key))}
+                        :class ["flex" "cursor-help" "items-baseline" "justify-between"
+                                "gap-2" "text-xs"]
+                        :data-role (str "margin-rec-buffer-" (name key))
+                        :title (get copy/buffer-tips key)}
                   [:span {:class ["min-w-0" "text-trading-text-secondary"]} label]
                   [:span {:class ["shrink-0" "num" "text-trading-text"]}
                    (str (fmt-usd amount)
                         (when (and (number? amount) (number? total) (pos? total))
                           (str " (" (js/Math.round (* 100 (/ amount total))) "%)")))]])
-               buffers))))
+               breakdown))))
 
 ;; --- risk mode ---------------------------------------------------------------
 
 (def risk-mode-options
-  [[:conservative "Conservative" "~1% risk"]
-   [:balanced "Balanced" "~2% risk"]
-   [:capital-efficient "Capital efficient" "~5% risk"]])
+  [[:conservative "Conservative" "~1% risk" :risk-conservative]
+   [:balanced "Balanced" "~2% risk" :risk-balanced]
+   [:capital-efficient "Capital efficient" "~5% risk" :risk-capital-efficient]])
 
 (defn- risk-mode-control
   [active-mode]
   [:div {:data-role "margin-rec-risk-mode"}
-   [:div {:class ["mb-1.5" "text-xs" "text-trading-text-secondary"]}
+   [:div {:class ["mb-1.5" "cursor-help" "inline-block" "text-xs"
+                  "text-trading-text-secondary"]
+          :title (copy/tip :risk-target)}
     "Target liquidation risk"]
    (into [:div {:class ["grid" "grid-cols-3" "gap-1.5"]}]
-         (map (fn [[mode label sub]]
+         (map (fn [[mode label sub tip-key]]
                 (let [active? (= mode active-mode)]
                   [:button {:type "button"
                             :aria-pressed (if active? "true" "false")
                             :data-role (str "margin-rec-risk-mode-" (name mode))
+                            :title (copy/tip tip-key)
                             :class (into ["rounded-md" "border" "px-2" "py-2"
                                           "text-center" "text-xs" "font-medium"
                                           "transition-colors" "focus:outline-none"
@@ -208,7 +228,9 @@
                    [:span {:class ["block"]} label]
                    [:span {:class ["block" "text-xs" "text-trading-text-secondary"]} sub]]))
               risk-mode-options))
-   [:div {:class ["mt-1.5" "text-center" "text-xs" "text-trading-text-secondary"]}
+   [:div {:class ["mt-1.5" "cursor-help" "text-center" "text-xs"
+                  "text-trading-text-secondary"]
+          :title (copy/tip :settings-note)}
     "You can adjust this anytime in Settings."]])
 
 (defn- advanced-details
@@ -226,7 +248,7 @@
                       "transition-colors" "hover:bg-base-300/50"
                       "focus:outline-none" "focus-visible:ring-1"
                       "focus-visible:ring-ho-text-muted/40"]}
-    [:span "How we estimated this & the buffers included"]
+    [:span "How we estimated this & the margin breakdown"]
     [:svg {:class ["h-4" "w-4" "shrink-0" "text-trading-text-secondary"
                    "transition-transform" "duration-150" "group-open:rotate-180"]
            :viewBox "0 0 20 20" :fill "currentColor" :aria-hidden true}
@@ -270,15 +292,18 @@
      [:div {:class ["flex" "shrink-0" "items-center" "gap-3" "border-b"
                     "border-base-300" "px-4" "py-3"]}
       [:div {:class ["flex" "min-w-0" "flex-wrap" "items-center" "gap-2"]}
-       [:span {:class ["text-base" "font-semibold" "text-trading-text"]}
+       [:span {:class ["cursor-help" "text-base" "font-semibold" "text-trading-text"]
+               :title (copy/tip :header)}
         "Margin recommendation"]
-       [:span {:class ["rounded" "bg-trading-green/15" "px-1.5" "py-0.5" "text-xs"
-                       "font-semibold" "text-trading-green"]
-               :data-role "margin-rec-coin"}
+       [:span {:class ["cursor-help" "rounded" "bg-trading-green/15" "px-1.5" "py-0.5"
+                       "text-xs" "font-semibold" "text-trading-green"]
+               :data-role "margin-rec-coin"
+               :title (copy/tip :coin)}
         coin-label]
        (when leverage-label
-         [:span {:class ["text-xs" "text-trading-text-secondary"]
-                 :data-role "margin-rec-leverage"}
+         [:span {:class ["cursor-help" "text-xs" "text-trading-text-secondary"]
+                 :data-role "margin-rec-leverage"
+                 :title (copy/tip :leverage)}
           leverage-label])]
       [:button {:type "button"
                 :data-role "margin-rec-panel-close"
@@ -288,7 +313,8 @@
                         "hover:bg-base-300" "hover:text-trading-text"
                         "focus:outline-none" "focus:ring-1"
                         "focus:ring-ho-text-muted/40"]
-                :aria-label "Hide recommendation"
+                :aria-label (copy/tip :close)
+                :title (copy/tip :close)
                 :on {:click [[:actions/close-margin-rec-panel]]}}
        "✕"]]
      (into [:div {:class ["min-h-0" "space-y-3" "overflow-y-auto" "px-4" "py-3"]}]
@@ -298,6 +324,7 @@
   [position-data additional]
   [:button {:type "button"
             :data-role "margin-rec-apply"
+            :title (copy/tip :apply)
             :class ["h-10" "w-full" "rounded-md" "bg-trading-green" "px-3"
                     "text-sm" "font-semibold" "text-base-100"
                     "transition-colors" "hover:bg-trading-green/90"
@@ -315,6 +342,7 @@
   [position-data]
   [:button {:type "button"
             :data-role "margin-rec-custom"
+            :title (copy/tip :custom)
             :class ["h-10" "w-full" "rounded-md" "border" "border-base-300"
                     "px-3" "text-sm" "font-medium" "text-trading-text"
                     "transition-colors" "hover:bg-base-300"
@@ -353,7 +381,12 @@
        actionable? [:div {:class ["grid" "grid-cols-1" "gap-2" "sm:grid-cols-2"]}
                     (apply-button position-data additional)
                     (custom-button position-data)]
-       :else (custom-button position-data))]))
+       :else (custom-button position-data))
+     ;; Always-visible honesty disclosure — never buried only in a tooltip.
+     (when-not read-only?
+       [:div {:class ["text-xs" "leading-relaxed" "text-trading-text-secondary"]
+              :data-role "margin-rec-disclaimer"}
+        (copy/tip :disclaimer)])]))
 
 (defn- leverage-copy
   [row-vm]

@@ -39,6 +39,18 @@
    :risk-structure
    {:method :signed-euler-decomposition
     :portfolio-volatility 0.5
+    :current-diversification {:modeled-volatility 0.20
+                              :all-move-together-volatility 0.30
+                              :zero-correlation-volatility 0.18
+                              :reduction-vs-all-move-together 0.10
+                              :reduction-ratio-vs-all-move-together (/ 1 3)
+                              :modeled-minus-zero-correlation 0.02}
+    :target-diversification {:modeled-volatility 0.40
+                             :all-move-together-volatility 0.80
+                             :zero-correlation-volatility 0.30
+                             :reduction-vs-all-move-together 0.40
+                             :reduction-ratio-vs-all-move-together 0.50
+                             :modeled-minus-zero-correlation 0.10}
     :standalone-share-by-instrument {"perp:BTC" 0.625
                                      "perp:ETH" 0.5
                                      "perp:MSTR" 0.25
@@ -163,10 +175,10 @@
     (testing "equal-risk summary reads the book-level RMS against the target"
       (is (= "RMS deviation 12.5 pts" (:value (by-key :summary))))
       (is (= "Assets spread around 25.0% target" (:sub (by-key :summary)))))
-    (testing "a negative diversification is a benefit in green"
-      (is (= "MSTR diversification" (:label (by-key :diversification))))
-      (is (= "-12.5 pts benefit" (:value (by-key :diversification))))
-      (is (= "Reduces total portfolio risk" (:sub (by-key :diversification))))
+    (testing "a negative cross-covariance effect is an offset in green"
+      (is (= "MSTR cross covariance" (:label (by-key :diversification))))
+      (is (= "-12.5 pts offsets" (:value (by-key :diversification))))
+      (is (= "Offsets risk at final weights" (:sub (by-key :diversification))))
       (is (= "long" (:icon-tone (by-key :diversification)))))
     (testing "net contribution states the signed deviation from target"
       (is (= "12.5% of total risk" (:value (by-key :net))))
@@ -177,8 +189,8 @@
       (is (= :lock (:icon (by-key :freedom))))
       (is (= "warn" (:icon-tone (by-key :freedom)))))))
 
-(deftest asset-breakdown-tiles-cost-and-degradation-test
-  (testing "a positive diversification is an honest concentration cost"
+(deftest asset-breakdown-tiles-amplification-and-degradation-test
+  (testing "a positive cross-covariance effect is an honest amplification"
     (let [amplified (assoc-in solved-result
                               [:risk-structure
                                :diversification-share-by-instrument
@@ -187,8 +199,8 @@
           selected (structure-model/selected-breakdown amplified "perp:BTC")
           tile (nth (structure-model/asset-breakdown-tiles amplified selected)
                     1)]
-      (is (= "+12.5 pts cost" (:value tile)))
-      (is (= "Adds to total portfolio risk" (:sub tile)))
+      (is (= "+12.5 pts amplifies" (:value tile)))
+      (is (= "Amplifies risk at final weights" (:sub tile)))
       (is (= "short" (:icon-tone tile)))))
   (testing "a persisted result without allocation freedom degrades honestly"
     (let [selected (structure-model/selected-breakdown solved-result
@@ -232,3 +244,30 @@
          (structure-model/risk-view-radio-id solved-result "correlation")))
   (is (= "optimizer-risk-view-result"
          (structure-model/risk-view-radio-name {}))))
+
+(deftest diversification-comparison-read-model-uses-one-absolute-scale-test
+  (let [{:keys [cards scale-max] :as model}
+        (structure-model/diversification-comparison-model solved-result)
+        by-key (into {} (map (juxt :key identity)) cards)
+        current (by-key :current)
+        target (by-key :target)]
+    (is (= [:current :target] (mapv :key cards)))
+    (is (= ["Current" "Recommended"] (mapv :label cards)))
+    (is (= 0.80 scale-max))
+    (is (= scale-max (:scale-max current) (:scale-max target)))
+    (doseq [card cards]
+      (is (= [:all-move-together :zero-correlation :modeled]
+             (mapv :key (:benchmarks card))))
+      (is (string? (:benefit-copy card)))
+      (is (contains? #{:amplifies :offsets :neutral}
+                     (:correlation-direction card))))
+    (is (= :amplifies (:correlation-direction current)))
+    (is (= :amplifies (:correlation-direction target)))
+    (is (< (get-in current [:positions :modeled])
+           (get-in target [:positions :modeled]))
+        "marker geometry follows absolute modeled volatility, not benefit percentage")
+    (is (= 50.0 (get-in target [:positions :modeled])))
+    (is (= 25.0 (get-in current [:positions :modeled])))
+    (is (= model
+           (structure-model/diversification-comparison-model solved-result))
+        "read model remains pure and deterministic")))

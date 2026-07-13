@@ -236,6 +236,7 @@
             [hyperopen.portfolio.optimizer.application.engine-sparse-caps-test]
             [hyperopen.portfolio.optimizer.application.engine-test]
             [hyperopen.portfolio.optimizer.application.engine-warning-labels-test]
+            [hyperopen.portfolio.optimizer.application.engine.equal-risk-payload-diversification-edge-test]
             [hyperopen.portfolio.optimizer.application.engine.equal-risk-solve-test]
             [hyperopen.portfolio.optimizer.application.execution-amend-test]
             [hyperopen.portfolio.optimizer.application.execution-amend-view-model-test]
@@ -299,6 +300,7 @@
             [hyperopen.portfolio.optimizer.application.view-model-setup-boundary-test]
             [hyperopen.portfolio.optimizer.application.view-model-test]
             [hyperopen.portfolio.optimizer.application.view-model.equal-risk-results-test]
+            [hyperopen.portfolio.optimizer.application.view-model.equal-risk-structure-diversification-edge-test]
             [hyperopen.portfolio.optimizer.application.view-model.equal-risk-structure-test]
             [hyperopen.portfolio.optimizer.application.view-model.execution-commit-block-test]
             [hyperopen.portfolio.optimizer.application.view-model.execution-reconcile-test]
@@ -328,6 +330,7 @@
             [hyperopen.portfolio.optimizer.domain.returns-test]
             [hyperopen.portfolio.optimizer.domain.risk-contributions-test]
             [hyperopen.portfolio.optimizer.domain.risk-ledoit-wolf-test]
+            [hyperopen.portfolio.optimizer.domain.risk-structure-diversification-edge-test]
             [hyperopen.portfolio.optimizer.domain.risk-structure-test]
             [hyperopen.portfolio.optimizer.domain.risk-test]
             [hyperopen.portfolio.optimizer.domain.volatility-intuition-test]
@@ -626,6 +629,7 @@
             [hyperopen.views.portfolio.optimize.results-panel-hierarchy-test]
             [hyperopen.views.portfolio.optimize.results-panel-test]
             [hyperopen.views.portfolio.optimize.return-views-io-panel-test]
+            [hyperopen.views.portfolio.optimize.risk-diversification-semantics-edge-test]
             [hyperopen.views.portfolio.optimize.risk-return-context-test]
             [hyperopen.views.portfolio.optimize.run-status-banner-test]
             [hyperopen.views.portfolio.optimize.scenario-detail-view-test]
@@ -1065,6 +1069,7 @@
              'hyperopen.portfolio.optimizer.application.engine-sparse-caps-test
              'hyperopen.portfolio.optimizer.application.engine-test
              'hyperopen.portfolio.optimizer.application.engine-warning-labels-test
+             'hyperopen.portfolio.optimizer.application.engine.equal-risk-payload-diversification-edge-test
              'hyperopen.portfolio.optimizer.application.engine.equal-risk-solve-test
              'hyperopen.portfolio.optimizer.application.execution-amend-test
              'hyperopen.portfolio.optimizer.application.execution-amend-view-model-test
@@ -1128,6 +1133,7 @@
              'hyperopen.portfolio.optimizer.application.view-model-setup-boundary-test
              'hyperopen.portfolio.optimizer.application.view-model-test
              'hyperopen.portfolio.optimizer.application.view-model.equal-risk-results-test
+             'hyperopen.portfolio.optimizer.application.view-model.equal-risk-structure-diversification-edge-test
              'hyperopen.portfolio.optimizer.application.view-model.equal-risk-structure-test
              'hyperopen.portfolio.optimizer.application.view-model.execution-commit-block-test
              'hyperopen.portfolio.optimizer.application.view-model.execution-reconcile-test
@@ -1157,6 +1163,7 @@
              'hyperopen.portfolio.optimizer.domain.returns-test
              'hyperopen.portfolio.optimizer.domain.risk-contributions-test
              'hyperopen.portfolio.optimizer.domain.risk-ledoit-wolf-test
+             'hyperopen.portfolio.optimizer.domain.risk-structure-diversification-edge-test
              'hyperopen.portfolio.optimizer.domain.risk-structure-test
              'hyperopen.portfolio.optimizer.domain.risk-test
              'hyperopen.portfolio.optimizer.domain.volatility-intuition-test
@@ -1455,6 +1462,7 @@
              'hyperopen.views.portfolio.optimize.results-panel-hierarchy-test
              'hyperopen.views.portfolio.optimize.results-panel-test
              'hyperopen.views.portfolio.optimize.return-views-io-panel-test
+             'hyperopen.views.portfolio.optimize.risk-diversification-semantics-edge-test
              'hyperopen.views.portfolio.optimize.risk-return-context-test
              'hyperopen.views.portfolio.optimize.run-status-banner-test
              'hyperopen.views.portfolio.optimize.scenario-detail-view-test

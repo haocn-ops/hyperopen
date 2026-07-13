@@ -103,8 +103,12 @@
         "/hyperopen/docs/agent-guides/browser-qa.md",
         "/hyperopen/docs/exec-plans/completed/2026-04-28-portfolio-optimizer-frontier-sweep-overlays.md"
       ],
-      "workbenchScenes": [],
-      "nativeControlAllowlist": []
+      "workbenchScenes": [
+        "/hyperopen/portfolio/hyperopen/workbench/scenes/optimize/equal_risk_correlation_scenes.cljs"
+      ],
+      "nativeControlAllowlist": [
+        "[data-role='portfolio-optimizer-risk-asset-select']"
+      ]
     },
     {
       "id": "trader-portfolio-route",

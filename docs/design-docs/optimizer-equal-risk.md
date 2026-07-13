@@ -93,45 +93,63 @@ warning instead of being fabricated. There is no efficient frontier for this obj
 The primary evidence the objective worked is the **Risk Contribution Balance
 card** (`views/portfolio/optimize/risk_contributions_card.cljs`, built to the
 designer's 2026-07-11 spec): a horizontal diverging chart on a signed axis
-through zero — one row per asset with the recommended share as a sign-colored
-bar capped by a green recommended dot, the current share as a gray outlined
+through zero — one row per asset with the recommended share as a neutral purple
+bar capped by a purple recommended dot, the current share as a gray outlined
 circle joined to the bar end by a dashed connector, a continuous dashed
 **purple** equal-target line (`--optimizer-target`, defined in the scoped
 optimizer palette) with per-row target ticks, and purple Target / sign-colored
 Deviation columns (above target = red, below = green). Between the header and
 the plot sits a five-cell KPI strip: Equal target (purple), Status
 (exact/approximate/not-converged), RMS and Max deviation (magnitude-toned:
-green ≤20% of the target, amber ≤50%, red beyond), and Negative contributors
-(red when any). A READING THIS footnote explains the encoding and names
-hedges. Rows are capped at 16 selected by worst |deviation| (so the rows that
+green ≤20% of the target, amber ≤50%, red beyond), and a neutral Negative
+contributors count. A READING THIS footnote explains that Equal Risk balances
+risk ownership but does not minimize total volatility and names hedges. Rows
+are capped at 16 selected by worst |deviation| (so the rows that
 explain an Approximate verdict always survive), then displayed in signed
 share descending order with an honest remainder line. No pie, donut, stacked,
 or absolute form is ever used: those all misrepresent negative contributions
 and >100% positive shares. No efficient frontier is computed, drawn, or
-implied for this objective anywhere. The card carries four DOM-state tabs
-(designer spec 2026-07-11, correlation view): RISK CONTRIBUTION | BREAKDOWN |
-CORRELATION | RISK / RETURN — visually-hidden radio inputs toggled by scoped
-`:has()` CSS, tab state in the DOM, never in app state. BREAKDOWN
-(`risk_breakdown_panel.cljs`) splits each charted asset's signed net share
-into its always-positive **standalone** (own-variance) component and its
-signed **diversification** (cross-covariance) component — paired sub-bars
-from zero with a purple net marker at their exact sum — because a short can
-be negatively correlated with every long and still contribute positive risk.
-CORRELATION (`risk_correlation_panel.cljs`) shows the correlation heatmap
+implied for this objective anywhere. The card carries four visible labels over
+stable DOM-state identities: RISK BALANCE | DIVERSIFICATION | CORRELATION
+DRIVERS | RISK / RETURN. Visually-hidden radio inputs are toggled by scoped
+`:has()` CSS, so tab state remains in the DOM rather than application state.
+
+DIVERSIFICATION first shows current and recommended books on one absolute
+annualized-volatility scale. For each book it compares the modeled volatility
+`sqrt(w' Sigma w)` with the zero-correlation benchmark
+`sqrt(sum_i w_i^2 Sigma_ii)` and the all-held-position-profit-and-loss-streams
+moving-together benchmark `sum_i abs(w_i) sqrt(Sigma_ii)`. The displayed
+diversification benefit is the reduction from the moving-together benchmark;
+the separate signed modeled-minus-zero-correlation value explains whether
+correlations amplify or offset risk versus independent positions. This makes
+it explicit that positive cross-covariance can coexist with genuine
+diversification versus perfect comovement.
+
+Below that summary, `risk_breakdown_panel.cljs` attributes each charted asset's
+signed net share to an always-positive **Own-variance term** plus a signed
+**Cross-covariance effect**. The own term runs from zero to its endpoint; the
+cross-covariance segment begins at that endpoint and moves left when it offsets
+risk or right when it amplifies risk, ending at the purple net marker. The copy
+calls this final-weight attribution and explicitly says it is not the causal
+impact of removing the asset, which would require a new optimization.
+
+CORRELATION DRIVERS (`risk_correlation_panel.cljs`) shows the correlation heatmap
 with a POSITION P&L / UNDERLYING RETURNS toggle (position-P&L correlation =
 sideᵢ·sideⱼ·underlying correlation; both matrices pre-render and a second
 DOM-state radio pair swaps them; every cell's native tooltip carries both
-numbers plus a Diversifying/Amplifying/Neutral verdict) beside a
-CONTRIBUTION BREAKDOWN block for the **selected asset**. Which asset is
+numbers plus a Diversifying/Amplifying/Neutral verdict). In POSITION P&L mode,
+negative/offsetting cells use green and positive/amplifying cells use red;
+underlying-return mode keeps conventional correlation-sign colors. Which asset is
 selected IS app state (`ui-selected-risk-instrument-path`, set by
 `set-portfolio-optimizer-selected-risk-instrument` from Allocation-row
 clicks — the one selection that must route data across cards); the fallback
 is the most negative net contributor, else the largest |net|. The heatmap's
 data comes from the persisted `:risk-structure` payload section (the
-covariance itself is never persisted), capped at the 12 largest |net share|
+covariance itself is never persisted), capped at the 24 largest |net share|
 positions with an honest remainder line, ordered by signed net share to
 match the balance chart. Allocation rows gain a "P&L corr. to portfolio"
-line (Corr(sᵢrᵢ, r_p)) and an accent ring on the effective selection.
+line (Corr(sᵢrᵢ, r_p)) with explicit offsets/amplifies text and an accent ring
+on the effective selection.
 RISK / RETURN (`risk_return_context.cljs`) shows
 current/recommended/standalone points with an explicit
 returns-are-context-only note. Persisted results that predate
@@ -147,7 +165,8 @@ correlation one computes its payload sections through the real domain math,
 with an interactive selection store) plus the
 hedged/exact/capped/degenerate/persisted states;
 `tools/playwright/test/optimizer-risk-correlation-workbench.spec.mjs` covers
-the tab/toggle switching and the click-to-select flow deterministically.
+the tab/toggle switching, current/recommended benchmark comparison, additive
+bridge endpoints, semantic copy, and click-to-select flow deterministically.
 
 The KPI strip (`scenario_kpi_strip.cljs`) swaps the Sharpe tile for RISK
 BALANCE (current → recommended max deviation in points) and renders the
@@ -162,7 +181,9 @@ selected position remains fully determined. Fully determined cases say so ("Equa
 Risk evaluates the resulting balance but cannot improve it") instead of implying the
 optimizer chose the weights.
 The payload also carries `:current-risk-contributions` (same summary over the
-current aligned book) for the current-vs-recommended comparison; views degrade
+current aligned book) and scalar `:target-diversification` plus optional
+`:current-diversification` maps inside `:risk-structure`. These benchmark maps
+persist only finite scalar values; covariance is never persisted. Views degrade
 to em-dashes on persisted results that predate these fields.
 
 ## Solver (for maintainers)

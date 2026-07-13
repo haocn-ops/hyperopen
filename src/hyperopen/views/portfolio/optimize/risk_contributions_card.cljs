@@ -43,6 +43,8 @@
              :as asset-breakdown-panel]
             [hyperopen.views.portfolio.optimize.risk-correlation-panel
              :as correlation-panel]
+            [hyperopen.views.portfolio.optimize.risk-diversification-summary
+             :as diversification-summary]
             [hyperopen.views.portfolio.optimize.risk-return-context
              :as risk-return-context]))
 
@@ -121,6 +123,7 @@
   [data-role label value {:keys [value-class tone title]}]
   [:div {:class ["optimizer-risk-balance-kpi"]
          :data-role data-role
+         :data-tone (some-> tone name)
          :title title}
    [:p {:class ["optimizer-risk-balance-kpi-label"]} label]
    [:p {:class (into ["optimizer-risk-balance-kpi-value" "font-mono" "tabular-nums"]
@@ -163,7 +166,7 @@
               (kpi-cell "portfolio-optimizer-risk-contributions-negative"
                         "Negative contributors"
                         (str (or negative-count 0))
-                        {:tone (when (pos? (or negative-count 0)) :bad)})]
+                        {:tone :neutral})]
        view-text (conj (kpi-cell "portfolio-optimizer-risk-contributions-view"
                                  "View"
                                  view-text
@@ -320,7 +323,8 @@
    [:span {:class ["optimizer-risk-balance-reading-label"]} "Reading this"]
    [:span {:class ["optimizer-risk-balance-reading-sep"]} "·"]
    (str "Bars show recommended contribution. Gray circle is current. Purple "
-        "line marks equal target (" (format-pct target-share) " per asset).")
+        "line marks equal target (" (format-pct target-share) " per asset). "
+        "Equal Risk balances risk ownership; it does not minimize total volatility.")
    (when (and (number? negative-count) (pos? negative-count))
      (str " " negative-count
           (if (= 1 negative-count)
@@ -401,7 +405,7 @@
                            {:result result
                             :rows (structure-model/breakdown-rows result rows)
                             :target-share target-share
-                            :kpi-strip (kpi-strip model "Breakdown details")
+                            :kpi-strip (kpi-strip model "Diversification details")
                             :overflow-note (overflow-line model)
                             :selected-instrument-id selected-risk-instrument})]
        [:section {:class ["optimizer-risk-balance" "rounded-xl" "border"
@@ -416,11 +420,11 @@
          (when (or risk-return-panel breakdown-body correlation-body)
            [:div {:class ["optimizer-risk-balance-tabs"]
                   :data-role "portfolio-optimizer-risk-view-tabs"}
-            (tab-label result "contribution" "Risk contribution")
+            (tab-label result "contribution" "Risk Balance")
             (when breakdown-body
-              (tab-label result "breakdown" "Breakdown"))
+              (tab-label result "breakdown" "Diversification"))
             (when correlation-body
-              (tab-label result "correlation" "Correlation"))
+              (tab-label result "correlation" "Correlation Drivers"))
             (when risk-return-panel
               (tab-label result "risk-return" "Risk / Return"))])]
         [:div {:class ["optimizer-risk-balance-panel"
@@ -442,6 +446,7 @@
         (when breakdown-body
           [:div {:class ["optimizer-risk-balance-panel"
                          "optimizer-risk-balance-panel--breakdown"]}
+           (diversification-summary/diversification-summary result)
            breakdown-body])
         (when correlation-body
           [:div {:class ["optimizer-risk-balance-panel"

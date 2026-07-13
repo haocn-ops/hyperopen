@@ -157,6 +157,25 @@
                     (map-indexed (fn [idx row] (nth row idx))
                                  (:matrix correlation))))
         (is (zero? (:hidden-count correlation)))))
+    (testing "current and recommended diversification benchmarks ride the same payload"
+      (let [structure (:risk-structure result)
+            target (:target-diversification structure)
+            current (:current-diversification structure)]
+        (doseq [summary [target current]]
+          (is (map? summary))
+          (is (every? number?
+                      (map summary
+                           [:modeled-volatility
+                            :all-move-together-volatility
+                            :zero-correlation-volatility
+                            :reduction-vs-all-move-together
+                            :reduction-ratio-vs-all-move-together
+                            :modeled-minus-zero-correlation])))
+          (is (every? #(js/isFinite %) (vals summary))))
+        (is (near? (:portfolio-volatility structure)
+                   (:modeled-volatility target)))
+        (is (not (contains? target :relative-contributions-by-instrument))
+            "scalar benchmarks do not duplicate or rewrite Euler contributions")))
     (testing "allocation freedom classifies the problem geometry"
       (let [freedom (get-in result [:equal-risk-solver :allocation-freedom])]
         (is (contains? #{:open :limited} (:status freedom))

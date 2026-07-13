@@ -252,6 +252,18 @@
          :risk-structure
          {:method :signed-euler-decomposition
           :portfolio-volatility 0.4
+          :current-diversification {:modeled-volatility 0.24
+                                    :all-move-together-volatility 0.32
+                                    :zero-correlation-volatility 0.20
+                                    :reduction-vs-all-move-together 0.08
+                                    :reduction-ratio-vs-all-move-together 0.25
+                                    :modeled-minus-zero-correlation 0.04}
+          :target-diversification {:modeled-volatility 0.40
+                                   :all-move-together-volatility 0.60
+                                   :zero-correlation-volatility 0.35
+                                   :reduction-vs-all-move-together 0.20
+                                   :reduction-ratio-vs-all-move-together (/ 1 3)
+                                   :modeled-minus-zero-correlation 0.05}
           :standalone-share-by-instrument {"perp:BTC" 0.75
                                            "spot:PURR" 0.5}
           :diversification-share-by-instrument {"perp:BTC" -0.13
@@ -275,11 +287,13 @@
 (deftest results-panel-equal-risk-correlation-view-renders-test
   (let [view-node (render structured-result)
         strings (set (collect-strings view-node))]
-    (testing "all four tabs render when the structure section exists"
+    (testing "the four stable tab identities get truthful visible labels"
       (is (some? (node-by-role view-node "portfolio-optimizer-risk-view-tab-contribution")))
       (is (some? (node-by-role view-node "portfolio-optimizer-risk-view-tab-breakdown")))
       (is (some? (node-by-role view-node "portfolio-optimizer-risk-view-tab-correlation")))
-      (is (some? (node-by-role view-node "portfolio-optimizer-risk-view-tab-risk-return"))))
+      (is (some? (node-by-role view-node "portfolio-optimizer-risk-view-tab-risk-return")))
+      (is (every? strings ["Risk Balance" "Diversification"
+                           "Correlation Drivers" "Risk / Return"])))
     (testing "both heatmap modes pre-render; position P&L flips the long × short pair"
       (is (some? (node-by-role view-node "portfolio-optimizer-risk-corr-mode-position")))
       (is (some? (node-by-role view-node "portfolio-optimizer-risk-corr-mode-underlying")))
@@ -302,7 +316,7 @@
           (is (str/includes? title "Effect on portfolio risk: Diversifying")))))
     (testing "the per-tab KPI strips carry their View cells"
       (is (contains? strings "Correlation matrix"))
-      (is (contains? strings "Breakdown details")))
+      (is (contains? strings "Diversification details")))
     (testing "the correlation tab is the full-width heatmap alone — the
               breakdown block moved to the BREAKDOWN tab"
       (let [corr-panel (first
@@ -315,7 +329,7 @@
         (is (nil? (node-by-role corr-panel
                                 "portfolio-optimizer-risk-selected-breakdown")))))
     (testing "the selected-asset breakdown defaults to the largest |net| and
-              tells the standalone + diversification = net story"
+              tells the own + cross-covariance = net story"
       (let [selected (node-by-role view-node
                                    "portfolio-optimizer-risk-selected-asset")]
         (is (= "true"
@@ -333,9 +347,9 @@
       (let [identity-node (node-by-role view-node
                                         "portfolio-optimizer-risk-selected-identity")
             identity-strings (set (collect-strings identity-node))]
-        (is (contains? identity-strings "Net Risk Contribution"))
-        (is (contains? identity-strings "Standalone Risk"))
-        (is (contains? identity-strings "Diversification Effect"))
+        (is (contains? identity-strings "Net risk contribution"))
+        (is (contains? identity-strings "Own-variance term"))
+        (is (contains? identity-strings "Cross-covariance effect"))
         (is (contains? identity-strings "75.0%")
             "the equation carries the actual standalone number")
         (is (contains? identity-strings "(-13.0%)")
@@ -344,9 +358,9 @@
               legend that names both diversification directions"
       (is (some? (node-by-role view-node "portfolio-optimizer-risk-breakdown-chart")))
       (is (some? (node-by-role view-node "portfolio-optimizer-risk-breakdown-row")))
-      (is (contains? strings "Standalone risk"))
-      (is (contains? strings "Reduces risk (diversifier)"))
-      (is (contains? strings "Adds risk (concentration)")))
+      (is (contains? strings "Own-variance term"))
+      (is (contains? strings "Offsets risk"))
+      (is (contains? strings "Amplifies risk")))
     (testing "the why-card's third card becomes the Correlation view tab link"
       (is (contains? strings "Correlation view"))
       (is (not (contains? strings "Largest risk contributor")))
@@ -389,9 +403,9 @@
               designer axis title"
       (is (some? (node-by-role view-node
                                "portfolio-optimizer-risk-selected-breakdown")))
-      (is (contains? strings "Standalone Risk"))
-      (is (contains? strings "Diversification Effect"))
-      (is (contains? strings "Net Risk Contribution"))
+      (is (contains? strings "Own-variance term"))
+      (is (contains? strings "Cross-covariance effect"))
+      (is (contains? strings "Net risk contribution"))
       (is (contains? strings "Contribution to Total Portfolio Volatility")))
     (testing "the four summary tiles render with honest copy"
       (is (some? (node-by-role view-node
@@ -403,7 +417,7 @@
       (is (some? (node-by-role view-node
                                "portfolio-optimizer-risk-asset-tile-freedom")))
       (is (contains? strings "RMS deviation 12.0 pts"))
-      (is (contains? strings "-13.0 pts benefit"))
+      (is (contains? strings "-13.0 pts offsets"))
       (is (contains? strings "62.0% of total risk"))
       (is (contains? strings "+12.0 pts vs 50.0% target"))
       (is (contains? strings "Limited · 2 binding caps"))

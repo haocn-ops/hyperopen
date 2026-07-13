@@ -72,6 +72,77 @@
               (js/Math.sqrt variance)))
           (math/diagonal covariance))))
 
+(defn portfolio-diversification-summary
+  "Portfolio-level volatility benchmarks for one aligned signed book.
+
+  `:all-move-together-volatility` is sum_i |w_i| sigma_i: the volatility if
+  every held position P&L stream moved together. `:zero-correlation-volatility`
+  keeps only diagonal covariance. `:modeled-volatility` uses the full
+  covariance. The result is deliberately separate from the per-asset signed
+  Euler decomposition below: a book can have positive cross-covariance terms
+  and still be diversified relative to perfect held-P&L comovement.
+
+  Returns a finite `{:status :ok ...}` scalar map, or
+  `{:status :error :reason ...}` for malformed, nonfinite, or degenerate input.
+  It never throws on shape/alignment errors."
+  [covariance weights]
+  (let [weights* (when (sequential? weights) (vec weights))
+        n (count weights*)]
+    (cond
+      (or (zero? n) (not-every? finite-number? weights*))
+      {:status :error :reason :weights-shape}
+
+      (not-any? #(not (zero? %)) weights*)
+      {:status :error :reason :degenerate-weights}
+
+      :else
+      (let [validation (risk-contributions/validate-covariance covariance n)]
+        (if-not (= :ok (:status validation))
+          validation
+          (let [covariance* (:covariance validation)
+                diagonal (math/diagonal covariance*)]
+            (if (some neg? diagonal)
+              {:status :error :reason :negative-variance}
+              (let [volatilities (mapv js/Math.sqrt diagonal)
+                    all-move-together (reduce + 0 (map (fn [weight sigma]
+                                                        (* (js/Math.abs weight)
+                                                           sigma))
+                                                      weights*
+                                                      volatilities))
+                    zero-variance (reduce + 0 (map (fn [weight variance]
+                                                    (* weight weight variance))
+                                                  weights*
+                                                  diagonal))
+                    modeled-variance (math/portfolio-variance weights*
+                                                              covariance*)
+                    tolerance (risk-contributions/variance-degeneracy-tolerance
+                               covariance* weights*)]
+                (cond
+                  (or (not (finite-number? all-move-together))
+                      (not (finite-number? zero-variance))
+                      (not (finite-number? modeled-variance)))
+                  {:status :error :reason :nonfinite-summary}
+
+                  (<= all-move-together 0)
+                  {:status :error :reason :degenerate-volatility}
+
+                  (< modeled-variance tolerance)
+                  {:status :error :reason :degenerate-variance}
+
+                  :else
+                  (let [modeled (js/Math.sqrt (max 0 modeled-variance))
+                        zero-correlation (js/Math.sqrt (max 0 zero-variance))
+                        reduction (- all-move-together modeled)]
+                    {:status :ok
+                     :modeled-volatility modeled
+                     :all-move-together-volatility all-move-together
+                     :zero-correlation-volatility zero-correlation
+                     :reduction-vs-all-move-together reduction
+                     :reduction-ratio-vs-all-move-together
+                     (/ reduction all-move-together)
+                     :modeled-minus-zero-correlation
+                     (- modeled zero-correlation)}))))))))))
+
 (defn correlation-matrix
   "Underlying-return correlation matrix rho_ij = Sigma_ij/(sigma_i*sigma_j),
   clamped to [-1, 1] against float noise, with an exact 1.0 diagonal. Entries

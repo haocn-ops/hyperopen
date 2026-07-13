@@ -169,16 +169,16 @@
 
 (defn- pnl-corr-line
   [result instrument-id]
-  (when-let [corr (structure-model/pnl-portfolio-correlation result
-                                                             instrument-id)]
+  (when-let [{:keys [correlation effect title]}
+             (some-> (structure-model/pnl-portfolio-correlation result instrument-id)
+                     structure-model/pnl-correlation-presentation)]
     [:span {:class ["optimizer-target-exposure-pnl-corr" "block"]
             :data-role (str "portfolio-optimizer-target-exposure-pnl-corr-"
-                            (data-role-token instrument-id))}
+                            (data-role-token instrument-id))
+            :data-effect effect :title title}
      "P&L corr. to portfolio "
-     [:span {:class ["font-mono" "tabular-nums"]
-             :data-sign (if (neg? corr) "negative" "positive")}
-      (structure-model/format-signed-correlation corr)]]))
-
+     [:span {:class ["font-mono" "tabular-nums"] :data-effect effect} correlation]
+     " · " effect]))
 (defn- selection-attrs
   "Attrs merged onto a row's <tr>: click-to-select + the highlight ring on the
   EFFECTIVE selection (explicit or view-model fallback), so the ring always
@@ -536,14 +536,14 @@
    [:section {:class ["optimizer-target-exposure-table"
                       "min-h-0" "border-r" "border-base-300" "bg-base-100/95" "leading-4"]
               :data-role "portfolio-optimizer-target-exposure-table"}
-    [:div {:class ["flex" "items-center" "justify-between" "gap-3" "border-b"
+    [:div {:class ["optimizer-target-exposure-header" "flex" "items-center" "justify-between" "gap-3" "border-b"
                    "border-base-300" "px-4" "py-3"]}
-     [:div
+     [:div {:class ["optimizer-target-exposure-header-copy"]}
       [:p {:class ["font-mono" "text-[0.62rem]" "uppercase" "tracking-[0.08em]" "text-trading-muted/70"]}
        "Allocation"]
       [:p {:class ["mt-1" "text-xs" "text-trading-text"]}
        "By asset · click to expand legs"]]
-     [:div {:class ["flex" "items-center" "gap-2"]}
+     [:div {:class ["optimizer-target-exposure-header-controls" "flex" "items-center" "gap-2"]}
       [:div {:class ["flex" "border" "border-base-300" "text-[0.62rem]" "font-semibold"
                      "uppercase" "tracking-[0.06em]"]}
        [:button {:type "button"

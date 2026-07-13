@@ -13,6 +13,8 @@
   contribution sign from a position side."
   (:require [hyperopen.portfolio.optimizer.application.view-model.equal-risk-results
              :as equal-risk-results]
+            [hyperopen.portfolio.optimizer.application.view-model.equal-risk-diversification
+             :as diversification-model]
             [hyperopen.portfolio.optimizer.coercion :as coercion]))
 
 (def ^:private finite-number? coercion/finite-number?)
@@ -21,6 +23,11 @@
   "|position correlation| below this displays as 0.00, so the tooltip verdict
   says Neutral instead of over-reading float dust as a hedge."
   0.005)
+
+(def cross-effect-neutral-threshold
+  "Cross-covariance effects below half of one displayed tenth of a percentage
+  point render as neutral, so rounded 0.0 pts is never colored red or green."
+  diversification-model/cross-effect-neutral-threshold)
 
 ;; --- Shared identity/formatting -----------------------------------------------
 
@@ -113,6 +120,22 @@
   (get-in result [:risk-structure
                   :pnl-portfolio-correlation-by-instrument
                   instrument-id]))
+
+(defn pnl-correlation-presentation
+  "Economic direction and non-color copy for one held-position P&L
+  correlation. Negative offsets portfolio risk; positive amplifies it."
+  [correlation]
+  (when (finite-number? correlation)
+    (let [effect (cond
+                   (< (js/Math.abs correlation)
+                      neutral-correlation-threshold) "neutral"
+                   (neg? correlation) "offsets"
+                   :else "amplifies")
+          formatted (format-signed-correlation correlation)]
+      {:correlation formatted
+       :effect effect
+       :title (str "Held-position P&L correlation " formatted " " effect
+                   " portfolio risk")})))
 
 (defn breakdown-asset-options
   "Options for the per-asset breakdown panel's Change-asset select: every
@@ -230,6 +253,17 @@
                                                instrument-id])))
             balance-rows))))
 
+(defn- correlation-direction
+  [effect]
+  (diversification-model/cross-effect-direction effect))
+
+(defn diversification-comparison-model
+  "Current/recommended portfolio benchmark cards on one absolute volatility
+  scale. Invalid or unavailable entries are omitted instead of becoming
+  zero-position markers; nil means no valid persisted summary exists."
+  [result]
+  (diversification-model/comparison-model result))
+
 (defn selected-breakdown
   "The CONTRIBUTION BREAKDOWN panel model for the selected (or defaulted)
   instrument: label, side, and the standalone + diversification = net story.
@@ -276,26 +310,23 @@
   [label diversification]
   (let [div-pts (when (finite-number? diversification)
                   (* 100 diversification))
-        direction (cond
-                    (not (finite-number? div-pts)) nil
-                    (< (js/Math.abs div-pts) 0.05) :neutral
-                    (neg? div-pts) :benefit
-                    :else :cost)]
+        direction (when (finite-number? diversification)
+                    (correlation-direction diversification))]
     {:key :diversification
      :icon :arrows
-     :icon-tone (case direction :benefit "long" :cost "short" "info")
-     :label (str label " diversification")
+     :icon-tone (case direction :offsets "long" :amplifies "short" "info")
+     :label (str label " cross covariance")
      :value (case direction
-              :benefit (str (equal-risk-results/format-signed-pts div-pts)
-                            " benefit")
-              :cost (str (equal-risk-results/format-signed-pts div-pts)
-                         " cost")
+              :offsets (str (equal-risk-results/format-signed-pts div-pts)
+                            " offsets")
+              :amplifies (str (equal-risk-results/format-signed-pts div-pts)
+                              " amplifies")
               :neutral "0.0 pts"
               "—")
      :sub (case direction
-            :benefit "Reduces total portfolio risk"
-            :cost "Adds to total portfolio risk"
-            :neutral "No net correlation effect"
+            :offsets "Offsets risk at final weights"
+            :amplifies "Amplifies risk at final weights"
+            :neutral "Neutral at final weights"
             "—")}))
 
 (defn- net-tile
@@ -369,6 +400,13 @@
           (-> (* 100 (/ (- value lo) span))
               (max 0)
               (min 100)))}))
+
+(defn breakdown-bridge-model
+  "Anchored own -> cross-covariance -> net geometry for all-assets rows.
+  The shared scale fits cumulative endpoints (zero, own, and net), never the
+  cross component as if it started from zero."
+  [rows]
+  (diversification-model/bridge-model fit-scale rows))
 
 (defn scale-ticks
   "Clean tick values for a fit-scale, capped at `max-labels` (default 8 —

@@ -120,21 +120,26 @@
 
 (defn- component-rows
   [{:keys [standalone diversification net]}]
-  [{:label "Standalone Risk"
-    :sub "Risk if held in isolation"
+  [{:label "Own-variance term"
+    :sub "Position weight squared × its own variance, normalized by portfolio variance"
     :value (structure-model/format-pct standalone)
     :end-label (breakdown-panel/format-signed-pct standalone)
     :bar-value standalone
     :kind "standalone"
     :role "portfolio-optimizer-risk-selected-standalone"}
-   {:label "Diversification Effect"
-    :sub "Impact from correlations with other positions"
+   {:label "Cross-covariance effect"
+    :sub (cond
+           (< (js/Math.abs diversification)
+              structure-model/cross-effect-neutral-threshold)
+           "Neutral at displayed precision"
+           (neg? diversification) "Offsets risk at final weights"
+           :else "Amplifies risk at final weights")
     :value (breakdown-panel/format-signed-pct diversification)
     :end-label (breakdown-panel/format-signed-pct diversification)
     :bar-value diversification
     :kind "diversification"
     :role "portfolio-optimizer-risk-selected-diversification"}
-   {:label "Net Risk Contribution"
+   {:label "Net risk contribution"
     :sub "To total portfolio volatility"
     :value (structure-model/format-pct net)
     :end-label (str "= " (structure-model/format-pct net))
@@ -151,11 +156,11 @@
          :data-role "portfolio-optimizer-risk-selected-identity"
          :title "The signed Euler contribution splits exactly into the position's own-variance term plus its cross-covariance term."}
    [:p {:class ["optimizer-risk-asset-equation-terms"]}
-    [:span "Net Risk Contribution"]
+    [:span "Net risk contribution"]
     [:span {:class ["optimizer-risk-asset-equation-op"]} "="]
-    [:span "Standalone Risk"]
+    [:span "Own-variance term"]
     [:span {:class ["optimizer-risk-asset-equation-op"]} "+"]
-    [:span "Diversification Effect"]]
+    [:span "Cross-covariance effect"]]
    [:p {:class ["optimizer-risk-asset-equation-values" "font-mono"
                 "tabular-nums"]}
     [:span {:data-kind "net"} (structure-model/format-pct net)]
@@ -220,10 +225,16 @@
                   :title (str "Held " side-word)}
            (subs side-word 0 1)])]
        [:p {:class ["optimizer-risk-asset-explainer"]}
-        (str "Net Risk Contribution is the asset's impact on total portfolio "
-             "volatility after accounting for diversification benefits "
-             "(negative) or concentration costs (positive) with other "
-             "positions.")]]
+        (str "This final-weight attribution shows how the held position's "
+             "cross-covariance "
+             (cond
+               (< (js/Math.abs (:diversification selected))
+                  structure-model/cross-effect-neutral-threshold)
+               "is neutral at displayed precision"
+               (neg? (:diversification selected)) "offsets risk"
+               :else "amplifies risk")
+             ". It is not removal impact; removing the asset would require "
+             "a new optimization.")]]
       (change-asset-picker result instrument-id)]
      [:div {:class ["optimizer-risk-balance-rows" "relative" "mt-3"]}
       (breakdown-panel/plot-backdrop scale nil

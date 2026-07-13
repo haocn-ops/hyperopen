@@ -1,6 +1,6 @@
 (ns hyperopen.workbench.scenes.optimize.equal-risk-correlation-scenes
-  "Workbench scenes for the Equal Risk CORRELATION / BREAKDOWN tabs (designer
-  specs 2026-07-11: correlation view + per-asset breakdown) and the
+  "Workbench scenes for the Equal Risk CORRELATION DRIVERS / DIVERSIFICATION
+  tabs (designer specs 2026-07-11: correlation view + per-asset breakdown) and the
   Allocation table's row selection + P&L-correlation line. `designer-parity`
   mirrors the mock's 3-long/2-short book with an INTERACTIVE selection store:
   clicking an Allocation row OR picking from the breakdown tab's Change-asset
@@ -13,8 +13,8 @@
 
   Every fixture's :risk-contributions AND :risk-structure sections are
   computed by the REAL domain math over an explicit covariance, so the scene
-  numbers can never violate the identities the views assume (net = standalone
-  + diversification; position corr = sides × underlying corr). Absent
+  numbers can never violate the identities the views assume (net = own variance
+  + cross covariance; position corr = sides × underlying corr). Absent
   :risk-structure (every scene in equal-risk-scenes) is the degradation case:
   the card keeps its original two tabs."
   (:require [portfolio.replicant :as portfolio]
@@ -63,6 +63,10 @@
   (let [symbols (mapv first assets)
         ids (mapv (comp instrument-id first) assets)
         weights (mapv second assets)
+        current-weights (mapv (fn [idx weight]
+                                (* weight (+ 0.45 (* 0.1 (mod idx 4)))))
+                              (range)
+                              weights)
         vols (mapv #(nth % 2) assets)
         n (count ids)
         targets (vec (repeat n (/ 1 n)))
@@ -76,7 +80,18 @@
                    (cond-> {:instrument-ids ids
                             :covariance covariance
                             :weights weights}
-                     correlation-cap (assoc :correlation-cap correlation-cap)))]
+                     correlation-cap (assoc :correlation-cap correlation-cap)))
+        target-diversification (risk-structure/portfolio-diversification-summary
+                                covariance weights)
+        current-diversification (risk-structure/portfolio-diversification-summary
+                                 covariance current-weights)
+        structure* (cond-> (dissoc structure :status)
+                     (= :ok (:status target-diversification))
+                     (assoc :target-diversification
+                            (dissoc target-diversification :status))
+                     (= :ok (:status current-diversification))
+                     (assoc :current-diversification
+                            (dissoc current-diversification :status)))]
     {:status :solved
      :as-of-ms 1752300000000
      :solver {:strategy :sequential-equal-risk
@@ -84,12 +99,7 @@
      :instrument-ids ids
      :labels-by-instrument (zipmap ids symbols)
      :target-weights-by-instrument (zipmap ids weights)
-     :current-weights-by-instrument (zipmap ids
-                                            (map-indexed
-                                             (fn [idx weight]
-                                               (* weight
-                                                  (+ 0.7 (* 0.2 (mod idx 4)))))
-                                             weights))
+     :current-weights-by-instrument (zipmap ids current-weights)
      :expected-return 0.11
      :volatility (:portfolio-volatility structure)
      :performance {:in-sample-sharpe 0.52}
@@ -102,7 +112,7 @@
      :risk-contributions (-> contributions
                              (dissoc :status)
                              (assoc :quality :approximate))
-     :risk-structure (dissoc structure :status)
+     :risk-structure structure*
      :equal-risk-solver {:strategy :sequential-equal-risk
                          :converged? true
                          :termination-reason :step-tolerance
@@ -194,8 +204,8 @@
       selection-reducers
       [:div {:class ["portfolio-optimizer" "mx-auto" "w-full"]
              :style {:max-width "1500px"}}
-       [:div {:class ["grid" "gap-4" "p-4" "items-start"]
-              :style {:grid-template-columns "minmax(320px, 430px) minmax(0, 1fr)"}}
+       [:div {:class ["grid" "grid-cols-1" "gap-4" "p-4" "items-start"
+                      "lg:grid-cols-[minmax(320px,430px)_minmax(0,1fr)]"]}
         (target-exposure-table/target-exposure-table
          result
          {:selected-risk-instrument selected})

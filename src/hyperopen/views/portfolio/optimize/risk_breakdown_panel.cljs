@@ -1,10 +1,10 @@
 (ns hyperopen.views.portfolio.optimize.risk-breakdown-panel
   "The ALL ASSETS sub-view of the Equal Risk BREAKDOWN tab: one lane per
   balance-chart row (same cap, same signed-share display order) splitting the
-  signed net contribution into its standalone (own-variance, always
-  positive, purple) and diversification (cross-covariance, signed,
-  green/red) components, both drawn from zero as paired sub-bars with a
-  purple net marker at their sum and the shared dashed equal-target line
+  signed net contribution into its own-variance term (always positive,
+  purple) and cross-covariance effect (signed, green/red). The second segment
+  is anchored at the own endpoint and ends at the purple net marker, making
+  the additive identity visible against the shared dashed equal-target line
   behind. Numeric Div / Net columns mirror the contribution tab's
   Target / Deviation columns. The tab's default per-asset sub-view and the
   toggle between the two live in risk-asset-breakdown-panel, which composes
@@ -82,54 +82,83 @@
 
 ;; --- Lanes ---------------------------------------------------------------------
 
-(defn- component-bar
-  [{:keys [x]} value kind]
-  (when (and (number? value) (js/isFinite value))
-    (let [x0 (x 0)
-          xv (x value)]
-      [:div {:class ["optimizer-risk-decomp-bar"]
-             :data-kind kind
-             :data-sign (sign-token value)
-             :style {:left (str (min x0 xv) "%")
-                     :width (str (max 0.4 (js/Math.abs (- xv x0))) "%")}}])))
+(defn- component-segment
+  [{:keys [x]} start end kind]
+  (when (and (number? start) (js/isFinite start)
+             (number? end) (js/isFinite end))
+    (let [xs (x start)
+          xe (x end)
+          effect (- end start)]
+      (when (> (js/Math.abs effect) 1e-12)
+        [:div {:class ["optimizer-risk-decomp-bar"]
+               :data-kind kind
+               :data-sign (sign-token effect)
+               :style {:left (str (min xs xe) "%")
+                       :width (str (max 0.4 (js/Math.abs (- xe xs))) "%")}}]))))
 
 (defn- net-marker
   [{:keys [x]} value]
   (when (and (number? value) (js/isFinite value))
     [:div {:class ["optimizer-risk-decomp-net" "optimizer-risk-balance-marker"]
            :data-role "portfolio-optimizer-risk-breakdown-net"
+           :data-tone "target"
            :style {:left (str (x value) "%")}}]))
 
 (defn- breakdown-lane
-  "Paired sub-bars from zero — standalone on the upper half, diversification
-  on the lower — with the net marker at their sum. Drawing both from zero
-  (not stacked) keeps the two components directly comparable; the net marker
-  carries the sum."
-  [scale {:keys [standalone diversification share]}]
+  "Additive bridge: own variance runs from zero to its endpoint; the
+  cross-covariance segment starts there and ends at net."
+  [scale {:keys [own-end cross-start cross-end net-end]}]
   [:div {:class ["optimizer-risk-balance-lane" "relative" "min-w-0"]}
-   (component-bar scale standalone "standalone")
-   (component-bar scale diversification "diversification")
-   (net-marker scale share)])
+   (component-segment scale 0 own-end "standalone")
+   (component-segment scale cross-start cross-end "diversification")
+   (net-marker scale net-end)])
+
+(defn- cross-semantics
+  [effect]
+  (cond
+    (or (not (number? effect)) (not (js/isFinite effect)))
+    {:effect nil :tone nil :label "unavailable"}
+    (< (js/Math.abs effect) structure-model/cross-effect-neutral-threshold)
+    {:effect "neutral" :tone "neutral" :label "neutral"}
+    (neg? effect)
+    {:effect "offsets" :tone "risk-offsetting" :label "offsets"}
+    :else
+    {:effect "amplifies" :tone "risk-amplifying" :label "amplifies"}))
 
 (defn- breakdown-row
-  [scale {:keys [instrument-id label standalone diversification share]
+  [scale {:keys [instrument-id label standalone diversification share
+                 own-end cross-start cross-end net-end]
           :as row}]
-  [:div {:class ["optimizer-risk-balance-row"]
-         :data-role "portfolio-optimizer-risk-breakdown-row"
-         :data-instrument-id instrument-id
-         :title (str label
-                     " · standalone " (structure-model/format-pct standalone)
-                     " · diversification " (format-signed-pct diversification)
-                     " · net " (structure-model/format-pct share))}
-   [:span {:class ["optimizer-risk-balance-label" "truncate"]} label]
-   (breakdown-lane scale row)
-   [:span {:class ["optimizer-risk-decomp-div-cell" "font-mono" "tabular-nums"]
-           :data-role "portfolio-optimizer-risk-breakdown-diversification"
-           :data-sign (sign-token diversification)}
-    (format-signed-pct diversification)]
-   [:span {:class ["optimizer-risk-decomp-net-cell" "font-mono" "tabular-nums"]
-           :data-role "portfolio-optimizer-risk-breakdown-net-cell"}
-    (structure-model/format-pct share)]])
+  (let [{:keys [effect tone] :as semantics}
+        (cross-semantics diversification)
+        effect-label (:label semantics)]
+    [:div {:class ["optimizer-risk-balance-row"]
+           :data-role "portfolio-optimizer-risk-breakdown-row"
+           :data-instrument-id instrument-id
+           :data-own-end own-end
+           :data-cross-start cross-start
+           :data-cross-end cross-end
+           :data-net-end net-end
+           :data-cross-effect effect
+           :data-cross-tone tone
+           :title (str label
+                       " · own term ends "
+                       (structure-model/format-pct own-end)
+                       " · cross-covariance " effect-label
+                       ", starts " (structure-model/format-pct cross-start)
+                       " and ends " (structure-model/format-pct cross-end)
+                       " · net " (structure-model/format-pct net-end))}
+     [:span {:class ["optimizer-risk-balance-label" "truncate"]} label]
+     (breakdown-lane scale row)
+     [:span {:class ["optimizer-risk-decomp-div-cell" "font-mono" "tabular-nums"]
+             :data-role "portfolio-optimizer-risk-breakdown-diversification"
+             :data-sign (sign-token diversification)
+             :data-tone tone}
+      (str (format-signed-pct diversification) " " effect-label)]
+     [:span {:class ["optimizer-risk-decomp-net-cell" "font-mono" "tabular-nums"]
+             :data-role "portfolio-optimizer-risk-breakdown-net-cell"
+             :data-tone "target"}
+      (structure-model/format-pct share)]]))
 
 (defn- legend-row
   [target-share]
@@ -139,24 +168,24 @@
     [:span {:class ["optimizer-risk-balance-legend-item"]}
      [:span {:class ["optimizer-risk-decomp-swatch"]
              :data-kind "standalone"}]
-     "Standalone risk"]
+     "Own-variance term"]
     [:span {:class ["optimizer-risk-balance-legend-item"]}
      [:span {:class ["optimizer-risk-decomp-swatch"]
              :data-kind "diversification"
              :data-sign "negative"}]
-     "Reduces risk (diversifier)"]
+     "Offsets risk"]
     [:span {:class ["optimizer-risk-balance-legend-item"]}
      [:span {:class ["optimizer-risk-decomp-swatch"]
              :data-kind "diversification"
              :data-sign "positive"}]
-     "Adds risk (concentration)"]
+     "Amplifies risk"]
     [:span {:class ["optimizer-risk-balance-legend-item"]}
      [:span {:class ["optimizer-risk-decomp-net"]}]
      "Net contribution"]
     [:span {:class ["optimizer-risk-balance-legend-item"]}
      [:span {:class ["optimizer-risk-balance-legend-dash"]}]
      (str "Target (" (structure-model/format-pct target-share) ")")]]
-   [:span {:class ["optimizer-risk-balance-col-head"]} "Div"]
+   [:span {:class ["optimizer-risk-balance-col-head"]} "Cross"]
    [:span {:class ["optimizer-risk-balance-col-head"]} "Net"]])
 
 (defn- reading-note
@@ -165,11 +194,10 @@
        :data-role "portfolio-optimizer-risk-breakdown-reading"}
    [:span {:class ["optimizer-risk-balance-reading-label"]} "Reading this"]
    [:span {:class ["optimizer-risk-balance-reading-sep"]} "·"]
-   (str "Standalone is the position's own-variance share; diversification is "
-        "what its correlations with the rest of the book add or remove — "
-        "green removes risk (a diversifier), red adds it (moves with the "
-        "book). They sum to the net contribution — the bar on the Risk "
-        "contribution tab.")])
+   (str "This is final-weight attribution, not removal impact. Own-variance "
+        "runs from zero; cross-covariance starts at that endpoint and moves "
+        "left when correlations offset risk or right when they amplify it. "
+        "The endpoint is net risk contribution.")])
 
 (defn breakdown-panel
   "The all-assets chart body. `rows` come pre-joined from the structure
@@ -178,11 +206,7 @@
   `kpi-strip` is normally nil here)."
   [{:keys [rows target-share kpi-strip overflow-note]}]
   (when (seq rows)
-    (let [scale (structure-model/fit-scale
-                 (concat [(or target-share 0)]
-                         (keep :standalone rows)
-                         (keep :diversification rows)
-                         (keep :share rows)))]
+    (let [{:keys [scale rows]} (structure-model/breakdown-bridge-model rows)]
       [:div
        kpi-strip
        [:div {:class ["optimizer-risk-balance-plot-frame"]

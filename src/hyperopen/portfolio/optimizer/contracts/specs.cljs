@@ -3,6 +3,7 @@
             [hyperopen.portfolio.optimizer.coercion :as coercion]
             [hyperopen.portfolio.optimizer.contracts.constants :as constants]
             [hyperopen.portfolio.optimizer.contracts.migrations :as migrations]
+            [hyperopen.portfolio.optimizer.contracts.result-sections :as result-sections]
             [hyperopen.portfolio.optimizer.contracts.signatures :as signatures]))
 
 (def result-payload-schema-version constants/result-payload-schema-version)
@@ -379,6 +380,7 @@
                    correlation-ids (:instrument-ids correlation)]
                (and (map? structure)
                     (finite-field? structure :portfolio-volatility)
+                    (result-sections/diversification-summaries? structure)
                     (instrument-keyed-map?
                      (:standalone-share-by-instrument structure))
                     (instrument-keyed-map?

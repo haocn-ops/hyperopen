@@ -140,3 +140,63 @@
            (get-in normalized [:equal-risk-solver :selected-initialization])))
     (is (= :equal-notional
            (get-in normalized [:equal-risk-solver :initializations 0 :seed-kind])))))
+
+(deftest legacy-and-summary-bearing-risk-structure-contracts-round-trip-test
+  (let [legacy-structure {:method :signed-euler-decomposition
+                          :portfolio-volatility 0.2
+                          :standalone-share-by-instrument {"perp:BTC" 1.0}
+                          :diversification-share-by-instrument {"perp:BTC" 0.0}
+                          :pnl-portfolio-correlation-by-instrument {"perp:BTC" 1.0}
+                          :correlation {:instrument-ids ["perp:BTC"]
+                                        :matrix [[1.0]]
+                                        :hidden-count 0}}
+        summary {:modeled-volatility 0.2
+                 :all-move-together-volatility 0.2
+                 :zero-correlation-volatility 0.2
+                 :reduction-vs-all-move-together 0.0
+                 :reduction-ratio-vs-all-move-together 0.0
+                 :modeled-minus-zero-correlation 0.0}
+        legacy (assoc (merge (fixtures/sample-solved-result {})
+                             equal-risk-result-sections)
+                      :risk-structure legacy-structure)
+        extended (assoc legacy :risk-structure
+                        (assoc legacy-structure
+                               :target-diversification summary
+                               :current-diversification summary))]
+    (testing "pre-summary saved results remain accepted without fabricated keys"
+      (is (s/valid? :hyperopen.portfolio.optimizer.contracts/result-payload legacy))
+      (is (not (contains? (:risk-structure legacy) :target-diversification))))
+    (testing "finite scalar summaries extend the result contract"
+      (is (s/valid? :hyperopen.portfolio.optimizer.contracts/result-payload extended)
+          (s/explain-str :hyperopen.portfolio.optimizer.contracts/result-payload
+                         extended))
+      (let [normalized (wire/normalize-worker-boundary
+                        (js->clj (clj->js extended) :keywordize-keys true))]
+        (is (= summary (get-in normalized
+                               [:risk-structure :target-diversification])))
+        (is (nil? (get-in normalized [:risk-structure :covariance])))
+        (is (nil? (get-in normalized [:risk-structure :observations])))))))
+
+(deftest current-diversification-cannot-exist-without-target-test
+  (let [summary {:modeled-volatility 0.2
+                 :all-move-together-volatility 0.3
+                 :zero-correlation-volatility 0.18
+                 :reduction-vs-all-move-together 0.1
+                 :reduction-ratio-vs-all-move-together (/ 1 3)
+                 :modeled-minus-zero-correlation 0.02}
+        current-only-structure
+        {:method :signed-euler-decomposition
+         :portfolio-volatility 0.2
+         :current-diversification summary
+         :standalone-share-by-instrument {"perp:BTC" 1.0}
+         :diversification-share-by-instrument {"perp:BTC" 0.0}
+         :pnl-portfolio-correlation-by-instrument {"perp:BTC" 1.0}
+         :correlation {:instrument-ids ["perp:BTC"]
+                       :matrix [[1.0]]
+                       :hidden-count 0}}
+        payload (assoc (merge (fixtures/sample-solved-result {})
+                              equal-risk-result-sections)
+                       :risk-structure current-only-structure)]
+    (is (not (s/valid? :hyperopen.portfolio.optimizer.contracts/result-payload
+                       payload))
+        "current is a comparison to the canonical target, never a standalone result")))

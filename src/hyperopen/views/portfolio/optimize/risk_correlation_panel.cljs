@@ -57,6 +57,7 @@
                       ", minmax(0, 1fr))")]
     [:div {:class ["optimizer-risk-corr-grid"]
            :data-role (str "portfolio-optimizer-risk-corr-grid-" (name mode))
+           :data-corr-mode (name mode)
            ;; Past ~12 columns the cells get narrow even at full card width;
            ;; dense mode drops the cell/label type a step so the numbers
            ;; keep fitting (CSS can't count grid columns).
@@ -84,7 +85,8 @@
 (defn- legend
   [mode]
   [:div {:class ["optimizer-risk-corr-legend"]
-         :data-role "portfolio-optimizer-risk-corr-legend"}
+         :data-role "portfolio-optimizer-risk-corr-legend"
+         :data-corr-mode (name mode)}
    [:div {:class ["optimizer-risk-corr-legend-bar"]}]
    (into [:div {:class ["optimizer-risk-corr-legend-labels" "font-mono"]}]
          (map (fn [value] [:span value]))

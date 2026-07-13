@@ -136,3 +136,27 @@
                   :weights [1.0 -1.0]})]
     (is (= :error (:status summary)))
     (is (= :degenerate-variance (:reason summary)))))
+
+(deftest portfolio-diversification-and-positive-cross-covariance-coexist-test
+  (let [covariance [[1.0 0.5]
+                    [0.5 1.0]]
+        weights [0.5 0.5]
+        summary (risk-structure/portfolio-diversification-summary covariance
+                                                                  weights)
+        decomposition (risk-structure/decomposition covariance weights)]
+    (is (= :ok (:status summary)))
+    (is (near? (js/Math.sqrt 0.75) (:modeled-volatility summary)))
+    (is (near? 1.0 (:all-move-together-volatility summary)))
+    (is (near? (js/Math.sqrt 0.5) (:zero-correlation-volatility summary)))
+    (is (near? (- 1.0 (js/Math.sqrt 0.75))
+               (:reduction-vs-all-move-together summary)))
+    (is (near? (- 1.0 (js/Math.sqrt 0.75))
+               (:reduction-ratio-vs-all-move-together summary)))
+    (is (pos? (:modeled-minus-zero-correlation summary)))
+    (is (every? pos? (:diversification-shares decomposition))
+        "positive cross-covariance attribution can coexist with portfolio diversification")
+    (doseq [[own cross net]
+            (map vector (:standalone-shares decomposition)
+                 (:diversification-shares decomposition)
+                 (:net-shares decomposition))]
+      (is (near? net (+ own cross))))))

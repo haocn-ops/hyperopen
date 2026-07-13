@@ -33,6 +33,126 @@ function corrCell(grid, rowId, colId) {
 }
 
 test.describe("equal risk correlation view (workbench scenes)", () => {
+  test("risk balance, diversification benchmarks, and additive attribution answer separate questions", async ({
+    page
+  }) => {
+    const frame = await openScene(page, "correlation-designer-parity");
+
+    const balanceTab = frame.locator(
+      role("portfolio-optimizer-risk-view-tab-contribution")
+    );
+    await expect(balanceTab).toContainText("Risk Balance");
+    await expect(
+      frame.locator(role("portfolio-optimizer-risk-contribution-chart"))
+    ).toBeVisible();
+
+    const diversificationTab = frame.locator(
+      role("portfolio-optimizer-risk-view-tab-breakdown")
+    );
+    await expect(diversificationTab).toContainText("Diversification");
+    await diversificationTab.click();
+
+    const comparison = frame.locator(
+      role("portfolio-optimizer-risk-diversification-comparison")
+    );
+    await expect(comparison).toBeVisible();
+    await expect(
+      comparison.locator(role("portfolio-optimizer-risk-diversification-current"))
+    ).toContainText("Current");
+    await expect(
+      comparison.locator(role("portfolio-optimizer-risk-diversification-target"))
+    ).toContainText("Recommended");
+    await expect(comparison).toContainText("All move together");
+    await expect(comparison).toContainText("Zero correlation");
+    await expect(comparison).toContainText("Modeled");
+
+    const currentModeled = comparison.locator(
+      `${role("portfolio-optimizer-risk-diversification-current")} ${role("portfolio-optimizer-risk-diversification-modeled")}`
+    );
+    const targetModeled = comparison.locator(
+      `${role("portfolio-optimizer-risk-diversification-target")} ${role("portfolio-optimizer-risk-diversification-modeled")}`
+    );
+    const currentPosition = Number(await currentModeled.getAttribute("data-position"));
+    const targetPosition = Number(await targetModeled.getAttribute("data-position"));
+    expect(Number.isFinite(currentPosition)).toBe(true);
+    expect(Number.isFinite(targetPosition)).toBe(true);
+    expect(targetPosition).toBeGreaterThan(currentPosition);
+
+    const selected = frame.locator(
+      role("portfolio-optimizer-risk-selected-breakdown")
+    );
+    await expect(selected).toContainText("offsets");
+    await expect(selected).toContainText("final-weight attribution");
+    await expect(selected).toContainText("not removal impact");
+
+    await frame
+      .locator(role("portfolio-optimizer-risk-breakdown-view-all"))
+      .click();
+    const firstRow = frame
+      .locator(role("portfolio-optimizer-risk-breakdown-row"))
+      .first();
+    const ownEnd = Number(await firstRow.getAttribute("data-own-end"));
+    const crossStart = Number(await firstRow.getAttribute("data-cross-start"));
+    const crossEnd = Number(await firstRow.getAttribute("data-cross-end"));
+    const netEnd = Number(await firstRow.getAttribute("data-net-end"));
+    expect(ownEnd).toBe(crossStart);
+    expect(crossEnd).toBe(netEnd);
+
+    await frame
+      .locator(role("portfolio-optimizer-risk-breakdown-view-asset"))
+      .click();
+    await frame
+      .locator(role("portfolio-optimizer-risk-asset-select"))
+      .selectOption("perp:ETH");
+    await expect(
+      frame.locator(role("portfolio-optimizer-target-exposure-asset-ETH"))
+    ).toHaveAttribute("data-selected", "true");
+  });
+
+  test("the parity scene and risk card stay within every governed viewport", async ({
+    page
+  }) => {
+    for (const width of [375, 768, 1280, 1440]) {
+      await page.setViewportSize({ width, height: 1000 });
+      const frame = await openScene(page, "correlation-designer-parity");
+      const card = frame.locator(
+        role("portfolio-optimizer-risk-contributions")
+      );
+      await frame
+        .locator(role("portfolio-optimizer-risk-view-tab-breakdown"))
+        .click();
+      await expect(
+        frame.locator(role("portfolio-optimizer-risk-diversification-comparison"))
+      ).toBeVisible();
+      const bounds = await card.evaluate((element) => {
+        const rect = element.getBoundingClientRect();
+        return {
+          clientWidth: document.documentElement.clientWidth,
+          scrollWidth: Math.max(
+            document.documentElement.scrollWidth,
+            document.body?.scrollWidth ?? 0
+          ),
+          card: {
+            left: rect.left,
+            right: rect.right,
+            width: rect.width
+          }
+        };
+      });
+
+      expect(bounds.scrollWidth, `${width}px scene overflow`).toBeLessThanOrEqual(
+        bounds.clientWidth + 1
+      );
+      expect(bounds.card.width, `${width}px risk card width`).toBeGreaterThan(
+        bounds.clientWidth * 0.5
+      );
+      expect(bounds.card.left, `${width}px risk card left edge`).toBeGreaterThanOrEqual(-1);
+      expect(bounds.card.right, `${width}px risk card right edge`).toBeLessThanOrEqual(
+        bounds.clientWidth + 1
+      );
+    }
+  });
+
   test("tabs and the P&L/underlying toggle switch via DOM state, flipping long × short signs", async ({
     page
   }) => {
@@ -115,7 +235,7 @@ test.describe("equal risk correlation view (workbench scenes)", () => {
     await expect(mstrRow).toHaveAttribute("data-selected", "true");
     await expect(
       frame.locator(role("portfolio-optimizer-risk-selected-identity"))
-    ).toContainText("Net Risk Contribution");
+    ).toContainText("Net risk contribution");
     await expect(
       frame.locator(role("portfolio-optimizer-risk-asset-tile-freedom"))
     ).toContainText("Limited · 2 binding caps");

@@ -108,15 +108,32 @@ test.describe("margin recommendation panel (workbench scenes)", () => {
     ).toHaveAttribute("aria-pressed", "true");
   });
 
-  test("panel is wider than it is tall so it covers the chart, not the whole UI", async ({
+  test("the chart is the full-width centrepiece", async ({ page }) => {
+    const frame = await openScene(page, "elevated-risk-recommendation");
+    const panel = await frame.locator(role("margin-rec-panel")).boundingBox();
+    const chart = await frame.locator(role("margin-rec-curve")).boundingBox();
+    // The chart spans almost the whole panel width and is a large canvas.
+    expect(chart.width).toBeGreaterThan(panel.width * 0.85);
+    expect(chart.width).toBeGreaterThan(640);
+    expect(chart.height).toBeGreaterThan(240);
+  });
+
+  test("methodology and buffers are collapsed by default behind the disclosure", async ({
     page
   }) => {
     const frame = await openScene(page, "elevated-risk-recommendation");
-    const box = await frame.locator(role("margin-rec-panel")).boundingBox();
-    expect(box.width).toBeGreaterThan(700);
-    // Half-ish the old ~960px tall stack; wider than tall.
-    expect(box.height).toBeLessThan(box.width);
-    expect(box.height).toBeLessThan(680);
+    const panel = frame.locator(role("margin-rec-panel"));
+    const methods = panel.locator(role("margin-rec-methods"));
+    const advanced = panel.locator(role("margin-rec-advanced"));
+
+    // Present in the DOM (so the info is kept) but hidden until expanded.
+    await expect(advanced).toBeVisible();
+    await expect(methods).toBeHidden();
+
+    await panel.locator(`${role("margin-rec-advanced")} summary`).click();
+    await expect(methods).toBeVisible();
+    await expect(methods).toContainText("Scenario simulation (4,000 paths)");
+    await expect(panel.locator(role("margin-rec-buffers"))).toBeVisible();
   });
 
   test("curve renders with the current marker left of the recommended marker", async ({
@@ -193,6 +210,8 @@ test.describe("margin recommendation panel (workbench scenes)", () => {
 
     await expect(panel.locator(role("margin-rec-summary"))).toBeVisible();
     await expect(panel.locator(role("margin-rec-curve-card"))).toHaveCount(0);
-    await expect(panel.locator(role("margin-rec-buffers"))).toBeVisible();
+    // Methodology still present (behind the collapsed disclosure).
+    await expect(panel.locator(role("margin-rec-advanced"))).toBeVisible();
+    await expect(panel.locator(role("margin-rec-buffers"))).toHaveCount(1);
   });
 });

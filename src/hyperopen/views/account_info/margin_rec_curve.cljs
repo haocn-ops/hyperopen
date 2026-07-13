@@ -2,7 +2,11 @@
   "SVG chart for the margin recommendation panel: modeled probability of
   liquidation as a function of isolated collateral, with Current and
   Recommended markers sitting on the sampled curve the engine emits
-  (`:curve` on the recommendation result)."
+  (`:curve` on the recommendation result).
+
+  It is the panel's centrepiece, so it renders full-width and large; the
+  viewBox is sized so that at the panel width the axis labels and marker
+  callouts are comfortably legible."
   (:require [clojure.string :as str]
             [hyperopen.views.account-info.shared :as shared]))
 
@@ -19,12 +23,12 @@
     (< p 0.0005) "<0.1%"
     :else (str (.toFixed (* 100 p) 1) "%")))
 
-(def ^:private chart-width 440)
-(def ^:private chart-height 214)
-(def ^:private plot-left 38)
-(def ^:private plot-right 430)
-(def ^:private plot-top 22)
-(def ^:private plot-bottom 168)
+(def ^:private chart-width 640)
+(def ^:private chart-height 250)
+(def ^:private plot-left 52)
+(def ^:private plot-right 626)
+(def ^:private plot-top 30)
+(def ^:private plot-bottom 198)
 (def ^:private grid-stroke "rgb(var(--ho-text-muted) / 0.25)")
 ;; The curve is stroked with a horizontal gradient: amber where collateral is
 ;; low (liquidation likely) on the left, green where it is high (safe) on the
@@ -35,9 +39,9 @@
 (def ^:private curve-gradient-id "margin-rec-curve-gradient")
 (def ^:private label-box-fill "rgb(var(--ho-bg-deep) / 0.92)")
 (def ^:private label-title-fill "rgb(var(--ho-text) / 0.92)")
-(def ^:private label-box-top 26)
-(def ^:private label-box-height 44)
-(def ^:private label-box-width 66)
+(def ^:private label-box-top 34)
+(def ^:private label-box-height 56)
+(def ^:private label-box-width 100)
 
 (defn- chart-x
   [x-max e]
@@ -54,7 +58,7 @@
   (str "$" (js/parseFloat (.toFixed value 2))))
 
 (defn- marker
-  "Dashed drop line, dot on the curve, and a small labeled box:
+  "Dashed drop line, dot on the curve, and a labeled callout box:
   name / collateral / probability."
   [role color-class label-x marker-x e p title]
   (let [y (chart-y p)
@@ -66,37 +70,37 @@
              :y1 (+ label-box-top label-box-height)
              :y2 plot-bottom
              :stroke "currentColor"
-             :stroke-dasharray "3 3"
+             :stroke-dasharray "4 4"
              :opacity 0.55}]
      [:circle {:cx marker-x
                :cy y
-               :r 4.5
+               :r 6
                :fill "currentColor"}]
      [:rect {:x box-left
              :y label-box-top
              :width label-box-width
              :height label-box-height
-             :rx 5
+             :rx 6
              :fill label-box-fill
              :stroke "currentColor"
              :stroke-opacity 0.45}]
      [:text {:x label-x
-             :y (+ label-box-top 12)
+             :y (+ label-box-top 16)
              :fill label-title-fill
-             :font-size 9
+             :font-size 11
              :text-anchor "middle"}
       title]
      [:text {:x label-x
-             :y (+ label-box-top 25)
+             :y (+ label-box-top 34)
              :fill "currentColor"
-             :font-size 10
+             :font-size 15
              :font-weight 600
              :text-anchor "middle"}
       (fmt-usd e)]
      [:text {:x label-x
-             :y (+ label-box-top 38)
+             :y (+ label-box-top 50)
              :fill "currentColor"
-             :font-size 10
+             :font-size 15
              :font-weight 600
              :text-anchor "middle"}
       (fmt-probability p)]]))
@@ -140,10 +144,10 @@
                        [:g {:key (str "y-" p)}
                         [:line {:x1 plot-left :x2 plot-right :y1 y :y2 y
                                 :stroke grid-stroke}]
-                        [:text {:x (- plot-left 6)
-                                :y (+ y 3)
+                        [:text {:x (- plot-left 8)
+                                :y (+ y 4)
                                 :fill "currentColor"
-                                :font-size 9
+                                :font-size 12
                                 :opacity 0.6
                                 :text-anchor "end"}
                          (str (js/Math.round (* 100 p)) "%")]]))
@@ -154,14 +158,26 @@
                            x (chart-x x-max value)]
                        [:text {:key (str "x-" i)
                                :x x
-                               :y (+ plot-bottom 14)
+                               :y (+ plot-bottom 20)
                                :fill "currentColor"
-                               :font-size 9
+                               :font-size 12
                                :opacity 0.6
                                :text-anchor "middle"}
                         (axis-usd value)]))
                    (range 5)))
-        (conj (when gradient?
+        (conj [:text {:x (/ (+ plot-left plot-right) 2)
+                      :y (+ plot-bottom 40)
+                      :fill "currentColor"
+                      :font-size 12
+                      :opacity 0.72
+                      :text-anchor "middle"}
+               "Isolated margin (USDC)"]
+              [:polyline {:points polyline
+                          :fill "none"
+                          :stroke curve-paint
+                          :stroke-width 2.5
+                          :stroke-linejoin "round"}]
+              (when gradient?
                 [:defs
                  [:linearGradient {:id curve-gradient-id
                                    :x1 "0%" :y1 "0%" :x2 "100%" :y2 "0%"}
@@ -171,18 +187,6 @@
                   [:stop {:offset (str (.toFixed (* 100 rec-frac) 2) "%")
                           :stop-color curve-stroke-safe}]
                   [:stop {:offset "100%" :stop-color curve-stroke-safe}]]])
-              [:text {:x (/ (+ plot-left plot-right) 2)
-                      :y (+ plot-bottom 30)
-                      :fill "currentColor"
-                      :font-size 9
-                      :opacity 0.72
-                      :text-anchor "middle"}
-               "Isolated margin (USDC)"]
-              [:polyline {:points polyline
-                          :fill "none"
-                          :stroke curve-paint
-                          :stroke-width 2
-                          :stroke-linejoin "round"}]
               (when (and cur-x (number? p-now))
                 (marker "margin-rec-curve-current" "text-amber-400"
                         cur-label-x cur-x current-e p-now "Current"))
@@ -195,10 +199,10 @@
   (when (seq (:points curve))
     [:div {:class ["rounded-lg" "bg-base-300/40" "p-3"]
            :data-role "margin-rec-curve-card"}
-     [:div {:class ["mb-1" "flex" "items-center" "gap-1.5" "text-xs" "font-semibold"
+     [:div {:class ["mb-1.5" "flex" "items-center" "gap-1.5" "text-sm" "font-semibold"
                     "text-trading-text"]}
       "Modeled probability of liquidation vs. collateral"
-      [:span {:class ["cursor-help" "font-normal" "text-trading-text-secondary"]
+      [:span {:class ["cursor-help" "text-xs" "font-normal" "text-trading-text-secondary"]
               :title (str "Each point is the modeled probability that this position"
                           " would be liquidated before your next likely intervention,"
                           " at that level of isolated margin. The markers show where"

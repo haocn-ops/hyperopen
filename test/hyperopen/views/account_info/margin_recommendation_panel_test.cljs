@@ -117,13 +117,14 @@
         (is (contains? strings "Add $6.22 USDC to your current $12.42")))
       (testing "one before/after probability line, not separate current/after cells"
         (is (some? (node-by-role tree "margin-rec-risk-delta")))
-        (is (contains? strings "Modeled liq. probability (before next intervention)"))
+        (is (contains? strings "Modeled liq. probability"))
+        (is (contains? strings "before next intervention"))
         (is (contains? strings "14.6%"))
         (is (contains? strings "2.1%")))
       (testing "resulting liquidation price with its improvement"
         (is (some? (node-by-role tree "margin-rec-new-liq")))
         (is (contains? strings "$403.10"))
-        (is (contains? strings "(5.0% lower)"))))
+        (is (contains? strings "≈ 5.0% lower"))))
     (testing "the duplicated stat cells were removed (the chart carries these)"
       (doseq [role ["margin-rec-current-stats" "margin-rec-stat-current"
                     "margin-rec-stat-liq" "margin-rec-stat-distance"
@@ -137,6 +138,14 @@
       (is (some? (node-by-role tree "margin-rec-curve-recommended")))
       (is (contains? strings "Modeled probability of liquidation vs. collateral"))
       (is (contains? strings "Isolated margin (USDC)")))
+    (testing "methodology + buffers are tucked into the advanced disclosure"
+      (let [advanced (node-by-role tree "margin-rec-advanced")]
+        (is (some? advanced))
+        (is (= :details (first advanced)))
+        (is (some? (node-by-role advanced "margin-rec-methods")))
+        (is (some? (node-by-role advanced "margin-rec-buffers")))
+        (is (contains? (collect-strings advanced)
+                       "How we estimated this & the buffers included"))))
     (testing "how-we-estimated column reflects real model quantities incl. horizon"
       (is (some? (node-by-role tree "margin-rec-methods")))
       (is (contains? strings "365-day crypto volatility convention"))

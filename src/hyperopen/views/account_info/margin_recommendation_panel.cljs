@@ -70,7 +70,10 @@
 ;; outright: the recommended-margin headline, the amount to add, the
 ;; before/after probability as one line, and the resulting liquidation price.
 
-(defn- recommendation-summary
+(defn- recommendation-strip
+  "Horizontal summary bar above the (now full-width) chart: the recommended
+  margin headline, the before/after liquidation probability, and the resulting
+  liquidation price. Stacks vertically on narrow viewports."
   [{:keys [as-of p-now p-after recommended]}]
   (let [{:keys [equity additional new-liquidation-px new-liq-change-frac]} recommended
         current-equity (:equity as-of)
@@ -79,45 +82,46 @@
                               (pos? current-equity)
                               (>= additional 0.01))
                      (/ additional current-equity))]
-    [:div {:class ["flex" "flex-col" "gap-2.5"]
+    [:div {:class ["overflow-hidden" "rounded-lg" "border" "border-trading-green/30"]
            :data-role "margin-rec-summary"}
-     [:div {:class ["rounded-lg" "border" "border-trading-green/30" "bg-trading-green/5"
-                    "px-3" "py-2.5"]
-            :data-role "margin-rec-recommended"}
-      [:div {:class ["text-xs" "text-trading-text-secondary"]}
-       "Recommended isolated margin"]
-      [:div {:class ["mt-0.5" "flex" "flex-wrap" "items-baseline" "gap-x-2" "gap-y-1"]}
-       [:span {:class ["text-2xl" "font-semibold" "num" "text-trading-green"]}
-        (fmt-usdc equity)]
-       (when vs-current
-         [:span {:class ["rounded" "bg-trading-green/15" "px-1.5" "py-0.5" "text-xs"
-                         "font-medium" "text-trading-green"]}
-          (str "+" (fmt-percent vs-current 1) " vs current")])]
-      (when (and (number? additional) (>= additional 0.01))
-        [:div {:class ["mt-1" "text-xs" "text-trading-text-secondary"]
-               :data-role "margin-rec-additional"}
-         (str "Add " (fmt-usdc additional) " to your current " (fmt-usd current-equity))])]
-     [:div {:class ["rounded-lg" "border" "border-base-300" "bg-base-300/20"
-                    "px-3" "py-2.5"]
-            :data-role "margin-rec-risk-delta"}
-      [:div {:class ["text-xs" "text-trading-text-secondary"]}
-       "Modeled liq. probability (before next intervention)"]
-      [:div {:class ["mt-0.5" "flex" "items-center" "gap-2"]}
-       [:span {:class ["text-lg" "font-semibold" "num" "text-amber-300"]}
-        (fmt-probability p-now)]
-       [:span {:class ["text-sm" "text-trading-text-secondary"]} "→"]
-       [:span {:class ["text-lg" "font-semibold" "num" "text-trading-green"]}
-        (fmt-probability p-after)]]]
-     [:div {:class ["flex" "items-baseline" "justify-between" "gap-3" "px-1"]
-            :data-role "margin-rec-new-liq"}
-      [:span {:class ["text-xs" "text-trading-text-secondary"]}
-       "New liquidation price (est.)"]
-      [:span {:class ["text-sm" "font-semibold" "num" "text-trading-text"]}
-       (fmt-price new-liquidation-px)
+     [:div {:class ["grid" "gap-px" "bg-base-300" "sm:grid-cols-3"]}
+      [:div {:class ["bg-trading-green/5" "px-3" "py-2.5"]
+             :data-role "margin-rec-recommended"}
+       [:div {:class ["text-xs" "text-trading-text-secondary"]}
+        "Recommended isolated margin"]
+       [:div {:class ["mt-0.5" "flex" "flex-wrap" "items-baseline" "gap-x-2" "gap-y-1"]}
+        [:span {:class ["text-xl" "font-semibold" "num" "text-trading-green"]}
+         (fmt-usdc equity)]
+        (when vs-current
+          [:span {:class ["rounded" "bg-trading-green/15" "px-1.5" "py-0.5" "text-xs"
+                          "font-medium" "text-trading-green"]}
+           (str "+" (fmt-percent vs-current 1) " vs current")])]
+       (when (and (number? additional) (>= additional 0.01))
+         [:div {:class ["mt-0.5" "text-xs" "text-trading-text-secondary"]
+                :data-role "margin-rec-additional"}
+          (str "Add " (fmt-usdc additional) " to your current " (fmt-usd current-equity))])]
+      [:div {:class ["bg-base-200" "px-3" "py-2.5"]
+             :data-role "margin-rec-risk-delta"}
+       [:div {:class ["text-xs" "text-trading-text-secondary"]}
+        "Modeled liq. probability"]
+       [:div {:class ["mt-0.5" "flex" "items-center" "gap-2"]}
+        [:span {:class ["text-lg" "font-semibold" "num" "text-amber-300"]}
+         (fmt-probability p-now)]
+        [:span {:class ["text-sm" "text-trading-text-secondary"]} "→"]
+        [:span {:class ["text-lg" "font-semibold" "num" "text-trading-green"]}
+         (fmt-probability p-after)]]
+       [:div {:class ["text-xs" "text-trading-text-secondary"]}
+        "before next intervention"]]
+      [:div {:class ["bg-base-200" "px-3" "py-2.5"]
+             :data-role "margin-rec-new-liq"}
+       [:div {:class ["text-xs" "text-trading-text-secondary"]}
+        "New liquidation price (est.)"]
+       [:div {:class ["mt-0.5" "text-lg" "font-semibold" "num" "text-trading-text"]}
+        (fmt-price new-liquidation-px)]
        (when (number? new-liq-change-frac)
-         [:span {:class ["ml-1.5" "text-xs" "font-normal" "text-trading-text-secondary"]}
-          (str "(" (fmt-percent (js/Math.abs new-liq-change-frac) 1)
-               (if (pos? new-liq-change-frac) " lower)" " higher)"))])]]]))
+         [:div {:class ["text-xs" "text-trading-text-secondary"]}
+          (str "≈ " (fmt-percent (js/Math.abs new-liq-change-frac) 1)
+               (if (pos? new-liq-change-frac) " lower" " higher"))])]]]))
 
 ;; --- methods + buffers -------------------------------------------------------
 
@@ -207,6 +211,32 @@
    [:div {:class ["mt-1.5" "text-center" "text-xs" "text-trading-text-secondary"]}
     "You can adjust this anytime in Settings."]])
 
+(defn- advanced-details
+  "Collapsible disclosure holding the supplementary methodology and buffer
+  breakdown, so the chart above can take the full width. Native <details> keeps
+  the content in the DOM and needs no app state; a stable :replicant/key stops
+  a re-render from recreating the element and closing it."
+  [rec-result coin-label]
+  [:details {:class ["group" "overflow-hidden" "rounded-lg" "border" "border-base-300"
+                     "bg-base-300/20"]
+             :replicant/key "margin-rec-advanced"
+             :data-role "margin-rec-advanced"}
+   [:summary {:class ["flex" "cursor-pointer" "list-none" "items-center" "justify-between"
+                      "gap-2" "px-3" "py-2" "text-xs" "font-medium" "text-trading-text"
+                      "transition-colors" "hover:bg-base-300/50"
+                      "focus:outline-none" "focus-visible:ring-1"
+                      "focus-visible:ring-ho-text-muted/40"]}
+    [:span "How we estimated this & the buffers included"]
+    [:svg {:class ["h-4" "w-4" "shrink-0" "text-trading-text-secondary"
+                   "transition-transform" "duration-150" "group-open:rotate-180"]
+           :viewBox "0 0 20 20" :fill "currentColor" :aria-hidden true}
+     [:path {:fill-rule "evenodd" :clip-rule "evenodd"
+             :d "M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z"}]]]
+   [:div {:class ["grid" "gap-4" "border-t" "border-base-300" "px-3" "py-3"
+                  "sm:grid-cols-2"]}
+    (methods-column rec-result coin-label)
+    (buffers-column rec-result)]])
+
 (defn- status-note
   [message role]
   [:div {:class ["rounded-md" "bg-base-300/40" "px-3" "py-2" "text-xs"
@@ -222,11 +252,11 @@
   [coin-label leverage-label anchor children]
   (let [layout-style (anchored-popover/centered-overlay-layout-style
                       {:anchor anchor
-                       ;; Wide and short: two internal columns (chart | summary)
-                       ;; keep the footprint over the chart rather than spanning
-                       ;; the UI from the positions table up to the nav bar.
+                       ;; Wide, with the full-width chart as the centrepiece and
+                       ;; the methodology collapsed below, so the footprint stays
+                       ;; over the chart rather than spanning the whole UI.
                        :preferred-width-px 780
-                       :preferred-height-px 560})]
+                       :preferred-height-px 680})]
     [:div {:class ["fixed" "z-[240]" "flex" "max-h-[calc(100vh-1.5rem)]" "flex-col"
                    "overflow-hidden" "rounded-xl" "border" "border-base-300" "bg-base-200"
                    "shadow-[0_24px_70px_rgba(0,0,0,0.55)]"]
@@ -308,19 +338,15 @@
                          (= :ok status)
                          (number? additional)
                          (>= additional 0.01))]
-    [;; Two-column body: the curve (evidence) beside the recommendation
-     ;; (the numbers and the before/after it produces).
-     [:div {:class ["grid" "gap-3" "sm:grid-cols-2"]}
-      (margin-rec-curve/curve-card curve (:equity as-of) p-now
-                                   (:equity recommended) p-after)
-      (recommendation-summary rec-result)]
+    [;; Recommendation summary strip, then the full-width chart as the
+     ;; centrepiece, with the methodology tucked into a disclosure below.
+     (recommendation-strip rec-result)
      (when (= :within-target status)
        (status-note "Current margin already meets the selected risk target."
                     "margin-rec-within-target"))
-     [:div {:class ["grid" "gap-4" "rounded-lg" "bg-base-300/40" "p-3"
-                    "sm:grid-cols-2"]}
-      (methods-column rec-result (:coin-label row-vm))
-      (buffers-column rec-result)]
+     (margin-rec-curve/curve-card curve (:equity as-of) p-now
+                                  (:equity recommended) p-after)
+     (advanced-details rec-result (:coin-label row-vm))
      (risk-mode-control risk-mode)
      (cond
        read-only? nil

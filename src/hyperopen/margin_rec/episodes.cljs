@@ -143,11 +143,34 @@
 (def min-horizon-hours 6)
 (def max-horizon-hours 720)
 (def ^:private min-gap-samples 8)
+(def ^:private min-account-coins
+  "Minimum distinct markets required before estimating a thin position's
+  horizon from the user's other markets."
+  3)
 (def ^:private horizon-quantile 0.8)
+
+(defn- ms->hours [ms] (/ ms 3600000))
+
+(defn- coin-horizon-hours
+  "A single market's horizon (hours): the upper quantile of the gaps between
+  its coalesced interventions, or nil if it has none."
+  [coalesced-fills]
+  (let [gaps (intervention-gaps-for-coin coalesced-fills)]
+    (when (seq gaps)
+      (ms->hours (quantile (vec (sort gaps)) horizon-quantile)))))
 
 (defn horizon-hours
   "Estimated intervention horizon for `coin` from raw fill rows.
-  Returns {:hours :source (:per-coin | :account | :default) :samples n}."
+  Returns {:hours :source (:per-coin | :account | :default) :samples n}.
+
+  When the coin itself has enough interventions, its own upper-quantile gap is
+  used. Otherwise the estimate comes from the user's other markets — but as the
+  MEDIAN of each market's own horizon (one vote per market), not a pool of
+  every gap. Pooling would weight by fill count, so a single hyperactively
+  traded market (hundreds of scalps seconds apart) would dominate and collapse
+  the horizon to the floor even though the user holds this position for days.
+  For `:per-coin` `:samples` is the gap count; for `:account` it is the number
+  of contributing markets."
   [fill-rows coin]
   (let [fills (keep normalize-fill fill-rows)
         ;; Coalesce each coin's partial fills into per-order interventions
@@ -157,18 +180,21 @@
                       (group-by :coin fills))
         coin-gaps (when coin
                     (intervention-gaps-for-coin (get by-coin coin [])))
-        account-gaps (when (< (count coin-gaps) min-gap-samples)
-                       (mapcat intervention-gaps-for-coin (vals by-coin)))
-        [gaps source] (cond
-                        (>= (count coin-gaps) min-gap-samples) [coin-gaps :per-coin]
-                        (>= (count account-gaps) min-gap-samples) [account-gaps :account]
-                        :else [nil :default])
-        hours (if gaps
-                (/ (quantile (vec (sort gaps)) horizon-quantile)
-                   3600000)
-                default-horizon-hours)]
+        market-horizons (when (< (count coin-gaps) min-gap-samples)
+                          (vec (keep coin-horizon-hours (vals by-coin))))
+        [hours source samples]
+        (cond
+          (>= (count coin-gaps) min-gap-samples)
+          [(ms->hours (quantile (vec (sort coin-gaps)) horizon-quantile))
+           :per-coin (count coin-gaps)]
+
+          (>= (count market-horizons) min-account-coins)
+          [(quantile (vec (sort market-horizons)) 0.5) ;; median market horizon
+           :account (count market-horizons)]
+
+          :else [default-horizon-hours :default 0])]
     {:hours (-> hours
                 (max min-horizon-hours)
                 (min max-horizon-hours))
      :source source
-     :samples (count (or gaps []))}))
+     :samples samples}))

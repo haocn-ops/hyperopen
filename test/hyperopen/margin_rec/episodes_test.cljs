@@ -126,17 +126,41 @@
       (is (= :per-coin source))
       (is (= 9 samples))
       (is (< (js/Math.abs (- hours 7.4)) 1e-9))))
-  (testing "account-level fallback when the coin is thin"
-    (let [rows (concat
-                [(fill "TSM" 0 "B" 1 0) (fill "TSM" 4 "A" 1 1)]
-                (mapcat (fn [i]
-                          (let [t0 (* (inc i) 1000)]
-                            [(fill "ETH" t0 "B" 1 0)
-                             (fill "ETH" (+ t0 8) "A" 1 1)]))
-                        (range 8)))
-          {:keys [source samples]} (episodes/horizon-hours rows "TSM")]
+  (testing "thin coin falls back to the median of per-market horizons"
+    ;; Three markets, one episode each (gaps 5h, 10h, 20h). The target coin is
+    ;; thin, so the horizon is the median market horizon (10h), and samples is
+    ;; the number of contributing markets.
+    (let [rows [(fill "TSM" 0 "B" 1 0) (fill "TSM" 5 "A" 1 1)
+                (fill "ETH" 0 "B" 1 0) (fill "ETH" 10 "A" 1 1)
+                (fill "SOL" 0 "B" 1 0) (fill "SOL" 20 "A" 1 1)]
+          {:keys [hours source samples]} (episodes/horizon-hours rows "TSM")]
       (is (= :account source))
-      (is (= 9 samples))))
+      (is (= 3 samples))
+      (is (< (js/Math.abs (- hours 10)) 1e-9))))
+  (testing "a hyperactively traded market cannot collapse the account estimate"
+    ;; Two markets held ~80-100h, plus one scalped market with many
+    ;; alternating-direction fills seconds apart (which coalescing cannot
+    ;; merge, being genuine round-trips). Pooling raw gaps would drown the
+    ;; slow markets and clamp to the floor; the per-market median does not.
+    (let [scalp (mapcat (fn [i]
+                          (let [t0 (* i 10000)]
+                            [(fill-ms "SCALP" t0 "B" 1 0 nil)
+                             (fill-ms "SCALP" (+ t0 5000) "A" 1 1 nil)]))
+                        (range 12))
+          rows (concat
+                [(fill "AAA" 0 "B" 1 0) (fill "AAA" 80 "A" 1 1)
+                 (fill "BBB" 0 "B" 1 0) (fill "BBB" 100 "A" 1 1)]
+                scalp)
+          {:keys [hours source]} (episodes/horizon-hours rows "AAA")]
+      (is (= :account source))
+      (is (> hours episodes/min-horizon-hours))
+      (is (< (js/Math.abs (- hours 80)) 1e-9))))
+  (testing "too few markets falls back to the default horizon"
+    (let [rows [(fill "AAA" 0 "B" 1 0) (fill "AAA" 5 "A" 1 1)
+                (fill "BBB" 0 "B" 1 0) (fill "BBB" 9 "A" 1 1)]
+          {:keys [hours source]} (episodes/horizon-hours rows "AAA")]
+      (is (= :default source))
+      (is (= episodes/default-horizon-hours hours))))
   (testing "clamped to the floor"
     (let [rows (mapcat (fn [i]
                          (let [t0 (* i 10)]

@@ -57,8 +57,8 @@
         basis (case source
                 :per-coin (str "inferred from " samples
                                " similar position episodes")
-                :account (str "inferred from " samples
-                              " episodes across your account")
+                :account (str "typical hold across " samples
+                              " markets you trade")
                 :override "manual override"
                 "default horizon — limited trade history")]
     {:duration duration :basis basis}))

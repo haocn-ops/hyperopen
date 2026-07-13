@@ -20,9 +20,11 @@
       n)))
 
 (defn normalize-fill
-  "Raw userFills row -> {:coin :time-ms :delta :start-position} or nil.
+  "Raw userFills row -> {:coin :time-ms :delta :start-position :order-id} or nil.
   `delta` is the signed size change (B buys increase net, A/S sells decrease);
-  `start-position` is the exchange-reported net before the fill when present."
+  `start-position` is the exchange-reported net before the fill when present;
+  `order-id` (the exchange `oid`) is what lets partial fills of one order be
+  recognised as a single intervention (see coalesce-fills)."
   [row]
   (let [coin (let [c (:coin row)]
                (when (and (string? c) (seq c)) c))
@@ -33,20 +35,70 @@
                  (contains? #{"B" "b" :buy "buy"} s) :buy
                  (contains? #{"A" "a" "S" "s" :sell "sell"} s) :sell
                  :else nil))
-        start-position (parse-num (:startPosition row))]
+        start-position (parse-num (:startPosition row))
+        order-id (some parse-num [(:oid row) (:orderId row) (:order-id row)])]
     (when (and coin time-ms size (pos? size) side)
       {:coin coin
        :time-ms time-ms
        :delta (if (= :buy side) size (- size))
-       :start-position start-position})))
+       :start-position start-position
+       :order-id order-id})))
 
 (defn- zeroish?
   [value]
   (< (js/Math.abs value) zero-size-epsilon))
 
+(def ^:private coalesce-window-ms
+  "When fills carry no order id, consecutive same-direction fills within this
+  window are treated as one order. Long enough to absorb an order that sweeps
+  the book (or a short TWAP), short enough not to merge distinct decisions."
+  60000)
+
+(defn- continues-order?
+  "Does `fill` continue the same order/action as the run's most recent fill?
+  True when they share an exchange order id (however long the order takes to
+  fill), or — for the same coin and direction — when they land within
+  `coalesce-window-ms` (covers missing ids, split child orders, and rapid
+  same-direction fills that are not a meaningful unattended gap). Opposite
+  directions never merge."
+  [latest fill]
+  (boolean
+   (and latest
+        (= (:coin latest) (:coin fill))
+        (or (and (:order-id latest) (:order-id fill)
+                 (= (:order-id latest) (:order-id fill)))
+            (and (= (neg? (:delta latest)) (neg? (:delta fill)))
+                 (<= (- (:time-ms fill) (:time-ms latest)) coalesce-window-ms))))))
+
+(defn coalesce-fills
+  "Collapse each order's partial fills into one logical fill so that an order
+  which executes in many pieces counts as a single intervention rather than a
+  burst of near-simultaneous ones. Without this, a multi-fill order (a TWAP, or
+  any order sweeping several book levels) contributes a run of seconds-apart
+  gaps that dominate the horizon quantile and collapse it to the floor.
+
+  Consecutive fills are merged when they share an order id (or, lacking ids,
+  the same coin and direction within `coalesce-window-ms`). The merged fill
+  keeps the earliest time and start-position (the state before the order began)
+  and the summed delta. Call this per coin: an order belongs to one coin, and
+  merging across coins would break on interleaved fills."
+  [fills]
+  (->> (sort-by :time-ms fills)
+       (reduce (fn [runs fill]
+                 (let [current (peek runs)]
+                   (if (continues-order? (:latest current) fill)
+                     (conj (pop runs)
+                           (-> current
+                               (update :delta + (:delta fill))
+                               (assoc :latest fill)))
+                     (conj runs (assoc fill :latest fill)))))
+               [])
+       (mapv #(dissoc % :latest))))
+
 (defn intervention-gaps-for-coin
   "Gap durations (ms) between consecutive interventions across this coin's
-  episodes, in fill order."
+  episodes, in fill order. Expects fills already coalesced per order
+  (see coalesce-fills)."
   [fills]
   (let [ordered (sort-by :time-ms fills)]
     (loop [remaining ordered
@@ -98,7 +150,11 @@
   Returns {:hours :source (:per-coin | :account | :default) :samples n}."
   [fill-rows coin]
   (let [fills (keep normalize-fill fill-rows)
-        by-coin (group-by :coin fills)
+        ;; Coalesce each coin's partial fills into per-order interventions
+        ;; before measuring the gaps between them.
+        by-coin (into {}
+                      (map (fn [[c fs]] [c (coalesce-fills fs)]))
+                      (group-by :coin fills))
         coin-gaps (when coin
                     (intervention-gaps-for-coin (get by-coin coin [])))
         account-gaps (when (< (count coin-gaps) min-gap-samples)

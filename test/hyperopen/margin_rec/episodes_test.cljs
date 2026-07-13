@@ -12,12 +12,81 @@
            :sz (str sz)}
     (some? start-position) (assoc :startPosition (str start-position))))
 
+(defn- fill-ms
+  "Like `fill` but `t` is milliseconds and an order id can be attached."
+  [coin t-ms side sz start-position oid]
+  (cond-> {:coin coin :time t-ms :side side :sz (str sz)
+           :startPosition (str start-position)}
+    (some? oid) (assoc :oid oid)))
+
 (deftest normalize-fill-shapes
-  (is (= {:coin "TSM" :time-ms 0 :delta 2 :start-position 0}
-         (episodes/normalize-fill {:coin "TSM" :time 0 :side "B" :sz "2" :startPosition "0"})))
+  (is (= {:coin "TSM" :time-ms 0 :delta 2 :start-position 0 :order-id 42}
+         (episodes/normalize-fill {:coin "TSM" :time 0 :side "B" :sz "2"
+                                   :startPosition "0" :oid 42})))
+  (is (nil? (:order-id (episodes/normalize-fill {:coin "TSM" :time 0 :side "B" :sz "2"}))))
   (is (= -1.5 (:delta (episodes/normalize-fill {:coin "X" :time 5 :side "A" :sz 1.5}))))
   (is (nil? (episodes/normalize-fill {:coin "X" :time 5 :side "?" :sz 1})))
   (is (nil? (episodes/normalize-fill {:coin "" :time 5 :side "B" :sz 1}))))
+
+(deftest coalesce-fills-collapses-multi-fill-orders
+  (testing "partial fills sharing an order id merge into one intervention"
+    (let [rows (keep episodes/normalize-fill
+                     (for [i (range 12)]
+                       (fill-ms "TSM" (+ (* 3 24 hour) (* i 8000)) "A" 1 (- 12 i) 7001)))
+          merged (episodes/coalesce-fills rows)]
+      (is (= 1 (count merged)))
+      (is (= -12 (:delta (first merged))))
+      ;; keeps the earliest time and the pre-order start position
+      (is (= (* 3 24 hour) (:time-ms (first merged))))
+      (is (= 12 (:start-position (first merged))))))
+  (testing "without ids, same-direction fills within the window merge"
+    (let [rows (keep episodes/normalize-fill
+                     (for [i (range 5)]
+                       (fill-ms "ETH" (* i 10000) "B" 2 (* i 2) nil)))]
+      (is (= 1 (count (episodes/coalesce-fills rows))))
+      (is (= 10 (:delta (first (episodes/coalesce-fills rows)))))))
+  (testing "different orders and opposite directions stay separate"
+    (let [rows (keep episodes/normalize-fill
+                     [(fill-ms "TSM" 0 "B" 5 0 100)          ;; order 100 buy
+                      (fill-ms "TSM" 1000 "A" 2 5 200)        ;; order 200 sell (different id)
+                      (fill-ms "TSM" 2000 "A" 1 3 200)])]     ;; continues order 200
+      (is (= 2 (count (episodes/coalesce-fills rows))))))
+  (testing "same-direction fills beyond the window stay separate"
+    (let [rows (keep episodes/normalize-fill
+                     [(fill-ms "X" 0 "A" 1 5 nil)
+                      (fill-ms "X" (* 2 60000) "A" 1 4 nil)])] ;; 2 min apart, no id
+      (is (= 2 (count (episodes/coalesce-fills rows))))))
+  (testing "one order id merges even when it fills across a long span"
+    ;; A resting limit order can fill in pieces minutes apart; the shared id
+    ;; keeps it a single intervention regardless of the window.
+    (let [rows (keep episodes/normalize-fill
+                     [(fill-ms "X" 0 "B" 1 0 555)
+                      (fill-ms "X" (* 10 60000) "B" 1 1 555)])] ;; 10 min apart, same id
+      (is (= 1 (count (episodes/coalesce-fills rows))))
+      (is (= 2 (:delta (first (episodes/coalesce-fills rows))))))))
+
+(deftest horizon-not-collapsed-by-multi-fill-close
+  ;; The reported bug: hold positions for hours/days, then close each with one
+  ;; order that fills in many pieces. Each partial fill used to count as its
+  ;; own intervention, so the real hold gaps were buried under a swarm of
+  ;; ~8s intra-order gaps and the 80th-percentile horizon pinned to the 6h
+  ;; floor. Eight episodes held 10..17h, each closed by a 5-fill order:
+  ;; coalescing yields eight real gaps (80th pctile 15.6h); without it the
+  ;; distribution would be 40 gaps (32 near-zero) and clamp to 6h.
+  (let [rows (mapcat
+              (fn [i]
+                (let [open-t (* i 100 hour)
+                      close-t (+ open-t (* (+ 10 i) hour))]
+                  (cons
+                   (fill-ms "TSM" open-t "B" 5 0 (+ 1000 i))
+                   (for [k (range 5)]
+                     (fill-ms "TSM" (+ close-t (* k 8000)) "A" 1 (- 5 k) (+ 2000 i))))))
+              (range 8))
+        {:keys [hours source samples]} (episodes/horizon-hours rows "TSM")]
+    (is (= :per-coin source))
+    (is (= 8 samples))
+    (is (< (js/Math.abs (- hours 15.6)) 1e-9))
+    (is (> hours episodes/min-horizon-hours))))
 
 (deftest gaps-from-episode-lifecycle
   (testing "open, add, partial reduce, close"

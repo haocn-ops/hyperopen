@@ -42,8 +42,6 @@
            run-state
            running?
            scenario-save-state
-           current-result?
-           result
            refinement
            rerun-blocked-reason]}]
   (let [status (:status active-scenario)
@@ -56,10 +54,7 @@
         ;; or missing result saves a setup-only snapshot (the workflow attaches
         ;; results only when they still match the draft).
         save-disabled? saving?
-        can-refine? (boolean (:can-refine? refinement))
-        solved? (= :solved (:status result))
-        no-trades? (and solved?
-                        (true? (:at-target? (kpi-strip/recommendation-deltas result))))]
+        can-refine? (boolean (:can-refine? refinement))]
     [:header {:class ["optimizer-scenario-header"
                       "border-b"
                       "border-base-300"
@@ -177,24 +172,10 @@
                        {:click [[:actions/run-portfolio-optimizer-from-draft]]})}
         (cond
           running? "Running"
-          :else "Rerun")]
-       ;; Review & execute is the single visually-primary action (amber solid,
-       ;; matching the app's primary-action convention). It stages the rebalance
-       ;; straight into the Execution tab (review and commit), skipping the retired
-       ;; standalone preview. Muted + relabelled when the target already matches the
-       ;; current book.
-       (when solved?
-         [:button {:type "button"
-                   :class (into ["optimizer-review-rebalance-action"
-                                 "optimizer-primary-action"
-                                 "rounded-lg" "border" "px-2.5" "py-1"
-                                 "text-[0.65625rem]" "font-semibold" "transition-colors"]
-                                (if no-trades?
-                                  ["border-base-300" "bg-base-200/40" "text-trading-muted"]
-                                  ["border-warning/70" "bg-warning/80" "text-base-100" "hover:bg-warning"]))
-                   :data-role "portfolio-optimizer-scenario-review-rebalance"
-                   :on {:click [[:actions/open-portfolio-optimizer-execution]]}}
-          (if no-trades? "Already at target" "Review & execute")])]]]))
+          :else "Rerun")]]]]))
+;; NOTE: the header deliberately does not duplicate the rebalance CTA — the
+;; verdict-bar "Review N trades" button (results-summary/verdict-cta) is the
+;; page's single forward action; a second amber button up here diluted it.
 
 (defn- auto-recompute-stale-scenario!
   [_node]
@@ -362,7 +343,7 @@
                     (assoc deltas* :objective-body body)
                     deltas*)]
        (cond-> []
-         ;; Lead with the plain-language verdict + the primary Review & execute CTA,
+         ;; Lead with the plain-language verdict + the primary Review-trades CTA,
          ;; before the analyst diagnostics — the page's job is review-and-act, so the
          ;; action sits above the fold instead of after the results grid.
          true (conj (results-summary/verdict-headline deltas))

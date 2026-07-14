@@ -363,7 +363,7 @@
                        :data-role "portfolio-optimizer-rebalance-link"
                        :on {:click [[:actions/navigate result-path*]
                                     [:actions/open-portfolio-optimizer-execution]]}}
-              "Review & execute"]]))
+              "Review trades"]]))
         (when read-only-message
           [:p {:class ["mt-3" "border" "border-warning/40" "bg-warning/10" "p-2"
                        "text-[0.8125rem]" "text-warning"]}

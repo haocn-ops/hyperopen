@@ -59,35 +59,52 @@
   'what to do next' read as one unit at the top of the tab (the previous end-of-grid
   placement buried it below the fold on real universes). Stages the rebalance straight
   into the Execution tab in-place (no navigation) so unsaved run state is preserved;
-  the spectate/read-only gate lives downstream in the execution surface. Mutes and
-  relabels when the target already matches the current book so it doesn't invite a
-  no-op."
-  [at-target?]
-  (let [no-trades? (true? at-target?)]
+  the spectate/read-only gate lives downstream in the execution surface.
+
+  This is the only control on the page that moves the flow FORWARD (everything else
+  adjusts the scenario), so the actionable state carries a sweeping 'snake' border
+  (`--live` modifier; static under prefers-reduced-motion) and a single large label.
+  The explanatory sentence lives in a delayed hover/focus tooltip instead of standing
+  subtext — it stays in the DOM for screen readers. Mutes, relabels, and drops the
+  animation when the target already matches the current book so a no-op doesn't beg
+  to be clicked.
+
+  Labelled \"Review N trades\": clicking stages the plan for review — nothing is
+  sent until the user arms and confirms on the Execution tab — so the label names
+  what the next screen actually is instead of over-promising execution. Falls back
+  to \"Review trades\" when the sendable count is zero (all-blocked plans still
+  deserve a path in to see why) or unknown."
+  [{:keys [at-target? trade-count]}]
+  (let [no-trades? (true? at-target?)
+        label (cond
+                no-trades? "Already at target"
+                (and (opt-format/finite-number? trade-count) (pos? trade-count))
+                (str "Review " trade-count (if (= 1 trade-count) " trade" " trades"))
+                :else "Review trades")]
     [:button {:type "button"
               :class (into ["optimizer-review-rebalance-cta" "optimizer-verdict-cta"
-                            "flex" "items-center" "justify-between" "gap-3"
+                            "relative" "flex" "items-center" "justify-between" "gap-3"
                             "rounded-lg" "border" "px-4" "py-2.5" "text-left"
                             "transition-colors"]
                            (if no-trades?
                              ["border-base-300" "bg-base-200/30" "text-trading-muted"]
-                             ["border-primary/50" "bg-primary/10" "text-primary" "hover:bg-primary/30"]))
+                             ["optimizer-verdict-cta--live"
+                              "border-primary/50" "bg-primary/10" "text-primary" "hover:bg-primary/30"]))
               :data-role "portfolio-optimizer-recommendation-rebalance-cta"
               :on {:click [[:actions/open-portfolio-optimizer-execution]]}}
-     [:span {:class ["flex" "flex-col" "gap-0.5"]}
-      [:span {:class ["text-[0.7rem]" "font-semibold"]}
-       (if no-trades? "Already at target" "Review & execute")]
-      [:span {:class ["text-[0.62rem]" "font-medium" "text-trading-muted"]}
-       (if no-trades?
-         "Your current allocation already matches the target — no trades needed."
-         "Review and execute the trades that move you from current to target allocation.")]]
+     [:span {:class ["optimizer-verdict-cta-label" "text-[0.8125rem]" "font-bold" "tracking-wide"]}
+      label]
+     [:span {:class ["optimizer-verdict-cta-tip"]}
+      (if no-trades?
+        "Your current allocation already matches the target — no trades needed."
+        "Opens the Execution tab to review the staged trades — nothing is sent until you arm and confirm there.")]
      [:span {:class ["text-sm" "font-semibold"] :aria-hidden "true"} "→"]]))
 
 (defn verdict-headline
   "The verdict bar at the top of the recommendation tab: one plain-language sentence
   stating what the recommended portfolio does to the user's risk and return, with the
   trade count — so the user reads the answer instead of reconstructing it from five
-  KPI cards and a frontier chart — paired with the primary Review & execute CTA.
+  KPI cards and a frontier chart — paired with the primary Review-trades CTA.
   Targets are framed as estimates; deltas are signed (the rest of the UI uses the same
   convention: lower volatility and higher return are good). Falls back to non-delta
   phrasing when there is no current baseline.
@@ -137,7 +154,7 @@
          [:p {:class ["mt-1" "text-[0.75rem]" "text-trading-muted"]
               :data-role "portfolio-optimizer-recommendation-verdict-trades"}
           trades-clause])]
-      (verdict-cta at-target?)]]))
+      (verdict-cta {:at-target? at-target? :trade-count trade-count})]]))
 
 (defn- target-shape
   "Long/short counts and the largest |target weight| position, from the solved target

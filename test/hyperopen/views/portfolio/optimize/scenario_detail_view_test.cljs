@@ -149,7 +149,9 @@
                                                   "portfolio-optimizer-recommendation-verdict")))]
     (is (str/includes? verdict-text "No trades can be sent — 2 legs are blocked."))
     (is (not (str/includes? verdict-text "Already at target")))
-    (is (str/includes? verdict-text "Review & execute"))))
+    ;; Zero sendable trades ⇒ the count-less fallback label; the blocked plan
+    ;; still deserves a path in to see why.
+    (is (str/includes? verdict-text "Review trades"))))
 
 (deftest portfolio-optimizer-provenance-strip-drops-invariant-horizon-field-test
   (let [view-node (solved-baseline-view {:current-vol 0.30 :target-vol 0.24
@@ -164,13 +166,18 @@
   (let [view-node (solved-baseline-view {:current-vol 0.30 :target-vol 0.24
                                          :current-return 0.08 :target-return 0.10
                                          :ready-count 3})
-        review (node-by-role view-node "portfolio-optimizer-scenario-review-rebalance")
+        cta (node-by-role view-node "portfolio-optimizer-recommendation-rebalance-cta")
         rerun (node-by-role view-node "portfolio-optimizer-scenario-rerun")
-        review-classes (set (node-attr review :class))
         rerun-classes (set (node-attr rerun :class))]
-    ;; Review & execute reads as THE single primary action (amber solid); Rerun is
-    ;; demoted to neutral; Save and Refine remain present.
-    (is (contains? review-classes "bg-warning/80"))
+    ;; The verdict-bar Review-trades CTA is THE single primary action; the header
+    ;; duplicate was removed (it diluted the signal and cluttered the toolbar).
+    ;; Rerun stays demoted to neutral; Save and Refine remain present.
+    (is (nil? (node-by-role view-node "portfolio-optimizer-scenario-review-rebalance"))
+        "The header must not duplicate the rebalance CTA.")
+    (is (some? cta))
+    ;; The label carries the sendable trade count and names the destination
+    ;; honestly — clicking stages for review, it does not place trades.
+    (is (some #{"Review 3 trades"} (collect-strings cta)))
     (is (contains? rerun-classes "bg-base-200/40"))
     (is (not (contains? rerun-classes "bg-primary/10")))
     (is (some? (node-by-role view-node "portfolio-optimizer-scenario-save")))
@@ -178,7 +185,28 @@
     ;; The standalone Rebalance preview tab was retired, so the primary CTA stages
     ;; straight into Execution.
     (is (= [[:actions/open-portfolio-optimizer-execution]]
-           (click-actions review)))))
+           (click-actions cta)))))
+
+(deftest portfolio-optimizer-recommendation-cta-prominence-test
+  ;; The verdict-bar CTA is the page's single forward-motion action: the actionable
+  ;; state carries the animated-border modifier and a large standalone label, with
+  ;; the explanatory sentence demoted to a delayed tooltip node instead of standing
+  ;; subtext (2026-07-13 redesign — the two-line card blended into the page).
+  (let [view-node (solved-baseline-view {:current-vol 0.30 :target-vol 0.24
+                                         :current-return 0.08 :target-return 0.10
+                                         :ready-count 3})
+        cta (node-by-role view-node "portfolio-optimizer-recommendation-rebalance-cta")
+        cta-classes (set (node-attr cta :class))
+        tip (first (collect-nodes cta
+                                  #(some #{"optimizer-verdict-cta-tip"}
+                                         (node-attr % :class))))]
+    (is (contains? cta-classes "optimizer-verdict-cta--live")
+        "Actionable CTA carries the sweeping-border modifier.")
+    (is (some? tip) "Guidance moved into the tooltip node.")
+    ;; The tooltip is explicit that nothing is sent from this click — the label
+    ;; promises review, and the tooltip backs that up.
+    (is (str/includes? (str/join " " (collect-strings tip))
+                       "nothing is sent until you arm and confirm"))))
 
 (deftest portfolio-optimizer-zero-trade-result-mutes-rebalance-affordances-test
   (let [view-node (solved-baseline-view {:current-vol 0.24 :target-vol 0.24
@@ -186,13 +214,17 @@
                                          :ready-count 0})
         verdict-text (str/join " " (collect-strings
                                     (node-by-role view-node "portfolio-optimizer-recommendation-verdict")))
-        review (node-by-role view-node "portfolio-optimizer-scenario-review-rebalance")
-        cta-text (str/join " " (collect-strings
-                                (node-by-role view-node "portfolio-optimizer-recommendation-rebalance-cta")))]
+        cta (node-by-role view-node "portfolio-optimizer-recommendation-rebalance-cta")
+        cta-text (str/join " " (collect-strings cta))]
     (is (str/includes? verdict-text "No trades needed"))
-    (is (some #{"Already at target"} (collect-strings review)))
-    (is (contains? (set (node-attr review :class)) "text-trading-muted"))
-    (is (str/includes? cta-text "Already at target"))))
+    (is (contains? (set (node-attr cta :class)) "text-trading-muted"))
+    (is (str/includes? cta-text "Already at target"))
+    ;; A no-op must not carry the attention-drawing animated border.
+    (is (not (contains? (set (node-attr
+                              (node-by-role view-node
+                                            "portfolio-optimizer-recommendation-rebalance-cta")
+                              :class))
+                        "optimizer-verdict-cta--live")))))
 
 (defn- scenario-kpi-delta-classes
   ([current-return target-return current-vol target-vol]
@@ -300,9 +332,10 @@
 
 (deftest portfolio-optimizer-scenario-detail-exposes-rebalance-paths-for-solved-result-test
   ;; Regression: on the scenario-detail Recommendation tab there was no
-  ;; discoverable path to the rebalance preview. A solved result must now expose
-  ;; both a header action and an end-of-read-flow CTA, each switching tabs
-  ;; in-place (no navigation, so unsaved run state is preserved).
+  ;; discoverable path to the rebalance preview. A solved result must expose the
+  ;; verdict-bar CTA and the result-confidence rail step, each switching tabs
+  ;; in-place (no navigation, so unsaved run state is preserved). The header
+  ;; duplicate CTA was removed 2026-07-13.
   (let [scenario-id "draft"
         state (ready-scenario-state scenario-id {:kind :historical-mean})
         solved-run (solved-run-for-state state)
@@ -312,23 +345,22 @@
                                  (:request-signature solved-run))
                        (assoc-in [:portfolio :optimizer :last-successful-run]
                                  solved-run)))
-        header-cta (node-by-role view-node "portfolio-optimizer-scenario-review-rebalance")
         recommendation-cta (node-by-role view-node "portfolio-optimizer-recommendation-rebalance-cta")
         confidence-cta (node-by-role view-node "portfolio-optimizer-result-confidence-rebalance")
         ;; The standalone Rebalance preview tab was retired, so every rebalance CTA
         ;; stages straight into Execution (in-place, no navigation).
         expected [[:actions/open-portfolio-optimizer-execution]]
         strings (set (collect-strings view-node))]
-    (is (some? header-cta)
-        "A solved scenario must expose a header path to stage the rebalance.")
+    (is (nil? (node-by-role view-node "portfolio-optimizer-scenario-review-rebalance"))
+        "The header must not duplicate the rebalance CTA (removed 2026-07-13).")
     (is (some? recommendation-cta)
         "The recommendation read-flow must end with a discoverable path to stage the rebalance.")
     (is (some? confidence-cta)
         "The result-confidence rail must lead with rebalance as a clickable next step, not a refine imperative.")
-    (is (= expected (click-actions header-cta)))
     (is (= expected (click-actions recommendation-cta)))
     (is (= expected (click-actions confidence-cta)))
-    (is (contains? strings "Review & execute"))
+    ;; One sendable trade in this fixture ⇒ singular count label.
+    (is (contains? strings "Review 1 trade"))
     ;; The rail frames refine as optional rather than required: it is relabelled "From
     ;; here" (not "Next step") and tells the user the draft is usable as-is.
     (is (contains? strings "From here"))

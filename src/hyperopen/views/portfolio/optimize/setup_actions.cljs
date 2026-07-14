@@ -172,7 +172,7 @@
                            :data-role "portfolio-optimizer-view-results"}))
      (when (and solved-run? result-path)
        (result-nav-button {:result-path result-path
-                           :label "Review & execute"
+                           :label "Review trades"
                            :data-role "portfolio-optimizer-view-rebalance"
                            :accent? true
                            :actions [[:actions/navigate result-path]

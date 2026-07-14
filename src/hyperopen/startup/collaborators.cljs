@@ -17,6 +17,7 @@
             [hyperopen.websocket.candles :as candles]
             [hyperopen.websocket.client :as ws-client]
             [hyperopen.websocket.orderbook :as orderbook]
+            [hyperopen.websocket.subscription-errors :as subscription-errors]
             [hyperopen.websocket.trades :as trades]
             [hyperopen.websocket.user :as user-ws]
             [hyperopen.websocket.webdata2 :as webdata2]))
@@ -102,6 +103,25 @@
                  requested-address
                  api-projections/apply-perp-dex-clearinghouse-success
                  dex))
+         (.catch (apply-error-and-reject-when-current
+                  store
+                  requested-address
+                  api-projections/apply-perp-dex-clearinghouse-error))))))
+
+(defn- fetch-default-clearinghouse-state!
+  "Hydrate the base-dex clearinghouse bucket ([:webdata2 :clearinghouseState])
+  via REST. Startup depends on this now that the webData2 stream no longer
+  exists provider-side; the dex \"\" clearinghouseState stream keeps the bucket
+  fresh afterwards."
+  ([api-ops store address]
+   (fetch-default-clearinghouse-state! api-ops store address {}))
+  ([{:keys [request-clearinghouse-state!]} store address opts]
+   (let [requested-address (normalize-address address)]
+     (-> (request-clearinghouse-state! address nil opts)
+         (.then (apply-success-and-return-when-current
+                 store
+                 requested-address
+                 api-projections/apply-default-clearinghouse-success))
          (.catch (apply-error-and-reject-when-current
                   store
                   requested-address
@@ -394,6 +414,11 @@
                                      (fetch-clearinghouse-state! api-ops store address dex))
                                     ([store address dex opts]
                                      (fetch-clearinghouse-state! api-ops store address dex opts)))
+      :fetch-default-clearinghouse-state! (fn
+                                            ([store address]
+                                             (fetch-default-clearinghouse-state! api-ops store address))
+                                            ([store address opts]
+                                             (fetch-default-clearinghouse-state! api-ops store address opts)))
       :fetch-user-fills! (fn
                            ([store address]
                             (fetch-user-fills! api-ops store address))
@@ -460,16 +485,15 @@
       :init-trades! trades/init!
       :init-user-ws! user-ws/init!
       :init-webdata2! webdata2/init!
+      :init-subscription-errors! subscription-errors/init!
       :dispatch! nxr/dispatch
-      :init-with-webdata2! address-watcher/init-with-webdata2!
       :add-handler! address-watcher/add-handler!
       :remove-handler! address-watcher/remove-handler!
       :stop-watching! address-watcher/stop-watching!
+      :start-watching! address-watcher/start-watching!
       :sync-current-address! address-watcher/sync-current-address!
       :create-user-handler user-ws/create-user-handler
       :subscribe-user! user-ws/subscribe-user!
       :unsubscribe-user! user-ws/unsubscribe-user!
-      :sync-perp-dex-clearinghouse-subscriptions! user-ws/sync-perp-dex-clearinghouse-subscriptions!
-      :subscribe-webdata2! webdata2/subscribe-webdata2!
-      :unsubscribe-webdata2! webdata2/unsubscribe-webdata2!}
+      :sync-perp-dex-clearinghouse-subscriptions! user-ws/sync-perp-dex-clearinghouse-subscriptions!}
      (dissoc overrides :api))))

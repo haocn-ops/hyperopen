@@ -249,14 +249,11 @@
 (defn clear-disconnected-account-state!
   [{:keys [store
            address
-           unsubscribe-user!
-           unsubscribe-webdata2!]
+           unsubscribe-user!]
     :as deps}]
   (when address
     (when (fn? unsubscribe-user!)
-      (unsubscribe-user! address))
-    (when (fn? unsubscribe-webdata2!)
-      (unsubscribe-webdata2! address)))
+      (unsubscribe-user! address)))
   (swap-startup-state! deps assoc :bootstrapped-address nil)
   (swap! store
          (fn [state]
@@ -422,17 +419,15 @@
 (defn install-address-handlers!
   [{:keys [store
            bootstrap-account-data!
-           init-with-webdata2!
            dispatch!
            add-handler!
            remove-handler!
            sync-current-address!
            stop-watching!
+           start-watching!
            create-user-handler
            subscribe-user!
            unsubscribe-user!
-           subscribe-webdata2!
-           unsubscribe-webdata2!
            address-handler-reify
            sync-current-address-on-install?
            address-handler-name]
@@ -443,12 +438,17 @@
   (when (fn? stop-watching!)
     (stop-watching! store))
   (when (fn? remove-handler!)
+    ;; default-webdata2-handler-name stays in the cleanup list so hot reloads
+    ;; drop any handler installed before the webData2 stream was retired.
     (doseq [handler-name [default-webdata2-handler-name
                           default-user-handler-name
                           address-handler-name]]
       (remove-handler! handler-name)))
-  ;; Note: WebData2 subscriptions are managed by address-watcher.
-  (init-with-webdata2! store subscribe-webdata2! unsubscribe-webdata2!)
+  ;; The provider removed the webData2 subscription; the base-dex book now
+  ;; arrives via the dex "" clearinghouseState stream managed by the user
+  ;; subscription handler below.
+  (when (fn? start-watching!)
+    (start-watching! store))
   (add-handler! (create-user-handler subscribe-user! unsubscribe-user!))
   (add-handler!
    (address-handler-reify
@@ -532,6 +532,7 @@
            init-trades!
            init-user-ws!
            init-webdata2!
+           init-subscription-errors!
            dispatch!
            install-address-handlers!
            start-critical-bootstrap!
@@ -546,6 +547,8 @@
   (init-trades! store)
   (init-user-ws! store)
   (init-webdata2! store)
+  (when (fn? init-subscription-errors!)
+    (init-subscription-errors!))
   ;; Ensure active-asset market streams are requested on startup.
   (when-let [asset (:active-asset @store)]
     (dispatch! store nil [[:actions/subscribe-to-asset asset]]))

@@ -170,8 +170,7 @@
     {:runtime runtime
      :store store
      :address address
-     :unsubscribe-user! user-ws/unsubscribe-user!
-     :unsubscribe-webdata2! ws-adapters/unsubscribe-webdata2})))
+     :unsubscribe-user! user-ws/unsubscribe-user!})))
 
 (def sync-asset-selector-active-ctx-subscriptions
   asset-adapters/sync-asset-selector-active-ctx-subscriptions)

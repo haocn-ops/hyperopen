@@ -316,12 +316,13 @@
                                                        :subscribed? true
                                                        :descriptor {:type "openOrders"
                                                                     :user effective-address}}
-                                                      ["webData2" nil effective-address nil nil]
-                                                      {:topic "webData2"
+                                                      ["clearinghouseState" nil effective-address "" nil]
+                                                      {:topic "clearinghouseState"
                                                        :status :live
                                                        :subscribed? true
-                                                       :descriptor {:type "webData2"
-                                                                    :user effective-address}}}}}))
+                                                       :descriptor {:type "clearinghouseState"
+                                                                    :user effective-address
+                                                                    :dex ""}}}}}))
         handlers (atom {})
         scheduled-refresh (atom nil)
         open-orders-addresses (atom [])
@@ -389,12 +390,13 @@
                                                        :subscribed? true
                                                        :descriptor {:type "openOrders"
                                                                     :user effective-address}}
-                                                      ["webData2" nil effective-address nil nil]
-                                                      {:topic "webData2"
+                                                      ["clearinghouseState" nil effective-address "" nil]
+                                                      {:topic "clearinghouseState"
                                                        :status :live
                                                        :subscribed? true
-                                                       :descriptor {:type "webData2"
-                                                                    :user effective-address}}}}})
+                                                       :descriptor {:type "clearinghouseState"
+                                                                    :user effective-address
+                                                                    :dex ""}}}}})
                 (swap! assoc-in [:account-info :selected-tab] :funding-history))
         handlers (atom {})
         scheduled-refresh (atom nil)
@@ -463,12 +465,13 @@
                                                          :subscribed? true
                                                          :descriptor {:type "openOrders"
                                                                       :user effective-address}}
-                                                        ["webData2" nil effective-address nil nil]
-                                                        {:topic "webData2"
+                                                        ["clearinghouseState" nil effective-address "" nil]
+                                                        {:topic "clearinghouseState"
                                                          :status :live
                                                          :subscribed? true
-                                                         :descriptor {:type "webData2"
-                                                                      :user effective-address}}
+                                                         :descriptor {:type "clearinghouseState"
+                                                                      :user effective-address
+                                                                      :dex ""}}
                                                         ["clearinghouseState" nil effective-address dex nil]
                                                         {:topic "clearinghouseState"
                                                          :status :idle
@@ -563,7 +566,8 @@
             unsubscribe-msgs (filter #(= "unsubscribe" (get % :method)) @outbound-messages)
             subscribe-subs (set (map :subscription subscribe-msgs))
             unsubscribe-subs (set (map :subscription unsubscribe-msgs))]
-        (is (= #{{:type "clearinghouseState" :user address :dex "dex-a"}
+        (is (= #{{:type "clearinghouseState" :user address :dex ""}
+                 {:type "clearinghouseState" :user address :dex "dex-a"}
                  {:type "clearinghouseState" :user address :dex "dex-b"}}
                subscribe-subs))
         (is (= #{{:type "clearinghouseState" :user address :dex "dex-a"}}
@@ -584,12 +588,13 @@
                                                        :subscribed? true
                                                        :descriptor {:type "openOrders"
                                                                     :user effective-address}}
-                                                      ["webData2" nil effective-address nil nil]
-                                                      {:topic "webData2"
+                                                      ["clearinghouseState" nil effective-address "" nil]
+                                                      {:topic "clearinghouseState"
                                                        :status :n-a
                                                        :subscribed? true
-                                                       :descriptor {:type "webData2"
-                                                                    :user effective-address}}}}}))
+                                                       :descriptor {:type "clearinghouseState"
+                                                                    :user effective-address
+                                                                    :dex ""}}}}}))
         handlers (atom {})
         scheduled-refresh (atom nil)
         open-orders-addresses (atom [])
@@ -657,12 +662,13 @@
                                                        :subscribed? true
                                                        :descriptor {:type "openOrders"
                                                                     :user effective-address}}
-                                                      ["webData2" nil effective-address nil nil]
-                                                      {:topic "webData2"
+                                                      ["clearinghouseState" nil effective-address "" nil]
+                                                      {:topic "clearinghouseState"
                                                        :status :live
                                                        :subscribed? true
-                                                       :descriptor {:type "webData2"
-                                                                    :user effective-address}}}}}))
+                                                       :descriptor {:type "clearinghouseState"
+                                                                    :user effective-address
+                                                                    :dex ""}}}}}))
         handlers (atom {})
         scheduled-refresh (atom nil)
         open-orders-addresses (atom [])

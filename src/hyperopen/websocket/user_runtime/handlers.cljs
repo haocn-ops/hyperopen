@@ -174,6 +174,17 @@
   (or (common/normalized-dex (:dex msg))
       (common/normalized-dex (get-in msg [:data :dex]))))
 
+(defn- base-dex-clearinghouse-message?
+  "True for a clearinghouseState payload addressed to the base perp dex: the
+  server echoes dex \"\" (blank) and nests the state under :clearinghouseState.
+  Frames without an explicit dex field stay unrouted."
+  [msg]
+  (let [payload (:data msg)]
+    (and (map? payload)
+         (contains? payload :dex)
+         (nil? (common/normalized-dex (:dex payload)))
+         (map? (:clearinghouseState payload)))))
+
 (defn- clearinghouse-message-data
   [msg]
   (let [payload (:data msg)]
@@ -187,8 +198,12 @@
   (fn [msg]
     (when (and (= "clearinghouseState" (:channel msg))
                (common/message-for-live-user-address? store msg))
-      (when-let [dex (clear-dex-from-clearinghouse-message msg)]
+      (if-let [dex (clear-dex-from-clearinghouse-message msg)]
         (swap! store
                api-projections/apply-perp-dex-clearinghouse-success
                dex
-               (clearinghouse-message-data msg))))))
+               (clearinghouse-message-data msg))
+        (when (base-dex-clearinghouse-message? msg)
+          (swap! store
+                 api-projections/apply-default-clearinghouse-success
+                 (clearinghouse-message-data msg)))))))

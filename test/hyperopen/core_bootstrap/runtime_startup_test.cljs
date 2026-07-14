@@ -34,7 +34,7 @@
                   trades/init! (fn [_] nil)
                   user-ws/init! (fn [_] nil)
                   webdata2/init! (fn [_] nil)
-                  address-watcher/init-with-webdata2! (fn [& _] nil)
+                  address-watcher/start-watching! (fn [& _] nil)
                   address-watcher/add-handler! (fn [& _] nil)
                   address-watcher/sync-current-address! (fn [& _] nil)
                   api/request-asset-contexts! (fn request-asset-contexts-mock
@@ -251,7 +251,7 @@
                           :spot {:clearinghouse-state {:time 1}}
                           :account {:mode :unified
                                     :abstraction-raw "unifiedAccount"}})]
-    (with-redefs [address-watcher/init-with-webdata2! (fn [& _] nil)
+    (with-redefs [address-watcher/start-watching! (fn [& _] nil)
                   address-watcher/add-handler! (fn [handler]
                                                  (swap! captured-handlers conj handler))
                   address-watcher/sync-current-address! (fn [& _] nil)]

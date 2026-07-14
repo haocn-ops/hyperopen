@@ -148,3 +148,58 @@
       (is (= "fill-1" (get-in @store [:orders :fills 0 :fillId])))
       (is (= 1 (count @refresh-calls)))
       (is (empty? @toast-calls)))))
+
+(deftest clearinghouse-state-handler-routes-named-dex-payloads-to-perp-dex-bucket-test
+  (let [store (atom {:wallet {:address address}
+                     :perp-dex-clearinghouse {}})
+        handle! (handlers/clearinghouse-state-handler store)
+        state {:marginSummary {:accountValue "100"}
+               :assetPositions [{:position {:coin "xyz:AAPL" :szi "0.5"}}]}]
+    (handle! {:channel "clearinghouseState"
+              :data {:dex "xyz"
+                     :user address
+                     :clearinghouseState state}})
+    (is (= state
+           (get-in @store [:perp-dex-clearinghouse "xyz"])))
+    (is (nil? (get-in @store [:webdata2 :clearinghouseState])))))
+
+(deftest clearinghouse-state-handler-routes-blank-dex-payloads-to-base-bucket-test
+  (let [store (atom {:wallet {:address address}
+                     :webdata2 {:clearinghouseState nil
+                                :other-webdata2-key :untouched}})
+        handle! (handlers/clearinghouse-state-handler store)
+        state {:marginSummary {:accountValue "74"}
+               :assetPositions [{:position {:coin "WLD" :szi "-58.9"}}
+                                {:position {:coin "ENS" :szi "0.06"}}]}]
+    (handle! {:channel "clearinghouseState"
+              :data {:dex ""
+                     :user address
+                     :clearinghouseState state}})
+    (is (= state
+           (get-in @store [:webdata2 :clearinghouseState])))
+    (is (= :untouched
+           (get-in @store [:webdata2 :other-webdata2-key])))
+    (is (empty? (get @store :perp-dex-clearinghouse)))))
+
+(deftest clearinghouse-state-handler-drops-frames-without-dex-or-state-test
+  (let [store (atom {:wallet {:address address}})
+        handle! (handlers/clearinghouse-state-handler store)]
+    ;; No dex field at all: unroutable, dropped.
+    (handle! {:channel "clearinghouseState"
+              :data {:user address
+                     :clearinghouseState {:marginSummary {}}}})
+    ;; Blank dex without a nested clearinghouseState map: malformed, dropped.
+    (handle! {:channel "clearinghouseState"
+              :data {:dex ""
+                     :user address}})
+    (is (nil? (get-in @store [:webdata2 :clearinghouseState])))
+    (is (nil? (get @store :perp-dex-clearinghouse)))))
+
+(deftest clearinghouse-state-handler-ignores-blank-dex-payloads-for-stale-addresses-test
+  (let [store (atom {:wallet {:address address}})
+        handle! (handlers/clearinghouse-state-handler store)]
+    (handle! {:channel "clearinghouseState"
+              :data {:dex ""
+                     :user "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+                     :clearinghouseState {:marginSummary {:accountValue "1"}}}})
+    (is (nil? (get-in @store [:webdata2 :clearinghouseState])))))

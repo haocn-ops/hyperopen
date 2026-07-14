@@ -129,6 +129,14 @@
   [state dex data]
   (assoc-in state [:perp-dex-clearinghouse dex] data))
 
+(defn apply-default-clearinghouse-success
+  "Store the base-dex clearinghouse state. [:webdata2 :clearinghouseState] is
+  the canonical bucket every base-book consumer reads (positions, balances,
+  equity, optimizer); it is fed by the dex \"\" clearinghouseState stream and
+  REST refreshes now that the provider removed the webData2 topic."
+  [state data]
+  (assoc-in state [:webdata2 :clearinghouseState] data))
+
 (defn apply-perp-dex-clearinghouse-error
   [state err]
   (let [{:keys [message category]} (normalized-error err)]

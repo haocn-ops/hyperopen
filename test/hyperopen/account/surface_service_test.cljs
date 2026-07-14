@@ -72,12 +72,13 @@
                                                   :subscribed? true
                                                   :descriptor {:type "openOrders"
                                                                :user address}}
-                                                 ["webData2" nil address nil nil]
-                                                 {:topic "webData2"
+                                                 ["clearinghouseState" nil address "" nil]
+                                                 {:topic "clearinghouseState"
                                                   :status :n-a
                                                   :subscribed? true
-                                                  :descriptor {:type "webData2"
-                                                               :user address}}
+                                                  :descriptor {:type "clearinghouseState"
+                                                               :user address
+                                                               :dex ""}}
                                                  ["clearinghouseState" nil address dex nil]
                                                  {:topic "clearinghouseState"
                                                  :status :idle
@@ -129,12 +130,13 @@
                                                   :subscribed? true
                                                   :descriptor {:type "openOrders"
                                                                :user address}}
-                                                 ["webData2" nil address nil nil]
-                                                 {:topic "webData2"
+                                                 ["clearinghouseState" nil address "" nil]
+                                                 {:topic "clearinghouseState"
                                                   :status :n-a
                                                   :subscribed? true
-                                                  :descriptor {:type "webData2"
-                                                               :user address}}}}}})]
+                                                  :descriptor {:type "clearinghouseState"
+                                                               :user address
+                                                               :dex ""}}}}}})]
       (surface-service/refresh-after-user-fill!
        {:store store
         :address address
@@ -161,12 +163,13 @@
                                                        :subscribed? true
                                                        :descriptor {:type "openOrders"
                                                                     :user address}}
-                                                      ["webData2" nil address nil nil]
-                                                      {:topic "webData2"
+                                                      ["clearinghouseState" nil address "" nil]
+                                                      {:topic "clearinghouseState"
                                                        :status :live
                                                        :subscribed? true
-                                                       :descriptor {:type "webData2"
-                                                                    :user address}}}}}})]
+                                                       :descriptor {:type "clearinghouseState"
+                                                                    :user address
+                                                                    :dex ""}}}}}})]
       (surface-service/refresh-after-order-mutation!
        {:store store
         :address address
@@ -201,12 +204,13 @@
                                :subscribed? true
                                :descriptor {:type "openOrders"
                                             :user address}}
-                              ["webData2" nil address nil nil]
-                              {:topic "webData2"
+                              ["clearinghouseState" nil address "" nil]
+                              {:topic "clearinghouseState"
                                :status :live
                                :subscribed? true
-                               :descriptor {:type "webData2"
-                                            :user address}}
+                               :descriptor {:type "clearinghouseState"
+                                            :user address
+                                            :dex ""}}
                               ["clearinghouseState" nil address dex nil]
                               {:topic "clearinghouseState"
                                :status :live
@@ -349,6 +353,8 @@
                              (swap! hidden-calls conj [:fills fetch-address opts]))
         :fetch-spot-clearinghouse-state! (fn [_store fetch-address opts]
                                            (swap! visible-calls conj [:spot fetch-address opts]))
+        :fetch-default-clearinghouse-state! (fn [_store fetch-address opts]
+                                              (swap! visible-calls conj [:default-clearinghouse fetch-address opts]))
         :fetch-user-abstraction! (fn [_store fetch-address opts]
                                    (swap! visible-calls conj [:abstraction fetch-address opts]))
         :fetch-portfolio! (fn [_store fetch-address opts]
@@ -365,6 +371,7 @@
         :stage-b-account-bootstrap! (fn [stage-address dex-names]
                                       (swap! stage-b-calls conj [stage-address dex-names]))})
       (is (= [[:spot address {:priority :high}]
+              [:default-clearinghouse address {:priority :high}]
               [:abstraction address {:priority :high}]
               [:portfolio address {:priority :high}]
               [:user-fees address {:priority :high}]

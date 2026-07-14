@@ -259,3 +259,60 @@
     (is (= {:expected 7 :actual 9 :at-ms 900}
            (get-in snapshot [:streams sub-key :last-gap])))
     (is (true? (get-in snapshot [:groups :market_data :gap-detected?])))))
+
+(deftest clearinghouse-fixture-matches-subscription-key-by-user-and-dex-test
+  (let [address "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        base {:type "clearinghouseState" :user address :dex ""}
+        xyz {:type "clearinghouseState" :user address :dex "xyz"}
+        base-key (model/subscription-key base)
+        xyz-key (model/subscription-key xyz)
+        streams {base-key (mk-stream {:subscribed? true
+                                      :topic "clearinghouseState"
+                                      :descriptor base})
+                 xyz-key (mk-stream {:subscribed? true
+                                     :topic "clearinghouseState"
+                                     :descriptor xyz})}]
+    (testing "Named-dex payload matches only its stream"
+      (is (= [xyz-key]
+             (health/match-stream-keys streams
+                                       {:topic "clearinghouseState"
+                                        :payload {:channel "clearinghouseState"
+                                                  :data {:dex "xyz"
+                                                         :user address
+                                                         :clearinghouseState {}}}}))))
+    (testing "Blank-dex payload matches the base stream"
+      (is (= [base-key]
+             (health/match-stream-keys streams
+                                       {:topic "clearinghouseState"
+                                        :payload {:channel "clearinghouseState"
+                                                  :data {:dex ""
+                                                         :user address
+                                                         :clearinghouseState {}}}}))))
+    (testing "Payload without any dex field matches nothing when several streams are active"
+      (is (= []
+             (health/match-stream-keys streams
+                                       {:topic "clearinghouseState"
+                                        :payload {:channel "clearinghouseState"
+                                                  :data {:user address
+                                                         :clearinghouseState {}}}}))))))
+
+(deftest rejected-stream-status-derivation-test
+  (testing "Unsubscribed stream with a rejection stamp derives :rejected"
+    (is (= :rejected
+           (health/derive-stream-status 10000 {:subscribed? false
+                                               :subscribed-at-ms nil
+                                               :rejected-at-ms 9000
+                                               :first-payload-at-ms nil
+                                               :last-payload-at-ms nil
+                                               :stale-threshold-ms nil}))))
+  (testing "Re-subscribed stream (rejection stamp cleared) derives :idle again"
+    (is (= :idle
+           (health/derive-stream-status 10000 {:subscribed? true
+                                               :subscribed-at-ms 9500
+                                               :rejected-at-ms nil
+                                               :first-payload-at-ms nil
+                                               :last-payload-at-ms nil
+                                               :stale-threshold-ms nil}))))
+  (testing ":rejected outranks :live in group rollups"
+    (is (= :rejected (health/worst-status :live :rejected)))
+    (is (= :offline (health/worst-status :rejected :offline)))))

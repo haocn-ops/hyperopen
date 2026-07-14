@@ -102,7 +102,8 @@
     :evt/timer-health-tick
     :evt/timer-market-flush-fired
     :evt/decoded-envelope
-    :evt/parse-error})
+    :evt/parse-error
+    :evt/subscription-rejected})
 
 (defn make-runtime-msg
   ([msg-type ts]
@@ -171,7 +172,8 @@
    "userTwapSliceFills" :orders_oms
    "userFundings" :orders_oms
    "userNonFundingLedgerUpdates" :orders_oms
-   "webData2" :account})
+   "webData2" :account
+   "clearinghouseState" :account})
 
 (defn topic->group
   ([topic]

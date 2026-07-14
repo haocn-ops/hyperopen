@@ -434,6 +434,33 @@
                                                           :error (:error msg)
                                                           :raw (:raw msg)})])))))
 
+(defmethod handle-runtime-msg :evt/subscription-rejected
+  ;; The provider refused a subscription at the schema level (e.g. a removed
+  ;; topic). Downgrade only the stream's health bookkeeping so `usable?` gates
+  ;; fall back to REST; :desired-subscriptions is untouched, so reconnect
+  ;; replay keeps the TLA-modeled behavior and self-heals if the provider
+  ;; restores the topic.
+  [_ state msg]
+  (let [msg-type (:msg/type msg)
+        ts (:ts msg)
+        subscription (:subscription msg)
+        sub-key (when (map? subscription)
+                  (model/subscription-key subscription))
+        state1 (connection/with-now state ts)
+        state2 (if (and sub-key
+                        (map? (get-in state1 [:streams sub-key])))
+                 (-> state1
+                     (update-in [:streams sub-key]
+                                merge
+                                {:subscribed? false
+                                 :status :rejected
+                                 :status-pending-status nil
+                                 :status-pending-count 0
+                                 :rejected-at-ms (or (:at-ms msg) ts)})
+                     (subscriptions/refresh-expected-traffic))
+                 state1)]
+    (emit-runtime-result-force-health msg-type state2 [])))
+
 (defmethod handle-runtime-msg :default
   [_ state msg]
   (let [msg-type (:msg/type msg)

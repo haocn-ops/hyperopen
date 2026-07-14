@@ -82,3 +82,12 @@
             {:t 3000 :c "103-updated"}
             {:t 4000 :c "104"}]
            (get-in next-state [:candles "BTC" :1d])))))
+
+(deftest apply-default-clearinghouse-success-writes-base-bucket-and-preserves-siblings-test
+  (let [state {:webdata2 {:clearinghouseState {:marginSummary {:accountValue "1"}}
+                          :spotAssetCtxs [{:coin "PURR"}]}}
+        data {:marginSummary {:accountValue "74"}
+              :assetPositions [{:position {:coin "WLD" :szi "-58.9"}}]}
+        next-state (market/apply-default-clearinghouse-success state data)]
+    (is (= data (get-in next-state [:webdata2 :clearinghouseState])))
+    (is (= [{:coin "PURR"}] (get-in next-state [:webdata2 :spotAssetCtxs])))))

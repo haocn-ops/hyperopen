@@ -31,6 +31,7 @@
                            (baseline-stream-entry state subscription)
                            {:subscribed? true
                             :subscribed-at-ms subscribed-at-ms
+                            :rejected-at-ms nil
                             :first-payload-at-ms nil
                             :last-payload-at-ms nil
                             :message-count 0
@@ -51,6 +52,7 @@
                            (baseline-stream-entry state subscription)
                            {:subscribed? false
                             :subscribed-at-ms nil
+                            :rejected-at-ms nil
                             :first-payload-at-ms nil
                             :status :idle
                             :status-pending-status nil

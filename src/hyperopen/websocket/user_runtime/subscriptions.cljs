@@ -16,6 +16,17 @@
    "userTwapHistory"
    "userTwapSliceFills"])
 
+(def base-perp-dex
+  "Wire value for the default perp dex. The server echoes clearinghouseState
+  payloads for the base dex with dex \"\" and accepts it on subscribe."
+  "")
+
+(defn- clearinghouse-dex-key
+  "Collapse a descriptor/subscription dex value to its wire identity: blank or
+  missing means the base dex."
+  [value]
+  (or (common/normalized-dex value) base-perp-dex))
+
 (defn- runtime-streams
   []
   (or (get-in @ws-client/runtime-view [:stream :streams])
@@ -50,19 +61,20 @@
       (->> (runtime-streams)
            (keep (fn [[_ {:keys [descriptor subscribed?]}]]
                    (let [descriptor* (or descriptor {})
-                         sub-address (common/normalized-address (:user descriptor*))
-                         dex (common/normalized-dex (:dex descriptor*))]
+                         sub-address (common/normalized-address (:user descriptor*))]
                      (when (and subscribed?
                                 (= "clearinghouseState" (:type descriptor*))
-                                (= address* sub-address)
-                                dex)
-                       [sub-address dex]))))
+                                (= address* sub-address))
+                       [sub-address (clearinghouse-dex-key (:dex descriptor*))]))))
            set))))
 
 (defn sync-perp-dex-clearinghouse-subscriptions!
+  "Keep clearinghouseState subscriptions for `address` in sync with the named
+  dexes plus the base dex, which carries the default-perp book that webData2
+  used to stream before the provider removed that topic."
   [address dex-names]
   (when-let [address* (common/normalized-address address)]
-    (let [desired (into #{}
+    (let [desired (into #{[address* base-perp-dex]}
                         (keep (fn [dex]
                                 (when-let [dex* (common/normalized-dex dex)]
                                   [address* dex*])))

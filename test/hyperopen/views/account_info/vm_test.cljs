@@ -371,8 +371,11 @@
                                                :subscribed? true
                                                :last-payload-at-ms 8000
                                                :stale-threshold-ms 5000}
-                                              ["webData2" nil "0xdddddddddddddddddddddddddddddddddddddddd" nil nil]
-                                              {:topic "webData2"
+                                              ["clearinghouseState" nil "0xdddddddddddddddddddddddddddddddddddddddd" "" nil]
+                                              {:topic "clearinghouseState"
+                                               :descriptor {:type "clearinghouseState"
+                                                            :user "0xdddddddddddddddddddddddddddddddddddddddd"
+                                                            :dex ""}
                                                :status :n-a
                                                :subscribed? true
                                                :last-payload-at-ms 17000}}}}}

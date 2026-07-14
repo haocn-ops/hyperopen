@@ -74,6 +74,7 @@
 (def apply-user-abstraction-snapshot user-abstraction/apply-user-abstraction-snapshot)
 (def apply-perp-dex-clearinghouse-success market/apply-perp-dex-clearinghouse-success)
 (def apply-perp-dex-clearinghouse-error market/apply-perp-dex-clearinghouse-error)
+(def apply-default-clearinghouse-success market/apply-default-clearinghouse-success)
 (def begin-vault-index-load vaults/begin-vault-index-load)
 (def apply-vault-index-cache-hydration vaults/apply-vault-index-cache-hydration)
 (def apply-vault-index-success vaults/apply-vault-index-success)

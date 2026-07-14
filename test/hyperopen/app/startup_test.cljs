@@ -185,8 +185,8 @@
                     (merge
                      {:store (:store deps)
                       :runtime (:runtime deps)
-                      :init-with-webdata2! (fn [store-arg subscribe-fn unsubscribe-fn]
-                                             (swap! init-calls conj [store-arg subscribe-fn unsubscribe-fn]))
+                      :start-watching! (fn [store-arg]
+                                         (swap! init-calls conj [store-arg]))
                       :add-handler! (fn [handler]
                                       (swap! added-handlers conj handler))
                       :remove-handler! (fn [handler-name]
@@ -199,8 +199,6 @@
                                              {:kind :user-handler})
                       :subscribe-user! (fn [& _] nil)
                       :unsubscribe-user! (fn [& _] nil)
-                      :subscribe-webdata2! (fn [& _] nil)
-                      :unsubscribe-webdata2! (fn [& _] nil)
                       :address-handler-reify (fn [on-change handler-name]
                                                {:kind :address-handler
                                                 :name handler-name

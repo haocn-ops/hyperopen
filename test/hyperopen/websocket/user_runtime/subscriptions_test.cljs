@@ -48,12 +48,38 @@
                                 :dex "dex-b"}}})
       (subscriptions-runtime/sync-perp-dex-clearinghouse-subscriptions! address ["dex-a" "dex-b"])
       (subscriptions-runtime/sync-perp-dex-clearinghouse-subscriptions! address ["dex-b"])
-      (is (= #{{:type "clearinghouseState" :user address :dex "dex-a"}
+      (is (= #{{:type "clearinghouseState" :user address :dex ""}
+               {:type "clearinghouseState" :user address :dex "dex-a"}
                {:type "clearinghouseState" :user address :dex "dex-b"}}
              (set (map :subscription (filter #(= "subscribe" (:method %)) @outbound)))))
       (is (= #{{:type "clearinghouseState" :user address :dex "dex-a"}}
              (set (map :subscription (filter #(= "unsubscribe" (:method %)) @outbound)))))))
     (reset-runtime-view!))
+
+(deftest sync-perp-dex-clearinghouse-subscriptions-always-includes-base-dex-test
+  (let [address "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        base-key ["clearinghouseState" nil address "" nil]
+        outbound (atom [])]
+    (reset-runtime-view!)
+    (with-redefs [ws-client/send-message! (fn [payload]
+                                            (swap! outbound conj payload)
+                                            true)]
+      ;; No named dexes still subscribes the base book.
+      (subscriptions-runtime/sync-perp-dex-clearinghouse-subscriptions! address [])
+      (is (= [{:method "subscribe"
+               :subscription {:type "clearinghouseState" :user address :dex ""}}]
+             @outbound))
+      ;; A subscribed base stream is not re-subscribed and not unsubscribed.
+      (set-runtime-streams!
+       {base-key {:topic "clearinghouseState"
+                  :subscribed? true
+                  :descriptor {:type "clearinghouseState"
+                               :user address
+                               :dex ""}}})
+      (reset! outbound [])
+      (subscriptions-runtime/sync-perp-dex-clearinghouse-subscriptions! address [])
+      (is (empty? @outbound))))
+  (reset-runtime-view!))
 
 (deftest subscribe-and-unsubscribe-user-read-runtime-view-state-test
   (let [address "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
@@ -149,7 +175,9 @@
             {:type "userTwapHistory" :user address}
             {:type "userTwapSliceFills" :user address}]
            (user-subscriptions address)))
-    (is (= #{[address "vault"]}
+    ;; Blank descriptor dex is the base book and must be tracked so address
+    ;; switches unsubscribe it.
+    (is (= #{[address "vault"] [address ""]}
            (clearinghouse-keys address)))
     (is (= #{}
            (clearinghouse-keys nil))))

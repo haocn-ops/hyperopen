@@ -28,6 +28,7 @@
    ["apply-spot-balances-error" projections/apply-spot-balances-error market/apply-spot-balances-error]
    ["apply-perp-dex-clearinghouse-success" projections/apply-perp-dex-clearinghouse-success market/apply-perp-dex-clearinghouse-success]
    ["apply-perp-dex-clearinghouse-error" projections/apply-perp-dex-clearinghouse-error market/apply-perp-dex-clearinghouse-error]
+   ["apply-default-clearinghouse-success" projections/apply-default-clearinghouse-success market/apply-default-clearinghouse-success]
 
    ["apply-open-orders-success" projections/apply-open-orders-success orders/apply-open-orders-success]
    ["apply-open-orders-error" projections/apply-open-orders-error orders/apply-open-orders-error]

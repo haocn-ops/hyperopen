@@ -375,9 +375,10 @@
         (boolean (get-in state [:websocket-ui :show-surface-freshness-cues?] false))
         freshness-cues (when show-surface-freshness-cues?
                         {:positions (ws-freshness/surface-cue websocket-health
-                                                             {:topic "webData2"
+                                                             {:topic "clearinghouseState"
                                                               :selector (when effective-address
-                                                                          {:user effective-address})
+                                                                          {:user effective-address
+                                                                           :dex ""})
                                                               :live-prefix "Updated"
                                                               :na-prefix "Last update"})
                          :open-orders (ws-freshness/surface-cue websocket-health

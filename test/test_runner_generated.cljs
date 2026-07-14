@@ -771,12 +771,14 @@
             [hyperopen.wallet.core-test]
             [hyperopen.websocket.account-surface-service-coverage-test]
             [hyperopen.websocket.acl.hyperliquid-test]
+            [hyperopen.websocket.acl.subscription-errors-test]
             [hyperopen.websocket.active-asset-ctx-test]
             [hyperopen.websocket.agent-session-coverage-test]
             [hyperopen.websocket.api-coverage-bridge-test]
             [hyperopen.websocket.api-wallets-application-coverage-test]
             [hyperopen.websocket.application.flight-recorder-test]
             [hyperopen.websocket.application.runtime-engine-test]
+            [hyperopen.websocket.application.runtime-reducer-subscription-rejected-test]
             [hyperopen.websocket.application.runtime-reducer-test]
             [hyperopen.websocket.application.runtime-test]
             [hyperopen.websocket.application.runtime-tla-conformance-test]
@@ -816,6 +818,7 @@
             [hyperopen.websocket.orderbook-policy-test]
             [hyperopen.websocket.orderbook-test]
             [hyperopen.websocket.runtime-state-coverage-test]
+            [hyperopen.websocket.subscription-errors-test]
             [hyperopen.websocket.subscriptions-runtime-test]
             [hyperopen.websocket.trades-policy-test]
             [hyperopen.websocket.trades-test]
@@ -1605,12 +1608,14 @@
              'hyperopen.wallet.core-test
              'hyperopen.websocket.account-surface-service-coverage-test
              'hyperopen.websocket.acl.hyperliquid-test
+             'hyperopen.websocket.acl.subscription-errors-test
              'hyperopen.websocket.active-asset-ctx-test
              'hyperopen.websocket.agent-session-coverage-test
              'hyperopen.websocket.api-coverage-bridge-test
              'hyperopen.websocket.api-wallets-application-coverage-test
              'hyperopen.websocket.application.flight-recorder-test
              'hyperopen.websocket.application.runtime-engine-test
+             'hyperopen.websocket.application.runtime-reducer-subscription-rejected-test
              'hyperopen.websocket.application.runtime-reducer-test
              'hyperopen.websocket.application.runtime-test
              'hyperopen.websocket.application.runtime-tla-conformance-test
@@ -1650,6 +1655,7 @@
              'hyperopen.websocket.orderbook-policy-test
              'hyperopen.websocket.orderbook-test
              'hyperopen.websocket.runtime-state-coverage-test
+             'hyperopen.websocket.subscription-errors-test
              'hyperopen.websocket.subscriptions-runtime-test
              'hyperopen.websocket.trades-policy-test
              'hyperopen.websocket.trades-test

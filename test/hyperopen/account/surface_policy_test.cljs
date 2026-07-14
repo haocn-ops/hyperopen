@@ -60,3 +60,29 @@
               {:router {:path "/portfolio"}
                :account-info {:selected-tab :funding-history}
                :funding-ui {:modal {:open? true}}}))))
+
+(deftest websocket-topic-helpers-accept-base-dex-selector-test
+  (let [state {:websocket {:health {:transport {:state :connected
+                                                :freshness :live}
+                                    :streams {["clearinghouseState" nil address "" nil]
+                                              {:topic "clearinghouseState"
+                                               :status :n-a
+                                               :subscribed? true
+                                               :descriptor {:type "clearinghouseState"
+                                                            :user address
+                                                            :dex ""}}}}}}]
+    (is (true? (surface-policy/topic-usable-for-address-and-dex?
+                state
+                "clearinghouseState"
+                address
+                "")))
+    (is (true? (surface-policy/topic-subscribed-for-address-and-dex?
+                state
+                "clearinghouseState"
+                address
+                "")))
+    (is (nil? (surface-policy/topic-usable-for-address-and-dex?
+               state
+               "clearinghouseState"
+               address
+               nil)))))

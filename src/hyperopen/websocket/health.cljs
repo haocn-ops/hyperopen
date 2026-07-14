@@ -17,8 +17,9 @@
    :n-a 1
    :live 2
    :delayed 3
-   :reconnecting 4
-   :offline 5})
+   :rejected 4
+   :reconnecting 5
+   :offline 6})
 
 (defn stream-stale-threshold-ms
   [config topic]
@@ -143,6 +144,7 @@
 (defn derive-stream-status
   [now-ms {:keys [subscribed?
                   subscribed-at-ms
+                  rejected-at-ms
                   first-payload-at-ms
                   last-payload-at-ms
                   stale-threshold-ms]}]
@@ -151,6 +153,12 @@
                                       (>= first-payload-at-ms subscribed-at-ms)))
         payload-age-ms (age-ms now-ms last-payload-at-ms)]
     (cond
+      ;; Provider refused the subscription; a fresh subscribe intent clears
+      ;; :rejected-at-ms and re-arms the stream.
+      (and (not subscribed?)
+           (number? rejected-at-ms))
+      :rejected
+
       (not subscribed?)
       :idle
 
@@ -243,6 +251,28 @@
   (->> (extract-user-candidates payload)
        (mapv user->descriptor)))
 
+(defn- clearinghouse-dex-value
+  "Wire dex identity of a clearinghouseState payload. Blank means the base
+  dex and must stay \"\" so it matches the subscribe descriptor; a payload
+  without any dex field yields nil (no descriptor match)."
+  [payload]
+  (let [data (:data payload)]
+    (cond
+      (and (map? data) (contains? data :dex))
+      (or (normalized-string (:dex data)) "")
+
+      (contains? payload :dex)
+      (or (normalized-string (:dex payload)) "")
+
+      :else nil)))
+
+(defn- clearinghouse-descriptor-candidates [payload]
+  (let [dex (clearinghouse-dex-value payload)]
+    (if (nil? dex)
+      []
+      (->> (extract-user-candidates payload)
+           (mapv (fn [user] {:user user :dex dex}))))))
+
 (defn- extract-candle-coin
   [payload row]
   (or (normalized-string (:s row))
@@ -291,7 +321,8 @@
    "userTwapHistory" user-descriptor-candidates
    "userTwapSliceFills" user-descriptor-candidates
    "userFundings" user-descriptor-candidates
-   "userNonFundingLedgerUpdates" user-descriptor-candidates})
+   "userNonFundingLedgerUpdates" user-descriptor-candidates
+   "clearinghouseState" clearinghouse-descriptor-candidates})
 
 (defn descriptor-candidates
   [{:keys [topic payload]}]

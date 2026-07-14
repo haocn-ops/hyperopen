@@ -61,7 +61,7 @@
   (-> (api/request-clearinghouse-state! address nil opts)
       (.then (fn [data]
                (when (common/requested-address-active? store address)
-                 (swap! store assoc-in [:webdata2 :clearinghouseState] data))
+                 (swap! store api-projections/apply-default-clearinghouse-success data))
                data))
       (.catch (fn [err]
                 (telemetry/log! "Error refreshing default clearinghouse state after user fill:" err)))))

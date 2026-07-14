@@ -1017,8 +1017,8 @@
       :startup-runtime startup-runtime-atom
       :bootstrap-account-data! (fn [new-address]
                                  (swap! bootstrap-calls conj new-address))
-      :init-with-webdata2! (fn [store-arg subscribe-fn unsubscribe-fn]
-                             (swap! init-calls conj [store-arg subscribe-fn unsubscribe-fn]))
+      :start-watching! (fn [store-arg]
+                         (swap! init-calls conj [store-arg]))
       :add-handler! (fn [handler]
                       (swap! handler-calls conj handler))
       :sync-current-address! (fn [store-arg]
@@ -1030,8 +1030,6 @@
                               :unsubscribe unsubscribe-fn})
       :subscribe-user! (fn [& _] nil)
       :unsubscribe-user! (fn [& _] nil)
-      :subscribe-webdata2! (fn [& _] nil)
-      :unsubscribe-webdata2! (fn [& _] nil)
       :address-handler-reify (fn [on-change handler-name]
                                {:kind :address-handler
                                 :name handler-name
@@ -1092,8 +1090,8 @@
     (startup-runtime/reload-address-handlers!
      {:store store
       :bootstrap-account-data! (fn [& _] nil)
-      :init-with-webdata2! (fn [store-arg subscribe-fn unsubscribe-fn]
-                             (swap! init-calls conj [store-arg subscribe-fn unsubscribe-fn]))
+      :start-watching! (fn [store-arg]
+                         (swap! init-calls conj [store-arg]))
       :add-handler! (fn [handler]
                       (swap! added-handlers conj handler))
       :remove-handler! (fn [handler-name]
@@ -1106,8 +1104,6 @@
                              {:kind :user-handler})
       :subscribe-user! (fn [& _] nil)
       :unsubscribe-user! (fn [& _] nil)
-      :subscribe-webdata2! (fn [& _] nil)
-      :unsubscribe-webdata2! (fn [& _] nil)
       :address-handler-reify (fn [_on-change handler-name]
                                {:kind :address-handler
                                 :name handler-name})
@@ -1143,6 +1139,8 @@
                                  (swap! mark-calls conj :init-user-ws))
                 :init-webdata2! (fn [_store]
                                   (swap! mark-calls conj :init-webdata2))
+                :init-subscription-errors! (fn []
+                                             (swap! mark-calls conj :init-subscription-errors))
                 :dispatch! (fn [_store _runtime effects]
                              (swap! mark-calls conj [:dispatch effects]))
                 :install-address-handlers! (fn []
@@ -1155,6 +1153,7 @@
       (startup-runtime/initialize-remote-data-streams! deps)
       (is (some #(= [:init-connection "wss://example.test/ws"] %) @mark-calls))
       (is (some #{:init-candles} @mark-calls))
+      (is (some #{:init-subscription-errors} @mark-calls))
       (is (some #(= [:dispatch [[:actions/subscribe-to-asset "BTC"]]] %) @mark-calls))
       (is (not-any? (fn [entry]
                       (and (vector? entry)

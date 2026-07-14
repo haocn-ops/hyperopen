@@ -25,22 +25,6 @@
   (watched-value [this state]
     "Returns the comparable watched value for the given state. State can be nil."))
 
-;; ---------- WebData2 Subscription Handler -----------------------------------
-
-(defrecord WebData2Handler [unsubscribe-fn subscribe-fn]
-  IAddressChangeHandler
-  (on-address-changed [_ old-address new-address]
-    (when old-address
-      (telemetry/log! (str "Unsubscribing WebData2 from old address: " old-address))
-      (unsubscribe-fn old-address))
-    
-    (when new-address
-      (telemetry/log! (str "Subscribing WebData2 to new address: " new-address))
-      (subscribe-fn new-address)))
-  
-  (get-handler-name [_]
-    "webdata2-subscription-handler"))
-
 ;; ---------- Address Watcher State and Management -------------------------
 
 (defonce ^:private address-watcher-state
@@ -200,17 +184,3 @@
     (swap! address-watcher-state assoc :current-address current-address)
     (notify-handlers! nil @store)))
 
-(defn create-webdata2-handler
-  "Factory function to create a WebData2 subscription handler"
-  [subscribe-fn unsubscribe-fn]
-  (->WebData2Handler unsubscribe-fn subscribe-fn))
-
-;; ---------- Initialization Helper ----------------------------------------
-
-(defn init-with-webdata2!
-  "Initialize address watcher with WebData2 handler"
-  [store subscribe-fn unsubscribe-fn]
-  (let [webdata2-handler (create-webdata2-handler subscribe-fn unsubscribe-fn)]
-    (add-handler! webdata2-handler)
-    (start-watching! store)
-    (telemetry/log! "Address watcher initialized with WebData2 handler")))

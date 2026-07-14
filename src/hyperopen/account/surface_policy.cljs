@@ -30,10 +30,11 @@
      {:user address})))
 
 (defn topic-usable-for-address-and-dex?
+  "dex \"\" addresses the base perp dex and is a valid selector."
   [state topic address dex]
   (when (and (string? topic)
              (seq address)
-             (seq dex))
+             (string? dex))
     (health-projection/topic-stream-usable?
      (get-in state [:websocket :health])
      topic
@@ -44,7 +45,7 @@
   [state topic address dex]
   (when (and (string? topic)
              (seq address)
-             (seq dex))
+             (string? dex))
     (health-projection/topic-stream-subscribed?
      (get-in state [:websocket :health])
      topic

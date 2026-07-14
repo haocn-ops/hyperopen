@@ -127,11 +127,15 @@
   [{:keys [store
            address
            fetch-spot-clearinghouse-state!
+           fetch-default-clearinghouse-state!
            fetch-user-abstraction!
            fetch-portfolio!
            fetch-user-fees!
            fetch-staking-delegator-summary!]}]
   (call-when-fn! fetch-spot-clearinghouse-state! store address {:priority :high})
+  ;; The base-dex perp book has no webData2 stream anymore; hydrate it via
+  ;; REST so positions/balances render before the dex "" stream's first push.
+  (call-when-fn! fetch-default-clearinghouse-state! store address {:priority :high})
   (call-when-fn! fetch-user-abstraction! store address {:priority :high})
   (call-when-fn! fetch-portfolio! store address {:priority :high})
   (call-when-fn! fetch-user-fees! store address {:priority :high})
@@ -283,10 +287,14 @@
                                  (surface-policy/topic-usable-for-address? state
                                                                            "openOrders"
                                                                            address))
-          webdata2-live? (and ws-first-enabled?
-                              (surface-policy/topic-usable-for-address? state
-                                                                        "webData2"
-                                                                        address))]
+          ;; The base-dex book streams via clearinghouseState dex "" (webData2
+          ;; no longer exists provider-side).
+          base-clearinghouse-live? (and ws-first-enabled?
+                                        (surface-policy/topic-usable-for-address-and-dex?
+                                         state
+                                         "clearinghouseState"
+                                         address
+                                         ""))]
       (when (or force-base-open-orders-refresh?
                 (not open-orders-live?))
         (call-when-fn! refresh-open-orders! store address nil {:priority :high}))
@@ -296,7 +304,7 @@
                        address
                        {:priority :high
                         :force-refresh? true}))
-      (when-not webdata2-live?
+      (when-not base-clearinghouse-live?
         (call-when-fn! refresh-default-clearinghouse! store address {:priority :high}))
       (when (fn? ensure-perp-dexs!)
         (-> (ensure-perp-dexs! store {:priority :low})

@@ -81,7 +81,7 @@
                                  (swap! bootstrap-calls conj new-address)
                                  (swap! startup-runtime-atom assoc :bootstrapped-address new-address)
                                  (seed-stale-account-surfaces! store new-address))
-      :init-with-webdata2! (fn [& _] nil)
+      :start-watching! (fn [& _] nil)
       :add-handler! (fn [handler]
                       (swap! handlers conj handler))
       :sync-current-address! (fn [_store] nil)
@@ -89,8 +89,6 @@
                              {:kind :user-handler})
       :subscribe-user! (fn [& _] nil)
       :unsubscribe-user! (fn [& _] nil)
-      :subscribe-webdata2! (fn [& _] nil)
-      :unsubscribe-webdata2! (fn [& _] nil)
       :address-handler-reify (fn [on-change handler-name]
                                {:kind :address-handler
                                 :name handler-name

@@ -259,24 +259,6 @@
     (is (= [["0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" nil]]
            @calls))))
 
-(deftest webdata2-handler-record-and-protocol-dispatch-test
-  (let [calls (atom [])
-        handler (watcher/create-webdata2-handler
-                 (fn [address]
-                   (swap! calls conj [:subscribe address]))
-                 (fn [address]
-                   (swap! calls conj [:unsubscribe address])))]
-    (is (satisfies? watcher/IAddressChangeHandler handler))
-    (is (= "webdata2-subscription-handler"
-           (watcher/get-handler-name handler)))
-    (watcher/on-address-changed handler "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" "0xcccccccccccccccccccccccccccccccccccccccc")
-    (is (= [[:unsubscribe "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"]
-            [:subscribe "0xcccccccccccccccccccccccccccccccccccccccc"]]
-           @calls))
-    (is (satisfies? watcher/IAddressChangeHandler
-                    (watcher/map->WebData2Handler {:unsubscribe-fn (fn [_] nil)
-                                                   :subscribe-fn (fn [_] nil)})))))
-
 (deftest start-and-stop-watching-are-idempotent-test
   (let [store (atom {:wallet {:address nil}})
         calls (atom [])

@@ -280,8 +280,11 @@
                   (assoc :wallet {:address "0xabc"})
                   (assoc-in [:websocket :health]
                             {:generated-at-ms 5000
-                             :streams {["webData2" nil "0xabc" nil nil]
-                                       {:topic "webData2"
+                             :streams {["clearinghouseState" nil "0xabc" "" nil]
+                                       {:topic "clearinghouseState"
+                                        :descriptor {:type "clearinghouseState"
+                                                     :user "0xabc"
+                                                     :dex ""}
                                         :status :n-a
                                         :subscribed? true
                                         :last-payload-at-ms 3000}}}))
@@ -317,8 +320,11 @@
                             (assoc :wallet {:address "0xabc"})
                             (assoc-in [:websocket :health]
                                       {:generated-at-ms 5000
-                                       :streams {["webData2" nil "0xabc" nil nil]
-                                                 {:topic "webData2"
+                                       :streams {["clearinghouseState" nil "0xabc" "" nil]
+                                                 {:topic "clearinghouseState"
+                                                  :descriptor {:type "clearinghouseState"
+                                                               :user "0xabc"
+                                                               :dex ""}
                                                   :status :n-a
                                                   :subscribed? true
                                                   :last-payload-at-ms 3000}}}))

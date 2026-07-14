@@ -172,6 +172,20 @@ in one pass.
 - Ground truth for the reference wallet (public info endpoint): 11 base
   positions (WLD, TIA, ZEN, MANTA, ZETA, W, REZ, SAND, TRUMP short; ENS, SOPH
   long) + 8 xyz longs = 19, matching the other frontend.
+- **Docs re-check (2026-07-14, hyperliquid.gitbook.io …/websocket/subscriptions
+  + live probe):** the subscription list no longer contains a `webData2`
+  entry; the account-summary sub is now **`webData3`** `{type, user}`. But
+  `webData3`'s payload is summary-only — `data = {userState, perpDexStates}`
+  (agent/abstraction metadata + per-dex `totalVaultEquity` + OI caps), with
+  **no `assetPositions` / `clearinghouseState` / `meta` / `assetCtxs`** (raw
+  ~600 bytes; every position field grep-negative). So subscribing `webData3`
+  would NOT have restored the missing positions — they now come from per-dex
+  `clearinghouseState` (this fix) or the new bundled `allDexsClearinghouseState`.
+- The provider also added **`allDexsClearinghouseState`** `{type, user}` — a
+  single subscription returning all 19 positions as a `clearinghouseStates`
+  array of `[dexInfo, state]` pairs — plus `allDexsAssetCtxs`, `spotState`,
+  and `fastAssetCtxs`. These are possible future consolidations (see Decision
+  Log), not needed for the fix.
 
 ## Decision Log
 
@@ -208,6 +222,21 @@ in one pass.
   contract surface (schema registrations + Lean formal surface) stays: no
   production dispatcher remains, and deleting it drags in the formal-surface
   sync for zero runtime gain. Logged in the tech-debt tracker instead.
+- **Kept per-dex `clearinghouseState` over the alternatives (2026-07-14 docs
+  re-check).** `webData3` is the documented webData2 replacement but is
+  summary-only (no positions), so it is not a candidate for the position book.
+  `allDexsClearinghouseState` DOES bundle all-dex positions in one sub, but its
+  `clearinghouseStates` array-of-pairs shape needs new parsing, routing, and
+  health accounting, and would diverge from the per-dex architecture the app
+  already runs for HIP-3 named dexes (named-dex refresh flows, margin-rec).
+  Adding the base `""` to the existing per-dex machinery is the minimal,
+  consistent change. Follow-ups worth considering separately: (a) subscribe
+  `webData3` to restore the account-summary data the old webData2 fed
+  (`abstraction` mode, agent info, per-dex equity) — the app still has latent
+  reads of `[:webdata2 :spotMeta]`/`:openOrders`/`:totalVaultEquity`/`:fills`
+  that have been dead since the provider dropped webData2 (pre-existing, not
+  caused by this fix); (b) evaluate `allDexsClearinghouseState` /
+  `allDexsAssetCtxs` as a consolidation of the per-dex subscription fan-out.
 
 ## Validation
 

@@ -31,6 +31,7 @@
                      (not (portfolio-routes/portfolio-optimize-route? %)))}
    {:id :optimize
     :label "Optimize"
+    :flagship? true
     :route (portfolio-routes/portfolio-optimize-path)
     :placements #{:desktop :mobile-secondary}
     :active-fn portfolio-routes/portfolio-optimize-route?}

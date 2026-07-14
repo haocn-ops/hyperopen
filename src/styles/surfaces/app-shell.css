@@ -76,6 +76,123 @@
     color: rgb(var(--ho-accent-bright));
   }
 
+  /* Flagship nav highlight: an accent shimmer sweeps the label roughly
+     every 3s (sweep ~1s, rest ~2s) with a sparkle that twinkles in
+     sync. Applied to inactive flagship links only (see header/navigation). */
+  .header-nav-link-flagship {
+    position: relative;
+    /* Stops keep the accent band inside the middle third so the windows
+       shown at both resting positions (100% and 0%) are pure currentColor —
+       otherwise the edge letters pick up a faint accent tint at rest. */
+    background-image: linear-gradient(
+      100deg,
+      currentColor 36%,
+      rgb(var(--ho-accent-bright)) 45%,
+      rgb(var(--ho-accent-bright)) 55%,
+      currentColor 64%
+    );
+    background-size: 300% 100%;
+    background-position: 100% 0;
+    background-repeat: no-repeat;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: header-nav-flagship-shimmer 3s linear infinite;
+  }
+
+  /* The sparkle twinkles every 3s while a second, slower animation walks it
+     around the label's edge (top-right, bottom-left, top-left, bottom-right).
+     Position jumps land while the sparkle is invisible, so each twinkle
+     appears somewhere new. */
+  .header-nav-link-flagship::after {
+    content: "\2726";
+    position: absolute;
+    top: -0.55em;
+    left: calc(100% + 0.15em);
+    font-size: 11px;
+    line-height: 1;
+    color: rgb(var(--ho-accent-bright));
+    -webkit-text-fill-color: rgb(var(--ho-accent-bright));
+    opacity: 0;
+    transform: scale(0.6);
+    animation:
+      header-nav-flagship-sparkle 3s ease-in-out infinite,
+      header-nav-flagship-sparkle-move 12s linear infinite;
+    pointer-events: none;
+  }
+
+  @keyframes header-nav-flagship-shimmer {
+    0%,
+    62% {
+      background-position: 100% 0;
+    }
+
+    95%,
+    100% {
+      background-position: 0% 0;
+    }
+  }
+
+  @keyframes header-nav-flagship-sparkle-move {
+    0%,
+    24.99% {
+      top: -0.55em;
+      left: calc(100% + 0.15em);
+    }
+
+    25%,
+    49.99% {
+      top: 0.9em;
+      left: -0.9em;
+    }
+
+    50%,
+    74.99% {
+      top: -0.65em;
+      left: -0.8em;
+    }
+
+    75%,
+    100% {
+      top: 0.85em;
+      left: calc(100% + 0.1em);
+    }
+  }
+
+  @keyframes header-nav-flagship-sparkle {
+    0%,
+    58%,
+    100% {
+      opacity: 0;
+      transform: scale(0.6) rotate(0deg);
+    }
+
+    74% {
+      opacity: 1;
+      transform: scale(1.15) rotate(20deg);
+    }
+
+    92% {
+      opacity: 0;
+      transform: scale(0.6) rotate(40deg);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .header-nav-link-flagship {
+      animation: none;
+      background-position: 100% 0;
+    }
+
+    .header-nav-link-flagship::after {
+      animation: none;
+      opacity: 0.55;
+      transform: none;
+      top: -0.55em;
+      left: calc(100% + 0.15em);
+    }
+  }
+
   .ui-dropdown-panel {
     display: block;
     opacity: 0;

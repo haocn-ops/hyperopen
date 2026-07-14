@@ -19,16 +19,20 @@
          "hover:text-white"]))
 
 (defn- nav-link
-  [{:keys [action active? href label route]}]
+  [{:keys [action active? flagship? href label route]}]
   [:button {:type "button"
             :role "link"
-            :class (into (if active?
-                           header-nav-link-active-classes
-                           header-nav-link-inactive-classes)
-                         ["border-0"
-                          "bg-transparent"
-                          "p-0"
-                          "appearance-none"])
+            :class (cond-> (into (if active?
+                                   header-nav-link-active-classes
+                                   header-nav-link-inactive-classes)
+                                 ["border-0"
+                                  "bg-transparent"
+                                  "p-0"
+                                  "appearance-none"])
+                     ;; Flagship shimmer only while inactive; once the user is
+                     ;; on the page there is nothing left to advertise.
+                     (and flagship? (not active?))
+                     (conj "header-nav-link-flagship"))
             :href (or href route)
             :on {:click action}}
    label])

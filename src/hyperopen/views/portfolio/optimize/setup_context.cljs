@@ -224,6 +224,12 @@
         ;; rail note names the goal and the CTA switches goals.
         return-free? (contains? setup-summary/return-free-objective-kinds
                                 objective-kind)
+        ;; The editor needs BOTH: a views-aware return model AND an objective
+        ;; that consumes returns. Equal Risk sets only the objective, so coming
+        ;; from Maximum Sharpe it leaves Black-Litterman active — without the
+        ;; return-free check the rail would keep soliciting per-asset return
+        ;; inputs that cannot move Equal Risk weights.
+        views-editor-active? (and views-active? (not return-free?))
         return-free-label (case objective-kind
                             :equal-risk "Not used by Equal Risk"
                             "Not used by Minimum risk")
@@ -263,10 +269,11 @@
              :data-role "portfolio-optimizer-right-rail"}
      (summary-card draft readiness {:history-data-label history-data-label
                                     :verdict verdict})
-     ;; The full Return views editor renders only while the views-aware model is
-     ;; live; when views are inert the section is demoted to the one-line note
-     ;; below, so inactive functionality never competes with live warnings.
-     (when views-active?
+     ;; The full Return views editor renders only while views actually shape
+     ;; the result (views-aware model AND a returns-consuming objective); when
+     ;; views are inert the section is demoted to the one-line note below, so
+     ;; inactive functionality never competes with live warnings.
+     (when views-editor-active?
        [:section {:class ["optimizer-setup-panel" "border" "border-base-300" "bg-base-100/90" "p-3"]
                   :data-role "portfolio-optimizer-assumptions-rail"
                   :replicant/key "return-views-editor"}
@@ -294,7 +301,7 @@
      ;; is not in use (comprehension pass 2026-07-10). The whole Return-views
      ;; slot (editor or note) sits ABOVE Data health so the rail order is
      ;; stable across goals (owner review 2026-07-04).
-     (when-not views-active?
+     (when-not views-editor-active?
        [:section {:class ["optimizer-setup-panel" "border" "border-base-300" "bg-base-100/90" "p-3"]
                   :data-role "portfolio-optimizer-assumptions-rail"
                   :replicant/key "return-views-inactive"}

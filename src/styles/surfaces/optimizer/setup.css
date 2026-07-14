@@ -180,9 +180,30 @@
     color: var(--optimizer-text);
   }
 
-  /* Optimization goal cards: the two canonical paths (primary) read heavier than
+  /* Optimization goal cards: the canonical paths (primary) read heavier than
      the advanced targets (secondary) so the single goal control has a clear
      hierarchy without the retired top-of-page preset row. */
+
+  /* The three primary cards read as a defensive→return-seeking spectrum, so
+     they render 3-across whenever the center column affords it and otherwise
+     stack — never a lopsided 2+1 wrap, which would break the spectrum order.
+     A container query instead of a viewport breakpoint: the column's width,
+     not the viewport's, decides (workbench iframes misreport breakpoints).
+     Where container queries are unsupported the cards simply stay stacked. */
+  .portfolio-optimizer .optimizer-goal-grid-container {
+    container-type: inline-size;
+  }
+
+  .portfolio-optimizer .optimizer-goal-grid-primary {
+    grid-template-columns: 1fr;
+  }
+
+  @container (min-width: 30rem) {
+    .portfolio-optimizer .optimizer-goal-grid-primary {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+
   .portfolio-optimizer .optimizer-goal-card-primary {
     background-color: var(--optimizer-surface-2, var(--optimizer-surface));
   }

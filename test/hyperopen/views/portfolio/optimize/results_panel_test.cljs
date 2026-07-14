@@ -282,6 +282,34 @@
     (is (= [[:actions/apply-portfolio-optimizer-objective-menu-selection-and-run]]
            (click-actions apply)))))
 
+(deftest results-panel-hides-return-views-editor-for-equal-risk-test
+  ;; Regression: Equal Risk selected after Maximum Sharpe leaves the draft's
+  ;; return model at Black-Litterman (objective actions never touch it), but
+  ;; Equal Risk never consumes return forecasts — the editor's "edits save and
+  ;; rerun automatically" promise would be false, so it must not render.
+  (let [draft {:universe [{:instrument-id "perp:BTC"
+                           :market-type :perp
+                           :coin "BTC"}
+                          {:instrument-id "perp:ETH"
+                           :market-type :perp
+                           :coin "ETH"}]
+               :objective {:kind :equal-risk}
+               :return-model {:kind :black-litterman
+                              :views [{:id "bl_view_1"
+                                       :kind :absolute
+                                       :instrument-id "perp:BTC"
+                                       :return 0.18
+                                       :confidence-level :medium
+                                       :confidence 0.5
+                                       :weights {"perp:BTC" 1}}]}}
+        view-node (results-panel/results-panel
+                   {:result solved-result
+                    :computed-at-ms 2600}
+                   draft
+                   {:frontier-overlay-mode :standalone})]
+    (is (nil? (node-by-role view-node
+                            "portfolio-optimizer-results-your-views-editor")))))
+
 (deftest results-panel-allocation-add-asset-selector-renders-closed-and-open-states-test
   (let [draft {:universe [{:instrument-id "perp:BTC"
                            :market-type :perp

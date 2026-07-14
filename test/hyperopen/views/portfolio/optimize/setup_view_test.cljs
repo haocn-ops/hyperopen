@@ -54,9 +54,9 @@
            (click-actions
             (node-by-role view-node
                           "portfolio-optimizer-objective-max-sharpe"))))
-    ;; Equal Risk is a parameterless More-goals card: it sets only the
-    ;; objective, leaving the return model untouched (forecasts never move
-    ;; Equal Risk weights).
+    ;; Equal Risk is the parameterless third PRIMARY card (between Minimum risk
+    ;; and Maximum Sharpe): it sets only the objective, leaving the return model
+    ;; untouched (forecasts never move Equal Risk weights).
     (is (= [[:actions/set-portfolio-optimizer-objective-kind :equal-risk]]
            (click-actions
             (node-by-role view-node
@@ -414,3 +414,45 @@
     ;; plain draft action for every return model — no BL apply-and-run special case.
     (is (= [[:actions/run-portfolio-optimizer-from-draft]]
            (click-actions run-button)))))
+
+(deftest portfolio-optimizer-equal-risk-with-black-litterman-demotes-views-editor-test
+  ;; Regression: Maximum Sharpe activates Black-Litterman, and switching to
+  ;; Equal Risk sets only the objective — the return model stays views-aware.
+  ;; Equal Risk never consumes return forecasts, so the rail must demote the
+  ;; full views editor to the inactive one-liner instead of keeping per-asset
+  ;; return inputs on screen that cannot move the weights.
+  (let [view-node (portfolio-view/portfolio-view
+                   {:router {:path "/portfolio/optimize/new"}
+                    :portfolio {:optimizer
+                                {:draft {:universe [{:instrument-id "perp:BTC"
+                                                     :market-type :perp
+                                                     :coin "BTC"}
+                                                    {:instrument-id "perp:ETH"
+                                                     :market-type :perp
+                                                     :coin "ETH"}]
+                                         :objective {:kind :equal-risk}
+                                         :return-model {:kind :black-litterman
+                                                        :views [{:id "view-1"
+                                                                 :kind :absolute
+                                                                 :instrument-id "perp:BTC"
+                                                                 :return 0.7
+                                                                 :confidence-level :high
+                                                                 :confidence 0.75
+                                                                 :weights {"perp:BTC" 1}}]}
+                                         :risk-model {:kind :diagonal-shrink}
+                                         :constraints {:long-only? false}}}}})
+        inactive-note (node-by-role view-node
+                                    "portfolio-optimizer-return-views-inactive")
+        activate (node-by-role view-node
+                               "portfolio-optimizer-return-views-activate")]
+    (is (nil? (node-by-role view-node
+                            "portfolio-optimizer-setup-use-my-views-editor")))
+    (is (nil? (node-by-role view-node
+                            "portfolio-optimizer-objective-menu-view-row-perp:BTC")))
+    (is (some? inactive-note))
+    (is (contains? (set (collect-strings inactive-note)) "Not used by Equal Risk"))
+    ;; The one-click escape hatch switches the GOAL (preset), not just the
+    ;; return model — under a return-free objective flipping the model alone
+    ;; would change nothing.
+    (is (= [[:actions/apply-portfolio-optimizer-setup-preset :max-sharpe]]
+           (click-actions activate)))))

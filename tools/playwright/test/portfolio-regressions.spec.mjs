@@ -1800,8 +1800,9 @@ test("portfolio optimizer setup exposes separate model layers @regression", asyn
   // the goal consolidation; open it before selecting one.
   await page.locator("[data-role='portfolio-optimizer-more-goals'] summary").click();
 
-  // Equal Risk is the parameterless More-goals card: selecting it flips the
-  // card, sets only the objective (no return-model change, no parameter
+  // Equal Risk is the parameterless third PRIMARY goal card (between Minimum
+  // risk and Maximum Sharpe, above the More-goals drawer): selecting it flips
+  // the card, sets only the objective (no return-model change, no parameter
   // block), and its covariance-only framing is stated on the card itself.
   const equalRiskObjective = page.locator("[data-role='portfolio-optimizer-objective-equal-risk']");
   await expect(equalRiskObjective)

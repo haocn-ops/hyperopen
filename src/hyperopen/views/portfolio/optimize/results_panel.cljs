@@ -1,5 +1,6 @@
 (ns hyperopen.views.portfolio.optimize.results-panel
   (:require [hyperopen.portfolio.optimizer.application.view-model.results :as results-model]
+            [hyperopen.portfolio.optimizer.application.view-model.setup-summary :as setup-summary]
             [hyperopen.portfolio.optimizer.contracts :as contracts]
             [hyperopen.views.portfolio.optimize.equal-risk-confidence-rail
              :as equal-risk-confidence-rail]
@@ -16,12 +17,17 @@
              :as volatility-intuition-card]))
 
 (defn- active-views-editor
-  ;; Rendered whenever the return model consumes views, regardless of objective —
-  ;; views are an input policy, not an objective. Collapsed by default here: on the
-  ;; results page view editing is a by-exception input task, so the rail shows only
-  ;; the title + live counts until opened.
+  ;; Rendered while the return model consumes views AND the objective consumes
+  ;; returns. Views are an input policy, not an objective — but covariance-only
+  ;; goals (Equal Risk keeps Black-Litterman set when selected after Maximum
+  ;; Sharpe) never read the forecast, so soliciting return edits that "rerun
+  ;; automatically" yet cannot move the weights would be dishonest. Collapsed by
+  ;; default here: on the results page view editing is a by-exception input
+  ;; task, so the rail shows only the title + live counts until opened.
   [state draft result readiness]
-  (when (= :black-litterman (get-in draft [:return-model :kind]))
+  (when (and (= :black-litterman (get-in draft [:return-model :kind]))
+             (not (contains? setup-summary/return-free-objective-kinds
+                             (get-in draft [:objective :kind]))))
     (objective-menu/views-editor-section
      draft
      state

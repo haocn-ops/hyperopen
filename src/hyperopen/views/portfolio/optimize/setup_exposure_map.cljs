@@ -417,10 +417,15 @@
               :data-role (str role "-value")}
        (str "± " (fmt-band-pct net-band-pct) " of gross")]]
      [:div {:class ["flex" "items-center" "gap-2" "pl-1"]}
-      [:input (cond-> {:type "number"
-                       :min 0
-                       :max 100
-                       :step 0.1
+      ;; type="text" + inputmode="decimal", not the native number input: the
+      ;; codebase-wide convention (setup_controls.cljs number-input/percent-input)
+      ;; avoids type="number" because its controlled-value re-render fights
+      ;; mid-typing decimals, and its native spinner/scroll-wheel styling isn't
+      ;; themeable. Bounds are enforced server-side by clamp-net-band-pct, so
+      ;; dropping min/max/step (browser-native, number-input-only hints) loses
+      ;; nothing.
+      [:input (cond-> {:type "text"
+                       :inputmode "decimal"
                        :value (str pct-value)
                        :replicant/key (str "net-band-pct:" pct-value)
                        :class ["optimizer-exposure-map__band-input" "input" "input-xs"

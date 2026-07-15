@@ -174,46 +174,79 @@
    chart
    selected-timeframe
    (assoc persistence-deps
+          :allow-persist-fn (fn []
+                              (>= (or (:visible-range-candle-count (chart-runtime/get-state node)) 0)
+                                  history-backfill-threshold-bars))
           :on-visible-range-change! (fn []
                                       (mark-visible-range-interaction! node))
           :on-visible-range-event! (fn []
                                      (maybe-request-history-backfill! node chart)))))
 
+(defn- restore-stale-for-candles?
+  "True when the last visible-range restore ran against a partial seed
+   dataset (fewer than history-backfill-threshold-bars bars) and older
+   history has since been prepended. That is the symbol-load race: a
+   live candle from the websocket/trades stream seeds the dataset before
+   the REST snapshot lands, the restore latches onto the seed's view,
+   and the snapshot then arrives as a prepend. Live tail appends never
+   prepend, so genuinely tiny datasets that only grow forward keep their
+   view."
+  [{:keys [visible-range-restore-tried?
+           visible-range-restore-candle-count
+           visible-range-restore-oldest-time-ms]}
+   candles]
+  (boolean
+   (and visible-range-restore-tried?
+        (number? visible-range-restore-candle-count)
+        (< visible-range-restore-candle-count history-backfill-threshold-bars)
+        (number? visible-range-restore-oldest-time-ms)
+        (when-let [oldest-ms (oldest-candle-time-ms candles)]
+          (< oldest-ms visible-range-restore-oldest-time-ms)))))
+
 (defn- start-visible-range-restore!
   [node chart candles selected-timeframe persistence-deps]
-  (let [runtime-state (chart-runtime/get-state node)
-        restore-token (inc (or (:visible-range-restore-token runtime-state) 0))
-        interaction-epoch (or (:visible-range-interaction-epoch runtime-state) 0)]
+  (let [restore-token (inc (or (:visible-range-restore-token (chart-runtime/get-state node)) 0))]
+    ;; Apply the default range before sampling the interaction epoch: the
+    ;; range change it triggers bumps the epoch when the persistence
+    ;; subscription is already attached (re-restore path), and sampling
+    ;; afterwards keeps allow-apply-fn true unless the user interacted.
     (ci/apply-default-visible-range! chart candles)
-    (chart-runtime/assoc-state! node
-                                :visible-range-restore-tried? true
-                                :visible-range-restore-token restore-token)
-    (-> (ci/apply-persisted-visible-range!
-         chart
-         selected-timeframe
-         (assoc persistence-deps
-                :candles candles
-                :fallback-to-default? false
-                :allow-apply-fn
-                (fn []
-                  (let [runtime-state* (chart-runtime/get-state node)]
-                    (and (= restore-token
-                            (:visible-range-restore-token runtime-state*))
-                         (= interaction-epoch
-                            (or (:visible-range-interaction-epoch runtime-state*) 0)))))))
-        (.then (fn [_]
-                 (when (restore-token-current? node chart restore-token)
-                   (maybe-request-history-backfill! node chart))))
-        (.catch (fn [error]
-                  (js/console.warn "Failed to restore persisted visible range:" error))))))
+    (let [interaction-epoch (or (:visible-range-interaction-epoch (chart-runtime/get-state node)) 0)]
+      (chart-runtime/assoc-state! node
+                                  :visible-range-restore-tried? true
+                                  :visible-range-restore-token restore-token
+                                  :visible-range-restore-candle-count (count candles)
+                                  :visible-range-restore-oldest-time-ms (oldest-candle-time-ms candles))
+      (-> (ci/apply-persisted-visible-range!
+           chart
+           selected-timeframe
+           (assoc persistence-deps
+                  :candles candles
+                  :fallback-to-default? false
+                  :allow-apply-fn
+                  (fn []
+                    (let [runtime-state* (chart-runtime/get-state node)]
+                      (and (= restore-token
+                              (:visible-range-restore-token runtime-state*))
+                           (= interaction-epoch
+                              (or (:visible-range-interaction-epoch runtime-state*) 0)))))))
+          (.then (fn [_]
+                   (when (restore-token-current? node chart restore-token)
+                     (maybe-request-history-backfill! node chart))))
+          (.catch (fn [error]
+                    (js/console.warn "Failed to restore persisted visible range:" error)))))))
 
 (defn- ensure-visible-range-lifecycle!
   [node chart candles selected-timeframe persistence-deps]
   (let [{:keys [visible-range-restore-tried?
-                visible-range-persistence-subscribed?]}
+                visible-range-persistence-subscribed?]
+         :as runtime-state}
         (chart-runtime/get-state node)
         data-ready? (boolean (seq candles))]
-    (when (and data-ready? (not visible-range-restore-tried?))
+    (chart-runtime/assoc-state! node :visible-range-candle-count (count candles))
+    (when (and data-ready?
+               (or (not visible-range-restore-tried?)
+                   (restore-stale-for-candles? runtime-state candles)))
       (start-visible-range-restore! node chart candles selected-timeframe persistence-deps))
     (when (and data-ready? (not visible-range-persistence-subscribed?))
       (chart-runtime/assoc-state! node
@@ -281,6 +314,9 @@
                                   :pending-decoration-context nil
                                   :visible-range-restore-tried? false
                                   :visible-range-restore-token 0
+                                  :visible-range-restore-candle-count nil
+                                  :visible-range-restore-oldest-time-ms nil
+                                  :visible-range-candle-count 0
                                   :visible-range-interaction-epoch 0
                                   :visible-range-persistence-subscribed? false
                                   :visible-range-cleanup nil}))

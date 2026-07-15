@@ -708,6 +708,7 @@
             [hyperopen.views.trading-chart.runtime-history-backfill-test]
             [hyperopen.views.trading-chart.runtime-state-test]
             [hyperopen.views.trading-chart.runtime-test]
+            [hyperopen.views.trading-chart.runtime-visible-range-restore-test]
             [hyperopen.views.trading-chart.timeframe-dropdown-test]
             [hyperopen.views.trading-chart.toolbar-test]
             [hyperopen.views.trading-chart.utils.chart-interop-test]
@@ -1545,6 +1546,7 @@
              'hyperopen.views.trading-chart.runtime-history-backfill-test
              'hyperopen.views.trading-chart.runtime-state-test
              'hyperopen.views.trading-chart.runtime-test
+             'hyperopen.views.trading-chart.runtime-visible-range-restore-test
              'hyperopen.views.trading-chart.timeframe-dropdown-test
              'hyperopen.views.trading-chart.toolbar-test
              'hyperopen.views.trading-chart.utils.chart-interop-test

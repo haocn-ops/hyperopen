@@ -278,6 +278,44 @@
          :time (time-range-valid-for-candles? persisted candles)
          false)))
 
+(defn- recenter-logical-range-on-live-edge
+  [{:keys [from to] :as range} candles]
+  (let [last-index (dec (count candles))]
+    (if (< to last-index)
+      (let [to* (+ last-index default-recent-right-offset-bars)]
+        (assoc range
+               :from (- to* (- to from))
+               :to to*))
+      range)))
+
+(defn- recenter-time-range-on-live-edge
+  [{:keys [from to] :as range} candles]
+  (let [{:keys [last-time interval]} (infer-candles-time-domain candles)]
+    (if (and (number? last-time)
+             (number? interval)
+             (< to last-time))
+      (let [to* (+ last-time (* interval default-recent-right-offset-bars))]
+        (assoc range
+               :from (- to* (- to from))
+               :to to*))
+      range)))
+
+(defn- recenter-persisted-range-on-live-edge
+  "Persisted pan/zoom memory keeps the user's window width (their zoom),
+   but chart loads are recency-first: the newest candle must stay in view
+   (see docs/exec-plans/completed/2026-02-24-chart-visible-range-recentering-on-asset-switch.md).
+   A persisted window whose right edge sits left of the newest bar - a
+   stale view from an earlier visit, or a window poisoned by a partial
+   load - is shifted right onto the live edge, preserving its width.
+   Windows that already show the newest bar apply unchanged. Applying the
+   recentered range re-persists it, so a stale stored window heals itself
+   on the next load."
+  [{:keys [kind] :as range} candles]
+  (case kind
+    :logical (recenter-logical-range-on-live-edge range candles)
+    :time (recenter-time-range-on-live-edge range candles)
+    range))
+
 (defn- apply-visible-range!
   [time-scale {:keys [kind from to]}]
   (try
@@ -388,15 +426,21 @@
    (let [time-scale (.timeScale ^js chart)]
      (-> (->promise (load-persisted-visible-range-fn asset timeframe {:storage-get storage-get}))
          (.then (fn [persisted]
-                  (let [persisted-valid? (persisted-range-valid-for-candles? persisted candles)
+                  (let [persisted* (when (persisted-range-valid-for-candles? persisted candles)
+                                     (let [recentered (recenter-persisted-range-on-live-edge persisted candles)]
+                                       ;; The overhang margins in validation bound any
+                                       ;; recentered window back inside the domain, so
+                                       ;; this re-check only guards future policy edits.
+                                       (when (persisted-range-valid-for-candles? recentered candles)
+                                         recentered)))
                         can-apply? (boolean (allow-apply-fn))
-                        persisted-applied? (if (and time-scale persisted-valid? can-apply?)
+                        persisted-applied? (if (and time-scale persisted* can-apply?)
                                              (do
-                                               (chart-contracts/assert-visible-range! persisted
+                                               (chart-contracts/assert-visible-range! persisted*
                                                                       {:boundary :chart-interop/load-visible-range
                                                                        :timeframe timeframe
                                                                        :asset asset})
-                                               (apply-visible-range! time-scale persisted))
+                                               (apply-visible-range! time-scale persisted*))
                                              false)]
                     (when (and time-scale
                                (seq candles)
@@ -416,11 +460,13 @@
                             persist-visible-range-fn
                             set-timeout-fn
                             clear-timeout-fn
+                            allow-persist-fn
                             on-visible-range-change!
                             on-visible-range-event!]
                      :or {debounce-ms visible-range-write-debounce-ms
                           set-timeout-fn platform/set-timeout!
                           clear-timeout-fn platform/clear-timeout!
+                          allow-persist-fn (constantly true)
                           on-visible-range-change! (fn [] nil)
                           on-visible-range-event! (fn [] nil)}}]
    (let [persist-visible-range!* (or persist-visible-range-fn
@@ -447,12 +493,22 @@
                                 (when range-data
                                   (persist-visible-range!* asset timeframe range-data))))
              queue-persist! (fn [range-data]
-                              (when range-data
-                                (reset! pending-range range-data)
-                                (when-let [timeout-id @pending-timeout-id]
-                                  (clear-timeout-fn timeout-id))
-                                (reset! pending-timeout-id
-                                        (set-timeout-fn flush-persist! debounce-ms))))
+                              ;; allow-persist-fn is sampled at queue time, not
+                              ;; flush time: the range belongs to the dataset it
+                              ;; was captured against, so a range read off a
+                              ;; partial seed dataset must never be written even
+                              ;; if the full snapshot lands before the debounce.
+                              (if (and range-data (allow-persist-fn))
+                                (do
+                                  (reset! pending-range range-data)
+                                  (when-let [timeout-id @pending-timeout-id]
+                                    (clear-timeout-fn timeout-id))
+                                  (reset! pending-timeout-id
+                                          (set-timeout-fn flush-persist! debounce-ms)))
+                                ;; No pending write, so there is no debounce
+                                ;; window to coalesce into: let the next range
+                                ;; event notify interaction again.
+                                (reset! interaction-notified? false)))
              persist-current! (fn []
                                 (when-let [range-data (visible-range-from-time-scale time-scale)]
                                   (queue-persist! range-data)))

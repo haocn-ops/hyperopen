@@ -256,6 +256,75 @@
                    (done)))
           (.catch (async-support/unexpected-error done))))))
 
+(deftest apply-persisted-visible-range-recenters-stale-logical-range-onto-live-edge-test
+  (async done
+    (let [applied-logical-ranges (atom [])
+          time-scale #js {:setVisibleLogicalRange (fn [range]
+                                                    (swap! applied-logical-ranges conj (js->clj range :keywordize-keys true)))
+                          :fitContent (fn [] nil)}
+          chart #js {:timeScale (fn [] time-scale)}
+          candles (daily-candles 246)]
+      (-> (chart-interop/apply-persisted-visible-range! chart
+                                                        :1d
+                                                        {:asset "xyz:NVDA"
+                                                         :candles candles
+                                                         :load-persisted-visible-range-fn (fn [_asset _timeframe _opts]
+                                                                                            (js/Promise.resolve {:kind :logical
+                                                                                                                 :from 71.5
+                                                                                                                 :to 200.5}))})
+          (.then (fn [applied?]
+                   (is (true? applied?))
+                   (is (= [{:from 124 :to 253}] @applied-logical-ranges)
+                       "stale window shifts onto the live edge keeping its width")
+                   (done)))
+          (.catch (async-support/unexpected-error done))))))
+
+(deftest apply-persisted-visible-range-keeps-live-edge-logical-range-unchanged-test
+  (async done
+    (let [applied-logical-ranges (atom [])
+          time-scale #js {:setVisibleLogicalRange (fn [range]
+                                                    (swap! applied-logical-ranges conj (js->clj range :keywordize-keys true)))
+                          :fitContent (fn [] nil)}
+          chart #js {:timeScale (fn [] time-scale)}
+          candles (daily-candles 331)]
+      (-> (chart-interop/apply-persisted-visible-range! chart
+                                                        :1d
+                                                        {:asset "BTC"
+                                                         :candles candles
+                                                         :load-persisted-visible-range-fn (fn [_asset _timeframe _opts]
+                                                                                            (js/Promise.resolve {:kind :logical
+                                                                                                                 :from 211
+                                                                                                                 :to 338}))})
+          (.then (fn [applied?]
+                   (is (true? applied?))
+                   (is (= [{:from 211 :to 338}] @applied-logical-ranges)
+                       "a window that already shows the newest bar applies as-is")
+                   (done)))
+          (.catch (async-support/unexpected-error done))))))
+
+(deftest apply-persisted-visible-range-recenters-stale-time-range-onto-live-edge-test
+  (async done
+    (let [applied-range (atom nil)
+          time-scale #js {:setVisibleRange (fn [range]
+                                             (reset! applied-range (js->clj range :keywordize-keys true)))}
+          chart #js {:timeScale (fn [] time-scale)}]
+      (-> (chart-interop/apply-persisted-visible-range! chart
+                                                        :1h
+                                                        {:asset "BTC"
+                                                         :candles [{:time 100}
+                                                                   {:time 200}
+                                                                   {:time 300}]
+                                                         :load-persisted-visible-range-fn (fn [_asset _timeframe _opts]
+                                                                                            (js/Promise.resolve {:kind :time
+                                                                                                                 :from 100
+                                                                                                                 :to 200}))})
+          (.then (fn [applied?]
+                   (is (true? applied?))
+                   (is (= {:from 1000 :to 1100} @applied-range)
+                       "stale time window shifts onto the live edge keeping its span")
+                   (done)))
+          (.catch (async-support/unexpected-error done))))))
+
 (deftest apply-persisted-visible-range-respects-allow-apply-guard-test
   (async done
     (let [applied-range (atom nil)
@@ -345,6 +414,41 @@
     (is (= 1 (count @writes)))
     (@handler* #js {:from 5 :to 6})
     (is (= 2 @interaction-calls*))
+    (cleanup)))
+
+(deftest subscribe-visible-range-persistence-skips-writes-when-persist-not-allowed-test
+  (let [handler* (atom nil)
+        writes (atom [])
+        interaction-calls* (atom 0)
+        allow-persist? (atom false)
+        time-scale #js {:subscribeVisibleTimeRangeChange (fn [handler]
+                                                           (reset! handler* handler))
+                        :unsubscribeVisibleTimeRangeChange (fn [_] nil)}
+        chart #js {:timeScale (fn [] time-scale)}
+        cleanup (chart-interop/subscribe-visible-range-persistence!
+                 chart
+                 :1h
+                 {:asset "BTC"
+                  :storage-set! (fn [key value]
+                                  (swap! writes conj [key value]))
+                  :allow-persist-fn (fn [] @allow-persist?)
+                  :on-visible-range-change! (fn []
+                                              (swap! interaction-calls* inc))
+                  :debounce-ms 0
+                  :set-timeout-fn immediate-timeout
+                  :clear-timeout-fn (fn [_] nil)})]
+    (@handler* #js {:from 1 :to 2})
+    (is (empty? @writes)
+        "ranges sampled while persist is disallowed are never written")
+    (is (= 1 @interaction-calls*)
+        "interaction notification still fires when persist is disallowed")
+    (reset! allow-persist? true)
+    (@handler* #js {:from 3 :to 4})
+    (is (= 1 (count @writes)))
+    (let [[key raw] (first @writes)
+          payload (js->clj (js/JSON.parse raw) :keywordize-keys true)]
+      (is (= (v2-storage-key :1h "BTC") key))
+      (is (= {:kind "time" :from 3 :to 4} payload)))
     (cleanup)))
 
 (deftest subscribe-visible-range-persistence-notifies-range-event-on-every-sample-test

@@ -124,15 +124,28 @@
                        :dedupe-key :outcome-meta}
                       opts))))
 
+(defn normalize-spot-meta-and-asset-ctxs
+  "Shape the spotMetaAndAssetCtxs tuple [spotMeta spotAssetCtxs] like the
+  spot slice of the retired webData2 aggregate so downstream consumers
+  (market-loader, api-service snapshot cache) keep reading :spotAssetCtxs."
+  [payload]
+  (if (sequential? payload)
+    {:spotMeta (first payload)
+     :spotAssetCtxs (second payload)}
+    {}))
+
 (defn request-public-webdata2!
+  "Public spot market snapshot. Historically {\"type\" \"webData2\"} with the
+  zero address; Hyperliquid deprecated webData2, so this now posts
+  spotMetaAndAssetCtxs and normalizes to the same consumer-facing shape."
   [post-info! opts]
-  (post-info! {"type" "webData2"
-               "user" "0x0000000000000000000000000000000000000000"}
-              (request-policy/apply-info-request-policy
-               :public-webdata2
-               (merge {:priority :high
-                       :dedupe-key :public-webdata2}
-                      opts))))
+  (-> (post-info! {"type" "spotMetaAndAssetCtxs"}
+                  (request-policy/apply-info-request-policy
+                   :public-webdata2
+                   (merge {:priority :high
+                           :dedupe-key :public-webdata2}
+                          opts)))
+      (.then normalize-spot-meta-and-asset-ctxs)))
 
 (def ^:private default-market-funding-history-page-size
   500)

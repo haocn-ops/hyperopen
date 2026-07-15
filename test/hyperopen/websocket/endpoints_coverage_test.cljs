@@ -192,7 +192,7 @@
                                        :deployerFeeScale 0.25}]
                           "candleSnapshot" []
                           "spotMeta" {:ok true}
-                          "webData2" {:ok true}
+                          "spotMetaAndAssetCtxs" [{:ok true} []]
                           "predictedFundings" {:rows []}
                           nil)))
           now-ms-fn (fn [] 10000)]
@@ -243,10 +243,7 @@
                    (is (nil? (nth results* 5)))
                    (is (= 8 (count @calls)))
                    (is (some #(= {"type" "spotMeta"} (first %)) @calls))
-                   (is (some #(= {"type" "webData2"
-                                  "user" "0x0000000000000000000000000000000000000000"}
-                                 (first %))
-                             @calls))
+                   (is (some #(= {"type" "spotMetaAndAssetCtxs"} (first %)) @calls))
                    (is (some #(= {"type" "predictedFundings"} (first %)) @calls))
                    (is (= 3 (count (:markets market-state))))
                    (is (= [:perp "vault"] (:key (:active-market market-state))))
@@ -785,7 +782,9 @@
                                           :followers [{:user "0xA"}]
                                           :followersCount "2"
                                           :allowDeposits "true"}
-                          "webData2" {:ok true}
+                          "clearinghouseState" {:assetPositions []}
+                          "frontendOpenOrders" [] "twapHistory" []
+                          "spotClearinghouseState" {:balances []}
                           nil)))]
       (-> (js/Promise.all
            #js [(vaults-endpoints/request-vault-index! fetch-fn "https://vaults.test/index" {:fetch-opts {:cache "no-store"}})
@@ -815,15 +814,16 @@
                (is (= 1 (nth results* 2)))
                (is (= "https://vaults.test/index" (ffirst @fetch-calls)))
                (is (= {"type" "vaultSummaries"} (ffirst @post-calls)))
-               (is (= {"type" "userVaultEquities"
-                       "user" "0xabc"}
+               (is (= {"type" "userVaultEquities" "user" "0xabc"}
                       (first (nth @post-calls 1))))
                (is (= {"type" "vaultDetails"
                        "vaultAddress" "0xvault"
                        "user" "0xuser"}
                       (first (nth @post-calls 2))))
-               (is (= {"type" "webData2"
-                       "user" "0xvault"}
-                      (first (nth @post-calls 3))))
+               (is (= #{"vaultDetails" "clearinghouseState" "frontendOpenOrders"
+                        "spotClearinghouseState" "twapHistory"}
+                      (set (map (comp #(get % "type") first) (drop 3 @post-calls)))))
+               (is (every? #(= "0xvault" (or (get (first %) "user") (get (first %) "vaultAddress")))
+                           (drop 3 @post-calls)))
                (done))))
           (.catch (async-support/unexpected-error done))))))

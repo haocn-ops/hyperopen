@@ -14,6 +14,7 @@
                 sort
                 loading?
                 error
+                default-agent-error
                 form
                 form-errors
                 form-error
@@ -65,7 +66,8 @@
      (rows/rows-section {:rows rows
                          :sort sort
                          :loading? loading?
-                         :error error})
+                         :error error
+                         :default-agent-error default-agent-error})
      (modal/modal-view {:modal modal
                         :form form
                         :generated-private-key generated-private-key

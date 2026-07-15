@@ -176,8 +176,7 @@
     (market/request-public-webdata2! post-info! {})
     (is (= [{"type" "spotMeta"}
             {"type" "outcomeMeta"}
-            {"type" "webData2"
-             "user" "0x0000000000000000000000000000000000000000"}]
+            {"type" "spotMetaAndAssetCtxs"}]
            (mapv first @calls)))
     (is (= [{:priority :high
              :dedupe-key :spot-meta
@@ -189,6 +188,22 @@
              :dedupe-key :public-webdata2
              :cache-ttl-ms 30000}]
            (mapv second @calls)))))
+
+(deftest request-public-webdata2-normalizes-spot-meta-and-asset-ctxs-tuple-test
+  (async done
+    (let [spot-meta {:universe [{:name "PURR/USDC"}]}
+          spot-ctxs [{:coin "PURR/USDC" :markPx "0.08"}]
+          post-info! (api-stubs/post-info-stub [spot-meta spot-ctxs])]
+      (-> (market/request-public-webdata2! post-info! {})
+          (.then (fn [snapshot]
+                   (is (= spot-meta (:spotMeta snapshot)))
+                   (is (= spot-ctxs (:spotAssetCtxs snapshot)))
+                   (done)))
+          (.catch (async-support/unexpected-error done))))))
+
+(deftest normalize-spot-meta-and-asset-ctxs-tolerates-non-tuple-payload-test
+  (is (= {} (market/normalize-spot-meta-and-asset-ctxs nil)))
+  (is (= {} (market/normalize-spot-meta-and-asset-ctxs {:unexpected true}))))
 
 (deftest request-predicted-fundings-uses-high-priority-and-dedupe-key-test
   (let [calls (atom [])

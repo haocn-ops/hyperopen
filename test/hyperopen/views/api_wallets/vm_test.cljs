@@ -64,3 +64,45 @@
     (is (= "Enter a valid wallet address."
            (get-in result [:form-errors :address])))
     (is (true? (:authorize-disabled? result)))))
+
+(deftest api-wallets-vm-degrades-default-agent-error-when-extra-agents-loaded-test
+  (let [state {:wallet {:address owner-address}
+               :api-wallets {:extra-agents []
+                             :default-agent-row nil
+                             :loading {:extra-agents? false
+                                       :default-agent? false}
+                             :loaded-at-ms {:extra-agents 1700000000000
+                                            :default-agent nil}
+                             :errors {:extra-agents nil
+                                      :default-agent "webData2 endpoint removed"}}}
+        result (vm/api-wallets-vm state)]
+    (is (nil? (:error result)))
+    (is (= "webData2 endpoint removed" (:default-agent-error result)))))
+
+(deftest api-wallets-vm-keeps-page-error-when-both-sources-fail-test
+  (let [state {:wallet {:address owner-address}
+               :api-wallets {:extra-agents []
+                             :default-agent-row nil
+                             :loading {:extra-agents? false
+                                       :default-agent? false}
+                             :loaded-at-ms {:extra-agents nil
+                                            :default-agent nil}
+                             :errors {:extra-agents nil
+                                      :default-agent "network down"}}}
+        result (vm/api-wallets-vm state)]
+    (is (= "network down" (:error result)))
+    (is (nil? (:default-agent-error result)))))
+
+(deftest api-wallets-vm-prefers-extra-agents-error-for-page-error-test
+  (let [state {:wallet {:address owner-address}
+               :api-wallets {:extra-agents []
+                             :default-agent-row nil
+                             :loading {:extra-agents? false
+                                       :default-agent? false}
+                             :loaded-at-ms {:extra-agents nil
+                                            :default-agent nil}
+                             :errors {:extra-agents "agents fetch failed"
+                                      :default-agent "webData2 endpoint removed"}}}
+        result (vm/api-wallets-vm state)]
+    (is (= "agents fetch failed" (:error result)))
+    (is (nil? (:default-agent-error result)))))

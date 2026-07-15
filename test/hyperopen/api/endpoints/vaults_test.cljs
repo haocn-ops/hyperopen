@@ -344,14 +344,104 @@
                    (done)))
           (.catch (async-support/unexpected-error done))))))
 
-(deftest request-vault-webdata2-builds-request-body-and-dedupe-key-test
-  (let [calls (atom [])
-        post-info! (api-stubs/post-info-stub calls {:ok true})]
-    (vaults/request-vault-webdata2! post-info! "0xVaUlT" {:priority :low})
-    (is (= {"type" "webData2"
-            "user" "0xvault"}
-           (ffirst @calls)))
-    (is (= {:priority :low
-            :dedupe-key [:vault-webdata2 "0xvault"]
-            :cache-ttl-ms 8000}
-           (second (first @calls))))))
+(deftest request-vault-webdata2-fans-out-and-merges-supported-endpoints-test
+  (async done
+    (let [calls (atom [])
+          clearinghouse {:assetPositions [{:position {:coin "ETH"}}]}
+          open-orders [{:coin "ETH" :oid 1}]
+          spot-state {:balances [{:coin "USDC" :total "5"}]}
+          twap-rows [{:state {:coin "ETH"} :status {:status "activated"}}
+                     {:state {:coin "BTC"} :status {:status "finished"}}
+                     {:state {:coin "SOL"} :status "running"}]
+          post-info! (api-stubs/post-info-stub
+                      calls
+                      (fn [body _opts]
+                        (case (get body "type")
+                          "vaultDetails" {:name "Vault" :relationship {:type "normal"}}
+                          "clearinghouseState" clearinghouse
+                          "frontendOpenOrders" open-orders
+                          "spotClearinghouseState" spot-state
+                          "twapHistory" twap-rows)))]
+      (-> (vaults/request-vault-webdata2! post-info! "0xVaUlT" {:priority :low})
+          (.then (fn [merged]
+                   (is (= #{["vaultDetails" [:vault-details "0xvault" nil]]
+                            ["clearinghouseState" [:vault-clearinghouse-state "0xvault"]]
+                            ["frontendOpenOrders" [:vault-open-orders "0xvault"]]
+                            ["spotClearinghouseState" [:vault-spot-clearinghouse-state "0xvault"]]
+                            ["twapHistory" [:vault-twap-history "0xvault"]]}
+                          (set (map (fn [[body opts]]
+                                      [(get body "type") (:dedupe-key opts)])
+                                    @calls))))
+                   (is (every? (fn [[body _]]
+                                 (= "0xvault" (or (get body "user")
+                                                  (get body "vaultAddress"))))
+                               @calls))
+                   (is (= clearinghouse (:clearinghouseState merged)))
+                   (is (= open-orders (:openOrders merged)))
+                   (is (= spot-state (:spotState merged)))
+                   (is (= [{:state {:coin "ETH"} :status {:status "activated"}}
+                           {:state {:coin "SOL"} :status "running"}]
+                          (:twapStates merged)))
+                   (done)))
+          (.catch (async-support/unexpected-error done))))))
+
+(deftest request-vault-webdata2-aggregates-parent-vault-children-test
+  (async done
+    (let [positions-by-user {"0xparent" []
+                             "0xchild1" [{:position {:coin "ETH"}}]
+                             "0xchild2" [{:position {:coin "BTC"}}]}
+          orders-by-user {"0xparent" []
+                          "0xchild1" [{:coin "ETH" :oid 1}]
+                          "0xchild2" [{:coin "BTC" :oid 2}]}
+          post-info! (api-stubs/post-info-stub
+                      (fn [body _opts]
+                        (let [user (get body "user")]
+                          (case (get body "type")
+                            "vaultDetails" {:relationship {:type "parent"
+                                                           :data {:childAddresses
+                                                                  ["0xChIlD1" "0xchild2"]}}}
+                            "clearinghouseState" {:marginSummary {:accountValue "1.0"}
+                                                  :assetPositions (get positions-by-user user)}
+                            "frontendOpenOrders" (get orders-by-user user)
+                            "spotClearinghouseState" {:balances []}
+                            "twapHistory" []))))]
+      (-> (vaults/request-vault-webdata2! post-info! "0xPaReNt" {})
+          (.then (fn [merged]
+                   (is (= [{:position {:coin "ETH"}} {:position {:coin "BTC"}}]
+                          (get-in merged [:clearinghouseState :assetPositions])))
+                   (is (= {:accountValue "1.0"}
+                          (get-in merged [:clearinghouseState :marginSummary])))
+                   (is (= [{:coin "ETH" :oid 1} {:coin "BTC" :oid 2}]
+                          (:openOrders merged)))
+                   (is (= {:balances []} (:spotState merged)))
+                   (done)))
+          (.catch (async-support/unexpected-error done))))))
+
+(deftest request-vault-webdata2-degrades-non-core-slices-but-rejects-on-clearinghouse-failure-test
+  (async done
+    (let [soft-failure-post-info!
+          (api-stubs/post-info-stub
+           (fn [body _opts]
+             (if (= "clearinghouseState" (get body "type"))
+               {:assetPositions []}
+               (js/Promise.reject (js/Error. "endpoint removed")))))
+          core-failure-post-info!
+          (api-stubs/post-info-stub
+           (fn [body _opts]
+             (if (= "clearinghouseState" (get body "type"))
+               (js/Promise.reject (js/Error. "clearinghouse down"))
+               [])))]
+      (-> (vaults/request-vault-webdata2! soft-failure-post-info! "0xvault" {})
+          (.then (fn [merged]
+                   (is (= {:assetPositions []} (:clearinghouseState merged)))
+                   (is (= [] (:openOrders merged)))
+                   (is (nil? (:spotState merged)))
+                   (is (= [] (:twapStates merged)))
+                   (vaults/request-vault-webdata2! core-failure-post-info! "0xvault" {})))
+          (.then (fn [_merged]
+                   (is false "clearinghouseState failure should reject")
+                   (done))
+                 (fn [err]
+                   (is (= "clearinghouse down" (.-message err)))
+                   (done)))
+          (.catch (async-support/unexpected-error done))))))

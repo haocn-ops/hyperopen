@@ -32,7 +32,9 @@
    :vault-summaries 15000
    :user-vault-equities 5000
    :vault-details 8000
-   :vault-webdata2 8000})
+   :vault-webdata2 8000
+   :vault-open-orders 8000
+   :vault-twap-history 8000})
 
 (def ^:private default-user-funding-page-min-delay-ms
   1250)

@@ -129,12 +129,21 @@
     [:span {:class ["num" "text-trading-text"]}
      (format-valid-until (:valid-until-ms row))]]])
 (defn rows-section
-  [{:keys [rows sort loading? error]}]
+  [{:keys [rows sort loading? error default-agent-error]}]
   [:section {:class ["rounded-xl"
                      "border"
                      "border-base-300"
                      "bg-base-100"
                      "overflow-hidden"]}
+   (when (seq default-agent-error)
+     [:div {:class ["px-3"
+                    "py-2"
+                    "border-b"
+                    "border-base-300"
+                    "text-xs"
+                    "text-trading-text-secondary"]
+            :data-role "api-wallets-default-agent-notice"}
+      "Default API wallet status unavailable."])
    [:div {:class ["hidden" "md:block" "overflow-x-auto"]}
     [:table {:class ["min-w-full"]
              :data-role "api-wallets-table"}

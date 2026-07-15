@@ -129,7 +129,10 @@
                           "vaultDetails" {:name "Vault"
                                           :vaultAddress "0xA"
                                           :portfolio []}
-                          "webData2" {:fills []}
+                          "clearinghouseState" {:assetPositions []}
+                          "frontendOpenOrders" []
+                          "spotClearinghouseState" {:balances []}
+                          "twapHistory" []
                           nil)))]
       (-> (js/Promise.all
            #js [(vault-gateway/request-vault-summaries! {:post-info! post-info!}
@@ -148,11 +151,19 @@
                      (is (= ["0xa"] (mapv :vault-address summaries)))
                      (is (= ["0xa"] (mapv :vault-address equities)))
                      (is (= "0xa" (:vault-address details)))
-                     (is (= {:fills []} webdata))
+                     (is (= {:clearinghouseState {:assetPositions []}
+                             :openOrders []
+                             :spotState {:balances []}
+                             :twapStates []}
+                            webdata))
                      (is (= ["vaultSummaries"
                              "userVaultEquities"
                              "vaultDetails"
-                             "webData2"]
+                             "vaultDetails"
+                             "spotClearinghouseState"
+                             "clearinghouseState"
+                             "frontendOpenOrders"
+                             "twapHistory"]
                             (mapv (comp #(get % "type") first) @calls))))
                    (done)))
           (.catch (async-support/unexpected-error done))))))

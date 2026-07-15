@@ -25,8 +25,17 @@
               sort)
         loading? (or (true? (get-in state [:api-wallets :loading :extra-agents?]))
                      (true? (get-in state [:api-wallets :loading :default-agent?])))
-        error (or (get-in state [:api-wallets :errors :extra-agents])
-                  (get-in state [:api-wallets :errors :default-agent]))
+        extra-agents-error (get-in state [:api-wallets :errors :extra-agents])
+        default-agent-error (get-in state [:api-wallets :errors :default-agent])
+        extra-agents-loaded? (some? (get-in state [:api-wallets :loaded-at-ms :extra-agents]))
+        ;; The default-agent snapshot rides the deprecated webData2 /info
+        ;; endpoint; if only that fetch fails while named agents loaded,
+        ;; degrade to an inline notice instead of a page-level error.
+        error (or extra-agents-error
+                  (when-not extra-agents-loaded?
+                    default-agent-error))
+        default-agent-error* (when (and (nil? error) default-agent-error)
+                               default-agent-error)
         server-time-ms (get-in state [:api-wallets :server-time-ms])
         generated-private-key (form-policy/generated-private-key
                                (get-in state [:api-wallets-ui :generated])
@@ -48,6 +57,7 @@
      :sort sort
      :loading? loading?
      :error error
+     :default-agent-error default-agent-error*
      :form form
      :form-errors form-errors
      :form-error (get-in state [:api-wallets-ui :form-error])

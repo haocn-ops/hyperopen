@@ -8,7 +8,8 @@
             [hyperopen.portfolio.optimizer.application.spot-token-labels :as spot-token-labels]
             [hyperopen.portfolio.optimizer.application.view-model.execution-reconcile :as reconcile]
             [hyperopen.portfolio.optimizer.application.view-model.workspace :as workspace]
-            [hyperopen.portfolio.optimizer.contracts :as contracts]))
+            [hyperopen.portfolio.optimizer.contracts :as contracts]
+            [hyperopen.trading-settings :as trading-settings]))
 
 ;; Keep in sync with hyperopen.portfolio.optimizer.actions.execution/stale-recommendation-message
 ;; (the action emits the same sentence as the modal error when a stale arm/confirm is refused).
@@ -210,11 +211,28 @@
                            (:rows latest-attempt)
 
                            :else plan-rows))
+        ;; Exit affordances (pre-run only): a skipped excluded-holding row is
+        ;; :exitable? (the table offers "Sell instead"); a row the trader already
+        ;; marked is :exit? (chip + revert-to-hold in its editor). State-only staging
+        ;; edits, so they stay available in read-only views (same policy as the
+        ;; order-type toggles); the arm/confirm gates are untouched.
+        exit-ids (or (:exit-instrument-ids modal) #{})
+        pre-run? (and (not submitting?) (not terminal?))
+        stamp-exit (fn [row]
+                     (cond-> row
+                       (and pre-run? (contains? exit-ids (:instrument-id row)))
+                       (assoc :exit? true)
+
+                       (and pre-run?
+                            (= :skipped (:status row))
+                            (= :excluded-from-optimization (:reason row)))
+                       (assoc :exitable? true)))
         display-rows (stamp-amend-affordances
                       state modal
                       (and (not (:execution-disabled? plan))
                            (not submitting?))
-                      (order-numbered-and-sorted reconciled-rows))
+                      (mapv stamp-exit
+                            (order-numbered-and-sorted reconciled-rows)))
         ;; When the run settled as :resting, re-derive its status from the reconciled rows so the
         ;; phase advances :resting -> :done as the open orders fill on the book.
         reconciled-status (if (= :resting status)
@@ -304,6 +322,10 @@
      :params (or (:params modal) {})
      :open-row (:open-row modal)
      :order-filter (or (:order-filter modal) :all)
+     ;; Persisted browser-local preference: auto-stage closing orders for held perp
+     ;; positions removed from the allocation. Drives the order-table's setting
+     ;; toggle; the entry action does the actual seeding.
+     :auto-exit-excluded? (boolean (trading-settings/optimizer-auto-exit-excluded? state))
      :submitting? submitting?
      :error (:error modal)
      :ready? ready?

@@ -40,7 +40,13 @@
    :confirm-market-orders? true
    :open-order-safety-mode :strict
    :margin-rec-risk-mode :balanced
-   :margin-rec-auto-topup? false})
+   :margin-rec-auto-topup? false
+   ;; Optimizer execution: stage closing orders (sell longs / buy back shorts) for
+   ;; held PERP positions the trader removed from the allocation, by default.
+   ;; Spot holdings and assets the trader requested but the engine dropped (missing
+   ;; history, ...) are never auto-closed. Default-on: an allocation the trader
+   ;; edited an asset out of reads as "I want out of it".
+   :optimizer-auto-exit-excluded? true})
 
 (defn normalize-state
   [value]
@@ -56,7 +62,9 @@
                               (:open-order-safety-mode settings))
      :margin-rec-risk-mode (normalize-margin-rec-risk-mode
                             (:margin-rec-risk-mode settings))
-     :margin-rec-auto-topup? (true? (:margin-rec-auto-topup? settings))}))
+     :margin-rec-auto-topup? (true? (:margin-rec-auto-topup? settings))
+     :optimizer-auto-exit-excluded? (not (false? (:optimizer-auto-exit-excluded?
+                                                  settings)))}))
 
 (defn restore-state
   []
@@ -111,3 +119,7 @@
 (defn margin-rec-auto-topup?
   [state]
   (:margin-rec-auto-topup? (state-settings state)))
+
+(defn optimizer-auto-exit-excluded?
+  [state]
+  (:optimizer-auto-exit-excluded? (state-settings state)))

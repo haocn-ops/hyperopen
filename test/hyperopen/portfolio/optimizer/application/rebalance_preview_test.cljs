@@ -103,3 +103,41 @@
     (is (= :ready (:status eth-row)))
     (is (= :sell (:side eth-row)))
     (is (= 0 (:target-weight eth-row)))))
+
+(deftest refreshed-preview-exit-instrument-ids-stage-sell-to-zero-test
+  ;; Execution-scoped exits (the trader's per-staging "sell this held-out asset"
+  ;; marks) arrive as an opts arg — never on the request — and behave exactly like a
+  ;; blocklisting: the held instrument with no result target becomes a ready
+  ;; sell-to-zero row. Without the opts the same row stays a held :excluded row.
+  (let [request (-> (sample-request)
+                    (assoc-in [:current-portfolio :by-instrument "perp:ETH"]
+                              {:instrument-id "perp:ETH"
+                               :market-type :perp
+                               :weight 0.2
+                               :mark-price 100
+                               :close 100})
+                    (update :universe conj {:instrument-id "perp:ETH"
+                                            :instrument-type :perp
+                                            :coin "ETH"}))
+        with-exit (rebalance-preview/result-with-refreshed-rebalance-preview
+                   request
+                   (sample-result)
+                   {:exit-instrument-ids #{"perp:ETH"}})
+        without-exit (rebalance-preview/result-with-refreshed-rebalance-preview
+                      request
+                      (sample-result))
+        exit-row (->> (get-in with-exit [:rebalance-preview :rows])
+                      (filter #(= "perp:ETH" (:instrument-id %)))
+                      first)
+        held-row (->> (get-in without-exit [:rebalance-preview :rows])
+                      (filter #(= "perp:ETH" (:instrument-id %)))
+                      first)]
+    (is (= :ready (:status exit-row)))
+    (is (= :sell (:side exit-row)))
+    (is (= 0 (:target-weight exit-row)))
+    ;; 0.2 weight on $1000 NAV = a $200 sell.
+    (is (= -200 (:delta-notional-usd exit-row)))
+    (is (= 2 (get-in with-exit [:rebalance-preview :summary :ready-count])))
+    ;; No exits opts ⇒ the excluded-holdings HOLD contract is untouched.
+    (is (= :excluded (:status held-row)))
+    (is (= 1 (get-in without-exit [:rebalance-preview :summary :ready-count])))))

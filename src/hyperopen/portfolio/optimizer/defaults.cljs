@@ -162,7 +162,12 @@
    :order-filter :all
    ;; Per-oid cancel/keep choices for untagged open orders that overlap the rebalance
    ;; (the cross-session decision surface); {oid-string true} = user chose to cancel.
-   :overlap-cancels {}})
+   :overlap-cancels {}
+   ;; Held instruments the allocator excluded that the trader marked "sell to zero"
+   ;; for THIS staging session (set of instrument-id strings). Deliberately reset on
+   ;; every execution-tab entry: a staged sell of a held-out asset is an explicit,
+   ;; per-staging decision, never a sticky default.
+   :exit-instrument-ids #{}})
 
 (defn default-execution-state
   []

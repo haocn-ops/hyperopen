@@ -9,6 +9,7 @@
             [hyperopen.portfolio.optimizer.application.rebalance-preview :as rebalance-preview]
             [hyperopen.portfolio.optimizer.application.run-identity :as run-identity]
             [hyperopen.portfolio.optimizer.application.setup-readiness :as setup-readiness]
+            [hyperopen.portfolio.optimizer.coercion :as coercion]
             [hyperopen.portfolio.optimizer.contracts :as contracts]
             [hyperopen.portfolio.optimizer.defaults :as optimizer-defaults]
             [hyperopen.trading-settings :as trading-settings]))
@@ -54,53 +55,114 @@
   since the solve) stages a plan flagged `:execution-disabled? :stale-recommendation`, so the
   trader sees what WOULD trade but can't arm or commit until the optimizer is re-run. A
   read-only (spectate) block takes precedence — it is the harder restriction and its message
-  wins."
-  [state]
-  (let [readiness (setup-readiness/build-readiness state)
-        last-successful-run
-        (rebalance-preview/last-successful-run-with-rebalance-preview
-         (:request readiness)
-         (get-in state contracts/last-successful-run-path))
-        result (:result last-successful-run)
-        preview (:rebalance-preview result)]
-    (when (and (= :solved (:status result))
-               (map? preview))
-      (let [plan (execution/build-execution-plan
-                  {:scenario-id (common/current-scenario-id state)
-                   :rebalance-preview preview
-                   :execution-assumptions (get-in state
-                                                  contracts/draft-execution-assumptions-path)
-                   :mutations-blocked-message
-                   (account-context/mutations-blocked-message state)})]
-        (if (and (not (:execution-disabled? plan))
-                 (stale-recommendation? state))
-          (assoc plan
-                 :execution-disabled? true
-                 :disabled-reason :stale-recommendation
-                 :disabled-message stale-recommendation-message)
-          plan)))))
+  wins.
+
+  `exit-instrument-ids` (a set, usually the modal's) are the trader's per-staging
+  \"sell this held-out asset to zero\" marks: when the set is PROVIDED (even empty —
+  the toggle-off path must return the plan to the run's own preview) the preview is
+  re-derived from the STORED run request (the source the stored preview was built
+  from, cost contexts included) with those instruments treated as explicit exits —
+  never from the live draft, whose divergence is the stale gate's concern, and never
+  by mutating the request, so the input-signature stays untouched."
+  ([state]
+   (staged-plan state nil))
+  ([state exit-instrument-ids]
+   (let [readiness (setup-readiness/build-readiness state)
+         last-successful-run
+         (rebalance-preview/last-successful-run-with-rebalance-preview
+          (:request readiness)
+          (get-in state contracts/last-successful-run-path))
+         last-successful-run
+         (if (and (map? last-successful-run) (some? exit-instrument-ids))
+           (update last-successful-run
+                   :result
+                   #(rebalance-preview/result-with-refreshed-rebalance-preview
+                     (get-in last-successful-run [:request-signature :request])
+                     %
+                     {:exit-instrument-ids exit-instrument-ids}))
+           last-successful-run)
+         result (:result last-successful-run)
+         preview (:rebalance-preview result)]
+     (when (and (= :solved (:status result))
+                (map? preview))
+       (let [plan (execution/build-execution-plan
+                   {:scenario-id (common/current-scenario-id state)
+                    :rebalance-preview preview
+                    :execution-assumptions (get-in state
+                                                   contracts/draft-execution-assumptions-path)
+                    :mutations-blocked-message
+                    (account-context/mutations-blocked-message state)})]
+         (if (and (not (:execution-disabled? plan))
+                  (stale-recommendation? state))
+           (assoc plan
+                  :execution-disabled? true
+                  :disabled-reason :stale-recommendation
+                  :disabled-message stale-recommendation-message)
+           plan))))))
+
+(defn- requested-universe-ids
+  [last-successful-run]
+  (into #{}
+        (keep #(coercion/non-blank-text (:instrument-id %)))
+        (get-in last-successful-run [:request-signature :request :requested-universe])))
+
+(defn- auto-exit-candidate-ids
+  "Held PERP positions the trader REMOVED from the allocation — the rows the auto-exit
+  preference stages closing orders for (a long sells, a short buys back, both via the
+  target-0 path). Two excluded groups are never auto-closed and stay held-by-default:
+  spot holdings (an excluded asset class), and assets the trader REQUESTED but the
+  engine dropped (present in the stored request's :requested-universe with no result
+  target — missing history, calendar exclusion, ...): the trader wanted those
+  allocated, so closing them on a data failure would trade against intent. Both remain
+  manually closable per row."
+  [last-successful-run plan]
+  (let [requested (requested-universe-ids last-successful-run)]
+    (into #{}
+          (comp (filter #(= :skipped (:status %)))
+                (filter #(= :excluded-from-optimization (:reason %)))
+                (filter #(= :perp (:instrument-type %)))
+                (keep #(coercion/non-blank-text (:instrument-id %)))
+                (remove requested))
+          (:rows plan))))
 
 (defn open-portfolio-optimizer-execution
   "Stages the current rebalance into an execution plan and switches the scenario
   surface to the Execution tab. Always switches the tab (so the entry point is
   discoverable even with no solved run, which renders an empty state); the plan is
-  rebuilt as a fresh snapshot on every entry."
+  rebuilt as a fresh snapshot on every entry.
+
+  When the persisted auto-exit preference is on (the default), held perp positions the
+  trader removed from the allocation are pre-staged as closing orders: the modal's
+  exit set is seeded with the candidates and the plan is re-derived with them, so the
+  realized portfolio matches the allocation the optimizer actually produced. The
+  per-row revert and the surface toggle both remain available."
   [state]
-  [[:effects/save
-    contracts/execution-modal-path
-    (assoc (optimizer-defaults/default-execution-modal-state)
-           :open? true
-           :plan (staged-plan state))]
-   ;; Reset run-state so re-staging shows a clean staged surface rather than a stale
-   ;; terminal status from a previous execution attempt.
-   [:effects/save contracts/execution-path (optimizer-defaults/default-execution-state)]
-   ;; Refresh every open-order surface (base + per-dex frontendOpenOrders, the only
-   ;; cloid-bearing source — the generic openOrders stream never hydrates named-dex
-   ;; rows). By confirm time the run can then recognize and cancel its own resting
-   ;; orders from previous sessions, and surface untagged overlaps for review.
-   [:effects/refresh-portfolio-optimizer-open-orders]
-   [:effects/save contracts/ui-results-tab-path :execution]
-   [:effects/replace-shareable-route-query]])
+  (let [base-plan (staged-plan state)
+        exits (if (and (map? base-plan)
+                       (trading-settings/optimizer-auto-exit-excluded? state))
+                (auto-exit-candidate-ids
+                 (get-in state contracts/last-successful-run-path)
+                 base-plan)
+                #{})
+        plan (if (seq exits)
+               (staged-plan state exits)
+               base-plan)]
+    [[:effects/save
+      contracts/execution-modal-path
+      (assoc (optimizer-defaults/default-execution-modal-state)
+             :open? true
+             :exit-instrument-ids exits
+             :plan plan)]
+     ;; Reset run-state so re-staging shows a clean staged surface rather than a stale
+     ;; terminal status from a previous execution attempt.
+     [:effects/save contracts/execution-path (optimizer-defaults/default-execution-state)]
+     ;; Refresh every open-order surface (base + per-dex frontendOpenOrders, the only
+     ;; cloid-bearing source — the generic openOrders stream never hydrates named-dex
+     ;; rows). By confirm time the run can then recognize and cancel its own resting
+     ;; orders from previous sessions, and surface untagged overlaps for review.
+     [:effects/refresh-portfolio-optimizer-open-orders]
+     [:effects/save contracts/ui-results-tab-path :execution]
+     [:effects/replace-shareable-route-query]]))
 
 (defn set-portfolio-optimizer-execution-phase
   "Pre-submit phase toggle: :armed asks for a second confirm, :staged returns to the
@@ -148,6 +210,81 @@
   "Sets the order-list filter (:all / :working / :filled)."
   [_state order-filter]
   [[:effects/save order-filter-path (keyword order-filter)]])
+
+(def ^:private exit-instrument-ids-path
+  (conj contracts/execution-modal-path :exit-instrument-ids))
+
+(defn set-portfolio-optimizer-execution-exit
+  "Marks (exit? true) or unmarks (exit? false) held instruments the allocator excluded
+  as explicit sell-to-zero exits for THIS staged execution, then re-stages the plan so
+  marked rows become real sell orders — quantity, cost estimate, and margin impact
+  folded into the plan summary — and unmarked rows return to skipped holds.
+
+  The marks are modal-scoped staging state (like :overrides / :overlap-cancels): they
+  never touch the run request or its input-signature, so the stale-recommendation gate
+  is unaffected, and they reset on every tab entry — a staged sell of a held-out asset
+  is an explicit per-staging decision. Re-staging drops an :armed surface back to
+  :staged: the order set just changed and must be re-reviewed before commit. No-ops
+  while submitting or once a run attempt left :idle (the staged plan was already sent;
+  a fresh staging starts from tab re-entry)."
+  [state instrument-ids exit?]
+  (let [modal (get-in state contracts/execution-modal-path)
+        run-status (or (get-in state (conj contracts/execution-path :status)) :idle)
+        ids (into #{}
+                  (keep #(when (and (string? %) (seq %)) %))
+                  instrument-ids)]
+    (if (or (not (map? (:plan modal)))
+            (:submitting? modal)
+            (not= :idle run-status)
+            (empty? ids))
+      []
+      (let [exits (or (get-in state exit-instrument-ids-path) #{})
+            exits* (if exit?
+                     (into exits ids)
+                     (reduce disj exits ids))]
+        [[:effects/save exit-instrument-ids-path exits*]
+         [:effects/save (conj contracts/execution-modal-path :plan)
+          (staged-plan state exits*)]
+         [:effects/save phase-path :staged]
+         [:effects/save contracts/execution-modal-error-path nil]]))))
+
+(defn set-portfolio-optimizer-execution-auto-exit
+  "Persists the trader's auto-exit preference — stage closing orders for held perp
+  positions removed from the allocation — to the browser-local trading settings
+  (localStorage, survives sessions), and when a pre-run plan is staged, immediately
+  re-seeds it: ON recomputes the candidate set (which also clears any manual per-row
+  reverts — the preference is the source of truth when toggled), OFF returns every
+  auto-staged close to a held row. Mirrors the margin-rec settings persistence
+  pattern (projection save + local-storage-set-json)."
+  [state enabled?]
+  (let [enabled?* (boolean enabled?)
+        settings (trading-settings/normalize-state
+                  (merge (or (:trading-settings state)
+                             trading-settings/default-state)
+                         {:optimizer-auto-exit-excluded? enabled?*}))
+        persist [[:effects/save [:trading-settings] settings]
+                 [:effects/local-storage-set-json trading-settings/storage-key settings]]
+        modal (get-in state contracts/execution-modal-path)
+        run-status (or (get-in state (conj contracts/execution-path :status)) :idle)
+        restage? (and (map? (:plan modal))
+                      (not (:submitting? modal))
+                      (= :idle run-status))]
+    (if-not restage?
+      persist
+      (let [base-plan (staged-plan state #{})
+            exits (if (and enabled?* (map? base-plan))
+                    (auto-exit-candidate-ids
+                     (get-in state contracts/last-successful-run-path)
+                     base-plan)
+                    #{})
+            plan (if (seq exits)
+                   (staged-plan state exits)
+                   base-plan)]
+        (into persist
+              [[:effects/save exit-instrument-ids-path exits]
+               [:effects/save (conj contracts/execution-modal-path :plan) plan]
+               [:effects/save phase-path :staged]
+               [:effects/save contracts/execution-modal-error-path nil]])))))
 
 (def ^:private overlap-cancels-path
   (conj contracts/execution-modal-path :overlap-cancels))

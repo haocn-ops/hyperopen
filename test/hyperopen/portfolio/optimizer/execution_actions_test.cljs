@@ -2,6 +2,7 @@
   (:require [cljs.test :refer-macros [deftest is]]
             [hyperopen.portfolio.optimizer.actions :as actions]
             [hyperopen.portfolio.optimizer.actions.execution :as exec-actions]
+            [hyperopen.portfolio.optimizer.application.rebalance-preview :as rebalance-preview]
             [hyperopen.portfolio.optimizer.fixtures :as fixtures]
             [hyperopen.schema.contracts :as contracts]))
 
@@ -54,6 +55,7 @@
              :open-row nil
              :order-filter :all
              :overlap-cancels {}
+             :exit-instrument-ids #{}
              :plan {:scenario-id "draft-1"
                     :status :ready
                     :execution-disabled? false
@@ -208,6 +210,229 @@
     ;; rows still present for context; the ready row is not silently dropped
     (is (= 1 (count (:rows plan))))
     (is (= "perp:BTC" (:instrument-id (first (:rows plan)))))))
+
+(def ^:private exit-request
+  ;; Stored run request for the exit-toggle tests: a $1000 NAV book holding perp:BTC
+  ;; (targeted by the run) and perp:ENS (held, NO result target — the allocator
+  ;; excluded it), both with live metadata + prices.
+  {:current-portfolio
+   {:capital {:nav-usdc 1000}
+    :by-instrument {"perp:BTC" {:instrument-id "perp:BTC"
+                                :market-type :perp
+                                :coin "BTC"
+                                :weight 0.5
+                                :close 100}
+                    "perp:ENS" {:instrument-id "perp:ENS"
+                                :market-type :perp
+                                :coin "ENS"
+                                :weight 0.2
+                                :close 20}}}
+   :universe [{:instrument-id "perp:BTC" :instrument-type :perp :coin "BTC"}
+              {:instrument-id "perp:ENS" :instrument-type :perp :coin "ENS"}]
+   :execution-assumptions {:default-fee-bps 4.5
+                           :fallback-slippage-bps 25}})
+
+(defn- exit-toggle-state
+  [modal-overrides]
+  {:portfolio {:optimizer
+               {:draft {:id "draft-1"
+                        :execution-assumptions {:default-order-type :market}}
+                :run-state (current-run-state)
+                :execution-modal (merge {:open? true
+                                         :phase :staged
+                                         :submitting? false
+                                         :exit-instrument-ids #{}
+                                         :plan {:status :ready :rows []}}
+                                        modal-overrides)
+                :last-successful-run
+                (fixtures/sample-minimal-last-successful-run
+                 {:request-signature (assoc current-run-signature
+                                            :request exit-request)
+                  :result {:scenario-id "draft-1"
+                           :instrument-ids ["perp:BTC"]
+                           :target-weights [0.5]
+                           :current-weights [0.5]}})}}})
+
+(defn- plan-row
+  [plan instrument-id]
+  (first (filter #(= instrument-id (:instrument-id %)) (:rows plan))))
+
+(deftest execution-exit-toggle-stages-sell-to-zero-and-restages-plan-test
+  (let [effects (actions/set-portfolio-optimizer-execution-exit
+                 (exit-toggle-state {:phase :armed})
+                 ["perp:ENS"]
+                 true)
+        plan (get-in effects [1 2])
+        ens-row (plan-row plan "perp:ENS")]
+    (is (emitted-effects-valid? :actions/set-portfolio-optimizer-execution-exit effects))
+    (is (= [:effects/save [:portfolio :optimizer :execution-modal :exit-instrument-ids]
+            #{"perp:ENS"}]
+           (first effects)))
+    (is (= [:portfolio :optimizer :execution-modal :plan] (get-in effects [1 1])))
+    ;; The held-out asset is now a real sell order: 0.2 weight on $1000 = a $200 sell.
+    (is (= :ready (:status ens-row)))
+    (is (= :sell (:side ens-row)))
+    (is (= -200 (:delta-notional-usd ens-row)))
+    (is (= :perp-order (get-in ens-row [:intent :kind])))
+    ;; ENS sells; BTC sits at its target (within tolerance) and stays skipped.
+    (is (= 1 (get-in plan [:summary :ready-count])))
+    (is (= 1 (get-in plan [:summary :skipped-count])))
+    ;; The order set changed — an :armed surface must drop back to :staged for re-review.
+    (is (= [:effects/save [:portfolio :optimizer :execution-modal :phase] :staged]
+           (nth effects 2)))
+    (is (= [:effects/save [:portfolio :optimizer :execution-modal :error] nil]
+           (nth effects 3)))))
+
+(deftest execution-exit-untoggle-returns-row-to-skipped-hold-test
+  (let [effects (actions/set-portfolio-optimizer-execution-exit
+                 (exit-toggle-state {:exit-instrument-ids #{"perp:ENS"}})
+                 ["perp:ENS"]
+                 false)
+        plan (get-in effects [1 2])
+        ens-row (plan-row plan "perp:ENS")]
+    (is (emitted-effects-valid? :actions/set-portfolio-optimizer-execution-exit effects))
+    (is (= #{} (get-in effects [0 2])))
+    ;; Back to the excluded-holdings contract: held, not sold.
+    (is (= :skipped (:status ens-row)))
+    (is (= :excluded-from-optimization (:reason ens-row)))
+    (is (= :none (:side ens-row)))
+    ;; Nothing trades: ENS holds again, BTC stays within tolerance.
+    (is (zero? (get-in plan [:summary :ready-count])))
+    (is (= 2 (get-in plan [:summary :skipped-count])))))
+
+(def ^:private auto-exit-request
+  ;; Stored run request for the auto-exit tests: BTC targeted; ENS a held perp the
+  ;; trader REMOVED from the allocation (not in :requested-universe); DROPPED a held
+  ;; perp the trader REQUESTED but the engine dropped (in :requested-universe, no
+  ;; result target); a spot HYPE holding (excluded asset class).
+  {:current-portfolio
+   {:capital {:nav-usdc 1000}
+    :by-instrument {"perp:BTC" {:instrument-id "perp:BTC"
+                                :market-type :perp
+                                :coin "BTC"
+                                :weight 0.5
+                                :close 100}
+                    "perp:ENS" {:instrument-id "perp:ENS"
+                                :market-type :perp
+                                :coin "ENS"
+                                :weight 0.2
+                                :close 20}
+                    "perp:DROPPED" {:instrument-id "perp:DROPPED"
+                                    :market-type :perp
+                                    :coin "DROPPED"
+                                    :weight 0.05
+                                    :close 10}
+                    "spot:@1" {:instrument-id "spot:@1"
+                               :market-type :spot
+                               :coin "HYPE"
+                               :weight 0.05
+                               :close 40}}}
+   :requested-universe [{:instrument-id "perp:BTC" :instrument-type :perp :coin "BTC"}
+                        {:instrument-id "perp:DROPPED" :instrument-type :perp :coin "DROPPED"}]
+   :universe [{:instrument-id "perp:BTC" :instrument-type :perp :coin "BTC"}
+              {:instrument-id "perp:ENS" :instrument-type :perp :coin "ENS"}
+              {:instrument-id "perp:DROPPED" :instrument-type :perp :coin "DROPPED"}]
+   :execution-assumptions {:default-fee-bps 4.5
+                           :fallback-slippage-bps 25}})
+
+(defn- auto-exit-state
+  [trading-settings]
+  (let [signature (assoc current-run-signature :request auto-exit-request)
+        result (rebalance-preview/result-with-refreshed-rebalance-preview
+                auto-exit-request
+                {:status :solved
+                 :scenario-id "draft-1"
+                 :instrument-ids ["perp:BTC"]
+                 :target-weights [0.6]
+                 :current-weights [0.5]})]
+    (cond-> {:portfolio {:optimizer
+                         {:draft {:id "draft-1"
+                                  :execution-assumptions {:default-order-type :market}}
+                          :run-state (current-run-state)
+                          :last-successful-run
+                          (fixtures/sample-minimal-last-successful-run
+                           {:request-signature signature})}}}
+      true (assoc-in [:portfolio :optimizer :last-successful-run :result] result)
+      (some? trading-settings) (assoc :trading-settings trading-settings))))
+
+(deftest open-execution-auto-stages-exits-for-removed-perps-by-default-test
+  ;; The persisted preference defaults ON: entry pre-stages closing orders for held
+  ;; perps the trader removed from the allocation. The two excluded groups stay held:
+  ;; spot, and a perp the trader requested but the engine dropped (data failure).
+  (let [effects (actions/open-portfolio-optimizer-execution (auto-exit-state nil))
+        modal (get-in effects [0 2])
+        plan (:plan modal)
+        row (fn [id] (plan-row plan id))]
+    (is (= #{"perp:ENS"} (:exit-instrument-ids modal)))
+    (is (= :ready (:status (row "perp:ENS"))))
+    (is (= :sell (:side (row "perp:ENS"))))
+    (is (= -200 (:delta-notional-usd (row "perp:ENS"))))
+    (is (= :skipped (:status (row "perp:DROPPED"))))
+    (is (= :skipped (:status (row "spot:@1"))))))
+
+(deftest open-execution-honors-auto-exit-opt-out-test
+  ;; An explicitly persisted false keeps every held-out asset a hold at entry.
+  (let [effects (actions/open-portfolio-optimizer-execution
+                 (auto-exit-state {:optimizer-auto-exit-excluded? false}))
+        modal (get-in effects [0 2])]
+    (is (= #{} (:exit-instrument-ids modal)))
+    (is (= :skipped (:status (plan-row (:plan modal) "perp:ENS"))))))
+
+(deftest set-auto-exit-persists-and-restages-test
+  ;; Turning the preference OFF on a staged surface persists the opt-out to
+  ;; browser-local settings AND returns every auto-staged close to a held row;
+  ;; turning it back ON re-seeds the candidates.
+  (let [on-state (-> (auto-exit-state nil)
+                     (assoc-in [:portfolio :optimizer :execution-modal]
+                               {:open? true
+                                :phase :staged
+                                :submitting? false
+                                :exit-instrument-ids #{"perp:ENS"}
+                                :plan {:status :ready :rows []}}))
+        effects (actions/set-portfolio-optimizer-execution-auto-exit on-state false)
+        [save-settings persist-json save-exits save-plan] effects]
+    (is (emitted-effects-valid? :actions/set-portfolio-optimizer-execution-auto-exit
+                                effects))
+    (is (= [:trading-settings] (nth save-settings 1)))
+    (is (false? (:optimizer-auto-exit-excluded? (nth save-settings 2))))
+    (is (= :effects/local-storage-set-json (first persist-json)))
+    (is (false? (:optimizer-auto-exit-excluded? (nth persist-json 2))))
+    (is (= #{} (nth save-exits 2)))
+    (is (= :skipped (:status (plan-row (nth save-plan 2) "perp:ENS"))))
+    ;; Toggling back ON from the opted-out state re-seeds the candidate set.
+    (let [off-state (-> on-state
+                        (assoc :trading-settings {:optimizer-auto-exit-excluded? false})
+                        (assoc-in [:portfolio :optimizer :execution-modal
+                                   :exit-instrument-ids] #{}))
+          effects-on (actions/set-portfolio-optimizer-execution-auto-exit off-state true)]
+      (is (= #{"perp:ENS"} (nth (nth effects-on 2) 2)))
+      (is (= :ready (:status (plan-row (nth (nth effects-on 3) 2) "perp:ENS")))))))
+
+(deftest set-auto-exit-only-persists-without-staged-plan-test
+  ;; With no staged pre-run plan (modal closed / run in flight / terminal run) the
+  ;; toggle still persists the preference but rewrites nothing on the surface.
+  (let [effects (actions/set-portfolio-optimizer-execution-auto-exit
+                 (auto-exit-state nil)
+                 false)]
+    (is (= 2 (count effects)))
+    (is (= #{:effects/save :effects/local-storage-set-json}
+           (set (map first effects))))))
+
+(deftest execution-exit-toggle-guards-test
+  ;; No staged plan, a submit in flight, a run attempt past :idle, or an empty id
+  ;; collection each no-op — a sell-to-zero can never be staged into a surface that
+  ;; is not reviewably pre-run.
+  (is (= [] (actions/set-portfolio-optimizer-execution-exit
+             (exit-toggle-state {:plan nil}) ["perp:ENS"] true)))
+  (is (= [] (actions/set-portfolio-optimizer-execution-exit
+             (exit-toggle-state {:submitting? true}) ["perp:ENS"] true)))
+  (is (= [] (actions/set-portfolio-optimizer-execution-exit
+             (assoc-in (exit-toggle-state {})
+                       [:portfolio :optimizer :execution :status]
+                       :executed)
+             ["perp:ENS"] true)))
+  (is (= [] (actions/set-portfolio-optimizer-execution-exit
+             (exit-toggle-state {}) [] true))))
 
 (deftest execution-staging-mutators-update-interaction-state-test
   (is (= [[:effects/save [:portfolio :optimizer :execution-modal :phase] :armed]

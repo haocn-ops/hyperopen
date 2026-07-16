@@ -235,6 +235,10 @@
     actions/set-portfolio-optimizer-execution-order-filter
     :set-portfolio-optimizer-execution-overlap-cancel
     actions/set-portfolio-optimizer-execution-overlap-cancel
+    :set-portfolio-optimizer-execution-exit
+    actions/set-portfolio-optimizer-execution-exit
+    :set-portfolio-optimizer-execution-auto-exit
+    actions/set-portfolio-optimizer-execution-auto-exit
     :refresh-portfolio-optimizer-tracking
     actions/refresh-portfolio-optimizer-tracking
     :enable-portfolio-optimizer-manual-tracking

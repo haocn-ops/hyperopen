@@ -287,6 +287,12 @@
 (def set-portfolio-optimizer-execution-overlap-cancel
   execution/set-portfolio-optimizer-execution-overlap-cancel)
 
+(def set-portfolio-optimizer-execution-exit
+  execution/set-portfolio-optimizer-execution-exit)
+
+(def set-portfolio-optimizer-execution-auto-exit
+  execution/set-portfolio-optimizer-execution-auto-exit)
+
 (def refresh-portfolio-optimizer-tracking
   tracking/refresh-portfolio-optimizer-tracking)
 

@@ -137,6 +137,10 @@
 (s/def ::portfolio-optimizer-execution-overlap-cancel-args
   ;; [oid cancel?] — oid is an exchange order id (number or string), cancel? a boolean.
   (s/tuple (s/or :number number? :string ::common/non-empty-string) boolean?))
+(s/def ::portfolio-optimizer-execution-exit-args
+  ;; [instrument-ids exit?] — instrument-ids is a collection (one id for the per-row
+  ;; toggle, many for the bulk sell-all control), exit? true = stage sell-to-zero.
+  (s/tuple (s/coll-of ::common/non-empty-string :min-count 1) boolean?))
 (s/def ::portfolio-optimizer-universe-search-keydown-args
   (s/tuple ::common/non-empty-string
            (s/coll-of ::common/non-empty-string :kind vector?)))
@@ -434,6 +438,8 @@
 	   :actions/open-portfolio-optimizer-execution-in-ticket ::common/no-args
 	   :actions/set-portfolio-optimizer-execution-order-filter ::common/keyword-or-string-args
 	   :actions/set-portfolio-optimizer-execution-overlap-cancel ::portfolio-optimizer-execution-overlap-cancel-args
+	   :actions/set-portfolio-optimizer-execution-exit ::portfolio-optimizer-execution-exit-args
+	   :actions/set-portfolio-optimizer-execution-auto-exit ::common/boolean-args
 	   :actions/refresh-portfolio-optimizer-tracking ::common/no-args
 	   :actions/enable-portfolio-optimizer-manual-tracking ::common/no-args
 	   :actions/auto-recompute-stale-portfolio-optimizer-scenario ::common/no-args

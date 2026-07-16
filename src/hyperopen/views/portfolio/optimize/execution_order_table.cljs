@@ -337,6 +337,16 @@
            [:span "Post-only at the best price — never crosses the spread, re-pegs as the book moves."])]
         [:p {:class ["font-mono" "text-[0.65rem]" "text-trading-muted/70"]}
          (str "Recommended: " (shared/order-type-labels rec) " — " rec-reason-text)]
+        (when (:exit? row)
+          [:div {:class ["flex" "flex-wrap" "items-center" "gap-2"]}
+           [:span {:class ["font-mono" "text-[0.65rem]" "text-warning"]}
+            "Exit — closes this held position to zero (not an optimizer target)."]
+           [:button {:type "button"
+                     :class ["font-mono" "text-[0.65rem]" "text-warning" "underline"]
+                     :data-role "portfolio-optimizer-execution-exit-revert"
+                     :on {:click [[:actions/set-portfolio-optimizer-execution-exit
+                                   [(:instrument-id row)] false]]}}
+            "↺ keep holding — remove this close"]])
         (when source
           ;; Cost-basis provenance lifted off the lowest 50% opacity / 0.6rem floor so the
           ;; trust signal (snapshot / orderbook / proxy) is actually readable.
@@ -497,7 +507,14 @@
           (when (:instrument-type row)
             [:span {:class ["optimizer-table-kind-badge" "ml-1.5"]
                     :data-kind (name (:instrument-type row))}
-             (name (:instrument-type row))])]
+             (name (:instrument-type row))])
+          ;; A closing order staged for a held asset the optimizer excluded (by the
+          ;; trader or the auto-exit preference) — marked so it never reads as an
+          ;; allocator decision. Reverted from the row editor.
+          (when (:exit? row)
+            [:span {:class ["ml-1.5" "inline-block"]
+                    :title "Exit — the optimizer expressed no target for this held position; this order closes it to zero. Revert from the row editor."}
+             (shared/chip "exit" :warn)])]
          [:td (shared/chip (name (or side :flat)) (side-tone side))]
          [:td
           [:span {:class ["inline-flex" "items-center" "gap-1.5"]}
@@ -559,20 +576,80 @@
     (when (seq parts)
       (str "All orders route to Hyperliquid — " (str/join " · " parts) "."))))
 
+(defn- exit-toggle-action
+  [rows exit?]
+  [[:actions/set-portfolio-optimizer-execution-exit (mapv :instrument-id rows) exit?]])
+
+(defn- auto-exit-setting-strip
+  "The persisted auto-exit preference (browser-local, survives sessions): stage
+  closing orders for held perp positions removed from the allocation. Rendered
+  whenever the surface is pre-run and the decision applies (any exit-staged or
+  still-holdable row exists) — including when auto-exit already staged every
+  candidate, so the preference can always be found and turned off right where its
+  effect shows."
+  [model rows]
+  (let [relevant? (some #(and (= :perp (:instrument-type %))
+                              (or (:exit? %) (:exitable? %)))
+                        rows)
+        auto? (boolean (:auto-exit-excluded? model))]
+    (when (and (editable? model) relevant?)
+      [:div {:class ["border-t" "border-base-300" "px-4" "py-2"]}
+       [:label {:class ["flex" "w-fit" "cursor-pointer" "items-center" "gap-1.5"
+                        "font-mono" "text-[0.7rem]" "text-trading-muted"]
+                :title (str "When on, opening this tab pre-stages closing orders (sell "
+                            "longs, buy back shorts) for perp positions you removed from "
+                            "the allocation. Spot holdings and assets dropped by the "
+                            "engine for data reasons are never auto-closed. Saved in this "
+                            "browser as your preference.")
+                :data-role "portfolio-optimizer-execution-auto-exit"}
+        [:input {:type "checkbox"
+                 :class ["h-3.5" "w-3.5" "rounded-[3px]" "border" "border-base-300"
+                         "bg-transparent"]
+                 :checked auto?
+                 :on {:change [[:actions/set-portfolio-optimizer-execution-auto-exit
+                                (not auto?)]]}}]
+        "Close perp positions removed from the allocation (saved preference)"]])))
+
 (defn- skipped-section
   "Within-tolerance / already-live rows collapsed OUT of the order list: they are not
   orders and must not read as 20 orders when 10 will be sent. Each keeps its ledger #,
-  its data-role, and a plain-language reason."
+  its data-role, and a plain-language reason. An :exitable? row (a held asset the
+  trader removed from the optimization) additionally offers \"Sell instead\" — staging
+  an explicit sell-to-zero into the plan — plus a bulk control when several qualify."
   [model rows]
-  (let [skipped (filterv #(= :skipped (row-display-state model %)) rows)]
+  (let [skipped (filterv #(= :skipped (row-display-state model %)) rows)
+        exitable (filterv :exitable? skipped)]
     (when (seq skipped)
       [:details {:class ["optimizer-exec-skipped" "border-t" "border-base-300"]
                  :replicant/key "portfolio-optimizer-execution-skipped"
                  :data-role "portfolio-optimizer-execution-skipped"}
        [:summary {:class ["px-4" "py-2.5" "text-xs" "font-medium" "text-trading-muted"
                           "select-none" "cursor-pointer"]}
+        ;; Held-out assets the trader can exit are a decision, not noise — the summary
+        ;; says so while the section stays collapsed (forcing :open every render would
+        ;; fight the user's collapse).
         (str "Skipped — " (count skipped) " asset" (when (not= 1 (count skipped)) "s")
-             " · no orders will be sent")]
+             " · no orders will be sent"
+             (when (seq exitable)
+               (str " · " (count exitable) " can be closed instead")))]
+       (when (seq exitable)
+         [:div {:class ["flex" "flex-wrap" "items-center" "gap-2" "px-4" "pb-2"
+                        "text-xs" "text-trading-muted"]
+                :data-role "portfolio-optimizer-execution-exit-note"}
+          [:span
+           (str (count exitable) " held asset" (when (not= 1 (count exitable)) "s")
+                " " (if (= 1 (count exitable)) "isn't" "aren't")
+                " part of this allocation and will be held. Stage a closing order"
+                " (sell a long, buy back a short) to exit "
+                (if (= 1 (count exitable)) "it" "them")
+                " with this rebalance.")]
+          (when (> (count exitable) 1)
+            [:button {:type "button"
+                      :class ["border" "border-base-300" "px-2" "py-0.5"
+                              "text-[0.65rem]" "font-semibold" "text-trading-text"]
+                      :data-role "portfolio-optimizer-execution-exit-all"
+                      :on {:click (exit-toggle-action exitable true)}}
+             (str "Close all " (count exitable))])])
        [:div {:class ["overflow-x-auto"]}
         (into
          [:table {:class ["optimizer-table" "optimizer-exec-table"]}
@@ -582,7 +659,8 @@
             [:th "Asset"]
             [:th "Side"]
             [:th {:class ["right"]} "Notional"]
-            [:th "Why skipped"]]]]
+            [:th "Why skipped"]
+            [:th {:class ["w-24"]}]]]]
          (for [row skipped]
            [:tbody
             [:tr {:class ["optimizer-exec-order-row" "is-muted"]
@@ -608,7 +686,17 @@
                 (str (if (= :buy (:side row)) "+" "−")
                      (opt-format/format-usdc (shared/abs-num (:delta-notional-usd row))))
                 "—")]
-             [:td {:class ["text-[0.75rem]"]} (state-cell :skipped row)]]]))]])))
+             [:td {:class ["text-[0.75rem]"]} (state-cell :skipped row)]
+             [:td {:class ["right"]}
+              (when (:exitable? row)
+                [:button {:type "button"
+                          :class ["border" "border-base-300" "px-2" "py-0.5"
+                                  "text-[0.65rem]" "font-semibold" "text-trading-text"]
+                          :title "Stage an order that closes this held position to zero (sells a long, buys back a short) as part of the rebalance."
+                          :data-role (str "portfolio-optimizer-execution-exit-"
+                                          (data-role-token (:instrument-id row)))
+                          :on {:click (exit-toggle-action [row] true)}}
+                 "Close instead"])]]]))]])))
 
 (defn order-table
   [{:keys [order-filter] :as model} rows]
@@ -671,4 +759,5 @@
                      []))
                  (range)
                  rows))])
+     (auto-exit-setting-strip model rows)
      (skipped-section model rows)]))

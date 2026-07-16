@@ -214,7 +214,7 @@
       (get-in request [:constraints :per-perp-leverage-caps])))
 
 (defn- build-derived-preview
-  [request result]
+  [request result {:keys [exit-instrument-ids]}]
   (let [target-by-id (target-weights-by-id result)
         current-by-id (current-weights-by-id request result)
         instrument-ids (preview-instrument-ids request
@@ -222,8 +222,14 @@
                                                target-by-id
                                                current-by-id)
         instruments (instruments-by-id request)
-        blocklist (set (keep non-blank-text
-                             (get-in request [:constraints :blocklist])))]
+        ;; Execution-scoped exits (the trader's per-staging "sell this held-out asset
+        ;; to zero" marks) union into the blocklist: both are the SAME explicit-exit
+        ;; semantics (target 0), so they share one code path in target-weight-for.
+        ;; Exits arrive as an opts arg, never on the request — they must not enter the
+        ;; input-signature or the persisted run.
+        blocklist (into (set (keep non-blank-text
+                                   (get-in request [:constraints :blocklist])))
+                        (keep non-blank-text exit-instrument-ids))]
     (when (seq instrument-ids)
       (rebalance/build-rebalance-preview
        {:capital-usd (capital-usd request)
@@ -274,17 +280,19 @@
     result
 
     :else
-    (if-let [preview (build-derived-preview request result)]
+    (if-let [preview (build-derived-preview request result nil)]
       (assoc result :rebalance-preview preview)
       result)))
 
 (defn result-with-refreshed-rebalance-preview
-  [request result]
-  (if-let [preview (and (map? request)
-                        (= :solved (:status result))
-                        (build-derived-preview request result))]
-    (assoc result :rebalance-preview preview)
-    result))
+  ([request result]
+   (result-with-refreshed-rebalance-preview request result nil))
+  ([request result opts]
+   (if-let [preview (and (map? request)
+                         (= :solved (:status result))
+                         (build-derived-preview request result opts))]
+     (assoc result :rebalance-preview preview)
+     result)))
 
 (defn last-successful-run-with-rebalance-preview
   [request last-successful-run]

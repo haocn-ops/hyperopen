@@ -118,6 +118,17 @@
     (str (when (pos? points) "+") (.toFixed points 1) " pts")
     "—"))
 
+(defn- display-direction-copy
+  "The judgment word next to the signed pts. Sub-threshold moves (see the
+  view-model's material-change-threshold-pts) read '≈ unchanged' — the value
+  stays exact, but a 0.1-pt wiggle must not announce itself as a direction."
+  [{:keys [change direction material?]} copy]
+  (cond
+    (nil? change) copy
+    (= :unchanged direction) copy
+    material? copy
+    :else "≈ unchanged"))
+
 (defn- change-cell
   [{:keys [change change-points]} direction-copy]
   [:div {:class ["optimizer-risk-diversification-change"]
@@ -185,7 +196,7 @@
              :style {:left (str recommended-position "%")}}]]]
    (comparison-value current-value)
    (comparison-value recommended-value)
-   (change-cell row (direction-word direction))])
+   (change-cell row (display-direction-copy row (direction-word direction)))])
 
 (defn- outcome-row
   [help-prefix {:keys [key current-value recommended-value direction tone]
@@ -217,13 +228,18 @@
            :role "cell"}]
    (comparison-value current-value)
    (comparison-value recommended-value)
-   (change-cell row (outcome-direction-copy row))]))
+   (change-cell row (display-direction-copy row (outcome-direction-copy row)))]))
 
 (defn- render-decision-summary
+  "The tab's verdict sentence. Rendered as the tab's LEAD (directly under the
+  intro, before the bridge and matrix) — the conclusion must not live in the
+  last line of fine print. Copy generation is unchanged from when it was the
+  matrix footer; only placement and the --lead styling class moved."
   [{:keys [status modeled-direction stress-direction
            modeled-current-value modeled-recommended-value
            stress-current-value stress-recommended-value]}]
-  [:p {:class ["optimizer-risk-diversification-decision"]
+  [:p {:class ["optimizer-risk-diversification-decision"
+               "optimizer-risk-diversification-decision--lead"]
        :data-role "portfolio-optimizer-risk-diversification-decision-summary"}
    (if (= :comparison status)
      (str "Modeled volatility " (direction-word modeled-direction)
@@ -238,8 +254,68 @@
           " and all-move-together stress is "
           (structure-model/format-pct stress-recommended-value) "."))])
 
+(defn- volatility-bridge
+  "The tab's lead visual: where the recommended book's modeled volatility
+  sits between its two benchmarks, on the SAME 0→scale-max axis as the
+  matrix lanes below. The solid segment is the modeled volatility the book
+  keeps; the soft segment up to the all-move-together stress is what
+  diversification removes; the dashed tick is the zero-correlation
+  (independent) baseline, and the note names the two deltas with the same
+  offsets/amplifies language the rest of the card uses. Built entirely from
+  the comparison model's per-book card for the recommended book — no new
+  math. No help-disclosure trigger here by contract: the card exposes
+  exactly six (pinned by browser coverage); the bridge explains itself with
+  visible labels and a native title."
+  [{:keys [cards]}]
+  (when-let [card (first (filter #(= :target (:key %)) cards))]
+    (let [{:keys [positions benchmarks correlation-effect
+                  correlation-direction]} card
+          value-of (fn [key]
+                     (:value (first (filter #(= key (:key %)) benchmarks))))
+          amt (value-of :all-move-together)
+          zero (value-of :zero-correlation)
+          modeled (value-of :modeled)
+          amt-pos (:all-move-together positions)
+          zero-pos (:zero-correlation positions)
+          modeled-pos (:modeled positions)
+          saved-pts (* 100 (- amt modeled))
+          corr-pts (* 100 correlation-effect)]
+      [:div {:class ["optimizer-risk-divbridge"]
+             :data-role "portfolio-optimizer-risk-divbridge"
+             :title "How the recommended book's modeled volatility relates to its benchmarks. Solid: modeled volatility. Soft: the additional volatility if every held position P&L stream moved together (removed by diversification). Dashed tick: the zero-correlation (independent) baseline. Same scale as the rows below."}
+       [:div {:class ["optimizer-risk-divbridge-lane"]
+              :aria-hidden true}
+        [:div {:class ["optimizer-risk-divbridge-kept"]
+               :style {:width (str modeled-pos "%")}}]
+        [:div {:class ["optimizer-risk-divbridge-saved"]
+               :style {:left (str modeled-pos "%")
+                       :width (str (max 0 (- amt-pos modeled-pos)) "%")}}]
+        [:div {:class ["optimizer-risk-divbridge-tick"]
+               :style {:left (str zero-pos "%")}}]]
+       [:div {:class ["optimizer-risk-divbridge-labels" "font-mono"]}
+        [:span {:class ["optimizer-risk-divbridge-label"]}
+         (str "Modeled " (structure-model/format-pct modeled))]
+        [:span {:class ["optimizer-risk-divbridge-label"
+                        "optimizer-risk-divbridge-label--stress"]}
+         (str "All move together " (structure-model/format-pct amt))]]
+       [:p {:class ["optimizer-risk-divbridge-note"]
+            :data-role "portfolio-optimizer-risk-divbridge-note"}
+        (str "If every position moved together: "
+             (structure-model/format-pct amt)
+             ". Diversification cuts " (.toFixed saved-pts 1)
+             " pts of that, to the modeled "
+             (structure-model/format-pct modeled)
+             ". Correlations "
+             (case correlation-direction
+               :offsets (str "remove " (.toFixed (js/Math.abs corr-pts) 1)
+                             " pts vs")
+               :amplifies (str "add " (.toFixed corr-pts 1) " pts vs")
+               "are neutral vs")
+             " the independent baseline ("
+             (structure-model/format-pct zero) ", dashed tick).")]])))
+
 (defn- comparison-matrix
-  [{:keys [benchmark-rows outcome-rows decision-summary help-prefix]}]
+  [{:keys [benchmark-rows outcome-rows help-prefix]}]
   [:div {:class ["optimizer-risk-diversification-matrix"]
          :data-role "portfolio-optimizer-risk-diversification-matrix"
          :role "table"
@@ -263,8 +339,7 @@
                         "optimizer-risk-diversification-row-group--outcomes"]
                 :role "rowgroup"}]
          (map (partial outcome-row help-prefix))
-         outcome-rows)
-   (render-decision-summary decision-summary)])
+         outcome-rows)])
 
 (defn diversification-summary
   "Renders one current/recommended comparison matrix when a valid target
@@ -307,6 +382,12 @@
                            "optimizer-risk-diversification-legend-marker--recommended"]
                    :aria-hidden true}]
            "Recommended"]]]
+        ;; Verdict first, picture second, evidence third: the decision
+        ;; sentence leads, the bridge shows where the recommended book's
+        ;; volatility comes from, and the benchmark matrix carries the
+        ;; numbers for both books.
+        (render-decision-summary (:decision-summary model))
+        (volatility-bridge model)
         (comparison-matrix (assoc model :help-prefix help-prefix))])
      [:div {:class ["optimizer-risk-diversification-unavailable"]
             :data-role "portfolio-optimizer-risk-diversification-unavailable"}

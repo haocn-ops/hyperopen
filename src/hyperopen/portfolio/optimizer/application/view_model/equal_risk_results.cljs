@@ -35,9 +35,14 @@
     "—"))
 
 (defn format-signed-pts
+  "Signed points with an honest zero: anything below the 0.1-pt display
+  resolution renders as unsigned \"0.0 pts\" — a -0.04 that rounds to zero
+  must never show as \"-0.0 pts\"."
   [value]
   (if (finite-number? value)
-    (str (when (>= value 0) "+") (.toFixed value 1) " pts")
+    (if (< (js/Math.abs value) 0.05)
+      "0.0 pts"
+      (str (when (>= value 0) "+") (.toFixed value 1) " pts"))
     "—"))
 
 (defn- format-share
@@ -69,14 +74,27 @@
         :else :bad))))
 
 (defn balance-model
-  "Chart model from the payload's contribution sections. The `display-row-cap`
-  worst rows by |deviation from target| are selected (so the rows that explain
-  an Approximate verdict always survive the cap), then DISPLAYED in signed
-  share descending order — longs high-to-low with hedges at the bottom, the
-  designer's diverging silhouette. The remainder is summarized honestly
-  instead of silently truncated. Current shares are nil-safe (old persisted
-  results, flat books); per-row targets read the per-instrument section and
-  fall back to the uniform equal target."
+  "Chart model from the payload's contribution sections, in one of two display
+  modes (`:display-mode`).
+
+  `:deviation` (default): the `display-row-cap` worst rows by |deviation from
+  target| are selected (so the rows that explain an Approximate verdict always
+  survive the cap), then DISPLAYED in signed share descending order — longs
+  high-to-low with hedges at the bottom, the designer's diverging silhouette.
+
+  `:shift` (an :exact fit whose result carries current shares): every bar ends
+  on the target line, so deviations are ties and the story is the MOVE. Each
+  row's `:shift-pts` is recommended − current in points, the cap keeps the
+  largest |shift| rows, and display order is current share descending — the
+  gray current markers form the descending silhouette and risk visibly drains
+  from the top rows into the bottom ones.
+
+  The remainder is summarized honestly instead of silently truncated
+  (`:hidden-max-pts` is max |deviation| or max |shift| to match the mode).
+  Current shares are nil-safe (old persisted results, flat books); per-row
+  targets read the per-instrument section and fall back to the uniform equal
+  target. `:current` additionally carries `:biggest-shift`, picked over EVERY
+  row before capping."
   [result]
   (when-let [contributions (:risk-contributions result)]
     (let [{:keys [instrument-ids relative-contributions
@@ -88,11 +106,12 @@
           current-by-id (get-in result [:current-risk-contributions
                                         :relative-contributions-by-instrument])
           target-share (first target-relative-contributions)
-          rows (->> (map (fn [instrument-id share]
+          all-rows (mapv (fn [instrument-id share]
                            (let [row-target (let [target (get targets-by-id instrument-id)]
                                               (if (finite-number? target)
                                                 target
                                                 target-share))
+                                 current-share (get current-by-id instrument-id)
                                  deviation (when (and (finite-number? share)
                                                       (finite-number? row-target))
                                              (- share row-target))]
@@ -100,23 +119,38 @@
                               :label (or (get labels instrument-id) instrument-id)
                               :weight (get weights instrument-id)
                               :share share
-                              :current-share (get current-by-id instrument-id)
+                              :current-share current-share
                               :target-share row-target
                               :deviation-pts (pts deviation)
+                              :shift-pts (when (and (finite-number? share)
+                                                    (finite-number? current-share))
+                                           (pts (- share current-share)))
                               :negative? (and (finite-number? share) (neg? share))}))
                          instrument-ids
                          relative-contributions)
-                    (sort-by (fn [{:keys [deviation-pts]}]
-                               (- (js/Math.abs (or deviation-pts 0))))))
+          shift-mode? (and (= :exact quality)
+                           (some #(finite-number? (:shift-pts %)) all-rows))
+          cap-key (if shift-mode? :shift-pts :deviation-pts)
+          rows (sort-by (fn [row]
+                          (- (js/Math.abs (or (get row cap-key) 0))))
+                        all-rows)
+          display-key (if shift-mode?
+                        (fn [{:keys [current-share]}]
+                          (- (if (finite-number? current-share)
+                               current-share
+                               ##-Inf)))
+                        (fn [{:keys [share]}]
+                          (- (or share ##-Inf))))
           visible (->> (take display-row-cap rows)
-                       (sort-by (fn [{:keys [share]}]
-                                  (- (or share ##-Inf))))
+                       (sort-by display-key)
                        vec)
           hidden (drop display-row-cap rows)]
       {:rows visible
+       :display-mode (if shift-mode? :shift :deviation)
+       :asset-count (count instrument-ids)
        :hidden-count (count hidden)
        :hidden-max-pts (when (seq hidden)
-                         (reduce max 0 (map #(js/Math.abs (or (:deviation-pts %) 0))
+                         (reduce max 0 (map #(js/Math.abs (or (get % cap-key) 0))
                                             hidden)))
        ;; Largest contributor over EVERY row (not just the visible cap): on a
        ;; wide near-balanced universe the largest share can carry a small
@@ -134,7 +168,16 @@
        :negative-count negative-contribution-count
        :current (when-let [current (:current-risk-contributions result)]
                   {:rms-pts (pts (:rms-error current))
-                   :max-pts (pts (:max-absolute-error current))})})))
+                   :max-pts (pts (:max-absolute-error current))
+                   :biggest-shift
+                   (let [movers (filter #(finite-number? (:shift-pts %))
+                                        all-rows)]
+                     (when (seq movers)
+                       (-> (apply max-key
+                                  #(js/Math.abs (:shift-pts %))
+                                  movers)
+                           (select-keys [:instrument-id :label
+                                         :shift-pts]))))})})))
 
 (defn kpi-risk-balance
   "Values for the KPI strip's Risk balance tile: current → recommended max

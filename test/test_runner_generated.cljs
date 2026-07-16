@@ -609,6 +609,7 @@
             [hyperopen.views.portfolio.montecarlo.chart-test]
             [hyperopen.views.portfolio.montecarlo.controls-test]
             [hyperopen.views.portfolio.optimize.black-litterman-preview-chart-test]
+            [hyperopen.views.portfolio.optimize.equal-risk-impact-strip-test]
             [hyperopen.views.portfolio.optimize.execution-amend-view-test]
             [hyperopen.views.portfolio.optimize.execution-exit-affordance-test]
             [hyperopen.views.portfolio.optimize.execution-order-table-test]
@@ -626,11 +627,13 @@
             [hyperopen.views.portfolio.optimize.refinement-status-card-test]
             [hyperopen.views.portfolio.optimize.result-vault-labels-test]
             [hyperopen.views.portfolio.optimize.results-diagnostics-rail-test]
+            [hyperopen.views.portfolio.optimize.results-panel-equal-risk-structure-test]
             [hyperopen.views.portfolio.optimize.results-panel-equal-risk-test]
             [hyperopen.views.portfolio.optimize.results-panel-hierarchy-test]
             [hyperopen.views.portfolio.optimize.results-panel-test]
             [hyperopen.views.portfolio.optimize.return-views-io-panel-test]
             [hyperopen.views.portfolio.optimize.risk-diversification-help-edge-test]
+            [hyperopen.views.portfolio.optimize.risk-diversification-reading-flow-test]
             [hyperopen.views.portfolio.optimize.risk-diversification-semantics-edge-test]
             [hyperopen.views.portfolio.optimize.risk-return-context-test]
             [hyperopen.views.portfolio.optimize.run-status-banner-test]
@@ -1448,6 +1451,7 @@
              'hyperopen.views.portfolio.montecarlo.chart-test
              'hyperopen.views.portfolio.montecarlo.controls-test
              'hyperopen.views.portfolio.optimize.black-litterman-preview-chart-test
+             'hyperopen.views.portfolio.optimize.equal-risk-impact-strip-test
              'hyperopen.views.portfolio.optimize.execution-amend-view-test
              'hyperopen.views.portfolio.optimize.execution-exit-affordance-test
              'hyperopen.views.portfolio.optimize.execution-order-table-test
@@ -1465,11 +1469,13 @@
              'hyperopen.views.portfolio.optimize.refinement-status-card-test
              'hyperopen.views.portfolio.optimize.result-vault-labels-test
              'hyperopen.views.portfolio.optimize.results-diagnostics-rail-test
+             'hyperopen.views.portfolio.optimize.results-panel-equal-risk-structure-test
              'hyperopen.views.portfolio.optimize.results-panel-equal-risk-test
              'hyperopen.views.portfolio.optimize.results-panel-hierarchy-test
              'hyperopen.views.portfolio.optimize.results-panel-test
              'hyperopen.views.portfolio.optimize.return-views-io-panel-test
              'hyperopen.views.portfolio.optimize.risk-diversification-help-edge-test
+             'hyperopen.views.portfolio.optimize.risk-diversification-reading-flow-test
              'hyperopen.views.portfolio.optimize.risk-diversification-semantics-edge-test
              'hyperopen.views.portfolio.optimize.risk-return-context-test
              'hyperopen.views.portfolio.optimize.run-status-banner-test

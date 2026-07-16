@@ -607,7 +607,7 @@
                  :checked auto?
                  :on {:change [[:actions/set-portfolio-optimizer-execution-auto-exit
                                 (not auto?)]]}}]
-        "Close perp positions removed from the allocation (saved preference)"]])))
+        "Close perp positions removed from the allocation"]])))
 
 (defn- skipped-section
   "Within-tolerance / already-live rows collapsed OUT of the order list: they are not

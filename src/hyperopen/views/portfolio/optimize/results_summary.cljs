@@ -245,13 +245,15 @@
             [:p {:class ["mt-1" "text-xs" "text-trading-muted"]}
              "None — the target sits inside your constraints."])]]))))
 
-(defn- equal-risk-fact-card
+(defn equal-risk-fact-card
   "One icon card of the WHY THIS RISK ALLOCATION row (designer spec
   2026-07-11): tinted icon tile, tiny uppercase label, value line, one-line
   sub. `sub-class` opts the sub-line into a signal color. With :for-radio the
   card renders as a <label> targeting a tab radio of the risk card — clicking
   it activates that tab with zero app state — and the scoped :has() CSS
-  highlights it while that tab is active."
+  highlights it while that tab is active. Public: the Equal Risk impact strip
+  (equal-risk-impact-strip) renders its current → target chips with the same
+  card so the two rows read as one visual language."
   ([data-role tone icon-node label value sub sub-class]
    (equal-risk-fact-card data-role tone icon-node label value sub sub-class nil))
   ([data-role tone icon-node label value sub sub-class {:keys [for-radio]}]

@@ -61,6 +61,44 @@
     ;; present one (checked precisely in the tips test below).
     (is (some #(str/includes? % "floor on ruin risk") (collect-strings node)))))
 
+(deftest tiles-carry-current-book-comparators-test
+  ;; Each stat tile frames the target number against the current book: the
+  ;; domain outcome-model already computes every current-book statistic, so
+  ;; the tiles show "Now X" — the delta the decision actually hinges on.
+  (let [node (panel/leverage-impact-panel
+              (fixtures/sample-solved-result
+               {:diagnostics {:gross-exposure 2.5}}))
+        current-outcome (leverage-risk/outcome-model {:expected-return 0.12
+                                                      :volatility 0.24})
+        tile-compare (fn [role]
+                       (some->> (node-by-role node (str role "-current"))
+                                collect-strings
+                                (str/join " ")))]
+    (is (= (str "Now " (panel/compact-usd
+                        (* 100000 (:mean-ending-factor current-outcome))))
+           (tile-compare "portfolio-optimizer-leverage-impact-mean")))
+    (is (= (str "Now " (panel/compact-usd
+                        (* 100000 (:p5-ending-factor current-outcome))))
+           (tile-compare "portfolio-optimizer-leverage-impact-p5")))
+    (is (str/starts-with?
+         (tile-compare "portfolio-optimizer-leverage-impact-terminal") "Now "))
+    (is (str/starts-with?
+         (tile-compare "portfolio-optimizer-leverage-impact-touch") "Now "))))
+
+(deftest tiles-skip-comparators-without-a-current-book-test
+  (let [node (panel/leverage-impact-panel
+              (fixtures/sample-solved-result
+               {:diagnostics {:gross-exposure 2.5}
+                :current-volatility nil
+                :current-expected-return nil}))]
+    (is (some? node))
+    (doseq [role ["portfolio-optimizer-leverage-impact-mean"
+                  "portfolio-optimizer-leverage-impact-p5"
+                  "portfolio-optimizer-leverage-impact-terminal"
+                  "portfolio-optimizer-leverage-impact-touch"]]
+      (is (nil? (node-by-role node (str role "-current")))
+          (str role " must not fabricate a current comparator")))))
+
 (deftest median-shortfall-headline-is-signed-test
   (let [shortfall-node (panel/leverage-impact-panel
                         (fixtures/sample-solved-result

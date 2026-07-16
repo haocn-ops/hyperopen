@@ -4,6 +4,8 @@
             [hyperopen.portfolio.optimizer.contracts :as contracts]
             [hyperopen.views.portfolio.optimize.equal-risk-confidence-rail
              :as equal-risk-confidence-rail]
+            [hyperopen.views.portfolio.optimize.equal-risk-impact-strip
+             :as equal-risk-impact-strip]
             [hyperopen.views.portfolio.optimize.frontier-chart :as frontier-chart]
             [hyperopen.views.portfolio.optimize.leverage-impact-panel
              :as leverage-impact-panel]
@@ -89,6 +91,12 @@
           ;; objective itself changes.
           [:div {:class ["space-y-4"]
                  :replicant/key (if equal-risk? "equal-risk-center" "frontier-center")}
+           ;; The implications lead: current → target imbalance / volatility /
+           ;; modeled outcome, each deep-linking into the card below. Above
+           ;; the chart so "what does executing change?" is answered before
+           ;; the per-asset detail starts.
+           (when equal-risk?
+             (equal-risk-impact-strip/equal-risk-impact-strip result))
            (when equal-risk?
              (risk-contributions-card/risk-contributions-card
               result

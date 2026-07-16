@@ -370,6 +370,16 @@
                      (:target-relative-contributions-by-instrument contributions)))))
          (optional? map? (:current-risk-contributions value))
          (optional? map? (:equal-risk-solver value))
+         ;; Present only on :inverse-volatility runs: the sizing-fidelity
+         ;; section (per-asset |w|·σ rows, the ideal pre-projection seed, and
+         ;; the realized parity deviation among unbound rows).
+         (or (nil? (:inverse-volatility value))
+             (let [sizing (:inverse-volatility value)]
+               (and (map? sizing)
+                    (vector? (:sizing-rows sizing))
+                    (every? map? (:sizing-rows sizing))
+                    (finite-number-vector? (:seed-weights sizing))
+                    (coercion/finite-number? (:max-sizing-deviation sizing)))))
          ;; Present only on :equal-risk runs: the correlation-view section —
          ;; standalone/diversification decomposition maps plus the capped
          ;; underlying correlation matrix (square, aligned to its own id list;

@@ -192,6 +192,9 @@
 (def apply-portfolio-optimizer-objective-menu-selection-and-run-action
   portfolio-optimizer-actions/apply-portfolio-optimizer-objective-menu-selection-and-run)
 
+(def switch-portfolio-optimizer-objective-and-run-action
+  portfolio-optimizer-actions/switch-portfolio-optimizer-objective-and-run)
+
 (def set-portfolio-optimizer-return-model-kind-action
   portfolio-optimizer-actions/set-portfolio-optimizer-return-model-kind)
 

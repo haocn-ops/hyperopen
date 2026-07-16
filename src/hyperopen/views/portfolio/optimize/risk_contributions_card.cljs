@@ -35,7 +35,8 @@
   stay 1px and markers stay round at any width. Replaces the
   efficient-frontier chart for :equal-risk — that objective is not selected
   from a frontier and must not be plotted as if it were."
-  (:require [hyperopen.portfolio.optimizer.application.view-model.equal-risk-results
+  (:require [clojure.string :as str]
+            [hyperopen.portfolio.optimizer.application.view-model.equal-risk-results
              :as equal-risk-results]
             [hyperopen.portfolio.optimizer.application.view-model.equal-risk-structure
              :as structure-model]
@@ -331,6 +332,37 @@
             " position hedges the book (negative risk contribution)."
             " positions hedge the book (negative risk contributions).")))])
 
+(defn- switch-objective-suggestion
+  "The floored-state escape hatch: when Equal Risk held one or more
+  side-locked assets at 0% (a zero binding bound + a zero published target),
+  offer the one-click switch to Risk-weighted sizing — the objective built to
+  keep every selected asset — and rerun. Renders nil when nothing is floored."
+  [result]
+  (let [floored (equal-risk-results/floored-instrument-ids result)
+        labels (:labels-by-instrument result)
+        named (->> floored
+                   (map #(or (get labels %) %))
+                   (take 3))]
+    (when (seq floored)
+      [:p {:class ["mt-2" "text-xs" "text-trading-muted"]
+           :data-role "portfolio-optimizer-risk-contributions-floored-note"}
+       (str (count floored)
+            (if (= 1 (count floored))
+              " side-locked position ("
+              " side-locked positions (")
+            (str/join ", " named)
+            (when (> (count floored) (count named)) ", …")
+            ") held at 0% — a fixed side Equal Risk cannot balance. ")
+       [:button {:type "button"
+                 :class ["border" "border-warning/50" "bg-warning/10" "px-1.5"
+                         "py-0.5" "text-xs" "font-semibold" "text-warning"
+                         "hover:bg-warning/20"]
+                 :data-role "portfolio-optimizer-switch-to-risk-weighted-sizing"
+                 :on {:click [[:actions/switch-portfolio-optimizer-objective-and-run
+                               :inverse-volatility]]}}
+        "Try Risk-weighted sizing"]
+       " to keep every asset with a volatility-based size."])))
+
 (defn- overflow-line
   [{:keys [hidden-count hidden-max-pts]}]
   (when (pos? (or hidden-count 0))
@@ -440,6 +472,7 @@
                  rows)]
           (axis-rows scale)]
          (reading-note model)
+         (switch-objective-suggestion result)
          (overflow-line model)
          (exposure-line (:diagnostics result))
          (solver-footer result)]

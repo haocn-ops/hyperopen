@@ -16,7 +16,8 @@
    :equal-risk-gross-target-above-max #{:gross-max}
    :equal-risk-gross-target-below-floor #{:gross-min :gross-max}
    :equal-risk-gross-minimum-above-target #{:held-locks}
-   :equal-risk-gross-capacity-below-target #{:max-asset-weight}})
+   :equal-risk-gross-capacity-below-target #{:max-asset-weight}
+   :inverse-volatility-zero-volatility-asset #{:blocklist}})
 
 (def ^:private violation-constraint-control-keys
   {:gross-exposure #{:gross-max}
@@ -31,7 +32,8 @@
    :max-turnover "Turnover Cap"
    :net-max "Net Exposure Max"
    :net-min "Net Exposure Min"
-   :target-return "Target Return"})
+   :target-return "Target Return"
+   :blocklist "Excluded Assets"})
 
 (defn infeasible-result
   [run-state]

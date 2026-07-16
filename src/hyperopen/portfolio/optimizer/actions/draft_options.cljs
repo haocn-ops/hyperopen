@@ -4,6 +4,7 @@
   {:minimum-variance {:kind :minimum-variance}
    :max-sharpe {:kind :max-sharpe}
    :equal-risk {:kind :equal-risk}
+   :inverse-volatility {:kind :inverse-volatility}
    :target-volatility {:kind :target-volatility
                        :target-volatility 0.2}
    :target-return {:kind :target-return
@@ -48,6 +49,7 @@
    :max-sharpe {:objective {:kind :max-sharpe}
                 :return-model-kind :black-litterman}
    :equal-risk {:objective {:kind :equal-risk}}
+   :inverse-volatility {:objective {:kind :inverse-volatility}}
    :target-volatility {:objective {:kind :target-volatility
                                    :target-volatility 0.12}}
    :maximum-return {:objective {:kind :target-return

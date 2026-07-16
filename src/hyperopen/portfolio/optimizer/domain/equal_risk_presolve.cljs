@@ -39,7 +39,7 @@
           (select-keys books [:long :short])))
 
 (defn- side-violations
-  [{:keys [instrument-ids side-metadata]} books]
+  [{:keys [instrument-ids side-metadata]} books objective-label]
   (let [two-sided (seq (:two-sided books))
         flipped-shorts (->> side-metadata
                             (keep-indexed (fn [idx {:keys [requested-side shortable?]}]
@@ -51,7 +51,7 @@
       two-sided
       (conj {:code :equal-risk-requires-fixed-sides
              :instrument-ids (mapv #(nth instrument-ids %) (:two-sided books))
-             :message (str "Equal Risk needs every asset fixed to one side, but "
+             :message (str objective-label " needs every asset fixed to one side, but "
                            (count (:two-sided books))
                            (if (= 1 (count (:two-sided books)))
                              " asset can"
@@ -89,17 +89,17 @@
                            " gross target. Raise caps or lower gross.")}))))
 
 (defn- exposure-violations
-  [encoded-constraints gross tolerance]
+  [encoded-constraints gross tolerance objective-label]
   (let [gross-max (get-in encoded-constraints [:gross-exposure :max])
         gross-floor (get-in encoded-constraints [:gross-floor :min])]
     (cond-> []
       (not (finite-number? gross))
       (conj {:code :equal-risk-invalid-exposure-targets :gross gross
-             :message "Equal Risk needs a finite gross exposure target."})
+             :message (str objective-label " needs a finite gross exposure target.")})
 
       (and (finite-number? gross) (<= gross tolerance))
       (conj {:code :equal-risk-gross-target-not-positive :gross gross
-             :message "Equal Risk needs a positive gross leverage target."})
+             :message (str objective-label " needs a positive gross leverage target.")})
 
       (and (finite-number? gross) (finite-number? gross-max)
            (> gross (+ gross-max tolerance)))
@@ -125,9 +125,16 @@
 (defn presolve
   "Explicit feasibility screening before the nonlinear solver. Returns
   {:status :ok :targets {:gross} :books {...} :warnings []}
-  or {:status :infeasible :violations [...]} with specific codes."
-  [{:keys [instrument-ids lower-bounds upper-bounds] :as encoded-constraints}
-   covariance]
+  or {:status :infeasible :violations [...]} with specific codes.
+  The optional opts map carries :objective-label (default \"Equal Risk\") so
+  objectives that reuse this screening (Risk-weighted sizing) produce
+  violation messages naming themselves; the :equal-risk-* violation CODES are
+  shared deliberately — the infeasible panel maps codes to setup controls."
+  ([encoded-constraints covariance]
+   (presolve encoded-constraints covariance nil))
+  ([{:keys [instrument-ids lower-bounds upper-bounds] :as encoded-constraints}
+    covariance
+    {:keys [objective-label] :or {objective-label "Equal Risk"}}]
   (let [tolerance (:exposure-feasibility equal-risk/tolerances)
         n (count instrument-ids)
         covariance-result (risk-contributions/validate-covariance covariance n)
@@ -138,12 +145,15 @@
                                   :details (:details covariance-result)
                                   :message (case (:reason covariance-result)
                                              :covariance-asymmetric
-                                             "The covariance matrix is materially asymmetric; Equal Risk will not silently repair invalid risk input."
+                                             (str "The covariance matrix is materially asymmetric; "
+                                                  objective-label
+                                                  " will not silently repair invalid risk input.")
                                              "The covariance matrix is missing, non-finite, or misaligned with the selected assets.")}])
         {:keys [gross]} (equal-risk/exposure-targets encoded-constraints)
-        exposure-violations* (exposure-violations encoded-constraints gross tolerance)
+        exposure-violations* (exposure-violations encoded-constraints gross tolerance
+                                                  objective-label)
         books (equal-risk/book-split encoded-constraints)
-        side-violations* (side-violations encoded-constraints books)
+        side-violations* (side-violations encoded-constraints books objective-label)
         targets-valid? (finite-number? gross)
         gross-violations* (when (and targets-valid?
                                      (empty? exposure-violations*)
@@ -165,4 +175,4 @@
        :covariance (:covariance covariance-result)
        :targets {:gross gross}
        :books (select-keys books [:long :short])
-       :warnings []})))
+       :warnings []}))))

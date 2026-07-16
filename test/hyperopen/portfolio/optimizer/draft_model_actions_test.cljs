@@ -93,6 +93,18 @@
           {}
           :mixed-frequency))))
 
+(deftest set-objective-kind-persists-inverse-volatility-test
+  ;; Risk-weighted sizing (ExecPlan optimizer-inverse-volatility-objective,
+  ;; item 8): the kind must be a persistable objective-model option, not
+  ;; rejected as invalid.
+  (is (= [[:effects/save-many [[[:portfolio :optimizer :draft :objective]
+                                {:kind :inverse-volatility}]
+                               [[:portfolio :optimizer :draft :metadata :dirty?]
+                                true]]]]
+         (actions/set-portfolio-optimizer-objective-kind
+          {}
+          :inverse-volatility))))
+
 (deftest set-draft-model-layer-actions-ignore-invalid-kinds-test
   (is (= []
          (actions/set-portfolio-optimizer-objective-kind {} "not-real")))

@@ -136,6 +136,24 @@
                   {:rms-pts (pts (:rms-error current))
                    :max-pts (pts (:max-absolute-error current))})})))
 
+(defn floored-instrument-ids
+  "Assets Equal Risk held at 0%: a zero binding bound plus a zero published
+  target weight — the side-locked hedges the objective's positive equal target
+  can never include. These drive the Risk-weighted sizing cross-link (the
+  objective built to keep every selected asset)."
+  [result]
+  (let [weights (:target-weights-by-instrument result)]
+    (->> (get-in result [:diagnostics :binding-constraints])
+         (filter (fn [{:keys [instrument-id bound]}]
+                   (and (finite-number? bound)
+                        (<= (js/Math.abs bound) 1e-10)
+                        (let [weight (get weights instrument-id)]
+                          (and (finite-number? weight)
+                               (<= (js/Math.abs weight) 1e-10))))))
+         (keep :instrument-id)
+         distinct
+         vec)))
+
 (defn kpi-risk-balance
   "Values for the KPI strip's Risk balance tile: current → recommended max
   deviation in points, RMS, and the signed change (negative = tighter =

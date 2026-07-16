@@ -232,6 +232,7 @@
         views-editor-active? (and views-active? (not return-free?))
         return-free-label (case objective-kind
                             :equal-risk "Not used by Equal Risk"
+                            :inverse-volatility "Not used by Risk-weighted sizing"
                             "Not used by Minimum risk")
         readiness-model (optimizer-view-model/readiness-panel-model readiness history-load-state)
         ;; Computed once for the whole rail: the assumptions panel rows, the

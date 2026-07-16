@@ -2,6 +2,7 @@
   (:require [hyperopen.portfolio.optimizer.application.view-model.results :as results-model]
             [hyperopen.portfolio.optimizer.application.view-model.setup-summary :as setup-summary]
             [hyperopen.portfolio.optimizer.contracts :as contracts]
+            [hyperopen.portfolio.optimizer.contracts.constants :as contracts-constants]
             [hyperopen.views.portfolio.optimize.equal-risk-confidence-rail
              :as equal-risk-confidence-rail]
             [hyperopen.views.portfolio.optimize.frontier-chart :as frontier-chart]
@@ -11,6 +12,8 @@
             [hyperopen.views.portfolio.optimize.results-diagnostics-rail :as diagnostics-rail]
             [hyperopen.views.portfolio.optimize.results-summary :as summary]
             [hyperopen.views.portfolio.optimize.risk-contributions-card :as risk-contributions-card]
+            [hyperopen.views.portfolio.optimize.risk-weighted-sizing-card
+             :as risk-weighted-sizing-card]
             [hyperopen.views.portfolio.optimize.scenario-objective-menu :as objective-menu]
             [hyperopen.views.portfolio.optimize.target-exposure-table :as target-exposure-table]
             [hyperopen.views.portfolio.optimize.volatility-intuition-card
@@ -54,7 +57,14 @@
    (let [result (results-model/enrich-result-labels (:result last-successful-run) draft)
          selected-risk-instrument (get-in state
                                           contracts/ui-selected-risk-instrument-path)
-         equal-risk? (= :equal-risk (get-in result [:solver :objective-kind]))]
+         equal-risk? (= :equal-risk (get-in result [:solver :objective-kind]))
+         inverse-volatility? (= :inverse-volatility
+                                (get-in result [:solver :objective-kind]))
+         ;; No covariance-only objective is selected from a frontier: each
+         ;; replaces the frontier chart with its own proof-of-objective card,
+         ;; and the frontier-density refinement machinery disappears.
+         frontier? (not (contains? contracts-constants/covariance-only-objective-kinds
+                                   (get-in result [:solver :objective-kind])))]
      (when (= :solved (:status result))
        [:section {:class ["optimizer-results-surface" "space-y-0" "leading-4"]
                   :replicant/key "optimizer-results-surface"
@@ -88,12 +98,20 @@
           ;; stringifies those); the whole set only toggles when the solved
           ;; objective itself changes.
           [:div {:class ["space-y-4"]
-                 :replicant/key (if equal-risk? "equal-risk-center" "frontier-center")}
+                 :replicant/key (cond
+                                  equal-risk? "equal-risk-center"
+                                  inverse-volatility? "inverse-volatility-center"
+                                  :else "frontier-center")}
            (when equal-risk?
              (risk-contributions-card/risk-contributions-card
               result
               {:selected-risk-instrument selected-risk-instrument}))
-           (when-not equal-risk?
+           ;; Risk-weighted sizing takes the same slot with its own
+           ;; centerpiece: the sizing-fidelity card that proves the |w|·σ
+           ;; parity the objective promises.
+           (when inverse-volatility?
+             (risk-weighted-sizing-card/risk-weighted-sizing-card result))
+           (when frontier?
              (frontier-chart/frontier-chart
               draft
               result
@@ -113,7 +131,7 @@
            ;; card below is compact with its options behind a disclosure.
            (when-not equal-risk?
              (summary/target-context-card result))
-           (when-not equal-risk?
+           (when frontier?
              (refinement-card/refinement-status-card refinement))]]
          ;; Rail order is review-first: the next-step row leads, then the
          ;; volatility-intuition context, then frontier solve-quality detail,
@@ -124,9 +142,12 @@
                 :data-role "portfolio-optimizer-results-right-panel"}
           ;; Equal Risk gets its own confidence rail (fit / allocation freedom
           ;; / solution stability / real stop reasons); the refinement-based
-          ;; rail speaks frontier language that does not exist for it.
+          ;; rail speaks frontier language that exists for neither
+          ;; covariance-only objective (Risk-weighted sizing is deterministic
+          ;; — there is nothing to refine).
           (or (equal-risk-confidence-rail/equal-risk-confidence-rail result)
-              (diagnostics-rail/result-confidence-rail refinement))
+              (when frontier?
+                (diagnostics-rail/result-confidence-rail refinement)))
           ;; Always-present wrapper: the volatility card is conditional (it
           ;; needs a solved σ), and without a stable slot its mounting would
           ;; shift the trust rail and views editor below — resetting open
@@ -138,8 +159,11 @@
           ;; Quality detail follows volatility intuition for both objectives;
           ;; their lead cards remain above it. Each renderer owns the rows
           ;; meaningful to its objective.
-          (if equal-risk?
+          (cond
+            equal-risk?
             (equal-risk-confidence-rail/equal-risk-confidence-quality-rail result)
+
+            frontier?
             (diagnostics-rail/result-confidence-quality-rail refinement))
           (diagnostics-rail/trust-diagnostics-rail result)
           (active-views-editor state draft result readiness)]]]))))

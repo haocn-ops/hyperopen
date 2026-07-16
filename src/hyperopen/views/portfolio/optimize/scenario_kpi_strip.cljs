@@ -3,14 +3,18 @@
   read model (extracted from scenario-detail-view during the Equal Risk
   results redesign, per that namespace's size-exception plan).
 
-  Objective-aware: for :equal-risk the Sharpe tile becomes the RISK BALANCE
-  tile (current → recommended max contribution deviation in points — the
-  quantity that objective actually optimizes), and the volatility /
-  expected-return deltas render NEUTRALLY because a rise or fall in either is
-  not success or failure for a balance objective. Every other objective keeps
-  the existing five tiles unchanged."
+  Objective-aware: for the covariance-only objectives the Sharpe tile becomes
+  the objective's own success metric (:equal-risk → the RISK BALANCE tile,
+  current → recommended max contribution deviation in points;
+  :inverse-volatility → the SIZING DEVIATION tile, max |w|·σ spread among
+  free assets), and the volatility / expected-return deltas render NEUTRALLY
+  because a rise or fall in either is not success or failure for them. Every
+  other objective keeps the existing five tiles unchanged."
   (:require [hyperopen.portfolio.optimizer.application.view-model.equal-risk-results
              :as equal-risk-results]
+            [hyperopen.portfolio.optimizer.application.view-model.inverse-volatility-results
+             :as inverse-volatility-results]
+            [hyperopen.portfolio.optimizer.contracts.constants :as contracts-constants]
             [hyperopen.views.portfolio.optimize.format :as opt-format]))
 
 (defn- kpi-delta-class
@@ -137,15 +141,32 @@
                                {:positive "text-warning"
                                 :negative "text-trading-green"}))))
 
+(defn- sizing-deviation-kpi-card
+  "Risk-weighted sizing's success metric: the largest relative |w|·σ spread
+  among the assets the projection left free (0% = perfect parity). No
+  Exact/Approximate quality label — the solve is deterministic."
+  [result]
+  (let [deviation (inverse-volatility-results/max-sizing-deviation result)]
+    (kpi-card "portfolio-optimizer-scenario-kpi-sizing-deviation"
+              "Sizing deviation · free assets"
+              (opt-format/format-pct deviation)
+              "max |w|·σ spread vs equal ideal"
+              "text-trading-muted")))
+
 (defn kpi-strip
   [result*]
   (let [{:keys [current-return current-vol target-return target-vol
                 return-delta vol-delta] :as deltas} (recommendation-deltas result*)
         preview (:rebalance-preview result*)
         diagnostics (:diagnostics result*)
-        ;; Equal Risk: vol/return direction is not success or failure, so the
-        ;; deltas stay neutral and the balance tile carries the verdict.
+        ;; Covariance-only objectives: vol/return direction is not success or
+        ;; failure, so the deltas stay neutral and the objective's own tile
+        ;; carries the verdict.
         equal-risk? (equal-risk-results/equal-risk-result? result*)
+        inverse-volatility? (inverse-volatility-results/inverse-volatility-result?
+                             result*)
+        covariance-only? (contains? contracts-constants/covariance-only-objective-kinds
+                                    (get-in result* [:solver :objective-kind]))
         gross (:gross-exposure diagnostics)
         net (:net-exposure diagnostics)]
     [:section {:class ["optimizer-scenario-kpi-strip"
@@ -161,7 +182,7 @@
                (if (opt-format/finite-number? current-vol)
                  (str (opt-format/format-pct-delta vol-delta) " · annualized")
                  "annualized")
-               (if equal-risk?
+               (if covariance-only?
                  "text-trading-muted"
                  (kpi-delta-class vol-delta
                                   {:positive "text-warning"
@@ -176,14 +197,15 @@
                (if (opt-format/finite-number? current-return)
                  (str (opt-format/format-pct-delta return-delta) " · annualized")
                  "annualized")
-               (if equal-risk?
+               (if covariance-only?
                  "text-trading-muted"
                  (kpi-delta-class return-delta
                                   {:positive "text-trading-green"
                                    :negative "text-warning"})))
-     (if equal-risk?
-       (risk-balance-kpi-card result*)
-       (sharpe-kpi-card result* deltas))
+     (cond
+       equal-risk? (risk-balance-kpi-card result*)
+       inverse-volatility? (sizing-deviation-kpi-card result*)
+       :else (sharpe-kpi-card result* deltas))
      (kpi-card "portfolio-optimizer-scenario-kpi-turnover"
                "Turnover Required"
                (opt-format/format-pct (:turnover diagnostics))

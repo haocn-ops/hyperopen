@@ -37,7 +37,7 @@
                    "hover:text-trading-text"]
            :data-role "portfolio-optimizer-constrain-frontier-control"}
    [:input {:type "checkbox"
-            :class ["optimizer-frontier-checkbox" "h-3.5" "w-3.5" "accent-warning" "outline-none"]
+            :class ["optimizer-checkbox"]
             :data-role "portfolio-optimizer-constrain-frontier-checkbox"
             :checked (true? constrain-frontier?)
             :on {:change [[:actions/set-portfolio-optimizer-constrain-frontier

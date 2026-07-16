@@ -28,48 +28,7 @@
     background-color: var(--optimizer-surface);
   }
 
-  .portfolio-optimizer .optimizer-frontier-checkbox {
-    appearance: none;
-    -webkit-appearance: none;
-    display: grid;
-    place-content: center;
-    flex: 0 0 14px;
-    width: 14px;
-    height: 14px;
-    min-height: 14px;
-    margin: 0;
-    border: 1px solid var(--optimizer-border-strong);
-    border-radius: 2px;
-    background-color: var(--optimizer-bg);
-    color: var(--optimizer-accent);
-    box-shadow: none;
-  }
-
-  .portfolio-optimizer .optimizer-frontier-checkbox::before {
-    content: "";
-    width: 4px;
-    height: 7px;
-    border-right: 2px solid var(--optimizer-bg);
-    border-bottom: 2px solid var(--optimizer-bg);
-    transform: rotate(45deg) scale(0);
-    transform-origin: center;
-  }
-
-  .portfolio-optimizer .optimizer-frontier-checkbox:checked {
-    border-color: var(--optimizer-accent);
-    background-color: var(--optimizer-accent);
-  }
-
-  .portfolio-optimizer .optimizer-frontier-checkbox:checked::before {
-    transform: rotate(45deg) scale(1);
-  }
-
-  .portfolio-optimizer .optimizer-frontier-checkbox:focus-visible,
-  .portfolio-optimizer .optimizer-frontier-checkbox:focus {
-    border-color: var(--optimizer-border-strong);
-    box-shadow: none;
-    outline: none;
-  }
+  /* The frontier toolbar checkbox uses the shared .optimizer-checkbox (base.css). */
 
   .portfolio-optimizer .portfolio-frontier-marker {
     outline: none;

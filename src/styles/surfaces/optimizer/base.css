@@ -241,6 +241,59 @@
     color: var(--optimizer-long);
   }
 
+  /* Shared optimizer checkbox — the frontier toolbar's custom control generalized
+     (appearance:none square, accent fill, drawn check glyph) so every optimizer
+     checkbox reads as one design instead of the browser default. */
+  .portfolio-optimizer .optimizer-checkbox {
+    appearance: none;
+    -webkit-appearance: none;
+    display: grid;
+    place-content: center;
+    flex: 0 0 14px;
+    width: 14px;
+    height: 14px;
+    min-height: 14px;
+    margin: 0;
+    border: 1px solid var(--optimizer-border-strong);
+    border-radius: 2px;
+    background-color: var(--optimizer-bg);
+    color: var(--optimizer-accent);
+    box-shadow: none;
+    cursor: pointer;
+    transition: border-color 120ms ease, background-color 120ms ease;
+  }
+
+  .portfolio-optimizer .optimizer-checkbox::before {
+    content: "";
+    width: 4px;
+    height: 7px;
+    border-right: 2px solid var(--optimizer-bg);
+    border-bottom: 2px solid var(--optimizer-bg);
+    transform: rotate(45deg) scale(0);
+    transform-origin: center;
+    transition: transform 120ms ease;
+  }
+
+  .portfolio-optimizer .optimizer-checkbox:hover {
+    border-color: var(--optimizer-accent-border);
+  }
+
+  .portfolio-optimizer .optimizer-checkbox:checked {
+    border-color: var(--optimizer-accent);
+    background-color: var(--optimizer-accent);
+  }
+
+  .portfolio-optimizer .optimizer-checkbox:checked::before {
+    transform: rotate(45deg) scale(1);
+  }
+
+  .portfolio-optimizer .optimizer-checkbox:focus-visible,
+  .portfolio-optimizer .optimizer-checkbox:focus {
+    border-color: var(--optimizer-accent-border);
+    box-shadow: none;
+    outline: none;
+  }
+
   .portfolio-optimizer .optimizer-note {
     background-color: var(--optimizer-surface);
     border: 1px solid var(--optimizer-border);

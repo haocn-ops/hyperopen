@@ -603,8 +603,7 @@
                             "browser as your preference.")
                 :data-role "portfolio-optimizer-execution-auto-exit"}
         [:input {:type "checkbox"
-                 :class ["h-3.5" "w-3.5" "rounded-[3px]" "border" "border-base-300"
-                         "bg-transparent"]
+                 :class ["optimizer-checkbox"]
                  :checked auto?
                  :on {:change [[:actions/set-portfolio-optimizer-execution-auto-exit
                                 (not auto?)]]}}]

@@ -219,8 +219,7 @@
                          "font-mono" "text-[0.7rem]" "text-trading-muted"]
                  :data-role "portfolio-optimizer-execution-auto-topup"}
          [:input {:type "checkbox"
-                  :class ["h-3.5" "w-3.5" "rounded-[3px]" "border" "border-base-300"
-                          "bg-transparent"]
+                  :class ["optimizer-checkbox"]
                   :checked (boolean margin-rec-auto-topup?)
                   :on {:change [[:actions/set-margin-rec-auto-topup
                                  (not margin-rec-auto-topup?)]]}}]

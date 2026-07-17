@@ -5,8 +5,17 @@
   flagged), the KPI sizing-deviation tile, and the recommendation verdict
   copy. Pure functions over the solved result payload's :inverse-volatility
   section; every view branch for this objective reads from here so the page
-  can never disagree with itself (same contract as equal-risk-results)."
-  (:require [hyperopen.portfolio.optimizer.coercion :as coercion]))
+  can never disagree with itself (same contract as equal-risk-results).
+
+  The CONTRIBUTIONS tab model shapes the diagnostic :risk-contributions
+  section the engine now emits for covariance-only runs generally: signed
+  Euler shares over the published weights, with NO target framing — this
+  objective sizes by standalone volatility and does not target contributions,
+  so the rows deliberately drop the uniform-target fields the shared
+  row-builder carries along."
+  (:require [hyperopen.portfolio.optimizer.application.view-model.equal-risk-results
+             :as equal-risk-results]
+            [hyperopen.portfolio.optimizer.coercion :as coercion]))
 
 (def ^:private finite-number? coercion/finite-number?)
 
@@ -71,6 +80,42 @@
                           (reduce max (or ideal 0) all-risk-weights))
        :moved-count (count (filter :moved-off-seed? rows))
        :max-sizing-deviation (:max-sizing-deviation section)})))
+
+(defn contributions-model
+  "Model for the sizing card's CONTRIBUTIONS diagnostic tab. The
+  `display-row-cap` largest |share| rows survive (the biggest owners of risk
+  are the diagnostic's point), displayed in signed-share descending order so
+  hedges sit at the bottom; the remainder is summarized honestly. No
+  target/deviation fields ride the rows — this objective does not target
+  contributions. Nil when the result is not an :inverse-volatility run or
+  predates the diagnostic section."
+  [result]
+  (when (and (inverse-volatility-result? result)
+             (= :inverse-volatility (get-in result [:solver :objective-kind])))
+    (when-let [all-rows (seq (equal-risk-results/contribution-rows result))]
+      (let [rows (mapv #(select-keys % [:instrument-id :label :weight :share
+                                        :current-share :negative?])
+                       all-rows)
+            ordered (sort-by (fn [{:keys [share]}]
+                               (- (js/Math.abs (or share 0))))
+                             rows)
+            visible (->> (take equal-risk-results/display-row-cap ordered)
+                         (sort-by (fn [{:keys [share]}]
+                                    (- (or share ##-Inf))))
+                         vec)
+            hidden (drop equal-risk-results/display-row-cap ordered)
+            negative-count (get-in result [:risk-contributions
+                                           :negative-contribution-count])]
+        {:rows visible
+         :asset-count (count rows)
+         :hidden-count (count hidden)
+         :hidden-max-pts (when (seq hidden)
+                           (reduce max 0 (map #(* 100 (js/Math.abs
+                                                       (or (:share %) 0)))
+                                              hidden)))
+         :current? (boolean (some #(finite-number? (:current-share %))
+                                  visible))
+         :negative-count negative-count}))))
 
 (defn verdict-body
   "The recommendation sentence for the verdict bar: what the sizing rule did,

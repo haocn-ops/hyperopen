@@ -1314,6 +1314,24 @@
     margin-top: 12px;
   }
 
+  /* The Risk-weighted sizing card shares the risk-balance tab grammar. Its
+     default (no radio checked) panel is the sizing-fidelity view — scoped by
+     the card's own modifier class so the sibling card's default-contribution
+     rule above stays untouched — and its CONTRIBUTIONS diagnostic panel keys
+     on the "contributions" view value, so neither card's default state can
+     leak a second visible panel into the other. */
+  .portfolio-optimizer
+    .optimizer-risk-balance--sizing:not(:has(input[data-risk-view]:checked))
+    .optimizer-risk-balance-panel--sizing,
+  .portfolio-optimizer
+    .optimizer-risk-balance:has(input[data-risk-view="sizing"]:checked)
+    .optimizer-risk-balance-panel--sizing,
+  .portfolio-optimizer
+    .optimizer-risk-balance:has(input[data-risk-view="contributions"]:checked)
+    .optimizer-risk-balance-panel--contributions {
+    display: block;
+  }
+
   /* KPI strip: one bordered band, hairline-divided cells (1px grid-gap trick
      so the hairlines survive responsive column wraps). */
   .portfolio-optimizer .optimizer-risk-balance-kpis {

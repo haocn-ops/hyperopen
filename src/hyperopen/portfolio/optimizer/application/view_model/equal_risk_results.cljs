@@ -13,8 +13,16 @@
 (def ^:private finite-number? coercion/finite-number?)
 
 (defn equal-risk-result?
+  "True when the result is an Equal Risk run carrying its contribution
+  section. Section PRESENCE alone stopped implying the objective when the
+  covariance-only sibling (:inverse-volatility) started emitting
+  :risk-contributions as a diagnostic — the recorded objective kind must
+  agree. A result with no recorded kind (persisted pre-kind payloads,
+  hand-built fixtures) could only have come from Equal Risk."
   [result]
-  (some? (:risk-contributions result)))
+  (and (some? (:risk-contributions result))
+       (let [kind (get-in result [:solver :objective-kind])]
+         (or (nil? kind) (= :equal-risk kind)))))
 
 (def display-row-cap
   "Chart rows shown before the remainder line takes over. Universes here reach
@@ -73,9 +81,53 @@
         (<= fraction 0.5) :caution
         :else :bad))))
 
+(defn contribution-rows
+  "Per-instrument signed-share rows from the result's :risk-contributions /
+  :current-risk-contributions sections — the objective-agnostic core the
+  Equal Risk balance model and the Risk-weighted sizing contributions view
+  both build on. Each row: id/label/weight, the recommended :share, the
+  nil-safe :current-share, the per-row :target-share (per-instrument section
+  with the uniform-target fallback), signed :deviation-pts / :shift-pts, and
+  :negative?. Deliberately NOT kind-gated: a consumer that does not target
+  contributions simply ignores the target-derived fields."
+  [result]
+  (when-let [contributions (:risk-contributions result)]
+    (let [{:keys [instrument-ids relative-contributions
+                  target-relative-contributions]} contributions
+          labels (:labels-by-instrument result)
+          weights (:target-weights-by-instrument result)
+          targets-by-id (:target-relative-contributions-by-instrument contributions)
+          current-by-id (get-in result [:current-risk-contributions
+                                        :relative-contributions-by-instrument])
+          target-share (first target-relative-contributions)]
+      (mapv (fn [instrument-id share]
+              (let [row-target (let [target (get targets-by-id instrument-id)]
+                                 (if (finite-number? target)
+                                   target
+                                   target-share))
+                    current-share (get current-by-id instrument-id)
+                    deviation (when (and (finite-number? share)
+                                         (finite-number? row-target))
+                                (- share row-target))]
+                {:instrument-id instrument-id
+                 :label (or (get labels instrument-id) instrument-id)
+                 :weight (get weights instrument-id)
+                 :share share
+                 :current-share current-share
+                 :target-share row-target
+                 :deviation-pts (pts deviation)
+                 :shift-pts (when (and (finite-number? share)
+                                       (finite-number? current-share))
+                              (pts (- share current-share)))
+                 :negative? (and (finite-number? share) (neg? share))}))
+            instrument-ids
+            relative-contributions))))
+
 (defn balance-model
   "Chart model from the payload's contribution sections, in one of two display
-  modes (`:display-mode`).
+  modes (`:display-mode`). Nil for non-Equal-Risk results — the sibling
+  covariance-only objective carries the same sections as diagnostics, and its
+  card owns their presentation.
 
   `:deviation` (default): the `display-row-cap` worst rows by |deviation from
   target| are selected (so the rows that explain an Approximate verdict always
@@ -96,38 +148,13 @@
   target. `:current` additionally carries `:biggest-shift`, picked over EVERY
   row before capping."
   [result]
-  (when-let [contributions (:risk-contributions result)]
-    (let [{:keys [instrument-ids relative-contributions
-                  target-relative-contributions quality rms-error
-                  max-absolute-error negative-contribution-count]} contributions
-          labels (:labels-by-instrument result)
-          weights (:target-weights-by-instrument result)
-          targets-by-id (:target-relative-contributions-by-instrument contributions)
-          current-by-id (get-in result [:current-risk-contributions
-                                        :relative-contributions-by-instrument])
+  (when-let [contributions (and (equal-risk-result? result)
+                                (:risk-contributions result))]
+    (let [{:keys [instrument-ids target-relative-contributions quality
+                  rms-error max-absolute-error
+                  negative-contribution-count]} contributions
           target-share (first target-relative-contributions)
-          all-rows (mapv (fn [instrument-id share]
-                           (let [row-target (let [target (get targets-by-id instrument-id)]
-                                              (if (finite-number? target)
-                                                target
-                                                target-share))
-                                 current-share (get current-by-id instrument-id)
-                                 deviation (when (and (finite-number? share)
-                                                      (finite-number? row-target))
-                                             (- share row-target))]
-                             {:instrument-id instrument-id
-                              :label (or (get labels instrument-id) instrument-id)
-                              :weight (get weights instrument-id)
-                              :share share
-                              :current-share current-share
-                              :target-share row-target
-                              :deviation-pts (pts deviation)
-                              :shift-pts (when (and (finite-number? share)
-                                                    (finite-number? current-share))
-                                           (pts (- share current-share)))
-                              :negative? (and (finite-number? share) (neg? share))}))
-                         instrument-ids
-                         relative-contributions)
+          all-rows (contribution-rows result)
           shift-mode? (and (= :exact quality)
                            (some #(finite-number? (:shift-pts %)) all-rows))
           cap-key (if shift-mode? :shift-pts :deviation-pts)
@@ -332,9 +359,12 @@
 (defn verdict-body
   "The recommendation sentence. Constraint-determined books get the honest
   'the optimizer could not change these weights' framing instead of implying
-  a choice was made."
+  a choice was made. Kind-gated (see equal-risk-result?) so the verdict
+  or-site never speaks Equal Risk over a sibling objective's diagnostic
+  contribution section."
   [result]
-  (when-let [contributions (:risk-contributions result)]
+  (when-let [contributions (and (equal-risk-result? result)
+                                (:risk-contributions result))]
     (let [n (count (:instrument-ids contributions))
           target-share (first (:target-relative-contributions contributions))
           max-pts* (pts (:max-absolute-error contributions))

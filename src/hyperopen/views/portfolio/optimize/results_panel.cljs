@@ -116,9 +116,13 @@
               {:selected-risk-instrument selected-risk-instrument}))
            ;; Risk-weighted sizing takes the same slot with its own
            ;; centerpiece: the sizing-fidelity card that proves the |w|·σ
-           ;; parity the objective promises.
+           ;; parity the objective promises, plus the objective-agnostic
+           ;; analytics tabs (its DIVERSIFICATION tab shares the same
+           ;; selected-instrument app state as the equal-risk card).
            (when inverse-volatility?
-             (risk-weighted-sizing-card/risk-weighted-sizing-card result))
+             (risk-weighted-sizing-card/risk-weighted-sizing-card
+              result
+              {:selected-risk-instrument selected-risk-instrument}))
            (when frontier?
              (frontier-chart/frontier-chart
               draft

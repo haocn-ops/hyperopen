@@ -9,8 +9,20 @@
   honest 'a cap/lock/side limit moved this row' flag. A FREE row whose |w|·σ
   still deviates from the free-set parity is :turnover-limited? — only the
   turnover L1 budget can displace an unpinned row, since at the KKT optimum
-  the sigma-weighted projection otherwise re-equalizes free rows exactly."
-  (:require [hyperopen.portfolio.optimizer.coercion :as coercion]
+  the sigma-weighted projection otherwise re-equalizes free rows exactly.
+
+  Alongside the sizing section, solved runs also publish the objective-
+  agnostic :risk-contributions / :current-risk-contributions /
+  :risk-structure analytics (engine.risk-analytics-payload — the same pure
+  weights+covariance sections Equal Risk emits). The contribution summary's
+  targets are the uniform 1/n vector only because the summary math requires
+  one; this objective does not target contributions, so the section carries
+  :quality :diagnostic instead of a convergence quality. When the analytics
+  inputs are unaligned or degenerate the diagnostics are simply omitted — the
+  sizing section is the objective's primary proof and never depends on them."
+  (:require [hyperopen.portfolio.optimizer.application.engine.risk-analytics-payload
+             :as risk-analytics]
+            [hyperopen.portfolio.optimizer.coercion :as coercion]
             [hyperopen.portfolio.optimizer.domain.equal-risk :as equal-risk]))
 
 (def ^:private finite-number? coercion/finite-number?)
@@ -102,11 +114,27 @@
           (/ (- high low) high)
           0)))))
 
+(defn- analytics-sections
+  "The shared diagnostic analytics over the published weights, with the
+  uniform-target contribution summary stamped :quality :diagnostic. Empty map
+  when the inputs cannot be summarized (see namespace docstring)."
+  [{:keys [risk-result instrument-ids target-weights current-weights]}]
+  (let [n (count instrument-ids)
+        analytics (risk-analytics/analytics-sections
+                   {:instrument-ids instrument-ids
+                    :covariance (:covariance risk-result)
+                    :target-weights target-weights
+                    :current-weights current-weights
+                    :targets (vec (repeat n (/ 1 n)))})]
+    (if (:error analytics)
+      {}
+      (update analytics :risk-contributions assoc :quality :diagnostic))))
+
 (defn inverse-volatility-sections
-  "Builds {:inverse-volatility {...}} from the FINAL published weights and
-  the planned problem's seed/bounds/sigmas; nil when the plan carries no
-  problem."
-  [{:keys [solver-plan instrument-ids target-weights]}]
+  "Builds {:inverse-volatility {...}} plus the diagnostic analytics sections
+  from the FINAL published weights and the planned problem's
+  seed/bounds/sigmas; nil when the plan carries no problem."
+  [{:keys [solver-plan instrument-ids target-weights] :as inputs}]
   (when-let [problem (get-in solver-plan [:problems 0])]
     (let [rows (sizing-rows {:instrument-ids instrument-ids
                              :target-weights target-weights
@@ -115,8 +143,10 @@
                              :lower-bounds (:lower-bounds problem)
                              :upper-bounds (:upper-bounds problem)})
           ideal (ideal-risk-weight rows)]
-      {:inverse-volatility
-       {:sizing-rows (annotate-turnover-limited rows ideal)
-        :seed-weights (vec (:seed-weights problem))
-        :ideal-risk-weight ideal
-        :max-sizing-deviation (max-sizing-deviation rows)}})))
+      (merge
+       {:inverse-volatility
+        {:sizing-rows (annotate-turnover-limited rows ideal)
+         :seed-weights (vec (:seed-weights problem))
+         :ideal-risk-weight ideal
+         :max-sizing-deviation (max-sizing-deviation rows)}}
+       (analytics-sections inputs)))))

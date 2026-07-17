@@ -65,10 +65,13 @@
 
 ;; --- Shared lane scale --------------------------------------------------------
 
-(defn- lane-scale
+(defn lane-scale
   "One scale for every lane, fitted to the PRIMARY data — zero, every target,
   and every recommended share — padded and rounded to 5% so the domain reads
-  as clean ticks. Current shares only extend the domain when they sit within
+  as clean ticks. Public: the Risk-weighted sizing card's CONTRIBUTIONS
+  diagnostic tab reuses the lane primitives (scale, backdrop, lane, axis)
+  with no targets, so the two covariance-only cards draw contributions in
+  one visual language. Current shares only extend the domain when they sit within
   35% of the primary span beyond it: a wildly unbalanced current book (one
   asset carrying ~100% of volatility is exactly why Equal Risk gets run)
   must not squash the recommended bars into a corner. Currents beyond that
@@ -153,9 +156,10 @@
    [:span {:class ["optimizer-risk-balance-col-head"]}
     (if (= :shift mode) "Shift" "Deviation")]])
 
-(defn- plot-backdrop
-  "Gridlines, the zero axis, and the continuous dashed target line, drawn once
-  behind the whole row stack in a same-grid overlay so they read as one plot."
+(defn plot-backdrop
+  "Gridlines, the zero axis, and the continuous dashed target line (only when
+  `target-share` is numeric), drawn once behind the whole row stack in a
+  same-grid overlay so they read as one plot."
   [{:keys [x] :as scale} target-share]
   [:div {:class ["optimizer-risk-balance-row" "optimizer-risk-balance-backdrop"
                  "pointer-events-none"]}
@@ -174,10 +178,11 @@
    [:span]
    [:span]])
 
-(defn- contribution-lane
+(defn contribution-lane
   "The row's plot area: dashed current↔recommended connector, the
   recommended-share bar from zero (sign-colored), the purple per-row target
-  tick, the gray current circle, and the green recommended dot. A current
+  tick (omitted when the row carries no :target-share), the gray current
+  circle, and the green recommended dot. A current
   share beyond the fitted domain (see lane-scale) draws as a gray chevron
   pinned to the plot edge — honest 'off the chart' instead of a circle that
   pretends the value sits at the edge — with the true value in the tooltip."
@@ -287,7 +292,7 @@
                :data-sign (deviation-sign deviation-pts)}
         (equal-risk-results/format-signed-pts deviation-pts)])]))
 
-(defn- axis-rows
+(defn axis-rows
   [{:keys [x] :as scale}]
   [:div
    [:div {:class ["optimizer-risk-balance-row"]}

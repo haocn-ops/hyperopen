@@ -14,6 +14,11 @@
              :refer [collect-strings node-by-role solved-result]]))
 
 (def ^:private inverse-volatility-result
+  ;; Carries the Milestone 6 diagnostic analytics sections (contributions
+  ;; with :quality :diagnostic, current contributions, :risk-structure) so
+  ;; every gating pin below exercises the payload shape the engine now emits
+  ;; — an inverse-vol result WITH :risk-contributions must still never render
+  ;; equal-risk chrome.
   (-> solved-result
       (assoc :solver {:strategy :inverse-volatility
                       :objective-kind :inverse-volatility})
@@ -29,7 +34,51 @@
                              :risk-weight 0.14
                              :moved-off-seed? false}]
               :seed-weights [0.35 -0.2]
-              :max-sizing-deviation 0.0})))
+              :max-sizing-deviation 0.0})
+      (assoc :risk-contributions
+             {:method :signed-euler-volatility
+              :instrument-ids ["perp:BTC" "spot:PURR"]
+              :relative-contributions [1.12 -0.12]
+              :target-relative-contributions [0.5 0.5]
+              :relative-contributions-by-instrument {"perp:BTC" 1.12
+                                                     "spot:PURR" -0.12}
+              :target-relative-contributions-by-instrument {"perp:BTC" 0.5
+                                                            "spot:PURR" 0.5}
+              :sum-relative-contributions 1.0
+              :rms-error 0.62
+              :max-absolute-error 0.62
+              :negative-contribution-count 1
+              :quality :diagnostic})
+      (assoc :current-risk-contributions
+             {:relative-contributions-by-instrument {"perp:BTC" 0.9
+                                                     "spot:PURR" 0.1}
+              :rms-error 0.4
+              :max-absolute-error 0.4})
+      (assoc :risk-structure
+             {:method :signed-euler-decomposition
+              :portfolio-volatility 0.42
+              :current-diversification {:modeled-volatility 0.24
+                                        :all-move-together-volatility 0.32
+                                        :zero-correlation-volatility 0.20
+                                        :reduction-vs-all-move-together 0.08
+                                        :reduction-ratio-vs-all-move-together 0.25
+                                        :modeled-minus-zero-correlation 0.04}
+              :target-diversification {:modeled-volatility 0.42
+                                       :all-move-together-volatility 0.60
+                                       :zero-correlation-volatility 0.35
+                                       :reduction-vs-all-move-together 0.18
+                                       :reduction-ratio-vs-all-move-together 0.3
+                                       :modeled-minus-zero-correlation 0.07}
+              :standalone-share-by-instrument {"perp:BTC" 0.75
+                                               "spot:PURR" 0.5}
+              :diversification-share-by-instrument {"perp:BTC" 0.37
+                                                    "spot:PURR" -0.62}
+              :pnl-portfolio-correlation-by-instrument {"perp:BTC" 0.9
+                                                        "spot:PURR" -0.55}
+              :correlation {:instrument-ids ["perp:BTC" "spot:PURR"]
+                            :matrix [[1.0 0.6]
+                                     [0.6 1.0]]
+                            :hidden-count 0}})))
 
 (defn- render
   [result]
@@ -76,6 +125,46 @@
     (testing "no Exact/Approximate quality label rides the strip"
       (is (not (contains? strings "Exact")))
       (is (not (contains? strings "Approximate"))))))
+
+(deftest sizing-card-analytics-tabs-render-as-target-free-diagnostics-test
+  ;; Milestone 6: the sizing card gains the equal-risk card's objective-
+  ;; agnostic analytics as DOM-state tabs, with the sizing-fidelity view as
+  ;; the default and the contributions view stripped of every target framing.
+  (let [view-node (render inverse-volatility-result)
+        strings (set (collect-strings view-node))]
+    (testing "every tab label rides the sizing card header"
+      (doseq [view ["sizing" "contributions" "breakdown" "correlation"
+                    "risk-return"]]
+        (is (some? (node-by-role view-node
+                                 (str "portfolio-optimizer-sizing-view-tab-"
+                                      view)))
+            (str "expected the " view " tab")))
+      (is (contains? strings "Sizing Fidelity"))
+      (is (contains? strings "Contributions"))
+      (is (contains? strings "Diversification"))
+      (is (contains? strings "Correlation Drivers"))
+      (is (contains? strings "Risk / Return")))
+    (testing "the contributions tab body renders the diagnostic chart"
+      (is (some? (node-by-role view-node
+                               "portfolio-optimizer-sizing-contributions-chart")))
+      (is (some? (node-by-role view-node
+                               "portfolio-optimizer-sizing-contribution-row"))))
+    (testing "no equal-target chrome leaks into the diagnostic tab"
+      (is (nil? (node-by-role view-node
+                              "portfolio-optimizer-risk-contribution-target-tick"))
+          "no per-row target tick anywhere on the surface")
+      (is (nil? (node-by-role view-node
+                              "portfolio-optimizer-risk-contribution-target"))
+          "no Target column cell anywhere on the surface")
+      (is (nil? (node-by-role view-node
+                              "portfolio-optimizer-risk-contribution-deviation"))
+          "no Deviation column cell anywhere on the surface"))
+    (testing "the risk/return tab names this objective, not Equal Risk"
+      (is (contains? strings "Recommended (Risk-weighted sizing)"))
+      (is (not (contains? strings "Recommended (Equal Risk)"))))
+    (testing "the volatility-intuition rail context renders for this objective"
+      (is (some? (node-by-role view-node
+                              "portfolio-optimizer-volatility-intuition"))))))
 
 ;; --- Floored-state cross-link (item 10, UI half) --------------------------------
 

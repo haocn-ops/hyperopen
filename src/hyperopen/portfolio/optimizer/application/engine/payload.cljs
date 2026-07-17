@@ -368,8 +368,10 @@
         inverse-volatility-sections* (inverse-volatility-sections
                                       request
                                       {:solver-plan solver-plan
+                                       :risk-result risk-result
                                        :instrument-ids instrument-ids
-                                       :target-weights target-weights})
+                                       :target-weights target-weights
+                                       :current-weights current-weights*})
         labels-by-instrument* (labels-by-instrument
                                request
                                (vec (distinct (concat instrument-ids
@@ -401,8 +403,14 @@
                                         :current-risk-contributions
                                         :equal-risk-solver
                                         :risk-structure])
-     ;; :inverse-volatility only: the sizing-fidelity section.
-     (select-keys inverse-volatility-sections* [:inverse-volatility])
+     ;; :inverse-volatility only: the sizing-fidelity section plus the same
+     ;; objective-agnostic contribution/structure analytics Equal Risk
+     ;; publishes (:quality :diagnostic — no convergence quality applies to
+     ;; the deterministic projection).
+     (select-keys inverse-volatility-sections* [:inverse-volatility
+                                                :risk-contributions
+                                                :current-risk-contributions
+                                                :risk-structure])
     {:status :solved
      :scenario-id (:scenario-id request)
      :as-of-ms (:as-of-ms request)

@@ -152,6 +152,24 @@
     (testing "the payload section carries the seed and the sizing deviation"
       (is (vector? (get-in result [:inverse-volatility :seed-weights])))
       (is (number? (get-in result [:inverse-volatility :max-sizing-deviation]))))
+    (testing "the objective-agnostic analytics ride the payload (Milestone 6):
+              signed contributions as a :diagnostic (no convergence quality
+              applies to the deterministic projection) plus the correlation
+              :risk-structure section"
+      (let [contributions (:risk-contributions result)]
+        (is (map? contributions)
+            "solved inverse-vol payloads carry :risk-contributions")
+        (is (= :diagnostic (:quality contributions))
+            (str "the diagnostic quality label, got "
+                 (pr-str (:quality contributions))))
+        (is (= 3 (count (:relative-contributions contributions)))))
+      (is (map? (:current-risk-contributions result))
+          "the current book (BTC/ETH) summarizes for current-vs-recommended")
+      (let [structure (:risk-structure result)]
+        (is (map? structure)
+            "solved inverse-vol payloads carry :risk-structure")
+        (is (map? (:correlation structure)))
+        (is (map? (:standalone-share-by-instrument structure)))))
     (testing "the solved payload passes the canonical result specs"
       (is (s/valid? :hyperopen.portfolio.optimizer.contracts/result-payload result)
           (s/explain-str :hyperopen.portfolio.optimizer.contracts/result-payload

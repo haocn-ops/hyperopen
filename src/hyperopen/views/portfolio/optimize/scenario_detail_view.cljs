@@ -2,6 +2,9 @@
   (:require [hyperopen.portfolio.optimizer.application.view-model :as optimizer-view-model]
             [hyperopen.portfolio.optimizer.application.view-model.equal-risk-results
              :as equal-risk-results]
+            [hyperopen.portfolio.optimizer.application.view-model.inverse-volatility-results
+             :as inverse-volatility-results]
+            [hyperopen.portfolio.optimizer.contracts.constants :as contracts-constants]
             [hyperopen.portfolio.routes :as portfolio-routes]
             [hyperopen.system :as app-system]
             [hyperopen.views.portfolio.optimize.execution-tab :as execution-tab]
@@ -227,14 +230,16 @@
                      (objective-menu/objective-menu-open? state))
                     (objective-menu/objective-menu state draft result* readiness)]]
                   (field "Returns"
-                         ;; Equal Risk never sizes positions from returns: say
-                         ;; so where the model is named or users will assume
-                         ;; the historical mean drove the weights.
+                         ;; Covariance-only objectives never size positions
+                         ;; from returns: say so where the model is named or
+                         ;; users will assume the historical mean drove the
+                         ;; weights.
                          (let [label (opt-format/display-label
                                       (or (:return-model result*)
-                                          (get-in draft [:return-model :kind])))]
-                           (if (or (= :equal-risk (get-in draft [:objective :kind]))
-                                   (= :equal-risk (get-in result* [:solver :objective-kind])))
+                                          (get-in draft [:return-model :kind])))
+                               covariance-only? contracts-constants/covariance-only-objective-kinds]
+                           (if (or (covariance-only? (get-in draft [:objective :kind]))
+                                   (covariance-only? (get-in result* [:solver :objective-kind])))
                              (str label " · analytics only")
                              label)))
                   (field "Risk"
@@ -336,10 +341,11 @@
    (cond
      (solved-result? model)
      (let [deltas* (kpi-strip/recommendation-deltas result)
-           ;; Equal Risk gets objective-specific verdict copy (incl. the
-           ;; constraint-determined case) instead of vol/return framing that
-           ;; implies a frontier choice was made.
-           deltas (if-let [body (equal-risk-results/verdict-body result)]
+           ;; The covariance-only objectives get objective-specific verdict
+           ;; copy (incl. Equal Risk's constraint-determined case) instead of
+           ;; vol/return framing that implies a frontier choice was made.
+           deltas (if-let [body (or (equal-risk-results/verdict-body result)
+                                    (inverse-volatility-results/verdict-body result))]
                     (assoc deltas* :objective-body body)
                     deltas*)]
        (cond-> []

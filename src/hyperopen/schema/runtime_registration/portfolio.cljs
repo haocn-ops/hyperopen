@@ -111,6 +111,8 @@
     :add-portfolio-optimizer-objective-menu-view]
    [:actions/apply-portfolio-optimizer-objective-menu-selection-and-run
     :apply-portfolio-optimizer-objective-menu-selection-and-run]
+   [:actions/switch-portfolio-optimizer-objective-and-run
+    :switch-portfolio-optimizer-objective-and-run]
    [:actions/set-portfolio-optimizer-return-views-filter
     :set-portfolio-optimizer-return-views-filter]
    [:actions/export-portfolio-optimizer-return-views

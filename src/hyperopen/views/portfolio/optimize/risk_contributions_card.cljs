@@ -40,7 +40,8 @@
   stay 1px and markers stay round at any width. Replaces the
   efficient-frontier chart for :equal-risk — that objective is not selected
   from a frontier and must not be plotted as if it were."
-  (:require [hyperopen.portfolio.optimizer.application.view-model.equal-risk-results
+  (:require [clojure.string :as str]
+            [hyperopen.portfolio.optimizer.application.view-model.equal-risk-results
              :as equal-risk-results]
             [hyperopen.portfolio.optimizer.application.view-model.equal-risk-structure
              :as structure-model]
@@ -64,10 +65,13 @@
 
 ;; --- Shared lane scale --------------------------------------------------------
 
-(defn- lane-scale
+(defn lane-scale
   "One scale for every lane, fitted to the PRIMARY data — zero, every target,
   and every recommended share — padded and rounded to 5% so the domain reads
-  as clean ticks. Current shares only extend the domain when they sit within
+  as clean ticks. Public: the Risk-weighted sizing card's CONTRIBUTIONS
+  diagnostic tab reuses the lane primitives (scale, backdrop, lane, axis)
+  with no targets, so the two covariance-only cards draw contributions in
+  one visual language. Current shares only extend the domain when they sit within
   35% of the primary span beyond it: a wildly unbalanced current book (one
   asset carrying ~100% of volatility is exactly why Equal Risk gets run)
   must not squash the recommended bars into a corner. Currents beyond that
@@ -152,9 +156,10 @@
    [:span {:class ["optimizer-risk-balance-col-head"]}
     (if (= :shift mode) "Shift" "Deviation")]])
 
-(defn- plot-backdrop
-  "Gridlines, the zero axis, and the continuous dashed target line, drawn once
-  behind the whole row stack in a same-grid overlay so they read as one plot."
+(defn plot-backdrop
+  "Gridlines, the zero axis, and the continuous dashed target line (only when
+  `target-share` is numeric), drawn once behind the whole row stack in a
+  same-grid overlay so they read as one plot."
   [{:keys [x] :as scale} target-share]
   [:div {:class ["optimizer-risk-balance-row" "optimizer-risk-balance-backdrop"
                  "pointer-events-none"]}
@@ -173,10 +178,11 @@
    [:span]
    [:span]])
 
-(defn- contribution-lane
+(defn contribution-lane
   "The row's plot area: dashed current↔recommended connector, the
   recommended-share bar from zero (sign-colored), the purple per-row target
-  tick, the gray current circle, and the green recommended dot. A current
+  tick (omitted when the row carries no :target-share), the gray current
+  circle, and the green recommended dot. A current
   share beyond the fitted domain (see lane-scale) draws as a gray chevron
   pinned to the plot edge — honest 'off the chart' instead of a circle that
   pretends the value sits at the edge — with the true value in the tooltip."
@@ -286,7 +292,7 @@
                :data-sign (deviation-sign deviation-pts)}
         (equal-risk-results/format-signed-pts deviation-pts)])]))
 
-(defn- axis-rows
+(defn axis-rows
   [{:keys [x] :as scale}]
   [:div
    [:div {:class ["optimizer-risk-balance-row"]}
@@ -327,6 +333,37 @@
           (if (= 1 negative-count)
             " position hedges the book (negative risk contribution)."
             " positions hedge the book (negative risk contributions).")))])
+
+(defn- switch-objective-suggestion
+  "The floored-state escape hatch: when Equal Risk held one or more
+  side-locked assets at 0% (a zero binding bound + a zero published target),
+  offer the one-click switch to Risk-weighted sizing — the objective built to
+  keep every selected asset — and rerun. Renders nil when nothing is floored."
+  [result]
+  (let [floored (equal-risk-results/floored-instrument-ids result)
+        labels (:labels-by-instrument result)
+        named (->> floored
+                   (map #(or (get labels %) %))
+                   (take 3))]
+    (when (seq floored)
+      [:p {:class ["mt-2" "text-xs" "text-trading-muted"]
+           :data-role "portfolio-optimizer-risk-contributions-floored-note"}
+       (str (count floored)
+            (if (= 1 (count floored))
+              " side-locked position ("
+              " side-locked positions (")
+            (str/join ", " named)
+            (when (> (count floored) (count named)) ", …")
+            ") held at 0% — a fixed side Equal Risk cannot balance. ")
+       [:button {:type "button"
+                 :class ["border" "border-warning/50" "bg-warning/10" "px-1.5"
+                         "py-0.5" "text-xs" "font-semibold" "text-warning"
+                         "hover:bg-warning/20"]
+                 :data-role "portfolio-optimizer-switch-to-risk-weighted-sizing"
+                 :on {:click [[:actions/switch-portfolio-optimizer-objective-and-run
+                               :inverse-volatility]]}}
+        "Try Risk-weighted sizing"]
+       " to keep every asset with a volatility-based size."])))
 
 (defn- overflow-line
   [{:keys [hidden-count hidden-max-pts] :as model}]
@@ -454,6 +491,7 @@
                  rows)]
           (axis-rows scale)]
          (reading-note model)
+         (switch-objective-suggestion result)
          (overflow-line model)
          (exposure-line (:diagnostics result))
          (solver-footer result)]

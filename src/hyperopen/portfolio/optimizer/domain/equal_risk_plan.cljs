@@ -12,7 +12,10 @@
 
 (def ^:private finite-number? coercion/finite-number?)
 
-(defn- gross-coefficients
+(defn gross-coefficients
+  "Signed unit coefficients per index (+1 long, -1 short, 0 unselected) from
+  the presolved books. Two consumers: the gross-equality row here and the
+  inverse-volatility plan's ideal-seed signs."
   [books n]
   (reduce (fn [coefficients [idx sign]]
             (assoc coefficients idx sign))

@@ -325,6 +325,7 @@
    :actions/remove-portfolio-optimizer-objective-menu-view ::portfolio-optimizer-instrument-id-args
    :actions/add-portfolio-optimizer-objective-menu-view ::common/no-args
    :actions/apply-portfolio-optimizer-objective-menu-selection-and-run ::common/no-args
+   :actions/switch-portfolio-optimizer-objective-and-run ::portfolio-optimizer-model-kind-args
    :actions/set-portfolio-optimizer-return-views-filter ::portfolio-optimizer-model-kind-args
    :actions/export-portfolio-optimizer-return-views ::common/no-args
    :actions/import-portfolio-optimizer-return-views ::common/no-args

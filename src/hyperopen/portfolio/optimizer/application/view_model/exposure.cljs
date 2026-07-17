@@ -5,7 +5,8 @@
   the band rectangle, the current-portfolio dot, the preset chips, the read-only generated-
   constraints echo numbers, and per-axis warning flags. All numbers come from the pure
   `exposure-policy` namespace so the view, actions, and tests stay in agreement."
-  (:require [hyperopen.portfolio.optimizer.domain.exposure-policy :as policy]))
+  (:require [hyperopen.portfolio.optimizer.contracts.constants :as contracts-constants]
+            [hyperopen.portfolio.optimizer.domain.exposure-policy :as policy]))
 
 (defn snapshot->current-exposure
   "Reduce a current-portfolio snapshot to {:gross r :net r} exposure ratios (multiples of
@@ -77,6 +78,15 @@
 (def equal-risk-net-output-copy
   "Resulting net is determined by Equal Risk from covariance and selected sides.")
 
+(def inverse-volatility-net-output-copy
+  "Resulting net is determined by Risk-weighted sizing from volatilities and selected sides.")
+
+(defn- net-output-copy
+  [objective-kind]
+  (case objective-kind
+    :inverse-volatility inverse-volatility-net-output-copy
+    equal-risk-net-output-copy))
+
 (defn exposure-map-model
   "Build the exposure-map display model. `current-exposure` is `{:gross r :net r}` (ratios of
   capital) or nil when the current portfolio is not loaded; `highlighted-controls` is the set of
@@ -86,9 +96,10 @@
   [{:keys [objective-kind constraints current-exposure highlighted-controls
            has-saved-default? zoom-level]}]
   (let [constraints* (or constraints {})
-        equal-risk? (= :equal-risk objective-kind)
+        covariance-only? (contains? contracts-constants/covariance-only-objective-kinds
+                                    objective-kind)
         stored-policy (policy/constraints->policy constraints*)
-        policy* (if equal-risk?
+        policy* (if covariance-only?
                   (assoc stored-policy :net-target 0.0 :net-band-pct 0.0)
                   stored-policy)
         active (policy/active-preset constraints*)
@@ -104,12 +115,12 @@
                                         :current-net (:net current-exposure))
                                  zoom-level)]
     {:policy policy*
-     :interaction-mode (if equal-risk? :gross-only :gross-net)
+     :interaction-mode (if covariance-only? :gross-only :gross-net)
      :gross-editable? true
-     :net-editable? (not equal-risk?)
-     :net-output-only? equal-risk?
-     :net-output-copy (when equal-risk? equal-risk-net-output-copy)
-     :net-direction (if equal-risk?
+     :net-editable? (not covariance-only?)
+     :net-output-only? covariance-only?
+     :net-output-copy (when covariance-only? (net-output-copy objective-kind))
+     :net-direction (if covariance-only?
                       :neutral
                       (net-direction (:net-target policy*)))
      :zoom (select-keys zoom [:level :fit-level :zoom-in-level :zoom-out-level])
@@ -146,7 +157,7 @@
             :net-max net-max
             :net-band-pct (:net-band-pct stored-policy)}
      :preview (exposure-preview {:current-exposure current-exposure
-                                 :constraints (if equal-risk?
+                                 :constraints (if covariance-only?
                                                 (dissoc constraints*
                                                         :net-min
                                                         :net-max
@@ -159,5 +170,5 @@
      ;; recognized policy ("Conservative" / "Custom · from holdings"), and the
      ;; preset action + domain presets remain for programmatic use.
      :highlighted {:gross (gross-highlighted? highlighted-controls)
-                   :net (and (not equal-risk?)
+                   :net (and (not covariance-only?)
                              (net-highlighted? highlighted-controls))}}))

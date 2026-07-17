@@ -49,6 +49,31 @@
   (is (= [:fetch-returns :risk-model :return-model :solve :frontier :diagnostics]
          (mapv :id (:steps sample-progress)))))
 
+(deftest default-steps-covariance-only-solve-and-frontier-labels-test
+  ;; Covariance-only objectives produce one selected portfolio, so their
+  ;; frontier row reads "target selection" — never "frontier sweep · N points".
+  ;; Risk-weighted sizing solves one deterministic projection QP.
+  (let [steps-for (fn [kind]
+                    (:steps (progress/begin-progress
+                             {:run-id "run-2"
+                              :scenario-id "scenario-2"
+                              :request {:universe [{:instrument-id "perp:BTC"}]
+                                        :risk-model {:kind :sample-covariance}
+                                        :return-model {:kind :historical-mean}
+                                        :objective {:kind kind}}
+                              :started-at-ms 100})))
+        step (fn [steps id] (first (filter #(= id (:id %)) steps)))
+        inverse-steps (steps-for :inverse-volatility)
+        equal-risk-steps (steps-for :equal-risk)]
+    (is (= {:label "risk-weighted sizing" :detail "projection QP"}
+           (select-keys (step inverse-steps :solve) [:label :detail])))
+    (is (= {:label "target selection" :detail "selected point"}
+           (select-keys (step inverse-steps :frontier) [:label :detail])))
+    (is (= {:label "equal-risk solve" :detail "sequential QP"}
+           (select-keys (step equal-risk-steps :solve) [:label :detail])))
+    (is (= {:label "target selection" :detail "selected point"}
+           (select-keys (step equal-risk-steps :frontier) [:label :detail])))))
+
 (deftest smooth-display-percent-trickles-ahead-but-stays-bounded-test
   ;; From a fresh real value with no prior display, the bar eases ahead a little
   ;; so it keeps moving, but never past the headroom cap.

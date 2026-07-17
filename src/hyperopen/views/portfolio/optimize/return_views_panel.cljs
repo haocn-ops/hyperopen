@@ -9,6 +9,7 @@
             [hyperopen.portfolio.optimizer.application.black-litterman-editor-model :as bl-model]
             [hyperopen.portfolio.optimizer.application.return-inputs :as return-inputs]
             [hyperopen.portfolio.optimizer.application.return-views :as return-views]
+            [hyperopen.portfolio.optimizer.application.view-model.setup-summary :as setup-summary]
             [hyperopen.portfolio.optimizer.contracts :as optimizer-contracts]
             [hyperopen.system :as app-system]
             [hyperopen.views.asset-icon :as asset-icon]
@@ -354,7 +355,10 @@
 (defn- return-free-objective-label
   ;; The covariance-only goal in play; its weights never consume returns.
   [objective-kind]
-  (if (= :equal-risk objective-kind) "Equal Risk" "Minimum risk"))
+  (case objective-kind
+    :equal-risk "Equal Risk"
+    :inverse-volatility "Risk-weighted sizing"
+    "Minimum risk"))
 
 (defn- min-variance-note
   [container-role objective-kind]
@@ -392,7 +396,8 @@
   (let [universe (vec (:universe draft))
         black-litterman? (= :black-litterman (get-in draft [:return-model :kind]))
         objective-kind (get-in draft [:objective :kind])
-        return-free? (contains? #{:minimum-variance :equal-risk} objective-kind)
+        return-free? (contains? setup-summary/return-free-objective-kinds
+                                objective-kind)
         rows (return-views/rows
               {:universe universe
                :views (get-in draft [:return-model :views])

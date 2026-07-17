@@ -12,6 +12,7 @@
   (case objective-kind
     :max-sharpe "Maximum Sharpe — best risk-adjusted return, uses your views"
     :equal-risk "Equal Risk — balance each position's share of portfolio risk"
+    :inverse-volatility "Risk-weighted sizing — size each asset by its own volatility"
     :target-volatility "Target volatility — max return at a pinned σ"
     :target-return "Target return — lowest risk at a required return"
     "Minimum risk — lowest volatility, no return forecast needed"))
@@ -101,7 +102,16 @@
           (secondary-goal-card "Target return" "Aim for a specific return"
                                (= :target-return objective-kind)
                                "portfolio-optimizer-objective-target-return"
-                               [:actions/set-portfolio-optimizer-objective-kind :target-return])]
+                               [:actions/set-portfolio-optimizer-objective-kind :target-return])
+          ;; Parameterless like Equal Risk, and covariance-only: the specialist
+          ;; tool for a fully side-locked book — every selected asset keeps a
+          ;; position sized by its own volatility. Discovered chiefly through
+          ;; the floored-state cross-link on Equal Risk results.
+          (secondary-goal-card "Risk-weighted sizing"
+                               "Size by each asset's own volatility · keeps every asset · ignores correlations"
+                               (= :inverse-volatility objective-kind)
+                               "portfolio-optimizer-objective-inverse-volatility"
+                               [:actions/set-portfolio-optimizer-objective-kind :inverse-volatility])]
          (when parameterized?
            [:div {:class ["mt-2"]}
             (case objective-kind

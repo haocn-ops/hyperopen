@@ -229,6 +229,7 @@
             [hyperopen.portfolio.optimizer.application.engine-current-portfolio-test]
             [hyperopen.portfolio.optimizer.application.engine-equal-risk-test]
             [hyperopen.portfolio.optimizer.application.engine-history-window-test]
+            [hyperopen.portfolio.optimizer.application.engine-inverse-volatility-test]
             [hyperopen.portfolio.optimizer.application.engine-progress-test]
             [hyperopen.portfolio.optimizer.application.engine-return-inputs-memo-test]
             [hyperopen.portfolio.optimizer.application.engine-solve-test]
@@ -311,6 +312,7 @@
             [hyperopen.portfolio.optimizer.black-litterman-view-edits-test]
             [hyperopen.portfolio.optimizer.coercion-test]
             [hyperopen.portfolio.optimizer.contracts-equal-risk-test]
+            [hyperopen.portfolio.optimizer.contracts-inverse-volatility-test]
             [hyperopen.portfolio.optimizer.contracts-test]
             [hyperopen.portfolio.optimizer.current-portfolio-constraint-actions-test]
             [hyperopen.portfolio.optimizer.defaults-test]
@@ -361,6 +363,7 @@
             [hyperopen.portfolio.optimizer.infrastructure.wire-test]
             [hyperopen.portfolio.optimizer.infrastructure.working-order-refresh-test]
             [hyperopen.portfolio.optimizer.instrument-keyed-codec-test]
+            [hyperopen.portfolio.optimizer.inverse-volatility-plan-test]
             [hyperopen.portfolio.optimizer.query-state-test]
             [hyperopen.portfolio.optimizer.recommended-assumptions-actions-test]
             [hyperopen.portfolio.optimizer.refinement-actions-test]
@@ -368,6 +371,7 @@
             [hyperopen.portfolio.optimizer.return-views-io-actions-test]
             [hyperopen.portfolio.optimizer.runtime-catalog-test]
             [hyperopen.portfolio.optimizer.scenario-library-actions-test]
+            [hyperopen.portfolio.optimizer.switch-objective-actions-test]
             [hyperopen.portfolio.optimizer.target-sigma-actions-test]
             [hyperopen.portfolio.optimizer.tracking-actions-test]
             [hyperopen.portfolio.optimizer.universe-actions-test]
@@ -630,6 +634,7 @@
             [hyperopen.views.portfolio.optimize.results-panel-equal-risk-structure-test]
             [hyperopen.views.portfolio.optimize.results-panel-equal-risk-test]
             [hyperopen.views.portfolio.optimize.results-panel-hierarchy-test]
+            [hyperopen.views.portfolio.optimize.results-panel-inverse-volatility-test]
             [hyperopen.views.portfolio.optimize.results-panel-test]
             [hyperopen.views.portfolio.optimize.return-views-io-panel-test]
             [hyperopen.views.portfolio.optimize.risk-diversification-help-edge-test]
@@ -649,6 +654,7 @@
             [hyperopen.views.portfolio.optimize.setup-universe-layout-test]
             [hyperopen.views.portfolio.optimize.setup-use-my-views-cards-test]
             [hyperopen.views.portfolio.optimize.setup-use-my-views-workspace-test]
+            [hyperopen.views.portfolio.optimize.setup-view-inverse-volatility-test]
             [hyperopen.views.portfolio.optimize.setup-view-test]
             [hyperopen.views.portfolio.optimize.target-sigma-test]
             [hyperopen.views.portfolio.optimize.tracking-panel-test]
@@ -1071,6 +1077,7 @@
              'hyperopen.portfolio.optimizer.application.engine-current-portfolio-test
              'hyperopen.portfolio.optimizer.application.engine-equal-risk-test
              'hyperopen.portfolio.optimizer.application.engine-history-window-test
+             'hyperopen.portfolio.optimizer.application.engine-inverse-volatility-test
              'hyperopen.portfolio.optimizer.application.engine-progress-test
              'hyperopen.portfolio.optimizer.application.engine-return-inputs-memo-test
              'hyperopen.portfolio.optimizer.application.engine-solve-test
@@ -1153,6 +1160,7 @@
              'hyperopen.portfolio.optimizer.black-litterman-view-edits-test
              'hyperopen.portfolio.optimizer.coercion-test
              'hyperopen.portfolio.optimizer.contracts-equal-risk-test
+             'hyperopen.portfolio.optimizer.contracts-inverse-volatility-test
              'hyperopen.portfolio.optimizer.contracts-test
              'hyperopen.portfolio.optimizer.current-portfolio-constraint-actions-test
              'hyperopen.portfolio.optimizer.defaults-test
@@ -1203,6 +1211,7 @@
              'hyperopen.portfolio.optimizer.infrastructure.wire-test
              'hyperopen.portfolio.optimizer.infrastructure.working-order-refresh-test
              'hyperopen.portfolio.optimizer.instrument-keyed-codec-test
+             'hyperopen.portfolio.optimizer.inverse-volatility-plan-test
              'hyperopen.portfolio.optimizer.query-state-test
              'hyperopen.portfolio.optimizer.recommended-assumptions-actions-test
              'hyperopen.portfolio.optimizer.refinement-actions-test
@@ -1210,6 +1219,7 @@
              'hyperopen.portfolio.optimizer.return-views-io-actions-test
              'hyperopen.portfolio.optimizer.runtime-catalog-test
              'hyperopen.portfolio.optimizer.scenario-library-actions-test
+             'hyperopen.portfolio.optimizer.switch-objective-actions-test
              'hyperopen.portfolio.optimizer.target-sigma-actions-test
              'hyperopen.portfolio.optimizer.tracking-actions-test
              'hyperopen.portfolio.optimizer.universe-actions-test
@@ -1472,6 +1482,7 @@
              'hyperopen.views.portfolio.optimize.results-panel-equal-risk-structure-test
              'hyperopen.views.portfolio.optimize.results-panel-equal-risk-test
              'hyperopen.views.portfolio.optimize.results-panel-hierarchy-test
+             'hyperopen.views.portfolio.optimize.results-panel-inverse-volatility-test
              'hyperopen.views.portfolio.optimize.results-panel-test
              'hyperopen.views.portfolio.optimize.return-views-io-panel-test
              'hyperopen.views.portfolio.optimize.risk-diversification-help-edge-test
@@ -1491,6 +1502,7 @@
              'hyperopen.views.portfolio.optimize.setup-universe-layout-test
              'hyperopen.views.portfolio.optimize.setup-use-my-views-cards-test
              'hyperopen.views.portfolio.optimize.setup-use-my-views-workspace-test
+             'hyperopen.views.portfolio.optimize.setup-view-inverse-volatility-test
              'hyperopen.views.portfolio.optimize.setup-view-test
              'hyperopen.views.portfolio.optimize.target-sigma-test
              'hyperopen.views.portfolio.optimize.tracking-panel-test

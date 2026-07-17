@@ -341,6 +341,14 @@
          (map (partial outcome-row help-prefix))
          outcome-rows)])
 
+(def default-explainer
+  "The intro sentence for Equal Risk, the tab's original owner. The
+  Risk-weighted sizing card passes its own :explainer — the benchmarks are
+  objective-agnostic, but the first clause names what the objective does."
+  (str "Equal Risk balances risk ownership; it does not minimize total "
+       "volatility. These benchmarks compare both books on one "
+       "absolute annualized-volatility scale."))
+
 (defn diversification-summary
   "Renders one current/recommended comparison matrix when a valid target
   summary exists. Callers that can co-render results may supply a distinct
@@ -352,7 +360,7 @@
     result
     {:help-id-prefix (str "optimizer-risk-diversification-help-"
                           (or (:as-of-ms result) "result"))}))
-  ([result {:keys [help-id-prefix]}]
+  ([result {:keys [help-id-prefix explainer]}]
    (if-let [model (structure-model/diversification-comparison-model result)]
      (let [help-prefix (or help-id-prefix
                            (str "optimizer-risk-diversification-help-"
@@ -367,9 +375,7 @@
            (help-disclosure help-prefix :overview
                             "Explain how to read this comparison")]
           [:p {:class ["optimizer-risk-diversification-explainer"]}
-           (str "Equal Risk balances risk ownership; it does not minimize total "
-                "volatility. These benchmarks compare both books on one "
-                "absolute annualized-volatility scale.")]]
+           (or explainer default-explainer)]]
          [:div {:class ["optimizer-risk-diversification-legend"]
                 :aria-label "Portfolio marker legend"}
           [:span {:class ["optimizer-risk-diversification-legend-item"]}
@@ -394,4 +400,4 @@
       [:p {:class ["optimizer-risk-corr-title"]}
        "Portfolio diversification unavailable"]
       [:p
-       "Re-run this saved Equal Risk scenario to add the portfolio benchmarks. Final-weight attribution remains available below."]])))
+       "Re-run this saved scenario to add the portfolio benchmarks. Final-weight attribution remains available below."]])))

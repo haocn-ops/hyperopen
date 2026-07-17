@@ -11,6 +11,7 @@
             [hyperopen.portfolio.optimizer.application.view-model.equal-risk-structure
              :as structure-model]
             [hyperopen.portfolio.optimizer.application.view-model.results :as results-model]
+            [hyperopen.portfolio.optimizer.contracts.constants :as contracts-constants]
             [hyperopen.views.portfolio.optimize.format :as opt-format]
             [hyperopen.views.portfolio.optimize.setup-controls :as controls]))
 
@@ -383,10 +384,11 @@
      [:div {:class ["mt-3" "grid" "grid-cols-2" "gap-2" "xl:grid-cols-5"]}
       (compact-fact "Objective" (opt-format/keyword-label objective-kind))
       (compact-fact "Return Model"
-                    ;; Equal Risk never uses returns to size positions — say so
-                    ;; where the model is named, or users will assume the
-                    ;; historical mean drove the weights.
-                    (if (= :equal-risk objective-kind)
+                    ;; Covariance-only objectives never use returns to size
+                    ;; positions — say so where the model is named, or users
+                    ;; will assume the historical mean drove the weights.
+                    (if (contains? contracts-constants/covariance-only-objective-kinds
+                                   objective-kind)
                       (str (opt-format/keyword-label (:return-model result))
                            " · analytics only")
                       (opt-format/keyword-label (:return-model result))))

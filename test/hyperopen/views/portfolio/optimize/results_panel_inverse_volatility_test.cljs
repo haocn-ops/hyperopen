@@ -111,6 +111,24 @@
       (is (not (contains? strings "Exact")))
       (is (not (contains? strings "Approximate"))))))
 
+(deftest results-panel-inverse-volatility-leverage-distribution-when-gated-test
+  ;; The ending-wealth distribution (leverage-impact panel) is objective-
+  ;; agnostic and must surface for Risk-weighted sizing exactly as for every
+  ;; other objective once its own gate passes (gross >= 2x or annualized
+  ;; volatility >= 100%, with finite modeled mu/sigma). Pinned after a live
+  ;; report that the chart "disappeared" — it was the gate arithmetic, not
+  ;; the objective, and this test keeps it that way.
+  (let [gated-result (-> inverse-volatility-result
+                         (assoc :volatility 1.2
+                                :expected-return 0.25))
+        view-node (render gated-result)]
+    (is (some? (node-by-role view-node
+                             "portfolio-optimizer-leverage-impact-distribution"))
+        "a gate-passing :inverse-volatility result renders the ending-wealth distribution")
+    (testing "and stays hidden below the gate — matching every other objective"
+      (is (nil? (node-by-role (render inverse-volatility-result)
+                              "portfolio-optimizer-leverage-impact-distribution"))))))
+
 (deftest kpi-strip-inverse-volatility-neutral-deltas-and-no-quality-label-test
   (let [strip (kpi-strip/kpi-strip inverse-volatility-result)
         strings (set (collect-strings strip))]

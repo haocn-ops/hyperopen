@@ -645,22 +645,25 @@
   (show-toast! store :error error-text))
 
 (defn- handle-position-margin-submit-response!
-  [store dispatch! exchange-response-error show-toast! address resp]
+  [store dispatch! exchange-response-error show-toast! address request resp]
   (if (= "ok" (:status resp))
     (do
       (swap! store assoc-in [:positions-ui :margin-modal]
              (position-margin/default-modal-state))
-      (show-toast! store :success "Margin updated.")
+      (show-toast! store :success
+                   (toast-payloads/position-margin-success-toast-payload request))
       (refresh-order-surfaces-after-submit! store dispatch! address))
     (let [error-text (str (exchange-response-error resp))]
       (set-position-margin-modal-error! store error-text)
-      (show-toast! store :error (str "Margin update failed: " error-text)))))
+      (show-toast! store :error
+                   (toast-payloads/position-margin-failure-toast-payload request error-text)))))
 
 (defn- handle-position-margin-submit-runtime-error!
-  [store runtime-error-message show-toast! err]
+  [store runtime-error-message show-toast! request err]
   (let [error-text (runtime-error-message err)]
     (set-position-margin-modal-error! store error-text)
-    (show-toast! store :error (str "Margin update failed: " error-text))))
+    (show-toast! store :error
+                 (toast-payloads/position-margin-failure-toast-payload request error-text))))
 
 (defn api-submit-position-margin
   [{:keys [dispatch! exchange-response-error runtime-error-message show-toast!]} _ store request]
@@ -676,11 +679,13 @@
                           dispatch!
                           exchange-response-error
                           show-toast!
-                          account-address))
+                          account-address
+                          request))
           (.catch (partial handle-position-margin-submit-runtime-error!
                            store
                            runtime-error-message
-                           show-toast!))))))
+                           show-toast!
+                           request))))))
 
 (defn api-cancel-order
   [{:keys [dispatch!

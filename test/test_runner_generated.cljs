@@ -194,6 +194,7 @@
             [hyperopen.order.feedback-runtime-test]
             [hyperopen.order.margin-rec-intent-test]
             [hyperopen.order.outcome-option-sort-test]
+            [hyperopen.order.toast-payloads-test]
             [hyperopen.orderbook.actions-test]
             [hyperopen.orderbook.price-aggregation-test]
             [hyperopen.orderbook.settings-test]
@@ -1042,6 +1043,7 @@
              'hyperopen.order.feedback-runtime-test
              'hyperopen.order.margin-rec-intent-test
              'hyperopen.order.outcome-option-sort-test
+             'hyperopen.order.toast-payloads-test
              'hyperopen.orderbook.actions-test
              'hyperopen.orderbook.price-aggregation-test
              'hyperopen.orderbook.settings-test

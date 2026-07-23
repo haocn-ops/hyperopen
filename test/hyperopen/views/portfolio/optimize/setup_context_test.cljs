@@ -1,5 +1,6 @@
 (ns hyperopen.views.portfolio.optimize.setup-context-test
   (:require [cljs.test :refer-macros [deftest is]]
+            [hyperopen.portfolio.optimizer.contracts :as contracts]
             [hyperopen.views.portfolio.optimize.setup-context :as setup-context]
             [hyperopen.views.portfolio.optimize.test-support :as ts]))
 
@@ -47,6 +48,74 @@
     :last-successful-run {}
     :current-result? false
     :result-path nil}))
+
+(def ^:private new-perp
+  {:instrument-id "perp:NEW" :market-type :perp :coin "NEW"})
+
+(def ^:private recommendation-discovery
+  ;; A conservative default-assumption keeps the fixture member-free, so the
+  ;; recommendation is applicable without any basket-availability setup.
+  {:backend-id-by-local-id {"perp:NEW" "hl:perp:NEW"
+                            "perp:BTC" "hl:perp:BTC"}
+   :instruments-by-backend-id
+   {"hl:perp:NEW" {:instrument-id "hl:perp:NEW"
+                   :aliases {:hyperopen-market-key "perp:NEW"}
+                   :history {:status :available}
+                   :default-assumption {:approach "conservative"
+                                        :members []
+                                        :rationale "No defensible basket."}}
+    "hl:perp:BTC" {:instrument-id "hl:perp:BTC"
+                   :aliases {:hyperopen-market-key "perp:BTC"}
+                   :display-symbol "BTC"
+                   :history {:status :available}}}})
+
+(defn- recommendation-rail-node
+  []
+  (let [universe* [btc new-perp]]
+    (setup-context/context-rail
+     {:state (assoc-in {} contracts/history-discovery-path recommendation-discovery)
+      :draft {:universe universe*
+              :objective {:kind :minimum-variance}
+              :constraints {:max-asset-weight 0.5}
+              :history-assumptions {}}
+      :readiness {:request {:requested-universe universe*
+                            :universe universe*
+                            :objective {:kind :minimum-variance}
+                            :history {:eligible-instruments universe*
+                                      :raw-price-series-by-instrument
+                                      {"perp:BTC" (vec (repeat 1079 {:close 1}))
+                                       "perp:NEW" (vec (repeat 40 {:close 1}))}}}
+                  :blocking-warnings []
+                  :warnings []}
+      :snapshot {:snapshot-loaded? true}
+      :preview-snapshot {:capital-ready? true :execution-ready? true :account {}}
+      :run-state {:status :idle}
+      :optimization-progress {:status :idle}
+      :history-load-state {:status :succeeded
+                           :request-signature {:universe universe*}}
+      :last-successful-run {}
+      :current-result? false
+      :result-path nil})))
+
+(deftest history-assumptions-rail-offers-apply-all-recommended-test
+  ;; The rail is where the user reads "0 of N configured", so the one-click
+  ;; bulk apply must be reachable there too — wired to the exact action id the
+  ;; center banner dispatches, and labeled with the applicable count.
+  (let [node (recommendation-rail-node)
+        button (ts/node-by-role
+                node
+                "portfolio-optimizer-history-assumptions-rail-apply-all-recommended")]
+    (is (some? button))
+    (is (= [[:actions/apply-portfolio-optimizer-recommended-history-assumptions]]
+           (get-in button [1 :on :click])))
+    (is (contains? (set (ts/collect-strings button)) "Apply all recommended (1)"))))
+
+(deftest history-assumptions-rail-hides-apply-all-without-recommendations-test
+  ;; Every workflow asset in the base harness carries an authored entry (and no
+  ;; discovery offers a recommendation), so the shortcut must not render.
+  (is (nil? (ts/node-by-role
+             (context-rail-node)
+             "portfolio-optimizer-history-assumptions-rail-apply-all-recommended"))))
 
 (deftest history-assumptions-rail-rows-are-height-capped-and-scrollable-test
   ;; Regression guard: a universe with many thin-history assets used to grow

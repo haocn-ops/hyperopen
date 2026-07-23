@@ -143,7 +143,7 @@
       true (conj (note-effect :success
                               (default-assumptions/apply-note-message plan))))))
 
-(defn- apply-recommended
+(defn- recommended-apply-plan
   [state pred]
   (let [discovery (discovery-state state)
         refs (reference-instruments state)
@@ -156,17 +156,31 @@
                              (resolve-catalog-instrument state instrument-id)
                              (default-assumptions/external-reference-instrument
                               (default-assumptions/discovery-instrument
-                               discovery backend-id))))
-        plan (default-assumptions/recommendation-plan
-              {:discovery discovery
-               :assumptions (assumptions-map state)
-               :universe-ids (into #{}
-                                   (keep :instrument-id)
-                                   (get-in state contracts/draft-universe-path))
-               :resolve-member resolve-member
-               :targets (recommendation-targets state pred)})]
+                               discovery backend-id))))]
+    (default-assumptions/recommendation-plan
+     {:discovery discovery
+      :assumptions (assumptions-map state)
+      :universe-ids (into #{}
+                          (keep :instrument-id)
+                          (get-in state contracts/draft-universe-path))
+      :resolve-member resolve-member
+      :targets (recommendation-targets state pred)})))
+
+(defn- apply-recommended
+  [state pred]
+  (let [plan (recommended-apply-plan state pred)]
     (if (empty? (:applied plan))
       [(note-effect :error (default-assumptions/apply-note-message plan))]
+      (plan-effects state plan))))
+
+(defn pending-recommended-apply-effects
+  "Bulk-apply effects for every pending applicable backend recommendation, or
+  nil when nothing would apply. The Run click's auto-apply keys off nil to fall
+  through to a plain pipeline run; the explicit apply-all action keeps its own
+  error-note path for the empty case."
+  [state]
+  (let [plan (recommended-apply-plan state (constantly true))]
+    (when (seq (:applied plan))
       (plan-effects state plan))))
 
 (defn apply-portfolio-optimizer-recommended-history-assumption

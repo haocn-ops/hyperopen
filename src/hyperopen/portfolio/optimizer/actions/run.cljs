@@ -1,6 +1,7 @@
 (ns hyperopen.portfolio.optimizer.actions.run
   (:require [clojure.string :as str]
             [hyperopen.portfolio.optimizer.actions.common :as action-common]
+            [hyperopen.portfolio.optimizer.actions.default-assumptions :as default-assumptions-actions]
             [hyperopen.portfolio.optimizer.application.run-identity :as run-identity]
             [hyperopen.portfolio.optimizer.application.setup-readiness :as setup-readiness]
             [hyperopen.portfolio.optimizer.black-litterman-actions.common :as bl-common]
@@ -56,9 +57,23 @@
 (defn run-portfolio-optimizer-from-draft
   [state]
   (if (seq (get-in state contracts/draft-universe-path))
-    (if (bl-common/black-litterman-return-model? state)
-      (black-litterman-run-effects state)
-      [(run-pipeline-effect)])
+    (let [run-effects (if (bl-common/black-litterman-return-model? state)
+                        (black-litterman-run-effects state)
+                        [(run-pipeline-effect)])
+          ;; A blocked draft's Run click otherwise dead-ends in the pipeline's
+          ;; readiness throw; when the backend has applicable recommendations
+          ;; for the pending workflow assets, the click applies them all first
+          ;; (the same funnel as the Apply-all-recommended banner) and then
+          ;; runs. A runnable draft is never silently reconfigured, and a
+          ;; click the Black-Litterman editor rejects (no pipeline effect in
+          ;; run-effects) must not mutate assumptions as a side effect.
+          auto-apply (when (and (some #{(run-pipeline-effect)} run-effects)
+                                (not (:runnable? (setup-readiness/build-readiness state))))
+                       (default-assumptions-actions/pending-recommended-apply-effects
+                        state))]
+      (if (seq auto-apply)
+        (into (vec auto-apply) run-effects)
+        run-effects))
     []))
 
 (defn run-portfolio-optimizer-from-ready-draft

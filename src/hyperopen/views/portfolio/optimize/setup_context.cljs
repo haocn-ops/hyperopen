@@ -166,7 +166,8 @@
   Data health only. While any proxy history is still fetching the count reads
   loading (a configured-count judged against a not-yet-loaded usable set is
   the same mid-flight falsehood the old ready banner gated on)."
-  [{:keys [applicable? rows configured-count any-loading?]}]
+  [{:keys [applicable? rows configured-count any-loading?
+           recommended-count recommended-actions]}]
   (when applicable?
     [:section {:class ["optimizer-setup-panel" "border" "border-base-300"
                        "bg-base-100/90" "p-3"]
@@ -184,6 +185,18 @@
        (if any-loading?
          "Loading history…"
          (str configured-count " of " (count rows) " configured"))]]
+     ;; Rail-level shortcut for the center section's apply-all banner: the rail
+     ;; is where the user reads "0 of 7 configured", so the one-click fix must
+     ;; be reachable here too, not only after scrolling to the cards. Same
+     ;; action id as the banner — one funnel, one set of guards.
+     (when (pos? (or recommended-count 0))
+       [:button {:type "button"
+                 :class ["mt-2" "w-full" "border" "border-success/50" "bg-success/10"
+                         "px-2" "py-1.5" "text-center" "font-mono" "text-[0.6875rem]"
+                         "font-semibold" "uppercase" "tracking-[0.08em]" "text-success"]
+                 :data-role "portfolio-optimizer-history-assumptions-rail-apply-all-recommended"
+                 :on {:click [[(:apply-all recommended-actions)]]}}
+        (str "Apply all recommended (" recommended-count ")")])
      ;; Height-capped and internally scrollable, same idiom as the Return
      ;; views editor's optimizer-objective-view-rows: a universe with many
      ;; thin-history assets otherwise grows this list without bound, which

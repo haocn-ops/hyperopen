@@ -96,6 +96,31 @@
           "A card with a chosen mode never re-offers the recommendation.")
       (is (zero? (:recommended-count model*))))))
 
+(deftest history-assumption-rail-model-passes-recommendation-aggregates-through-test
+  ;; The right rail renders its own "Apply all recommended (N)" shortcut, so the
+  ;; rail model must carry the SAME aggregates the center banner keys off —
+  ;; passed through from the cards model, never recomputed.
+  (let [state (assoc-in {} contracts/history-discovery-path
+                        recommendation-discovery)
+        draft {:universe universe
+               :objective {:kind :minimum-variance}
+               :history-assumptions {}}
+        rail (view-model/history-assumption-rail-model
+              state draft readiness load-state {})]
+    (is (= 1 (:recommended-count rail)))
+    (is (= :actions/apply-portfolio-optimizer-recommended-history-assumptions
+           (get-in rail [:recommended-actions :apply-all])))
+    (let [configured (assoc draft :history-assumptions
+                            {"perp:NEW" {:behavior :conservative
+                                         :expected-return 0.0
+                                         :volatility 0.8
+                                         :max-weight 0.03
+                                         :correlation-floor 0.75}})
+          rail* (view-model/history-assumption-rail-model
+                 state configured readiness load-state {})]
+      (is (zero? (:recommended-count rail*))
+          "A configured asset stops counting toward the rail shortcut."))))
+
 (deftest history-assumption-cards-recommendation-unapplicable-when-all-members-held-test
   ;; When the backend cannot serve ANY recommended member yet, the card still
   ;; explains the recommendation but one-click apply is withheld — applying it

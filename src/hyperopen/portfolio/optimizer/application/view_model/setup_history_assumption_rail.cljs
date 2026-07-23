@@ -66,11 +66,12 @@
   ([state draft readiness history-load-state]
    (history-assumption-rail-model state draft readiness history-load-state nil))
   ([state draft readiness history-load-state opts]
-   (let [{:keys [cards applicable?]} (assumption-cards/history-assumption-cards state
-                                                               draft
-                                                               readiness
-                                                               history-load-state
-                                                               opts)
+   (let [{:keys [cards applicable? recommended-count recommended-actions]}
+         (assumption-cards/history-assumption-cards state
+                                                    draft
+                                                    readiness
+                                                    history-load-state
+                                                    opts)
          any-loading? (boolean (some :history-loading? cards))
          ;; "Ready to run" judged while proxy history is still fetching is the
          ;; same mid-flight falsehood as a green Configured chip - completeness
@@ -92,4 +93,9 @@
                   cards)
       :all-configured? all-configured?
       :any-loading? any-loading?
-      :configured-count (count (filter :engine-applied? cards))})))
+      :configured-count (count (filter :engine-applied? cards))
+      ;; Same aggregates the center section's apply-all banner keys off, passed
+      ;; through untouched so the rail's shortcut can never disagree with the
+      ;; banner about how many recommendations are applicable.
+      :recommended-count (or recommended-count 0)
+      :recommended-actions recommended-actions})))

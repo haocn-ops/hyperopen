@@ -89,7 +89,7 @@ function cloneScenarioForSpectate(scenario, address) {
   return cloned;
 }
 
-function isContractScenarioId(id) {
+export function isContractScenarioId(id) {
   return [...CONTRACT_SMOKE_IDS].some(
     (baseId) => id === baseId || String(id || "").startsWith(`${baseId}-spectate-`)
   );

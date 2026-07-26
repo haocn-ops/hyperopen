@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import fs from "node:fs/promises";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { BrowserInspectionService } from "./service.mjs";
@@ -8,6 +9,7 @@ import { runDesignReview } from "./design_review_runner.mjs";
 import {
   buildNightlyScenarios,
   extractInspectedAddresses,
+  isContractScenarioId,
   NIGHTLY_SPECTATE_ADDRESSES,
   NIGHTLY_TAGS,
   summarizeNightlyCoverage
@@ -62,6 +64,9 @@ function scenarioKey(result) {
 function summarizeRouteCoverage(results) {
   const buckets = new Map();
   for (const result of results || []) {
+    if (!isContractScenarioId(result.scenarioId)) {
+      continue;
+    }
     const key = `${result.route}::${result.viewport}`;
     if (!buckets.has(key)) {
       buckets.set(key, {
@@ -69,11 +74,23 @@ function summarizeRouteCoverage(results) {
         viewport: result.viewport,
         attempted: 0,
         pass: 0,
-        failed: 0
+        failed: 0,
+        inspectedSpectateAddresses: []
       });
     }
     const bucket = buckets.get(key);
     bucket.attempted += 1;
+    try {
+      const spectateAddress = new URL(result.url).searchParams.get("spectate");
+      if (
+        spectateAddress &&
+        !bucket.inspectedSpectateAddresses.includes(spectateAddress)
+      ) {
+        bucket.inspectedSpectateAddresses.push(spectateAddress);
+      }
+    } catch (_error) {
+      // Missing or invalid result URLs are accounted for as absent contract coverage.
+    }
     if (result.state === "pass") {
       bucket.pass += 1;
     } else {
@@ -105,11 +122,37 @@ function mergeRouteCoverage(actualCoverage, expectedCoverage = []) {
         expectedAttempts: expected?.expectedAttempts ?? actual?.attempted ?? 0,
         pass: actual?.pass || 0,
         failed: actual?.failed || 0,
-        expectedSpectateAddresses: expected?.expectedSpectateAddresses || []
+        expectedSpectateAddresses: expected?.expectedSpectateAddresses || [],
+        inspectedSpectateAddresses: actual?.inspectedSpectateAddresses || []
       };
     })
     .sort((left, right) =>
       `${left.route}/${left.viewport}`.localeCompare(`${right.route}/${right.viewport}`)
+    );
+}
+
+function coverageGapKey(entry) {
+  return `${entry.route}::${entry.viewport}`;
+}
+
+function coverageContractGapsFor(summary, expectedRouteCoverage) {
+  return mergeRouteCoverage(
+    summarizeRouteCoverage(summary?.results),
+    expectedRouteCoverage
+  )
+    .map((entry) => ({
+      route: entry.route,
+      viewport: entry.viewport,
+      attempted: entry.attempted,
+      expectedAttempts: entry.expectedAttempts,
+      missingSpectateAddresses: entry.expectedSpectateAddresses.filter(
+        (address) => !entry.inspectedSpectateAddresses.includes(address)
+      )
+    }))
+    .filter(
+      (entry) =>
+        entry.attempted !== entry.expectedAttempts ||
+        entry.missingSpectateAddresses.length > 0
     );
 }
 
@@ -172,7 +215,7 @@ async function gitBranch(repoRoot) {
   return stdout.trim();
 }
 
-function classifyNightlyFailures(summary, previousSummary, expectedRouteCoverage = []) {
+export function classifyNightlyFailures(summary, previousSummary, expectedRouteCoverage = []) {
   const previousResults = new Map(
     (previousSummary?.results || []).map((result) => [scenarioKey(result), result])
   );
@@ -195,6 +238,13 @@ function classifyNightlyFailures(summary, previousSummary, expectedRouteCoverage
     return previousResults.get(scenarioKey(result))?.state !== "product-regression";
   });
 
+  const newAutomationGaps = results.filter((result) => {
+    if (result.state !== "automation-gap") {
+      return false;
+    }
+    return previousResults.get(scenarioKey(result))?.state !== "automation-gap";
+  });
+
   const persistentAutomationGaps = results.filter((result) => {
     if (result.state !== "automation-gap") {
       return false;
@@ -208,38 +258,62 @@ function classifyNightlyFailures(summary, previousSummary, expectedRouteCoverage
     summarizeRouteCoverage(results),
     expectedRouteCoverage
   );
-  const coverageContractGaps = routeCoverage
-    .filter((entry) => entry.attempted !== entry.expectedAttempts)
-    .map((entry) => ({
-      route: entry.route,
-      viewport: entry.viewport,
-      attempted: entry.attempted,
-      expectedAttempts: entry.expectedAttempts
-    }));
+  const currentCoverageContractGaps = coverageContractGapsFor(
+    summary,
+    expectedRouteCoverage
+  );
+  const previousCoverageGapKeys = new Set(
+    previousSummary
+      ? coverageContractGapsFor(previousSummary, expectedRouteCoverage).map(coverageGapKey)
+      : []
+  );
+  const coverageContractGaps = currentCoverageContractGaps.map((entry) => ({
+    ...entry,
+    novelty: previousCoverageGapKeys.has(coverageGapKey(entry)) ? "EXISTING" : "NEW"
+  }));
+  const newCoverageContractGaps = coverageContractGaps.filter(
+    (entry) => entry.novelty === "NEW"
+  );
+  const persistentCoverageContractGaps = coverageContractGaps.filter(
+    (entry) => entry.novelty === "EXISTING"
+  );
   const classification =
     coverageContractGaps.length > 0 && summary.state === "pass" ? "automation-gap" : summary.state;
+  const novelty =
+    classification === "pass"
+      ? null
+      : newProductRegressions.length > 0 ||
+          newAutomationGaps.length > 0 ||
+          newCoverageContractGaps.length > 0 ||
+          !previousSummary
+        ? "NEW"
+        : "EXISTING";
 
   return {
     classification,
+    novelty,
     summary:
       coverageContractGaps.length > 0
-        ? "Nightly scenario bundle missed part of the expected coverage contract."
+        ? "Nightly scenario bundle did not match the expected coverage contract."
         : summary.state === "pass"
         ? "Nightly scenario bundle completed without failing scenarios."
         : `Nightly scenario bundle finished with state ${summary.state}.`,
     stateCounts,
     newProductRegressions,
+    newAutomationGaps,
     persistentAutomationGaps,
     manualExceptions,
     inspectedAddresses: extractInspectedAddresses(results),
     routeCoverage,
     coverageContractSatisfied: coverageContractGaps.length === 0,
     coverageContractGaps,
+    newCoverageContractGaps,
+    persistentCoverageContractGaps,
     generatedAt: safeNowIso()
   };
 }
 
-function combinedNightlyState(scenarioState, designReviewState) {
+export function combinedNightlyState(scenarioState, designReviewState) {
   if (scenarioState !== "pass") {
     return scenarioState;
   }
@@ -250,6 +324,29 @@ function combinedNightlyState(scenarioState, designReviewState) {
     return "design-review-blocked";
   }
   return "pass";
+}
+
+export function buildNightlyOutcome({
+  summary,
+  previousSummary,
+  expectedRouteCoverage,
+  designReviewState
+}) {
+  const classification = classifyNightlyFailures(
+    summary,
+    previousSummary,
+    expectedRouteCoverage
+  );
+  const overallState = combinedNightlyState(
+    classification.classification,
+    designReviewState
+  );
+  classification.overallState = overallState;
+  classification.designReviewState = designReviewState;
+  return {
+    classification,
+    overallState
+  };
 }
 
 async function createBdIssue({ title, description, type, priority, cwd, dryRun }) {
@@ -288,7 +385,7 @@ async function createBdIssue({ title, description, type, priority, cwd, dryRun }
   }
 }
 
-async function fileNightlyIssues({
+export async function fileNightlyIssues({
   classification,
   repoRoot,
   runDir,
@@ -317,16 +414,16 @@ async function fileNightlyIssues({
         title: `Nightly UI regression: ${result.scenarioId} (${result.viewport})`,
         description,
         type: "bug",
-        priority: result.severity === "critical" ? 0 : 1,
+        priority: result.severity === "critical" ? 1 : 2,
         cwd: repoRoot,
         dryRun
       })
     );
   }
 
-  for (const result of classification.persistentAutomationGaps || []) {
+  for (const result of classification.newAutomationGaps || []) {
     const description =
-      `Nightly UI QA detected a persistent automation gap across consecutive nightly runs.\n\n` +
+      `Nightly UI QA detected a new automation gap.\n\n` +
       `Scenario: ${result.scenarioId}\n` +
       `Viewport: ${result.viewport}\n` +
       `Route: ${result.route}\n` +
@@ -340,6 +437,36 @@ async function fileNightlyIssues({
     issues.push(
       await createBdIssue({
         title: `Nightly UI automation gap: ${result.scenarioId} (${result.viewport})`,
+        description,
+        type: "task",
+        priority: 2,
+        cwd: repoRoot,
+        dryRun
+      })
+    );
+  }
+
+  if ((classification.newCoverageContractGaps || []).length > 0) {
+    const gapLines = classification.newCoverageContractGaps
+      .map((gap) => {
+        const missingAddresses =
+          gap.missingSpectateAddresses.length > 0
+            ? `; missing spectate addresses ${gap.missingSpectateAddresses.join(", ")}`
+            : "";
+        return `- ${gap.route} / ${gap.viewport}: attempted ${gap.attempted}/${gap.expectedAttempts}${missingAddresses}`;
+      })
+      .join("\n");
+    const description =
+      `Nightly UI QA detected a new coverage-contract automation gap.\n\n` +
+      `${gapLines}\n\n` +
+      `Run: ${runId}\n` +
+      `Artifacts: ${runDir}\n` +
+      `Report: ${reportPath}\n` +
+      `Previous nightly: ${previousRunDir || "none"}`;
+
+    issues.push(
+      await createBdIssue({
+        title: "Nightly UI coverage contract gap",
         description,
         type: "task",
         priority: 2,
@@ -378,10 +505,15 @@ function renderReport({
     classification.coverageContractGaps.length === 0
       ? "- None."
       : classification.coverageContractGaps
-          .map(
-            (entry) =>
-              `- \`${entry.route}\` / \`${entry.viewport}\`: attempted ${entry.attempted}/${entry.expectedAttempts}`
-          )
+          .map((entry) => {
+            const missingAddresses =
+              entry.missingSpectateAddresses.length > 0
+                ? `; missing spectate addresses ${entry.missingSpectateAddresses
+                    .map((address) => `\`${address}\``)
+                    .join(", ")}`
+                : "";
+            return `- \`${entry.route}\` / \`${entry.viewport}\` / \`${entry.novelty}\`: attempted ${entry.attempted}/${entry.expectedAttempts}${missingAddresses}`;
+          })
           .join("\n");
 
   const productRegressionLines =
@@ -398,6 +530,16 @@ function renderReport({
     classification.persistentAutomationGaps.length === 0
       ? "- None."
       : classification.persistentAutomationGaps
+          .map(
+            (result) =>
+              `- \`${result.scenarioId}\` / \`${result.viewport}\`: ${result.message || "no message"}`
+          )
+          .join("\n");
+
+  const newAutomationGapLines =
+    classification.newAutomationGaps.length === 0
+      ? "- None."
+      : classification.newAutomationGaps
           .map(
             (result) =>
               `- \`${result.scenarioId}\` / \`${result.viewport}\`: ${result.message || "no message"}`
@@ -449,6 +591,8 @@ function renderReport({
 ## Summary
 
 - Overall state: \`${overallState}\`
+- Failure classification: \`${classification.classification}\`
+- Novelty: \`${classification.novelty || "n/a"}\`
 - Run id: \`${summary.runId}\`
 - Scenario bundle state: \`${summary.state}\`
 - Design review state: \`${designReview?.state || "not-run"}\`
@@ -479,6 +623,10 @@ ${inspectedAddressLines}
 ## New critical/high product regressions
 
 ${productRegressionLines}
+
+## New automation gaps
+
+${newAutomationGapLines}
 
 ## Persistent automation gaps
 
@@ -564,19 +712,17 @@ async function main() {
     targetId: args["target-id"] || null,
     localUrl: args["local-url"] || null
   });
-  const overallState = combinedNightlyState(summary.state, designReview.state);
 
   const previousRunDir = await findPreviousNightlyRun(service.config.artifactRoot, summary.runDir);
   const previousSummary = previousRunDir
     ? await readJson(path.join(previousRunDir, "summary.json"), null)
     : null;
-  const classification = classifyNightlyFailures(
+  const { classification, overallState } = buildNightlyOutcome({
     summary,
     previousSummary,
-    expectedRouteCoverage
-  );
-  classification.overallState = overallState;
-  classification.designReviewState = designReview.state;
+    expectedRouteCoverage,
+    designReviewState: designReview.state
+  });
   const reportDate = reportDateString();
   const reportPath = path.resolve(repoRoot, `docs/qa/nightly-ui-report-${reportDate}.md`);
 
@@ -666,7 +812,9 @@ async function main() {
   }
 }
 
-main().catch((error) => {
-  process.stderr.write(`${error?.stack || error?.message || error}\n`);
-  process.exitCode = 1;
-});
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  main().catch((error) => {
+    process.stderr.write(`${error?.stack || error?.message || error}\n`);
+    process.exitCode = 1;
+  });
+}

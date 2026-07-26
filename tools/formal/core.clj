@@ -1,0 +1,325 @@
+(ns tools.formal.core
+  (:require [clojure.java.io :as io]
+            [clojure.string :as str])
+  (:import [java.io ByteArrayOutputStream File]))
+
+(def ^:private supported-surfaces
+  {"vault-transfer" {:lean-module "Hyperopen.Formal.VaultTransfer"
+                     :status "modeled"
+                     :manifest "generated/vault-transfer.edn"
+                     :target-source "target/formal/vault-transfer-vectors.cljs"
+                     :committed-source "test/hyperopen/formal/vault_transfer_vectors.cljs"}
+   "order-request-standard" {:lean-module "Hyperopen.Formal.OrderRequest.Standard"
+                             :status "modeled"
+                             :manifest "generated/order-request-standard.edn"
+                             :target-source "target/formal/order-request-standard-vectors.cljs"
+                             :committed-source "test/hyperopen/formal/order_request_standard_vectors.cljs"}
+   "order-request-advanced" {:lean-module "Hyperopen.Formal.OrderRequest.Advanced"
+                             :status "modeled"
+                             :manifest "generated/order-request-advanced.edn"
+                             :target-source "target/formal/order-request-advanced-vectors.cljs"
+                             :committed-source "test/hyperopen/formal/order_request_advanced_vectors.cljs"}
+   "effect-order-contract" {:lean-module "Hyperopen.Formal.EffectOrderContract"
+                            :status "modeled"
+                            :manifest "generated/effect-order-contract.edn"
+                            :target-source "target/formal/effect-order-contract-vectors.cljs"
+                            :committed-source "test/hyperopen/formal/effect_order_contract_vectors.cljs"}
+   "portfolio-returns-estimator" {:lean-module "Hyperopen.Formal.PortfolioReturnsEstimator"
+                                  :status "modeled"
+                                  :manifest "generated/portfolio-returns-estimator.edn"
+                                  :target-source "target/formal/portfolio-returns-estimator-vectors.cljs"
+                                  :committed-source "test/hyperopen/formal/portfolio_returns_estimator_vectors.cljs"}
+   "portfolio-returns-normalization" {:lean-module "Hyperopen.Formal.PortfolioReturnsNormalization"
+                                      :status "modeled"
+                                      :manifest "generated/portfolio-returns-normalization.edn"
+                                      :target-source "target/formal/portfolio-returns-normalization-vectors.cljs"
+                                      :committed-source "test/hyperopen/formal/portfolio_returns_normalization_vectors.cljs"}
+   "trading-submit-policy" {:lean-module "Hyperopen.Formal.TradingSubmitPolicy"
+                            :status "modeled"
+                            :manifest "generated/trading-submit-policy.edn"
+                            :target-source "target/formal/trading-submit-policy-vectors.cljs"
+                            :committed-source "test/hyperopen/formal/trading_submit_policy_vectors.cljs"}
+   "order-form-ownership" {:lean-module "Hyperopen.Formal.OrderFormOwnership"
+                           :status "modeled"
+                           :manifest "generated/order-form-ownership.edn"
+                           :target-source "target/formal/order-form-ownership-vectors.cljs"
+                           :committed-source "test/hyperopen/formal/order_form_ownership_vectors.cljs"}})
+
+(def ^:private install-message
+  (str "Lean 4 is required for the formal toolchain.\n"
+       "Install it with elan, then retry:\n"
+       "  curl https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -sSf | sh -s -- -y --no-modify-path\n"
+       "  export PATH=\"$HOME/.elan/bin:$PATH\""))
+
+(defn- usage
+  []
+  (str "Usage: bb tools/formal.clj <verify|sync> --surface <vault-transfer|order-request-standard|order-request-advanced|effect-order-contract|portfolio-returns-estimator|portfolio-returns-normalization|trading-submit-policy|order-form-ownership>\n"
+       "Examples:\n"
+       "  bb tools/formal.clj verify --surface vault-transfer\n"
+       "  bb tools/formal.clj sync --surface order-request-standard\n"
+       "  bb tools/formal.clj verify --surface effect-order-contract\n"
+       "  bb tools/formal.clj verify --surface portfolio-returns-estimator\n"
+       "  bb tools/formal.clj verify --surface portfolio-returns-normalization\n"
+       "  bb tools/formal.clj verify --surface trading-submit-policy\n"
+       "  bb tools/formal.clj verify --surface order-form-ownership\n"
+       "Notes:\n"
+       "  - `verify` builds the Lean workspace and checks the selected surface manifest.\n"
+       "  - modeled surfaces also verify any checked-in generated source files.\n"
+       "  - `sync` refreshes the deterministic generated manifest and any modeled generated source.\n"
+       "  - Lean is expected under `~/.elan/bin` or on PATH.\n"))
+
+(defn- fail!
+  [message]
+  (throw (ex-info message {:usage (usage)})))
+
+(defn- repo-root
+  []
+  (let [script-file (some-> (System/getProperty "babashka.file") io/file .getCanonicalFile)
+        tools-dir (or (some-> script-file .getParentFile)
+                      (io/file "."))]
+    (some-> tools-dir .getParentFile .getCanonicalFile)))
+
+(defn- formal-root
+  []
+  (io/file (repo-root) "tools" "formal"))
+
+(defn- lean-root
+  []
+  (io/file (repo-root) "spec" "lean"))
+
+(defn- generated-root
+  []
+  (io/file (formal-root) "generated"))
+
+(defn- target-root
+  []
+  (io/file (repo-root) "target" "formal"))
+
+(defn- shell-argv
+  [command args]
+  (into [command] args))
+
+(defn- start-output-drainer!
+  [process output-buffer]
+  (doto (Thread.
+         (fn []
+           (try
+             (with-open [stream (.getInputStream process)]
+               (io/copy stream output-buffer))
+             (catch Exception _)))
+         "formal-output-drainer")
+    (.setDaemon true)
+    (.start)))
+
+(defn- run-command
+  [command args {:keys [dir]}]
+  (let [builder (doto (ProcessBuilder. ^java.util.List (vec (shell-argv command args)))
+                  (.redirectErrorStream true))
+        _ (when dir
+            (.directory builder ^File dir))
+        process (.start builder)
+        output-buffer (ByteArrayOutputStream.)
+        drainer (start-output-drainer! process output-buffer)
+        exit-code (.waitFor process)]
+    (.join drainer 1000)
+    {:command (cons command args)
+     :exit exit-code
+     :output (.toString output-buffer "UTF-8")}))
+
+(defn- tool-exists?
+  [name]
+  (let [elan-path (io/file (System/getProperty "user.home") ".elan" "bin" name)]
+    (or (.exists elan-path)
+        (zero? (:exit (run-command "/bin/sh" ["-lc" (str "command -v " name " >/dev/null 2>&1")] {}))))))
+
+(defn- ensure-lean-tools!
+  []
+  (when-not (and (tool-exists? "lean")
+                 (tool-exists? "lake"))
+    (fail! install-message)))
+
+(defn- lean-binary
+  [name]
+  (let [elan-path (io/file (System/getProperty "user.home") ".elan" "bin" name)]
+    (if (.exists elan-path)
+      (.getAbsolutePath elan-path)
+      name)))
+
+(defn- normalize-surface
+  [value]
+  (when-let [surface (some-> value str/trim)]
+    (when-let [surface* (get supported-surfaces surface)]
+      (assoc surface* :id surface))))
+
+(defn- parse-args
+  [args]
+  (when (empty? args)
+    (fail! (usage)))
+  (let [[command & tail] args]
+    (cond
+      (contains? #{"--help" "-h" "help"} command)
+      {:help true}
+
+      (not (contains? #{"verify" "sync"} command))
+      (fail! (str "Unsupported command: " command "\n" (usage)))
+
+      :else
+      (loop [remaining tail
+             opts {:command command
+                   :surface nil}]
+        (if (empty? remaining)
+          (if (:surface opts)
+            opts
+            (fail! (str "Missing --surface value.\n" (usage))))
+          (let [[key value & more] remaining]
+            (cond
+              (= key "--help")
+              {:help true}
+
+              (= key "--surface")
+              (if value
+                (if-let [surface (normalize-surface value)]
+                  (recur more (assoc opts :surface surface))
+                  (fail! (str "Unsupported surface: " value "\n" (usage))))
+                (fail! (str "Missing value for --surface.\n" (usage))))
+
+              :else
+              (fail! (str "Unknown argument: " key "\n" (usage))))))))))
+
+(defn- manifest-content
+  [{:keys [id lean-module status]}]
+  (str "{:surface \"" id "\""
+       " :module \"" lean-module "\""
+       " :status \"" status "\"}\n"))
+
+(defn- manifest-path
+  [surface-id]
+  (io/file (generated-root) (str surface-id ".edn")))
+
+(defn- write-manifest!
+  [{:keys [id] :as surface}]
+  (let [file (manifest-path id)
+        content (manifest-content surface)]
+    (.mkdirs (.getParentFile file))
+    (spit file content)
+    {:path file
+     :content content}))
+
+(defn- verify-manifest!
+  [{:keys [id] :as surface}]
+  (let [file (manifest-path id)
+        expected (manifest-content surface)]
+    (if (.exists file)
+      (let [actual (slurp file)]
+        (when-not (= actual expected)
+          (fail! (str "Stale generated manifest: " (.getPath file) "\n"
+                      "Run `bb tools/formal.clj sync --surface " id "` to refresh it."))))
+      (fail! (str "Missing generated manifest: " (.getPath file) "\n"
+                  "Run `bb tools/formal.clj sync --surface " id "` first.")))
+    {:path file
+     :content expected}))
+
+(defn- target-source-path
+  [{:keys [target-source]}]
+  (when target-source
+    (io/file (repo-root) target-source)))
+
+(defn- committed-source-path
+  [{:keys [committed-source]}]
+  (when committed-source
+    (io/file (repo-root) committed-source)))
+
+(defn- sync-generated-source!
+  [{:keys [id] :as surface}]
+  (when-let [target-file (target-source-path surface)]
+    (let [committed-file (committed-source-path surface)]
+      (when-not (.exists target-file)
+        (fail! (str "Missing generated source output: " (.getPath target-file) "\n"
+                    "The Lean surface did not emit its expected source artifact.")))
+      (.mkdirs (.getParentFile committed-file))
+      (spit committed-file (slurp target-file))
+      {:target-path target-file
+       :committed-path committed-file
+       :surface id})))
+
+(defn- verify-generated-source!
+  [{:keys [id] :as surface}]
+  (when-let [target-file (target-source-path surface)]
+    (let [committed-file (committed-source-path surface)]
+      (when-not (.exists target-file)
+        (fail! (str "Missing generated source output: " (.getPath target-file) "\n"
+                    "The Lean surface did not emit its expected source artifact.")))
+      (when-not (.exists committed-file)
+        (fail! (str "Missing committed generated source: " (.getPath committed-file) "\n"
+                    "Run `bb tools/formal.clj sync --surface " id "` to refresh it.")))
+      (let [generated-text (slurp target-file)
+            committed-text (slurp committed-file)]
+        (when-not (= generated-text committed-text)
+          (fail! (str "Stale generated source: " (.getPath committed-file) "\n"
+                      "Run `bb tools/formal.clj sync --surface " id "` to refresh it."))))
+      {:surface id
+       :target-path target-file
+       :committed-path committed-file})))
+
+(defn- lake-command
+  []
+  (lean-binary "lake"))
+
+(defn- build-lean-workspace!
+  []
+  (let [result (run-command (lake-command) ["build"] {:dir (lean-root)})]
+    (when-not (zero? (:exit result))
+      (fail! (str "Lean build failed.\n" (:output result))))
+    result))
+
+(defn- run-lean-entrypoint!
+  [command surface-id]
+  (let [result (run-command (lake-command)
+                            ["exe" "formal" command "--surface" surface-id]
+                            {:dir (lean-root)})]
+    (when-not (zero? (:exit result))
+      (fail! (str "Lean entrypoint failed.\n" (:output result))))
+    result))
+
+(defn- surface-record
+  [surface-id]
+  (let [surface (get supported-surfaces surface-id)]
+    (when-not surface
+      (fail! (str "Unsupported surface: " surface-id "\n" (usage))))
+    (assoc surface :id surface-id)))
+
+(defn run!
+  [args]
+  (let [opts (parse-args args)]
+    (if (:help opts)
+      (println (usage))
+      (do
+        (ensure-lean-tools!)
+        (build-lean-workspace!)
+        (let [{:keys [command surface]} opts
+              surface* (surface-record (:id surface))]
+          (case command
+            "verify"
+            (do
+              (run-lean-entrypoint! command (:id surface))
+              (verify-manifest! surface*)
+              (verify-generated-source! surface*)
+              (println
+               (if (committed-source-path surface*)
+                 (str "Verified " (:id surface)
+                      " and confirmed the checked-in artifacts are current.")
+                 (str "Verified " (:id surface)
+                      " and confirmed the checked-in manifest is current."))))
+
+            "sync"
+            (do
+              (run-lean-entrypoint! command (:id surface))
+              (write-manifest! surface*)
+              (sync-generated-source! surface*)
+              (println
+               (if-let [committed-file (committed-source-path surface*)]
+                 (str "Synced " (:id surface)
+                      " into " (.getPath (manifest-path (:id surface)))
+                      " and " (.getPath committed-file))
+                 (str "Synced " (:id surface)
+                      " into " (.getPath (manifest-path (:id surface)))))))))))))

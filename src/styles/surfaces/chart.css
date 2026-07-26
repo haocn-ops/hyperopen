@@ -1,0 +1,85 @@
+@layer components {
+  /* Chart container */
+  .chart-container {
+    @apply bg-trading-surface border border-trading-border rounded-lg overflow-hidden;
+  }
+
+  .trading-chart-host .tv-lightweight-charts {
+    cursor: crosshair;
+  }
+
+  .trading-chart-host .tv-lightweight-charts canvas {
+    cursor: crosshair;
+  }
+
+  .trading-chart-host--history-loading::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 16px;
+    z-index: 12;
+    pointer-events: none;
+    background:
+      linear-gradient(
+        180deg,
+        transparent 0%,
+        transparent 6%,
+        rgba(153, 246, 228, 0.94) 20%,
+        rgba(20, 184, 166, 0.96) 36%,
+        rgba(153, 246, 228, 0.94) 52%,
+        transparent 68%,
+        transparent 100%
+      ) left 0 / 3px 170% no-repeat,
+      linear-gradient(90deg, rgba(20, 184, 166, 0.13), transparent 100%) left top / 16px 100% no-repeat,
+      linear-gradient(180deg, rgba(20, 184, 166, 0.24), rgba(20, 184, 166, 0.08)) left top / 1px 100% no-repeat;
+    filter: drop-shadow(0 0 7px rgba(20, 184, 166, 0.4));
+    animation: chart-history-load-edge 1.18s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  }
+
+  .trading-chart-host--history-loading::after {
+    content: "Loading older candles";
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    z-index: 13;
+    pointer-events: none;
+    max-width: min(240px, calc(100% - 24px));
+    padding: 5px 8px;
+    border: 1px solid rgba(20, 184, 166, 0.28);
+    border-radius: 6px;
+    background: rgba(7, 17, 20, 0.82);
+    color: rgb(153, 246, 228);
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1.1;
+    letter-spacing: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.24);
+  }
+
+  @keyframes chart-history-load-edge {
+    0% {
+      background-position: left -115%, left top, left top;
+      opacity: 0.7;
+    }
+
+    58% {
+      opacity: 1;
+    }
+
+    100% {
+      background-position: left 155%, left top, left top;
+      opacity: 0.7;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .trading-chart-host--history-loading::before {
+      animation: none;
+    }
+  }
+}

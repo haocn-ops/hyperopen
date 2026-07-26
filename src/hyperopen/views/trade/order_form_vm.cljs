@@ -1,0 +1,184 @@
+(ns hyperopen.views.trade.order-form-vm
+  (:require [hyperopen.state.trading :as trading]
+            [hyperopen.trading.order-form-application :as application]
+            [hyperopen.trading.order-type-registry :as order-types]
+            [hyperopen.views.trade.order-form-vm-selectors :as selectors]
+            [hyperopen.views.trade.order-form-vm-submit :as submit]))
+
+(def order-type-config
+  order-types/order-type-config)
+
+(defn order-type-label [order-type]
+  (order-types/order-type-label order-type))
+
+(defn order-type-sections [order-type]
+  (order-types/order-type-sections order-type))
+
+(defn pro-dropdown-options []
+  (order-types/pro-order-types))
+
+(defn pro-tab-label [entry-mode order-type]
+  (if (= entry-mode :pro)
+    (order-type-label order-type)
+    "Pro"))
+
+(defn- parse-outcome-side-index [value]
+  (let [parsed (cond
+                 (number? value) value
+                 (string? value) (js/parseInt value 10)
+                 :else js/NaN)]
+    (if (and (number? parsed)
+             (not (js/isNaN parsed)))
+      (int parsed)
+      0)))
+
+(defn- outcome-side-index-value
+  [side]
+  (let [parsed (parse-outcome-side-index (:side-index side))]
+    (when (some? (:side-index side))
+      parsed)))
+
+(defn- outcome-side-display-label
+  [side fallback-index]
+  (or (:side-label side)
+      (:side-name side)
+      (str "Side " fallback-index)))
+
+(defn- selected-outcome-side
+  [outcome-sides selected-index]
+  (let [sides (seq outcome-sides)]
+    (or (some (fn [side]
+                (when (= selected-index
+                         (outcome-side-index-value side))
+                  side))
+              sides)
+        (first sides))))
+
+(defn- parse-outcome-option-id [value]
+  (let [parsed (cond
+                 (number? value) value
+                 (string? value) (js/parseInt value 10)
+                 :else js/NaN)]
+    (when (and (number? parsed)
+               (not (js/isNaN parsed)))
+      (int parsed))))
+
+(defn- selected-outcome-option
+  [outcome-options selected-option-id]
+  (let [options (seq outcome-options)]
+    (or (some (fn [option]
+                (when (= selected-option-id
+                         (parse-outcome-option-id (:outcome-id option)))
+                  option))
+              options)
+        (first options))))
+
+(defn order-form-vm [state]
+  (let [{:keys [draft
+                ui
+                runtime-state
+                market-info
+                order-type-capabilities
+                pricing-policy
+                scale-preview-lines
+                summary
+                submitting?
+                submit-policy]}
+        (application/order-form-context state)
+        normalized-form draft
+        {:keys [quote-symbol
+                base-symbol
+                spot?
+                hip3?
+                outcome?
+                outcome-sides
+                outcome-options
+                outcome-option-id
+                read-only?
+                sz-decimals
+                max-leverage]}
+        market-info
+        side (:side normalized-form)
+        type (:type normalized-form)
+        entry-mode (:entry-mode normalized-form)
+        pro-dropdown-open? (boolean (get-in ui [:entry :pro-dropdown-open?]))
+        pro-mode? (= entry-mode :pro)
+        tpsl-panel-open? (boolean (get-in ui [:panels :tpsl-open?]))
+        controls (selectors/order-type-controls {:entry-mode entry-mode
+                                                 :pro-mode? pro-mode?
+                                                 :tpsl-panel-open? tpsl-panel-open?
+                                                 :order-type-capabilities order-type-capabilities})
+        summary-display (selectors/summary-display summary sz-decimals)
+        ui-leverage (:ui-leverage normalized-form)
+        size-percent (trading/clamp-percent (:size-percent normalized-form))
+        price (selectors/price-model pricing-policy)
+        submit-form (:form submit-policy)
+        submit-errors (:errors submit-policy)
+        required-submit-fields (:required-fields submit-policy)
+        submit-tooltip (submit/submit-tooltip-from-policy submit-policy)
+        submit-disabled? (:disabled? submit-policy)
+        outcome-side-index (parse-outcome-side-index
+                            (or (:outcome-side normalized-form)
+                                (:outcome-side-index normalized-form)))
+        selected-outcome-side (when outcome?
+                                (selected-outcome-side outcome-sides
+                                                       outcome-side-index))
+        selected-outcome-side-label (when selected-outcome-side
+                                      (outcome-side-display-label selected-outcome-side
+                                                                  outcome-side-index))
+        selected-outcome-option-id (or (parse-outcome-option-id
+                                        (or (:outcome-option-id normalized-form)
+                                            (:outcome-option normalized-form)))
+                                       outcome-option-id)
+        selected-outcome-option (when outcome?
+                                  (selected-outcome-option outcome-options
+                                                           selected-outcome-option-id))
+        selected-outcome-option-label (:label selected-outcome-option)
+        base-symbol* (cond
+                       (and outcome? selected-outcome-option-label)
+                       selected-outcome-option-label
+
+                       (and outcome? selected-outcome-side-label)
+                       selected-outcome-side-label
+
+                       :else
+                       base-symbol)]
+    {:form normalized-form
+     :side side
+     :type type
+     :entry-mode entry-mode
+     :pro-dropdown-open? pro-dropdown-open?
+     :tpsl-panel-open? tpsl-panel-open?
+     :pro-dropdown-options (pro-dropdown-options)
+     :pro-tab-label (pro-tab-label entry-mode type)
+     :controls controls
+     :spot? spot?
+     :hip3? hip3?
+     :outcome? (boolean outcome?)
+     :outcome-sides (vec (or outcome-sides []))
+     :outcome-side-index outcome-side-index
+     :outcome-options (vec (or outcome-options []))
+     :outcome-option-id (or selected-outcome-option-id 0)
+     :read-only? read-only?
+     :display summary-display
+     :ui-leverage ui-leverage
+     :next-leverage (selectors/next-leverage ui-leverage max-leverage)
+     :size-percent size-percent
+     :display-size-percent (selectors/display-size-percent size-percent)
+     :notch-overlap-threshold selectors/notch-overlap-threshold
+     :size-input-mode (:size-input-mode normalized-form)
+     :size-display (:size-display normalized-form)
+     :price price
+     :quote-symbol quote-symbol
+     :base-symbol base-symbol*
+     :scale-preview-lines scale-preview-lines
+     :error (:error runtime-state)
+     :submitting? submitting?
+     :submit {:form submit-form
+              :errors submit-errors
+              :required-fields required-submit-fields
+              :reason (:reason submit-policy)
+              :error-message (:error-message submit-policy)
+              :tooltip submit-tooltip
+              :market-price-missing? (:market-price-missing? submit-policy)
+              :disabled? submit-disabled?}}))

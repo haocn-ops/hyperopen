@@ -1,0 +1,10 @@
+{
+  "viewports": {
+    "mobile": {
+      "width": 430,
+      "height": 932,
+      "mobile": true,
+      "deviceScaleFactor": 3
+    }
+  }
+}

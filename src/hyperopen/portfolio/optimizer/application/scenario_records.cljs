@@ -1,0 +1,127 @@
+(ns hyperopen.portfolio.optimizer.application.scenario-records
+  (:require [hyperopen.portfolio.optimizer.contracts :as contracts]))
+
+(defn- result-summary
+  [saved-run & ks]
+  (get-in saved-run (into [:result] ks)))
+
+(def ^:private execution-scenario-statuses
+  #{:executed :partially-executed})
+
+(defn- with-saved-metadata
+  [draft saved-at-ms]
+  (-> (contracts/migrate-draft draft)
+      (assoc-in [:metadata :dirty?] false)
+      (assoc-in [:metadata :saved-at-ms] saved-at-ms)
+      (assoc-in [:metadata :updated-at-ms] saved-at-ms)))
+
+(defn build-saved-scenario-record
+  [{:keys [address scenario-id draft last-successful-run saved-at-ms]}]
+  (let [config (-> (with-saved-metadata draft saved-at-ms)
+                   (assoc :id scenario-id
+                          :status :saved))
+        created-at-ms (or (get-in draft [:metadata :created-at-ms])
+                          saved-at-ms)]
+    {:schema-version contracts/scenario-record-schema-version
+     :id scenario-id
+     :name (or (:name draft) "Untitled Optimization")
+     :address address
+     :status :saved
+     :config config
+     :saved-run last-successful-run
+     :created-at-ms created-at-ms
+     :updated-at-ms saved-at-ms}))
+
+(defn scenario-summary
+  [scenario-record]
+  (let [scenario-record (contracts/migrate-scenario-record scenario-record)
+        config (:config scenario-record)
+        saved-run (:saved-run scenario-record)]
+    (cond-> {:id (:id scenario-record)
+             :name (:name scenario-record)
+             :status (:status scenario-record)
+             :objective-kind (get-in config [:objective :kind])
+             :return-model-kind (get-in config [:return-model :kind])
+             :risk-model-kind (get-in config [:risk-model :kind])
+             :expected-return (result-summary saved-run :expected-return)
+             :volatility (result-summary saved-run :volatility)
+             :rebalance-status (result-summary saved-run :rebalance-preview :status)
+             :updated-at-ms (:updated-at-ms scenario-record)}
+      (some? (:last-execution-status scenario-record))
+      (assoc :last-execution-status (:last-execution-status scenario-record)))))
+
+(defn upsert-scenario-index
+  [scenario-index summary]
+  (let [scenario-id (:id summary)
+        ordered-ids (vec (cons scenario-id
+                               (remove #(= scenario-id %)
+                                       (:ordered-ids scenario-index))))]
+    {:ordered-ids ordered-ids
+     :by-id (assoc (:by-id scenario-index) scenario-id summary)}))
+
+(defn refresh-scenario-index-summary
+  [scenario-index summary]
+  (let [scenario-id (:id summary)
+        ordered-ids (vec (:ordered-ids scenario-index))
+        ordered-ids* (if (some #(= scenario-id %) ordered-ids)
+                       ordered-ids
+                       (vec (cons scenario-id ordered-ids)))]
+    {:ordered-ids ordered-ids*
+     :by-id (assoc (:by-id scenario-index) scenario-id summary)}))
+
+(defn archive-scenario-record
+  [scenario-record archived-at-ms]
+  (-> (contracts/migrate-scenario-record scenario-record)
+      (assoc :status :archived
+             :updated-at-ms archived-at-ms)
+      (assoc-in [:config :status] :archived)
+      (assoc-in [:config :metadata :dirty?] false)
+      (assoc-in [:config :metadata :updated-at-ms] archived-at-ms)))
+
+(defn duplicate-scenario-record
+  [{:keys [source-record scenario-id duplicated-at-ms]}]
+  (let [source-record (contracts/migrate-scenario-record source-record)
+        copy-name (str "Copy of " (:name source-record))
+        config (-> (:config source-record)
+                   (assoc :id scenario-id
+                          :name copy-name
+                          :status :saved)
+                   (assoc-in [:metadata :dirty?] false)
+                   (assoc-in [:metadata :created-at-ms] duplicated-at-ms)
+                   (assoc-in [:metadata :updated-at-ms] duplicated-at-ms))]
+    (-> source-record
+        (assoc :id scenario-id
+               :name copy-name
+               :status :saved
+               :config config
+               :source-scenario-id (:id source-record)
+               :created-at-ms duplicated-at-ms
+               :updated-at-ms duplicated-at-ms
+               :execution-ledger []))))
+
+(defn append-execution-ledger
+  [scenario-record ledger]
+  (let [scenario-record (contracts/migrate-scenario-record scenario-record)
+        execution-status (:status ledger)
+        status (if (contains? execution-scenario-statuses execution-status)
+                 execution-status
+                 (:status scenario-record))
+        updated-at-ms (or (:completed-at-ms ledger)
+                          (:updated-at-ms scenario-record))]
+    (-> scenario-record
+        (assoc :status status
+               :last-execution-status execution-status
+               :updated-at-ms updated-at-ms)
+        (assoc-in [:config :status] status)
+        (assoc-in [:config :metadata :dirty?] false)
+        (assoc-in [:config :metadata :updated-at-ms] updated-at-ms)
+        (update :execution-ledger #(conj (vec %) ledger)))))
+
+(defn mark-tracking-enabled
+  [scenario-record enabled-at-ms]
+  (-> (contracts/migrate-scenario-record scenario-record)
+      (assoc :status :tracking
+             :updated-at-ms enabled-at-ms)
+      (assoc-in [:config :status] :tracking)
+      (assoc-in [:config :metadata :dirty?] false)
+      (assoc-in [:config :metadata :updated-at-ms] enabled-at-ms)))

@@ -1,0 +1,99 @@
+{
+  "passes": [
+    "visual-evidence-captured",
+    "native-control",
+    "styling-consistency",
+    "interaction",
+    "layout-regression",
+    "jank-perf"
+  ],
+  "viewports": {
+    "review-375": {
+      "width": 375,
+      "height": 812,
+      "mobile": true,
+      "deviceScaleFactor": 3
+    },
+    "review-768": {
+      "width": 768,
+      "height": 1024,
+      "mobile": false,
+      "deviceScaleFactor": 2
+    },
+    "review-1280": {
+      "width": 1280,
+      "height": 900,
+      "mobile": false,
+      "deviceScaleFactor": 1
+    },
+    "review-1440": {
+      "width": 1440,
+      "height": 900,
+      "mobile": false,
+      "deviceScaleFactor": 1
+    }
+  },
+  "maxSemanticNodes": 3500,
+  "maxSelectorMatches": 10,
+  "computedStyleKeys": [
+    "display",
+    "position",
+    "color",
+    "backgroundColor",
+    "fontFamily",
+    "fontSize",
+    "fontWeight",
+    "lineHeight",
+    "letterSpacing",
+    "paddingTop",
+    "paddingRight",
+    "paddingBottom",
+    "paddingLeft",
+    "marginTop",
+    "marginRight",
+    "marginBottom",
+    "marginLeft",
+    "gap",
+    "rowGap",
+    "columnGap",
+    "columnCount",
+    "columnWidth",
+    "borderTopWidth",
+    "borderRightWidth",
+    "borderBottomWidth",
+    "borderLeftWidth",
+    "borderColor",
+    "borderRadius",
+    "width",
+    "height",
+    "maxWidth",
+    "minWidth",
+    "overflowX",
+    "overflowY",
+    "zIndex",
+    "opacity",
+    "boxShadow",
+    "outlineStyle",
+    "outlineWidth",
+    "outlineColor"
+  ],
+  "approvedValues": {
+    "fontSizePx": [10, 11, 12, 13, 14, 16, 18, 20, 24, 28, 32, 36, 40, 48],
+    "lineHeightPx": [12, 14, 16, 18, 20, 22, 24, 28, 32, 36, 40, 44, 48, 56],
+    "letterSpacingPx": [-0.5, -0.25, 0, 0.1, 0.18, 0.2, 0.25, 0.3, 0.4, 0.5, 1, 2],
+    "spacingPx": [0, 1, 2, 3, 4, 5, 6, 8, 10, 12, 14, 16, 18, 20, 24, 28, 32, 36, 40, 44, 48, 56, 64],
+    "radiusPx": [0, 2, 4, 6, 8, 10, 12, 16, 20, 24, 9999],
+    "borderWidthPx": [0, 1, 2, 3, 4]
+  },
+  "focusWalk": {
+    "limit": 20
+  },
+  "interactionTrace": {
+    "focusLimit": 4,
+    "scrollFractions": [0, 0.5, 0],
+    "delayMs": 90,
+    "settleDelayMs": 0,
+    "layoutShiftFailThreshold": 0.1,
+    "longTaskFailThresholdMs": 120
+  }
+}

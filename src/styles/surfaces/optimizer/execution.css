@@ -1,0 +1,373 @@
+/* ── Optimizer · Execution surface ────────────────────────────────────────
+   Phase-aware control bands, per-order type editor, and the execution-health
+   rail. Reuses the shared optimizer tokens + table/diag/kpi/chip/note classes;
+   only the execution-specific structure lives here. */
+
+@layer components {
+  .portfolio-optimizer .optimizer-exec-overflow { position: relative; }
+  .portfolio-optimizer .optimizer-exec-overflow > summary { list-style: none; cursor: pointer; }
+  .portfolio-optimizer .optimizer-exec-overflow > summary::-webkit-details-marker { display: none; }
+  .portfolio-optimizer .optimizer-exec-overflow > summary::marker { content: ""; }
+  .portfolio-optimizer .optimizer-exec-overflow-menu {
+    position: absolute;
+    right: 0;
+    top: 100%;
+    margin-top: 4px;
+    min-width: 210px;
+    z-index: 20;
+  }
+  .portfolio-optimizer .optimizer-exec-table .optimizer-exec-glyph {
+    text-align: center;
+    font-family: "JetBrains Mono", "SF Mono", ui-monospace, monospace;
+    font-size: 12px;
+    width: 28px;
+  }
+  .portfolio-optimizer .optimizer-exec-glyph[data-state="filled"] { color: var(--optimizer-long); }
+  .portfolio-optimizer .optimizer-exec-glyph[data-state="failed"] { color: var(--optimizer-short); }
+  .portfolio-optimizer .optimizer-exec-glyph[data-state="queued"] { color: var(--optimizer-accent); }
+  .portfolio-optimizer .optimizer-exec-glyph[data-state="staged"],
+  .portfolio-optimizer .optimizer-exec-glyph[data-state="blocked"],
+  .portfolio-optimizer .optimizer-exec-glyph[data-state="skipped"] { color: var(--optimizer-text-3); }
+
+  /* row affordances */
+  .portfolio-optimizer .optimizer-exec-order-row { cursor: default; }
+  .portfolio-optimizer .optimizer-exec-order-row[data-exec-state="staged"],
+  .portfolio-optimizer .optimizer-exec-order-row[data-exec-state="queued"] { cursor: pointer; }
+  .portfolio-optimizer .optimizer-exec-order-row.is-open > td { background: var(--optimizer-surface-2); }
+  .portfolio-optimizer .optimizer-exec-order-row.is-failed > td {
+    background: color-mix(in srgb, var(--optimizer-short) 8%, transparent);
+  }
+  .portfolio-optimizer .optimizer-exec-order-row.is-muted > td { opacity: 0.55; }
+
+  /* Execution-table legibility: this is the screen where mistakes are expensive, so its
+     rows read a step LARGER than the shared 11px .optimizer-table density baseline —
+     never smaller. */
+  .portfolio-optimizer .optimizer-exec-table { font-size: 12.5px; }
+  .portfolio-optimizer .optimizer-exec-table td { padding: 7px 10px; }
+  .portfolio-optimizer .optimizer-exec-table thead th { font-size: 10px; }
+
+  /* per-order type chip in the Type column */
+  .portfolio-optimizer .optimizer-exec-type-chip {
+    border: 1px solid var(--optimizer-border);
+    border-radius: 2px;
+    padding: 1px 6px;
+    font-family: "JetBrains Mono", "SF Mono", ui-monospace, monospace;
+    font-size: 10px;
+    letter-spacing: 0.03em;
+    color: var(--optimizer-text-2);
+    white-space: nowrap;
+  }
+  .portfolio-optimizer .optimizer-exec-type-chip.is-overridden {
+    border-color: var(--optimizer-accent-border);
+    color: var(--optimizer-accent);
+  }
+  .portfolio-optimizer .optimizer-exec-override-dot {
+    width: 5px; height: 5px; border-radius: 50%;
+    background: var(--optimizer-accent); flex-shrink: 0;
+  }
+
+  /* spot / perp kind badge */
+  .portfolio-optimizer .optimizer-table-kind-badge {
+    display: inline-block;
+    padding: 0 4px;
+    border: 1px solid var(--optimizer-border-strong);
+    border-radius: 2px;
+    font-family: "JetBrains Mono", "SF Mono", ui-monospace, monospace;
+    font-size: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--optimizer-text-2);
+  }
+  .portfolio-optimizer .optimizer-table-kind-badge[data-kind="spot"] {
+    color: var(--optimizer-info);
+    border-color: color-mix(in srgb, var(--optimizer-info) 45%, transparent);
+  }
+  .portfolio-optimizer .optimizer-table-kind-badge[data-kind="perp"] {
+    color: var(--optimizer-accent);
+    border-color: var(--optimizer-accent-border);
+  }
+
+  /* inline order-type editor */
+  .portfolio-optimizer .optimizer-exec-order-editor {
+    padding: 12px 16px 14px;
+    background: var(--optimizer-surface);
+    border-top: 1px solid var(--optimizer-accent-soft);
+    border-bottom: 1px solid var(--optimizer-border);
+  }
+  .portfolio-optimizer .optimizer-exec-toggle {
+    border: 1px solid var(--optimizer-border-strong);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .portfolio-optimizer .optimizer-exec-toggle button {
+    border-right: 1px solid var(--optimizer-border-strong);
+    color: var(--optimizer-text-2);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .portfolio-optimizer .optimizer-exec-toggle button:last-child { border-right: none; }
+  .portfolio-optimizer .optimizer-exec-toggle button.is-on {
+    background: var(--optimizer-surface-3);
+    color: var(--optimizer-text);
+  }
+
+  /* expanded editor — two columns: type controls (left) + cost equation (right).
+     Flex-wraps to a single stacked column on narrow widths; side-by-side gets a quiet
+     divider so the wide row uses the empty right-hand space for a readable breakdown. */
+  .portfolio-optimizer .optimizer-exec-editor-grid {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: stretch;
+    gap: 14px 32px;
+  }
+  .portfolio-optimizer .optimizer-exec-editor-controls {
+    flex: 1 1 300px;
+    min-width: 260px;
+    max-width: 460px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .portfolio-optimizer .optimizer-exec-cost-panel {
+    flex: 2 1 440px;
+    min-width: 300px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 12px;
+  }
+  @media (min-width: 1024px) {
+    .portfolio-optimizer .optimizer-exec-cost-panel {
+      border-left: 1px solid var(--optimizer-border);
+      padding-left: 32px;
+    }
+  }
+  .portfolio-optimizer .optimizer-exec-cost-head {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-family: "JetBrains Mono", "SF Mono", ui-monospace, monospace;
+    font-size: 9.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--optimizer-text-3);
+  }
+  .portfolio-optimizer .optimizer-exec-cost-info { cursor: help; opacity: 0.7; }
+
+  /* the equation row spreads its terms across the full panel width */
+  .portfolio-optimizer .optimizer-exec-cost-eq {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px 8px;
+  }
+  .portfolio-optimizer .optimizer-exec-cost-stat,
+  .portfolio-optimizer .optimizer-exec-cost-rests {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+  }
+  .portfolio-optimizer .optimizer-exec-cost-stat-label {
+    font-family: "JetBrains Mono", "SF Mono", ui-monospace, monospace;
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--optimizer-text-3);
+    white-space: nowrap;
+  }
+  .portfolio-optimizer .optimizer-exec-cost-stat-bp {
+    font-family: "JetBrains Mono", "SF Mono", ui-monospace, monospace;
+    font-size: 18px;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    color: var(--optimizer-text-2);
+    white-space: nowrap;
+  }
+  .portfolio-optimizer .optimizer-exec-cost-stat-usd {
+    font-family: "JetBrains Mono", "SF Mono", ui-monospace, monospace;
+    font-size: 10px;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    color: var(--optimizer-text-3);
+    white-space: nowrap;
+  }
+  .portfolio-optimizer .optimizer-exec-cost-stat[data-emphasis="total"] .optimizer-exec-cost-stat-bp {
+    color: var(--optimizer-text);
+    font-weight: 600;
+    font-size: 20px;
+  }
+  .portfolio-optimizer .optimizer-exec-cost-stat[data-emphasis="allin"] {
+    border: 1px solid var(--optimizer-accent-border);
+    background: var(--optimizer-accent-soft);
+    border-radius: 3px;
+    padding: 5px 13px;
+    gap: 2px;
+  }
+  .portfolio-optimizer .optimizer-exec-cost-stat[data-emphasis="allin"] .optimizer-exec-cost-stat-label {
+    color: var(--optimizer-accent);
+  }
+  .portfolio-optimizer .optimizer-exec-cost-stat[data-emphasis="allin"] .optimizer-exec-cost-stat-bp {
+    color: var(--optimizer-accent);
+    font-weight: 600;
+    font-size: 20px;
+  }
+  .portfolio-optimizer .optimizer-exec-cost-stat[data-emphasis="allin"] .optimizer-exec-cost-stat-usd {
+    color: color-mix(in srgb, var(--optimizer-accent) 72%, transparent);
+  }
+  .portfolio-optimizer .optimizer-exec-cost-op {
+    flex: 0 0 auto;
+    align-self: flex-start;
+    margin-top: 13px;
+    font-family: "JetBrains Mono", "SF Mono", ui-monospace, monospace;
+    font-size: 14px;
+    color: var(--optimizer-text-3);
+  }
+  .portfolio-optimizer .optimizer-exec-cost-rests-note {
+    max-width: 160px;
+    font-size: 10px;
+    line-height: 1.3;
+    color: var(--optimizer-text-3);
+  }
+
+  /* default-order-type tiles (staged band) */
+  .portfolio-optimizer .optimizer-exec-mode-tile {
+    flex: 1 1 0%;
+    min-width: 0;
+    background: transparent;
+    transition: background 0.08s ease;
+  }
+  .portfolio-optimizer .optimizer-exec-mode-tile:hover { background: var(--optimizer-surface); }
+  .portfolio-optimizer .optimizer-exec-mode-tile.is-active {
+    background: var(--optimizer-surface-2);
+    box-shadow: inset 0 0 0 1px var(--optimizer-accent);
+  }
+  .portfolio-optimizer .optimizer-exec-mode-dot {
+    width: 10px; height: 10px; border-radius: 50%;
+    border: 1px solid var(--optimizer-border-strong);
+    flex-shrink: 0;
+  }
+  .portfolio-optimizer .optimizer-exec-mode-tile.is-active .optimizer-exec-mode-dot {
+    border-color: var(--optimizer-accent);
+    background: var(--optimizer-accent);
+  }
+  /* strategy-tile consequence copy — off the 0.6rem floor; these lines carry the
+     tradeoff (est. cost / routing mix) the tile choice is made on. */
+  .portfolio-optimizer .optimizer-exec-mode-sub {
+    font-size: 10.5px;
+    line-height: 1.35;
+  }
+  .portfolio-optimizer .optimizer-exec-readonly {
+    background: color-mix(in srgb, var(--optimizer-warn) 8%, transparent);
+  }
+  /* high-cost crossing warning (staged band) */
+  .portfolio-optimizer .optimizer-exec-highcost {
+    background: color-mix(in srgb, var(--optimizer-warn) 8%, transparent);
+  }
+  /* skipped (no-order) rows collapsed below the order list */
+  .portfolio-optimizer .optimizer-exec-skipped > summary { list-style: none; }
+  .portfolio-optimizer .optimizer-exec-skipped > summary::-webkit-details-marker { display: none; }
+  .portfolio-optimizer .optimizer-exec-skipped > summary::marker { content: ""; }
+  .portfolio-optimizer .optimizer-exec-skipped > summary::before {
+    content: "▸";
+    margin-right: 6px;
+    color: var(--optimizer-text-3);
+  }
+  .portfolio-optimizer .optimizer-exec-skipped[open] > summary::before { content: "▾"; }
+  .portfolio-optimizer .optimizer-exec-skipped[open] > summary {
+    border-bottom: 1px solid var(--optimizer-border);
+  }
+
+  /* control bands */
+  .portfolio-optimizer .optimizer-exec-band.is-armed {
+    background: color-mix(in srgb, var(--optimizer-warn) 7%, transparent);
+    border-top: 1px solid var(--optimizer-warn);
+  }
+  .portfolio-optimizer .optimizer-exec-band.is-running { background: var(--optimizer-surface); }
+  .portfolio-optimizer .optimizer-exec-band.is-halted {
+    background: color-mix(in srgb, var(--optimizer-short) 8%, transparent);
+    border-top: 1px solid var(--optimizer-short);
+  }
+  .portfolio-optimizer .optimizer-exec-band.is-partial {
+    background: color-mix(in srgb, var(--optimizer-warn) 7%, transparent);
+    border-top: 1px solid var(--optimizer-warn);
+  }
+  .portfolio-optimizer .optimizer-exec-band.is-done {
+    background: color-mix(in srgb, var(--optimizer-long) 6%, transparent);
+    border-top: 1px solid var(--optimizer-long);
+  }
+
+  /* progress bar + pulse */
+  .portfolio-optimizer .optimizer-exec-progress {
+    position: relative;
+    height: 6px;
+    width: 100%;
+    background: var(--optimizer-surface-3);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .portfolio-optimizer .optimizer-exec-progress-fill {
+    position: absolute; top: 0; left: 0; height: 100%;
+    background: var(--optimizer-accent);
+    border-radius: 3px;
+    overflow: hidden;
+    transition: width 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .portfolio-optimizer .optimizer-exec-progress[data-phase="halted"] .optimizer-exec-progress-fill {
+    background: var(--optimizer-short);
+  }
+  .portfolio-optimizer .optimizer-exec-progress[data-phase="partial"] .optimizer-exec-progress-fill {
+    background: var(--optimizer-warn);
+  }
+  .portfolio-optimizer .optimizer-exec-progress[data-phase="done"] .optimizer-exec-progress-fill {
+    background: var(--optimizer-long);
+  }
+  .portfolio-optimizer .optimizer-exec-progress-shimmer {
+    position: absolute; top: 0; right: 0; height: 100%; width: 70px;
+    background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.4), transparent);
+    animation: optimizer-exec-sweep 1.1s linear infinite;
+  }
+  @keyframes optimizer-exec-sweep {
+    0% { transform: translateX(-90px); }
+    100% { transform: translateX(90px); }
+  }
+  .portfolio-optimizer .optimizer-exec-pulse {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--optimizer-accent); flex-shrink: 0;
+    animation: optimizer-exec-pulse 1.3s ease-in-out infinite;
+  }
+  @keyframes optimizer-exec-pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.35; transform: scale(0.78); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .portfolio-optimizer .optimizer-exec-progress-shimmer,
+    .portfolio-optimizer .optimizer-exec-pulse { animation: none; }
+  }
+
+  /* nested discard confirmation inside the overflow menu (pure-markup <details>) */
+  .portfolio-optimizer .optimizer-exec-overflow-confirm > summary { list-style: none; }
+  .portfolio-optimizer .optimizer-exec-overflow-confirm > summary::-webkit-details-marker { display: none; }
+  .portfolio-optimizer .optimizer-exec-overflow-confirm > summary::marker { content: ""; }
+  .portfolio-optimizer .optimizer-exec-overflow-confirm[open] > summary {
+    background: color-mix(in srgb, var(--optimizer-short) 12%, transparent);
+  }
+
+  /* live-commit button — reserved danger styling so the irreversible "Confirm & send"
+     never shares the amber primary look of safe actions (Arm / Resume / View tracking). */
+  .portfolio-optimizer .optimizer-exec-commit {
+    background: var(--optimizer-short);
+    border-color: var(--optimizer-short);
+    color: var(--optimizer-text);
+    border-radius: 2px;
+  }
+  .portfolio-optimizer .optimizer-exec-commit:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--optimizer-short) 84%, white);
+    border-color: color-mix(in srgb, var(--optimizer-short) 84%, white);
+  }
+
+  /* diagnostics-rail status pill + rail scroll */
+  .portfolio-optimizer .optimizer-diag-status { font-weight: 500; color: var(--optimizer-long); }
+  .portfolio-optimizer .optimizer-exec-rail { min-height: 0; }
+}

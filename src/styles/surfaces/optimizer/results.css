@@ -1,0 +1,3173 @@
+@layer components {
+  /* Footer clearance for the scenario surface comes from the optimizer route
+     frame's padding-bottom (portfolio_view.cljs) — effective now that the frame
+     is shrink-0 and its box grows with content instead of clamping to the
+     viewport and letting content overflow past its padding. */
+  .portfolio-optimizer .optimizer-scenario-surface {
+    background-color: var(--optimizer-bg);
+  }
+
+  .portfolio-optimizer .optimizer-scenario-header {
+    border-width: 0 0 1px 0;
+    border-radius: 0;
+    background-color: var(--optimizer-bg);
+  }
+
+  .portfolio-optimizer .optimizer-scenario-header h1 {
+    color: var(--optimizer-text);
+    font-size: 18px;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+    line-height: 1.2;
+  }
+
+  .portfolio-optimizer .optimizer-status-tag {
+    border-color: var(--optimizer-border-strong);
+    border-radius: 2px;
+    background-color: var(--optimizer-bg);
+    color: var(--optimizer-text-2);
+  }
+
+  .portfolio-optimizer
+    :is(
+      .optimizer-provenance-strip,
+      .optimizer-scenario-tabs,
+      .optimizer-scenario-kpi-strip
+    ) {
+    border-radius: 0;
+    background-color: var(--optimizer-surface-2);
+  }
+
+  .portfolio-optimizer .optimizer-scenario-tabs {
+    background-color: var(--optimizer-bg);
+    height: 32px;
+  }
+
+  .portfolio-optimizer .optimizer-scenario-tabs a {
+    min-height: 32px;
+    font-size: 11px;
+  }
+
+  .portfolio-optimizer .optimizer-scenario-kpi-strip {
+    background-color: var(--optimizer-bg);
+  }
+
+  .portfolio-optimizer .optimizer-provenance-objective-trigger {
+    min-height: 18px;
+    color: var(--optimizer-text);
+  }
+
+  .portfolio-optimizer .optimizer-provenance-objective-trigger:not(:disabled):hover {
+    border-color: transparent;
+    background-color: transparent;
+    color: var(--optimizer-text);
+  }
+
+  .portfolio-optimizer .optimizer-provenance-objective-label {
+    border-bottom: 1px solid var(--optimizer-accent);
+    padding-bottom: 2px;
+  }
+
+  .portfolio-optimizer .optimizer-objective-menu {
+    background-color: #101316;
+    border-color: var(--optimizer-border-strong);
+    color: var(--optimizer-text);
+  }
+
+  .portfolio-optimizer .optimizer-objective-anchor {
+    z-index: 40;
+  }
+
+  .portfolio-optimizer .optimizer-objective-popover {
+    width: min(440px, calc(100vw - 1rem));
+    max-height: min(760px, calc(100vh - 5rem));
+    overflow: hidden;
+    border-radius: 0;
+    box-shadow: 0 18px 48px rgb(0 0 0 / 0.42);
+  }
+
+  @media (max-width: 639px) {
+    .portfolio-optimizer .optimizer-objective-popover {
+      max-height: calc(100vh - 19rem);
+    }
+  }
+
+  /* Inside the popover the row list yields to the footer: a large universe
+     scrolls within the list instead of growing the menu past the fold. */
+  .portfolio-optimizer .optimizer-objective-menu .optimizer-objective-view-rows {
+    max-height: min(320px, 34vh);
+  }
+
+  .portfolio-optimizer
+    :is(.optimizer-objective-menu-body, .optimizer-objective-view-rows) {
+    scrollbar-width: thin;
+    scrollbar-color: var(--optimizer-border-strong) transparent;
+  }
+
+  .portfolio-optimizer
+    :is(.optimizer-objective-menu-body, .optimizer-objective-view-rows)::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  .portfolio-optimizer
+    :is(.optimizer-objective-menu-body, .optimizer-objective-view-rows)::-webkit-scrollbar-thumb {
+    background-color: var(--optimizer-border-strong);
+  }
+
+  .portfolio-optimizer .optimizer-objective-menu-option {
+    min-height: 54px;
+    background-color: #101316;
+    border-color: var(--optimizer-border);
+    color: var(--optimizer-text);
+  }
+
+  .portfolio-optimizer .optimizer-objective-menu-option:not(:disabled):hover {
+    background-color: var(--optimizer-surface-2);
+    border-color: var(--optimizer-border-strong);
+  }
+
+  .portfolio-optimizer .optimizer-objective-menu-option[data-selected="true"] {
+    background-color: rgb(212 181 88 / 0.06);
+    border-color: var(--optimizer-accent-border);
+  }
+
+  .portfolio-optimizer .optimizer-objective-menu-check {
+    border-color: var(--optimizer-border-strong);
+    color: var(--optimizer-bg);
+  }
+
+  .portfolio-optimizer
+    .optimizer-objective-menu-option[data-selected="true"]
+    .optimizer-objective-menu-check {
+    background-color: var(--optimizer-accent);
+    border-color: var(--optimizer-accent);
+    color: #191407;
+  }
+
+  .portfolio-optimizer .optimizer-objective-view-row {
+    grid-template-columns: minmax(86px, 1fr) minmax(102px, 118px) 66px;
+    column-gap: 10px;
+    min-height: 46px;
+    background-color: #090b0d;
+    border-color: var(--optimizer-border);
+  }
+
+  .portfolio-optimizer .optimizer-objective-view-token {
+    background-color: var(--optimizer-accent);
+    color: #161105;
+  }
+
+  .portfolio-optimizer .optimizer-objective-view-token:has(img) {
+    background-color: var(--optimizer-surface);
+    color: inherit;
+  }
+
+  .portfolio-optimizer .optimizer-objective-view-return-shell {
+    justify-content: flex-end;
+  }
+
+  .portfolio-optimizer .optimizer-objective-view-return-input-shell {
+    width: 82px;
+  }
+
+  .portfolio-optimizer .optimizer-objective-view-return-input {
+    width: 82px;
+    height: 28px;
+    min-height: 28px;
+    background-color: #0f1215;
+    border-color: var(--optimizer-border-strong);
+  }
+
+  .portfolio-optimizer .optimizer-objective-view-return-suffix {
+    top: 50%;
+    right: 17px;
+    transform: translateY(-50%);
+  }
+
+  .portfolio-optimizer .optimizer-objective-view-stepper {
+    top: 4px;
+    right: 3px;
+    width: 10px;
+    height: 20px;
+    opacity: 0.45;
+    transition: opacity 120ms ease;
+  }
+
+  .portfolio-optimizer
+    .optimizer-objective-view-return-shell:is(:hover, :focus-within)
+    .optimizer-objective-view-stepper {
+    opacity: 1;
+  }
+
+  .portfolio-optimizer .optimizer-objective-view-stepper-button {
+    width: 10px;
+    height: 10px;
+    min-height: 10px;
+    background-color: transparent;
+    color: var(--optimizer-text-3);
+    font-size: 6px;
+    line-height: 1;
+  }
+
+  .portfolio-optimizer .optimizer-objective-view-stepper-button:not(:disabled):hover,
+  .portfolio-optimizer .optimizer-objective-view-stepper-button:focus-visible {
+    background-color: transparent;
+    color: var(--optimizer-accent);
+  }
+
+  .portfolio-optimizer .optimizer-objective-view-confidence {
+    display: flex;
+    gap: 6px;
+  }
+
+  .portfolio-optimizer .optimizer-objective-view-confidence-button {
+    position: relative;
+    min-width: 60px;
+    min-height: 30px;
+    height: 30px;
+    padding: 0 12px;
+    border-radius: 0;
+    background-color: var(--optimizer-surface);
+    color: var(--optimizer-text-3);
+  }
+
+  .portfolio-optimizer .optimizer-objective-view-confidence-button::after {
+    content: attr(data-tooltip);
+    pointer-events: none;
+    position: absolute;
+    right: 50%;
+    bottom: calc(100% + 6px);
+    z-index: 70;
+    transform: translateX(50%) translateY(2px);
+    border: 1px solid var(--optimizer-border-strong);
+    background-color: var(--optimizer-surface-3);
+    color: var(--optimizer-text);
+    font-family: "Inter Variable", var(--font-ui-system);
+    font-size: 10px;
+    font-weight: 600;
+    line-height: 1;
+    opacity: 0;
+    padding: 5px 6px;
+    text-transform: capitalize;
+    transition:
+      opacity 120ms ease 420ms,
+      transform 120ms ease 420ms;
+    white-space: nowrap;
+  }
+
+  .portfolio-optimizer
+    .optimizer-objective-view-confidence-button:is(:hover, :focus-visible)::after {
+    opacity: 1;
+    transform: translateX(50%) translateY(0);
+  }
+
+  .portfolio-optimizer
+    .optimizer-objective-view-confidence-button[data-selected="true"] {
+    background-color: var(--optimizer-accent);
+    border-color: var(--optimizer-accent);
+    color: #191407;
+  }
+
+  /* Return views provenance: source chips, ages, filters, implied styling. */
+
+  .portfolio-optimizer .optimizer-return-view-row {
+    display: block;
+  }
+
+  .portfolio-optimizer .optimizer-return-view-chip {
+    border-color: var(--optimizer-border-strong);
+    color: var(--optimizer-text-3);
+  }
+
+  .portfolio-optimizer .optimizer-return-view-chip--user {
+    background-color: var(--optimizer-accent-soft);
+    border-color: var(--optimizer-accent-border);
+    color: var(--optimizer-accent);
+  }
+
+  .portfolio-optimizer .optimizer-return-view-chip--stale {
+    background-color: color-mix(in srgb, var(--optimizer-warn) 14%, transparent);
+    border-color: color-mix(in srgb, var(--optimizer-warn) 55%, transparent);
+    color: var(--optimizer-warn);
+  }
+
+  .portfolio-optimizer .optimizer-return-view-chip--implied {
+    background-color: transparent;
+    border-style: dashed;
+  }
+
+  /* An implied value is the machine's number, not the user's: render it in the
+     muted tier until the row is authored. */
+  .portfolio-optimizer .optimizer-objective-view-return-input--implied {
+    color: var(--optimizer-text-3);
+  }
+
+  .portfolio-optimizer .optimizer-return-view-reset {
+    opacity: 0.55;
+  }
+
+  .portfolio-optimizer .optimizer-return-view-reset:is(:hover, :focus-visible) {
+    color: var(--optimizer-warn);
+    opacity: 1;
+  }
+
+  .portfolio-optimizer .optimizer-return-view-filter {
+    background-color: var(--optimizer-surface);
+    color: var(--optimizer-text-3);
+  }
+
+  .portfolio-optimizer .optimizer-return-view-filter[data-selected="true"] {
+    border-color: var(--optimizer-accent-border);
+    background-color: var(--optimizer-accent-soft);
+    color: var(--optimizer-accent);
+  }
+
+  @media (max-width: 360px) {
+    .portfolio-optimizer .optimizer-objective-view-return-input,
+    .portfolio-optimizer .optimizer-objective-view-return-input-shell {
+      width: 100%;
+    }
+
+    .portfolio-optimizer .optimizer-objective-view-confidence {
+      width: 100%;
+    }
+
+    .portfolio-optimizer .optimizer-objective-view-confidence-button {
+      flex: 1 1 0;
+      min-width: 0;
+    }
+  }
+
+  .portfolio-optimizer .optimizer-kpi-card {
+    padding: 10px;
+  }
+
+  .portfolio-optimizer .optimizer-kpi-card p:first-child {
+    color: var(--optimizer-text-3);
+    font-size: 9.5px;
+    letter-spacing: 0.08em;
+  }
+
+  .portfolio-optimizer .optimizer-kpi-card p:nth-child(2) {
+    /* Inherit --optimizer-text by default (from .portfolio-optimizer) rather
+       than pinning it here, so a value can opt into a signal colour via a
+       utility class (e.g. text-trading-green on Buys / text-trading-red on
+       Sells) without this higher-specificity rule overriding it. */
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+  }
+
+  .portfolio-optimizer .optimizer-kpi-card p:nth-child(3) {
+    font-size: 10.5px;
+  }
+
+  .portfolio-optimizer .optimizer-results-grid {
+    min-height: min(674px, calc(100vh - 236px));
+    overflow: hidden;
+    background-color: var(--optimizer-bg);
+  }
+
+  .portfolio-optimizer
+    :is(.optimizer-results-left-panel, .optimizer-results-center-panel, .optimizer-results-right-panel) {
+    min-width: 0;
+  }
+
+  .portfolio-optimizer
+    :is(.optimizer-results-left-panel, .optimizer-results-center-panel) {
+    background-color: var(--optimizer-bg);
+  }
+
+  .portfolio-optimizer .optimizer-results-right-panel {
+    background-color: var(--optimizer-bg);
+  }
+
+  .portfolio-optimizer .optimizer-results-your-views-editor {
+    border-top-width: 0;
+    border-left: 1px solid var(--optimizer-border);
+    border-bottom: 1px solid var(--optimizer-border);
+    background-color: var(--optimizer-bg);
+  }
+
+  .portfolio-optimizer .optimizer-target-exposure-table {
+    border-radius: 0;
+    background-color: var(--optimizer-bg);
+  }
+
+  .portfolio-optimizer .optimizer-target-exposure-header {
+    min-width: 0;
+    flex-wrap: wrap;
+  }
+
+  .portfolio-optimizer .optimizer-target-exposure-header-copy {
+    min-width: 0;
+    flex: 1 1 10rem;
+  }
+
+  .portfolio-optimizer .optimizer-target-exposure-header-controls {
+    min-width: 0;
+    flex: 0 1 auto;
+    flex-wrap: wrap;
+  }
+
+  @media (max-width: 639px) {
+    .portfolio-optimizer .optimizer-target-exposure-header {
+      align-items: flex-start;
+    }
+
+    .portfolio-optimizer .optimizer-target-exposure-header-controls {
+      flex-basis: 100%;
+      justify-content: flex-start;
+    }
+  }
+
+  .portfolio-optimizer .optimizer-draft-add-asset-popover--dark {
+    background-color: #0e1013;
+    border-color: var(--optimizer-border-strong);
+  }
+
+  .portfolio-optimizer
+    .optimizer-draft-add-asset-popover
+    .optimizer-universe-search-shell {
+    background-color: #090a0c;
+    border-color: var(--optimizer-accent-border);
+  }
+
+  .portfolio-optimizer .optimizer-draft-add-asset-results {
+    scrollbar-width: none;
+  }
+
+  .portfolio-optimizer .optimizer-draft-add-asset-results::-webkit-scrollbar {
+    display: none;
+  }
+
+  .portfolio-optimizer .optimizer-target-exposure-table table th {
+    background-color: var(--optimizer-surface);
+    color: var(--optimizer-text-3);
+    font-size: 9.5px;
+    letter-spacing: 0.06em;
+    padding: 6px 10px;
+  }
+
+  .portfolio-optimizer .optimizer-target-exposure-table table td {
+    border-bottom: 1px solid var(--optimizer-border);
+    background-color: var(--optimizer-bg);
+    color: var(--optimizer-text);
+    padding: 6px 10px;
+  }
+
+  .portfolio-optimizer
+    .optimizer-target-exposure-table
+    table
+    td.optimizer-target-exposure-change-cell.text-trading-green {
+    color: var(--optimizer-long);
+  }
+
+  .portfolio-optimizer
+    .optimizer-target-exposure-table
+    table
+    td.optimizer-target-exposure-change-cell.text-trading-red {
+    color: var(--optimizer-short);
+  }
+
+  .portfolio-optimizer .optimizer-target-exposure-delta-bar-cell {
+    min-width: 76px;
+    text-align: right;
+  }
+
+  .portfolio-optimizer .optimizer-target-exposure-delta-bar {
+    --optimizer-delta-bar-size: 0%;
+    --optimizer-delta-bar-fill-size: 0%;
+    position: relative;
+    display: block;
+    width: 68px;
+    height: 14px;
+    margin-left: auto;
+  }
+
+  .portfolio-optimizer .optimizer-target-exposure-delta-bar::before {
+    content: "";
+    position: absolute;
+    top: 2px;
+    bottom: 2px;
+    left: 50%;
+    width: 1px;
+    background-color: var(--optimizer-border-strong);
+    transform: translateX(-0.5px);
+  }
+
+  .portfolio-optimizer .optimizer-target-exposure-delta-bar-fill {
+    position: absolute;
+    top: 4px;
+    bottom: 4px;
+    width: var(--optimizer-delta-bar-fill-size);
+    min-width: 0;
+  }
+
+  .portfolio-optimizer
+    .optimizer-target-exposure-delta-bar[data-direction="positive"]
+    .optimizer-target-exposure-delta-bar-fill {
+    left: 50%;
+    background-color: var(--optimizer-long);
+  }
+
+  .portfolio-optimizer
+    .optimizer-target-exposure-delta-bar[data-direction="negative"]
+    .optimizer-target-exposure-delta-bar-fill {
+    right: 50%;
+    background-color: var(--optimizer-short);
+  }
+
+  .portfolio-optimizer .optimizer-target-exposure-row td {
+    background-color: var(--optimizer-surface-2);
+  }
+
+  .portfolio-optimizer
+    .optimizer-target-exposure-row--excluded
+    td {
+    color: var(--optimizer-text-3);
+    opacity: 0.62;
+  }
+
+  .portfolio-optimizer .optimizer-target-exposure-asset:hover td,
+  .portfolio-optimizer .optimizer-target-exposure-row:hover td {
+    background-color: var(--optimizer-surface-3);
+  }
+
+  .portfolio-optimizer .optimizer-target-exposure-exclude-button {
+    display: inline-flex;
+    width: 18px;
+    height: 18px;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid transparent;
+    border-radius: 999px;
+    color: var(--optimizer-text-3);
+    font-size: 11px;
+    line-height: 1;
+    opacity: 0;
+    transition:
+      border-color 120ms ease,
+      color 120ms ease,
+      opacity 120ms ease,
+      background-color 120ms ease;
+  }
+
+  .portfolio-optimizer
+    :is(.optimizer-target-exposure-asset, .optimizer-target-exposure-row):hover
+    .optimizer-target-exposure-exclude-button,
+  .portfolio-optimizer .optimizer-target-exposure-exclude-button:focus-visible,
+  .portfolio-optimizer .optimizer-target-exposure-exclude-button[data-excluded="true"] {
+    opacity: 1;
+  }
+
+  .portfolio-optimizer .optimizer-target-exposure-exclude-button:hover {
+    border-color: var(--optimizer-border-strong);
+    background-color: var(--optimizer-surface);
+    color: var(--optimizer-text);
+  }
+
+  .portfolio-optimizer .optimizer-target-exposure-excluded-tag,
+  .portfolio-optimizer .optimizer-target-exposure-status {
+    display: inline-flex;
+    align-items: center;
+    border: 1px solid var(--optimizer-border);
+    background-color: var(--optimizer-surface);
+    color: var(--optimizer-text-3);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    font-size: 9px;
+    font-weight: 650;
+    letter-spacing: 0.06em;
+    line-height: 1;
+    padding: 3px 5px;
+    text-transform: uppercase;
+  }
+
+  .portfolio-optimizer
+    :is(.optimizer-frontier-panel, .optimizer-trust-caution-panel) {
+    border-radius: 0;
+  }
+
+  .portfolio-optimizer .optimizer-trust-caution-panel {
+    background-color: var(--optimizer-surface);
+  }
+
+  .portfolio-optimizer .optimizer-trust-caution-panel > div:first-child {
+    padding: 12px 14px;
+  }
+
+  .portfolio-optimizer .optimizer-trust-caution-panel .optimizer-diagnostics-list > div {
+    padding: 10px;
+  }
+
+  .portfolio-optimizer .optimizer-result-confidence-panel {
+    border-radius: 0;
+    background-color: var(--optimizer-surface);
+  }
+
+  /* The lone inline action in the confidence rail ("From here" next-step row). Amber
+     underlined link — accent color reads as "clickable" here, deliberately quieter than
+     the rounded "Review rebalance" header CTA so it does not compete as a banner. */
+  .portfolio-optimizer .optimizer-result-confidence-rebalance {
+    appearance: none;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    font: inherit;
+    font-weight: 600;
+    color: var(--optimizer-accent);
+    cursor: pointer;
+    text-decoration-line: underline;
+    text-decoration-color: var(--optimizer-accent-border);
+    text-underline-offset: 2px;
+  }
+
+  .portfolio-optimizer .optimizer-result-confidence-rebalance:hover {
+    text-decoration-color: var(--optimizer-accent);
+  }
+
+  .portfolio-optimizer .optimizer-result-confidence-rebalance:focus-visible {
+    outline: 1px solid var(--optimizer-accent-border);
+    outline-offset: 2px;
+  }
+
+  .portfolio-optimizer .optimizer-refinement-card {
+    border-radius: 0;
+    background-color: var(--optimizer-surface);
+  }
+
+  /* Dense pane-head: status pip + uppercase mono label on the left, tier/points meta
+     on the right. Pip is amber for a draft/partial result, green once refined. */
+  .portfolio-optimizer .optimizer-refinement-head-pip {
+    flex: 0 0 auto;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background-color: var(--optimizer-accent);
+  }
+
+  .portfolio-optimizer
+    .optimizer-refinement-head[data-tier="refined"]
+    .optimizer-refinement-head-pip,
+  .portfolio-optimizer
+    .optimizer-refinement-head[data-tier="maximum"]
+    .optimizer-refinement-head-pip {
+    background-color: var(--optimizer-long);
+  }
+
+  .portfolio-optimizer .optimizer-refinement-head-label {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    font-size: 9px;
+    font-weight: 650;
+    letter-spacing: 0.16em;
+    line-height: 1;
+    text-transform: uppercase;
+    color: var(--optimizer-text-2);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .portfolio-optimizer .optimizer-refinement-head-meta {
+    flex: 0 0 auto;
+    font-size: 10px;
+    letter-spacing: 0.02em;
+    color: var(--optimizer-text-3);
+  }
+
+  /* Square, 1px-bordered mono tag chips. Tint (and reveal the leading pip) only when
+     the value carries signal — amber caution, green confirmation; neutral otherwise. */
+  .portfolio-optimizer .optimizer-refinement-tag {
+    border: 1px solid var(--optimizer-border);
+    background-color: var(--optimizer-surface);
+    color: var(--optimizer-text-3);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    font-size: 9px;
+    font-weight: 650;
+    letter-spacing: 0.06em;
+    line-height: 1;
+    padding: 3px 6px;
+    text-transform: uppercase;
+  }
+
+  .portfolio-optimizer .optimizer-refinement-tag-label {
+    color: var(--optimizer-text-3);
+  }
+
+  .portfolio-optimizer .optimizer-refinement-tag-value {
+    color: var(--optimizer-text);
+  }
+
+  .portfolio-optimizer .optimizer-refinement-tag-pip {
+    flex: 0 0 auto;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background-color: var(--optimizer-text-3);
+  }
+
+  .portfolio-optimizer .optimizer-refinement-tag[data-tone="warn"] {
+    border-color: var(--optimizer-accent-border);
+    background-color: var(--optimizer-accent-soft);
+  }
+
+  .portfolio-optimizer
+    .optimizer-refinement-tag[data-tone="warn"]
+    .optimizer-refinement-tag-value {
+    color: var(--optimizer-accent);
+  }
+
+  .portfolio-optimizer
+    .optimizer-refinement-tag[data-tone="warn"]
+    .optimizer-refinement-tag-pip {
+    background-color: var(--optimizer-accent);
+  }
+
+  .portfolio-optimizer .optimizer-refinement-tag[data-tone="good"] {
+    border-color: rgb(78 166 116 / 0.45);
+  }
+
+  .portfolio-optimizer
+    .optimizer-refinement-tag[data-tone="good"]
+    .optimizer-refinement-tag-value {
+    color: var(--optimizer-long);
+  }
+
+  .portfolio-optimizer
+    .optimizer-refinement-tag[data-tone="good"]
+    .optimizer-refinement-tag-pip {
+    background-color: var(--optimizer-long);
+  }
+
+  /* Refinement options: divider above, uppercase mono eyebrow + lowercase hint. */
+  .portfolio-optimizer .optimizer-refinement-options {
+    border-top: 1px solid var(--optimizer-border);
+    padding-top: 12px;
+  }
+
+  .portfolio-optimizer .optimizer-refinement-eyebrow {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .portfolio-optimizer .optimizer-refinement-eyebrow-label {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    font-size: 9px;
+    font-weight: 650;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--optimizer-text-2);
+  }
+
+  .portfolio-optimizer .optimizer-refinement-eyebrow-hint {
+    font-size: 10px;
+    letter-spacing: 0.01em;
+    color: var(--optimizer-text-3);
+  }
+
+  /* Tiled mode selector: one hairline frame, tiles share borders (no gutters). */
+  .portfolio-optimizer .optimizer-refinement-depth-grid {
+    border: 1px solid var(--optimizer-border);
+    background-color: var(--optimizer-surface);
+  }
+
+  .portfolio-optimizer .optimizer-refinement-depth-tile {
+    position: relative;
+    min-height: 0;
+    padding: 9px 10px;
+    border: 0;
+    border-radius: 0;
+    background-color: transparent;
+    transition: background-color 120ms ease;
+  }
+
+  .portfolio-optimizer
+    .optimizer-refinement-depth-tile
+    + .optimizer-refinement-depth-tile {
+    border-left: 1px solid var(--optimizer-border);
+  }
+
+  .portfolio-optimizer .optimizer-refinement-depth-tile:not(:disabled):hover {
+    background-color: var(--optimizer-surface-2);
+    border-color: var(--optimizer-border);
+  }
+
+  /* Selected tile: amber inset frame + soft tint (kept on hover). */
+  .portfolio-optimizer .optimizer-refinement-depth-tile[data-selected="true"] {
+    background-color: var(--optimizer-accent-soft);
+    box-shadow: inset 0 0 0 1px var(--optimizer-accent-border);
+  }
+
+  .portfolio-optimizer .optimizer-refinement-depth-tile[data-selected="true"]:hover {
+    background-color: var(--optimizer-accent-soft);
+  }
+
+  .portfolio-optimizer .optimizer-refinement-depth-check {
+    display: grid;
+    place-content: center;
+    flex: 0 0 13px;
+    width: 13px;
+    height: 13px;
+    border: 1px solid var(--optimizer-border-strong);
+    border-radius: 2px;
+    background-color: var(--optimizer-bg);
+  }
+
+  .portfolio-optimizer .optimizer-refinement-depth-check::after {
+    content: "";
+    width: 3px;
+    height: 6px;
+    border-right: 2px solid var(--optimizer-bg);
+    border-bottom: 2px solid var(--optimizer-bg);
+    transform: rotate(45deg) scale(0);
+    transform-origin: center;
+  }
+
+  .portfolio-optimizer
+    .optimizer-refinement-depth-tile[data-selected="true"]
+    .optimizer-refinement-depth-check {
+    border-color: var(--optimizer-accent);
+    background-color: var(--optimizer-accent);
+  }
+
+  .portfolio-optimizer
+    .optimizer-refinement-depth-tile[data-selected="true"]
+    .optimizer-refinement-depth-check::after {
+    transform: rotate(45deg) scale(1);
+  }
+
+  .portfolio-optimizer .optimizer-refinement-depth-label {
+    color: var(--optimizer-text-2);
+  }
+
+  .portfolio-optimizer .optimizer-refinement-depth-hint {
+    color: var(--optimizer-text-3);
+  }
+
+  .portfolio-optimizer .optimizer-refinement-depth-points {
+    color: var(--optimizer-text-3);
+  }
+
+  .portfolio-optimizer
+    .optimizer-refinement-depth-tile[data-selected="true"]
+    .optimizer-refinement-depth-label {
+    color: var(--optimizer-text);
+  }
+
+  .portfolio-optimizer
+    .optimizer-refinement-depth-tile[data-selected="true"]
+    .optimizer-refinement-depth-points {
+    color: var(--optimizer-accent);
+  }
+
+  /* Primary amber CTA: solid fill via .optimizer-primary-action; muted when disabled. */
+  .portfolio-optimizer .optimizer-refinement-refine {
+    letter-spacing: 0.01em;
+  }
+
+  .portfolio-optimizer .optimizer-refinement-refine:disabled {
+    border-color: var(--optimizer-border);
+    background-color: var(--optimizer-surface-2);
+    color: var(--optimizer-text-3);
+    cursor: not-allowed;
+  }
+
+  /* In-flight: determinate amber fill with a shimmer sweep (no spinner, per motion rules). */
+  .portfolio-optimizer .optimizer-refinement-progress-track {
+    border: 1px solid var(--optimizer-border);
+    background-color: var(--optimizer-surface-3);
+    border-radius: 2px;
+  }
+
+  .portfolio-optimizer .optimizer-refinement-progress-fill {
+    background-color: var(--optimizer-accent);
+    background-image: linear-gradient(
+      90deg,
+      rgb(212 181 88 / 0) 0%,
+      rgb(255 244 214 / 0.5) 50%,
+      rgb(212 181 88 / 0) 100%
+    );
+    background-size: 220% 100%;
+    animation: optimizer-refinement-shimmer 1.4s linear infinite;
+    will-change: background-position;
+  }
+
+  @keyframes optimizer-refinement-shimmer {
+    from {
+      background-position: 200% 0;
+    }
+
+    to {
+      background-position: -200% 0;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .portfolio-optimizer .optimizer-refinement-progress-fill {
+      animation: none;
+    }
+  }
+
+  /* ── Dense trade table (rebalance preview) ─────────────────────
+     A real tiled data table in the dense designer idiom: 1px row separators, a
+     sticky uppercase header, hover-lit rows, and striped group/leg
+     rows — replacing the rounded card-per-row grid. */
+  .portfolio-optimizer .optimizer-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11px;
+  }
+
+  .portfolio-optimizer .optimizer-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    text-align: left;
+    font-weight: 400;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-size: 9.5px;
+    color: var(--optimizer-text-3);
+    padding: 6px 10px;
+    background-color: var(--optimizer-surface);
+    border-bottom: 1px solid var(--optimizer-border);
+    white-space: nowrap;
+  }
+
+  .portfolio-optimizer .optimizer-table :is(th, td).right {
+    text-align: right;
+  }
+
+  .portfolio-optimizer .optimizer-table td {
+    padding: 6px 10px;
+    border-bottom: 1px solid var(--optimizer-border);
+    color: var(--optimizer-text);
+    vertical-align: top;
+  }
+
+  .portfolio-optimizer .optimizer-table tbody tr:hover td {
+    background-color: var(--optimizer-surface-2);
+  }
+
+  .portfolio-optimizer .optimizer-table tr.optimizer-table-group > td {
+    background-color: var(--optimizer-surface-2);
+    font-weight: 600;
+  }
+
+  .portfolio-optimizer .optimizer-table tr.optimizer-table-leg > td {
+    background-color: var(--optimizer-surface);
+    color: var(--optimizer-text-2);
+  }
+
+  .portfolio-optimizer .optimizer-table tr.optimizer-table-blocked > td {
+    color: var(--optimizer-text-3);
+  }
+
+  /* ── Outcome diagnostics list (what this rebalance achieves) ────
+     before → after metric rows for the rebalance side rail, mirroring
+     the dense designer .diag block: small uppercase label, large mono value, 1px
+     separators, no card boxing. */
+  .portfolio-optimizer .optimizer-diag {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--optimizer-border);
+  }
+
+  .portfolio-optimizer .optimizer-diag:last-child {
+    border-bottom: none;
+  }
+
+  .portfolio-optimizer .optimizer-diag-label {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    color: var(--optimizer-text-2);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  .portfolio-optimizer .optimizer-diag-value {
+    margin-top: 4px;
+    font-size: 16px;
+    letter-spacing: -0.01em;
+    color: var(--optimizer-text);
+  }
+
+  .portfolio-optimizer .optimizer-diag-sub {
+    /* Colour comes from a utility class in markup (text-trading-muted/70 by
+       default, or a signal colour for improvement/regression deltas) so this
+       rule does not specificity-lock it; see kpi-card value note above. */
+    margin-top: 2px;
+    font-size: 10px;
+  }
+
+  /* ── Verdict bar CTA ──────────────────────────────────────────
+     The page's primary action, paired with the plain-language verdict at the top
+     of the Recommendation tab. Wide enough to read as a button block on desktop;
+     full-width when it wraps under the verdict text on narrow screens.
+
+     The actionable state (`--live`) is the ONLY control on the page that moves the
+     flow forward, so it carries a sweeping "snake" border: a masked conic-gradient
+     ring on ::before whose bright arc rotates continuously (registered @property
+     angle so the gradient itself interpolates). Static accent border under
+     prefers-reduced-motion. The explanatory sentence sits in a hover/focus tooltip
+     with a hover-intent delay instead of standing subtext. */
+  .portfolio-optimizer .optimizer-verdict-cta {
+    flex: 0 1 auto;
+    min-width: min(260px, 100%);
+    border-radius: 0;
+  }
+
+  @media (max-width: 767px) {
+    .portfolio-optimizer .optimizer-verdict-cta {
+      width: 100%;
+    }
+  }
+
+  @property --optimizer-cta-sweep {
+    syntax: "<angle>";
+    inherits: false;
+    initial-value: 0deg;
+  }
+
+  .portfolio-optimizer .optimizer-verdict-cta--live::before {
+    content: "";
+    position: absolute;
+    inset: -2px;
+    border-radius: inherit;
+    padding: 2px;
+    background: conic-gradient(
+      from var(--optimizer-cta-sweep),
+      transparent 0deg,
+      transparent 264deg,
+      rgb(var(--ho-warn) / 0.55) 312deg,
+      rgb(var(--ho-warn) / 1) 342deg,
+      transparent 360deg
+    );
+    mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    mask-composite: exclude;
+    animation: optimizer-cta-sweep 2.8s linear infinite;
+    pointer-events: none;
+  }
+
+  @keyframes optimizer-cta-sweep {
+    to {
+      --optimizer-cta-sweep: 360deg;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .portfolio-optimizer .optimizer-verdict-cta--live::before {
+      animation: none;
+      /* Static full accent ring so the emphasis survives without motion. */
+      background: rgb(var(--ho-warn) / 0.7);
+    }
+  }
+
+  /* Delayed tooltip: hidden in place (not display:none, so screen readers still
+     read it as the button's description), fades in above the button after a
+     hover-intent delay; instant show on keyboard focus, instant hide on leave. */
+  .portfolio-optimizer .optimizer-verdict-cta-tip {
+    position: absolute;
+    right: 0;
+    bottom: calc(100% + 8px);
+    z-index: 10;
+    max-width: 280px;
+    padding: 8px 10px;
+    border: 1px solid var(--optimizer-border);
+    background-color: var(--optimizer-surface-2);
+    color: var(--optimizer-text-2);
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 1.4;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition:
+      opacity 0.15s ease,
+      visibility 0.15s;
+  }
+
+  .portfolio-optimizer .optimizer-verdict-cta:hover .optimizer-verdict-cta-tip {
+    opacity: 1;
+    visibility: visible;
+    transition-delay: 0.8s;
+  }
+
+  .portfolio-optimizer .optimizer-verdict-cta:focus-visible .optimizer-verdict-cta-tip {
+    opacity: 1;
+    visibility: visible;
+    transition-delay: 0s;
+  }
+
+  /* ── Refinement disclosure ────────────────────────────────────
+     Refinement is by-exception: the depth picker sits behind a native <details>
+     under the compact status header. The separator that used to live on
+     .optimizer-refinement-options moves up here so the closed state still reads
+     as a footer row of the card. */
+  .portfolio-optimizer .optimizer-refinement-disclosure {
+    border-top: 1px solid var(--optimizer-border);
+    padding-top: 10px;
+  }
+
+  .portfolio-optimizer .optimizer-refinement-disclosure-summary {
+    color: var(--optimizer-text-2);
+  }
+
+  .portfolio-optimizer .optimizer-refinement-disclosure-summary:hover
+    .optimizer-refinement-eyebrow-label {
+    color: var(--optimizer-accent);
+  }
+
+  .portfolio-optimizer .optimizer-refinement-disclosure .optimizer-refinement-options {
+    border-top: 0;
+    padding-top: 0;
+    margin-top: 4px;
+  }
+
+  /* ── Return-views disclosure (results rail) ───────────────────
+     Collapsed by default: the summary row (title + live counts) is the whole
+     panel until opened. The title <p> renders inline so it shares the marker
+     line with the counts. */
+  .portfolio-optimizer .optimizer-return-views-disclosure-summary p {
+    display: inline;
+    margin-right: 8px;
+  }
+
+  .portfolio-optimizer .optimizer-return-views-disclosure-summary:hover p {
+    color: var(--optimizer-accent);
+  }
+
+  /* ── "Why this target" context card ───────────────────────────
+     Engine-derived facts under the frontier: book shape, largest position,
+     binding constraints. Same dense-surface treatment as the refinement card. */
+  .portfolio-optimizer .optimizer-target-context {
+    border-radius: 0;
+    background-color: var(--optimizer-surface);
+  }
+
+  .portfolio-optimizer .optimizer-target-context-fact {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    border: 1px solid var(--optimizer-border);
+    background-color: var(--optimizer-bg);
+    padding: 8px 10px;
+  }
+
+  .portfolio-optimizer .optimizer-target-context-label {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    font-size: 9px;
+    font-weight: 650;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--optimizer-text-3);
+  }
+
+  .portfolio-optimizer .optimizer-target-context-value {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--optimizer-text);
+  }
+
+  .portfolio-optimizer .optimizer-target-context-binding {
+    border-radius: 0;
+  }
+
+  /* ── Risk contribution balance card (designer spec 2026-07-11) ──
+     Dense charcoal card: header + DOM-state tab switcher, five-cell KPI
+     strip, framed plot with backdrop gridlines and the continuous dashed
+     purple equal-target line, HTML lanes, purple Target / signed Deviation
+     columns, READING THIS footnote. Tab state is a pair of visually-hidden
+     radios toggled purely by :has() — no app state. */
+  .portfolio-optimizer .optimizer-risk-balance {
+    border-radius: 0;
+    background-color: var(--optimizer-surface);
+    padding: 14px 16px 16px;
+  }
+
+  .portfolio-optimizer .optimizer-risk-balance-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .portfolio-optimizer .optimizer-risk-balance-title {
+    font-family: "JetBrains Mono", var(--font-mono);
+    font-size: 12px;
+    font-weight: 650;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--optimizer-text);
+  }
+
+  .portfolio-optimizer .optimizer-risk-balance-subtitle {
+    margin-top: 4px;
+    font-size: 12px;
+    color: var(--optimizer-text-2);
+  }
+
+  /* Tab switcher: one hairline frame, mono uppercase segments, active segment
+     lifted with the amber underline. The first tab is active by default until
+     any radio is checked. */
+  .portfolio-optimizer .optimizer-risk-balance-tabs {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: stretch;
+    border: 1px solid var(--optimizer-border-strong);
+    background-color: var(--optimizer-surface);
+  }
+
+  .portfolio-optimizer .optimizer-risk-balance-tab {
+    display: flex;
+    align-items: center;
+    padding: 7px 12px;
+    cursor: pointer;
+    font-family: "JetBrains Mono", var(--font-mono);
+    font-size: 10px;
+    font-weight: 650;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    color: var(--optimizer-text-3);
+    box-shadow: inset 0 -2px 0 transparent;
+    transition: color 120ms ease, background-color 120ms ease;
+  }
+
+  .portfolio-optimizer .optimizer-risk-balance-tab + .optimizer-risk-balance-tab {
+    border-left: 1px solid var(--optimizer-border-strong);
+  }
+
+  .portfolio-optimizer .optimizer-risk-balance-tab:hover {
+    color: var(--optimizer-text-2);
+  }
+
+  .portfolio-optimizer
+    .optimizer-risk-balance:not(:has(input[data-risk-view]:checked))
+    .optimizer-risk-balance-tabs
+    .optimizer-risk-balance-tab:first-child,
+  .portfolio-optimizer .optimizer-risk-balance-tab:has(> input:checked) {
+    background-color: var(--optimizer-surface-3);
+    color: var(--optimizer-text);
+    box-shadow: inset 0 -2px 0 var(--optimizer-accent);
+  }
+
+  .portfolio-optimizer .optimizer-risk-balance-tab:has(> input:focus-visible) {
+    outline: 1px solid var(--optimizer-accent-border);
+    outline-offset: 2px;
+  }
+
+  @media (max-width: 639px) {
+    .portfolio-optimizer .optimizer-risk-balance-header {
+      min-width: 0;
+      flex-direction: column;
+    }
+
+    .portfolio-optimizer .optimizer-risk-balance-tabs {
+      width: 100%;
+      max-width: 100%;
+      min-width: 0;
+      align-self: stretch;
+      overflow-x: auto;
+      overflow-y: hidden;
+      overscroll-behavior-inline: contain;
+      scrollbar-width: thin;
+      contain: inline-size paint;
+    }
+
+    .portfolio-optimizer .optimizer-risk-balance-tab {
+      flex: 0 0 auto;
+    }
+
+    .portfolio-optimizer .optimizer-risk-balance-tab:has(> input:focus-visible) {
+      outline-offset: -2px;
+    }
+  }
+
+  .portfolio-optimizer .optimizer-risk-balance-panel {
+    display: none;
+  }
+
+  .portfolio-optimizer
+    .optimizer-risk-balance:not(:has(input[data-risk-view]:checked))
+    .optimizer-risk-balance-panel--contribution,
+  .portfolio-optimizer
+    .optimizer-risk-balance:has(input[data-risk-view="contribution"]:checked)
+    .optimizer-risk-balance-panel--contribution,
+  .portfolio-optimizer
+    .optimizer-risk-balance:has(input[data-risk-view="breakdown"]:checked)
+    .optimizer-risk-balance-panel--breakdown,
+  .portfolio-optimizer
+    .optimizer-risk-balance:has(input[data-risk-view="correlation"]:checked)
+    .optimizer-risk-balance-panel--correlation,
+  .portfolio-optimizer
+    .optimizer-risk-balance:has(input[data-risk-view="risk-return"]:checked)
+    .optimizer-risk-balance-panel--risk-return {
+    display: block;
+  }
+
+  .portfolio-optimizer .optimizer-risk-balance-panel--risk-return {
+    margin-top: 12px;
+  }
+
+  /* KPI strip: one bordered band, hairline-divided cells (1px grid-gap trick
+     so the hairlines survive responsive column wraps). */
+  .portfolio-optimizer .optimizer-risk-balance-kpis {
+    margin-top: 12px;
+    display: grid;
+    /* auto-fit tracks the CONTAINER (the center panel), not the viewport:
+       all five cells share one row above ~760px of card width and wrap into
+       even rows below it — the hairline 1px-gap trick survives the wrap. */
+    grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
+    gap: 1px;
+    border: 1px solid var(--optimizer-border);
+    background-color: var(--optimizer-border);
+  }
+
+  .portfolio-optimizer .optimizer-risk-balance-kpi {
+    background-color: var(--optimizer-bg);
+    padding: 9px 12px 10px;
+  }
+
+  .portfolio-optimizer .optimizer-risk-balance-kpi-label {
+    font-family: "JetBrains Mono", var(--font-mono);
+    font-size: 9.5px;
+    font-weight: 650;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--optimizer-text-3);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .portfolio-optimizer .optimizer-risk-balance-kpi-value {
+    margin-top: 5px;
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--optimizer-text);
+  }
+
+  .portfolio-optimizer .optimizer-risk-balance-kpi-value--target {
+    color: var(--optimizer-target);
+  }
+
+  .portfolio-optimizer .optimizer-risk-balance-kpi-value[data-tone="good"] {
+    color: var(--optimizer-long);
+  }
+
+  .portfolio-optimizer .optimizer-risk-balance-kpi-value[data-tone="caution"] {
+    color: var(--optimizer-warn);
+  }
+
+  .portfolio-optimizer .optimizer-risk-balance-kpi-value[data-tone="bad"] {
+    color: var(--optimizer-short);
+  }
+
+  .portfolio-optimizer .optimizer-risk-balance-kpi-value[data-tone="neutral"] {
+    color: var(--optimizer-text);
+  }
+
+  /* Plot frame + the shared four-column row grid (static tracks — Tailwind's
+     JIT intermittently drops arbitrary grid-cols-[…] values in watch mode;
+     see the universe panel precedent). */
+  .portfolio-optimizer .optimizer-risk-balance-plot-frame {
+    margin-top: 12px;
+    border: 1px solid var(--optimizer-border);
+    background-color: var(--optimizer-bg);
+    padding: 12px 14px 10px;
+  }
+
+  .portfolio-optimizer .optimizer-risk-balance-row {
+    display: grid;
+    grid-template-columns: minmax(0, 5rem) minmax(0, 1fr) 3.75rem 4.75rem;
+    column-gap: 12px;
+    align-items: center;
+  }
+
+  .portfolio-optimizer .optimizer-risk-balance-legend-row {
+    padding-bottom: 10px;
+  }
+
+  .portfolio-optimizer .optimizer-risk-balance-legend {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    column-gap: 16px;
+    row-gap: 4px;
+    min-width: 0;
+  }
+
+  .portfolio-optimizer .optimizer-risk-balance-legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: var(--optimizer-text-2);
+    white-space: nowrap;
+  }
+
+  .portfolio-optimizer .optimizer-risk-balance-legend-dash {
+    width: 18px;
+    border-top: 1px dashed var(--optimizer-target);
+  }
+
+  .portfolio-optimizer .optimizer-risk-balance-legend-tick {
+    width: 2px;
+    height: 11px;
+    background-color: var(--optimizer-target);
+  }
+
+  .portfolio-optimizer .optimizer-risk-balance-col-head {
+    font-family: "JetBrains Mono", var(--font-mono);
+    font-size: 9.5px;
+    font-weight: 650;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    text-align: right;
+    color: var(--optimizer-text-3);
+  }
+
+  .portfolio-optimizer .optimizer-risk-balance-rows {
+    padding: 2px 0;
+  }
+
+  .portfolio-optimizer .optimizer-risk-balance-backdrop {
+    position: absolute;
+    inset: 0;
+  }
+
+  .portfolio-optimizer .optimizer-risk-balance-gridline {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    background-color: color-mix(in srgb, var(--optimizer-border) 72%, transparent);
+  }
+
+  .portfolio-optimizer .optimizer-risk-balance-zeroline {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    background-color: var(--optimizer-border-strong);
+  }
+
+  .portfolio-optimizer .optimizer-risk-balance-targetline {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    border-left: 1px dashed var(--optimizer-target-border);
+  }
+
+  .portfolio-optimizer .optimizer-risk-balance-label {
+    font-size: 12px;
+    color: var(--optimizer-text);
+  }
+
+  .portfolio-optimizer .optimizer-risk-balance-lane {
+    height: 28px;
+  }
+
+  .portfolio-optimizer .optimizer-risk-balance-connector {
+    position: absolute;
+    top: 50%;
+    border-top: 1px dashed color-mix(in srgb, var(--optimizer-text-2) 55%, transparent);
+  }
+
+  .portfolio-optimizer .optimizer-risk-balance-bar {
+    position: absolute;
+    top: 8px;
+    bottom: 8px;
+  }
+
+  .portfolio-optimizer .optimizer-risk-balance-bar[data-sign="positive"] {
+    background-color: color-mix(in srgb, var(--optimizer-target) 82%, transparent);
+  }
+
+  .portfolio-optimizer .optimizer-risk-balance-bar[data-sign="negative"] {
+    background-color: color-mix(in srgb, var(--optimizer-target) 82%, transparent);
+  }
+
+  .portfolio-optimizer .optimizer-risk-balance-tick {
+    position: absolute;
+    top: 6px;
+    bottom: 6px;
+    width: 2px;
+    margin-left: -1px;
+    background-color: var(--optimizer-target);
+  }
+
+  /* Marker glyphs double as legend swatches: sizing/shape here, absolute
+     lane positioning only via .optimizer-risk-balance-marker. */
+  .portfolio-optimizer .optimizer-risk-balance-current {
+    display: inline-block;
+    flex: 0 0 auto;
+    width: 10px;
+    height: 10px;
+    box-sizing: border-box;
+    border-radius: 50%;
+    border: 1.5px solid var(--optimizer-text-2);
+    background-color: var(--optimizer-bg);
+  }
+
+  .portfolio-optimizer .optimizer-risk-balance-dot {
+    display: inline-block;
+    flex: 0 0 auto;
+    width: 9px;
+    height: 9px;
+    box-sizing: border-box;
+    border-radius: 50%;
+    border: 1px solid color-mix(in srgb, var(--optimizer-target) 55%, black);
+    background-color: var(--optimizer-target);
+  }
+
+  .portfolio-optimizer .optimizer-risk-balance-marker {
+    position: absolute;
+    top: 50%;
+    transform: translate(-50%, -50%);
+  }
+
+  /* Current share beyond the fitted domain: a gray chevron pinned to the
+     plot edge (true value in the tooltip) instead of a circle pretending
+     the point sits at the edge. */
+  .portfolio-optimizer .optimizer-risk-balance-current-offscale {
+    position: absolute;
+    top: 50%;
+    width: 0;
+    height: 0;
+    border-top: 5px solid transparent;
+    border-bottom: 5px solid transparent;
+  }
+
+  .portfolio-optimizer
+    .optimizer-risk-balance-current-offscale[data-offscale="right"] {
+    right: 0;
+    transform: translateY(-50%);
+    border-left: 7px solid var(--optimizer-text-2);
+  }
+
+  .portfolio-optimizer
+    .optimizer-risk-balance-current-offscale[data-offscale="left"] {
+    left: 0;
+    transform: translateY(-50%);
+    border-right: 7px solid var(--optimizer-text-2);
+  }
+
+  .portfolio-optimizer .optimizer-risk-balance-target-cell {
+    font-size: 12px;
+    text-align: right;
+    color: var(--optimizer-target);
+  }
+
+  .portfolio-optimizer .optimizer-risk-balance-deviation-cell {
+    font-size: 12px;
+    text-align: right;
+    color: var(--optimizer-text-2);
+  }
+
+  .portfolio-optimizer
+    .optimizer-risk-balance-deviation-cell[data-sign="positive"] {
+    color: var(--optimizer-short);
+  }
+
+  .portfolio-optimizer
+    .optimizer-risk-balance-deviation-cell[data-sign="negative"] {
+    color: var(--optimizer-long);
+  }
+
+  .portfolio-optimizer .optimizer-risk-balance-axis {
+    height: 16px;
+    margin-top: 6px;
+    border-top: 1px solid var(--optimizer-border);
+  }
+
+  .portfolio-optimizer .optimizer-risk-balance-axis-label {
+    top: 4px;
+    font-size: 10px;
+    color: var(--optimizer-text-3);
+  }
+
+  .portfolio-optimizer .optimizer-risk-balance-axis-title {
+    margin-top: 10px;
+    text-align: center;
+    font-size: 11.5px;
+    letter-spacing: 0.02em;
+    color: var(--optimizer-text-2);
+  }
+
+  .portfolio-optimizer .optimizer-risk-balance-reading {
+    margin-top: 12px;
+    font-size: 11.5px;
+    line-height: 1.5;
+    color: var(--optimizer-text-2);
+  }
+
+  .portfolio-optimizer .optimizer-risk-balance-reading-label {
+    font-family: "JetBrains Mono", var(--font-mono);
+    font-size: 9.5px;
+    font-weight: 650;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--optimizer-text-3);
+  }
+
+  .portfolio-optimizer .optimizer-risk-balance-reading-sep {
+    margin: 0 6px;
+    color: var(--optimizer-text-3);
+  }
+
+  /* Portfolio-level diversification comparison. Current and recommended
+     markers share one rail per benchmark; green/red belongs only to the
+     economic direction of the Change column. */
+  .portfolio-optimizer .optimizer-risk-diversification-summary,
+  .portfolio-optimizer .optimizer-risk-diversification-unavailable {
+    margin-top: 12px;
+    border: 1px solid var(--optimizer-border);
+    background-color: var(--optimizer-bg);
+    padding: 12px 14px;
+  }
+
+  .portfolio-optimizer .optimizer-risk-diversification-intro {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .portfolio-optimizer
+  .optimizer-risk-corr-title.optimizer-risk-diversification-title-with-help {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    line-height: 1.35;
+  }
+
+  .portfolio-optimizer .optimizer-risk-diversification-explainer,
+  .portfolio-optimizer .optimizer-risk-diversification-unavailable > p:last-child {
+    margin-top: 4px;
+    max-width: 72ch;
+    font-size: 11.5px;
+    line-height: 1.55;
+    color: var(--optimizer-text-3);
+  }
+
+  .portfolio-optimizer .optimizer-risk-diversification-legend {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 10.5px;
+    color: var(--optimizer-text-3);
+  }
+
+  .portfolio-optimizer .optimizer-risk-diversification-legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .portfolio-optimizer .optimizer-risk-diversification-legend-marker {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+  }
+
+  .portfolio-optimizer .optimizer-risk-diversification-legend-marker--current {
+    border: 1.5px solid var(--optimizer-text-3);
+    background-color: var(--optimizer-bg);
+  }
+
+  .portfolio-optimizer .optimizer-risk-diversification-legend-marker--recommended {
+    border: 1px solid var(--optimizer-target);
+    background-color: var(--optimizer-target);
+  }
+
+  .portfolio-optimizer .optimizer-risk-diversification-help {
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .portfolio-optimizer .optimizer-risk-diversification-help-trigger {
+    display: inline-grid;
+    place-items: center;
+    flex: 0 0 24px;
+    width: 24px;
+    min-width: 24px;
+    height: 24px;
+    min-height: 24px;
+    padding: 0;
+    border: 1px solid var(--optimizer-border-strong);
+    border-radius: 50%;
+    background: var(--optimizer-bg);
+    font-family: "JetBrains Mono", var(--font-mono);
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 1;
+    color: var(--optimizer-text-2);
+    cursor: help;
+  }
+
+  .portfolio-optimizer .optimizer-risk-diversification-help-trigger:hover {
+    border-color: var(--optimizer-text-3);
+    color: var(--optimizer-text);
+  }
+
+  .portfolio-optimizer .optimizer-risk-diversification-help-trigger:focus-visible {
+    outline: 2px solid var(--optimizer-target);
+    outline-offset: 2px;
+  }
+
+  .portfolio-optimizer .optimizer-risk-diversification-tooltip {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    z-index: 30;
+    width: min(18rem, calc(100vw - 96px));
+    max-width: calc(100vw - 96px);
+    padding: 8px 10px;
+    border: 1px solid var(--optimizer-border-strong);
+    background: var(--optimizer-bg);
+    box-shadow: 0 8px 20px rgb(0 0 0 / 22%);
+    font-family: "Inter Variable", var(--font-ui-system);
+    font-size: 11px;
+    font-weight: 400;
+    line-height: 1.45;
+    letter-spacing: normal;
+    text-align: left;
+    text-transform: none;
+    color: var(--optimizer-text-2);
+    white-space: normal;
+    overflow-wrap: anywhere;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity 120ms ease;
+  }
+
+  .portfolio-optimizer .optimizer-risk-diversification-help:focus-within
+  .optimizer-risk-diversification-tooltip {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+  }
+
+  @media (hover: hover) {
+    .portfolio-optimizer .optimizer-risk-diversification-help:hover
+    .optimizer-risk-diversification-tooltip {
+      opacity: 1;
+      visibility: visible;
+      pointer-events: auto;
+    }
+  }
+
+  .portfolio-optimizer
+  .optimizer-risk-diversification-help[data-dismissed="true"]
+  .optimizer-risk-diversification-tooltip {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+  }
+
+  .portfolio-optimizer .optimizer-risk-diversification-matrix {
+    min-width: 0;
+    margin-top: 12px;
+    border: 1px solid var(--optimizer-border);
+    background-color: var(--optimizer-surface);
+  }
+
+  .portfolio-optimizer .optimizer-risk-diversification-header,
+  .portfolio-optimizer .optimizer-risk-diversification-row {
+    display: grid;
+    grid-template-columns:
+      minmax(9.5rem, 1.15fr)
+      minmax(9rem, 1fr)
+      minmax(4.5rem, 0.5fr)
+      minmax(5.75rem, 0.6fr)
+      minmax(7rem, 0.75fr);
+    align-items: center;
+    gap: 9px;
+  }
+
+  .portfolio-optimizer .optimizer-risk-diversification-header {
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--optimizer-border);
+    font-family: "JetBrains Mono", var(--font-mono);
+    font-size: 10px;
+    font-weight: 650;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--optimizer-text-3);
+  }
+
+  .portfolio-optimizer .optimizer-risk-diversification-header > span:nth-last-child(-n + 3) {
+    text-align: right;
+  }
+
+  .portfolio-optimizer .optimizer-risk-diversification-row-group--outcomes {
+    border-top: 1px solid var(--optimizer-border);
+  }
+
+  .portfolio-optimizer .optimizer-risk-diversification-row {
+    min-width: 0;
+    padding: 10px;
+  }
+
+  .portfolio-optimizer .optimizer-risk-diversification-row +
+  .optimizer-risk-diversification-row {
+    border-top: 1px solid color-mix(in srgb, var(--optimizer-border) 70%, transparent);
+  }
+
+  .portfolio-optimizer .optimizer-risk-diversification-row-label {
+    position: relative;
+    min-width: 0;
+    display: grid;
+    gap: 3px;
+    font-size: 12px;
+    line-height: 1.3;
+    color: var(--optimizer-text-2);
+  }
+
+  .portfolio-optimizer .optimizer-risk-diversification-row-label-primary {
+    min-width: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .portfolio-optimizer .optimizer-risk-diversification-row-kind {
+    font-size: 10px;
+    line-height: 1.4;
+    color: var(--optimizer-text-3);
+  }
+
+  .portfolio-optimizer .optimizer-risk-diversification-lane-cell {
+    min-width: 0;
+  }
+
+  .portfolio-optimizer .optimizer-risk-diversification-lane-graphic {
+    position: relative;
+    width: 100%;
+    height: 16px;
+  }
+
+  .portfolio-optimizer .optimizer-risk-diversification-row[data-overlap="true"]
+  .optimizer-risk-diversification-lane-graphic {
+    height: 22px;
+  }
+
+  .portfolio-optimizer .optimizer-risk-diversification-rail {
+    position: absolute;
+    top: 50%;
+    right: 0;
+    left: 0;
+    border-top: 1px solid var(--optimizer-border-strong);
+  }
+
+  .portfolio-optimizer .optimizer-risk-diversification-connector {
+    position: absolute;
+    top: 50%;
+    min-width: 1px;
+    border-top: 2px solid var(--optimizer-text-3);
+    opacity: 0.62;
+    transform: translateY(-50%);
+  }
+
+  .portfolio-optimizer .optimizer-risk-diversification-marker {
+    position: absolute;
+    top: 50%;
+    z-index: 1;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+  }
+
+  .portfolio-optimizer .optimizer-risk-diversification-marker--current {
+    border: 1.5px solid var(--optimizer-text-3);
+    background-color: var(--optimizer-surface);
+  }
+
+  .portfolio-optimizer .optimizer-risk-diversification-marker--recommended {
+    border: 1px solid var(--optimizer-surface);
+    background-color: var(--optimizer-target);
+    box-shadow: 0 0 0 1px var(--optimizer-target);
+  }
+
+  .portfolio-optimizer .optimizer-risk-diversification-row[data-overlap="true"]
+  .optimizer-risk-diversification-marker--current {
+    top: 30%;
+  }
+
+  .portfolio-optimizer .optimizer-risk-diversification-row[data-overlap="true"]
+  .optimizer-risk-diversification-marker--recommended {
+    top: 70%;
+  }
+
+  .portfolio-optimizer .optimizer-risk-diversification-cell-value {
+    min-width: 0;
+    font-size: 12px;
+    text-align: right;
+    color: var(--optimizer-text-2);
+  }
+
+  .portfolio-optimizer .optimizer-risk-diversification-change {
+    min-width: 0;
+    display: grid;
+    justify-items: end;
+    gap: 1px;
+  }
+
+  .portfolio-optimizer .optimizer-risk-diversification-direction-copy {
+    min-width: 0;
+    font-size: 10px;
+    line-height: 1.35;
+    text-align: right;
+    color: var(--optimizer-text-3);
+  }
+
+  .portfolio-optimizer .optimizer-risk-diversification-row[data-tone="favorable"]
+  .optimizer-risk-diversification-change > * {
+    color: var(--optimizer-long);
+  }
+
+  .portfolio-optimizer .optimizer-risk-diversification-row[data-tone="unfavorable"]
+  .optimizer-risk-diversification-change > * {
+    color: var(--optimizer-short);
+  }
+
+  .portfolio-optimizer .optimizer-risk-diversification-decision {
+    margin: 0;
+    padding: 10px;
+    border-top: 1px solid var(--optimizer-border);
+    font-size: 11.5px;
+    line-height: 1.5;
+    color: var(--optimizer-text-2);
+  }
+
+  @media (max-width: 719px) {
+    .portfolio-optimizer .optimizer-risk-diversification-intro {
+      min-width: 0;
+      flex-direction: column;
+      align-items: flex-start;
+    }
+
+    .portfolio-optimizer .optimizer-risk-diversification-legend {
+      max-width: 100%;
+      flex-wrap: wrap;
+    }
+
+    .portfolio-optimizer .optimizer-risk-diversification-header {
+      min-width: 0;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 6px;
+    }
+
+    .portfolio-optimizer .optimizer-risk-diversification-header > span:first-child {
+      display: none;
+    }
+
+    .portfolio-optimizer .optimizer-risk-diversification-rail-header {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    .portfolio-optimizer .optimizer-risk-diversification-row {
+      min-width: 0;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 6px;
+      padding-block: 10px;
+    }
+
+    .portfolio-optimizer .optimizer-risk-diversification-row-label,
+    .portfolio-optimizer .optimizer-risk-diversification-lane {
+      grid-column: 1 / -1;
+    }
+
+    .portfolio-optimizer .optimizer-risk-diversification-lane {
+      width: 100%;
+      margin: 2px 0;
+    }
+
+    .portfolio-optimizer .optimizer-risk-diversification-outcome-spacer {
+      grid-column: 1 / -1;
+      height: 0;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .portfolio-optimizer .optimizer-risk-diversification-cell-value,
+    .portfolio-optimizer .optimizer-risk-diversification-change {
+      text-align: right;
+    }
+
+    .portfolio-optimizer .optimizer-risk-diversification-direction-copy {
+      overflow-wrap: anywhere;
+    }
+  }
+
+  /* ── RISK / RETURN tab (designer spec 2026-07-11) ──────────────────
+     Header line + context boxes above the chart, legend below it. The
+     chart itself is SVG sharing the frontier chart's chrome; only its
+     HTML frame is styled here. */
+  .portfolio-optimizer .optimizer-risk-return-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 4px 16px;
+  }
+
+  .portfolio-optimizer .optimizer-risk-return-title-wrap {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+  }
+
+  .portfolio-optimizer .optimizer-risk-return-title {
+    font-family: "JetBrains Mono", var(--font-mono);
+    font-size: 9.5px;
+    font-weight: 650;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--optimizer-text-2);
+  }
+
+  .portfolio-optimizer .optimizer-risk-return-info {
+    font-size: 10px;
+    color: var(--optimizer-text-3);
+    cursor: help;
+  }
+
+  .portfolio-optimizer .optimizer-risk-return-note {
+    font-size: 11px;
+    line-height: 1.4;
+    color: var(--optimizer-text-2);
+  }
+
+  .portfolio-optimizer .optimizer-risk-return-boxes {
+    margin-top: 10px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 8px;
+  }
+
+  .portfolio-optimizer .optimizer-risk-return-box {
+    border: 1px solid var(--optimizer-border);
+    background-color: var(--optimizer-bg);
+    padding: 9px 12px 10px;
+  }
+
+  .portfolio-optimizer .optimizer-risk-return-box--recommended {
+    border-color: color-mix(in srgb, var(--optimizer-long) 45%, transparent);
+  }
+
+  .portfolio-optimizer
+    .optimizer-risk-return-box--recommended
+    .optimizer-risk-return-box-title {
+    color: var(--optimizer-long);
+  }
+
+  .portfolio-optimizer .optimizer-risk-return-box-title {
+    font-family: "JetBrains Mono", var(--font-mono);
+    font-size: 9.5px;
+    font-weight: 650;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--optimizer-text-3);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .portfolio-optimizer .optimizer-risk-return-box-stats {
+    margin-top: 6px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 18px;
+  }
+
+  .portfolio-optimizer .optimizer-risk-return-box-label {
+    font-family: "JetBrains Mono", var(--font-mono);
+    font-size: 8.5px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--optimizer-text-3);
+  }
+
+  .portfolio-optimizer .optimizer-risk-return-box-value {
+    margin-top: 3px;
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+
+  .portfolio-optimizer .optimizer-risk-return-box-value--vol {
+    color: var(--optimizer-target);
+  }
+
+  .portfolio-optimizer .optimizer-risk-return-box-value--ret {
+    color: var(--optimizer-long);
+  }
+
+  .portfolio-optimizer .optimizer-risk-return-box-body {
+    margin-top: 6px;
+    font-size: 11px;
+    line-height: 1.45;
+    color: var(--optimizer-text-2);
+  }
+
+  /* Legend: asset icons (capped with an honest overflow count) plus the
+     two portfolio-marker swatches — a ring with a core dot, matching the
+     SVG markers. */
+  .portfolio-optimizer .optimizer-risk-return-legend {
+    margin-top: 4px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 6px 14px;
+    font-size: 10.5px;
+    color: var(--optimizer-text-2);
+  }
+
+  .portfolio-optimizer .optimizer-risk-return-legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .portfolio-optimizer .optimizer-risk-return-legend-icon {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    border: 1px solid var(--optimizer-border-strong);
+    background-color: var(--optimizer-surface-3);
+  }
+
+  .portfolio-optimizer .optimizer-risk-return-legend-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: var(--optimizer-text-3);
+  }
+
+  .portfolio-optimizer .optimizer-risk-return-legend-more {
+    color: var(--optimizer-text-3);
+  }
+
+  .portfolio-optimizer .optimizer-risk-return-legend-swatch {
+    width: 12px;
+    height: 12px;
+    box-sizing: border-box;
+    border-radius: 50%;
+    border: 1.5px solid var(--optimizer-text);
+    background: radial-gradient(circle,
+                                var(--optimizer-text) 0 2px,
+                                transparent 2.5px);
+  }
+
+  .portfolio-optimizer .optimizer-risk-return-legend-swatch--recommended {
+    border-color: var(--optimizer-long);
+    background: radial-gradient(circle,
+                                var(--optimizer-long) 0 2px,
+                                transparent 2.5px);
+  }
+
+  /* ── "Why this risk allocation" icon cards ──────────────────── */
+  .portfolio-optimizer .optimizer-equal-risk-fact {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    border: 1px solid var(--optimizer-border);
+    background-color: var(--optimizer-bg);
+    padding: 10px 12px;
+  }
+
+  .portfolio-optimizer .optimizer-equal-risk-fact-icon {
+    display: grid;
+    place-content: center;
+    flex: 0 0 auto;
+    width: 26px;
+    height: 26px;
+    border: 1px solid var(--optimizer-border);
+    border-radius: 2px;
+    color: var(--optimizer-text-2);
+  }
+
+  .portfolio-optimizer .optimizer-equal-risk-fact-icon[data-tone="info"] {
+    color: var(--optimizer-info);
+    border-color: color-mix(in srgb, var(--optimizer-info) 35%, transparent);
+    background-color: color-mix(in srgb, var(--optimizer-info) 12%, transparent);
+  }
+
+  .portfolio-optimizer .optimizer-equal-risk-fact-icon[data-tone="long"] {
+    color: var(--optimizer-long);
+    border-color: color-mix(in srgb, var(--optimizer-long) 35%, transparent);
+    background-color: color-mix(in srgb, var(--optimizer-long) 12%, transparent);
+  }
+
+  .portfolio-optimizer .optimizer-equal-risk-fact-icon[data-tone="short"] {
+    color: var(--optimizer-short);
+    border-color: color-mix(in srgb, var(--optimizer-short) 35%, transparent);
+    background-color: color-mix(in srgb, var(--optimizer-short) 12%, transparent);
+  }
+
+  .portfolio-optimizer .optimizer-equal-risk-fact-icon[data-tone="accent"] {
+    color: var(--optimizer-accent);
+    border-color: color-mix(in srgb, var(--optimizer-accent) 35%, transparent);
+    background-color: color-mix(in srgb, var(--optimizer-accent) 12%, transparent);
+  }
+
+  .portfolio-optimizer .optimizer-equal-risk-fact-icon[data-tone="warn"] {
+    color: var(--optimizer-warn);
+    border-color: color-mix(in srgb, var(--optimizer-warn) 35%, transparent);
+    background-color: color-mix(in srgb, var(--optimizer-warn) 12%, transparent);
+  }
+
+  .portfolio-optimizer .optimizer-equal-risk-fact-label {
+    font-family: "JetBrains Mono", var(--font-mono);
+    font-size: 9.5px;
+    font-weight: 650;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--optimizer-text-3);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .portfolio-optimizer .optimizer-equal-risk-fact-value {
+    margin-top: 3px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--optimizer-text);
+  }
+
+  .portfolio-optimizer .optimizer-equal-risk-fact-sub {
+    /* Color comes from a utility class in markup (text-trading-muted by
+       default, or a signal color for above/below-target deltas) so this rule
+       does not specificity-lock it; see the kpi-card value note above. */
+    margin-top: 2px;
+    font-size: 11px;
+  }
+
+  /* The Correlation-view card is a <label> for the correlation tab's radio:
+     clicking it switches the tab (zero app state), and while that tab is
+     active the card lights up — the :has() scope is the center panel, the
+     nearest ancestor containing both the card and the radios. */
+  .portfolio-optimizer .optimizer-equal-risk-fact--link {
+    cursor: pointer;
+    transition: border-color 120ms ease, background-color 120ms ease;
+  }
+
+  .portfolio-optimizer .optimizer-equal-risk-fact--link:hover {
+    border-color: var(--optimizer-border-strong);
+  }
+
+  .portfolio-optimizer
+    .optimizer-results-center-panel:has(input[data-risk-view="correlation"]:checked)
+    .optimizer-equal-risk-fact--link {
+    border-color: var(--optimizer-accent-border);
+    background-color: var(--optimizer-accent-soft);
+  }
+
+  /* ── Correlation tab (designer spec 2026-07-11, correlation view) ──
+     Two sub-panels: the heatmap with its POSITION P&L / UNDERLYING RETURNS
+     DOM-state toggle, and the selected-asset contribution breakdown. Track
+     sizing is container-driven (auto-fit), never viewport media queries —
+     the card also renders inside workbench iframes. */
+  .portfolio-optimizer .optimizer-risk-corr-layout {
+    margin-top: 12px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(330px, 1fr));
+    gap: 12px;
+    align-items: start;
+  }
+
+  .portfolio-optimizer .optimizer-risk-corr-block {
+    border: 1px solid var(--optimizer-border);
+    background-color: var(--optimizer-bg);
+    padding: 12px 14px;
+    min-width: 0;
+  }
+
+  .portfolio-optimizer .optimizer-risk-corr-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .portfolio-optimizer .optimizer-risk-corr-title {
+    font-family: "JetBrains Mono", var(--font-mono);
+    font-size: 10.5px;
+    font-weight: 650;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--optimizer-text-2);
+  }
+
+  /* Mode toggle: same DOM-state radio pattern as the card tabs, one size
+     down. First segment is active until any radio is checked. */
+  .portfolio-optimizer .optimizer-risk-corr-mode-tabs {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: stretch;
+    border: 1px solid var(--optimizer-border-strong);
+  }
+
+  .portfolio-optimizer .optimizer-risk-corr-mode-tab {
+    display: flex;
+    align-items: center;
+    padding: 4px 9px;
+    cursor: pointer;
+    font-family: "JetBrains Mono", var(--font-mono);
+    font-size: 9px;
+    font-weight: 650;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    color: var(--optimizer-text-3);
+    transition: color 120ms ease, background-color 120ms ease;
+  }
+
+  .portfolio-optimizer
+    .optimizer-risk-corr-mode-tab + .optimizer-risk-corr-mode-tab {
+    border-left: 1px solid var(--optimizer-border-strong);
+  }
+
+  .portfolio-optimizer .optimizer-risk-corr-mode-tab:hover {
+    color: var(--optimizer-text-2);
+  }
+
+  .portfolio-optimizer
+    .optimizer-risk-corr-block:not(:has(input[data-corr-mode]:checked))
+    .optimizer-risk-corr-mode-tab:first-child,
+  .portfolio-optimizer .optimizer-risk-corr-mode-tab:has(> input:checked) {
+    background-color: var(--optimizer-surface-3);
+    color: var(--optimizer-text);
+    box-shadow: inset 0 -2px 0 var(--optimizer-accent);
+  }
+
+  .portfolio-optimizer
+    .optimizer-risk-corr-mode-tab:has(> input:focus-visible) {
+    outline: 1px solid var(--optimizer-accent-border);
+    outline-offset: 2px;
+  }
+
+  /* Both matrices (and their titles/captions) are pre-rendered; the checked
+     radio picks which mode's elements show. Position P&L is the default. */
+  .portfolio-optimizer .optimizer-risk-corr-block [data-corr-only] {
+    display: none;
+  }
+
+  .portfolio-optimizer
+    .optimizer-risk-corr-block:not(:has(input[data-corr-mode]:checked))
+    [data-corr-only="position"],
+  .portfolio-optimizer
+    .optimizer-risk-corr-block:has(input[data-corr-mode="position"]:checked)
+    [data-corr-only="position"],
+  .portfolio-optimizer
+    .optimizer-risk-corr-block:has(input[data-corr-mode="underlying"]:checked)
+    [data-corr-only="underlying"] {
+    display: block;
+  }
+
+  /* Heatmap grid: column tracks are inline (dynamic asset count). Cell
+     color mixes the sign color into the surface by |correlation| via the
+     per-cell --corr-strength custom property. */
+  .portfolio-optimizer .optimizer-risk-corr-grid {
+    margin-top: 10px;
+    display: grid;
+    gap: 3px;
+  }
+
+  .portfolio-optimizer .optimizer-risk-corr-corner {
+    min-width: 0;
+  }
+
+  .portfolio-optimizer .optimizer-risk-corr-col-label {
+    min-width: 0;
+    padding-bottom: 3px;
+    text-align: center;
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--optimizer-text-2);
+  }
+
+  .portfolio-optimizer .optimizer-risk-corr-row-label {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    min-width: 0;
+    padding-right: 7px;
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--optimizer-text-2);
+  }
+
+  .portfolio-optimizer .optimizer-risk-corr-cell {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 33px;
+    min-width: 0;
+    font-size: 10.5px;
+    color: var(--optimizer-text);
+    background-color: var(--optimizer-surface-2);
+  }
+
+  /* Dense mode (heatmaps past ~12 columns, flagged by the view): one type
+     step down and shorter cells so a 24-column matrix keeps its numbers
+     legible at full card width. */
+  .portfolio-optimizer
+    .optimizer-risk-corr-grid[data-dense="true"] .optimizer-risk-corr-cell {
+    height: 24px;
+    font-size: 8.5px;
+  }
+
+  .portfolio-optimizer
+    .optimizer-risk-corr-grid[data-dense="true"] .optimizer-risk-corr-col-label,
+  .portfolio-optimizer
+    .optimizer-risk-corr-grid[data-dense="true"] .optimizer-risk-corr-row-label {
+    font-size: 8.5px;
+    padding-right: 4px;
+  }
+
+  .portfolio-optimizer
+    .optimizer-risk-corr-grid[data-corr-mode="underlying"]
+    .optimizer-risk-corr-cell[data-sign="positive"],
+  .portfolio-optimizer
+    .optimizer-risk-corr-grid[data-corr-mode="position"]
+    .optimizer-risk-corr-cell[data-sign="negative"] {
+    background-color: color-mix(in srgb,
+                                var(--optimizer-long) var(--corr-strength),
+                                var(--optimizer-surface-2));
+  }
+
+  .portfolio-optimizer
+    .optimizer-risk-corr-grid[data-corr-mode="underlying"]
+    .optimizer-risk-corr-cell[data-sign="negative"],
+  .portfolio-optimizer
+    .optimizer-risk-corr-grid[data-corr-mode="position"]
+    .optimizer-risk-corr-cell[data-sign="positive"] {
+    background-color: color-mix(in srgb,
+                                var(--optimizer-short) var(--corr-strength),
+                                var(--optimizer-surface-2));
+  }
+
+  .portfolio-optimizer .optimizer-risk-corr-cell[data-sign="missing"] {
+    color: var(--optimizer-text-3);
+  }
+
+  .portfolio-optimizer .optimizer-risk-corr-cell[data-diagonal="true"] {
+    box-shadow: inset 0 0 0 1px var(--optimizer-border-strong);
+    font-weight: 600;
+  }
+
+  .portfolio-optimizer .optimizer-risk-corr-legend {
+    margin-top: 10px;
+  }
+
+  .portfolio-optimizer
+    .optimizer-risk-corr-legend[data-corr-mode="underlying"]
+    .optimizer-risk-corr-legend-bar {
+    height: 7px;
+    background: linear-gradient(to right,
+                                var(--optimizer-short),
+                                var(--optimizer-surface-2),
+                                var(--optimizer-long));
+  }
+
+  .portfolio-optimizer
+    .optimizer-risk-corr-legend[data-corr-mode="position"]
+    .optimizer-risk-corr-legend-bar {
+    height: 7px;
+    background: linear-gradient(to right,
+                                var(--optimizer-long),
+                                var(--optimizer-surface-2),
+                                var(--optimizer-short));
+  }
+
+  .portfolio-optimizer .optimizer-risk-corr-legend-labels {
+    margin-top: 3px;
+    display: flex;
+    justify-content: space-between;
+    font-size: 9.5px;
+    color: var(--optimizer-text-3);
+  }
+
+  .portfolio-optimizer .optimizer-risk-corr-caption {
+    margin-top: 8px;
+    text-align: center;
+    font-size: 11px;
+    color: var(--optimizer-text-2);
+  }
+
+  .portfolio-optimizer .optimizer-risk-corr-info {
+    margin-left: 6px;
+    color: var(--optimizer-text-3);
+    cursor: help;
+  }
+
+  /* ── Decomposition primitives (Breakdown tab, both sub-views): standalone =
+     own-variance (purple), diversification = cross-covariance (green removes
+     / red adds), net = their exact sum. */
+  .portfolio-optimizer .optimizer-risk-decomp-label {
+    font-size: 11.5px;
+    color: var(--optimizer-text);
+  }
+
+  .portfolio-optimizer .optimizer-risk-decomp-sub {
+    margin-top: 1px;
+    font-size: 10px;
+    line-height: 1.35;
+    color: var(--optimizer-text-3);
+  }
+
+  .portfolio-optimizer .optimizer-risk-decomp-value {
+    font-size: 12px;
+    font-weight: 600;
+    text-align: right;
+    color: var(--optimizer-text);
+  }
+
+  .portfolio-optimizer
+    .optimizer-risk-decomp-value[data-kind="diversification"][data-sign="negative"] {
+    color: var(--optimizer-long);
+  }
+
+  .portfolio-optimizer
+    .optimizer-risk-decomp-value[data-kind="diversification"][data-sign="positive"] {
+    color: var(--optimizer-short);
+  }
+
+  /* Additive bridge segments in the Diversification tab lanes: own variance
+     rides the upper half from zero, while cross covariance rides the lower
+     half from the own endpoint to net. The --full modifier (selected-asset
+     view, one row per component) restores a single full-height bar. */
+  .portfolio-optimizer .optimizer-risk-decomp-bar {
+    position: absolute;
+  }
+
+  .portfolio-optimizer .optimizer-risk-decomp-bar[data-kind="standalone"] {
+    top: 6px;
+    height: 7px;
+    background-color: color-mix(in srgb, var(--optimizer-target) 78%, transparent);
+  }
+
+  .portfolio-optimizer .optimizer-risk-decomp-bar[data-kind="diversification"] {
+    bottom: 6px;
+    height: 7px;
+  }
+
+  .portfolio-optimizer
+    .optimizer-risk-decomp-bar[data-kind="diversification"][data-sign="negative"] {
+    background-color: color-mix(in srgb, var(--optimizer-long) 82%, transparent);
+  }
+
+  .portfolio-optimizer
+    .optimizer-risk-decomp-bar[data-kind="diversification"][data-sign="positive"] {
+    background-color: color-mix(in srgb, var(--optimizer-short) 82%, transparent);
+  }
+
+  .portfolio-optimizer .optimizer-risk-decomp-bar[data-kind="net"] {
+    background-color: color-mix(in srgb, var(--optimizer-target) 92%, transparent);
+  }
+
+  .portfolio-optimizer
+    .optimizer-risk-decomp-bar.optimizer-risk-decomp-bar--full {
+    top: 8px;
+    bottom: 8px;
+    height: auto;
+  }
+
+  .portfolio-optimizer .optimizer-risk-decomp-net {
+    display: inline-block;
+    flex: 0 0 auto;
+    width: 8px;
+    height: 8px;
+    box-sizing: border-box;
+    border-radius: 50%;
+    border: 1px solid color-mix(in srgb, var(--optimizer-target) 55%, black);
+    background-color: var(--optimizer-target);
+  }
+
+  .portfolio-optimizer .optimizer-risk-decomp-swatch {
+    display: inline-block;
+    flex: 0 0 auto;
+    width: 10px;
+    height: 10px;
+  }
+
+  .portfolio-optimizer .optimizer-risk-decomp-swatch[data-kind="standalone"] {
+    background-color: color-mix(in srgb, var(--optimizer-target) 78%, transparent);
+  }
+
+  /* Cross-covariance swatches track economic direction: negative offsets
+     risk in green; positive amplifies risk in red. */
+  .portfolio-optimizer
+    .optimizer-risk-decomp-swatch[data-kind="diversification"],
+  .portfolio-optimizer
+    .optimizer-risk-decomp-swatch[data-kind="diversification"][data-sign="negative"] {
+    background-color: color-mix(in srgb, var(--optimizer-long) 82%, transparent);
+  }
+
+  .portfolio-optimizer
+    .optimizer-risk-decomp-swatch[data-kind="diversification"][data-sign="positive"] {
+    background-color: color-mix(in srgb, var(--optimizer-short) 82%, transparent);
+  }
+
+  .portfolio-optimizer .optimizer-risk-decomp-div-cell,
+  .portfolio-optimizer .optimizer-risk-decomp-net-cell {
+    font-size: 12px;
+    text-align: right;
+    color: var(--optimizer-text-2);
+  }
+
+  .portfolio-optimizer .optimizer-risk-decomp-net-cell {
+    color: var(--optimizer-text);
+    font-weight: 600;
+  }
+
+  .portfolio-optimizer
+    .optimizer-risk-decomp-div-cell[data-sign="negative"] {
+    color: var(--optimizer-long);
+  }
+
+  .portfolio-optimizer
+    .optimizer-risk-decomp-div-cell[data-sign="positive"] {
+    color: var(--optimizer-short);
+  }
+
+  .portfolio-optimizer .optimizer-risk-decomp-selected-asset {
+    font-weight: 600;
+    color: var(--optimizer-text);
+  }
+
+  .portfolio-optimizer
+    .optimizer-risk-decomp-selected-asset[data-side="long"] {
+    color: var(--optimizer-long);
+  }
+
+  .portfolio-optimizer
+    .optimizer-risk-decomp-selected-asset[data-side="short"] {
+    color: var(--optimizer-short);
+  }
+
+  /* ── Per-asset breakdown (designer spec 2026-07-11, per-asset view): the
+     BREAKDOWN tab's default sub-view. The Selected asset / All assets toggle
+     is the card's usual DOM-state radio pattern, scoped to the tab body; the
+     per-asset block reuses the corr-block chrome and the decomp bar colors. */
+  .portfolio-optimizer .optimizer-risk-breakdown-toolbar {
+    margin-top: 12px;
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  .portfolio-optimizer .optimizer-risk-breakdown-mode-tabs {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: stretch;
+    border: 1px solid var(--optimizer-border-strong);
+  }
+
+  .portfolio-optimizer .optimizer-risk-breakdown-mode-tab {
+    display: flex;
+    align-items: center;
+    padding: 4px 9px;
+    cursor: pointer;
+    font-family: "JetBrains Mono", var(--font-mono);
+    font-size: 9px;
+    font-weight: 650;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    color: var(--optimizer-text-3);
+    transition: color 120ms ease, background-color 120ms ease;
+  }
+
+  .portfolio-optimizer
+    .optimizer-risk-breakdown-mode-tab + .optimizer-risk-breakdown-mode-tab {
+    border-left: 1px solid var(--optimizer-border-strong);
+  }
+
+  .portfolio-optimizer .optimizer-risk-breakdown-mode-tab:hover {
+    color: var(--optimizer-text-2);
+  }
+
+  .portfolio-optimizer
+    .optimizer-risk-breakdown-body:not(:has(input[data-breakdown-view]:checked))
+    .optimizer-risk-breakdown-mode-tab:first-child,
+  .portfolio-optimizer
+    .optimizer-risk-breakdown-mode-tab:has(> input:checked) {
+    background-color: var(--optimizer-surface-3);
+    color: var(--optimizer-text);
+    box-shadow: inset 0 -2px 0 var(--optimizer-accent);
+  }
+
+  .portfolio-optimizer
+    .optimizer-risk-breakdown-mode-tab:has(> input:focus-visible) {
+    outline: 1px solid var(--optimizer-accent-border);
+    outline-offset: 2px;
+  }
+
+  /* Both sub-views are pre-rendered; the checked radio picks one. The
+     per-asset view is the default (first tab active until any radio is
+     checked). */
+  .portfolio-optimizer
+    .optimizer-risk-breakdown-body [data-breakdown-only] {
+    display: none;
+    margin-top: 12px;
+  }
+
+  .portfolio-optimizer
+    .optimizer-risk-breakdown-body:not(:has(input[data-breakdown-view]:checked))
+    [data-breakdown-only="asset"],
+  .portfolio-optimizer
+    .optimizer-risk-breakdown-body:has(input[data-breakdown-view="asset"]:checked)
+    [data-breakdown-only="asset"],
+  .portfolio-optimizer
+    .optimizer-risk-breakdown-body:has(input[data-breakdown-view="all"]:checked)
+    [data-breakdown-only="all"] {
+    display: block;
+  }
+
+  .portfolio-optimizer .optimizer-risk-asset-explainer {
+    margin-top: 4px;
+    max-width: 56ch;
+    font-size: 11px;
+    line-height: 1.45;
+    color: var(--optimizer-text-3);
+  }
+
+  .portfolio-optimizer .optimizer-risk-asset-side-badge {
+    display: inline-grid;
+    place-content: center;
+    margin-left: 8px;
+    width: 14px;
+    height: 14px;
+    vertical-align: text-bottom;
+    border-radius: 2px;
+    font-size: 9px;
+    font-weight: 700;
+  }
+
+  .portfolio-optimizer .optimizer-risk-asset-side-badge[data-side="long"] {
+    color: var(--optimizer-long);
+    background-color: color-mix(in srgb, var(--optimizer-long) 16%, transparent);
+    border: 1px solid color-mix(in srgb, var(--optimizer-long) 40%, transparent);
+  }
+
+  .portfolio-optimizer .optimizer-risk-asset-side-badge[data-side="short"] {
+    color: var(--optimizer-short);
+    background-color: color-mix(in srgb, var(--optimizer-short) 16%, transparent);
+    border: 1px solid color-mix(in srgb, var(--optimizer-short) 40%, transparent);
+  }
+
+  .portfolio-optimizer .optimizer-risk-asset-picker {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .portfolio-optimizer .optimizer-risk-asset-picker-label {
+    font-family: "JetBrains Mono", var(--font-mono);
+    font-size: 9.5px;
+    font-weight: 650;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    color: var(--optimizer-text-3);
+  }
+
+  .portfolio-optimizer .optimizer-risk-asset-picker-select {
+    min-width: 7.5rem;
+  }
+
+  /* Per-asset component rows: wider label column than the all-assets lanes
+     (the labels carry sub-lines), tall lanes, hairline row separators with a
+     stronger rule above the Net sum row. */
+  .portfolio-optimizer .optimizer-risk-asset-row {
+    display: grid;
+    grid-template-columns: minmax(0, 11.5rem) 4.5rem minmax(0, 1fr);
+    column-gap: 12px;
+    align-items: center;
+  }
+
+  .portfolio-optimizer .optimizer-risk-asset-row--component {
+    padding: 9px 0;
+    border-bottom: 1px solid color-mix(in srgb, var(--optimizer-border) 72%, transparent);
+  }
+
+  .portfolio-optimizer .optimizer-risk-asset-row--sum {
+    border-top: 1px solid var(--optimizer-border-strong);
+    border-bottom-color: transparent;
+  }
+
+  .portfolio-optimizer .optimizer-risk-asset-row .optimizer-risk-balance-lane {
+    height: 36px;
+  }
+
+  .portfolio-optimizer
+    .optimizer-risk-decomp-value[data-kind="standalone"] {
+    color: var(--optimizer-target);
+  }
+
+  .portfolio-optimizer
+    .optimizer-risk-decomp-value[data-kind="net"] {
+    color: var(--optimizer-target);
+  }
+
+  /* Value label riding the free end of each bar: positive bars label to the
+     right of the bar end, negative bars to the left. */
+  .portfolio-optimizer .optimizer-risk-asset-bar-label {
+    position: absolute;
+    top: 50%;
+    transform: translate(8px, -50%);
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
+    color: var(--optimizer-text-2);
+  }
+
+  .portfolio-optimizer .optimizer-risk-asset-bar-label[data-dir="negative"] {
+    transform: translate(-100%, -50%) translateX(-8px);
+  }
+
+  .portfolio-optimizer .optimizer-risk-asset-bar-label[data-kind="standalone"],
+  .portfolio-optimizer .optimizer-risk-asset-bar-label[data-kind="net"] {
+    color: var(--optimizer-target);
+  }
+
+  /* Color follows the value's SIGN, not the label's placement side — a
+     cramped negative label flips to the zero side (data-dir) but must keep
+     its negative color. */
+  .portfolio-optimizer
+    .optimizer-risk-asset-bar-label[data-kind="diversification"][data-sign="negative"] {
+    color: var(--optimizer-long);
+  }
+
+  .portfolio-optimizer
+    .optimizer-risk-asset-bar-label[data-kind="diversification"][data-sign="positive"] {
+    color: var(--optimizer-short);
+  }
+
+  /* Framed identity equation with the actual numbers: terms on the first
+     line, values on the second, colored by component. */
+  .portfolio-optimizer .optimizer-risk-asset-equation {
+    margin-top: 14px;
+    border: 1px solid var(--optimizer-border);
+    background-color: var(--optimizer-surface-2);
+    padding: 10px 12px;
+    text-align: center;
+  }
+
+  .portfolio-optimizer .optimizer-risk-asset-equation-terms,
+  .portfolio-optimizer .optimizer-risk-asset-equation-values {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: center;
+    column-gap: 10px;
+    row-gap: 2px;
+  }
+
+  .portfolio-optimizer .optimizer-risk-asset-equation-terms {
+    font-size: 11px;
+    color: var(--optimizer-text-2);
+  }
+
+  .portfolio-optimizer .optimizer-risk-asset-equation-values {
+    margin-top: 4px;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--optimizer-text);
+  }
+
+  .portfolio-optimizer .optimizer-risk-asset-equation-op {
+    color: var(--optimizer-text-3);
+    font-weight: 400;
+  }
+
+  .portfolio-optimizer
+    .optimizer-risk-asset-equation-values [data-kind="standalone"],
+  .portfolio-optimizer
+    .optimizer-risk-asset-equation-values [data-kind="net"] {
+    color: var(--optimizer-target);
+  }
+
+  .portfolio-optimizer
+    .optimizer-risk-asset-equation-values
+    [data-kind="diversification"][data-sign="negative"] {
+    color: var(--optimizer-long);
+  }
+
+  .portfolio-optimizer
+    .optimizer-risk-asset-equation-values
+    [data-kind="diversification"][data-sign="positive"] {
+    color: var(--optimizer-short);
+  }
+
+  /* Summary tiles: the why-card's fact-card language in a container-driven
+     auto-fit grid (the card renders inside workbench iframes — never
+     viewport media queries). */
+  .portfolio-optimizer .optimizer-risk-asset-tiles {
+    margin-top: 12px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 8px;
+  }
+
+  /* ── Allocation table: Equal Risk row selection + P&L-corr line ── */
+  .portfolio-optimizer .optimizer-exposure-row[data-selectable="true"],
+  .portfolio-optimizer .optimizer-target-exposure-asset[data-selectable="true"] {
+    cursor: pointer;
+  }
+
+  .portfolio-optimizer .optimizer-exposure-row[data-selected="true"],
+  .portfolio-optimizer .optimizer-target-exposure-asset[data-selected="true"] {
+    outline: 1px solid var(--optimizer-accent-border);
+    outline-offset: -1px;
+  }
+
+  .portfolio-optimizer .optimizer-exposure-row[data-selected="true"] td,
+  .portfolio-optimizer
+    .optimizer-target-exposure-asset[data-selected="true"] td {
+    background-color: var(--optimizer-accent-soft);
+  }
+
+  .portfolio-optimizer .optimizer-target-exposure-pnl-corr {
+    margin-top: 2px;
+    font-size: 10.5px;
+    font-weight: 400;
+    white-space: nowrap;
+    color: var(--optimizer-text-3);
+  }
+
+  .portfolio-optimizer
+    .optimizer-target-exposure-pnl-corr [data-effect="amplifies"] {
+    color: var(--optimizer-short);
+  }
+
+  .portfolio-optimizer
+    .optimizer-target-exposure-pnl-corr [data-effect="offsets"] {
+    color: var(--optimizer-long);
+  }
+
+  /* ── Volatility intuition rail card (designer spec 2026-07-12) ──
+     Annualized σ translated into daily/weekly/monthly 1σ move scales with
+     aria-hidden magnitude bars. The Target/Current switch is a pair of
+     visually hidden radios toggled purely by :has() — no app state; with no
+     radio checked the Target panel shows (the recommendation default). */
+  .portfolio-optimizer .optimizer-vol-intuition-tabs {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: stretch;
+    border: 1px solid var(--optimizer-border-strong);
+    background-color: var(--optimizer-surface);
+  }
+
+  .portfolio-optimizer .optimizer-vol-intuition-tab {
+    display: flex;
+    align-items: center;
+    padding: 4px 9px;
+    cursor: pointer;
+    font-family: "JetBrains Mono", var(--font-mono);
+    font-size: 9.5px;
+    font-weight: 650;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    color: var(--optimizer-text-3);
+    box-shadow: inset 0 -2px 0 transparent;
+    transition: color 120ms ease, background-color 120ms ease;
+  }
+
+  .portfolio-optimizer .optimizer-vol-intuition-tab + .optimizer-vol-intuition-tab {
+    border-left: 1px solid var(--optimizer-border-strong);
+  }
+
+  .portfolio-optimizer .optimizer-vol-intuition-tab:hover {
+    color: var(--optimizer-text-2);
+  }
+
+  .portfolio-optimizer
+    .optimizer-vol-intuition:not(:has(input[data-vol-view]:checked))
+    .optimizer-vol-intuition-tabs
+    .optimizer-vol-intuition-tab:first-child,
+  .portfolio-optimizer .optimizer-vol-intuition-tab:has(> input:checked) {
+    background-color: var(--optimizer-surface-3);
+    color: var(--optimizer-text);
+    box-shadow: inset 0 -2px 0 var(--optimizer-accent);
+  }
+
+  .portfolio-optimizer .optimizer-vol-intuition-tab:has(> input:focus-visible) {
+    outline: 1px solid var(--optimizer-accent-border);
+    outline-offset: 2px;
+  }
+
+  .portfolio-optimizer .optimizer-vol-intuition-body {
+    display: none;
+  }
+
+  .portfolio-optimizer
+    .optimizer-vol-intuition:not(:has(input[data-vol-view]:checked))
+    .optimizer-vol-intuition-body--target,
+  .portfolio-optimizer
+    .optimizer-vol-intuition:has(input[data-vol-view="target"]:checked)
+    .optimizer-vol-intuition-body--target,
+  .portfolio-optimizer
+    .optimizer-vol-intuition:has(input[data-vol-view="current"]:checked)
+    .optimizer-vol-intuition-body--current {
+    display: block;
+  }
+
+  .portfolio-optimizer .optimizer-vol-intuition-row {
+    display: grid;
+    grid-template-columns: 84px minmax(0, 1fr) 68px;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .portfolio-optimizer .optimizer-vol-intuition-row-label {
+    font-size: 10.5px;
+    color: var(--optimizer-text-2);
+    white-space: nowrap;
+  }
+
+  .portfolio-optimizer .optimizer-vol-intuition-row-value {
+    font-size: 11px;
+    font-weight: 600;
+    text-align: right;
+    color: var(--optimizer-text);
+    white-space: nowrap;
+  }
+
+  .portfolio-optimizer .optimizer-vol-intuition-track {
+    height: 6px;
+    background-color: var(--optimizer-surface-3);
+    overflow: hidden;
+  }
+
+  .portfolio-optimizer .optimizer-vol-intuition-fill {
+    height: 100%;
+    background-color: var(--optimizer-target);
+    opacity: 0.85;
+  }
+
+  .portfolio-optimizer
+    .optimizer-vol-intuition-body--current
+    .optimizer-vol-intuition-fill {
+    background-color: var(--optimizer-info);
+  }
+
+  .portfolio-optimizer .optimizer-vol-intuition-callout {
+    border: 1px solid rgb(212 154 58 / 0.4);
+    background-color: rgb(212 154 58 / 0.1);
+    padding: 6px 8px;
+    line-height: 1.5;
+    color: var(--optimizer-warn);
+  }
+
+  /* ── One-year modeled leverage impact panel (designer mockup, user-trimmed
+     2026-07-12) ── Full-width center-column card under the efficient
+     frontier: median-ending-wealth bars sharing one scale with a hairline
+     tick at the starting equity, the shortfall headline, stat tiles, and the
+     modeled ending-wealth distribution. Surfaces only for levered/extreme
+     targets (gate in the view-model). */
+  .portfolio-optimizer .optimizer-leverage-impact-chip {
+    border: 1px solid rgb(212 154 58 / 0.4);
+    padding: 2px 6px;
+    font-family: "JetBrains Mono", var(--font-mono);
+    font-size: 9px;
+    font-weight: 650;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    color: var(--optimizer-warn);
+  }
+
+  .portfolio-optimizer .optimizer-leverage-impact-median-row {
+    display: grid;
+    grid-template-columns: 76px minmax(0, 1fr) 96px;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .portfolio-optimizer .optimizer-leverage-impact-median-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 10.5px;
+    color: var(--optimizer-text-2);
+    white-space: nowrap;
+  }
+
+  .portfolio-optimizer .optimizer-leverage-impact-legend {
+    width: 7px;
+    height: 7px;
+    flex: 0 0 auto;
+  }
+
+  .portfolio-optimizer .optimizer-leverage-impact-legend--current {
+    background-color: var(--optimizer-info);
+  }
+
+  .portfolio-optimizer .optimizer-leverage-impact-legend--target {
+    background-color: var(--optimizer-target);
+  }
+
+  .portfolio-optimizer .optimizer-leverage-impact-median-value {
+    font-size: 12px;
+    font-weight: 600;
+    text-align: right;
+    color: var(--optimizer-text);
+    white-space: nowrap;
+  }
+
+  .portfolio-optimizer .optimizer-leverage-impact-track {
+    position: relative;
+    height: 7px;
+    background-color: var(--optimizer-surface-3);
+    overflow: hidden;
+  }
+
+  .portfolio-optimizer .optimizer-leverage-impact-start-tick {
+    position: absolute;
+    top: -1px;
+    bottom: -1px;
+    width: 1px;
+    background-color: var(--optimizer-text-3);
+  }
+
+  .portfolio-optimizer .optimizer-leverage-impact-fill {
+    height: 100%;
+    opacity: 0.85;
+  }
+
+  .portfolio-optimizer .optimizer-leverage-impact-fill--current {
+    background-color: var(--optimizer-info);
+  }
+
+  .portfolio-optimizer .optimizer-leverage-impact-fill--target {
+    background-color: var(--optimizer-target);
+  }
+}

@@ -1,0 +1,366 @@
+{
+  "defaultTargets": [
+    "trade-route",
+    "staking-route",
+    "portfolio-route",
+    "vaults-route"
+  ],
+  "targets": [
+    {
+      "id": "trade-route",
+      "route": "/trade",
+      "url": "http://localhost:8080/trade",
+      "selectors": [
+        "[data-parity-id='trade-root']",
+        "[data-parity-id='chart-panel']",
+        "[data-parity-id='orderbook-panel']",
+        "[data-parity-id='order-form']",
+        "[data-parity-id='account-equity']"
+      ],
+      "referenceDocs": [
+        "/hyperopen/docs/FRONTEND.md",
+        "/hyperopen/docs/agent-guides/browser-qa.md",
+        "/hyperopen/docs/product-specs/hyperliquid-ui-affordance-parity-spec.md"
+      ],
+      "workbenchScenes": [
+        "/hyperopen/portfolio/hyperopen/workbench/scenes/markets/active_asset_scenes.cljs",
+        "/hyperopen/portfolio/hyperopen/workbench/scenes/markets/chart_controls_scenes.cljs",
+        "/hyperopen/portfolio/hyperopen/workbench/scenes/markets/orderbook_scenes.cljs",
+        "/hyperopen/portfolio/hyperopen/workbench/scenes/trade/order_form_scenes.cljs"
+      ],
+      "nativeControlAllowlist": []
+    },
+    {
+      "id": "staking-route",
+      "route": "/staking",
+      "url": "http://localhost:8080/staking",
+      "selectors": [
+        "[data-parity-id='staking-root']",
+        "[data-role='staking-balance-panel']",
+        "[data-role='staking-validator-panel']"
+      ],
+      "referenceDocs": [
+        "/hyperopen/docs/FRONTEND.md",
+        "/hyperopen/docs/agent-guides/browser-qa.md",
+        "/hyperopen/docs/exec-plans/completed/2026-03-12-staking-page-parity-and-workflows.md"
+      ],
+      "workbenchScenes": [],
+      "nativeControlAllowlist": []
+    },
+    {
+      "id": "portfolio-route",
+      "route": "/portfolio",
+      "url": "http://localhost:8080/portfolio",
+      "selectors": [
+        "[data-parity-id='portfolio-root']",
+        "[data-role='portfolio-chart-shell']",
+        "[data-role='portfolio-account-table']"
+      ],
+      "referenceDocs": [
+        "/hyperopen/docs/FRONTEND.md",
+        "/hyperopen/docs/agent-guides/browser-qa.md",
+        "/hyperopen/docs/product-specs/portfolio-page-parity-prd.md"
+      ],
+      "workbenchScenes": [
+        "/hyperopen/portfolio/hyperopen/workbench/scenes/account/portfolio_chart_scenes.cljs"
+      ],
+      "interactionTrace": {
+        "settleDelayMs": 5000
+      },
+      "nativeControlAllowlist": []
+    },
+    {
+      "id": "portfolio-optimizer-route",
+      "route": "/portfolio/optimize/new",
+      "url": "http://localhost:8080/portfolio/optimize/new",
+      "selectors": [
+        "[data-role='portfolio-optimizer-setup-route-surface']",
+        "[data-role='portfolio-optimizer-universe-panel']",
+        "[data-role='portfolio-optimizer-setup-summary-pane']",
+        "[data-role='portfolio-optimizer-setup-bottom-actions']"
+      ],
+      "referenceDocs": [
+        "/hyperopen/docs/FRONTEND.md",
+        "/hyperopen/docs/agent-guides/browser-qa.md",
+        "/hyperopen/docs/exec-plans/completed/2026-04-28-portfolio-optimizer-frontier-sweep-overlays.md"
+      ],
+      "workbenchScenes": [],
+      "nativeControlAllowlist": []
+    },
+    {
+      "id": "portfolio-optimizer-results-route",
+      "route": "/portfolio/optimize/qa-frontier",
+      "url": "http://localhost:8080/portfolio/optimize/qa-frontier",
+      "selectors": [
+        "[data-role='portfolio-optimizer-scenario-detail-surface']",
+        "[data-role='portfolio-optimizer-results-surface']",
+        "[data-role='portfolio-optimizer-frontier-panel']",
+        "[data-role='portfolio-optimizer-frontier-overlay-mode-standalone']",
+        "[data-role='portfolio-optimizer-target-exposure-table']"
+      ],
+      "referenceDocs": [
+        "/hyperopen/docs/FRONTEND.md",
+        "/hyperopen/docs/agent-guides/browser-qa.md",
+        "/hyperopen/docs/exec-plans/completed/2026-04-28-portfolio-optimizer-frontier-sweep-overlays.md"
+      ],
+      "workbenchScenes": [
+        "/hyperopen/portfolio/hyperopen/workbench/scenes/optimize/equal_risk_correlation_scenes.cljs"
+      ],
+      "nativeControlAllowlist": [
+        "[data-role='portfolio-optimizer-risk-asset-select']"
+      ]
+    },
+    {
+      "id": "trader-portfolio-route",
+      "route": "/portfolio/trader",
+      "url": "http://localhost:8080/portfolio/trader/0x3333333333333333333333333333333333333333",
+      "selectors": [
+        "[data-parity-id='portfolio-root']",
+        "[data-role='portfolio-inspection-header']",
+        "[data-role='portfolio-account-table']"
+      ],
+      "referenceDocs": [
+        "/hyperopen/docs/FRONTEND.md",
+        "/hyperopen/docs/agent-guides/browser-qa.md",
+        "/hyperopen/docs/product-specs/portfolio-page-parity-prd.md"
+      ],
+      "workbenchScenes": [
+        "/hyperopen/portfolio/hyperopen/workbench/scenes/account/portfolio_chart_scenes.cljs"
+      ],
+      "interactionTrace": {
+        "settleDelayMs": 5000
+      },
+      "nativeControlAllowlist": []
+    },
+    {
+      "id": "leaderboard-route",
+      "route": "/leaderboard",
+      "url": "http://localhost:8080/leaderboard",
+      "selectors": [
+        "[data-parity-id='leaderboard-root']",
+        "[data-role='leaderboard-table']",
+        "[data-role='leaderboard-mobile-list']"
+      ],
+      "referenceDocs": [
+        "/hyperopen/docs/FRONTEND.md",
+        "/hyperopen/docs/agent-guides/browser-qa.md",
+        "/hyperopen/docs/product-specs/leaderboard-page-parity-prd.md"
+      ],
+      "workbenchScenes": [],
+      "nativeControlAllowlist": []
+    },
+    {
+      "id": "referrals-route",
+      "route": "/referrals",
+      "url": "http://localhost:8080/referrals",
+      "selectors": [
+        "[data-parity-id='referrals-root']",
+        "[data-role='referrals-hero']",
+        "[data-role='referrals-table-panel']"
+      ],
+      "referenceDocs": [
+        "/hyperopen/docs/FRONTEND.md",
+        "/hyperopen/docs/agent-guides/browser-qa.md",
+        "/hyperopen/docs/product-specs/referrals-page-parity-prd.md"
+      ],
+      "workbenchScenes": [],
+      "nativeControlAllowlist": []
+    },
+    {
+      "id": "vaults-route",
+      "route": "/vaults",
+      "url": "http://localhost:8080/vaults",
+      "selectors": [
+        "[data-parity-id='vaults-root']",
+        "[data-role='vault-row']"
+      ],
+      "referenceDocs": [
+        "/hyperopen/docs/FRONTEND.md",
+        "/hyperopen/docs/agent-guides/browser-qa.md"
+      ],
+      "workbenchScenes": [
+        "/hyperopen/portfolio/hyperopen/workbench/scenes/vaults/list_scenes.cljs"
+      ],
+      "nativeControlAllowlist": []
+    },
+    {
+      "id": "vault-detail-route",
+      "route": "/vaults/detail",
+      "url": "http://localhost:8080/vaults",
+      "selectors": [
+        "[data-parity-id='vault-detail-root']",
+        "[data-role='vault-detail-chart-plot-area']",
+        "[data-role='vault-detail-performance-metrics-card']"
+      ],
+      "referenceDocs": [
+        "/hyperopen/docs/FRONTEND.md",
+        "/hyperopen/docs/agent-guides/browser-qa.md"
+      ],
+      "workbenchScenes": [
+        "/hyperopen/portfolio/hyperopen/workbench/scenes/vaults/detail_chart_scenes.cljs",
+        "/hyperopen/portfolio/hyperopen/workbench/scenes/vaults/activity_scenes.cljs",
+        "/hyperopen/portfolio/hyperopen/workbench/scenes/vaults/transfer_modal_scenes.cljs"
+      ],
+      "nativeControlAllowlist": []
+    },
+    {
+      "id": "api-wallets-route",
+      "route": "/api-wallets",
+      "url": "http://localhost:8080/api-wallets",
+      "selectors": [
+        "[data-parity-id='api-wallets-root']",
+        "[data-role='api-wallets-table']"
+      ],
+      "referenceDocs": [
+        "/hyperopen/docs/FRONTEND.md",
+        "/hyperopen/docs/agent-guides/browser-qa.md"
+      ],
+      "workbenchScenes": [
+        "/hyperopen/portfolio/hyperopen/workbench/scenes/api/api_wallets_scenes.cljs"
+      ],
+      "nativeControlAllowlist": []
+    },
+    {
+      "id": "subaccounts-route",
+      "route": "/subAccounts",
+      "url": "http://localhost:8080/subAccounts",
+      "selectors": [
+        "[data-parity-id='subaccounts-root']",
+        "[data-role='subaccounts-console']"
+      ],
+      "referenceDocs": [
+        "/hyperopen/docs/FRONTEND.md",
+        "/hyperopen/docs/agent-guides/browser-qa.md",
+        "/hyperopen/docs/exec-plans/completed/2026-06-03-hyperliquid-subaccounts.md"
+      ],
+      "workbenchScenes": [],
+      "nativeControlAllowlist": []
+    }
+  ],
+  "rules": [
+    {
+      "id": "styles",
+      "glob": "src/styles/**",
+      "targets": ["trade-route", "staking-route", "portfolio-route", "vaults-route"]
+    },
+    {
+      "id": "app-shell",
+      "glob": "src/hyperopen/views/app_view.cljs",
+      "targets": [
+        "trade-route",
+        "staking-route",
+        "portfolio-route",
+        "trader-portfolio-route",
+        "vaults-route",
+        "leaderboard-route"
+      ]
+    },
+    {
+      "id": "header-shell",
+      "glob": "src/hyperopen/views/header_view.cljs",
+      "targets": [
+        "trade-route",
+        "staking-route",
+        "portfolio-route",
+        "trader-portfolio-route",
+        "vaults-route",
+        "leaderboard-route"
+      ]
+    },
+    {
+      "id": "staking-view",
+      "glob": "src/hyperopen/views/staking_view.cljs",
+      "targets": ["staking-route"]
+    },
+    {
+      "id": "staking-subviews",
+      "glob": "src/hyperopen/views/staking/**",
+      "targets": ["staking-route"]
+    },
+    {
+      "id": "staking-domain",
+      "glob": "src/hyperopen/staking/**",
+      "targets": ["staking-route"]
+    },
+    {
+      "id": "trade-view",
+      "glob": "src/hyperopen/views/trade_view.cljs",
+      "targets": ["trade-route"]
+    },
+    {
+      "id": "trade-chart",
+      "glob": "src/hyperopen/views/trading_chart/**",
+      "targets": ["trade-route"]
+    },
+    {
+      "id": "order-form",
+      "glob": "src/hyperopen/views/trade/**",
+      "targets": ["trade-route"]
+    },
+    {
+      "id": "account-info-shared",
+      "glob": "src/hyperopen/views/account_info/**",
+      "targets": ["trade-route", "portfolio-route", "trader-portfolio-route"]
+    },
+    {
+      "id": "account-equity",
+      "glob": "src/hyperopen/views/account_equity_view.cljs",
+      "targets": ["trade-route"]
+    },
+    {
+      "id": "funding-modal",
+      "glob": "src/hyperopen/views/funding_modal.cljs",
+      "targets": ["trade-route"]
+    },
+    {
+      "id": "portfolio-view",
+      "glob": "src/hyperopen/views/portfolio_view.cljs",
+      "targets": ["portfolio-route", "trader-portfolio-route"]
+    },
+    {
+      "id": "portfolio-optimizer",
+      "glob": "src/hyperopen/views/portfolio/optimize/**",
+      "targets": ["portfolio-optimizer-route", "portfolio-optimizer-results-route"]
+    },
+    {
+      "id": "leaderboard-view",
+      "glob": "src/hyperopen/views/leaderboard_view.cljs",
+      "targets": ["leaderboard-route"]
+    },
+    {
+      "id": "referrals-view",
+      "glob": "src/hyperopen/views/referrals_view.cljs",
+      "targets": ["referrals-route"]
+    },
+    {
+      "id": "vaults-list",
+      "glob": "src/hyperopen/views/vaults/list_view.cljs",
+      "targets": ["vaults-route"]
+    },
+    {
+      "id": "vaults-detail",
+      "glob": "src/hyperopen/views/vaults/detail/**",
+      "targets": ["vault-detail-route"]
+    },
+    {
+      "id": "vaults-shared",
+      "glob": "src/hyperopen/views/vaults/**",
+      "targets": ["vaults-route", "vault-detail-route"]
+    },
+    {
+      "id": "api-wallets",
+      "glob": "src/hyperopen/views/api_wallets_view.cljs",
+      "targets": ["api-wallets-route"]
+    },
+    {
+      "id": "subaccounts",
+      "glob": "src/hyperopen/views/subaccounts_view.cljs",
+      "targets": ["subaccounts-route"]
+    },
+    {
+      "id": "subaccounts-management",
+      "glob": "src/hyperopen/views/subaccounts_view/**",
+      "targets": ["subaccounts-route"]
+    }
+  ]
+}

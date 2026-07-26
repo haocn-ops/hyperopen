@@ -1,0 +1,209 @@
+(ns hyperopen.views.leaderboard-view-test
+  (:require [cljs.test :refer-macros [deftest is]]
+            [hyperopen.views.leaderboard-view :as view]))
+
+(defn- node-children [node]
+  (if (map? (second node))
+    (drop 2 node)
+    (drop 1 node)))
+
+(defn- find-first-node [node pred]
+  (cond
+    (vector? node)
+    (let [children (node-children node)]
+      (or (when (pred node) node)
+          (some #(find-first-node % pred) children)))
+
+    (seq? node)
+    (some #(find-first-node % pred) node)
+
+    :else nil))
+
+(defn- find-nodes [node pred]
+  (cond
+    (vector? node)
+    (let [children (node-children node)
+          child-matches (mapcat #(find-nodes % pred) children)]
+      (cond-> child-matches
+        (pred node) (conj node)))
+
+    (seq? node)
+    (mapcat #(find-nodes % pred) node)
+
+    :else []))
+
+(defn- collect-strings [node]
+  (cond
+    (string? node) [node]
+    (vector? node) (mapcat collect-strings (node-children node))
+    (seq? node) (mapcat collect-strings node)
+    :else []))
+
+(defn- with-viewport-width
+  [width f]
+  (let [original-inner-width (.-innerWidth js/globalThis)]
+    (set! (.-innerWidth js/globalThis) width)
+    (try
+      (f)
+      (finally
+        (set! (.-innerWidth js/globalThis) original-inner-width)))))
+
+(def sample-state
+  {:wallet {:address "0x2222222222222222222222222222222222222222"}
+   :leaderboard-ui {:query ""
+                    :timeframe :month
+                    :sort {:column :pnl
+                           :direction :desc}
+                    :page 1}
+   :leaderboard {:rows [{:eth-address "0x1111111111111111111111111111111111111111"
+                         :account-value 1000
+                         :display-name "Alpha"
+                         :window-performances {:day {:pnl 10 :roi 0.01 :volume 100}
+                                               :week {:pnl 20 :roi 0.02 :volume 200}
+                                               :month {:pnl 30 :roi 0.03 :volume 300}
+                                               :all-time {:pnl 40 :roi 0.04 :volume 400}}}
+                        {:eth-address "0x2222222222222222222222222222222222222222"
+                         :account-value 2000
+                         :display-name "Bravo"
+                         :window-performances {:day {:pnl 5 :roi 0.005 :volume 90}
+                                               :week {:pnl 15 :roi 0.015 :volume 190}
+                                               :month {:pnl 25 :roi 0.025 :volume 290}
+                                               :all-time {:pnl 35 :roi 0.035 :volume 390}}}]
+                 :excluded-addresses #{}
+                 :loading? false
+                 :error nil
+                 :loaded-at-ms 1700000000000}})
+
+(deftest leaderboard-view-renders-shell-controls-and-methodology-test
+  (with-viewport-width
+    1280
+    (fn []
+      (let [view-node (view/leaderboard-view sample-state)
+            root (find-first-node view-node #(= "leaderboard-root" (get-in % [1 :data-parity-id])))
+            search-input (find-first-node view-node #(= "leaderboard-search" (get-in % [1 :id])))
+            pinned-row (find-first-node view-node #(= "leaderboard-pinned-row" (get-in % [1 :data-role])))
+            table-node (find-first-node view-node #(= "leaderboard-table" (get-in % [1 :data-role])))
+            methodology (find-first-node view-node #(= "leaderboard-methodology" (get-in % [1 :data-role])))
+            control-shell (find-first-node view-node #(= ["rounded-xl" "border" "border-base-300/80" "bg-base-100/95" "p-2.5" "md:p-3"]
+                                                         (get-in % [1 :class])))
+            text (set (collect-strings view-node))]
+        (is (some? root))
+        (is (some? search-input))
+        (is (some? pinned-row))
+        (is (some? table-node))
+        (is (some? methodology))
+        (is (some? control-shell))
+        (is (string? (get-in root [1 :style :background-image])))
+        (is (contains? text "Leaderboard"))
+        (is (contains? text "Methodology"))
+        (is (contains? text "Pinned separately from paginated results."))))))
+
+(deftest leaderboard-view-timeframe-and-retry-actions-are-wired-test
+  (let [view-node (view/leaderboard-view (assoc-in sample-state [:leaderboard :error] "Network issue"))
+        month-button (find-first-node view-node
+                                      (fn [node]
+                                        (and (= :button (first node))
+                                             (contains? (set (collect-strings node)) "Month"))))
+        retry-button (find-first-node view-node
+                                      (fn [node]
+                                        (and (= :button (first node))
+                                             (contains? (set (collect-strings node)) "Retry"))))]
+    (is (= [[:actions/set-leaderboard-timeframe :month]]
+           (get-in month-button [1 :on :click])))
+    (is (= [[:actions/load-leaderboard]]
+           (get-in retry-button [1 :on :click])))))
+
+(deftest leaderboard-view-trader-click-navigates-to-portfolio-and-explorer-remains-separate-test
+  (with-viewport-width
+    1280
+    (fn []
+      (let [state (assoc sample-state :wallet {:address "0xffffffffffffffffffffffffffffffffffffffff"})
+            view-node (view/leaderboard-view state)
+            trader-link (find-first-node view-node
+                                         (fn [node]
+                                           (and (= "leaderboard-address-link" (get-in node [1 :data-role]))
+                                                (contains? (set (collect-strings node)) "Alpha"))))
+            explorer-link (find-first-node view-node #(= "leaderboard-explorer-link" (get-in % [1 :data-role])))]
+        (is (= [[:actions/navigate "/portfolio/trader/0x1111111111111111111111111111111111111111"]]
+               (get-in trader-link [1 :on :click])))
+        (is (= "https://app.hyperliquid.xyz/explorer/address/0x1111111111111111111111111111111111111111"
+               (get-in explorer-link [1 :href])))))))
+
+(deftest leaderboard-view-mobile-layout-renders-cards-instead-of-table-test
+  (with-viewport-width
+    430
+    (fn []
+      (let [view-node (view/leaderboard-view sample-state)
+            table-node (find-first-node view-node #(= "leaderboard-table" (get-in % [1 :data-role])))
+            mobile-list (find-first-node view-node #(= "leaderboard-mobile-list" (get-in % [1 :data-role])))
+            mobile-links (find-nodes view-node #(= "leaderboard-address-link" (get-in % [1 :data-role])))
+            explorer-links (find-nodes view-node #(= "leaderboard-explorer-link" (get-in % [1 :data-role])))]
+        (is (nil? table-node))
+        (is (some? mobile-list))
+        (is (pos? (count mobile-links)))
+        (is (pos? (count explorer-links)))))))
+
+(deftest leaderboard-view-renders-page-size-dropdown-controls-test
+  (let [view-node (view/leaderboard-view sample-state)
+        page-size-button (find-first-node view-node #(= "leaderboard-page-size" (get-in % [1 :id])))
+        page-size-label (find-first-node view-node #(= "leaderboard-page-size-label" (get-in % [1 :id])))
+        text (set (collect-strings view-node))]
+    (is (some? page-size-button))
+    (is (some? page-size-label))
+    (is (= [[:actions/toggle-leaderboard-page-size-dropdown]]
+           (get-in page-size-button [1 :on :click])))
+    (is (not (contains? (set (get-in page-size-button [1 :class])) "focus:ring-2")))
+    (is (contains? text "Rows"))
+    (is (contains? text "Total: 2 ranked traders"))))
+
+(deftest leaderboard-view-open-page-size-dropdown-renders-options-test
+  (let [view-node (view/leaderboard-view (assoc-in sample-state [:leaderboard-ui :page-size-dropdown-open?] true))
+        close-overlay (find-first-node view-node
+                                       (fn [node]
+                                         (= [[:actions/close-leaderboard-page-size-dropdown]]
+                                            (get-in node [1 :on :click]))))
+        option (find-first-node view-node
+                                (fn [node]
+                                  (and (= :button (first node))
+                                       (= [[:actions/set-leaderboard-page-size 25]]
+                                          (get-in node [1 :on :click])))))]
+    (is (some? close-overlay))
+    (is (some? option))
+    (is (= [[:actions/set-leaderboard-page-size 25]]
+           (get-in option [1 :on :mousedown])))
+    (is (not (contains? (set (collect-strings option)) "ON")))))
+
+(deftest leaderboard-view-renders-address-only-once-when-display-name-is-missing-test
+  (let [view-node (view/leaderboard-view (assoc-in sample-state
+                                                   [:leaderboard :rows]
+                                                   [{:eth-address "0x393d393d393d393d393d393d393d393d393d2109"
+                                                     :account-value 1000
+                                                     :display-name nil
+                                                     :window-performances {:day {:pnl 10 :roi 0.01 :volume 100}
+                                                                           :week {:pnl 20 :roi 0.02 :volume 200}
+                                                                           :month {:pnl 30 :roi 0.03 :volume 300}
+                                                                           :all-time {:pnl 40 :roi 0.04 :volume 400}}}]))
+        text (collect-strings view-node)]
+    (is (= 1 (count (filter #(= "0x393d…2109" %) text))))))
+
+(deftest leaderboard-view-shows-workspace-loading-on-cold-start-test
+  (with-viewport-width
+    1280
+    (fn []
+      (let [view-node (view/leaderboard-view (assoc sample-state
+                                                    :leaderboard {:rows []
+                                                                  :excluded-addresses #{}
+                                                                  :loading? false
+                                                                  :error nil
+                                                                  :loaded-at-ms nil}))
+            loading-node (find-first-node view-node #(= "leaderboard-loading" (get-in % [1 :data-role])))
+            shimmer-node (find-first-node view-node
+                                          (fn [node]
+                                            (contains? (set (get-in node [1 :class]))
+                                                       "ui-loading-shimmer")))
+            table-node (find-first-node view-node #(= "leaderboard-table" (get-in % [1 :data-role])))
+            text (set (collect-strings view-node))]
+        (is (some? loading-node))
+        (is (some? shimmer-node))
+        (is (nil? table-node))
+        (is (contains? text "Loading ranked traders and vault exclusions..."))))))

@@ -1,0 +1,313 @@
+(ns hyperopen.views.portfolio.optimize.frontier-overlay-markers-test
+  (:require [cljs.test :refer-macros [deftest is]]
+            [clojure.string :as str]
+            [hyperopen.portfolio.optimizer.fixtures :as fixtures]
+            [hyperopen.views.portfolio.optimize.results-panel :as results-panel]))
+
+(defn- node-children
+  [node]
+  (if (map? (second node))
+    (drop 2 node)
+    (drop 1 node)))
+
+(defn- find-first-node
+  [node pred]
+  (cond
+    (vector? node)
+    (let [children (node-children node)]
+      (or (when (pred node) node)
+          (some #(find-first-node % pred) children)))
+
+    (seq? node)
+    (some #(find-first-node % pred) node)
+
+    :else nil))
+
+(defn- collect-strings
+  [node]
+  (cond
+    (string? node) [node]
+    (vector? node) (mapcat collect-strings (node-children node))
+    (seq? node) (mapcat collect-strings node)
+    :else []))
+
+(defn- collect-nodes
+  [node pred]
+  (cond
+    (vector? node)
+    (let [children (node-children node)
+          matches (when (pred node) [node])]
+      (concat matches (mapcat #(collect-nodes % pred) children)))
+
+    (seq? node)
+    (mapcat #(collect-nodes % pred) node)
+
+    :else []))
+
+(defn- node-by-role
+  [node role]
+  (find-first-node node #(= role (get-in % [1 :data-role]))))
+
+(defn- nodes-by-tag
+  [node tag]
+  (collect-nodes node #(= tag (first %))))
+
+(defn- node-attr
+  [node attr]
+  (get-in node [1 attr]))
+
+(defn- class-name?
+  [node class-name]
+  (let [classes (node-attr node :class)]
+    (cond
+      (string? classes) (some #{class-name} (str/split classes #"\s+"))
+      (sequential? classes) (some #{class-name} classes)
+      :else false)))
+
+(deftest frontier-overlays-render-namespaced-market-icons-test
+  (let [result (assoc (fixtures/sample-solved-result)
+                      :frontier-overlays
+                      {:standalone [{:instrument-id "hl:hip3:xyz:GOLD"
+                                     :label "GOLD"
+                                     :target-weight 0.5
+                                     :expected-return 0.2
+                                     :volatility 0.16}]
+                       :contribution [{:instrument-id "hl:hip3:xyz:AAPL"
+                                       :label "AAPL"
+                                       :target-weight 0.5
+                                       :expected-return 0.05
+                                       :volatility 0.08}]})
+        standalone-node (results-panel/results-panel
+                         {:result result
+                          :computed-at-ms 2600}
+                         {:objective {:kind :minimum-variance}}
+                         {:frontier-overlay-mode :standalone})
+        contribution-node (results-panel/results-panel
+                           {:result result
+                            :computed-at-ms 2600}
+                           {:objective {:kind :minimum-variance}}
+                           {:frontier-overlay-mode :contribution})
+        gold-symbol (node-by-role
+                     standalone-node
+                     "portfolio-optimizer-frontier-overlay-symbol-standalone-hl:hip3:xyz:GOLD")
+        aapl-symbol (node-by-role
+                     contribution-node
+                     "portfolio-optimizer-frontier-overlay-symbol-contribution-hl:hip3:xyz:AAPL")
+        gold-image (first (nodes-by-tag gold-symbol :image))
+        aapl-image (first (nodes-by-tag aapl-symbol :image))
+        gold-clip (first (nodes-by-tag gold-symbol :clipPath))
+        gold-clip-circle (first (nodes-by-tag gold-clip :circle))]
+    (is (= "https://app.hyperliquid.xyz/coins/xyz:GOLD.svg"
+           (node-attr gold-image :href)))
+    (is (= "https://app.hyperliquid.xyz/coins/xyz:AAPL.svg"
+           (node-attr aapl-image :href)))
+    (is (= "url(#portfolio-optimizer-frontier-overlay-symbol-standalone-hl-hip3-xyz-GOLD-clip)"
+           (node-attr gold-image :clip-path)))
+    (is (= "userSpaceOnUse"
+           (node-attr gold-clip :clipPathUnits)))
+    (is (= 7 (node-attr gold-clip-circle :r)))
+    (is (= (node-attr gold-image :x)
+           (- (node-attr gold-clip-circle :cx) 7)))
+    (is (= (node-attr gold-image :y)
+           (- (node-attr gold-clip-circle :cy) 7)))))
+
+(deftest frontier-overlays-render-draft-hip3-icons-for-result-ids-test
+  (let [result (assoc (fixtures/sample-solved-result)
+                      :frontier-overlays
+                      {:standalone [{:instrument-id "perp:XYZ100"
+                                     :label "XYZ100"
+                                     :target-weight 0.5
+                                     :expected-return 0.2
+                                     :volatility 0.16}]
+                       :contribution [{:instrument-id "external:tiingo:SPY"
+                                       :label "SP500"
+                                       :target-weight 0.5
+                                       :expected-return 0.05
+                                       :volatility 0.08}]})
+        draft {:objective {:kind :minimum-variance}
+               :universe [{:instrument-id "perp:XYZ100"
+                           :market-type :perp
+                           :coin "XYZ100-USDC"
+                           :symbol "XYZ100-USDC"
+                           :base "XYZ100"
+                           :dex "xyz"
+                           :hip3? true}
+                          {:instrument-id "perp:xyz:SP500"
+                           :market-type :perp
+                           :coin "SP500-USDC"
+                           :symbol "SP500-USDC"
+                           :base "SP500"
+                           :dex "xyz"
+                           :hip3? true
+                           :optimizer-history/instrument-id "external:tiingo:SPY"}]}
+        standalone-node (results-panel/results-panel
+                         {:result result
+                          :computed-at-ms 2600}
+                         draft
+                         {:frontier-overlay-mode :standalone})
+        contribution-node (results-panel/results-panel
+                           {:result result
+                            :computed-at-ms 2600}
+                           draft
+                           {:frontier-overlay-mode :contribution})
+        xyz100-symbol (node-by-role
+                       standalone-node
+                       "portfolio-optimizer-frontier-overlay-symbol-standalone-perp:XYZ100")
+        sp500-symbol (node-by-role
+                      contribution-node
+                      "portfolio-optimizer-frontier-overlay-symbol-contribution-external:tiingo:SPY")
+        xyz100-image (first (nodes-by-tag xyz100-symbol :image))
+        sp500-image (first (nodes-by-tag sp500-symbol :image))]
+    (is (= "https://app.hyperliquid.xyz/coins/xyz:XYZ100.svg"
+           (node-attr xyz100-image :href)))
+    (is (= "https://app.hyperliquid.xyz/coins/xyz:SP500.svg"
+           (node-attr sp500-image :href)))))
+
+(deftest results-panel-renders-vault-frontier-overlays-with-inline-marker-and-name-test
+  (let [vault-address "0x1111111111111111111111111111111111111111"
+        vault-id (str "vault:" vault-address)
+        vault-label "BTC Basis Carry Vault"
+        result (assoc (fixtures/sample-solved-result)
+                      :frontier-overlays
+                      {:standalone [{:instrument-id vault-id
+                                     :label vault-label
+                                     :target-weight 0.25
+                                     :expected-return 0.2
+                                     :volatility 0.18}]
+                       :contribution [{:instrument-id vault-id
+                                       :label vault-label
+                                       :target-weight 0.25
+                                       :expected-return 0.05
+                                       :volatility 0.06}]})
+        standalone-node (results-panel/results-panel
+                         {:result result
+                          :computed-at-ms 2600}
+                         {:objective {:kind :minimum-variance}}
+                         {:frontier-overlay-mode :standalone})
+        contribution-node (results-panel/results-panel
+                           {:result result
+                            :computed-at-ms 2600}
+                           {:objective {:kind :minimum-variance}}
+                           {:frontier-overlay-mode :contribution})
+        standalone-group (node-by-role
+                          standalone-node
+                          (str "portfolio-optimizer-frontier-overlay-standalone-"
+                               vault-id))
+        standalone-symbol (node-by-role
+                           standalone-node
+                           (str "portfolio-optimizer-frontier-overlay-symbol-standalone-"
+                                vault-id))
+        standalone-callout (node-by-role
+                            standalone-node
+                            (str "portfolio-optimizer-frontier-callout-standalone-"
+                                 vault-id))
+        standalone-icon (node-by-role
+                         standalone-symbol
+                         (str "portfolio-optimizer-frontier-vault-icon-standalone-"
+                              vault-id))
+        standalone-code (node-by-role
+                         standalone-symbol
+                         (str "portfolio-optimizer-frontier-vault-code-standalone-"
+                              vault-id))
+        contribution-symbol (node-by-role
+                             contribution-node
+                             (str "portfolio-optimizer-frontier-overlay-symbol-contribution-"
+                                  vault-id))
+        contribution-callout (node-by-role
+                              contribution-node
+                              (str "portfolio-optimizer-frontier-callout-contribution-"
+                                   vault-id))
+        contribution-icon (node-by-role
+                           contribution-symbol
+                           (str "portfolio-optimizer-frontier-vault-icon-contribution-"
+                                vault-id))
+        contribution-code (node-by-role
+                           contribution-symbol
+                           (str "portfolio-optimizer-frontier-vault-code-contribution-"
+                                vault-id))
+        standalone-icon-bg (first (nodes-by-tag standalone-icon :rect))
+        standalone-leader (first (filter #(class-name? % "portfolio-frontier-vault-leader")
+                                         (nodes-by-tag standalone-symbol :line)))
+        standalone-label-bg (first (filter #(class-name? % "portfolio-frontier-vault-label")
+                                           (nodes-by-tag standalone-symbol :rect)))
+        standalone-vault-labels (collect-nodes standalone-symbol
+                                               #(class-name? % "portfolio-frontier-vault-label"))
+        standalone-focus-rings (collect-nodes standalone-group
+                                             #(class-name? % "portfolio-frontier-focus-ring"))]
+    (is (some? standalone-group))
+    (is (some? standalone-icon))
+    (is (some? contribution-icon))
+    (is (= "BCV" (first (collect-strings standalone-code))))
+    (is (= "BCV" (first (collect-strings contribution-code))))
+    (is (str/starts-with? (node-attr standalone-symbol :transform) "translate("))
+    (is (nil? standalone-icon-bg)
+        "Vault glyph should not sit in a filled icon box.")
+    (is (= 15 (node-attr standalone-leader :x1)))
+    (is (= 25 (node-attr standalone-leader :x2)))
+    (is (= 29 (node-attr standalone-label-bg :x)))
+    (is (= -11 (node-attr standalone-label-bg :y)))
+    (is (= 48 (node-attr standalone-label-bg :width)))
+    (is (= 22 (node-attr standalone-label-bg :height)))
+    (is (= 4 (node-attr standalone-label-bg :rx)))
+    (is (= "transparent" (node-attr standalone-label-bg :fill)))
+    (is (= 12 (node-attr standalone-code :font-size)))
+    (is (= 0 (node-attr standalone-code :y)))
+    (is (= "middle" (node-attr standalone-code :dominant-baseline)))
+    (is (= "middle" (node-attr standalone-code :alignment-baseline)))
+    (is (= 1 (count standalone-vault-labels))
+        "Vault marker should render as one compact outlined ticker chip.")
+    (is (empty? standalone-focus-rings)
+        "Vault overlays should not render the shared circular focus ring inside the marker.")
+    (is (empty? (collect-nodes standalone-symbol #(= :image (first %))))
+        "Vault markers should never request a remote coin SVG from the vault address.")
+    (is (empty? (collect-nodes contribution-symbol #(= :image (first %))))
+        "Vault contribution markers should use the same inline marker as standalone markers.")
+    (is (contains? (set (collect-strings standalone-callout)) vault-label))
+    (is (contains? (set (collect-strings contribution-callout)) vault-label))
+    (is (not (contains? (set (collect-strings standalone-callout)) vault-id)))
+    (is (not (contains? (set (collect-strings contribution-callout)) vault-id)))
+    (is (not (str/includes? (node-attr standalone-group :aria-label) vault-id)))
+    (is (str/includes? (node-attr standalone-group :aria-label) vault-label))))
+
+(deftest vault-frontier-marker-prefers-explicit-parenthesized-abbreviation-test
+  (let [vault-address "0x2222222222222222222222222222222222222222"
+        vault-id (str "vault:" vault-address)
+        vault-label "Hyperliquidity Provider (HLP)"
+        result (assoc (fixtures/sample-solved-result)
+                      :frontier-overlays
+                      {:standalone [{:instrument-id vault-id
+                                     :label vault-label
+                                     :target-weight 0.5
+                                     :expected-return -0.0596
+                                     :volatility 0.0105}]})
+        node (results-panel/results-panel
+              {:result result
+               :computed-at-ms 2600}
+              {:objective {:kind :minimum-variance}}
+              {:frontier-overlay-mode :standalone})
+        code-node (node-by-role
+                   node
+                   (str "portfolio-optimizer-frontier-vault-code-standalone-"
+                        vault-id))]
+    (is (= "HLP" (first (collect-strings code-node))))))
+
+(deftest vault-frontier-marker-uses-known-hlp-abbreviation-without-parentheses-test
+  (let [vault-address "0x3333333333333333333333333333333333333333"
+        vault-id (str "vault:" vault-address)
+        result (assoc (fixtures/sample-solved-result)
+                      :frontier-overlays
+                      {:standalone [{:instrument-id vault-id
+                                     :label "Hyperliquidity Provider"
+                                     :target-weight 0.5
+                                     :expected-return -0.0596
+                                     :volatility 0.0105}]})
+        node (results-panel/results-panel
+              {:result result
+               :computed-at-ms 2600}
+              {:objective {:kind :minimum-variance}}
+              {:frontier-overlay-mode :standalone})
+        code-node (node-by-role
+                   node
+                   (str "portfolio-optimizer-frontier-vault-code-standalone-"
+                        vault-id))]
+    (is (= "HLP" (first (collect-strings code-node))))))

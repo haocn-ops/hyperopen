@@ -1,0 +1,174 @@
+(ns hyperopen.runtime.validation-test
+  (:require [cljs.test :refer-macros [deftest is]]
+            [hyperopen.runtime.effect-order-contract]
+            [hyperopen.runtime.validation :as validation]
+            [hyperopen.system :as system]))
+
+(deftest wrap-action-handler-rejects-invalid-payload-arity-test
+  (with-redefs [validation/validation-enabled? (constantly true)]
+    (let [wrapped (validation/wrap-action-handler :actions/select-asset
+                                                  (fn [_state _coin]
+                                                    []))]
+      (is (thrown-with-msg?
+           js/Error
+           #"action payload"
+           (wrapped {}))))))
+
+(deftest wrap-action-handler-rejects-invalid-emitted-effect-test
+  (with-redefs [validation/validation-enabled? (constantly true)]
+    (let [wrapped (validation/wrap-action-handler :actions/test-invalid-effect
+                                                  (fn [_state]
+                                                    [[:effects/save "not-a-path" 42]]))]
+      (is (thrown-with-msg?
+           js/Error
+           #"effect request"
+           (wrapped {}))))))
+
+(deftest wrap-action-handler-allows-projection-before-heavy-for-covered-action-test
+  (with-redefs [validation/validation-enabled? (constantly true)]
+    (let [wrapped (validation/wrap-action-handler :actions/select-chart-timeframe
+                                                  (fn [_state timeframe]
+                                                    [[:effects/save [:chart-options :selected-timeframe] timeframe]
+                                                     [:effects/sync-active-candle-subscription :interval timeframe]
+                                                     [:effects/fetch-candle-snapshot :interval timeframe]]))]
+      (is (= [[:effects/save [:chart-options :selected-timeframe] :5m]
+              [:effects/sync-active-candle-subscription :interval :5m]
+              [:effects/fetch-candle-snapshot :interval :5m]]
+             (wrapped {} :5m))))))
+
+(deftest wrap-action-handler-rejects-heavy-before-projection-for-covered-action-test
+  (with-redefs [validation/validation-enabled? (constantly true)]
+    (let [wrapped (validation/wrap-action-handler :actions/select-chart-timeframe
+                                                  (fn [_state timeframe]
+                                                    [[:effects/sync-active-candle-subscription :interval timeframe]
+                                                     [:effects/save [:chart-options :selected-timeframe] timeframe]]))]
+      (is (thrown-with-msg?
+           js/Error
+           #"rule=heavy-before-projection-phase"
+           (wrapped {} :5m))))))
+
+(deftest wrap-action-handler-enforces-projection-before-heavy-for-portfolio-benchmark-selection-test
+  (with-redefs [validation/validation-enabled? (constantly true)]
+    (let [wrapped (validation/wrap-action-handler :actions/select-portfolio-returns-benchmark
+                                                  (fn [_state coin]
+                                                    [[:effects/save [:portfolio-ui :returns-benchmark-coin] coin]
+                                                     [:effects/fetch-candle-snapshot :coin coin :interval :1h :bars 800]]))]
+      (is (= [[:effects/save [:portfolio-ui :returns-benchmark-coin] "SPY"]
+              [:effects/fetch-candle-snapshot :coin "SPY" :interval :1h :bars 800]]
+             (wrapped {} "SPY"))))))
+
+(deftest wrap-action-handler-rejects-heavy-before-projection-for-portfolio-benchmark-selection-test
+  (with-redefs [validation/validation-enabled? (constantly true)]
+    (let [wrapped (validation/wrap-action-handler :actions/select-portfolio-returns-benchmark
+                                                  (fn [_state coin]
+                                                    [[:effects/fetch-candle-snapshot :coin coin :interval :1h :bars 800]
+                                                     [:effects/save [:portfolio-ui :returns-benchmark-coin] coin]]))]
+      (is (thrown-with-msg?
+           js/Error
+           #"rule=heavy-before-projection-phase"
+           (wrapped {} "SPY"))))))
+
+(deftest wrap-action-handler-rejects-phase-order-regression-for-covered-action-test
+  (with-redefs [validation/validation-enabled? (constantly true)]
+    (let [wrapped (validation/wrap-action-handler :actions/select-portfolio-returns-benchmark
+                                                  (fn [_state coin]
+                                                    [[:effects/save [:portfolio-ui :returns-benchmark-coin] coin]
+                                                     [:effects/fetch-candle-snapshot :coin coin :interval :1h :bars 800]
+                                                     [:effects/local-storage-set "portfolio-returns-benchmark" coin]]))]
+      (is (thrown-with-msg?
+           js/Error
+           #"rule=phase-order-regression"
+           (wrapped {} "SPY"))))))
+
+(deftest wrap-action-handler-rejects-duplicate-heavy-effects-for-covered-action-test
+  (with-redefs [validation/validation-enabled? (constantly true)]
+    (let [wrapped (validation/wrap-action-handler :actions/select-orderbook-price-aggregation
+                                                  (fn [_state mode]
+                                                    [[:effects/save [:orderbook-ui :price-aggregation-dropdown-visible?] false]
+                                                     [:effects/subscribe-orderbook "BTC"]
+                                                     [:effects/subscribe-orderbook (str mode)]]))]
+      (is (thrown-with-msg?
+           js/Error
+           #"rule=duplicate-heavy-effect"
+           (wrapped {} "BTC"))))))
+
+(deftest wrap-action-handler-allows-duplicate-heavy-effects-when-policy-permits-test
+  (with-redefs [validation/validation-enabled? (constantly true)]
+    (let [wrapped (validation/wrap-action-handler :actions/select-portfolio-summary-time-range
+                                                  (fn [_state timeframe]
+                                                    [[:effects/save [:portfolio-ui :summary-time-range] timeframe]
+                                                     [:effects/fetch-candle-snapshot :interval :1h]
+                                                     [:effects/fetch-candle-snapshot :interval :1h]]))
+          effects (wrapped {} :1w)]
+      (is (= [[:effects/save [:portfolio-ui :summary-time-range] :1w]
+              [:effects/fetch-candle-snapshot :interval :1h]
+              [:effects/fetch-candle-snapshot :interval :1h]]
+             effects)))))
+
+(deftest wrap-action-handler-does-not-apply-order-contract-to-uncovered-actions-test
+  (with-redefs [validation/validation-enabled? (constantly true)]
+    (let [wrapped (validation/wrap-action-handler :actions/refresh-asset-markets
+                                                  (fn [_state]
+                                                    [[:effects/fetch-asset-selector-markets]
+                                                     [:effects/save [:asset-selector :visible-dropdown] nil]]))]
+      (is (= [[:effects/fetch-asset-selector-markets]
+              [:effects/save [:asset-selector :visible-dropdown] nil]]
+             (wrapped {}))))))
+
+(deftest wrap-effect-handler-rejects-invalid-save-args-test
+  (with-redefs [validation/validation-enabled? (constantly true)]
+    (let [wrapped (validation/wrap-effect-handler :effects/save
+                                                  (fn [_ctx _store _path _value]
+                                                    nil))]
+      (is (thrown-with-msg?
+           js/Error
+           #"effect request"
+           (wrapped nil (atom {}) "not-a-path" 1))))))
+
+(deftest install-store-state-validation-rejects-invalid-transition-test
+  (with-redefs [validation/validation-enabled? (constantly true)]
+    (let [store (atom (system/default-store-state))]
+      (validation/install-store-state-validation! store)
+      (is (thrown-with-msg?
+           js/Error
+           #"app state"
+           (swap! store assoc :active-market {:coin "BTC"}))))))
+
+(deftest wrap-action-handler-records-debug-effect-traces-when-validation-disabled-test
+  (with-redefs [validation/validation-enabled? (constantly false)]
+    (validation/clear-debug-action-effect-traces!)
+    (let [wrapped (validation/wrap-action-handler :actions/submit-order
+                                                  (fn [_state]
+                                                    [[:effects/save [:order-form-runtime :error] nil]
+                                                     [:effects/api-submit-order {:id 1}]]))
+          effects (wrapped {})]
+      (is (= [[:effects/save [:order-form-runtime :error] nil]
+              [:effects/api-submit-order {:id 1}]]
+             effects))
+      (let [trace (last (validation/debug-action-effect-traces-snapshot))]
+        (is (= :actions/submit-order (:action-id trace)))
+        (is (= 1 (:projection-effect-count trace)))
+        (is (= 1 (:heavy-effect-count trace)))
+        (is (true? (:projection-before-heavy trace)))
+        (is (true? (:phase-order-valid trace)))))))
+
+(deftest wrap-action-handler-records-invalid-phase-order-in-debug-trace-when-validation-disabled-test
+  (with-redefs [validation/validation-enabled? (constantly false)]
+    (validation/clear-debug-action-effect-traces!)
+    (let [wrapped (validation/wrap-action-handler
+                   :actions/select-portfolio-returns-benchmark
+                   (fn [_state]
+                     [[:effects/save [:portfolio-ui :returns-benchmark-coin] "SPY"]
+                      [:effects/fetch-candle-snapshot :coin "SPY" :interval :1h :bars 800]
+                      [:effects/local-storage-set "portfolio-returns-benchmark" "SPY"]]))
+          effects (wrapped {})]
+      (is (= [[:effects/save [:portfolio-ui :returns-benchmark-coin] "SPY"]
+              [:effects/fetch-candle-snapshot :coin "SPY" :interval :1h :bars 800]
+              [:effects/local-storage-set "portfolio-returns-benchmark" "SPY"]]
+             effects))
+      (let [trace (last (validation/debug-action-effect-traces-snapshot))]
+        (is (= :actions/select-portfolio-returns-benchmark (:action-id trace)))
+        (is (true? (:projection-before-heavy trace)))
+        (is (false? (:phase-order-valid trace)))
+        (is (= [:projection :heavy-io :persistence]
+               (:phases trace)))))))

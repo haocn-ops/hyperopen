@@ -1,0 +1,135 @@
+(ns hyperopen.views.account-info.mobile-cards)
+
+(def ^:private mobile-account-card-shell-classes
+  ["overflow-hidden"
+   "rounded-lg"
+   "border"
+   "border-ho-border-accent-muted"
+   "bg-[#08161f]"])
+
+(def ^:private mobile-account-card-button-classes
+  ["w-full"
+   "px-3.5"
+   "py-3"
+   "text-left"
+   "transition-colors"
+   "hover:bg-[#0c1b24]"
+   "focus:outline-none"
+   "focus:ring-0"
+   "focus:ring-offset-0"])
+
+(def ^:private mobile-account-card-expanded-container-classes
+  ["border-t"
+   "border-ho-border-accent-muted"
+   "px-3.5"
+   "py-3"])
+
+(defn- chevron-icon [open?]
+  [:svg {:class (into ["h-4"
+                       "w-4"
+                       "shrink-0"
+                       "transition-transform"
+                       "duration-150"]
+                      (if open?
+                        ["rotate-180"]
+                        ["rotate-0"]))
+         :viewBox "0 0 12 12"
+         :fill "none"
+         :stroke "currentColor"
+         :aria-hidden true}
+   [:path {:d "M3 4.5L6 7.5L9 4.5"
+           :stroke-linecap "round"
+           :stroke-linejoin "round"
+           :stroke-width "1.5"}]])
+
+(defn summary-item
+  ([label content]
+   (summary-item label content {}))
+  ([label content {:keys [root-classes label-classes value-classes]
+                   :or {root-classes []
+                        label-classes []
+                        value-classes []}}]
+   [:div {:class (into ["min-w-0" "space-y-1"] root-classes)}
+    [:div {:class (into ["text-xs"
+                         "font-medium"
+                         "leading-4"
+                         "text-trading-text-secondary"]
+                        label-classes)}
+     label]
+    [:div {:class (into ["min-w-0"
+                         "text-sm"
+                         "font-semibold"
+                         "leading-5"
+                         "text-trading-text"]
+                        value-classes)}
+     content]]))
+
+(defn detail-item
+  ([label content]
+   (detail-item label content {}))
+  ([label content {:keys [full-width? root-classes label-classes value-classes]
+                   :or {full-width? false
+                        root-classes []
+                        label-classes []
+                        value-classes []}}]
+   [:div {:class (into ["min-w-0" "space-y-1"]
+                       (concat root-classes
+                               (when full-width?
+                                 ["col-span-full"])))}
+    [:div {:class (into ["text-xs"
+                         "font-medium"
+                         "leading-4"
+                         "text-trading-text-secondary"]
+                        label-classes)}
+     label]
+    [:div {:class (into ["min-w-0"
+                         "text-sm"
+                         "font-semibold"
+                         "leading-5"
+                         "text-trading-text"]
+                        value-classes)}
+     content]]))
+
+(defn detail-grid [column-classes children]
+  (into [:div {:class ["grid"
+                       column-classes
+                       "gap-x-3"
+                       "gap-y-3"]}]
+        (keep identity children)))
+
+(defn expandable-card
+  [{:keys [data-role
+           expanded?
+           toggle-actions
+           summary-items
+           detail-content
+           card-classes
+           button-classes
+           summary-grid-classes
+           expanded-container-classes]
+    :or {card-classes mobile-account-card-shell-classes
+         button-classes mobile-account-card-button-classes
+         summary-grid-classes ["grid"
+                               "grid-cols-[minmax(0,1fr)_minmax(0,0.9fr)_minmax(0,1fr)_auto]"
+                               "items-start"
+                               "gap-3"]
+         expanded-container-classes mobile-account-card-expanded-container-classes}}]
+  (let [chevron-node
+        [:div {:class ["flex"
+                       "h-full"
+                       "items-start"
+                       "justify-end"
+                       "pt-1"
+                       "text-trading-text-secondary"]}
+         (chevron-icon expanded?)]]
+    [:div {:class card-classes
+           :data-role data-role}
+     [:button {:type "button"
+               :class button-classes
+               :aria-expanded (boolean expanded?)
+               :on {:click toggle-actions}}
+      (into [:div {:class summary-grid-classes}]
+            (concat summary-items [chevron-node]))]
+     (when expanded?
+       [:div {:class expanded-container-classes}
+        detail-content])]))

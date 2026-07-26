@@ -1,0 +1,127 @@
+(ns hyperopen.api.projections.facade-contract-test
+  (:require [cljs.test :refer-macros [deftest is testing]]
+            [hyperopen.api.projections :as projections]
+            [hyperopen.api.projections.api-wallets :as api-wallets]
+            [hyperopen.api.projections.asset-selector :as asset-selector]
+            [hyperopen.api.projections.funding :as funding]
+            [hyperopen.api.projections.leaderboard :as leaderboard]
+            [hyperopen.api.projections.market :as market]
+            [hyperopen.api.projections.orders :as orders]
+            [hyperopen.api.projections.portfolio :as portfolio]
+            [hyperopen.api.projections.staking :as staking]
+            [hyperopen.api.projections.user-abstraction :as user-abstraction]
+            [hyperopen.api.projections.user-fees :as user-fees]
+            [hyperopen.api.projections.vaults :as vaults]))
+
+(def ^:private facade-aliases
+  [["begin-spot-meta-load" projections/begin-spot-meta-load market/begin-spot-meta-load]
+   ["apply-spot-meta-success" projections/apply-spot-meta-success market/apply-spot-meta-success]
+   ["apply-spot-meta-error" projections/apply-spot-meta-error market/apply-spot-meta-error]
+   ["apply-asset-contexts-success" projections/apply-asset-contexts-success market/apply-asset-contexts-success]
+   ["apply-asset-contexts-error" projections/apply-asset-contexts-error market/apply-asset-contexts-error]
+   ["apply-perp-dexs-success" projections/apply-perp-dexs-success market/apply-perp-dexs-success]
+   ["apply-perp-dexs-error" projections/apply-perp-dexs-error market/apply-perp-dexs-error]
+   ["apply-candle-snapshot-success" projections/apply-candle-snapshot-success market/apply-candle-snapshot-success]
+   ["apply-candle-snapshot-error" projections/apply-candle-snapshot-error market/apply-candle-snapshot-error]
+   ["begin-spot-balances-load" projections/begin-spot-balances-load market/begin-spot-balances-load]
+   ["apply-spot-balances-success" projections/apply-spot-balances-success market/apply-spot-balances-success]
+   ["apply-spot-balances-error" projections/apply-spot-balances-error market/apply-spot-balances-error]
+   ["apply-perp-dex-clearinghouse-success" projections/apply-perp-dex-clearinghouse-success market/apply-perp-dex-clearinghouse-success]
+   ["apply-perp-dex-clearinghouse-error" projections/apply-perp-dex-clearinghouse-error market/apply-perp-dex-clearinghouse-error]
+   ["apply-default-clearinghouse-success" projections/apply-default-clearinghouse-success market/apply-default-clearinghouse-success]
+
+   ["apply-open-orders-success" projections/apply-open-orders-success orders/apply-open-orders-success]
+   ["apply-open-orders-error" projections/apply-open-orders-error orders/apply-open-orders-error]
+   ["apply-user-fills-success" projections/apply-user-fills-success orders/apply-user-fills-success]
+   ["apply-user-fills-error" projections/apply-user-fills-error orders/apply-user-fills-error]
+
+   ["begin-portfolio-load" projections/begin-portfolio-load portfolio/begin-portfolio-load]
+   ["apply-portfolio-success" projections/apply-portfolio-success portfolio/apply-portfolio-success]
+   ["apply-portfolio-error" projections/apply-portfolio-error portfolio/apply-portfolio-error]
+   ["begin-trader-benchmark-portfolio-load"
+    projections/begin-trader-benchmark-portfolio-load
+    portfolio/begin-trader-benchmark-portfolio-load]
+   ["apply-trader-benchmark-portfolio-success"
+    projections/apply-trader-benchmark-portfolio-success
+    portfolio/apply-trader-benchmark-portfolio-success]
+   ["apply-trader-benchmark-portfolio-error"
+    projections/apply-trader-benchmark-portfolio-error
+    portfolio/apply-trader-benchmark-portfolio-error]
+   ["begin-user-fees-load" projections/begin-user-fees-load user-fees/begin-load]
+   ["apply-user-fees-success" projections/apply-user-fees-success user-fees/apply-success]
+   ["apply-user-fees-error" projections/apply-user-fees-error user-fees/apply-error]
+
+   ["begin-asset-selector-load" projections/begin-asset-selector-load asset-selector/begin-asset-selector-load]
+   ["apply-asset-selector-success" projections/apply-asset-selector-success asset-selector/apply-asset-selector-success]
+   ["apply-asset-selector-error" projections/apply-asset-selector-error asset-selector/apply-asset-selector-error]
+
+   ["begin-funding-comparison-load" projections/begin-funding-comparison-load funding/begin-funding-comparison-load]
+   ["apply-funding-comparison-success" projections/apply-funding-comparison-success funding/apply-funding-comparison-success]
+   ["apply-funding-comparison-error" projections/apply-funding-comparison-error funding/apply-funding-comparison-error]
+
+   ["begin-leaderboard-load" projections/begin-leaderboard-load leaderboard/begin-leaderboard-load]
+   ["apply-leaderboard-success" projections/apply-leaderboard-success leaderboard/apply-leaderboard-success]
+   ["apply-leaderboard-cache-hydration" projections/apply-leaderboard-cache-hydration leaderboard/apply-leaderboard-cache-hydration]
+   ["apply-leaderboard-error" projections/apply-leaderboard-error leaderboard/apply-leaderboard-error]
+
+   ["begin-staking-validator-summaries-load" projections/begin-staking-validator-summaries-load staking/begin-staking-validator-summaries-load]
+   ["apply-staking-validator-summaries-success" projections/apply-staking-validator-summaries-success staking/apply-staking-validator-summaries-success]
+   ["apply-staking-validator-summaries-error" projections/apply-staking-validator-summaries-error staking/apply-staking-validator-summaries-error]
+   ["begin-staking-delegator-summary-load" projections/begin-staking-delegator-summary-load staking/begin-staking-delegator-summary-load]
+   ["apply-staking-delegator-summary-success" projections/apply-staking-delegator-summary-success staking/apply-staking-delegator-summary-success]
+   ["apply-staking-delegator-summary-error" projections/apply-staking-delegator-summary-error staking/apply-staking-delegator-summary-error]
+   ["begin-staking-delegations-load" projections/begin-staking-delegations-load staking/begin-staking-delegations-load]
+   ["apply-staking-delegations-success" projections/apply-staking-delegations-success staking/apply-staking-delegations-success]
+   ["apply-staking-delegations-error" projections/apply-staking-delegations-error staking/apply-staking-delegations-error]
+   ["begin-staking-rewards-load" projections/begin-staking-rewards-load staking/begin-staking-rewards-load]
+   ["apply-staking-rewards-success" projections/apply-staking-rewards-success staking/apply-staking-rewards-success]
+   ["apply-staking-rewards-error" projections/apply-staking-rewards-error staking/apply-staking-rewards-error]
+   ["begin-staking-history-load" projections/begin-staking-history-load staking/begin-staking-history-load]
+   ["apply-staking-history-success" projections/apply-staking-history-success staking/apply-staking-history-success]
+   ["apply-staking-history-error" projections/apply-staking-history-error staking/apply-staking-history-error]
+
+   ["clear-api-wallets-errors" projections/clear-api-wallets-errors api-wallets/clear-api-wallets-errors]
+   ["reset-api-wallets" projections/reset-api-wallets api-wallets/reset-api-wallets]
+   ["apply-api-wallets-extra-agents-success" projections/apply-api-wallets-extra-agents-success api-wallets/apply-api-wallets-extra-agents-success]
+   ["apply-api-wallets-extra-agents-error" projections/apply-api-wallets-extra-agents-error api-wallets/apply-api-wallets-extra-agents-error]
+   ["apply-api-wallets-default-agent-success" projections/apply-api-wallets-default-agent-success api-wallets/apply-api-wallets-default-agent-success]
+   ["apply-api-wallets-default-agent-error" projections/apply-api-wallets-default-agent-error api-wallets/apply-api-wallets-default-agent-error]
+
+   ["apply-user-abstraction-snapshot" projections/apply-user-abstraction-snapshot user-abstraction/apply-user-abstraction-snapshot]
+
+   ["begin-vault-index-load" projections/begin-vault-index-load vaults/begin-vault-index-load]
+   ["apply-vault-index-cache-hydration" projections/apply-vault-index-cache-hydration vaults/apply-vault-index-cache-hydration]
+   ["apply-vault-index-success" projections/apply-vault-index-success vaults/apply-vault-index-success]
+   ["apply-vault-index-error" projections/apply-vault-index-error vaults/apply-vault-index-error]
+   ["begin-vault-summaries-load" projections/begin-vault-summaries-load vaults/begin-vault-summaries-load]
+   ["apply-vault-summaries-success" projections/apply-vault-summaries-success vaults/apply-vault-summaries-success]
+   ["apply-vault-summaries-error" projections/apply-vault-summaries-error vaults/apply-vault-summaries-error]
+   ["begin-user-vault-equities-load" projections/begin-user-vault-equities-load vaults/begin-user-vault-equities-load]
+   ["apply-user-vault-equities-success" projections/apply-user-vault-equities-success vaults/apply-user-vault-equities-success]
+   ["apply-user-vault-equities-error" projections/apply-user-vault-equities-error vaults/apply-user-vault-equities-error]
+   ["begin-vault-details-load" projections/begin-vault-details-load vaults/begin-vault-details-load]
+   ["apply-vault-details-success" projections/apply-vault-details-success vaults/apply-vault-details-success]
+   ["apply-vault-details-error" projections/apply-vault-details-error vaults/apply-vault-details-error]
+   ["begin-vault-benchmark-details-load" projections/begin-vault-benchmark-details-load vaults/begin-vault-benchmark-details-load]
+   ["apply-vault-benchmark-details-success" projections/apply-vault-benchmark-details-success vaults/apply-vault-benchmark-details-success]
+   ["apply-vault-benchmark-details-error" projections/apply-vault-benchmark-details-error vaults/apply-vault-benchmark-details-error]
+   ["begin-vault-webdata2-load" projections/begin-vault-webdata2-load vaults/begin-vault-webdata2-load]
+   ["apply-vault-webdata2-success" projections/apply-vault-webdata2-success vaults/apply-vault-webdata2-success]
+   ["apply-vault-webdata2-error" projections/apply-vault-webdata2-error vaults/apply-vault-webdata2-error]
+   ["begin-vault-fills-load" projections/begin-vault-fills-load vaults/begin-vault-fills-load]
+   ["apply-vault-fills-success" projections/apply-vault-fills-success vaults/apply-vault-fills-success]
+   ["apply-vault-fills-error" projections/apply-vault-fills-error vaults/apply-vault-fills-error]
+   ["begin-vault-funding-history-load" projections/begin-vault-funding-history-load vaults/begin-vault-funding-history-load]
+   ["apply-vault-funding-history-success" projections/apply-vault-funding-history-success vaults/apply-vault-funding-history-success]
+   ["apply-vault-funding-history-error" projections/apply-vault-funding-history-error vaults/apply-vault-funding-history-error]
+   ["begin-vault-order-history-load" projections/begin-vault-order-history-load vaults/begin-vault-order-history-load]
+   ["apply-vault-order-history-success" projections/apply-vault-order-history-success vaults/apply-vault-order-history-success]
+   ["apply-vault-order-history-error" projections/apply-vault-order-history-error vaults/apply-vault-order-history-error]
+   ["begin-vault-ledger-updates-load" projections/begin-vault-ledger-updates-load vaults/begin-vault-ledger-updates-load]
+   ["apply-vault-ledger-updates-success" projections/apply-vault-ledger-updates-success vaults/apply-vault-ledger-updates-success]
+   ["apply-vault-ledger-updates-error" projections/apply-vault-ledger-updates-error vaults/apply-vault-ledger-updates-error]])
+
+(deftest api-projections-public-facade-delegates-to-owner-namespaces-test
+  (testing "facade vars remain direct aliases for every owner-owned projection"
+    (doseq [[label facade-var owner-var] facade-aliases]
+      (is (identical? owner-var facade-var) label))))

@@ -1,0 +1,636 @@
+(ns hyperopen.portfolio.optimizer.application.engine-test
+  (:require [cljs.test :refer-macros [async deftest is]]
+            [hyperopen.portfolio.optimizer.application.engine :as engine]
+            [hyperopen.portfolio.optimizer.application.request-builder :as request-builder]
+            [hyperopen.portfolio.optimizer.defaults :as defaults]
+            [hyperopen.portfolio.optimizer.fixtures :as fixtures]
+            [hyperopen.portfolio.optimizer.infrastructure.solver-adapter :as solver-adapter]))
+
+(defn- near?
+  [expected actual]
+  (< (js/Math.abs (- expected actual)) 0.000001))
+
+(def base-request
+  (fixtures/sample-engine-request
+   {:draft (fixtures/sample-draft
+            {:id "scenario-1"
+             :universe [{:instrument-id "perp:BTC"
+                         :market-type :perp
+                         :coin "BTC"}
+                        {:instrument-id "perp:ETH"
+                         :market-type :perp
+                         :coin "ETH"}]
+             :return-model {:kind :historical-mean}
+             :risk-model {:kind :sample-covariance}
+             :objective {:kind :minimum-variance}
+             :constraints {:long-only? true
+                           :max-asset-weight 0.8
+                           :rebalance-tolerance 0.001}
+             :execution-assumptions {:fallback-slippage-bps 20
+                                     :prices-by-id {"perp:BTC" 100
+                                                    "perp:ETH" 50}
+                                     :fee-bps-by-id {"perp:BTC" 4
+                                                    "perp:ETH" 5}}})
+    :current-portfolio (fixtures/sample-current-portfolio
+                        {:capital {:nav-usdc 10000}
+                         :by-instrument {"perp:BTC" {:weight 0.6}
+                                         "perp:ETH" {:weight 0.4}}})
+    :history-data {:candle-history-by-coin
+                   {"BTC" [{:time-ms 0 :close "100"}
+                           {:time-ms 100 :close "101"}
+                           {:time-ms 200 :close "103.02"}
+                           {:time-ms 300 :close "106.1106"}]
+                    "ETH" [{:time-ms 0 :close "100"}
+                           {:time-ms 100 :close "102"}
+                           {:time-ms 200 :close "103.02"}
+                           {:time-ms 300 :close "103.02"}]}
+                   :funding-history-by-coin
+                   {"BTC" [{:time-ms 0 :funding-rate-raw 0.000045662100456621}]
+                    "ETH" [{:time-ms 0 :funding-rate-raw -0.000009132420091324}]}}
+    :market-cap-by-coin {}
+    :as-of-ms 1000}))
+
+(deftest run-optimization-assembles-solved-result-with-diagnostics-and-rebalance-preview-test
+  (let [calls (atom [])
+        result (engine/run-optimization
+                base-request
+                {:solve-problem (fn [problem]
+                                  (swap! calls conj problem)
+                                  {:status :solved
+                                   :solver :fixture-solver
+                                   :weights [0.5 0.5]
+                                   :iterations 12
+                                   :elapsed-ms 2})})]
+    (is (= :solved (:status result)))
+    (is (= "scenario-1" (:scenario-id result)))
+    (is (= :minimum-variance (:objective-kind (first @calls))))
+    (is (> (count @calls) 1))
+    (is (= :minimum-variance (get-in result [:solver :objective-kind])))
+    (is (= ["perp:BTC" "perp:ETH"] (:instrument-ids result)))
+    (is (= [0.5 0.5] (:target-weights result)))
+    (is (= {"perp:BTC" 0.6
+            "perp:ETH" 0.4}
+           (:current-weights-by-instrument result)))
+    (is (= {"perp:BTC" 0.5
+            "perp:ETH" 0.5}
+           (:target-weights-by-instrument result)))
+    (is (near? 1 (:gross-exposure (:diagnostics result))))
+    (is (near? 0.1 (get-in result [:diagnostics :turnover])))
+    (is (= :ready (get-in result [:rebalance-preview :status])))
+    (is (= :market-funding-history
+           (get-in result [:return-decomposition-by-instrument "perp:BTC" :funding-source])))
+    (is (= {:return-observations 3
+            :oldest-common-ms 0
+            :latest-common-ms 300
+            :age-ms 700
+            :stale? false}
+           (select-keys (:history-summary result) [:return-observations :oldest-common-ms :latest-common-ms :age-ms :stale?])))
+    (is (seq (:frontier result)))))
+
+(deftest run-optimization-labels-vault-frontier-overlays-by-human-name-test
+  (let [vault-address "0x1111111111111111111111111111111111111111"
+        vault-id (str "vault:" vault-address)
+        request (fixtures/sample-engine-request
+                 {:draft (fixtures/sample-draft
+                          {:id "vault-frontier-labels"
+                           :universe [{:instrument-id "perp:BTC"
+                                       :market-type :perp
+                                       :coin "BTC"
+                                       :shortable? true}
+                                      {:instrument-id vault-id
+                                       :market-type :vault
+                                       :coin vault-id
+                                       :vault-address vault-address
+                                       :name "BTC Basis Carry Vault"
+                                       :symbol "BTC Basis Carry Vault"
+                                       :shortable? false}]
+                           :objective {:kind :minimum-variance}
+                           :return-model {:kind :historical-mean}
+                           :risk-model {:kind :diagonal-shrink}
+                           :constraints {:long-only? true
+                                         :max-asset-weight 0.8
+                                         :rebalance-tolerance 0.001}})
+                  :current-portfolio (fixtures/sample-current-portfolio
+                                      {:by-instrument {"perp:BTC" {:weight 0.45
+                                                                  :market-type :perp
+                                                                  :coin "BTC"}}})
+                  :history-data {:candle-history-by-coin
+                                 {"BTC" [{:time-ms 1000 :close "100"}
+                                         {:time-ms 2000 :close "110"}
+                                         {:time-ms 3000 :close "121"}
+                                         {:time-ms 4000 :close "133.1"}]}
+                                 :funding-history-by-coin
+                                 {"BTC" [{:time-ms 1000
+                                          :funding-rate-raw 0.0001}]}
+                                 :vault-details-by-address
+                                 {vault-address
+                                  {:portfolio
+                                   {:month
+                                    {:accountValueHistory [[1000 100]
+                                                           [2000 106]
+                                                           [3000 114]
+                                                           [4000 125]]
+                                     :pnlHistory [[1000 0]
+                                                  [2000 6]
+                                                  [3000 14]
+                                                  [4000 25]]}}}}}
+                  :market-cap-by-coin {"BTC" 600}
+                  :as-of-ms 5000})
+        result (engine/run-optimization
+                request
+                {:solve-problem (fn [_problem]
+                                  {:status :solved
+                                   :solver :fixture-solver
+                                   :weights [0.5 0.5]})})
+        vault-standalone (first (filter #(= vault-id (:instrument-id %))
+                                        (get-in result [:frontier-overlays :standalone])))
+        vault-contribution (first (filter #(= vault-id (:instrument-id %))
+                                          (get-in result [:frontier-overlays :contribution])))]
+    (is (= :solved (:status result)))
+    (is (= "BTC Basis Carry Vault" (:label vault-standalone)))
+    (is (= "BTC Basis Carry Vault" (:label vault-contribution)))
+    (is (not= vault-id (:label vault-standalone)))
+    (is (not= vault-id (:label vault-contribution)))))
+
+(deftest run-optimization-derives-nonzero-fees-from-default-fee-bps-test
+  ;; The worker-built rebalance preview (shown before any snapshot refresh) must
+  ;; charge fees from execution-assumptions :default-fee-bps even when no per-id
+  ;; :fee-bps-by-id is supplied — the reported "Est. fees + slippage is always $0"
+  ;; bug. request_builder derives :default-fee-bps from :fee-mode + the canonical
+  ;; schedule; here we assert the worker preview actually applies it.
+  (let [request (-> base-request
+                    (update :execution-assumptions dissoc :fee-bps-by-id)
+                    (assoc-in [:execution-assumptions :default-fee-bps] 4.5))
+        result (engine/run-optimization
+                request
+                {:solve-problem (fn [_]
+                                  {:status :solved
+                                   :solver :fixture-solver
+                                   :weights [0.5 0.5]
+                                   :iterations 1
+                                   :elapsed-ms 1})})
+        ready (->> (get-in result [:rebalance-preview :rows])
+                   (filter #(= :ready (:status %))))]
+    (is (seq ready))
+    (is (every? #(= 4.5 (get-in % [:cost :fee-bps])) ready))
+    (is (pos? (get-in result [:rebalance-preview :summary :estimated-fees-usd])))))
+
+(deftest run-optimization-uses-latest-history-price-for-rebalance-preview-test
+  (let [result (engine/run-optimization
+                (-> base-request
+                    (assoc :current-portfolio {:capital {:nav-usdc 100000}
+                                               :by-instrument {"perp:BTC" {:weight 0}
+                                                               "perp:ETH" {:weight 0}}})
+                    (assoc :execution-assumptions {:fallback-slippage-bps 20})
+                    (assoc-in [:history :price-series-by-instrument]
+                              {"perp:BTC" [{:close 90} {:close 100}]
+                               "perp:ETH" [{:close 45} {:close 50}]}))
+                {:solve-problem (fn [_problem]
+                                  {:status :solved
+                                   :weights [0.4 0.6]})})
+        rows-by-id (into {}
+                         (map (juxt :instrument-id identity))
+                         (get-in result [:rebalance-preview :rows]))]
+    (is (= :ready (get-in result [:rebalance-preview :status])))
+    (is (= 100 (:price (get rows-by-id "perp:BTC"))))
+    (is (= 50 (:price (get rows-by-id "perp:ETH"))))
+    (is (= 400 (:quantity (get rows-by-id "perp:BTC"))))
+    (is (= 1200 (:quantity (get rows-by-id "perp:ETH"))))))
+
+(deftest run-optimization-returns-structured-infeasibility-without-calling-solver-test
+  (let [called? (atom false)
+        result (engine/run-optimization
+                (assoc base-request
+                       :constraints {:long-only? true
+                                     :max-asset-weight 0.4})
+                {:solve-problem (fn [_]
+                                  (reset! called? true)
+                                  {:status :solved
+                                   :weights [0.5 0.5]})})]
+    (is (= :infeasible (:status result)))
+    (is (= :constraint-presolve (:reason result)))
+    (is (false? @called?))
+    (is (= [{:code :sum-upper-below-target
+             :sum-upper 0.8
+             :target-net 1}]
+           (get-in result [:details :violations])))))
+
+(deftest run-optimization-blocks-black-litterman-views-without-matching-instruments-test
+  (let [called? (atom false)
+        result (engine/run-optimization
+                (assoc base-request
+                       :return-model {:kind :black-litterman
+                                      :views [{:id "sol-view"
+                                               :kind :absolute
+                                               :instrument-id "perp:SOL"
+                                               :weights {"perp:SOL" 1}
+                                               :return 0.2
+                                               :confidence 0.75}]})
+                {:solve-problem (fn [_]
+                                  (reset! called? true)
+                                  {:status :solved
+                                   :weights [0.5 0.5]})})
+        warning (first (:warnings result))]
+    (is (= :infeasible (:status result)))
+    (is (= :invalid-return-model (:reason result)))
+    (is (false? @called?))
+    (is (= :black-litterman-view-has-no-matching-instrument
+           (:code warning)))
+    (is (= 1 (count (filter #(= :black-litterman-view-has-no-matching-instrument
+                                (:code %))
+                            (:warnings result)))))
+    (is (= "sol-view" (:view-id warning)))
+    (is (= ["perp:SOL"] (:instrument-ids warning)))))
+
+(deftest run-optimization-solves-frontier-sweep-and-selects-target-volatility-result-test
+  (let [result (engine/run-optimization
+                (assoc base-request
+                       :objective {:kind :target-volatility
+                                   :target-volatility 0}
+                       :return-tilts [0 1])
+                {:solve-problem (fn [problem]
+                                  (if (zero? (:return-tilt problem))
+                                    {:status :solved
+                                     :weights [0.7 0.3]}
+                                    {:status :solved
+                                     :weights [0.5 0.5]}))})]
+    (is (= :solved (:status result)))
+    (is (= :frontier-sweep (get-in result [:solver :strategy])))
+    (is (= [0.5 0.5] (:target-weights result)))
+    (is (= 2 (count (:solver-results result))))
+    (is (= 2 (count (:frontier result))))))
+
+(deftest max-sharpe-emits-display-frontier-without-changing-target-solver-test
+  (let [calls (atom [])
+        result (engine/run-optimization
+                (assoc base-request
+                       :objective {:kind :max-sharpe
+                                   :frontier-points 3})
+                {:solve-problem (fn [problem]
+                                  (swap! calls conj problem)
+                                  {:status :solved
+                                   :solver :fixture-solver
+                                   :weights (case (:objective-kind problem)
+                                              :target-return
+                                              (if (= [1 1] (:upper-bounds problem))
+                                                [0 1]
+                                                [0.3 0.7])
+
+                                              :return-tilted
+                                              (if (= [1 1] (:upper-bounds problem))
+                                                [0 1]
+                                                [0.3 0.7])
+
+                                              [0.5 0.5])})})]
+    (is (= :solved (:status result)))
+    (is (= :frontier-sweep (get-in result [:solver :strategy]))
+        "The target solver for Max Sharpe should remain the frontier-selection sweep.")
+    (is (= :display-sweep (get-in result [:frontier-summary :source]))
+        "The chart frontier should come from a dedicated display sweep, not the target-selection sweep.")
+    (is (some #(= :target-return (:objective-kind %)) @calls)
+        "Max-Sharpe display frontier should solve target-return floor points for chart coverage.")))
+
+(deftest minimum-variance-emits-display-frontier-without-changing-selected-target-test
+  (let [calls (atom [])
+        result (engine/run-optimization
+                (assoc base-request
+                       :objective {:kind :minimum-variance}
+                       :return-tilts [0 1])
+                {:solve-problem (fn [problem]
+                                  (let [idx (count @calls)]
+                                    (swap! calls conj problem)
+                                     {:status :solved
+                                      :solver :fixture-solver
+                                      :weights (case idx
+                                                0 [0.5 0.5]
+                                                1 [0.7 0.3]
+                                                2 [0.5 0.5]
+                                                3 [0.7 0.3]
+                                                4 [0.5 0.5]
+                                                [0.5 0.5])}))})]
+    (is (= :solved (:status result)))
+    (is (= :single-qp (get-in result [:solver :strategy])))
+    (is (= [0.5 0.5] (:target-weights result))
+        "Minimum variance target weights must come from the target solve, not the display sweep.")
+    (is (= 3 (count @calls)))
+    (is (= :minimum-variance (:objective-kind (first @calls))))
+    (is (= [:return-tilted :return-tilted]
+           (mapv :objective-kind (rest @calls))))
+    (is (= :display-sweep (get-in result [:frontier-summary :source])))
+    (is (= 2 (get-in result [:frontier-summary :point-count])))
+    (is (= 2 (count (:frontier result))))
+    (is (seq (get-in result [:frontier-overlays :standalone])))
+    (is (seq (get-in result [:frontier-overlays :contribution])))))
+
+(deftest minimum-variance-emits-unconstrained-and-constrained-display-frontiers-test
+  ;; Reference frontier relaxes only locks: BTC is locked, so the constrained
+  ;; sweep pins it, the reference sweep frees it, and both keep the 0.8 cap.
+  (let [calls (atom [])
+        result (engine/run-optimization
+                (assoc base-request
+                       :objective {:kind :minimum-variance
+                                   :frontier-points 3}
+                       :constraints {:long-only? true
+                                     :max-asset-weight 0.8
+                                     :held-position-locks ["perp:BTC"]})
+                {:solve-problem (fn [problem]
+                                  (swap! calls conj problem)
+                                  {:status :solved
+                                   :solver :fixture-solver
+                                   :weights [0.6 0.4]})})
+        sweep (filter #(= :return-tilted (:objective-kind %)) @calls)
+        locked? (fn [problem] (seq (:locked-weights problem)))
+        unlocked (remove locked? sweep)]
+    (is (= :solved (:status result)))
+    (is (= :unconstrained (get-in result [:frontier-summary :constraint-mode])))
+    (is (= (:frontier result) (get-in result [:frontiers :unconstrained])))
+    (is (seq (get-in result [:frontiers :constrained])))
+    (is (= :constrained
+           (get-in result [:frontier-summaries :constrained :constraint-mode])))
+    (is (some locked? sweep)
+        "The constrained display frontier keeps the held-position lock.")
+    (is (seq unlocked)
+        "The reference display frontier drops the held-position lock.")
+    (is (every? #(= [0.8 0.8] (:upper-bounds %)) unlocked)
+        "The reference frontier retains the scenario per-asset caps.")))
+
+(deftest minimum-variance-keeps-target-result-when-display-frontier-fails-test
+  (let [calls (atom [])
+        result (engine/run-optimization
+                (assoc base-request
+                       :objective {:kind :minimum-variance}
+                       :return-tilts [0 1])
+                {:solve-problem (fn [problem]
+                                  (swap! calls conj problem)
+                                  (if (= :minimum-variance (:objective-kind problem))
+                                    {:status :solved
+                                     :solver :fixture-solver
+                                     :weights [0.5 0.5]}
+                                    {:status :error
+                                     :reason :fixture-display-frontier-failure}))})]
+    (is (= :solved (:status result)))
+    (is (= [0.5 0.5] (:target-weights result)))
+    (is (= 3 (count @calls)))
+    (is (= :target-solve (get-in result [:frontier-summary :source])))
+    (is (= 1 (get-in result [:frontier-summary :point-count])))
+    (is (= 1 (count (:frontier result))))
+    (is (some #(= :display-frontier-unavailable (:code %))
+              (:warnings result)))))
+
+(deftest display-frontier-ignores-solved-results-with-impossible-weights-test
+  (let [impossible-weight 2143289344
+        calls (atom [])
+        result (engine/run-optimization
+                (assoc base-request
+                       :objective {:kind :minimum-variance
+                                   :frontier-points 3})
+                {:solve-problem (fn [problem]
+                                  (swap! calls conj problem)
+                                  {:status :solved
+                                   :solver :fixture-solver
+                                   :weights (case (:objective-kind problem)
+                                              :minimum-variance
+                                              [0.5 0.5]
+
+                                              :return-tilted
+                                              [0.8 0.2]
+
+                                              :target-return
+                                              [impossible-weight impossible-weight])})})]
+    (is (= :solved (:status result)))
+    (is (= [0.5 0.5] (:target-weights result)))
+    (is (some #(= :target-return (:objective-kind %)) @calls))
+    (is (not-any? #(= [impossible-weight impossible-weight] (:weights %))
+                  (:frontier result)))
+    (is (some #(= :display-frontier-unavailable (:code %))
+              (:warnings result)))))
+
+(deftest run-optimization-converts-usdc-dust-threshold-to-weight-threshold-test
+  (let [result (engine/run-optimization
+                (assoc base-request
+                       :constraints {:long-only? true
+                                     :max-asset-weight 1
+                                     :dust-usdc 50})
+                {:solve-problem (fn [_problem]
+                                  {:status :solved
+                                   :weights [0.996 0.004]})})]
+    (is (= :solved (:status result)))
+    (is (= [1 0] (:target-weights result)))
+    (is (= [{:instrument-id "perp:ETH"
+             :weight 0.004
+             :reason :dust-threshold}]
+           (:dropped-weights result)))))
+
+(deftest run-optimization-async-awaits-promise-solver-results-test
+  (async done
+    (-> (engine/run-optimization-async
+         base-request
+         {:solve-problem (fn [_problem]
+                           (js/Promise.resolve
+                            {:status :solved
+                             :solver :promise-fixture-solver
+                             :weights [0.5 0.5]}))})
+        (.then (fn [result]
+                 (is (= :solved (:status result)))
+                 (is (= :promise-fixture-solver
+                        (get-in result [:solver-results 0 :solver])))
+                 (is (= [0.5 0.5] (:target-weights result)))
+                 (done)))
+        (.catch (fn [err]
+                  (is false (str "async optimization failed: " err))
+                  (done))))))
+
+(deftest default-signed-minimum-variance-run-respects-net-min-floor-test
+  (async done
+    (let [instrument (fn [coin]
+                       {:instrument-id (str "perp:" coin)
+                        :market-type :perp
+                        :coin coin
+                        :shortable? true})
+          candle (fn [time close]
+                   {:time time
+                    :close close})
+          coins ["BTC" "ETH" "SOL" "HYPE"]
+          draft (assoc (defaults/default-draft)
+                       :id "default-cash-regression"
+                       :universe (mapv instrument coins))
+          history-by-coin {"BTC" [(candle 1000 "100")
+                                  (candle 2000 "104")
+                                  (candle 3000 "103")
+                                  (candle 4000 "108")]
+                           "ETH" [(candle 1000 "50")
+                                  (candle 2000 "52")
+                                  (candle 3000 "55")
+                                  (candle 4000 "54")]
+                           "SOL" [(candle 1000 "20")
+                                  (candle 2000 "21")
+                                  (candle 3000 "20.5")
+                                  (candle 4000 "22")]
+                           "HYPE" [(candle 1000 "10")
+                                   (candle 2000 "10.4")
+                                   (candle 3000 "10.2")
+                                   (candle 4000 "10.8")]}
+          request (request-builder/build-engine-request
+                   {:draft draft
+                    :current-portfolio {:capital {:nav-usdc 10000}
+                                        :by-instrument {}}
+                    :history-data {:candle-history-by-coin history-by-coin
+                                   :funding-history-by-coin {}}
+                    :market-cap-by-coin {}
+                    :as-of-ms 5000})]
+      (-> (engine/run-optimization-async request
+                                          {:solve-problem solver-adapter/solve-with-osqp})
+          (.then (fn [result]
+                   (is (= :solved (:status result)))
+                   (is (<= 0.049 (get-in result [:diagnostics :net-exposure])))
+                   (is (<= 0.049 (get-in result [:diagnostics :gross-exposure])))
+                   (is (not (contains? (set (map :code (:warnings result)))
+                                       :low-invested-exposure)))
+                   (done)))
+          (.catch (fn [err]
+                    (is false (str "default minimum-variance regression failed: " err))
+                    (done)))))))
+
+(deftest explicit-net-min-floor-forces-default-minimum-variance-exposure-test
+  (async done
+    (let [instrument (fn [coin]
+                       {:instrument-id (str "perp:" coin)
+                        :market-type :perp
+                        :coin coin
+                        :shortable? true})
+          candle (fn [time close]
+                   {:time time
+                    :close close})
+          coins ["BTC" "ETH" "SOL" "HYPE"]
+          draft (-> (defaults/default-draft)
+                    (assoc :id "explicit-net-floor"
+                           :universe (mapv instrument coins))
+                    (assoc-in [:constraints :net-min] 0.8))
+          history-by-coin {"BTC" [(candle 1000 "100")
+                                  (candle 2000 "104")
+                                  (candle 3000 "103")
+                                  (candle 4000 "108")]
+                           "ETH" [(candle 1000 "50")
+                                  (candle 2000 "52")
+                                  (candle 3000 "55")
+                                  (candle 4000 "54")]
+                           "SOL" [(candle 1000 "20")
+                                  (candle 2000 "21")
+                                  (candle 3000 "20.5")
+                                  (candle 4000 "22")]
+                           "HYPE" [(candle 1000 "10")
+                                   (candle 2000 "10.4")
+                                   (candle 3000 "10.2")
+                                   (candle 4000 "10.8")]}
+          request (request-builder/build-engine-request
+                   {:draft draft
+                    :current-portfolio {:capital {:nav-usdc 10000}
+                                        :by-instrument {}}
+                    :history-data {:candle-history-by-coin history-by-coin
+                                   :funding-history-by-coin {}}
+                    :market-cap-by-coin {}
+                    :as-of-ms 5000})]
+      (-> (engine/run-optimization-async request
+                                          {:solve-problem solver-adapter/solve-with-osqp})
+          (.then (fn [result]
+                   (is (= :solved (:status result)))
+                   (is (<= 0.799 (get-in result [:diagnostics :net-exposure])))
+                   (is (< 0.79 (reduce + 0 (map js/Math.abs (:target-weights result)))))
+                   (is (not (contains? (set (map :code (:warnings result)))
+                                       :low-invested-exposure)))
+                   (done)))
+          (.catch (fn [err]
+                    (is false (str "explicit net-min regression failed: " err))
+                    (done)))))))
+
+(def ^:private proxy-day-ms
+  (* 24 60 60 1000))
+
+(defn- proxy-daily-candles
+  [start-day count* base]
+  (mapv (fn [idx]
+          {:time-ms (* (+ start-day idx) proxy-day-ms)
+           :close (str (+ base idx))})
+        (range count*)))
+
+(deftest run-optimization-engine-backs-proxy-history-assumption-test
+  ;; TOKENX has 10 days of native history. With a complete proxy assumption
+  ;; (basket BTC+ETH, 80% vol, 5% cap) the minimum-variance run must include it,
+  ;; give it a covariance row synthesized FROM the proxies (never zero
+  ;; correlation), enforce the cap, keep regression confidence low for the tiny
+  ;; overlap, and use the stated expected return rather than a 10-day mean.
+  (let [request (fixtures/sample-engine-request
+                 {:draft (fixtures/sample-draft
+                          {:id "scenario-proxy"
+                           :universe [{:instrument-id "perp:BTC"
+                                       :market-type :perp
+                                       :coin "BTC"}
+                                      {:instrument-id "perp:ETH"
+                                       :market-type :perp
+                                       :coin "ETH"}
+                                      {:instrument-id "perp:TOKENX"
+                                       :market-type :perp
+                                       :coin "TOKENX"}]
+                           :return-model {:kind :historical-mean}
+                           :risk-model {:kind :sample-covariance}
+                           :objective {:kind :minimum-variance}
+                           :constraints {:long-only? true
+                                         :max-asset-weight 0.8
+                                         :rebalance-tolerance 0.001}
+                           :history-assumptions
+                           {"perp:TOKENX" {:behavior :proxy
+                                           :expected-return 0.0
+                                           :volatility 0.8
+                                           :max-weight 0.05
+                                           :proxy {:instrument-ids ["perp:BTC"
+                                                                    "perp:ETH"]
+                                                   :relationship-strength :medium
+                                                   :prior-weights nil}}}})
+                  :current-portfolio (fixtures/sample-current-portfolio
+                                      {:capital {:nav-usdc 10000}
+                                       :by-instrument {"perp:BTC" {:weight 0.6}
+                                                       "perp:ETH" {:weight 0.4}}})
+                  :history-data {:candle-history-by-coin
+                                 {"BTC" (proxy-daily-candles 0 400 100)
+                                  "ETH" (proxy-daily-candles 0 400 2000)
+                                  "TOKENX" (proxy-daily-candles 390 10 10)}
+                                 :funding-history-by-coin {}}
+                  :market-cap-by-coin {}
+                  :as-of-ms (* 401 proxy-day-ms)})
+        calls (atom [])
+        result (engine/run-optimization
+                request
+                {:solve-problem (fn [problem]
+                                  (swap! calls conj problem)
+                                  {:status :solved
+                                   :solver :fixture-solver
+                                   :weights [0.5 0.45 0.05]
+                                   :iterations 3
+                                   :elapsed-ms 1})})
+        problem (first @calls)
+        tokenx-idx (.indexOf (:instrument-ids problem) "perp:TOKENX")
+        quadratic (:quadratic problem)
+        diagnostics (get-in result [:risk-estimation :history-assumptions
+                                    "perp:TOKENX"])]
+    (is (= :solved (:status result)))
+    (is (= ["perp:BTC" "perp:ETH" "perp:TOKENX"] (:instrument-ids result))
+        "The proxy asset reaches the solve - it is not silently dropped.")
+    (is (= 2 tokenx-idx))
+    (is (pos? (get-in quadratic [tokenx-idx 0]))
+        "Cov(BTC, TOKENX) comes from the proxy basket, not zero correlation.")
+    (is (pos? (get-in quadratic [tokenx-idx 1])))
+    (is (near? (get-in quadratic [0 tokenx-idx])
+               (get-in quadratic [tokenx-idx 0]))
+        "The synthesized row/column is symmetric.")
+    (is (> (get-in quadratic [tokenx-idx tokenx-idx]) 0.5)
+        "Total variance honors the stated 80% volatility (specific risk added).")
+    (is (near? 0.05 (get-in problem [:upper-bounds tokenx-idx]))
+        "The 5% proxy cap is enforced through the constraint machinery.")
+    (is (some? diagnostics) "Result diagnostics disclose the proxy modeling.")
+    (is (= ["perp:BTC" "perp:ETH"] (:proxy-instrument-ids diagnostics)))
+    (is (< (:confidence-q diagnostics) 0.08)
+        "Ten days of overlap keeps regression confidence low even on a good fit.")
+    (is (pos? (:specific-variance diagnostics)))
+    (is (= 0.0 (get-in result [:expected-returns-by-instrument "perp:TOKENX"]))
+        "The assumption's expected return is used - never the raw 10-day mean.")
+    (is (= 0.05 (get-in result [:target-weights-by-instrument "perp:TOKENX"])))))

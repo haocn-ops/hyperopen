@@ -1,0 +1,400 @@
+(ns hyperopen.runtime.action-adapters
+  (:require [hyperopen.funding.actions :as funding-actions]
+            [hyperopen.portfolio.optimizer.actions :as portfolio-optimizer-actions]
+            [hyperopen.portfolio.optimizer.black-litterman-actions :as portfolio-optimizer-bl-actions]
+            [hyperopen.portfolio.optimizer.frontier-actions :as portfolio-optimizer-frontier-actions]
+            [hyperopen.referrals.actions :as referrals-actions]
+            [hyperopen.runtime.action-adapters.leaderboard :as leaderboard-adapters]
+            [hyperopen.runtime.action-adapters.navigation :as navigation-adapters]
+            [hyperopen.runtime.action-adapters.spectate-mode :as spectate-mode-adapters]
+            [hyperopen.runtime.action-adapters.wallet :as wallet-adapters]
+            [hyperopen.runtime.action-adapters.websocket :as websocket-adapters]
+            [hyperopen.runtime.action-adapters.ws-diagnostics :as ws-diagnostics-adapters]))
+
+(def init-websockets websocket-adapters/init-websockets)
+
+(def subscribe-to-asset websocket-adapters/subscribe-to-asset)
+
+(def subscribe-to-webdata2 websocket-adapters/subscribe-to-webdata2)
+
+(def refresh-asset-markets websocket-adapters/refresh-asset-markets)
+
+(def load-user-data websocket-adapters/load-user-data)
+
+(def set-funding-modal funding-actions/set-funding-modal-compat)
+
+(def open-spectate-mode-modal spectate-mode-adapters/open-spectate-mode-modal)
+
+(def close-spectate-mode-modal spectate-mode-adapters/close-spectate-mode-modal)
+
+(def set-spectate-mode-search spectate-mode-adapters/set-spectate-mode-search)
+
+(def set-spectate-mode-label spectate-mode-adapters/set-spectate-mode-label)
+
+(def start-spectate-mode spectate-mode-adapters/start-spectate-mode)
+
+(def stop-spectate-mode spectate-mode-adapters/stop-spectate-mode)
+
+(def add-spectate-mode-watchlist-address
+  spectate-mode-adapters/add-spectate-mode-watchlist-address)
+
+(def remove-spectate-mode-watchlist-address
+  spectate-mode-adapters/remove-spectate-mode-watchlist-address)
+
+(def edit-spectate-mode-watchlist-address
+  spectate-mode-adapters/edit-spectate-mode-watchlist-address)
+
+(def clear-spectate-mode-watchlist-edit
+  spectate-mode-adapters/clear-spectate-mode-watchlist-edit)
+
+(def copy-spectate-mode-watchlist-address
+  spectate-mode-adapters/copy-spectate-mode-watchlist-address)
+
+(def copy-spectate-mode-watchlist-link
+  spectate-mode-adapters/copy-spectate-mode-watchlist-link)
+
+(def start-spectate-mode-watchlist-address
+  spectate-mode-adapters/start-spectate-mode-watchlist-address)
+
+(def export-spectate-mode-watchlist
+  spectate-mode-adapters/export-spectate-mode-watchlist)
+
+(def import-spectate-mode-watchlist
+  spectate-mode-adapters/import-spectate-mode-watchlist)
+
+(def apply-imported-spectate-watchlist
+  spectate-mode-adapters/apply-imported-spectate-watchlist)
+
+(def navigate navigation-adapters/navigate)
+
+(def load-vault-route-action navigation-adapters/load-vault-route-action)
+
+(def load-leaderboard-route-action leaderboard-adapters/load-leaderboard-route-action)
+
+(def set-leaderboard-query-action leaderboard-adapters/set-leaderboard-query-action)
+
+(def set-leaderboard-timeframe-action leaderboard-adapters/set-leaderboard-timeframe-action)
+
+(def set-leaderboard-sort-action leaderboard-adapters/set-leaderboard-sort-action)
+
+(def set-leaderboard-page-size-action leaderboard-adapters/set-leaderboard-page-size-action)
+
+(def toggle-leaderboard-page-size-dropdown-action
+  leaderboard-adapters/toggle-leaderboard-page-size-dropdown-action)
+
+(def close-leaderboard-page-size-dropdown-action
+  leaderboard-adapters/close-leaderboard-page-size-dropdown-action)
+
+(def set-leaderboard-page-action leaderboard-adapters/set-leaderboard-page-action)
+
+(def next-leaderboard-page-action leaderboard-adapters/next-leaderboard-page-action)
+
+(def prev-leaderboard-page-action leaderboard-adapters/prev-leaderboard-page-action)
+
+(def load-funding-comparison-route-action
+  navigation-adapters/load-funding-comparison-route-action)
+
+(def load-staking-route-action navigation-adapters/load-staking-route-action)
+
+(def load-referrals-route-action navigation-adapters/load-referrals-route-action)
+
+(def load-api-wallet-route-action navigation-adapters/load-api-wallet-route-action)
+
+(def load-subaccounts-route-action navigation-adapters/load-subaccounts-route-action)
+
+(def connect-wallet-action wallet-adapters/connect-wallet-action)
+
+(def disconnect-wallet-action wallet-adapters/disconnect-wallet-action)
+
+(def should-auto-enable-agent-trading? wallet-adapters/should-auto-enable-agent-trading?)
+
+(def handle-wallet-connected wallet-adapters/handle-wallet-connected)
+
+(def enable-agent-trading wallet-adapters/enable-agent-trading)
+
+(def enable-agent-trading-action wallet-adapters/enable-agent-trading-action)
+
+(def unlock-agent-trading wallet-adapters/unlock-agent-trading)
+
+(def unlock-agent-trading-action wallet-adapters/unlock-agent-trading-action)
+
+(def set-agent-storage-mode-action wallet-adapters/set-agent-storage-mode-action)
+
+(def set-agent-local-protection-mode-action
+  wallet-adapters/set-agent-local-protection-mode-action)
+
+(def copy-wallet-address-action wallet-adapters/copy-wallet-address-action)
+
+(def reconnect-websocket-action websocket-adapters/reconnect-websocket-action)
+
+(def toggle-ws-diagnostics ws-diagnostics-adapters/toggle-ws-diagnostics)
+
+(def close-ws-diagnostics ws-diagnostics-adapters/close-ws-diagnostics)
+
+(def handle-ws-diagnostics-keydown
+  ws-diagnostics-adapters/handle-ws-diagnostics-keydown)
+
+(def toggle-ws-diagnostics-sensitive
+  ws-diagnostics-adapters/toggle-ws-diagnostics-sensitive)
+
+(def ws-diagnostics-reconnect-now ws-diagnostics-adapters/ws-diagnostics-reconnect-now)
+
+(def ws-diagnostics-copy ws-diagnostics-adapters/ws-diagnostics-copy)
+
+(def set-show-surface-freshness-cues
+  ws-diagnostics-adapters/set-show-surface-freshness-cues)
+
+(def toggle-show-surface-freshness-cues
+  ws-diagnostics-adapters/toggle-show-surface-freshness-cues)
+
+(def ws-diagnostics-reset-market-subscriptions
+  ws-diagnostics-adapters/ws-diagnostics-reset-market-subscriptions)
+
+(def ws-diagnostics-reset-orders-subscriptions
+  ws-diagnostics-adapters/ws-diagnostics-reset-orders-subscriptions)
+
+(def ws-diagnostics-reset-all-subscriptions
+  ws-diagnostics-adapters/ws-diagnostics-reset-all-subscriptions)
+
+(def run-portfolio-optimizer-action
+  portfolio-optimizer-actions/run-portfolio-optimizer)
+
+(def set-portfolio-optimizer-objective-kind-action
+  portfolio-optimizer-actions/set-portfolio-optimizer-objective-kind)
+
+(def open-portfolio-optimizer-objective-menu-action
+  portfolio-optimizer-actions/open-portfolio-optimizer-objective-menu)
+
+(def close-portfolio-optimizer-objective-menu-action
+  portfolio-optimizer-actions/close-portfolio-optimizer-objective-menu)
+
+(def handle-portfolio-optimizer-objective-menu-keydown-action
+  portfolio-optimizer-actions/handle-portfolio-optimizer-objective-menu-keydown)
+
+(def select-portfolio-optimizer-objective-menu-option-action
+  portfolio-optimizer-actions/select-portfolio-optimizer-objective-menu-option)
+
+(def set-portfolio-optimizer-objective-menu-view-return-action
+  portfolio-optimizer-actions/set-portfolio-optimizer-objective-menu-view-return)
+
+(def step-portfolio-optimizer-objective-menu-view-return-action
+  portfolio-optimizer-actions/step-portfolio-optimizer-objective-menu-view-return)
+
+(def set-portfolio-optimizer-objective-menu-view-confidence-action
+  portfolio-optimizer-actions/set-portfolio-optimizer-objective-menu-view-confidence)
+
+(def remove-portfolio-optimizer-objective-menu-view-action
+  portfolio-optimizer-actions/remove-portfolio-optimizer-objective-menu-view)
+
+(def add-portfolio-optimizer-objective-menu-view-action
+  portfolio-optimizer-actions/add-portfolio-optimizer-objective-menu-view)
+
+(def apply-portfolio-optimizer-objective-menu-selection-and-run-action
+  portfolio-optimizer-actions/apply-portfolio-optimizer-objective-menu-selection-and-run)
+
+(def set-portfolio-optimizer-return-model-kind-action
+  portfolio-optimizer-actions/set-portfolio-optimizer-return-model-kind)
+
+(def set-portfolio-optimizer-risk-model-kind-action
+  portfolio-optimizer-actions/set-portfolio-optimizer-risk-model-kind)
+
+(def apply-portfolio-optimizer-setup-preset-action
+  portfolio-optimizer-actions/apply-portfolio-optimizer-setup-preset)
+
+(def set-portfolio-optimizer-constraint-action
+  portfolio-optimizer-actions/set-portfolio-optimizer-constraint)
+
+(def set-portfolio-optimizer-objective-parameter-action
+  portfolio-optimizer-actions/set-portfolio-optimizer-objective-parameter)
+
+(def set-portfolio-optimizer-objective-parameter-percent-action
+  portfolio-optimizer-actions/set-portfolio-optimizer-objective-parameter-percent)
+
+(def set-portfolio-optimizer-target-sigma-draft-action
+  portfolio-optimizer-actions/set-portfolio-optimizer-target-sigma-draft)
+
+(def set-portfolio-optimizer-objective-menu-target-sigma-action
+  portfolio-optimizer-actions/set-portfolio-optimizer-objective-menu-target-sigma)
+
+(def reset-portfolio-optimizer-target-sigma-draft-action
+  portfolio-optimizer-actions/reset-portfolio-optimizer-target-sigma-draft)
+
+(def rerun-portfolio-optimizer-at-target-sigma-action
+  portfolio-optimizer-actions/rerun-portfolio-optimizer-at-target-sigma)
+
+(def set-portfolio-optimizer-execution-assumption-action
+  portfolio-optimizer-actions/set-portfolio-optimizer-execution-assumption)
+
+(def add-portfolio-optimizer-black-litterman-view-action
+  portfolio-optimizer-bl-actions/add-portfolio-optimizer-black-litterman-view)
+
+(def set-portfolio-optimizer-black-litterman-view-parameter-action
+  portfolio-optimizer-bl-actions/set-portfolio-optimizer-black-litterman-view-parameter)
+
+(def remove-portfolio-optimizer-black-litterman-view-action
+  portfolio-optimizer-bl-actions/remove-portfolio-optimizer-black-litterman-view)
+
+(def set-portfolio-optimizer-black-litterman-editor-type-action
+  portfolio-optimizer-bl-actions/set-portfolio-optimizer-black-litterman-editor-type)
+
+(def set-portfolio-optimizer-black-litterman-editor-field-action
+  portfolio-optimizer-bl-actions/set-portfolio-optimizer-black-litterman-editor-field)
+
+(def save-portfolio-optimizer-black-litterman-editor-view-action
+  portfolio-optimizer-bl-actions/save-portfolio-optimizer-black-litterman-editor-view)
+
+(def edit-portfolio-optimizer-black-litterman-view-action
+  portfolio-optimizer-bl-actions/edit-portfolio-optimizer-black-litterman-view)
+
+(def cancel-portfolio-optimizer-black-litterman-edit-action
+  portfolio-optimizer-bl-actions/cancel-portfolio-optimizer-black-litterman-edit)
+
+(def request-clear-portfolio-optimizer-black-litterman-views-action
+  portfolio-optimizer-bl-actions/request-clear-portfolio-optimizer-black-litterman-views)
+
+(def cancel-clear-portfolio-optimizer-black-litterman-views-action
+  portfolio-optimizer-bl-actions/cancel-clear-portfolio-optimizer-black-litterman-views)
+
+(def confirm-clear-portfolio-optimizer-black-litterman-views-action
+  portfolio-optimizer-bl-actions/confirm-clear-portfolio-optimizer-black-litterman-views)
+
+(def set-portfolio-optimizer-instrument-filter-action
+  portfolio-optimizer-actions/set-portfolio-optimizer-instrument-filter)
+
+(def set-portfolio-optimizer-asset-override-action
+  portfolio-optimizer-actions/set-portfolio-optimizer-asset-override)
+
+(def set-portfolio-optimizer-universe-search-query-action
+  portfolio-optimizer-actions/set-portfolio-optimizer-universe-search-query)
+
+(def set-portfolio-optimizer-draft-add-asset-open-action
+  portfolio-optimizer-actions/set-portfolio-optimizer-draft-add-asset-open)
+
+(def handle-portfolio-optimizer-universe-search-keydown-action
+  portfolio-optimizer-actions/handle-portfolio-optimizer-universe-search-keydown)
+
+(def handle-portfolio-optimizer-draft-add-asset-keydown-action
+  portfolio-optimizer-actions/handle-portfolio-optimizer-draft-add-asset-keydown)
+
+(def set-portfolio-optimizer-results-tab-action
+  portfolio-optimizer-actions/set-portfolio-optimizer-results-tab)
+
+(def set-portfolio-optimizer-selected-risk-instrument-action
+  portfolio-optimizer-actions/set-portfolio-optimizer-selected-risk-instrument)
+
+(def set-portfolio-optimizer-frontier-overlay-mode-action
+  portfolio-optimizer-frontier-actions/set-portfolio-optimizer-frontier-overlay-mode)
+
+(def set-portfolio-optimizer-constrain-frontier-action
+  portfolio-optimizer-frontier-actions/set-portfolio-optimizer-constrain-frontier)
+
+(def add-portfolio-optimizer-universe-instrument-action
+  portfolio-optimizer-actions/add-portfolio-optimizer-universe-instrument)
+
+(def add-portfolio-optimizer-universe-instrument-and-run-action
+  portfolio-optimizer-actions/add-portfolio-optimizer-universe-instrument-and-run)
+
+(def toggle-portfolio-optimizer-universe-instrument-exclusion-and-run-action
+  portfolio-optimizer-actions/toggle-portfolio-optimizer-universe-instrument-exclusion-and-run)
+
+(def remove-portfolio-optimizer-universe-instrument-action
+  portfolio-optimizer-actions/remove-portfolio-optimizer-universe-instrument)
+
+(def set-portfolio-optimizer-universe-from-current-action
+  portfolio-optimizer-actions/set-portfolio-optimizer-universe-from-current)
+
+(def load-portfolio-optimizer-history-from-draft-action
+  portfolio-optimizer-actions/load-portfolio-optimizer-history-from-draft)
+
+(def save-portfolio-optimizer-scenario-from-current-action
+  portfolio-optimizer-actions/save-portfolio-optimizer-scenario-from-current)
+
+(def open-portfolio-optimizer-scenario-save-modal-action
+  portfolio-optimizer-actions/open-portfolio-optimizer-scenario-save-modal)
+
+(def close-portfolio-optimizer-scenario-save-modal-action
+  portfolio-optimizer-actions/close-portfolio-optimizer-scenario-save-modal)
+
+(def set-portfolio-optimizer-scenario-save-name-action
+  portfolio-optimizer-actions/set-portfolio-optimizer-scenario-save-name)
+
+(def confirm-portfolio-optimizer-scenario-save-action
+  portfolio-optimizer-actions/confirm-portfolio-optimizer-scenario-save)
+
+(def toggle-portfolio-optimizer-scenario-menu-action
+  portfolio-optimizer-actions/toggle-portfolio-optimizer-scenario-menu)
+
+(def close-portfolio-optimizer-scenario-menu-action
+  portfolio-optimizer-actions/close-portfolio-optimizer-scenario-menu)
+
+(def handle-portfolio-optimizer-scenario-menu-keydown-action
+  portfolio-optimizer-actions/handle-portfolio-optimizer-scenario-menu-keydown)
+
+(def new-portfolio-optimizer-scenario-action
+  portfolio-optimizer-actions/new-portfolio-optimizer-scenario)
+
+(def load-portfolio-optimizer-route-action
+  portfolio-optimizer-actions/load-portfolio-optimizer-route)
+
+(def archive-portfolio-optimizer-scenario-action
+  portfolio-optimizer-actions/archive-portfolio-optimizer-scenario)
+
+(def duplicate-portfolio-optimizer-scenario-action
+  portfolio-optimizer-actions/duplicate-portfolio-optimizer-scenario)
+
+(def open-portfolio-optimizer-execution-action
+  portfolio-optimizer-actions/open-portfolio-optimizer-execution)
+
+(def set-portfolio-optimizer-execution-phase-action
+  portfolio-optimizer-actions/set-portfolio-optimizer-execution-phase)
+
+(def set-portfolio-optimizer-execution-default-order-type-action
+  portfolio-optimizer-actions/set-portfolio-optimizer-execution-default-order-type)
+
+(def set-portfolio-optimizer-execution-row-order-type-action
+  portfolio-optimizer-actions/set-portfolio-optimizer-execution-row-order-type)
+
+(def toggle-portfolio-optimizer-execution-row-action
+  portfolio-optimizer-actions/toggle-portfolio-optimizer-execution-row)
+
+(def set-portfolio-optimizer-execution-row-param-action
+  portfolio-optimizer-actions/set-portfolio-optimizer-execution-row-param)
+
+(def confirm-portfolio-optimizer-execution-action
+  portfolio-optimizer-actions/confirm-portfolio-optimizer-execution)
+
+(def amend-portfolio-optimizer-execution-order-action
+  portfolio-optimizer-actions/amend-portfolio-optimizer-execution-order)
+
+(def resume-portfolio-optimizer-execution-action
+  portfolio-optimizer-actions/resume-portfolio-optimizer-execution)
+
+(def revert-portfolio-optimizer-execution-filled-action
+  portfolio-optimizer-actions/revert-portfolio-optimizer-execution-filled)
+
+(def restage-portfolio-optimizer-execution-smaller-action
+  portfolio-optimizer-actions/restage-portfolio-optimizer-execution-smaller)
+
+(def pause-portfolio-optimizer-execution-action
+  portfolio-optimizer-actions/pause-portfolio-optimizer-execution)
+
+(def discard-portfolio-optimizer-execution-action
+  portfolio-optimizer-actions/discard-portfolio-optimizer-execution)
+
+(def open-portfolio-optimizer-execution-in-ticket-action
+  portfolio-optimizer-actions/open-portfolio-optimizer-execution-in-ticket)
+
+(def set-portfolio-optimizer-execution-order-filter-action
+  portfolio-optimizer-actions/set-portfolio-optimizer-execution-order-filter)
+
+(def refresh-portfolio-optimizer-tracking-action
+  portfolio-optimizer-actions/refresh-portfolio-optimizer-tracking)
+
+(def enable-portfolio-optimizer-manual-tracking-action
+  portfolio-optimizer-actions/enable-portfolio-optimizer-manual-tracking)
+
+(def auto-recompute-stale-portfolio-optimizer-scenario-action
+  portfolio-optimizer-actions/auto-recompute-stale-portfolio-optimizer-scenario)
+
+(def run-portfolio-optimizer-from-draft-action
+  portfolio-optimizer-actions/run-portfolio-optimizer-from-draft)

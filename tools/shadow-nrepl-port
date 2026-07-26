@@ -1,0 +1,64 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat <<'EOF'
+Usage: tools/shadow-nrepl-port
+
+Resolve the active Shadow nREPL port for the current git worktree.
+Outputs JSON:
+  {"worktree":"/path/to/worktree","nreplPort":12345}
+EOF
+}
+
+fail() {
+  printf 'tools/shadow-nrepl-port: %s\n' "$1" >&2
+  exit "${2:-1}"
+}
+
+require_cmd() {
+  command -v "$1" >/dev/null 2>&1 || fail "missing required command '$1'"
+}
+
+json_escape() {
+  local value="$1"
+  value=${value//\\/\\\\}
+  value=${value//\"/\\\"}
+  value=${value//$'\n'/\\n}
+  value=${value//$'\r'/\\r}
+  value=${value//$'\t'/\\t}
+  printf '%s' "$value"
+}
+
+if [[ "${1-}" == "--help" ]]; then
+  usage
+  exit 0
+fi
+
+if [[ $# -ne 0 ]]; then
+  usage >&2
+  exit 2
+fi
+
+require_cmd git
+require_cmd lsof
+
+worktree_root="$(git rev-parse --show-toplevel 2>/dev/null)" \
+  || fail "must be run from within a git worktree"
+port_file="$worktree_root/target/shadow-cljs/nrepl.port"
+
+if [[ ! -f "$port_file" ]]; then
+  fail "nREPL port file not found at $port_file. Start shadow-cljs in this worktree first."
+fi
+
+port="$(tr -d '[:space:]' < "$port_file")"
+
+if [[ ! "$port" =~ ^[0-9]+$ ]]; then
+  fail "invalid nREPL port '$port' in $port_file"
+fi
+
+if ! lsof -nP -iTCP:"$port" -sTCP:LISTEN >/dev/null 2>&1; then
+  fail "nREPL port $port from $port_file is not listening"
+fi
+
+printf '{"worktree":"%s","nreplPort":%s}\n' "$(json_escape "$worktree_root")" "$port"

@@ -1,0 +1,214 @@
+root=/Users//projects/hyperopen
+scope=test
+scanned_files=209
+parse_errors=0
+total_lambda_arities=2369
+duplicate_groups=322
+duplicate_occurrences=1239
+cross_file_duplicate_groups=139
+large_duplicate_groups_size_ge_10=115
+
+top_files_by_lambda_arities:
+  173 test/hyperopen/api/fetch_compat_test.cljs
+  91 test/hyperopen/startup/runtime_test.cljs
+  74 test/hyperopen/wallet/agent_runtime_test.cljs
+  71 test/hyperopen/api/endpoints/account_test.cljs
+  69 test/hyperopen/wallet/core_test.cljs
+  64 test/hyperopen/api_test.cljs
+  59 test/hyperopen/websocket/client_test.cljs
+  52 test/hyperopen/api/gateway/market_test.cljs
+  48 test/hyperopen/account/history/effects_test.cljs
+  47 test/hyperopen/core_bootstrap/runtime_startup_test.cljs
+  46 test/hyperopen/api/default_test.cljs
+  40 test/hyperopen/api/trading/sign_and_submit_test.cljs
+  37 test/hyperopen/api/compat_test.cljs
+  36 test/hyperopen/api/instance_test.cljs
+  35 test/hyperopen/views/account_info/tabs/funding_history_test.cljs
+  34 test/hyperopen/api/trading/session_invalidation_test.cljs
+  32 test/hyperopen/views/account_info/tabs/trade_history_test.cljs
+  31 test/hyperopen/views/trading_chart/utils/chart_interop/volume_indicator_overlay_test.cljs
+  30 test/hyperopen/api/endpoints/market_test.cljs
+  30 test/hyperopen/wallet/copy_feedback_runtime_test.cljs
+  28 test/hyperopen/runtime/api_effects_test.cljs
+  28 test/hyperopen/websocket/infrastructure/runtime_effects_test.cljs
+  27 test/hyperopen/runtime/bootstrap_test.cljs
+  27 test/hyperopen/views/trading_chart/utils/chart_interop/visible_range_persistence_test.cljs
+  26 test/hyperopen/api/gateway/account_test.cljs
+
+top_duplicate_groups:
+  count=182 files=48 argc=1 size=3 canon=(do nil)
+    - test/hyperopen/account/history/effects_test.cljs:481
+    - test/hyperopen/account/history/effects_test.cljs:487
+    - test/hyperopen/account/history/effects_test.cljs:488
+    - test/hyperopen/account/history/effects_test.cljs:531
+    - test/hyperopen/account/history/effects_test.cljs:532
+    - test/hyperopen/api/compat_test.cljs:12
+    - test/hyperopen/api/compat_test.cljs:28
+    - test/hyperopen/api/compat_test.cljs:49
+    - ...
+  count=101 files=21 argc=1 size=11 canon=(do (is false (str "Unexpected error: " arg0)) (done))
+    - test/hyperopen/account/history/effects_test.cljs:146
+    - test/hyperopen/account/history/effects_test.cljs:210
+    - test/hyperopen/account/history/effects_test.cljs:236
+    - test/hyperopen/account/history/effects_test.cljs:293
+    - test/hyperopen/account/history/effects_test.cljs:316
+    - test/hyperopen/account/history/effects_test.cljs:358
+    - test/hyperopen/account/history/effects_test.cljs:384
+    - test/hyperopen/api/compat_test.cljs:20
+    - ...
+  count=34 files=16 argc=0 size=3 canon=(do nil)
+    - test/hyperopen/account/history/effects_test.cljs:485
+    - test/hyperopen/account/history/effects_test.cljs:529
+    - test/hyperopen/api/facade_runtime_test.cljs:84
+    - test/hyperopen/api/facade_runtime_test.cljs:88
+    - test/hyperopen/platform_test.cljs:89
+    - test/hyperopen/runtime/bootstrap_test.cljs:101
+    - test/hyperopen/runtime/bootstrap_test.cljs:102
+    - test/hyperopen/runtime/effect_adapters_test.cljs:67
+    - ...
+  count=16 files=8 argc=1 size=6 canon=(do (find-first-node arg0 pred))
+    - test/hyperopen/views/account_equity_view_test.cljs:44
+    - test/hyperopen/views/account_equity_view_test.cljs:47
+    - test/hyperopen/views/account_info/test_support/hiccup.cljs:53
+    - test/hyperopen/views/account_info/test_support/hiccup.cljs:56
+    - test/hyperopen/views/app_shell_spacing_test.cljs:41
+    - test/hyperopen/views/app_shell_spacing_test.cljs:44
+    - test/hyperopen/views/asset_selector_view_test.cljs:170
+    - test/hyperopen/views/asset_selector_view_test.cljs:173
+    - ...
+  count=13 files=4 argc=0 size=3 canon=(do time-scale)
+    - test/hyperopen/views/trading_chart/utils/chart_interop/baseline_test.cljs:21
+    - test/hyperopen/views/trading_chart/utils/chart_interop/baseline_test.cljs:53
+    - test/hyperopen/views/trading_chart/utils/chart_interop/open_order_overlays_test.cljs:20
+    - test/hyperopen/views/trading_chart/utils/chart_interop/open_order_overlays_test.cljs:79
+    - test/hyperopen/views/trading_chart/utils/chart_interop/open_order_overlays_test.cljs:123
+    - test/hyperopen/views/trading_chart/utils/chart_interop/visible_range_persistence_test.cljs:11
+    - test/hyperopen/views/trading_chart/utils/chart_interop/visible_range_persistence_test.cljs:22
+    - test/hyperopen/views/trading_chart/utils/chart_interop/visible_range_persistence_test.cljs:37
+    - ...
+  count=10 files=4 argc=1 size=7 canon=(do (swap! logs conj arg0))
+    - test/hyperopen/api/market_metadata/facade_test.cljs:36
+    - test/hyperopen/startup/runtime_test.cljs:72
+    - test/hyperopen/startup/runtime_test.cljs:83
+    - test/hyperopen/startup/runtime_test.cljs:109
+    - test/hyperopen/startup/runtime_test.cljs:123
+    - test/hyperopen/startup/runtime_test.cljs:135
+    - test/hyperopen/wallet/address_watcher_test.cljs:79
+    - test/hyperopen/wallet/address_watcher_test.cljs:137
+    - ...
+  count=9 files=6 argc=2 size=3 canon=(do nil)
+    - test/hyperopen/api/trading/sign_and_submit_test.cljs:125
+    - test/hyperopen/api/trading_test.cljs:22
+    - test/hyperopen/wallet/agent_session_test.cljs:188
+    - test/hyperopen/wallet/agent_session_test.cljs:191
+    - test/hyperopen/wallet/agent_session_test.cljs:195
+    - test/hyperopen/wallet/core_test.cljs:93
+    - test/hyperopen/wallet/core_test.cljs:115
+    - test/hyperopen/websocket/diagnostics_effects_test.cljs:25
+    - ...
+  count=9 files=4 argc=1 size=4 canon=(do (arg0))
+    - test/hyperopen/core_bootstrap/wallet_actions_effects_test.cljs:44
+    - test/hyperopen/core_bootstrap/wallet_actions_effects_test.cljs:60
+    - test/hyperopen/startup/watchers_test.cljs:16
+    - test/hyperopen/wallet/core_test.cljs:133
+    - test/hyperopen/wallet/core_test.cljs:166
+    - test/hyperopen/websocket/health_runtime_test.cljs:50
+    - test/hyperopen/websocket/health_runtime_test.cljs:86
+    - test/hyperopen/websocket/health_runtime_test.cljs:127
+    - ...
+  count=9 files=4 argc=1 size=3 canon=(do true)
+    - test/hyperopen/wallet/agent_runtime_test.cljs:47
+    - test/hyperopen/wallet/agent_runtime_test.cljs:75
+    - test/hyperopen/wallet/agent_runtime_test.cljs:219
+    - test/hyperopen/wallet/agent_runtime_test.cljs:259
+    - test/hyperopen/wallet/agent_runtime_test.cljs:274
+    - test/hyperopen/wallet/agent_runtime_test.cljs:316
+    - test/hyperopen/websocket/active_asset_ctx_test.cljs:74
+    - test/hyperopen/websocket/diagnostics_effects_test.cljs:13
+    - ...
+  count=8 files=1 argc=3 size=6 canon=(do (post-info-mock arg0 arg1))
+    - test/hyperopen/api_test.cljs:27
+    - test/hyperopen/api_test.cljs:154
+    - test/hyperopen/api_test.cljs:206
+    - test/hyperopen/api_test.cljs:234
+    - test/hyperopen/api_test.cljs:259
+    - test/hyperopen/api_test.cljs:301
+    - test/hyperopen/api_test.cljs:333
+    - test/hyperopen/api_test.cljs:361
+  count=8 files=1 argc=1 size=6 canon=(do (post-info-mock arg0 {}))
+    - test/hyperopen/api_test.cljs:27
+    - test/hyperopen/api_test.cljs:154
+    - test/hyperopen/api_test.cljs:206
+    - test/hyperopen/api_test.cljs:234
+    - test/hyperopen/api_test.cljs:259
+    - test/hyperopen/api_test.cljs:301
+    - test/hyperopen/api_test.cljs:333
+    - test/hyperopen/api_test.cljs:361
+  count=8 files=1 argc=0 size=6 canon=(do (set! hyperopen.api.default/post-info! original-post-info))
+    - test/hyperopen/api_test.cljs:47
+    - test/hyperopen/api_test.cljs:198
+    - test/hyperopen/api_test.cljs:227
+    - test/hyperopen/api_test.cljs:250
+    - test/hyperopen/api_test.cljs:290
+    - test/hyperopen/api_test.cljs:323
+    - test/hyperopen/api_test.cljs:351
+    - test/hyperopen/api_test.cljs:381
+  count=7 files=3 argc=2 size=12 canon=(do (swap! calls conj [arg0 arg1]) (js/Promise.resolve []))
+    - test/hyperopen/api/endpoints/account_test.cljs:101
+    - test/hyperopen/api/endpoints/market_test.cljs:8
+    - test/hyperopen/api/endpoints/market_test.cljs:22
+    - test/hyperopen/api/endpoints/market_test.cljs:56
+    - test/hyperopen/api/endpoints/market_test.cljs:91
+    - test/hyperopen/api/endpoints/orders_test.cljs:7
+    - test/hyperopen/api/endpoints/orders_test.cljs:28
+  count=7 files=1 argc=1 size=22 canon=(do (let [socket (make-fake-socket sent closes)] (swap! created conj {:url arg0, :socket socket}) socket))
+    - test/hyperopen/websocket/client_test.cljs:39
+    - test/hyperopen/websocket/client_test.cljs:62
+    - test/hyperopen/websocket/client_test.cljs:114
+    - test/hyperopen/websocket/client_test.cljs:163
+    - test/hyperopen/websocket/client_test.cljs:196
+    - test/hyperopen/websocket/client_test.cljs:250
+    - test/hyperopen/websocket/client_test.cljs:290
+  count=7 files=1 argc=0 size=3 canon=(do true)
+    - test/hyperopen/wallet/core_test.cljs:135
+    - test/hyperopen/wallet/core_test.cljs:168
+    - test/hyperopen/wallet/core_test.cljs:272
+    - test/hyperopen/wallet/core_test.cljs:283
+    - test/hyperopen/wallet/core_test.cljs:305
+    - test/hyperopen/wallet/core_test.cljs:316
+    - test/hyperopen/wallet/core_test.cljs:349
+  count=6 files=4 argc=1 size=7 canon=(do (swap! calls conj arg0))
+    - test/hyperopen/startup/composition_test.cljs:10
+    - test/hyperopen/startup/composition_test.cljs:24
+    - test/hyperopen/startup/composition_test.cljs:47
+    - test/hyperopen/startup/wiring_test.cljs:9
+    - test/hyperopen/telemetry/console_warning_test.cljs:38
+    - test/hyperopen/websocket/application/runtime_test.cljs:118
+  count=6 files=3 argc=1 size=16 canon=(do (and (= :button (first arg0)) (contains? (hiccup/direct-texts arg0) "Next")))
+    - test/hyperopen/views/account_info/tabs/funding_history_test.cljs:175
+    - test/hyperopen/views/account_info/tabs/funding_history_test.cljs:184
+    - test/hyperopen/views/account_info/tabs/order_history_test.cljs:298
+    - test/hyperopen/views/account_info/tabs/order_history_test.cljs:308
+    - test/hyperopen/views/account_info/tabs/trade_history_test.cljs:435
+    - test/hyperopen/views/account_info/tabs/trade_history_test.cljs:442
+  count=6 files=3 argc=1 size=16 canon=(do (and (= :button (first arg0)) (contains? (hiccup/direct-texts arg0) "Prev")))
+    - test/hyperopen/views/account_info/tabs/funding_history_test.cljs:173
+    - test/hyperopen/views/account_info/tabs/funding_history_test.cljs:182
+    - test/hyperopen/views/account_info/tabs/order_history_test.cljs:296
+    - test/hyperopen/views/account_info/tabs/order_history_test.cljs:306
+    - test/hyperopen/views/account_info/tabs/trade_history_test.cljs:433
+    - test/hyperopen/views/account_info/tabs/trade_history_test.cljs:440
+  count=6 files=3 argc=2 size=10 canon=(do (swap! cleared conj [arg0 arg1]) true)
+    - test/hyperopen/api/trading/session_invalidation_test.cljs:29
+    - test/hyperopen/api/trading/session_invalidation_test.cljs:89
+    - test/hyperopen/api/trading/session_invalidation_test.cljs:155
+    - test/hyperopen/api/trading/session_invalidation_test.cljs:218
+    - test/hyperopen/api/trading/sign_and_submit_test.cljs:210
+    - test/hyperopen/core_bootstrap/agent_trading_lifecycle_test.cljs:57
+  count=6 files=2 argc=4 size=16 canon=(do (js/Promise.resolve (clj->js {:r "0x01", :s "0x02", :v 27})))
+    - test/hyperopen/api/trading/session_invalidation_test.cljs:37
+    - test/hyperopen/api/trading/session_invalidation_test.cljs:97
+    - test/hyperopen/api/trading/session_invalidation_test.cljs:163
+    - test/hyperopen/api/trading/session_invalidation_test.cljs:226
+    - test/hyperopen/api/trading/sign_and_submit_test.cljs:162
+    - test/hyperopen/api/trading/sign_and_submit_test.cljs:218

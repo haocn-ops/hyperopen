@@ -1,0 +1,222 @@
+(ns hyperopen.api.gateway.account-test
+  (:require [cljs.test :refer-macros [async deftest is]]
+            [hyperopen.api.endpoints.account :as account-endpoints]
+            [hyperopen.api.fetch-compat :as fetch-compat]
+            [hyperopen.api.gateway.account :as account-gateway]))
+
+(deftest fetch-user-funding-history-uses-normalized-window-test
+  (async done
+    (let [calls (atom [])
+          deps {:post-info! (fn [body _opts]
+                              (swap! calls conj body)
+                              (js/Promise.resolve []))
+                :normalize-funding-history-filters (fn [_opts]
+                                                     {:start-time-ms 1000
+                                                      :end-time-ms 2000})
+                :normalize-info-funding-rows identity
+                :sort-funding-history-rows identity}]
+      (-> (account-gateway/fetch-user-funding-history! deps nil "0xabc" {:priority :high})
+          (.then (fn [rows]
+                   (is (= [] rows))
+                   (is (= {"type" "userFunding"
+                           "user" "0xabc"
+                           "startTime" 1000
+                           "endTime" 2000}
+                          (first @calls)))
+                   (done)))
+          (.catch (fn [err]
+                    (is false (str "Unexpected error: " err))
+                    (done)))))))
+
+(deftest fetch-user-funding-history-skips-empty-address-test
+  (async done
+    (let [calls (atom 0)
+          deps {:post-info! (fn [_body _opts]
+                              (swap! calls inc)
+                              (js/Promise.resolve []))
+                :normalize-funding-history-filters (fn [_opts]
+                                                     {:start-time-ms 1000
+                                                      :end-time-ms 2000})
+                :normalize-info-funding-rows identity
+                :sort-funding-history-rows identity}]
+      (-> (account-gateway/fetch-user-funding-history! deps nil nil {})
+          (.then (fn [rows]
+                   (is (= [] rows))
+                   (is (= 0 @calls))
+                   (done)))
+          (.catch (fn [err]
+                    (is false (str "Unexpected error: " err))
+                    (done)))))))
+
+(deftest request-user-funding-history-delegates-to-request-data-wrapper-test
+  (async done
+    (let [called (atom nil)
+          deps {:request-user-funding-history-data! (fn [address opts]
+                                                      (reset! called [address opts])
+                                                      (js/Promise.resolve []))}]
+      (-> (account-gateway/request-user-funding-history! deps "0xabc" {:priority :high})
+          (.then (fn [_]
+                   (is (= ["0xabc" {:priority :high}] @called))
+                   (done)))
+          (.catch (fn [err]
+                    (is false (str "Unexpected error: " err))
+                    (done)))))))
+
+(deftest request-user-funding-history-supports-legacy-fetch-dependency-test
+  (async done
+    (let [called (atom nil)
+          deps {:fetch-user-funding-history! (fn [store address opts]
+                                               (reset! called [store address opts])
+                                               (js/Promise.resolve []))}]
+      (-> (account-gateway/request-user-funding-history! deps "0xabc" {:priority :high})
+          (.then (fn [_]
+                   (is (= [nil "0xabc" {:priority :high}] @called))
+                   (done)))
+          (.catch (fn [err]
+                    (is false (str "Unexpected error: " err))
+                    (done)))))))
+
+(deftest request-clearinghouse-state-includes-dex-test
+  (async done
+    (let [calls (atom [])
+          deps {:post-info! (fn [body _opts]
+                              (swap! calls conj body)
+                              (js/Promise.resolve {:ok true}))}]
+      (-> (account-gateway/request-clearinghouse-state! deps "0xabc" "dex-a" {:priority :high})
+          (.then (fn [_]
+                   (is (= {"type" "clearinghouseState"
+                           "user" "0xabc"
+                           "dex" "dex-a"}
+                          (first @calls)))
+                   (done)))
+          (.catch (fn [err]
+                    (is false (str "Unexpected error: " err))
+                    (done)))))))
+
+(deftest account-gateway-wrapper-delegation-coverage-test
+  (let [called (atom [])
+        post-info! (fn [& _] nil)]
+    (with-redefs [account-endpoints/request-spot-clearinghouse-state! (fn [& args]
+                                                                         (swap! called conj [:request-spot args])
+                                                                         {:ok :request-spot})
+                  account-endpoints/request-extra-agents! (fn [& args]
+                                                            (swap! called conj [:request-extra-agents args])
+                                                            {:ok :request-extra-agents})
+                  account-endpoints/request-sub-accounts! (fn [& args]
+                                                            (swap! called conj [:request-sub-accounts args])
+                                                            {:ok :request-sub-accounts})
+                  account-endpoints/request-user-webdata2! (fn [& args]
+                                                             (swap! called conj [:request-user-webdata2 args])
+                                                             {:ok :request-user-webdata2})
+                  account-endpoints/request-staking-validator-summaries! (fn [& args]
+                                                                            (swap! called conj [:request-staking-validator-summaries args])
+                                                                            {:ok :request-staking-validator-summaries})
+                  account-endpoints/request-staking-delegator-summary! (fn [& args]
+                                                                          (swap! called conj [:request-staking-delegator-summary args])
+                                                                          {:ok :request-staking-delegator-summary})
+                  account-endpoints/request-staking-delegations! (fn [& args]
+                                                                    (swap! called conj [:request-staking-delegations args])
+                                                                    {:ok :request-staking-delegations})
+                  account-endpoints/request-staking-delegator-rewards! (fn [& args]
+                                                                          (swap! called conj [:request-staking-delegator-rewards args])
+                                                                          {:ok :request-staking-delegator-rewards})
+                  account-endpoints/request-staking-delegator-history! (fn [& args]
+                                                                          (swap! called conj [:request-staking-delegator-history args])
+                                                                          {:ok :request-staking-delegator-history})
+                  account-endpoints/request-user-abstraction! (fn [& args]
+                                                                (swap! called conj [:request-abstraction args])
+                                                                {:ok :request-abstraction})
+                  fetch-compat/fetch-spot-clearinghouse-state! (fn [& args]
+                                                                 (swap! called conj [:fetch-spot args])
+                                                                 {:ok :fetch-spot})
+                  fetch-compat/fetch-user-abstraction! (fn [& args]
+                                                         (swap! called conj [:fetch-abstraction args])
+                                                         {:ok :fetch-abstraction})
+                  fetch-compat/fetch-clearinghouse-state! (fn [& args]
+                                                           (swap! called conj [:fetch-clearinghouse args])
+                                                           {:ok :fetch-clearinghouse})
+                  fetch-compat/fetch-perp-dex-clearinghouse-states! (fn [& args]
+                                                                      (swap! called conj [:fetch-perp-batch args])
+                                                                      {:ok :fetch-perp-batch})]
+      (is (= {:ok :request-spot}
+             (account-gateway/request-spot-clearinghouse-state! {:post-info! post-info!}
+                                                                "0xabc"
+                                                                {:priority :high})))
+      (is (= {:ok :request-extra-agents}
+             (account-gateway/request-extra-agents! {:post-info! post-info!}
+                                                    "0xabc"
+                                                    {:priority :high})))
+      (is (= {:ok :request-sub-accounts}
+             (account-gateway/request-sub-accounts! {:post-info! post-info!}
+                                                    "0xabc"
+                                                    {:priority :high})))
+      (is (= {:ok :request-user-webdata2}
+             (account-gateway/request-user-webdata2! {:post-info! post-info!}
+                                                     "0xabc"
+                                                     {:priority :high})))
+      (is (= {:ok :request-staking-validator-summaries}
+             (account-gateway/request-staking-validator-summaries! {:post-info! post-info!}
+                                                                   {:priority :high})))
+      (is (= {:ok :request-staking-delegator-summary}
+             (account-gateway/request-staking-delegator-summary! {:post-info! post-info!}
+                                                                 "0xabc"
+                                                                 {:priority :high})))
+      (is (= {:ok :request-staking-delegations}
+             (account-gateway/request-staking-delegations! {:post-info! post-info!}
+                                                           "0xabc"
+                                                           {:priority :high})))
+      (is (= {:ok :request-staking-delegator-rewards}
+             (account-gateway/request-staking-delegator-rewards! {:post-info! post-info!}
+                                                                 "0xabc"
+                                                                 {:priority :high})))
+      (is (= {:ok :request-staking-delegator-history}
+             (account-gateway/request-staking-delegator-history! {:post-info! post-info!}
+                                                                 "0xabc"
+                                                                 {:priority :high})))
+      (is (= {:ok :fetch-spot}
+             (account-gateway/fetch-spot-clearinghouse-state! {:log-fn identity
+                                                                :request-spot-clearinghouse-state! identity
+                                                                :begin-spot-balances-load identity
+                                                                :apply-spot-balances-success identity
+                                                                :apply-spot-balances-error identity}
+                                                               nil
+                                                               "0xabc"
+                                                               {:priority :low})))
+      (is (= {:ok :request-abstraction}
+             (account-gateway/request-user-abstraction! {:post-info! post-info!}
+                                                        "0xabc"
+                                                        {:priority :high})))
+      (is (= {:ok :fetch-abstraction}
+             (account-gateway/fetch-user-abstraction! {:log-fn identity
+                                                       :request-user-abstraction! identity
+                                                       :normalize-user-abstraction-mode identity
+                                                       :apply-user-abstraction-snapshot identity}
+                                                      nil
+                                                      "0xabc"
+                                                      {:priority :low})))
+      (is (= {:ok :fetch-clearinghouse}
+             (account-gateway/fetch-clearinghouse-state! {:log-fn identity
+                                                           :request-clearinghouse-state! identity
+                                                           :apply-perp-dex-clearinghouse-success identity
+                                                           :apply-perp-dex-clearinghouse-error identity}
+                                                          nil
+                                                          "0xabc"
+                                                          "dex-a"
+                                                          {:priority :high})))
+      (is (= {:ok :fetch-perp-batch}
+             (account-gateway/fetch-perp-dex-clearinghouse-states! {:fetch-clearinghouse-state! identity}
+                                                                    nil
+                                                                    "0xabc"
+                                                                    ["dex-a" "dex-b"]
+                                                                    {:priority :high})))
+      (is (some #(= :request-spot (first %)) @called))
+      (is (some #(= :request-extra-agents (first %)) @called))
+      (is (= [:request-sub-accounts [post-info! "0xabc" {:priority :high}]]
+             (some #(when (= :request-sub-accounts (first %)) %) @called)))
+      (is (some #(= :request-user-webdata2 (first %)) @called))
+      (is (some #(= :request-staking-validator-summaries (first %)) @called))
+      (is (some #(= :request-staking-delegator-summary (first %)) @called))
+      (is (some #(= :request-staking-delegations (first %)) @called))
+      (is (some #(= :request-staking-delegator-rewards (first %)) @called))
+      (is (some #(= :request-staking-delegator-history (first %)) @called))
+      (is (some #(= :fetch-clearinghouse (first %)) @called)))))

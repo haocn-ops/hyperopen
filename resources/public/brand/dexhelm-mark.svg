@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title desc">
+  <title id="title">DEXHelm</title>
+  <desc id="desc">A compact helm wheel mark</desc>
+  <rect width="64" height="64" rx="12" fill="#0b1615"/>
+  <circle cx="32" cy="32" r="19" fill="none" stroke="#25d6b2" stroke-width="5"/>
+  <path d="M32 7v12M32 45v12M7 32h12M45 32h12M14.3 14.3l8.5 8.5M41.2 41.2l8.5 8.5M49.7 14.3l-8.5 8.5M22.8 41.2l-8.5 8.5" stroke="#25d6b2" stroke-width="5" stroke-linecap="round"/>
+  <circle cx="32" cy="32" r="8" fill="#25d6b2"/>
+  <circle cx="32" cy="32" r="3" fill="#0b1615"/>
+</svg>

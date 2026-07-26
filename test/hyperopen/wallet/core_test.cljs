@@ -1,0 +1,600 @@
+(ns hyperopen.wallet.core-test
+  (:require [cljs.test :refer-macros [async deftest is]]
+            [hyperopen.wallet.agent-session :as agent-session]
+            [hyperopen.wallet.core :as wallet]))
+
+(defn- fulfilled-thenable
+  [value]
+  (let [thenable #js {}]
+    (set! (.-then thenable)
+          (fn [on-fulfilled]
+            (on-fulfilled value)
+            thenable))
+    (set! (.-catch thenable)
+          (fn [_]
+            thenable))
+    thenable))
+
+(defn- rejected-thenable
+  [error]
+  (let [thenable #js {}]
+    (set! (.-then thenable)
+          (fn [_]
+            thenable))
+    (set! (.-catch thenable)
+          (fn [on-rejected]
+            (on-rejected error)
+            thenable))
+    thenable))
+
+(deftest set-disconnected-clears-agent-session-and-resets-state-test
+  (let [store (atom {:wallet {:connected? true
+                              :address "0xabc"
+                              :chain-id "0x1"
+                              :agent {:status :ready
+                                      :storage-mode :session
+                                      :agent-address "0xagent"}}})
+        cleared (atom [])]
+    (with-redefs [agent-session/default-agent-state
+                  (fn [& {:keys [storage-mode]}]
+                    {:status :not-ready
+                     :storage-mode (or storage-mode :session)})
+                  agent-session/clear-agent-session-by-mode!
+                  (fn [wallet-address storage-mode]
+                    (swap! cleared conj [wallet-address storage-mode]))]
+      (wallet/set-disconnected! store)
+      (is (= [["0xabc" :session]] @cleared))
+      (is (= false (get-in @store [:wallet :connected?])))
+      (is (nil? (get-in @store [:wallet :address])))
+      (is (= "0x1" (get-in @store [:wallet :chain-id])))
+      (is (= :not-ready (get-in @store [:wallet :agent :status]))))))
+
+(deftest set-connected-account-switch-clears-prior-session-and-loads-new-session-test
+  (let [store (atom {:wallet {:connected? true
+                              :address "0xold"
+                              :agent {:status :ready
+                                      :storage-mode :session
+                                      :agent-address "0xoldagent"}}})
+        cleared (atom [])
+        loaded (atom [])]
+    (with-redefs [agent-session/default-agent-state
+                  (fn [& {:keys [storage-mode]}]
+                    {:status :not-ready
+                     :storage-mode (or storage-mode :session)})
+                  agent-session/clear-agent-session-by-mode!
+                  (fn [wallet-address storage-mode]
+                    (swap! cleared conj [wallet-address storage-mode]))
+                  agent-session/load-agent-session-by-mode
+                  (fn [wallet-address storage-mode]
+                    (swap! loaded conj [wallet-address storage-mode])
+                    {:agent-address "0xnewagent"
+                     :last-approved-at 1700000003333
+                     :nonce-cursor 1700000003333})]
+      (wallet/set-connected! store "0xnew")
+      (is (= [["0xold" :session]] @cleared))
+      (is (= [["0xnew" :session]] @loaded))
+      (is (= true (get-in @store [:wallet :connected?])))
+      (is (= "0xnew" (get-in @store [:wallet :address])))
+      (is (= :ready (get-in @store [:wallet :agent :status])))
+      (is (= "0xnewagent" (get-in @store [:wallet :agent :agent-address]))))))
+
+(deftest set-connected-notifies-handler-when-notify-option-enabled-test
+  (let [store (atom {:wallet {:connected? false
+                              :address nil
+                              :connecting? false
+                              :agent {:status :not-ready
+                                      :storage-mode :session}}})
+        notified (atom [])]
+    (with-redefs [agent-session/default-agent-state
+                  (fn [& {:keys [storage-mode]}]
+                    {:status :not-ready
+                     :storage-mode (or storage-mode :session)})
+                  agent-session/load-agent-session-by-mode
+                  (fn [_ _] nil)]
+      (wallet/set-on-connected-handler!
+       (fn [_ address]
+         (swap! notified conj address)))
+      (try
+        (wallet/set-connected! store "0xabc" :notify-connected? true)
+        (is (= ["0xabc"] @notified))
+        (finally
+          (wallet/clear-on-connected-handler!))))))
+
+(deftest set-connected-skips-handler-when-notify-option-not-set-test
+  (let [store (atom {:wallet {:connected? false
+                              :address nil
+                              :connecting? true
+                              :agent {:status :not-ready
+                                      :storage-mode :session}}})
+        notified (atom [])]
+    (with-redefs [agent-session/default-agent-state
+                  (fn [& {:keys [storage-mode]}]
+                    {:status :not-ready
+                     :storage-mode (or storage-mode :session)})
+                  agent-session/load-agent-session-by-mode
+                  (fn [_ _] nil)]
+      (wallet/set-on-connected-handler!
+       (fn [_ address]
+         (swap! notified conj address)))
+      (try
+        (wallet/set-connected! store "0xabc")
+        (is (= [] @notified))
+        (finally
+          (wallet/clear-on-connected-handler!))))))
+
+(deftest request-connection-success-notifies-connected-handler-path-test
+  (let [store (atom {:wallet {:connected? false
+                              :address nil
+                              :connecting? false
+                              :error nil}})
+        connected-calls (atom [])
+        disconnected-calls (atom 0)
+        original-queue-microtask js/queueMicrotask]
+    (set! js/queueMicrotask (fn [f] (f)))
+    (try
+      (with-redefs [wallet/has-provider? (fn [] true)
+                    wallet/provider (fn []
+                                      (let [thenable #js {}]
+                                        (set! (.-then thenable)
+                                              (fn [on-fulfilled]
+                                                (on-fulfilled #js ["0xabc"])
+                                                thenable))
+                                        (set! (.-catch thenable)
+                                              (fn [_]
+                                                thenable))
+                                        #js {:request (fn [_] thenable)}))
+                    wallet/set-connected! (fn [store' addr & {:keys [notify-connected?]}]
+                                            (swap! connected-calls conj [store' addr notify-connected?]))
+                    wallet/set-disconnected! (fn [_]
+                                               (swap! disconnected-calls inc))]
+        (wallet/request-connection! store)
+        (is (= 1 (count @connected-calls)))
+        (is (= "0xabc" (second (first @connected-calls))))
+        (is (true? (nth (first @connected-calls) 2)))
+        (is (= 0 @disconnected-calls)))
+      (finally
+        (set! js/queueMicrotask original-queue-microtask)))))
+
+(deftest check-connection-success-restores-wallet-without-notify-handler-test
+  (let [store (atom {:wallet {:connected? false
+                              :address nil
+                              :connecting? false
+                              :error nil}})
+        connected-calls (atom [])
+        disconnected-calls (atom 0)
+        original-queue-microtask js/queueMicrotask]
+    (set! js/queueMicrotask (fn [f] (f)))
+    (try
+      (with-redefs [wallet/has-provider? (fn [] true)
+                    wallet/provider (fn []
+                                      (let [thenable #js {}]
+                                        (set! (.-then thenable)
+                                              (fn [on-fulfilled]
+                                                (on-fulfilled #js ["0xabc"])
+                                                thenable))
+                                        (set! (.-catch thenable)
+                                              (fn [_]
+                                                thenable))
+                                        #js {:request (fn [_] thenable)}))
+                    wallet/set-connected! (fn [store' addr & {:keys [notify-connected?]}]
+                                            (swap! connected-calls conj [store' addr notify-connected?]))
+                    wallet/set-disconnected! (fn [_]
+                                               (swap! disconnected-calls inc))]
+        (wallet/check-connection! store)
+        (is (= 1 (count @connected-calls)))
+        (is (= "0xabc" (second (first @connected-calls))))
+        (is (nil? (nth (first @connected-calls) 2)))
+        (is (= 0 @disconnected-calls)))
+      (finally
+        (set! js/queueMicrotask original-queue-microtask)))))
+
+(deftest provider-and-short-address-helpers-test
+  (let [original-window (aget js/globalThis "window")
+        window* (or original-window #js {})
+        original-ethereum (aget window* "ethereum")]
+    (try
+      (aset js/globalThis "window" window*)
+      (aset window* "ethereum" #js {:request (fn [_] nil)})
+      (is (some? (wallet/provider)))
+      (is (true? (wallet/has-provider?)))
+      (is (= "0x1234…cdef" (wallet/short-addr "0x1234567890abcdef")))
+      (is (nil? (wallet/short-addr nil)))
+      (finally
+        (aset window* "ethereum" original-ethereum)
+        (if (some? original-window)
+          (aset js/globalThis "window" original-window)
+          (js-delete js/globalThis "window"))))))
+
+(deftest set-disconnected-skips-clearing-session-when-wallet-address-missing-test
+  (let [store (atom {:wallet {:connected? true
+                              :address nil
+                              :chain-id "0x1"
+                              :agent {:status :ready
+                                      :storage-mode :local}}})
+        cleared (atom 0)]
+    (with-redefs [agent-session/default-agent-state
+                  (fn [& {:keys [storage-mode]}]
+                    {:status :not-ready
+                     :storage-mode (or storage-mode :local)})
+                  agent-session/clear-agent-session-by-mode!
+                  (fn [_ _]
+                    (swap! cleared inc))]
+      (wallet/set-disconnected! store)
+      (is (= 0 @cleared))
+      (is (= false (get-in @store [:wallet :connected?]))))))
+
+(deftest set-connected-does-not-clear-session-when-address-is-unchanged-test
+  (let [store (atom {:wallet {:connected? true
+                              :address "0xAbC"
+                              :agent {:status :ready
+                                      :storage-mode :session}}})
+        cleared (atom [])
+        loaded (atom [])]
+    (with-redefs [agent-session/default-agent-state
+                  (fn [& {:keys [storage-mode]}]
+                    {:status :not-ready
+                     :storage-mode (or storage-mode :session)})
+                  agent-session/clear-agent-session-by-mode!
+                  (fn [wallet-address storage-mode]
+                    (swap! cleared conj [wallet-address storage-mode]))
+                  agent-session/load-agent-session-by-mode
+                  (fn [wallet-address storage-mode]
+                    (swap! loaded conj [wallet-address storage-mode])
+                    nil)]
+      (wallet/set-connected! store "0xabc")
+      (is (empty? @cleared))
+      (is (= [["0xabc" :session]] @loaded))
+      (is (= "0xabc" (get-in @store [:wallet :address]))))))
+
+(deftest set-chain-and-set-error-update-wallet-fields-test
+  (let [store (atom {:wallet {:chain-id nil
+                              :connecting? true
+                              :error nil}})]
+    (wallet/set-chain! store "0xa4b1")
+    (wallet/set-error! store (js/Error. "boom"))
+    (is (= "0xa4b1" (get-in @store [:wallet :chain-id])))
+    (is (= "boom" (get-in @store [:wallet :error])))
+    (is (false? (get-in @store [:wallet :connecting?])))))
+
+(deftest check-connection-branches-cover-provider-missing-empty-and-error-test
+  (let [store (atom {:wallet {:connected? false
+                              :address nil
+                              :connecting? false
+                              :error nil}})
+        disconnected-calls (atom 0)
+        connected-calls (atom [])
+        error-calls (atom [])]
+    (with-redefs [wallet/has-provider? (fn [] false)
+                  wallet/set-disconnected! (fn [_]
+                                             (swap! disconnected-calls inc))]
+      (wallet/check-connection! store)
+      (is (= 1 @disconnected-calls)))
+    (with-redefs [wallet/has-provider? (fn [] true)
+                  wallet/provider (fn []
+                                    #js {:request (fn [_]
+                                                    (fulfilled-thenable #js []))})
+                  wallet/set-connected! (fn [store' addr & {:keys [notify-connected?]}]
+                                          (swap! connected-calls conj [store' addr notify-connected?]))
+                  wallet/set-disconnected! (fn [_]
+                                             (swap! disconnected-calls inc))]
+      (wallet/check-connection! store)
+      (is (= 2 @disconnected-calls))
+      (is (empty? @connected-calls)))
+    (with-redefs [wallet/has-provider? (fn [] true)
+                  wallet/provider (fn []
+                                    #js {:request (fn [_]
+                                                    (rejected-thenable (js/Error. "rpc failed")))})
+                  wallet/set-error! (fn [_ err]
+                                      (swap! error-calls conj (.-message err)))]
+      (wallet/check-connection! store)
+      (is (= ["rpc failed"] @error-calls)))))
+
+(deftest request-connection-branches-cover-provider-missing-empty-and-error-test
+  (let [store (atom {:wallet {:connected? false
+                              :address nil
+                              :connecting? false
+                              :error nil}})
+        disconnected-calls (atom 0)
+        connected-calls (atom [])
+        error-calls (atom [])]
+    (with-redefs [wallet/has-provider? (fn [] false)
+                  wallet/set-disconnected! (fn [_]
+                                             (swap! disconnected-calls inc))]
+      (wallet/request-connection! store)
+      (is (= 0 @disconnected-calls))
+      (is (= wallet/provider-unavailable-message
+             (get-in @store [:wallet :error])))
+      (is (false? (get-in @store [:wallet :connecting?]))))
+    (with-redefs [wallet/has-provider? (fn [] true)
+                  wallet/provider (fn []
+                                    #js {:request (fn [_]
+                                                    (fulfilled-thenable #js []))})
+                  wallet/set-connected! (fn [store' addr & {:keys [notify-connected?]}]
+                                          (swap! connected-calls conj [store' addr notify-connected?]))
+                  wallet/set-disconnected! (fn [_]
+                                             (swap! disconnected-calls inc))]
+      (wallet/request-connection! store)
+      (is (= 1 @disconnected-calls))
+      (is (empty? @connected-calls)))
+    (with-redefs [wallet/has-provider? (fn [] true)
+                  wallet/provider (fn []
+                                    #js {:request (fn [_]
+                                                    (rejected-thenable (js/Error. "request failed")))})
+                  wallet/set-error! (fn [_ err]
+                                      (swap! error-calls conj (.-message err)))]
+      (wallet/request-connection! store)
+      (is (= ["request failed"] @error-calls)))))
+
+(deftest request-connection-selects-legacy-coinbase-provider-test
+  (async done
+    (let [store (atom {:wallet {:connected? false
+                                :address nil
+                                :connecting? false
+                                :error nil
+                                :agent {:status :not-ready
+                                        :storage-mode :local}}})
+          original-window (aget js/globalThis "window")
+          original-global-provider (aget js/globalThis "ethereum")
+          window* (or original-window #js {})
+          original-window-provider (aget window* "ethereum")
+          coinbase-calls (atom [])
+          metamask-calls (atom [])
+          coinbase #js {:isCoinbaseWallet true
+                        :request (fn [payload]
+                                   (let [method (aget payload "method")]
+                                     (swap! coinbase-calls conj method)
+                                     (case method
+                                       "eth_requestAccounts"
+                                       (js/Promise.resolve
+                                        #js ["0x1111111111111111111111111111111111111111"])
+                                       "eth_chainId"
+                                       (js/Promise.resolve "0xa4b1")
+                                       (js/Promise.resolve nil))))}
+          metamask #js {:isMetaMask true
+                        :request (fn [payload]
+                                   (swap! metamask-calls conj (aget payload "method"))
+                                   (js/Promise.reject
+                                    (js/Error. "wrong provider")))}]
+      (try
+        (aset js/globalThis "window" window*)
+        (aset js/globalThis "ethereum" metamask)
+        (aset metamask "providers" #js [metamask coinbase])
+        (aset window* "ethereum" metamask)
+        (wallet/reset-provider-registry!)
+        (wallet/request-connection! store "legacy:coinbase")
+        (js/setTimeout
+         (fn []
+           (try
+             (is (= ["eth_requestAccounts" "eth_chainId"]
+                    @coinbase-calls))
+             (is (= [] @metamask-calls))
+             (is (= true (get-in @store [:wallet :connected?])))
+             (is (= "0x1111111111111111111111111111111111111111"
+                    (get-in @store [:wallet :address])))
+             (is (= "0xa4b1" (get-in @store [:wallet :chain-id])))
+             (is (= "legacy:coinbase"
+                    (get-in @store [:wallet :selected-provider-id])))
+             (finally
+               (wallet/reset-provider-registry!)
+               (aset window* "ethereum" original-window-provider)
+               (if (some? original-window)
+                 (aset js/globalThis "window" original-window)
+                 (js-delete js/globalThis "window"))
+               (if (some? original-global-provider)
+                 (aset js/globalThis "ethereum" original-global-provider)
+                 (js-delete js/globalThis "ethereum"))
+               (done))))
+         0)
+        (catch :default err
+          (wallet/reset-provider-registry!)
+          (aset window* "ethereum" original-window-provider)
+          (if (some? original-window)
+            (aset js/globalThis "window" original-window)
+            (js-delete js/globalThis "window"))
+          (if (some? original-global-provider)
+            (aset js/globalThis "ethereum" original-global-provider)
+            (js-delete js/globalThis "ethereum"))
+          (is false (str "Unexpected error: " err))
+          (done))))))
+
+(deftest notify-connected-catches-handler-errors-and-warns-test
+  (let [warns (atom [])
+        original-console (.-console js/globalThis)]
+    (set! (.-console js/globalThis)
+          #js {:warn (fn [message err]
+                       (swap! warns conj [message (.-message err)]))})
+    (wallet/set-on-connected-handler!
+     (fn [_ _]
+       (throw (js/Error. "handler boom"))))
+    (try
+      (@#'hyperopen.wallet.core/notify-connected! (atom {}) "0xabc")
+      (is (= [["Wallet connected handler failed" "handler boom"]] @warns))
+      (finally
+        (wallet/clear-on-connected-handler!)
+        (set! (.-console js/globalThis) original-console)))))
+
+(deftest attach-listeners-installs-once-and-forwards-provider-events-test
+  (let [store (atom {:wallet {:connected? false
+                              :address nil}})
+        provider #js {}
+        listeners (atom {})
+        set-connected-calls (atom [])
+        set-disconnected-calls (atom 0)
+        set-chain-calls (atom [])]
+    (aset provider "on"
+          (fn [event-name callback]
+            (swap! listeners assoc event-name callback)))
+    (wallet/reset-provider-listener-state!)
+    (with-redefs [wallet/has-provider? (fn [] true)
+                  wallet/provider (fn [] provider)
+                  wallet/set-connected! (fn [_ addr & _]
+                                          (swap! set-connected-calls conj addr))
+                  wallet/set-disconnected! (fn [_]
+                                             (swap! set-disconnected-calls inc))
+                  wallet/set-chain! (fn [_ chain-id]
+                                      (swap! set-chain-calls conj chain-id))]
+      (wallet/attach-listeners! store)
+      (wallet/attach-listeners! store)
+      (is (= #{"accountsChanged" "chainChanged"}
+             (set (keys @listeners))))
+      ((get @listeners "accountsChanged") #js ["0xabc"])
+      ((get @listeners "accountsChanged") #js [])
+      ((get @listeners "chainChanged") "0xa4b1")
+      (is (= ["0xabc"] @set-connected-calls))
+      (is (= 1 @set-disconnected-calls))
+      (is (= ["0xa4b1"] @set-chain-calls)))
+    (wallet/reset-provider-listener-state!)))
+
+(deftest attach-listeners-reuses-same-provider-callbacks-when-removal-is-unavailable-test
+  (let [store-a (atom {:wallet {:connected? false}})
+        store-b (atom {:wallet {:connected? false}})
+        provider #js {}
+        listeners (atom {})
+        set-connected-calls (atom [])]
+    (aset provider "on"
+          (fn [event-name callback]
+            (swap! listeners assoc event-name callback)))
+    (wallet/reset-provider-listener-state!)
+    (with-redefs [wallet/has-provider? (fn [] true)
+                  wallet/provider (fn [] provider)
+                  wallet/set-connected! (fn [store addr & _]
+                                          (swap! set-connected-calls conj [store addr]))]
+      (wallet/attach-listeners! store-a)
+      (let [accounts-handler (get @listeners "accountsChanged")
+            chain-handler (get @listeners "chainChanged")]
+        (wallet/attach-listeners! store-b)
+        (is (identical? accounts-handler (get @listeners "accountsChanged")))
+        (is (identical? chain-handler (get @listeners "chainChanged")))
+        (accounts-handler #js ["0xabc"])
+        (is (= [[store-b "0xabc"]]
+               @set-connected-calls))))
+    (wallet/reset-provider-listener-state!)))
+
+(deftest attach-listeners-detaches-old-provider-callbacks-when-removal-is-supported-test
+  (let [store-a (atom {:wallet {:connected? false}})
+        store-b (atom {:wallet {:connected? false}})
+        active-listeners (atom {})
+        remove-calls (atom [])
+        set-connected-calls (atom [])
+        provider #js {}]
+    (aset provider "on"
+          (fn [event-name callback]
+            (swap! active-listeners assoc event-name callback)))
+    (aset provider "removeListener"
+          (fn [event-name callback]
+            (swap! remove-calls conj [event-name callback])
+            (when (identical? callback (get @active-listeners event-name))
+              (swap! active-listeners dissoc event-name))))
+    (wallet/reset-provider-listener-state!)
+    (with-redefs [wallet/has-provider? (fn [] true)
+                  wallet/provider (fn [] provider)
+                  wallet/set-connected! (fn [store addr & _]
+                                          (swap! set-connected-calls conj [store addr]))]
+      (wallet/attach-listeners! store-a)
+      (let [first-accounts-handler (get @active-listeners "accountsChanged")
+            first-chain-handler (get @active-listeners "chainChanged")]
+        (wallet/attach-listeners! store-b)
+        (is (= [["accountsChanged" first-accounts-handler]
+                ["chainChanged" first-chain-handler]]
+               @remove-calls))
+        ((get @active-listeners "accountsChanged") #js ["0xdef"])
+        (is (= [[store-b "0xdef"]]
+               @set-connected-calls))))
+    (wallet/reset-provider-listener-state!)))
+
+(deftest attach-listeners-ignores-stale-provider-events-after-provider-swap-without-removal-test
+  (let [store-a (atom {:wallet {:connected? false}})
+        store-b (atom {:wallet {:connected? false}})
+        provider-a #js {}
+        provider-b #js {}
+        active-provider (atom provider-a)
+        provider-a-listeners (atom {})
+        provider-b-listeners (atom {})
+        set-connected-calls (atom [])
+        set-chain-calls (atom [])]
+    (aset provider-a "on"
+          (fn [event-name callback]
+            (swap! provider-a-listeners assoc event-name callback)))
+    (aset provider-b "on"
+          (fn [event-name callback]
+            (swap! provider-b-listeners assoc event-name callback)))
+    (wallet/reset-provider-listener-state!)
+    (with-redefs [wallet/has-provider? (fn [] true)
+                  wallet/provider (fn [] @active-provider)
+                  wallet/set-connected! (fn [store addr & _]
+                                          (swap! set-connected-calls conj [store addr]))
+                  wallet/set-chain! (fn [store chain-id]
+                                      (swap! set-chain-calls conj [store chain-id]))]
+      (wallet/attach-listeners! store-a)
+      (reset! active-provider provider-b)
+      (wallet/attach-listeners! store-b)
+      ((get @provider-a-listeners "accountsChanged") #js ["0xold"])
+      ((get @provider-a-listeners "chainChanged") "0x1")
+      (is (empty? @set-connected-calls))
+      (is (empty? @set-chain-calls))
+      ((get @provider-b-listeners "accountsChanged") #js ["0xnew"])
+      ((get @provider-b-listeners "chainChanged") "0xa4b1")
+      (is (= [[store-b "0xnew"]] @set-connected-calls))
+      (is (= [[store-b "0xa4b1"]] @set-chain-calls)))
+    (wallet/reset-provider-listener-state!)))
+
+(deftest init-wallet-invokes-listener-attach-and-connection-check-test
+  (let [store (atom {:wallet {:connected? false}})
+        calls (atom [])]
+    (with-redefs [wallet/attach-listeners! (fn [store-arg]
+                                             (swap! calls conj [:attach (= store store-arg)]))
+                  wallet/check-connection! (fn [store-arg]
+                                             (swap! calls conj [:check (= store store-arg)]))]
+      (wallet/init-wallet! store)
+      (is (= [[:attach true] [:check true]] @calls)))))
+
+(deftest provider-override-precedes-window-ethereum-and-reset-clears-listener-state-test
+  (let [original-window (aget js/globalThis "window")
+        window* (or original-window #js {})
+        original-ethereum (aget window* "ethereum")
+        override #js {:request (fn [_] nil)}]
+    (reset! wallet/listeners-installed? true)
+    (try
+      (aset js/globalThis "window" window*)
+      (aset window* "ethereum" #js {:request (fn [_] "window-provider")})
+      (wallet/set-provider-override! override)
+      (is (identical? override (wallet/provider)))
+      (wallet/reset-provider-listener-state!)
+      (is (false? @wallet/listeners-installed?))
+      (wallet/clear-provider-override!)
+      (is (= "window-provider" (.request (wallet/provider) nil)))
+      (finally
+        (wallet/clear-provider-override!)
+        (aset window* "ethereum" original-ethereum)
+        (if (some? original-window)
+          (aset js/globalThis "window" original-window)
+          (js-delete js/globalThis "window"))))))
+
+(deftest wallet-status-renders-all-main-states-test
+  (is (= [:span.text-red-600 "Wallet error: denied"]
+         (second (wallet/wallet-status {:wallet {:error "denied"}}))))
+  (is (= [:span.text-white.opacity-80 "Connecting…"]
+         (second (wallet/wallet-status {:wallet {:connecting? true}}))))
+  (let [connected-view (wallet/wallet-status
+                        {:wallet {:connected? true
+                                  :address "0x1234567890abcdef"
+                                  :chain-id "0x1"}})
+        chain-pill (nth (second connected-view) 2)]
+    (is (= :<> (first (second connected-view))))
+    (is (= [:span.text-sm.text-white.opacity-60.ml-1 " chain 0x1"] chain-pill)))
+  (is (= [:span.text-white.opacity-80 "Not connected"]
+         (second (wallet/wallet-status {:wallet {:connected? false}})))))
+
+(deftest connect-button-reflects-connected-and-connecting-state-test
+  (let [ready-button (wallet/connect-button {:wallet {:connected? false
+                                                      :connecting? false}})
+        connecting-button (wallet/connect-button {:wallet {:connected? false
+                                                           :connecting? true}})
+        connected-button (wallet/connect-button {:wallet {:connected? true
+                                                          :connecting? false}})]
+    (is (false? (get-in ready-button [1 :disabled])))
+    (is (= "Connect Wallet" (nth ready-button 2)))
+    (is (true? (get-in connecting-button [1 :disabled])))
+    (is (= "Connecting…" (nth connecting-button 2)))
+    (is (true? (get-in connected-button [1 :disabled])))
+    (is (= "Connected" (nth connected-button 2)))))

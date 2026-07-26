@@ -1,0 +1,4 @@
+interface:
+  display_name: "Deploy Hyperopen to Cloudflare"
+  short_description: "Bootstrap and publish branded Hyperopen Workers"
+  default_prompt: "Use $deploy-hyperopen-cloudflare to take a branded Hyperopen tenant from a fresh checkout through Testnet acceptance and a verified Cloudflare Workers launch."

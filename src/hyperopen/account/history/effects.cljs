@@ -1,0 +1,322 @@
+(ns hyperopen.account.history.effects
+  (:require [clojure.string :as str]
+            [hyperopen.account.context :as account-context]
+            [hyperopen.account.history.funding-actions :as funding-actions]
+            [hyperopen.account.history.order-actions :as order-actions]
+            [hyperopen.api.default :as api]
+            [hyperopen.domain.funding-history :as funding-history]
+            [hyperopen.platform :as platform]
+            [hyperopen.utils.formatting :as fmt]
+            [hyperopen.websocket.health-projection :as health-projection]))
+
+(defn- format-funding-history-time [time-ms]
+  (fmt/format-local-date-time (or time-ms 0)))
+
+(def ^:private funding-stream-fallback-delay-ms
+  1200)
+
+(defn- funding-position-side-label
+  [position-side]
+  (case position-side
+    :long "Long"
+    :short "Short"
+    :flat "Flat"
+    "Flat"))
+
+(defn- csv-escape
+  [value]
+  (let [text (str (or value ""))]
+    (if (or (str/includes? text ",")
+            (str/includes? text "\"")
+            (str/includes? text "\n"))
+      (str "\""
+           (str/replace text "\"" "\"\"")
+           "\"")
+      text)))
+
+(defn- format-funding-history-size
+  [row]
+  (let [size (if (number? (:size-raw row)) (:size-raw row) 0)
+        coin (or (:coin row) "-")]
+    (str (or (fmt/format-intl-number size
+                                     {:minimumFractionDigits 3
+                                      :maximumFractionDigits 6})
+             "0.000")
+         " "
+         coin)))
+
+(defn- format-funding-history-payment
+  [row]
+  (let [payment (if (number? (:payment-usdc-raw row)) (:payment-usdc-raw row) 0)]
+    (str (or (fmt/format-intl-number payment
+                                     {:minimumFractionDigits 4
+                                      :maximumFractionDigits 6})
+             "0.0000")
+         " USDC")))
+
+(defn- format-funding-history-rate
+  [row]
+  (let [rate (if (number? (:funding-rate-raw row)) (:funding-rate-raw row) 0)]
+    (str (.toFixed (* 100 rate) 4) "%")))
+
+(defn- funding-row->csv-line
+  [row]
+  (str/join ","
+            (map csv-escape
+                 [(format-funding-history-time (:time-ms row))
+                  (:coin row)
+                  (format-funding-history-size row)
+                  (funding-position-side-label (:position-side row))
+                  (format-funding-history-payment row)
+                  (format-funding-history-rate row)])))
+
+(defn- merge-and-project-funding-history
+  [state rows]
+  (let [filters (funding-actions/funding-history-filters state)
+        merged (funding-history/merge-funding-history-rows (get-in state [:orders :fundings-raw] [])
+                                                           rows)
+        projected (funding-history/filter-funding-history-rows merged filters)]
+    (-> state
+        (assoc-in [:account-info :funding-history :filters] filters)
+        (assoc-in [:orders :fundings-raw] merged)
+        (assoc-in [:orders :fundings] projected))))
+
+(defn- funding-stream-hydrated?
+  [state address]
+  (when-let [address* (account-context/normalize-address address)]
+    (when-let [[_ stream]
+               (health-projection/find-usable-topic-stream
+                (get-in state [:websocket :health])
+                {:topic "userFundings"
+                 :selector {:user address*}})]
+      (pos? (or (:message-count stream) 0)))))
+
+(defn- funding-stream-usable?
+  [state address]
+  (when-let [address* (account-context/normalize-address address)]
+    (health-projection/topic-stream-usable?
+     (get-in state [:websocket :health])
+     "userFundings"
+     {:user address*})))
+
+(defn- apply-funding-history-stream-projection
+  [state]
+  (let [filters (funding-actions/funding-history-filters state)
+        projected (funding-history/filter-funding-history-rows
+                   (get-in state [:orders :fundings-raw] [])
+                   filters)]
+    (-> state
+        (assoc-in [:account-info :funding-history :filters] filters)
+        (assoc-in [:orders :fundings] projected))))
+
+(defn- apply-funding-fetch-success!
+  [store request-id rows]
+  (swap! store
+         (fn [state]
+           (if (= request-id (funding-actions/funding-history-request-id state))
+             (-> (merge-and-project-funding-history state rows)
+                 (assoc-in [:account-info :funding-history :loading?] false)
+                 (assoc-in [:account-info :funding-history :error] nil))
+             state))))
+
+(defn- apply-funding-fetch-error!
+  [store request-id err]
+  (swap! store
+         (fn [state]
+           (if (= request-id (funding-actions/funding-history-request-id state))
+             (-> state
+                 (assoc-in [:account-info :funding-history :loading?] false)
+                 (assoc-in [:account-info :funding-history :error] (str err)))
+             state))))
+
+(defn- request-funding-history-with-fallback!
+  [store request-id address opts]
+  (-> (api/request-user-funding-history! address opts)
+      (.then (fn [rows]
+               (apply-funding-fetch-success! store request-id rows)))
+      (.catch (fn [err]
+                (apply-funding-fetch-error! store request-id err)))))
+
+(defn fetch-and-merge-funding-history!
+  [store address opts]
+  (when address
+    (let [filters (funding-actions/funding-history-filters @store)
+          opts* (or opts {})
+          force-refresh? (true? (:force-refresh? opts*))
+          request-opts (merge {:priority :high}
+                              filters
+                              opts*)
+          fetch-rest!
+          (fn []
+            (-> (api/request-user-funding-history! address request-opts)
+                (.then
+                 (fn [rows]
+                   (swap! store
+                          (fn [state]
+                            (if (= address (account-context/effective-account-address state))
+                              (-> (merge-and-project-funding-history state rows)
+                                  (assoc-in [:account-info :funding-history :error] nil))
+                              state)))))
+                (.catch
+                 (fn [err]
+                   (swap! store
+                          (fn [state]
+                            (if (= address (account-context/effective-account-address state))
+                              (assoc-in state [:account-info :funding-history :error] (str err))
+                              state)))))))
+          apply-stream!
+          (fn []
+            (swap! store
+                   (fn [state]
+                     (if (= address (account-context/effective-account-address state))
+                       (-> (apply-funding-history-stream-projection state)
+                           (assoc-in [:account-info :funding-history :error] nil))
+                       state))))]
+      (cond
+        (and (not force-refresh?)
+             (funding-stream-hydrated? @store address))
+        (apply-stream!)
+
+        (and (not force-refresh?)
+             (funding-stream-usable? @store address))
+        (js/Promise.
+         (fn [resolve _reject]
+           (platform/set-timeout!
+            (fn []
+              (if (funding-stream-hydrated? @store address)
+                (do
+                  (apply-stream!)
+                  (resolve nil))
+                (-> (fetch-rest!)
+                    (.then (fn [result]
+                             (resolve result))))))
+            funding-stream-fallback-delay-ms)))
+
+        :else
+        (fetch-rest!)))))
+
+(defn api-fetch-user-funding-history-effect
+  [_ store request-id]
+  (let [selected? (= :funding-history (get-in @store [:account-info :selected-tab]))
+        address (account-context/effective-account-address @store)
+        filters (funding-actions/funding-history-filters @store)
+        opts (merge {:priority :high}
+                    filters)]
+    (cond
+      (not selected?)
+      (swap! store
+             (fn [state]
+               (if (= request-id (funding-actions/funding-history-request-id state))
+                 (assoc-in state [:account-info :funding-history :loading?] false)
+                 state)))
+
+      (not address)
+      (swap! store
+             (fn [state]
+               (if (= request-id (funding-actions/funding-history-request-id state))
+                 (-> state
+                     (assoc-in [:account-info :funding-history :loading?] false)
+                     (assoc-in [:orders :fundings-raw] [])
+                     (assoc-in [:orders :fundings] []))
+                 state)))
+
+      :else
+      (if (funding-stream-hydrated? @store address)
+        (swap! store
+               (fn [state]
+                 (if (= request-id (funding-actions/funding-history-request-id state))
+                   (-> (apply-funding-history-stream-projection state)
+                       (assoc-in [:account-info :funding-history :loading?] false)
+                       (assoc-in [:account-info :funding-history :error] nil))
+                   state)))
+        (if (funding-stream-usable? @store address)
+          (js/Promise.
+           (fn [resolve _reject]
+             (platform/set-timeout!
+              (fn []
+                (if (not= request-id
+                          (funding-actions/funding-history-request-id @store))
+                  (resolve nil)
+                  (if (funding-stream-hydrated? @store address)
+                    (do
+                      (swap! store
+                             (fn [state]
+                               (if (= request-id (funding-actions/funding-history-request-id state))
+                                 (-> (apply-funding-history-stream-projection state)
+                                     (assoc-in [:account-info :funding-history :loading?] false)
+                                     (assoc-in [:account-info :funding-history :error] nil))
+                                 state)))
+                      (resolve nil))
+                    (-> (request-funding-history-with-fallback! store request-id address opts)
+                        (.then (fn [result]
+                                 (resolve result)))))))
+              funding-stream-fallback-delay-ms)))
+          (request-funding-history-with-fallback! store request-id address opts))))))
+
+(defn fetch-historical-orders!
+  [{:keys [store request-id request-historical-orders! opts]
+    :or {request-historical-orders! api/request-historical-orders!}}]
+  (let [address (account-context/effective-account-address @store)
+        requested-address (some-> address str str/lower-case)
+        opts* (merge {:priority :high}
+                     (or opts {}))]
+    (if-not address
+      (do
+        (swap! store
+               (fn [state]
+                 (if (= request-id (order-actions/order-history-request-id state))
+                   (-> state
+                       (assoc-in [:account-info :order-history :loading?] false)
+                       (assoc-in [:account-info :order-history :error] nil)
+                       (assoc-in [:account-info :order-history :loaded-at-ms] nil)
+                       (assoc-in [:account-info :order-history :loaded-for-address] nil)
+                       (assoc-in [:orders :order-history] []))
+                   state)))
+        (js/Promise.resolve nil))
+      (-> (request-historical-orders! address opts*)
+      (.then (fn [rows]
+               (swap! store
+                      (fn [state]
+                        (if (= request-id (order-actions/order-history-request-id state))
+                          (-> state
+                              (assoc-in [:account-info :order-history :loading?] false)
+                              (assoc-in [:account-info :order-history :error] nil)
+                                  (assoc-in [:account-info :order-history :loaded-at-ms] (platform/now-ms))
+                                  (assoc-in [:account-info :order-history :loaded-for-address]
+                                            requested-address)
+                                  (assoc-in [:orders :order-history] (vec (or rows []))))
+                              state)))))
+      (.catch (fn [err]
+                (swap! store
+                       (fn [state]
+                         (if (= request-id (order-actions/order-history-request-id state))
+                           (-> state
+                               (assoc-in [:account-info :order-history :loading?] false)
+                               (assoc-in [:account-info :order-history :error] (str err)))
+                               state)))))))))
+
+(defn api-fetch-historical-orders-effect
+  [_ store request-id]
+  (if (= :order-history (get-in @store [:account-info :selected-tab]))
+    (fetch-historical-orders! {:store store
+                               :request-id request-id})
+    (js/Promise.resolve nil)))
+
+(defn export-funding-history-csv-effect
+  [_ _ rows]
+  (let [rows* (vec (or rows []))
+        header "Time,Coin,Size,Position Side,Payment,Rate"
+        body (map funding-row->csv-line rows*)
+        csv (str/join "\n" (cons header body))]
+    (when (and (exists? js/document)
+               (exists? js/URL))
+      (let [blob (js/Blob. #js [csv] #js {:type "text/csv;charset=utf-8"})
+            url (.createObjectURL js/URL blob)
+            link (.createElement js/document "a")
+            filename (str "funding-history-" (platform/now-ms) ".csv")]
+        (set! (.-href link) url)
+        (set! (.-download link) filename)
+        (.appendChild (.-body js/document) link)
+        (.click link)
+        (.removeChild (.-body js/document) link)
+        (.revokeObjectURL js/URL url)))))

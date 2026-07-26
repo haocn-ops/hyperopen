@@ -1,0 +1,421 @@
+(ns hyperopen.views.trade.order-form-component-sections
+  (:require [clojure.string :as str]
+            [hyperopen.trading.order-form-tpsl-policy :as tpsl-policy]
+            [hyperopen.views.trade.order-form-component-primitives :as primitives]
+            [hyperopen.views.trade.order-form-type-extensions :as type-extensions]))
+
+(def ^:private entry-mode-indicator-left
+  {:market "0%"
+   :limit "33.333333%"
+   :pro "66.666667%"})
+
+(def ^:private entry-mode-tab-button-base-classes
+  ["relative"
+   "z-10"
+   "cursor-pointer"
+   "flex"
+   "h-[35px]"
+   "min-w-0"
+   "items-center"
+   "justify-center"
+   "overflow-hidden"
+   "px-2"
+   "select-none"
+   "text-sm"
+   "font-normal"
+   "whitespace-nowrap"
+   "transition-colors"
+   "duration-200"
+   "ease-in-out"])
+
+(defn- entry-mode-tab-button-classes [active?]
+  (into entry-mode-tab-button-base-classes
+        (if active?
+          ["text-ho-text"]
+          ["text-ho-text-secondary" "hover:text-white"])))
+
+(defn entry-mode-tabs
+  [{:keys [entry-mode
+           type
+           pro-dropdown-open?
+           pro-tab-label
+           pro-dropdown-options
+           order-type-label]}
+   {:keys [on-close-dropdown
+           on-select-entry-market
+           on-select-entry-limit
+           on-toggle-dropdown
+           on-dropdown-keydown
+           on-select-pro-order-type]}]
+  [:div {:class ["relative"]}
+   (when pro-dropdown-open?
+     [:div {:class ["fixed" "inset-0" "z-[180]"]
+            :on {:click on-close-dropdown}}])
+   [:div {:class ["relative" "z-[190]" "grid" "h-[35px]" "grid-cols-3" "border-b" "border-ho-border"]}
+    [:div {:data-role "entry-mode-active-indicator"
+           :aria-hidden true
+           :class ["pointer-events-none"
+                   "absolute"
+                   "bottom-0"
+                   "h-px"
+                   "bg-ho-accent"]
+           :style {:left (get entry-mode-indicator-left entry-mode "0%")
+                   :width "33.333333%"
+                   :transition "left 0.3s ease"}}]
+    [:button {:type "button"
+              :class (entry-mode-tab-button-classes (= entry-mode :market))
+              :on {:click on-select-entry-market}}
+     "Market"]
+    [:button {:type "button"
+              :class (entry-mode-tab-button-classes (= entry-mode :limit))
+              :on {:click on-select-entry-limit}}
+     "Limit"]
+    [:div {:class ["relative" "min-w-0"]}
+     [:button {:type "button"
+               :class (into (entry-mode-tab-button-classes (= entry-mode :pro))
+                            ["w-full" "gap-1.5"])
+               :title pro-tab-label
+               :on {:click on-toggle-dropdown
+                    :keydown on-dropdown-keydown}}
+      [:span {:class ["truncate"]} pro-tab-label]
+      [:svg {:class (into ["h-3.5"
+                           "w-3.5"
+                           "transition-transform"
+                           "duration-150"
+                           "ease-out"]
+                          (if pro-dropdown-open?
+                            ["rotate-180"]
+                            ["rotate-0"]))
+             :viewBox "0 0 20 20"
+             :fill "currentColor"}
+       [:path {:fill-rule "evenodd"
+               :clip-rule "evenodd"
+               :d "M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"}]]]
+     [:div {:class ["ui-dropdown-panel"
+                    "absolute"
+                    "right-0"
+                    "top-full"
+                    "mt-1"
+                    "w-36"
+                    "overflow-hidden"
+                    "rounded-lg"
+                    "border"
+                    "border-base-300"
+                    "bg-base-100"
+                    "spectate-lg"
+                    "z-[210]"]
+            :data-ui-state (if pro-dropdown-open? "open" "closed")
+            :aria-hidden (not pro-dropdown-open?)}
+      (for [pro-order-type pro-dropdown-options]
+        ^{:key (name pro-order-type)}
+        [:button {:type "button"
+                  :class (into ["block"
+                                "w-full"
+                                "px-3"
+                                "py-2"
+                                "text-left"
+                                "text-sm"
+                                "transition-colors"]
+                               (if (= type pro-order-type)
+                                 ["bg-base-200" "text-gray-100"]
+                                 ["text-gray-300" "hover:bg-base-200" "hover:text-gray-100"]))
+                  :on {:click (on-select-pro-order-type pro-order-type)}}
+         (order-type-label pro-order-type)])]]]])
+
+(def ^:private tpsl-unit-options
+  [:usd :roe-percent :position-percent])
+
+(defn- tpsl-unit-option-row [selected-unit unit on-select-tpsl-unit]
+  [:button {:type "button"
+            :class (into ["flex"
+                          "h-7"
+                          "w-full"
+                          "items-center"
+                          "justify-start"
+                          "whitespace-nowrap"
+                          "text-xs"
+                          "leading-6"
+                          "transition-colors"]
+                         (if (= selected-unit unit)
+                           ["text-ho-text"]
+                           ["text-ho-text-secondary" "hover:text-ho-text"]))
+            :role "option"
+            :aria-selected (boolean (= selected-unit unit))
+            :title (tpsl-policy/unit-menu-label unit)
+            :on {:click (on-select-tpsl-unit unit)}}
+   (tpsl-policy/unit-symbol unit)])
+
+(defn- tpsl-unit-accessory
+  [unit {:keys [interactive?
+                dropdown-open?
+                menu-enabled?
+                on-toggle-dropdown
+                on-close-dropdown
+                on-dropdown-keydown
+                on-select-tpsl-unit]}]
+  (let [selected-unit (tpsl-policy/normalize-unit unit)
+        selected-label (tpsl-policy/unit-symbol selected-unit)
+        interactive? (not= false interactive?)
+        menu-enabled? (not= false menu-enabled?)
+        open? (and interactive? (boolean dropdown-open?))
+        menu-open? (and open? menu-enabled?)]
+    (if-not interactive?
+      [:span {:class ["text-xs"
+                      "font-normal"
+                      "text-ho-text"]
+              :title (tpsl-policy/unit-menu-label selected-unit)}
+       selected-label]
+      [:div {:class ["relative" "flex" "items-center"]
+             :style (when menu-open?
+                      {:z-index 1200})}
+       (when menu-open?
+         [:button {:type "button"
+                   :class ["absolute" "bg-transparent" "cursor-default"]
+                   :style {:left "-100vmax"
+                           :top "-100vmax"
+                           :width "200vmax"
+                           :height "200vmax"
+                           :z-index 1200}
+                   :aria-label "Close TP/SL unit menu"
+                   :on {:click on-close-dropdown}}])
+       [:button {:type "button"
+                 :class ["relative"
+                         "inline-flex"
+                         "items-center"
+                         "gap-0.5"
+                         "bg-transparent"
+                         "p-0"
+                         "text-xs"
+                         "font-normal"
+                         "leading-4"
+                         "whitespace-nowrap"
+                         "text-ho-text"
+                         "outline-none"
+                         "focus:outline-none"
+                         "focus:ring-0"
+                         "focus:ring-offset-0"
+                         "focus:shadow-none"]
+                 :aria-label (str "TP/SL gain-loss unit: " selected-label)
+                 :aria-haspopup "listbox"
+                 :aria-expanded open?
+                 :title (tpsl-policy/unit-menu-label selected-unit)
+                 :style (when menu-open?
+                          {:z-index 1201})
+                 :on {:click on-toggle-dropdown
+                      :keydown on-dropdown-keydown}}
+        [:span selected-label]
+        [:svg {:class (into ["pointer-events-none"
+                             "h-2.5"
+                             "w-2.5"
+                             "text-[#94A0A6]"
+                             "transition-transform"
+                             "duration-150"
+                             "ease-out"]
+                            (if open?
+                              ["rotate-180"]
+                              ["rotate-0"]))
+               :viewBox "0 0 20 20"
+               :fill "currentColor"}
+         [:path {:fill-rule "evenodd"
+                 :clip-rule "evenodd"
+                 :d "M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"}]]]
+       (when menu-enabled?
+         [:div {:class ["ui-dropdown-panel"
+                        "absolute"
+                        "right-[-4px]"
+                        "top-full"
+                        "mt-1"
+                        "min-w-[136px]"
+                        "rounded-lg"
+                        "border"
+                        "border-ho-surface-raised"
+                        "bg-ho-surface"
+                        "px-2"
+                        "py-1"
+                        "spectate-[0_8px_16px_rgba(0,0,0,0.25)]"]
+                :style {:z-index 1202}
+                :data-ui-state (if menu-open? "open" "closed")
+                :role "listbox"
+                :aria-label "TP/SL gain-loss unit options"
+                :aria-hidden (not menu-open?)
+                :on {:keydown on-dropdown-keydown}}
+          (for [option-unit tpsl-unit-options]
+            ^{:key (name option-unit)}
+            (tpsl-unit-option-row selected-unit option-unit on-select-tpsl-unit))])])))
+
+(defn tp-sl-panel
+  [{:keys [form
+           unit
+           unit-dropdown-open?
+           tp-offset
+           sl-offset]}
+   {:keys [on-set-tp-trigger
+           on-set-tp-offset
+           on-set-sl-trigger
+           on-set-sl-offset
+           on-toggle-unit-dropdown
+           on-close-unit-dropdown
+           on-unit-dropdown-keydown
+           on-select-tpsl-unit]}]
+  (let [selected-unit (tpsl-policy/normalize-unit unit)]
+    [:div {:class ["grid" "grid-cols-1" "gap-[10px]"]}
+     [:div {:class ["grid" "grid-cols-[minmax(0,_0.93fr)_minmax(0,_1.07fr)]" "gap-[10px]"]}
+      (primitives/compact-row-input (get-in form [:tp :trigger])
+                                    "TP Price"
+                                    on-set-tp-trigger
+                                    nil
+                                    :inputmode "decimal"
+                                    :short-label "TP")
+      (primitives/compact-row-input tp-offset
+                                    "Gain"
+                                    on-set-tp-offset
+                                    (tpsl-unit-accessory selected-unit {:interactive? true
+                                                                        :menu-enabled? true
+                                                                        :dropdown-open? unit-dropdown-open?
+                                                                        :on-toggle-dropdown on-toggle-unit-dropdown
+                                                                        :on-close-dropdown on-close-unit-dropdown
+                                                                        :on-dropdown-keydown on-unit-dropdown-keydown
+                                                                        :on-select-tpsl-unit on-select-tpsl-unit})
+                                    :inputmode "decimal"
+                                    :overflow-visible? true)]
+     [:div {:class ["grid" "grid-cols-[minmax(0,_0.93fr)_minmax(0,_1.07fr)]" "gap-[10px]"]}
+      (primitives/compact-row-input (get-in form [:sl :trigger])
+                                    "SL Price"
+                                    on-set-sl-trigger
+                                    nil
+                                    :inputmode "decimal"
+                                    :short-label "SL")
+      (primitives/compact-row-input sl-offset
+                                    "Loss"
+                                    on-set-sl-offset
+                                    (tpsl-unit-accessory selected-unit {:interactive? true
+                                                                        :menu-enabled? false
+                                                                        :dropdown-open? unit-dropdown-open?
+                                                                        :on-toggle-dropdown on-toggle-unit-dropdown
+                                                                        :on-close-dropdown on-close-unit-dropdown
+                                                                        :on-dropdown-keydown on-unit-dropdown-keydown
+                                                                        :on-select-tpsl-unit on-select-tpsl-unit})
+                                    :inputmode "decimal")]
+     (when (not= selected-unit :usd)
+       [:div {:class ["pl-1" "text-xs" "text-gray-400"]}
+        (str "Percent basis: "
+             (if (= selected-unit :position-percent)
+               "Position (notional)"
+               "ROE (margin)"))])]))
+
+(def ^:private tif-options
+  [[:gtc "GTC"]
+   [:ioc "IOC"]
+   [:alo "ALO"]])
+
+(defn- tif-option-row [selected-tif tif label on-select-tif]
+  [:button {:type "button"
+            :class (into ["flex"
+                          "h-6"
+                          "w-full"
+                          "items-center"
+                          "justify-start"
+                          "text-left"
+                          "text-xs"
+                          "leading-6"
+                          "transition-colors"]
+                         (if (= selected-tif tif)
+                           ["text-ho-text"]
+                           ["text-ho-text-secondary" "hover:text-ho-text"]))
+            :role "option"
+            :aria-selected (boolean (= selected-tif tif))
+            :on {:click (on-select-tif tif)}}
+   label])
+
+(defn tif-inline-control
+  [form {:keys [dropdown-open?
+                on-toggle-dropdown
+                on-close-dropdown
+                on-dropdown-keydown
+                on-select-tif]}]
+  (let [selected-tif (keyword (name (or (:tif form) :gtc)))
+        selected-label (some-> selected-tif name str/upper-case)
+        open? (boolean dropdown-open?)]
+    [:div {:class ["relative" "flex" "items-center" "gap-2"]
+           :style (when open?
+                    {:z-index 1200})}
+     (when open?
+       [:button {:type "button"
+                 :class ["absolute" "bg-transparent" "cursor-default"]
+                 :style {:left "-100vmax"
+                         :top "-100vmax"
+                         :width "200vmax"
+                         :height "200vmax"
+                         :z-index 1200}
+                 :aria-label "Close TIF menu"
+                 :on {:click on-close-dropdown}}])
+     [:span {:class ["text-xs" "uppercase" "tracking-wide" "text-gray-400"]} "TIF"]
+     [:button {:type "button"
+               :class ["inline-flex"
+                       "items-center"
+                       "gap-1.5"
+                       "bg-transparent"
+                       "text-sm"
+                       "font-normal"
+                       "leading-6"
+                       "text-ho-text-secondary"
+                       "transition-colors"
+                       "duration-200"
+                       "ease-in-out"
+                       "hover:text-ho-text"
+                       "outline-none"
+                       "focus:outline-none"
+                       "focus:ring-0"
+                       "focus:ring-offset-0"
+                       "focus:shadow-none"]
+               :aria-label (str "Time in force: " selected-label)
+               :aria-haspopup "listbox"
+               :aria-expanded open?
+               :style (when open?
+                        {:z-index 1201})
+               :on {:click on-toggle-dropdown
+                    :keydown on-dropdown-keydown}}
+      [:span selected-label]
+      [:svg {:class (into ["pointer-events-none"
+                           "h-3.5"
+                           "w-3.5"
+                           "text-gray-400"
+                           "transition-transform"
+                           "duration-150"
+                           "ease-out"]
+                          (if open?
+                            ["rotate-180"]
+                            ["rotate-0"]))
+             :viewBox "0 0 20 20"
+             :fill "currentColor"}
+       [:path {:fill-rule "evenodd"
+               :clip-rule "evenodd"
+               :d "M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"}]]]
+     [:div {:class ["ui-dropdown-panel"
+                    "absolute"
+                    "right-0"
+                    "top-full"
+                    "mt-1"
+                    "min-w-[46px]"
+                    "rounded-lg"
+                    "border"
+                    "border-ho-surface-raised"
+                    "bg-ho-surface"
+                    "px-2"
+                    "py-1"
+                    "spectate-[0_8px_16px_rgba(0,0,0,0.25)]"]
+            :style {:z-index 1202}
+            :data-ui-state (if open? "open" "closed")
+            :role "listbox"
+            :aria-label "TIF options"
+            :aria-hidden (not open?)
+            :on {:keydown on-dropdown-keydown}}
+      (for [[tif label] tif-options]
+        ^{:key (name tif)}
+        (tif-option-row selected-tif tif label on-select-tif))]]))
+
+(defn render-order-type-sections [order-type form callbacks]
+  (type-extensions/render-order-type-sections order-type form callbacks))
+
+(defn supported-order-type-sections []
+  (type-extensions/supported-order-type-sections))

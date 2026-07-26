@@ -1,0 +1,164 @@
+name: Tests
+
+on:
+  pull_request:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Setup Babashka
+        run: |
+          BB_VERSION=1.12.197
+          curl -sSL -o bb.tar.gz "https://github.com/babashka/babashka/releases/download/v${BB_VERSION}/babashka-${BB_VERSION}-linux-amd64-static.tar.gz"
+          tar -xzf bb.tar.gz bb
+          mkdir -p "$HOME/.local/bin"
+          mv bb "$HOME/.local/bin/"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          "$HOME/.local/bin/bb" --version
+
+      - name: Cache Clojure Dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.m2/repository
+            ~/.gitlibs
+            ~/.shadow-cljs
+          key: ${{ runner.os }}-clojure-${{ hashFiles('deps.edn', 'shadow-cljs.edn') }}
+          restore-keys: |
+            ${{ runner.os }}-clojure-
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Run CI Test Gate
+        id: test_main
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          HYPEROPEN_SKIP_BD_DOCS_CHECK=1 npm run test:ci | tee .github/badges/test-main.log
+
+      - name: Run WebSocket Test Gate
+        id: test_websocket
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          npm run test:websocket | tee .github/badges/test-websocket.log
+
+      - name: Release build + bundle budget check (soft)
+        id: bundle_budget
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          # The release :app build doubles as a compile smoke (advanced-optimization
+          # failures don't surface in the dev `compile` the test gate runs). The
+          # budget checker then measures the hashed release main.js, but it is a
+          # SOFT check: over-target prints a warning + PR annotation and exits 0,
+          # so bundle size never fails CI or the Cloudflare deploy. Only a real
+          # release build failure trips this step.
+          npx shadow-cljs release app
+          npm run lint:bundle-budget
+
+      - name: Generate Coverage Report
+        id: coverage
+        continue-on-error: true
+        run: npm run coverage
+
+      - name: Generate Coverage Badge Data
+        if: always()
+        run: npm run coverage:badge
+
+      - name: Determine Badge Status
+        if: always()
+        run: |
+          if [ "${{ steps.test_main.outcome }}" = "failure" ] || \
+             [ "${{ steps.test_websocket.outcome }}" = "failure" ]; then
+            echo "TESTS_STATUS_BADGE_MESSAGE=failing" >> "$GITHUB_ENV"
+            echo "TESTS_STATUS_BADGE_COLOR=red" >> "$GITHUB_ENV"
+          else
+            echo "TESTS_STATUS_BADGE_MESSAGE=passing" >> "$GITHUB_ENV"
+            echo "TESTS_STATUS_BADGE_COLOR=brightgreen" >> "$GITHUB_ENV"
+          fi
+
+      - name: Generate Test Metrics Badge Data
+        if: always()
+        run: npm run test-metrics:badge
+
+      - name: Upload Coverage Artifact
+        if: always() && hashFiles('coverage/**') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage
+          if-no-files-found: warn
+
+      - name: Upload Raw Coverage Diagnostics
+        if: always() && steps.coverage.outcome == 'failure' && hashFiles('.coverage/**') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: raw-v8-coverage
+          path: .coverage
+          if-no-files-found: warn
+
+      - name: Commit Coverage Badge
+        if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main' && github.actor != 'github-actions[bot]'
+        run: |
+          if git diff --quiet -- \
+            .github/badges/tests-status.json \
+            .github/badges/tests-status.svg \
+            .github/badges/coverage.json \
+            .github/badges/coverage.svg \
+            .github/badges/tests-total.json \
+            .github/badges/tests-total.svg \
+            .github/badges/assertions-total.json \
+            .github/badges/assertions-total.svg; then
+            echo "Badges unchanged."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            .github/badges/tests-status.json \
+            .github/badges/tests-status.svg \
+            .github/badges/coverage.json \
+            .github/badges/coverage.svg \
+            .github/badges/tests-total.json \
+            .github/badges/tests-total.svg \
+            .github/badges/assertions-total.json \
+            .github/badges/assertions-total.svg
+          git commit -m "chore: update test and coverage badges [skip ci]"
+          git push origin "HEAD:${GITHUB_REF#refs/heads/}"
+
+      - name: Fail Workflow If Any Gate Failed
+        if: always()
+        run: |
+          if [ "${{ steps.test_main.outcome }}" = "failure" ] || \
+             [ "${{ steps.test_websocket.outcome }}" = "failure" ] || \
+             [ "${{ steps.bundle_budget.outcome }}" = "failure" ]; then
+            exit 1
+          fi

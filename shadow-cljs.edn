@@ -1,0 +1,178 @@
+{:source-paths ["src" "test" "portfolio"]
+ 
+ :dependencies [[no.cjohansen/portfolio "2026.03.1"]
+                [coderafting/memsearch "0.1.1"]
+                [no.cjohansen/replicant "2025.06.21"]
+                [no.cjohansen/nexus "2025.07.1"]
+                [org.clojure/test.check "1.1.1"]]
+ 
+ :dev-http {8080 ["resources/public"]}
+ 
+  :builds
+ {:app {:target :browser
+        :output-dir "resources/public/js"
+        :asset-path "/js"
+        :module-hash-names true
+        :build-options {:manifest-name "manifest.json"}
+        :module-loader true
+        :modules {:main {:init-fn hyperopen.core/start!}
+                  :trading_crypto {:entries [hyperopen.trading-crypto.module]
+                                   :depends-on #{:main}}
+                  :margin_rec {:entries [hyperopen.margin-rec.engine-module]
+                               :depends-on #{:main}}
+                  :trade_chart {:entries [hyperopen.views.trading-chart.module]
+                                :depends-on #{:main}}
+                  :trading_indicators {:entries [hyperopen.views.trading-chart.indicators-module]
+                                       :depends-on #{:trade_chart}}
+                  :funding_modal {:entries [hyperopen.views.funding-modal-module]
+                                  :depends-on #{:main}}
+                  :spectate_mode_modal {:entries [hyperopen.views.spectate-mode-modal-module]
+                                        :depends-on #{:main}}
+                  :account_surfaces {:entries [hyperopen.views.account-surfaces-module]
+                                     :depends-on #{:main}}
+                  :account_positions_outcomes {:entries [hyperopen.views.account-positions-outcomes-module]
+                                               :depends-on #{:account_surfaces}}
+                  :account_orders {:entries [hyperopen.views.account-orders-module]
+                                   :depends-on #{:account_surfaces}}
+                  :account_activity {:entries [hyperopen.views.account-activity-module]
+                                     :depends-on #{:account_surfaces}}
+                  :account_funding_history {:entries [hyperopen.views.account-funding-history-module]
+                                            :depends-on #{:account_surfaces}}
+                  :charts_shared {:entries [hyperopen.views.chart.d3.runtime]
+                                  :depends-on #{:main}}
+                  :portfolio_route {:entries [hyperopen.views.portfolio-view
+                                             hyperopen.portfolio.route-runtime-module]
+                                    :depends-on #{:account_surfaces :charts_shared}}
+                  :leaderboard_route {:entries [hyperopen.views.leaderboard-view]
+                                      :depends-on #{:main}}
+                  :funding_comparison_route {:entries [hyperopen.views.funding-comparison-view]
+                                             :depends-on #{:main}}
+                  :staking_route {:entries [hyperopen.views.staking-view]
+                                  :depends-on #{:main}}
+                  :referrals_route {:entries [hyperopen.views.referrals-view]
+                                    :depends-on #{:main}}
+                  :api_wallets_route {:entries [hyperopen.views.api-wallets-view]
+                                      :depends-on #{:main}}
+                  :subaccounts_route {:entries [hyperopen.views.subaccounts-view]
+                                      :depends-on #{:main}}
+                  :vaults_route {:entries [hyperopen.views.vaults.list-view
+                                           hyperopen.views.vaults.detail-view
+                                           hyperopen.views.vaults.startup-preview
+                                           hyperopen.vaults.route-runtime-module]
+                                 :depends-on #{:charts_shared}}}
+        :devtools {:preloads [hyperopen.telemetry.console-preload
+                              hyperopen.dev.contracts-preload]
+                   :http-root "resources/public"
+                   :http-port 8080
+                   :after-load hyperopen.core/reload}}
+
+  :portfolio {:target :portfolio
+              :runner-ns hyperopen.workbench.runner
+              :ns-regexp "-scenes$"
+              :output-dir "resources/public/js"
+              :asset-path "/js"
+              :html-file {:path "resources/public/ui-workbench.html"
+                          :title "Hyperopen UI Workbench"}
+              :portfolio.ui/config {:css-paths ["/css/main.css"]
+                                    :canvas-path "/ui-workbench-canvas.html"
+                                    :viewport/defaults {:viewport/width "100%"
+                                                        :viewport/height "100%"
+                                                        :viewport/padding [20 20 20 20]}
+                                    :viewport/options [{:title "Auto"
+                                                        :value {:viewport/width "100%"
+                                                                :viewport/height "100%"}}
+                                                       {:title "iPhone 14 Pro Max"
+                                                        :value {:viewport/width 430
+                                                                :viewport/height 932}}
+                                                       {:title "Tablet"
+                                                        :value {:viewport/width 820
+                                                                :viewport/height 1180}}
+                                                       {:title "Desktop"
+                                                        :value {:viewport/width 1440
+                                                                :viewport/height 900}}]}}
+
+  :portfolio-worker {:target :browser
+                     :output-dir "resources/public/js"
+                     :asset-path "/js"
+                     :modules {:portfolio_worker {:init-fn hyperopen.portfolio.worker/init
+                                                  :web-worker true}}
+                     :compiler-options {:optimizations :advanced}}
+
+  :portfolio-optimizer-worker {:target :browser
+                               :output-dir "resources/public/js"
+                               :asset-path "/js"
+                               :modules {:portfolio_optimizer_worker {:init-fn hyperopen.portfolio.optimizer.worker/init
+                                                                       :web-worker true}}
+                               :compiler-options {:optimizations :advanced}}
+
+  :vault-detail-worker {:target :browser
+                        :output-dir "resources/public/js"
+                        :asset-path "/js"
+                        :modules {:vault_detail_worker {:init-fn hyperopen.vaults.detail.worker/init
+                                                        :web-worker true}}
+                     :compiler-options {:optimizations :advanced}}
+  
+  :test {:target :node-script
+         :output-to "out/test.js"
+         :main test-runner/-main
+         :compiler-options {:source-map true}
+         :js-options {:resolve {"lightweight-charts" {:target :file
+                                                      :file "test/shims/lightweight_charts_stub.cjs"}}}}
+
+  :ws-test {:target :node-test
+            :output-to "out/ws-test.js"
+            :compiler-options {:source-map true}
+            :ns-regexp "^(hyperopen\\.websocket\\..*-test|hyperopen\\.wallet\\.address-watcher-test|hyperopen\\.startup\\.runtime-test)$"}
+  
+  :release {:target :browser
+            :output-dir "resources/public/js"
+            :asset-path "/js"
+            :module-hash-names true
+            :build-options {:manifest-name "manifest.json"}
+            :module-loader true
+            :modules {:main {:init-fn hyperopen.core/start!}
+                      :trading_crypto {:entries [hyperopen.trading-crypto.module]
+                                       :depends-on #{:main}}
+                      :margin_rec {:entries [hyperopen.margin-rec.engine-module]
+                                   :depends-on #{:main}}
+                      :trade_chart {:entries [hyperopen.views.trading-chart.module]
+                                    :depends-on #{:main}}
+                      :trading_indicators {:entries [hyperopen.views.trading-chart.indicators-module]
+                                           :depends-on #{:trade_chart}}
+                      :funding_modal {:entries [hyperopen.views.funding-modal-module]
+                                      :depends-on #{:main}}
+                      :spectate_mode_modal {:entries [hyperopen.views.spectate-mode-modal-module]
+                                            :depends-on #{:main}}
+                      :account_surfaces {:entries [hyperopen.views.account-surfaces-module]
+                                         :depends-on #{:main}}
+                      :account_positions_outcomes {:entries [hyperopen.views.account-positions-outcomes-module]
+                                                   :depends-on #{:account_surfaces}}
+                      :account_orders {:entries [hyperopen.views.account-orders-module]
+                                       :depends-on #{:account_surfaces}}
+                      :account_activity {:entries [hyperopen.views.account-activity-module]
+                                         :depends-on #{:account_surfaces}}
+                      :account_funding_history {:entries [hyperopen.views.account-funding-history-module]
+                                                :depends-on #{:account_surfaces}}
+                      :charts_shared {:entries [hyperopen.views.chart.d3.runtime]
+                                      :depends-on #{:main}}
+                      :portfolio_route {:entries [hyperopen.views.portfolio-view
+                                                 hyperopen.portfolio.route-runtime-module]
+                                        :depends-on #{:account_surfaces :charts_shared}}
+                      :leaderboard_route {:entries [hyperopen.views.leaderboard-view]
+                                          :depends-on #{:main}}
+                      :funding_comparison_route {:entries [hyperopen.views.funding-comparison-view]
+                                                 :depends-on #{:main}}
+                      :staking_route {:entries [hyperopen.views.staking-view]
+                                      :depends-on #{:main}}
+                      :referrals_route {:entries [hyperopen.views.referrals-view]
+                                        :depends-on #{:main}}
+                      :api_wallets_route {:entries [hyperopen.views.api-wallets-view]
+                                          :depends-on #{:main}}
+                      :subaccounts_route {:entries [hyperopen.views.subaccounts-view]
+                                          :depends-on #{:main}}
+                      :vaults_route {:entries [hyperopen.views.vaults.list-view
+                                               hyperopen.views.vaults.detail-view
+                                               hyperopen.views.vaults.startup-preview
+                                               hyperopen.vaults.route-runtime-module]
+                                     :depends-on #{:charts_shared}}}
+            :compiler-options {:optimizations :advanced}}}} 

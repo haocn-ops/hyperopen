@@ -1,0 +1,76 @@
+[features]
+multi_agent = true
+
+[agents]
+max_threads = 6
+max_depth = 1
+
+[agents.spec_writer]
+description = "Clarifies scope, writes requirements inside the active ExecPlan, and defines non-goals. No production code edits."
+config_file = ".codex/agents/spec-writer.toml"
+
+[agents.acceptance_test_writer]
+description = "Proposes happy-path acceptance and integration coverage only. No production code or tracked test edits."
+config_file = ".codex/agents/acceptance-tests.toml"
+
+[agents.edge_case_test_writer]
+description = "Writes adversarial, invariant, and boundary-case test proposals. No production code."
+config_file = ".codex/agents/edge-case-tests.toml"
+
+[agents.worker]
+description = "Implements the smallest defensible change that makes the approved tests pass."
+config_file = ".codex/agents/worker.toml"
+
+[agents.reviewer]
+description = "Read-only reviewer for correctness, regressions, security, race conditions, and missing tests."
+config_file = ".codex/agents/reviewer.toml"
+
+[agents.browser_debugger]
+description = "Browser QA agent that reproduces flows, captures screenshots/logs/network evidence, and reports defects. No application-code edits."
+config_file = ".codex/agents/browser-debugger.toml"
+
+# Explicit registry for repo-local Codex agents under .codex/agents.
+[agents.architect_review]
+description = "Use when review changes need rigorous review for correctness, risk, and release readiness."
+config_file = ".codex/agents/architect-review.toml"
+nickname_candidates = ["Atlas", "Keystone"]
+
+[agents.clojure_expert]
+description = "Use when implementing clojure functionality with production-grade patterns and safeguards."
+config_file = ".codex/agents/clojure-expert.toml"
+nickname_candidates = ["Lambda", "Parens"]
+
+[agents.content_writer]
+description = "Use when producing polished written content for docs, blogs, or external communication."
+config_file = ".codex/agents/content_writer.toml"
+nickname_candidates = ["Quill", "Scribe"]
+
+[agents.debugger]
+description = "Use when failures are unclear and root-cause analysis is needed quickly."
+config_file = ".codex/agents/debugger.toml"
+nickname_candidates = ["Tracer", "Probe"]
+
+[agents.documentation_specialist]
+description = "Use when implementing documentation functionality with production-grade patterns and safeguards."
+config_file = ".codex/agents/documentation_specialist.toml"
+nickname_candidates = ["Guide", "Ledger"]
+
+[agents.tdd_test_writer]
+description = "Only materializes approved failing tests for the RED phase before implementation starts. No production code."
+config_file = ".codex/agents/tdd_test_writer.toml"
+nickname_candidates = ["Redline", "Harness"]
+
+[agents.ui_designer]
+description = "Use when UI expertise is needed to unblock implementation decisions."
+config_file = ".codex/agents/ui-designer.toml"
+nickname_candidates = ["Canvas", "Loom"]
+
+[agents.ui_visual_validator]
+description = "Use when UI visual changes need rigorous review for correctness, risk, and release readiness."
+config_file = ".codex/agents/ui-visual-validator.toml"
+nickname_candidates = ["Pixel", "Prism"]
+
+[mcp_servers.hyperopen-browser]
+command = "node"
+args = ["./tools/browser-inspection/src/mcp_server.mjs"]
+cwd = "."

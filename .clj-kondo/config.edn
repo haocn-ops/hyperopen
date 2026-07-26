@@ -1,0 +1,9 @@
+{:ns-groups [{:pattern "^(?!hyperopen\\.core$|hyperopen\\.core-bootstrap-test$|hyperopen\\.core-public-actions-test$|dev\\..*$|user$).+$"
+              :name non-entrypoint-ns}]
+ :config-in-ns
+ {non-entrypoint-ns
+  {:linters
+   {:discouraged-namespace
+    {hyperopen.core
+     {:level :error
+      :message "Prefer requiring owning namespaces (or wiring modules) instead of hyperopen.core. Reserve hyperopen.core for app entrypoints, legacy API compatibility tests, and dev tooling."}}}}}}

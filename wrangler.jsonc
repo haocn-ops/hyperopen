@@ -1,0 +1,22 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "hyperopen",
+  "main": "./workers/hyperopen-worker.mjs",
+  "compatibility_date": "2026-07-21",
+  "workers_dev": true,
+  "routes": [
+    { "pattern": "dexhelm.com", "custom_domain": true },
+    { "pattern": "app.dexhelm.com", "custom_domain": true },
+    { "pattern": "testnet.dexhelm.com", "custom_domain": true },
+    { "pattern": "status.dexhelm.com", "custom_domain": true }
+  ],
+  "vars": {
+    "HYPERUNIT_MAINNET_URL": "https://api.hyperunit.xyz",
+    "HYPERUNIT_TESTNET_URL": "https://api.hyperunit-testnet.xyz"
+  },
+  "assets": {
+    "directory": "./out/white-label/dexhelm",
+    "binding": "ASSETS",
+    "run_worker_first": true
+  }
+}

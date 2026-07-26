@@ -1,0 +1,621 @@
+(ns hyperopen.trading.order-form-transitions-test
+  (:require [cljs.test :refer-macros [deftest is testing]]
+            [clojure.test.check :as tc]
+            [clojure.test.check.generators :as gen]
+            [clojure.test.check.properties :as prop :include-macros true]
+            [hyperopen.schema.order-form-contracts :as contracts]
+            [hyperopen.state.trading.order-form-key-policy :as key-policy]
+            [hyperopen.state.trading :as trading]
+            [hyperopen.trading.order-type-registry :as order-type-registry]
+            [hyperopen.trading.order-form-transitions :as transitions]))
+
+(defn- base-state
+  ([] (base-state {}))
+  ([order-form-overrides]
+   (let [order-form (merge (trading/default-order-form) order-form-overrides)]
+     {:active-asset "BTC"
+      :active-market {:coin "BTC"
+                      :quote "USDC"
+                      :mark 100
+                      :maxLeverage 40
+                      :market-type :perp
+                      :szDecimals 4}
+      :asset-contexts {:BTC {:idx 0}}
+      :orderbooks {"BTC" {:bids [{:px "99"}]
+                          :asks [{:px "101"}]}}
+      :webdata2 {:clearinghouseState {:marginSummary {:accountValue "1000"
+                                                      :totalMarginUsed "250"}}}
+      :order-form order-form
+      :order-form-ui (trading/default-order-form-ui)
+      :order-form-runtime (trading/default-order-form-runtime)})))
+
+(deftest transition-runtime-shape-invariant-test
+  (let [state (base-state {:type :limit :size "1" :price "100"})
+        leverage-draft-transition (transitions/set-order-ui-leverage-draft state 25)
+        confirm-leverage-transition (transitions/confirm-order-ui-leverage
+                                     (merge state leverage-draft-transition))]
+    (doseq [transition [(transitions/select-entry-mode state :market)
+                        (transitions/select-entry-mode state :limit)
+                        (transitions/select-pro-order-type state :scale)
+                        (transitions/toggle-leverage-popover state)
+                        leverage-draft-transition
+                        confirm-leverage-transition
+                        (transitions/set-order-ui-leverage state 25)
+                        (transitions/set-order-size-percent state 45)
+                        (transitions/set-order-size-display state "123")
+                        (transitions/focus-order-price-input state)
+                        (transitions/blur-order-price-input state)
+                        (transitions/set-order-price-to-mid state)
+                        (transitions/update-order-form state [:side] :sell)]]
+      (is (map? transition))
+      (is (contracts/order-form-transition-valid? transition))
+      (when-let [runtime (:order-form-runtime transition)]
+        (is (boolean? (:submitting? runtime)))
+        (is (nil? (:error runtime)))))))
+
+(deftest percent-application-property-test
+  (let [state (base-state {:type :limit :price "100"})]
+    (doseq [input [-100 -1 0 1 12 33 50 77 100 120 999]]
+      (let [transition (transitions/set-order-size-percent state input)
+            form (:order-form transition)
+            pct (:size-percent form)]
+        (is (number? pct))
+        (is (<= 0 pct 100))
+        (when (zero? pct)
+          (is (= "" (:size form))))))))
+
+(deftest size-input-mode-toggle-converts-display-without-changing-canonical-size-test
+  (let [state (base-state {:type :limit
+                           :price "100"
+                           :size "2"
+                           :size-input-mode :quote
+                           :size-display "200"})
+        to-base (transitions/set-order-size-input-mode state :base)
+        base-form (:order-form to-base)
+        base-ui (:order-form-ui to-base)
+        next-state (merge state to-base)
+        to-quote (transitions/set-order-size-input-mode next-state :quote)
+        quote-form (:order-form to-quote)
+        quote-ui (:order-form-ui to-quote)]
+    (is (= :base (:size-input-mode base-ui)))
+    (is (= "2" (:size base-form)))
+    (is (= "2" (:size-display base-ui)))
+    (is (= :quote (:size-input-mode quote-ui)))
+    (is (= "2" (:size quote-form)))
+    (is (= "200" (:size-display quote-ui)))))
+
+(deftest manual-size-behavior-on-price-change-respects-active-size-input-mode-test
+  (let [quote-state (base-state {:type :limit
+                                 :price "100"
+                                 :size-input-mode :quote})
+        quote-after-size (merge quote-state
+                                (transitions/set-order-size-display quote-state "200"))
+        quote-after-price (transitions/update-order-form quote-after-size [:price] "50")
+        quote-form (:order-form quote-after-price)
+        quote-ui (:order-form-ui quote-after-price)
+        base-state* (base-state {:type :limit
+                                 :price "100"
+                                 :size-input-mode :base})
+        base-after-size (merge base-state*
+                               (transitions/set-order-size-display base-state* "2"))
+        base-after-price (transitions/update-order-form base-after-size [:price] "50")
+        base-form (:order-form base-after-price)
+        base-ui (:order-form-ui base-after-price)]
+    (is (= "200" (:size-display quote-ui)))
+    (is (= "4" (:size quote-form)))
+    (is (= :manual (:size-input-source quote-ui)))
+    (is (= "2" (:size-display base-ui)))
+    (is (= "2" (:size base-form)))
+    (is (= :manual (:size-input-source base-ui)))))
+
+(deftest localized-decimal-inputs-are-normalized-for-order-form-calculations-test
+  (let [state (assoc (base-state {:type :limit
+                                  :side :buy
+                                  :price "100"
+                                  :size "2"
+                                  :ui-leverage 20
+                                  :tpsl {:unit :usd}})
+                     :ui {:locale "fr-FR"})
+        price-transition (transitions/update-order-form state [:price] "101,5")
+        percent-transition (transitions/set-order-size-percent state "25,5")
+        size-display-transition (transitions/set-order-size-display state "203,0")
+        offset-transition (transitions/update-order-form state [:tp :offset-input] "20,5")]
+    (is (= "101.5" (get-in price-transition [:order-form :price])))
+    (is (< (js/Math.abs (- 25.5 (get-in percent-transition [:order-form :size-percent]))) 0.000001))
+    (is (= "203,0" (get-in size-display-transition [:order-form-ui :size-display])))
+    (is (= "110.25" (get-in offset-transition [:order-form :tp :trigger])))))
+
+(deftest submit-policy-disabled-reason-invariant-test
+  (let [state (base-state)
+        forms [(assoc (:order-form state) :type :limit :size "" :price "")
+               (assoc (:order-form state) :type :market :size "1")
+               (assoc (:order-form state) :type :stop-market :size "1" :trigger-px "")
+               (assoc (:order-form state) :type :limit :size "1" :price "100")]
+        modes [{:mode :view :submitting? false}
+               {:mode :submit :agent-ready? true}]]
+    (doseq [form forms
+            opts modes]
+      (let [policy (trading/submit-policy state form opts)]
+        (is (= (boolean (:reason policy))
+               (:disabled? policy)))))))
+
+(deftest select-entry-mode-and-pro-type-transitions-preserve-order-type-invariants-test
+  (let [state (base-state {:type :limit})
+        pro-types (set (order-type-registry/pro-order-types))]
+    (doseq [mode [:market :limit :pro]]
+      (let [transition (transitions/select-entry-mode state mode)
+            form (:order-form transition)
+            ui (:order-form-ui transition)
+            order-type (:type form)]
+        (is (contracts/order-form-transition-valid? transition))
+        (is (= mode (:entry-mode ui)))
+        (cond
+          (= mode :market) (is (= :market order-type))
+          (= mode :limit) (is (= :limit order-type))
+          :else (is (contains? pro-types order-type)))))
+    (doseq [order-type (order-type-registry/pro-order-types)]
+      (let [transition (transitions/select-pro-order-type state order-type)
+            form (:order-form transition)
+            ui (:order-form-ui transition)]
+        (is (contracts/order-form-transition-valid? transition))
+        (is (= :pro (:entry-mode ui)))
+        (is (= order-type (:type form)))))))
+
+(deftest tif-dropdown-transitions-toggle-close-and-reset-on-entry-mode-change-test
+  (let [state (base-state {:type :limit})
+        toggled (transitions/toggle-tif-dropdown state)
+        open-ui (:order-form-ui toggled)
+        escaped (transitions/handle-tif-dropdown-keydown (merge state toggled) "Escape")
+        escaped-ui (:order-form-ui escaped)
+        reopen (transitions/toggle-tif-dropdown state)
+        market-transition (transitions/select-entry-mode (merge state reopen) :market)
+        market-ui (:order-form-ui market-transition)]
+    (is (true? (:tif-dropdown-open? open-ui)))
+    (is (false? (:tif-dropdown-open? escaped-ui)))
+    (is (false? (:tif-dropdown-open? market-ui)))))
+
+(deftest margin-mode-transitions-toggle-close-escape-and-select-test
+  (let [state (base-state {:type :limit})
+        toggled (transitions/toggle-margin-mode-dropdown state)
+        open-ui (:order-form-ui toggled)
+        escaped (transitions/handle-margin-mode-dropdown-keydown (merge state toggled) "Escape")
+        escaped-ui (:order-form-ui escaped)
+        reopened (transitions/toggle-margin-mode-dropdown state)
+        selected (transitions/set-order-margin-mode (merge state reopened) :isolated)
+        selected-form (:order-form selected)
+        selected-ui (:order-form-ui selected)]
+    (is (true? (:margin-mode-dropdown-open? open-ui)))
+    (is (false? (:margin-mode-dropdown-open? escaped-ui)))
+    (is (not (contains? selected-form :margin-mode)))
+    (is (= :isolated (:margin-mode selected-ui)))
+    (is (false? (:margin-mode-dropdown-open? selected-ui)))))
+
+(deftest margin-mode-transition-forces-isolated-when-market-disallows-cross-test
+  (let [state (assoc (base-state {:type :limit})
+                     :active-market {:coin "xyz:NATGAS"
+                                     :quote "USDC"
+                                     :market-type :perp
+                                     :marginMode "noCross"
+                                     :onlyIsolated true})
+        selected (transitions/set-order-margin-mode state :cross)
+        selected-ui (:order-form-ui selected)
+        next-state (merge state selected)
+        next-draft (trading/order-form-draft next-state)]
+    (is (= :isolated (:margin-mode selected-ui)))
+    (is (false? (:margin-mode-dropdown-open? selected-ui)))
+    (is (= :isolated (:margin-mode next-draft)))))
+
+(deftest leverage-popover-transitions-toggle-draft-escape-and-confirm-test
+  (let [state (base-state {:type :limit})
+        toggled (transitions/toggle-leverage-popover state)
+        open-ui (:order-form-ui toggled)
+        drafted (transitions/set-order-ui-leverage-draft (merge state toggled) "17")
+        drafted-ui (:order-form-ui drafted)
+        escaped (transitions/handle-leverage-popover-keydown (merge state drafted) "Escape")
+        escaped-ui (:order-form-ui escaped)
+        reopened (transitions/toggle-leverage-popover (merge state escaped))
+        confirmed (transitions/confirm-order-ui-leverage
+                   (merge state
+                          reopened
+                          {:order-form-ui (assoc (:order-form-ui reopened)
+                                                 :leverage-draft 23)}))
+        confirmed-ui (:order-form-ui confirmed)]
+    (is (true? (:leverage-popover-open? open-ui)))
+    (is (= 17 (:leverage-draft drafted-ui)))
+    (is (false? (:leverage-popover-open? escaped-ui)))
+    (is (= 20 (:leverage-draft escaped-ui)))
+    (is (= 23 (:ui-leverage confirmed-ui)))
+    (is (= 23 (:leverage-draft confirmed-ui)))
+    (is (false? (:leverage-popover-open? confirmed-ui)))
+    (is (not (contains? (:order-form confirmed) :ui-leverage)))))
+
+(deftest localized-leverage-inputs-use-locale-decimal-parsing-test
+  (let [state (assoc (base-state {:type :limit})
+                     :ui {:locale "fr-FR"})
+        drafted (transitions/set-order-ui-leverage-draft state "17,5")
+        drafted-ui (:order-form-ui drafted)
+        direct (transitions/set-order-ui-leverage state "17,5")
+        direct-ui (:order-form-ui direct)
+        opened (transitions/toggle-leverage-popover state)
+        confirmed (transitions/confirm-order-ui-leverage
+                   (merge state
+                          opened
+                          {:order-form-ui (assoc (:order-form-ui opened)
+                                                 :leverage-draft "22,5")}))
+        confirmed-ui (:order-form-ui confirmed)]
+    (is (= 18 (:leverage-draft drafted-ui)))
+    (is (= 18 (:ui-leverage direct-ui)))
+    (is (= 23 (:ui-leverage confirmed-ui)))
+    (is (= 23 (:leverage-draft confirmed-ui)))))
+
+(deftest tpsl-unit-dropdown-transitions-toggle-close-and-reset-on-unit-selection-test
+  (let [state (assoc (base-state {:type :limit
+                                  :tpsl {:unit :usd}})
+                     :order-form-ui (assoc (trading/default-order-form-ui)
+                                           :tpsl-panel-open? true))
+        toggled (transitions/toggle-tpsl-unit-dropdown state)
+        open-ui (:order-form-ui toggled)
+        escaped (transitions/handle-tpsl-unit-dropdown-keydown (merge state toggled) "Escape")
+        escaped-ui (:order-form-ui escaped)
+        reopened (transitions/toggle-tpsl-unit-dropdown state)
+        unit-transition (transitions/update-order-form (merge state reopened) [:tpsl :unit] :percent)
+        unit-ui (:order-form-ui unit-transition)
+        unit-form (:order-form unit-transition)]
+    (is (true? (:tpsl-unit-dropdown-open? open-ui)))
+    (is (false? (:tpsl-unit-dropdown-open? escaped-ui)))
+    (is (= :roe-percent (get-in unit-form [:tpsl :unit])))
+    (is (false? (:tpsl-unit-dropdown-open? unit-ui)))))
+
+(deftest tpsl-unit-dropdown-toggle-allows-market-mode-when-panel-open-test
+  (let [state (assoc (base-state {:type :market
+                                  :tpsl {:unit :usd}})
+                     :order-form-ui (assoc (trading/default-order-form-ui)
+                                           :entry-mode :market
+                                           :tpsl-panel-open? true))
+        toggled (transitions/toggle-tpsl-unit-dropdown state)
+        open-ui (:order-form-ui toggled)]
+    (is (true? (:tpsl-unit-dropdown-open? open-ui)))))
+
+(deftest tpsl-and-reduce-only-are-mutually-exclusive-test
+  (let [state (base-state {:type :limit
+                           :price "100"
+                           :size "1"
+                           :reduce-only true})
+        toggled (transitions/toggle-order-tpsl-panel state)
+        toggled-form (:order-form toggled)
+        toggled-ui (:order-form-ui toggled)
+        with-tpsl-values (merge state
+                                toggled
+                                {:order-form (-> toggled-form
+                                                 (assoc-in [:tp :trigger] "110")
+                                                 (assoc-in [:tp :enabled?] true)
+                                                 (assoc-in [:sl :trigger] "90")
+                                                 (assoc-in [:sl :enabled?] true))})
+        reduce-only-transition (transitions/update-order-form with-tpsl-values [:reduce-only] true)
+        reduce-only-form (:order-form reduce-only-transition)
+        reduce-only-ui (:order-form-ui reduce-only-transition)]
+    (is (false? (:reduce-only toggled-form)))
+    (is (true? (:tpsl-panel-open? toggled-ui)))
+    (is (true? (:reduce-only reduce-only-form)))
+    (is (false? (get-in reduce-only-form [:tp :enabled?])))
+    (is (false? (get-in reduce-only-form [:sl :enabled?])))
+    (is (false? (:tpsl-panel-open? reduce-only-ui)))))
+
+(deftest tpsl-offset-input-updates-trigger-price-test
+  (let [state (base-state {:type :limit
+                           :side :buy
+                           :price "100"
+                           :size "2"
+                           :ui-leverage 20
+                           :tpsl {:unit :usd}})
+        tp-transition (transitions/update-order-form state [:tp :offset-input] "20")
+        sl-transition (transitions/update-order-form state [:sl :offset-input] "20")]
+    (is (= "110" (get-in tp-transition [:order-form :tp :trigger])))
+    (is (= "90" (get-in sl-transition [:order-form :sl :trigger])))
+    (is (= "20" (get-in tp-transition [:order-form :tp :offset-input])))
+    (is (= "20" (get-in sl-transition [:order-form :sl :offset-input])))
+    (is (true? (get-in tp-transition [:order-form :tp :enabled?])))
+    (is (true? (get-in sl-transition [:order-form :sl :enabled?])))))
+
+(deftest tpsl-offset-input-backfills-trigger-when-size-is-entered-later-test
+  (let [state (assoc (base-state {:type :limit
+                                  :side :buy
+                                  :size ""
+                                  :price "100"
+                                  :tpsl {:unit :usd}})
+                     :order-form-ui (assoc (trading/default-order-form-ui)
+                                           :tpsl-panel-open? true))
+        offset-transition (transitions/update-order-form state [:tp :offset-input] "20")
+        sized-transition (transitions/set-order-size-display (merge state offset-transition) "200")]
+    (is (= "" (get-in offset-transition [:order-form :tp :trigger])))
+    (is (= "20" (get-in offset-transition [:order-form :tp :offset-input])))
+    (is (= "110" (get-in sized-transition [:order-form :tp :trigger])))
+    (is (= "20" (get-in sized-transition [:order-form :tp :offset-input])))
+    (is (true? (get-in sized-transition [:order-form :tp :enabled?])))))
+
+(deftest tpsl-trigger-edit-clears-offset-input-cache-test
+  (let [state (base-state {:type :limit
+                           :tp {:enabled? true
+                                :trigger "110"
+                                :offset-input "20"
+                                :is-market true
+                                :limit ""}
+                           :sl {:enabled? true
+                                :trigger "90"
+                                :offset-input "20"
+                                :is-market true
+                                :limit ""}})
+        tp-transition (transitions/update-order-form state [:tp :trigger] "120")
+        sl-transition (transitions/update-order-form state [:sl :trigger] "80")]
+    (is (= "" (get-in tp-transition [:order-form :tp :offset-input])))
+    (is (= "" (get-in sl-transition [:order-form :sl :offset-input])))))
+
+(deftest tpsl-unit-change-clears-offset-input-cache-test
+  (let [state (base-state {:type :limit
+                           :tpsl {:unit :usd}
+                           :tp {:enabled? true
+                                :trigger "110"
+                                :offset-input "20"
+                                :is-market true
+                                :limit ""}
+                           :sl {:enabled? true
+                                :trigger "90"
+                                :offset-input "20"
+                                :is-market true
+                                :limit ""}})
+        transition (transitions/update-order-form state [:tpsl :unit] :percent)]
+    (is (= "" (get-in transition [:order-form :tp :offset-input])))
+    (is (= "" (get-in transition [:order-form :sl :offset-input])))))
+
+(deftest update-order-form-tif-closes-tif-dropdown-test
+  (let [state (assoc (base-state {:type :limit :tif :gtc})
+                     :order-form-ui (assoc (trading/default-order-form-ui)
+                                           :tif-dropdown-open? true))
+        transition (transitions/update-order-form state [:tif] :ioc)
+        form (:order-form transition)
+        ui (:order-form-ui transition)]
+    (is (= :ioc (:tif form)))
+    (is (false? (:tif-dropdown-open? ui)))))
+
+(deftest update-order-form-rejects-ui-and-runtime-paths-test
+  (let [state (base-state {:type :limit :size "1" :price "100"})]
+    (doseq [path key-policy/canonical-write-blocked-order-form-paths]
+      (let [transition (transitions/update-order-form state path true)]
+        (is (contracts/order-form-transition-valid? transition))
+        (is (nil? (:order-form transition)))
+        (is (nil? (:order-form-ui transition)))
+        (is (= nil (get-in transition [:order-form-runtime :error])))))))
+
+(def ^:private ui-only-form-paths
+  key-policy/deprecated-canonical-order-form-key-set)
+
+(def ^:private entry-mode-gen
+  (gen/elements [:market :limit :pro]))
+
+(def ^:private pro-order-type-gen
+  (gen/elements (vec (order-type-registry/pro-order-types))))
+
+(def ^:private side-gen
+  (gen/elements [:buy :sell]))
+
+(def ^:private tif-gen
+  (gen/elements [:gtc :ioc :alo]))
+
+(def ^:private keydown-gen
+  (gen/elements ["Escape" "Enter"]))
+
+(def ^:private intent-gen
+  (gen/one-of
+   [(gen/fmap (fn [mode] {:intent :select-entry-mode :mode mode}) entry-mode-gen)
+    (gen/fmap (fn [order-type] {:intent :select-pro-order-type :order-type order-type}) pro-order-type-gen)
+    (gen/fmap (fn [leverage] {:intent :set-ui-leverage :leverage leverage}) (gen/choose 1 120))
+    (gen/fmap (fn [percent] {:intent :set-size-percent :percent percent}) (gen/choose -40 160))
+    (gen/fmap (fn [size-display] {:intent :set-size-display :size-display size-display})
+              (gen/fmap str (gen/choose 0 10000)))
+    (gen/return {:intent :focus-price})
+    (gen/return {:intent :blur-price})
+    (gen/return {:intent :set-mid-price})
+    (gen/return {:intent :toggle-tpsl})
+    (gen/fmap (fn [side] {:intent :set-side :side side}) side-gen)
+    (gen/fmap (fn [price] {:intent :set-price :price price})
+              (gen/fmap str (gen/choose 1 300000)))
+    (gen/fmap (fn [tif] {:intent :set-tif :tif tif}) tif-gen)
+    (gen/fmap (fn [key] {:intent :keydown-pro-dropdown :key key}) keydown-gen)
+    (gen/fmap (fn [key] {:intent :keydown-tif-dropdown :key key}) keydown-gen)
+    (gen/fmap (fn [key] {:intent :keydown-tpsl-unit-dropdown :key key}) keydown-gen)
+    (gen/return {:intent :toggle-pro-dropdown})
+    (gen/return {:intent :toggle-tif-dropdown})
+    (gen/return {:intent :toggle-tpsl-unit-dropdown})]))
+
+(defn- run-intent [state {:keys [intent mode order-type leverage percent size-display side price tif key]}]
+  (case intent
+    :select-entry-mode (transitions/select-entry-mode state mode)
+    :select-pro-order-type (transitions/select-pro-order-type state order-type)
+    :set-ui-leverage (transitions/set-order-ui-leverage state leverage)
+    :set-size-percent (transitions/set-order-size-percent state percent)
+    :set-size-display (transitions/set-order-size-display state size-display)
+    :focus-price (transitions/focus-order-price-input state)
+    :blur-price (transitions/blur-order-price-input state)
+    :set-mid-price (transitions/set-order-price-to-mid state)
+    :toggle-tpsl (transitions/toggle-order-tpsl-panel state)
+    :set-side (transitions/update-order-form state [:side] side)
+    :set-price (transitions/update-order-form state [:price] price)
+    :set-tif (transitions/update-order-form state [:tif] tif)
+    :keydown-pro-dropdown (transitions/handle-pro-order-type-dropdown-keydown state key)
+    :toggle-pro-dropdown (transitions/toggle-pro-order-type-dropdown state)
+    :keydown-tif-dropdown (transitions/handle-tif-dropdown-keydown state key)
+    :toggle-tif-dropdown (transitions/toggle-tif-dropdown state)
+    :keydown-tpsl-unit-dropdown (transitions/handle-tpsl-unit-dropdown-keydown state key)
+    :toggle-tpsl-unit-dropdown (transitions/toggle-tpsl-unit-dropdown state)
+    nil))
+
+(defn- apply-model [model {:keys [intent mode order-type key]}]
+  (case intent
+    :select-entry-mode
+    (case mode
+      :market (assoc model
+                     :entry-mode :market
+                     :type :market
+                     :pro-order-type-dropdown-open? false
+                     :tpsl-panel-open? (boolean (:tpsl-panel-open? model))
+                     :tpsl-unit-dropdown-open? false
+                     :tif-dropdown-open? false)
+      :limit (assoc model
+                    :entry-mode :limit
+                    :type :limit
+                    :pro-order-type-dropdown-open? false
+                    :tpsl-panel-open? (boolean (:tpsl-panel-open? model))
+                    :tpsl-unit-dropdown-open? false
+                    :tif-dropdown-open? false)
+      :pro (let [next-type (trading/normalize-pro-order-type (:type model))
+                 scale? (= :scale next-type)]
+             (assoc model
+                    :entry-mode :pro
+                    :type next-type
+                    :tpsl-panel-open? (if scale?
+                                        false
+                                        (boolean (:tpsl-panel-open? model)))
+                    :tpsl-unit-dropdown-open? false
+                    :tif-dropdown-open? false)))
+
+    :select-pro-order-type
+    (let [next-type (trading/normalize-pro-order-type order-type)
+          scale? (= :scale next-type)]
+      (assoc model :entry-mode :pro
+             :type next-type
+             :pro-order-type-dropdown-open? false
+             :tpsl-panel-open? (if scale?
+                                 false
+                                 (boolean (:tpsl-panel-open? model)))
+             :tpsl-unit-dropdown-open? false
+             :tif-dropdown-open? false))
+
+    :toggle-pro-dropdown
+    (update model :pro-order-type-dropdown-open? not)
+
+    :keydown-pro-dropdown
+    (if (= key "Escape")
+      (assoc model :pro-order-type-dropdown-open? false)
+      model)
+
+    :toggle-tif-dropdown
+    (if (trading/limit-like-type? (:type model))
+      (update model :tif-dropdown-open? not)
+      (assoc model :tif-dropdown-open? false))
+
+    :toggle-tpsl-unit-dropdown
+    (if (:tpsl-panel-open? model)
+      (update model :tpsl-unit-dropdown-open? not)
+      (assoc model :tpsl-unit-dropdown-open? false))
+
+    :keydown-tif-dropdown
+    (if (= key "Escape")
+      (assoc model :tif-dropdown-open? false)
+      model)
+
+    :keydown-tpsl-unit-dropdown
+    (if (= key "Escape")
+      (assoc model :tpsl-unit-dropdown-open? false)
+      model)
+
+    :set-tif
+    (assoc model :tif-dropdown-open? false)
+
+    :toggle-tpsl
+    (if (= :scale (:type model))
+      model
+      (-> model
+          (update :tpsl-panel-open? not)
+          (assoc :tpsl-unit-dropdown-open? false)))
+
+    model))
+
+(defn- apply-transition [state transition]
+  (if (map? transition)
+    (merge state transition)
+    state))
+
+(defn- state-invariants-hold?
+  [state model]
+  (let [form (:order-form state)
+        ui-state (:order-form-ui state)
+        normalized-form (trading/order-form-draft state)
+        effective-ui (trading/order-form-ui-state state)
+        size-percent (:size-percent normalized-form)]
+    (and (map? form)
+         (map? ui-state)
+         (every? #(not (contains? form %)) ui-only-form-paths)
+         (= (:entry-mode normalized-form) (:entry-mode effective-ui))
+         (= (:ui-leverage normalized-form) (:ui-leverage effective-ui))
+         (= (:margin-mode normalized-form) (:margin-mode effective-ui))
+         (= (:size-display normalized-form) (:size-display effective-ui))
+         (= (:entry-mode model) (:entry-mode effective-ui))
+         (= (:margin-mode model) (:margin-mode effective-ui))
+         (= (:type model) (:type normalized-form))
+         (= (:pro-order-type-dropdown-open? model)
+            (boolean (:pro-order-type-dropdown-open? effective-ui)))
+         (= (:tpsl-unit-dropdown-open? model)
+            (boolean (:tpsl-unit-dropdown-open? effective-ui)))
+         (= (:tif-dropdown-open? model)
+            (boolean (:tif-dropdown-open? effective-ui)))
+         (or (not (= :scale (:type normalized-form)))
+             (false? (:tpsl-panel-open? effective-ui)))
+         (if (number? size-percent)
+           (<= 0 size-percent 100)
+           true))))
+
+(defn- evaluate-intents
+  [initial-state initial-model intents]
+  (loop [idx 0
+         remaining intents
+         state initial-state
+         model initial-model]
+    (if (empty? remaining)
+      {:ok? true}
+      (let [intent (first remaining)
+            transition (run-intent state intent)
+            transition-valid? (or (nil? transition)
+                                  (contracts/order-form-transition-valid? transition))
+            next-state (apply-transition state transition)
+            next-model (apply-model model intent)
+            invariants-ok? (state-invariants-hold? next-state next-model)]
+        (if (and transition-valid? invariants-ok?)
+          (recur (inc idx) (rest remaining) next-state next-model)
+          {:ok? false
+           :idx idx
+           :intent intent
+           :transition transition
+           :transition-valid? transition-valid?
+           :invariants-ok? invariants-ok?
+           :state-snapshot {:order-form (:order-form next-state)
+                            :order-form-ui (:order-form-ui next-state)}})))))
+
+(defn- failure-diagnostics
+  [base initial-model result]
+  (let [shrunk-intents (or (get-in result [:shrunk :smallest])
+                           (get-in result [:fail]))
+        run (when (sequential? shrunk-intents)
+              (evaluate-intents base initial-model shrunk-intents))]
+    {:result (dissoc result :result)
+     :shrunk-intents (when (sequential? shrunk-intents)
+                       (vec (take 25 shrunk-intents)))
+     :failure run}))
+
+(deftest transition-state-machine-generative-model-invariants-test
+  (let [base (base-state {:type :limit
+                          :price "100"
+                          :size "1"
+                          :size-percent 10})
+        initial-model {:entry-mode :limit
+                       :type :limit
+                       :margin-mode :cross
+                       :pro-order-type-dropdown-open? false
+                       :tpsl-unit-dropdown-open? false
+                       :tif-dropdown-open? false
+                       :tpsl-panel-open? false}
+        property (prop/for-all [intents (gen/vector intent-gen 1 120)]
+                   (:ok? (evaluate-intents base initial-model intents)))]
+    (let [result (tc/quick-check 120 property)]
+      (is (:pass? result)
+          (str "generative model check failed: "
+               (pr-str (failure-diagnostics base initial-model result)))))))

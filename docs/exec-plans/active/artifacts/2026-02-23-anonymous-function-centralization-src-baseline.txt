@@ -1,0 +1,122 @@
+root=/Users//projects/hyperopen
+scope=src
+scanned_files=241
+parse_errors=0
+total_lambda_arities=910
+duplicate_groups=59
+duplicate_occurrences=142
+cross_file_duplicate_groups=28
+large_duplicate_groups_size_ge_10=28
+
+top_files_by_lambda_arities:
+  48 src/hyperopen/schema/contracts.cljs
+  39 src/hyperopen/startup/collaborators.cljs
+  24 src/hyperopen/runtime/effect_adapters.cljs
+  23 src/hyperopen/views/account_info/projections/balances.cljs
+  23 src/hyperopen/websocket/application/runtime.cljs
+  22 src/hyperopen/api/fetch_compat.cljs
+  22 src/hyperopen/websocket/health.cljs
+  20 src/hyperopen/api/gateway/orders/commands.cljs
+  19 src/hyperopen/api/info_client.cljs
+  17 src/hyperopen/domain/trading/indicators/trend/strength.cljs
+  17 src/hyperopen/order/effects.cljs
+  17 src/hyperopen/views/account_info/tabs/order_history.cljs
+  15 src/hyperopen/account/history/effects.cljs
+  15 src/hyperopen/domain/trading/indicators/volatility/dispersion.cljs
+  15 src/hyperopen/schema/order_form_contracts.cljs
+  14 src/hyperopen/domain/trading/indicators/oscillators/structure.cljs
+  13 src/hyperopen/startup/runtime.cljs
+  13 src/hyperopen/views/trading_chart/utils/chart_interop/volume_indicator_overlay.cljs
+  13 src/hyperopen/websocket/infrastructure/runtime_effects.cljs
+  12 src/hyperopen/domain/trading/indicators/oscillators/patterns.cljs
+  12 src/hyperopen/domain/trading/indicators/trend/moving_averages.cljs
+  11 src/hyperopen/api/instance.cljs
+  11 src/hyperopen/app/startup.cljs
+  11 src/hyperopen/domain/trading/indicators/oscillators/classic.cljs
+  11 src/hyperopen/websocket/trades.cljs
+
+top_duplicate_groups:
+  count=5 files=5 argc=1 size=3 canon=(do 0)
+    - src/hyperopen/views/account_info/tabs/funding_history.cljs:212
+    - src/hyperopen/views/account_info/tabs/open_orders.cljs:107
+    - src/hyperopen/views/account_info/tabs/order_history.cljs:193
+    - src/hyperopen/views/account_info/tabs/positions.cljs:122
+    - src/hyperopen/views/account_info/tabs/trade_history.cljs:309
+  count=5 files=4 argc=2 size=16 canon=(do (when (and (finite-number? arg0) (finite-number? arg1)) (- arg0 arg1)))
+    - src/hyperopen/domain/trading/indicators/oscillators/classic.cljs:157
+    - src/hyperopen/domain/trading/indicators/oscillators/patterns.cljs:110
+    - src/hyperopen/domain/trading/indicators/oscillators/patterns.cljs:116
+    - src/hyperopen/domain/trading/indicators/oscillators/statistics.cljs:87
+    - src/hyperopen/domain/trading/indicators/volatility/dispersion.cljs:213
+  count=5 files=3 argc=0 size=3 canon=(do nil)
+    - src/hyperopen/views/trading_chart/utils/chart_interop/baseline.cljs:49
+    - src/hyperopen/views/trading_chart/utils/chart_interop/baseline.cljs:68
+    - src/hyperopen/views/trading_chart/utils/chart_interop/visible_range_persistence.cljs:138
+    - src/hyperopen/views/trading_chart/utils/chart_interop/visible_range_persistence.cljs:168
+    - src/hyperopen/views/trading_chart/utils/chart_interop/volume_indicator_overlay.cljs:396
+  count=5 files=1 argc=1 size=17 canon=(do (->> (extract-user-candidates arg0) (mapv (fn [user] {:user user}))))
+    - src/hyperopen/websocket/health.cljs:239
+    - src/hyperopen/websocket/health.cljs:242
+    - src/hyperopen/websocket/health.cljs:245
+    - src/hyperopen/websocket/health.cljs:248
+    - src/hyperopen/websocket/health.cljs:251
+  count=5 files=1 argc=1 size=6 canon=(do {:user arg0})
+    - src/hyperopen/websocket/health.cljs:241
+    - src/hyperopen/websocket/health.cljs:244
+    - src/hyperopen/websocket/health.cljs:247
+    - src/hyperopen/websocket/health.cljs:250
+    - src/hyperopen/websocket/health.cljs:253
+  count=4 files=4 argc=1 size=9 canon=(do (.padStart (str arg0) 2 "0"))
+    - src/hyperopen/account/history/effects.cljs:10
+    - src/hyperopen/utils/formatting.cljs:130
+    - src/hyperopen/views/account_info/tabs/funding_history.cljs:21
+    - src/hyperopen/views/l2_orderbook_view.cljs:119
+  count=4 files=3 argc=2 size=19 canon=(do (when (and (finite-number? arg0) (finite-number? arg1)) (+ arg0 (* multiplier arg1))))
+    - src/hyperopen/domain/trading/indicators/oscillators/structure.cljs:73
+    - src/hyperopen/domain/trading/indicators/volatility/channels.cljs:115
+    - src/hyperopen/domain/trading/indicators/volatility/dispersion.cljs:31
+    - src/hyperopen/domain/trading/indicators/volatility/dispersion.cljs:131
+  count=4 files=3 argc=2 size=19 canon=(do (when (and (finite-number? arg0) (finite-number? arg1)) (- arg0 (* multiplier arg1))))
+    - src/hyperopen/domain/trading/indicators/oscillators/structure.cljs:68
+    - src/hyperopen/domain/trading/indicators/volatility/channels.cljs:120
+    - src/hyperopen/domain/trading/indicators/volatility/dispersion.cljs:36
+    - src/hyperopen/domain/trading/indicators/volatility/dispersion.cljs:136
+  count=3 files=3 argc=1 size=8 canon=(do (or (:coin arg0) ""))
+    - src/hyperopen/views/account_info/tabs/funding_history.cljs:197
+    - src/hyperopen/views/account_info/tabs/open_orders.cljs:101
+    - src/hyperopen/views/account_info/tabs/order_history.cljs:172
+  count=3 files=1 argc=1 size=10 canon=(do (policy/topic->tier (:channel-tier-policy (clojure.core/deref connection-config)) arg0))
+    - src/hyperopen/websocket/client.cljs:138
+    - src/hyperopen/websocket/client.cljs:170
+    - src/hyperopen/websocket/client.cljs:199
+  count=3 files=1 argc=0 size=5 canon=(do (clear-wallet-copy-feedback-timeout! runtime))
+    - src/hyperopen/runtime/effect_adapters.cljs:348
+    - src/hyperopen/runtime/effect_adapters.cljs:373
+    - src/hyperopen/runtime/effect_adapters.cljs:386
+  count=2 files=2 argc=1 size=49 canon=(do (if (< arg0 period) nil (let [current (nth values arg0) base (nth values (- arg0 period))] (when (and (finite-number? current) (finite-number? base) (not= base 0)) (* 100 (/ (- current base) base))))))
+    - src/hyperopen/domain/trading/indicators/oscillators/helpers.cljs:50
+    - src/hyperopen/domain/trading/indicators/oscillators/momentum.cljs:22
+  count=2 files=2 argc=1 size=49 canon=(do (let [high (nth highs arg0) low (nth lows arg0) prev-close (if (zero? arg0) (nth closes arg0) (nth closes (dec arg0)))] (max (- high low) (js/Math.abs (- high prev-close)) (js/Math.abs (- low prev-close)))))
+    - src/hyperopen/domain/trading/indicators/trend/strength.cljs:31
+    - src/hyperopen/domain/trading/indicators/volatility/range.cljs:18
+  count=2 files=2 argc=2 size=23 canon=(do (when (and (finite-number? arg0) (finite-number? arg1) (not= arg1 0)) (* 100 (/ arg0 arg1))))
+    - src/hyperopen/domain/trading/indicators/oscillators/statistics.cljs:26
+    - src/hyperopen/domain/trading/indicators/volatility/range.cljs:79
+  count=2 files=2 argc=0 size=19 canon=(do (when apply-spot-meta-success (swap! store apply-spot-meta-success spot-meta)) (swap! store apply-asset-selector-success phase market-state) (:markets market-state))
+    - src/hyperopen/api/fetch_compat.cljs:168
+    - src/hyperopen/runtime/api_effects.cljs:15
+  count=2 files=2 argc=1 size=15 canon=(do (/ (+ (nth high-values arg0) (nth low-values arg0)) 2))
+    - src/hyperopen/domain/trading/indicators/price.cljs:39
+    - src/hyperopen/domain/trading/indicators/trend/strength.cljs:207
+  count=2 files=2 argc=1 size=12 canon=(do (and (number? arg0) (not (js/isNaN arg0))))
+    - src/hyperopen/views/trading_chart/utils/chart_interop/baseline.cljs:14
+    - src/hyperopen/views/trading_chart/utils/chart_interop/price_format.cljs:32
+  count=2 files=2 argc=1 size=11 canon=(do (if (number? arg0) arg0 (js/parseFloat arg0)))
+    - src/hyperopen/views/trading_chart/utils/chart_interop/baseline.cljs:12
+    - src/hyperopen/views/trading_chart/utils/chart_interop/price_format.cljs:30
+  count=2 files=2 argc=1 size=10 canon=(do (or (boolean arg0) (boolean seq-gap-detected?)))
+    - src/hyperopen/websocket/application/runtime_reducer.cljs:131
+    - src/hyperopen/websocket/health.cljs:362
+  count=2 files=2 argc=1 size=10 canon=(do (swap! store api-projections/apply-open-orders-error arg0) (js/Promise.reject arg0))
+    - src/hyperopen/order/effects.cljs:98
+    - src/hyperopen/startup/collaborators.cljs:48

@@ -1,0 +1,16 @@
+[{:label "API wallet policy"
+  :module "src/hyperopen/api_wallets/domain/policy.cljs"
+  :suite :test
+  :mutate-all true}
+ {:label "Trading validation"
+  :module "src/hyperopen/domain/trading/validation.cljs"
+  :suite :test
+  :mutate-all true}
+ {:label "Vault transfer policy"
+  :module "src/hyperopen/vaults/domain/transfer_policy.cljs"
+  :suite :test
+  :mutate-all true}
+ {:label "Orderbook policy"
+  :module "src/hyperopen/websocket/orderbook_policy.cljs"
+  :suite :auto
+  :mutate-all true}]

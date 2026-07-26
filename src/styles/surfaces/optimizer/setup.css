@@ -1,0 +1,914 @@
+@layer components {
+  .portfolio-optimizer.optimizer-setup-route-surface,
+  .portfolio-optimizer .optimizer-setup-route-surface {
+    background-color: var(--optimizer-bg);
+    /* Raised setup type ladder (2026-07-02 design review): unclassed text
+       inherits 13px here instead of the optimizer-wide 12px base. Explicitly
+       classed text follows the ladder documented in setup_controls.cljs. */
+    font-size: 0.8125rem;
+    box-sizing: border-box;
+    max-width: 100%;
+    min-width: 0;
+    overflow-x: clip;
+  }
+
+  .portfolio-optimizer .optimizer-setup-header {
+    background-color: var(--optimizer-bg);
+  }
+
+  .portfolio-optimizer .optimizer-setup-surface {
+    background-color: var(--optimizer-bg);
+    border: 1px solid var(--optimizer-border);
+    box-sizing: border-box;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .portfolio-optimizer
+    :is(.optimizer-control-rail, .optimizer-context-rail) {
+    background-color: var(--optimizer-surface);
+    box-sizing: border-box;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .portfolio-optimizer .optimizer-control-rail {
+    border-right: 1px solid var(--optimizer-border);
+  }
+
+  .portfolio-optimizer .optimizer-context-rail {
+    border-left: 1px solid var(--optimizer-border);
+  }
+
+  /* Desktop 3-column workbench: the CENTER policy pane is the tall primary
+     scroll surface (exposure map + every policy panel + the full assumption
+     cards). The two side rails — universe selection (left) and the scenario
+     contract / readiness (right) — are much shorter, so page-scrolling down to
+     the center's height stranded them at the top and left large empty voids
+     below (2026-07-08 "very janky … I scroll to the bottom and it's cut off").
+     Pin each rail to the top of the viewport so it stays in view while the
+     center scrolls, and let a rail scroll internally when its own content is
+     taller than the viewport (e.g. a long custom universe). Scoped to the
+     setup grid only via `.optimizer-setup-surface >`, so the results and
+     execution tabs keep normal document flow. The 3-column track only exists at
+     xl (1280px); below that the grid is a single stacked column that must keep
+     natural page scroll, so this is gated to the same breakpoint. */
+  @media (min-width: 1280px) {
+    .portfolio-optimizer .optimizer-setup-surface > .optimizer-control-rail,
+    .portfolio-optimizer .optimizer-setup-surface > .optimizer-context-rail {
+      position: sticky;
+      top: 0;
+      align-self: start;
+      /* Matches the route frame's own `calc(100vh - 3.5rem)` height budget so a
+         pinned rail rests just above the fixed footer instead of behind it. */
+      max-height: calc(100vh - 3.5rem);
+      overflow-y: auto;
+      scrollbar-width: thin;
+    }
+  }
+
+  /* Any rail row-list that can grow with the universe (the open-by-default
+     Return views editor under Maximum Sharpe, and the History assumptions
+     list of thin-history assets) shows as many rows as the viewport allows —
+     the rail otherwise trails into empty space while the list scrolls at a
+     fixed height — but still caps the list so a large universe cannot push
+     Data health and the run context out of reach, or stretch the whole
+     3-column setup grid row (default CSS Grid align-items: stretch) taller
+     than the other columns' actual content. */
+  .portfolio-optimizer
+    .optimizer-context-rail
+    :is(.optimizer-objective-view-rows, .optimizer-history-assumptions-rows) {
+    max-height: clamp(24rem, 62vh, 48rem);
+  }
+
+  /* The rail list's scrollbar must be OBVIOUS: it is the cue that more assets
+     exist below the fold. An accent-tinted, always-visible thumb on a faint
+     track — not the near-invisible default. */
+  .portfolio-optimizer
+    .optimizer-context-rail
+    :is(.optimizer-objective-view-rows, .optimizer-history-assumptions-rows) {
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in srgb, var(--optimizer-accent) 55%, transparent)
+      color-mix(in srgb, var(--optimizer-border-strong) 45%, transparent);
+    scrollbar-gutter: stable;
+  }
+
+  .portfolio-optimizer
+    .optimizer-context-rail
+    :is(.optimizer-objective-view-rows, .optimizer-history-assumptions-rows)::-webkit-scrollbar {
+    width: 10px;
+  }
+
+  .portfolio-optimizer
+    .optimizer-context-rail
+    :is(.optimizer-objective-view-rows, .optimizer-history-assumptions-rows)::-webkit-scrollbar-track {
+    background-color: color-mix(in srgb, var(--optimizer-border-strong) 45%, transparent);
+  }
+
+  .portfolio-optimizer
+    .optimizer-context-rail
+    :is(.optimizer-objective-view-rows, .optimizer-history-assumptions-rows)::-webkit-scrollbar-thumb {
+    background-color: color-mix(in srgb, var(--optimizer-accent) 55%, transparent);
+    border-radius: 5px;
+  }
+
+  .portfolio-optimizer
+    .optimizer-context-rail
+    :is(.optimizer-objective-view-rows, .optimizer-history-assumptions-rows)::-webkit-scrollbar-thumb:hover {
+    background-color: color-mix(in srgb, var(--optimizer-accent) 75%, transparent);
+  }
+
+  .portfolio-optimizer .optimizer-policy-pane {
+    background-color: transparent;
+    box-sizing: border-box;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .portfolio-optimizer :is(.optimizer-setup-panel, .optimizer-setup-actions) {
+    box-sizing: border-box;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  /* Trailing header summaries (selected goal one-liner, live constraint numbers)
+     exist so a COLLAPSED panel reads without opening it. While the panel is open
+     they duplicate the panel body and the right-rail scenario contract, so they
+     hide; collapsing the panel brings the summary back. */
+  .portfolio-optimizer details[open] > summary .optimizer-section-trailing {
+    display: none;
+  }
+
+  /* Counterpart of optimizer-section-trailing: content that shows ONLY while
+     the owning disclosure is open (e.g. an Edit label flipping to Done). */
+  .portfolio-optimizer details:not([open]) > summary .optimizer-section-open-only {
+    display: none;
+  }
+
+  /* Summaries whose affordance is their own control (Edit label, chevron
+     button): no native disclosure marker. */
+  .portfolio-optimizer summary.optimizer-plain-summary {
+    list-style: none;
+  }
+
+  .portfolio-optimizer summary.optimizer-plain-summary::-webkit-details-marker {
+    display: none;
+  }
+
+  @media (max-width: 639px) and (hover: hover) and (pointer: fine) {
+    .portfolio-optimizer.optimizer-setup-route-surface,
+    .portfolio-optimizer .optimizer-setup-route-surface {
+      width: calc(100vw - 15px);
+      max-width: calc(100vw - 15px);
+    }
+  }
+
+  .portfolio-optimizer .optimizer-control-rail > :is(section, details) {
+    background-color: var(--optimizer-surface);
+    border-width: 0 0 1px 0;
+    border-color: var(--optimizer-border);
+    border-radius: 0;
+  }
+
+  .portfolio-optimizer .optimizer-control-rail > :is(section, details):last-child {
+    border-bottom-width: 0;
+  }
+
+  .portfolio-optimizer .optimizer-choice-card[aria-pressed="true"] {
+    border-color: var(--optimizer-accent-border);
+    background-color: var(--optimizer-accent-soft);
+    color: var(--optimizer-text);
+  }
+
+  /* Optimization goal cards: the canonical paths (primary) read heavier than
+     the advanced targets (secondary) so the single goal control has a clear
+     hierarchy without the retired top-of-page preset row. */
+
+  /* The three primary cards read as a defensive→return-seeking spectrum, so
+     they render 3-across whenever the center column affords it and otherwise
+     stack — never a lopsided 2+1 wrap, which would break the spectrum order.
+     A container query instead of a viewport breakpoint: the column's width,
+     not the viewport's, decides (workbench iframes misreport breakpoints).
+     Where container queries are unsupported the cards simply stay stacked. */
+  .portfolio-optimizer .optimizer-goal-grid-container {
+    container-type: inline-size;
+  }
+
+  .portfolio-optimizer .optimizer-goal-grid-primary {
+    grid-template-columns: 1fr;
+  }
+
+  @container (min-width: 30rem) {
+    .portfolio-optimizer .optimizer-goal-grid-primary {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+
+  .portfolio-optimizer .optimizer-goal-card-primary {
+    background-color: var(--optimizer-surface-2, var(--optimizer-surface));
+  }
+
+  .portfolio-optimizer .optimizer-goal-card-secondary {
+    font-size: 0.9375em;
+  }
+
+  .portfolio-optimizer
+    .optimizer-model-segment-group
+    .optimizer-segment-button[aria-pressed="true"] {
+    border-color: var(--optimizer-border-strong);
+    background-color: var(--optimizer-surface-3);
+    color: var(--optimizer-text);
+  }
+
+  .portfolio-optimizer .optimizer-setup-actions {
+    background-color: #101518;
+    /* Pin the Run bar to the viewport bottom while the policy pane is in view, so expanding the
+       Constraints disclosure never pushes the primary action below the fold. The bar already
+       has a solid background and a high z-index, so pinning costs nothing visually. */
+    position: sticky;
+    bottom: 0;
+  }
+
+  /* --- Layer 1 run-status banner ---------------------------------------------
+     A running optimization is the page's primary state, not a right-rail detail.
+     This banner pins to the top of the scroll viewport (the app header is not
+     sticky, so top:0 is the viewport top once the header scrolls away) and spans
+     the full setup surface, so the live state is visible regardless of scroll
+     position or how long the right rail grows under Maximum Sharpe. It reads as a
+     live operation — stronger than the passive warning cards — via a solid
+     elevated surface, a bold tone-colored left edge, a faint tone wash, and a
+     lift shadow. Opaque background is required so scrolled content never bleeds
+     through while pinned; z-index clears the low-stacked policy/exposure content
+     (1-70) and the sticky Run bar (180) but stays under modals/tooltips. */
+  .portfolio-optimizer .optimizer-run-banner {
+    position: sticky;
+    top: 0;
+    z-index: 190;
+    padding: 0.75rem 1rem;
+    border: 1px solid var(--optimizer-border-strong);
+    border-left-width: 3px;
+    background-color: var(--optimizer-surface-2);
+    box-shadow: 0 8px 18px -10px color-mix(in srgb, var(--optimizer-bg) 78%, transparent);
+  }
+
+  .portfolio-optimizer .optimizer-run-banner[data-run-tone="running"] {
+    border-left-color: var(--optimizer-accent);
+    background-image: linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--optimizer-accent) 11%, transparent),
+      transparent 42%
+    );
+  }
+
+  .portfolio-optimizer .optimizer-run-banner[data-run-tone="succeeded"] {
+    border-left-color: var(--optimizer-long);
+    background-image: linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--optimizer-long) 11%, transparent),
+      transparent 42%
+    );
+  }
+
+  .portfolio-optimizer .optimizer-run-banner[data-run-tone="failed"] {
+    border-left-color: var(--optimizer-short);
+    background-image: linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--optimizer-short) 13%, transparent),
+      transparent 42%
+    );
+  }
+
+  /* Tone-colored accents inside the banner are driven straight from tokens rather
+     than the DaisyUI solid semantic classes: the optimizer only remaps the
+     *opacity* variants (bg-primary/10 …), so plain bg-primary/bg-success would
+     fall through to the off-palette DaisyUI theme colors. */
+  .portfolio-optimizer .optimizer-run-banner__dot {
+    border-radius: 9999px;
+  }
+
+  .portfolio-optimizer
+    .optimizer-run-banner[data-run-tone="running"]
+    .optimizer-run-banner__dot {
+    background-color: var(--optimizer-accent);
+  }
+
+  .portfolio-optimizer
+    .optimizer-run-banner[data-run-tone="succeeded"]
+    .optimizer-run-banner__dot {
+    background-color: var(--optimizer-long);
+  }
+
+  .portfolio-optimizer
+    .optimizer-run-banner[data-run-tone="failed"]
+    .optimizer-run-banner__dot {
+    background-color: var(--optimizer-short);
+  }
+
+  /* The stepper segments double as the progress bar: done = green, active =
+     amber (with a pulse), still-to-run = a dim track. */
+  .portfolio-optimizer .optimizer-run-banner__seg-track {
+    background-color: color-mix(in srgb, var(--optimizer-border-strong) 60%, transparent);
+  }
+
+  .portfolio-optimizer .optimizer-run-banner__seg-fill[data-seg-status="succeeded"] {
+    background-color: var(--optimizer-long);
+  }
+
+  .portfolio-optimizer .optimizer-run-banner__seg-fill[data-seg-status="running"] {
+    background-color: var(--optimizer-accent);
+  }
+
+  .portfolio-optimizer .optimizer-run-banner__seg-fill[data-seg-status="failed"] {
+    background-color: var(--optimizer-short);
+  }
+
+  .portfolio-optimizer .optimizer-run-banner__seg-fill[data-seg-status="pending"] {
+    background-color: transparent;
+  }
+
+  .portfolio-optimizer .optimizer-model-assumptions-note {
+    padding: 7px 12px;
+  }
+
+  .portfolio-optimizer .optimizer-use-my-views-insight-cards {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  @media (min-width: 960px) {
+    .portfolio-optimizer .optimizer-use-my-views-insight-cards {
+      grid-template-columns: minmax(0, 1.16fr) minmax(11rem, 0.68fr) minmax(0, 1.16fr);
+    }
+  }
+
+  .portfolio-optimizer .optimizer-use-my-views-card {
+    border-color: var(--optimizer-border);
+    background-color: var(--optimizer-surface);
+  }
+
+  .portfolio-optimizer .optimizer-use-my-views-card--accent {
+    border-color: var(--optimizer-accent-border);
+    background-color: color-mix(in srgb, var(--optimizer-accent) 4%, transparent);
+  }
+
+  .portfolio-optimizer .views-trust-panel__box {
+    padding: 14px;
+  }
+
+  .portfolio-optimizer .views-trust-panel__eyebrow {
+    color: var(--optimizer-text-3);
+    font-family: "JetBrains Mono", var(--font-mono);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    line-height: 1.35;
+    text-transform: uppercase;
+  }
+
+  .portfolio-optimizer .views-trust-panel__eyebrow--accent {
+    color: var(--optimizer-accent);
+  }
+
+  .portfolio-optimizer .views-trust-panel__headline {
+    margin-top: 12px;
+    color: var(--optimizer-text);
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1.25;
+  }
+
+  .portfolio-optimizer .views-trust-panel__description {
+    margin-top: 10px;
+    color: var(--optimizer-text-2);
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 1.55;
+  }
+
+  .portfolio-optimizer .views-trust-panel__body {
+    margin-top: 14px;
+    display: grid;
+    gap: 4px;
+    font-family: "JetBrains Mono", var(--font-mono);
+    font-size: 12px;
+    line-height: 1.35;
+  }
+
+  .portfolio-optimizer .views-trust-panel__row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: baseline;
+    gap: 12px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .portfolio-optimizer .views-trust-panel__empty {
+    color: var(--optimizer-text-2);
+    font-family: "Inter Variable", var(--font-ui-system);
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 1.45;
+  }
+
+  .portfolio-optimizer .views-trust-panel__value--prior {
+    color: var(--optimizer-info);
+  }
+
+  .portfolio-optimizer .views-trust-panel__value--view {
+    color: var(--optimizer-text-2);
+  }
+
+  .portfolio-optimizer .views-trust-panel__confidence {
+    color: var(--optimizer-text-3);
+  }
+
+  .portfolio-optimizer .views-trust-panel__value--combined {
+    color: var(--optimizer-accent);
+    font-weight: 600;
+  }
+
+  .portfolio-optimizer .views-trust-panel__callout {
+    margin-top: 10px;
+    border: 1px solid var(--optimizer-border);
+    background-color: var(--optimizer-bg);
+    padding: 8px;
+    color: var(--optimizer-text-2);
+    font-family: "Inter Variable", var(--font-ui-system);
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 1.45;
+  }
+
+  .portfolio-optimizer
+    :is(.optimizer-use-my-views-note, .optimizer-use-my-views-empty) {
+    border-color: var(--optimizer-border);
+    background-color: var(--optimizer-bg);
+  }
+
+  .portfolio-optimizer .optimizer-turnover-cap-control {
+    justify-self: end;
+    min-width: 130px;
+  }
+
+  .portfolio-optimizer .optimizer-long-only-control {
+    justify-self: end;
+  }
+
+  .portfolio-optimizer .optimizer-include-spot-control {
+    justify-self: end;
+  }
+
+  /* --- Exposure map (the 2D Positioning control) ------------------------------- */
+
+  .portfolio-optimizer .optimizer-constraint-group + .optimizer-constraint-group {
+    border-top: 1px solid var(--optimizer-border);
+    padding-top: 0.75rem;
+  }
+
+  /* Risk guards + Rebalance behavior share one row on wide screens; the row carries the
+     separator against Positioning above it, and the sibling separator only applies while the
+     two groups are stacked (narrow screens). */
+  .portfolio-optimizer .optimizer-constraint-group-row {
+    border-top: 1px solid var(--optimizer-border);
+    padding-top: 0.75rem;
+  }
+
+  @media (min-width: 768px) {
+    .portfolio-optimizer
+      .optimizer-constraint-group-row
+      .optimizer-constraint-group
+      + .optimizer-constraint-group {
+      border-top: 0;
+      padding-top: 0;
+    }
+  }
+
+  .portfolio-optimizer .optimizer-exposure-map {
+    display: flex;
+    flex-direction: column;
+    gap: 0.625rem;
+    min-width: 0;
+  }
+
+  /* Two columns on wide screens: the bounded pad beside its controls, so the open Constraints
+     panel stays inside one screen instead of stacking everything under a full-width pad. */
+  .portfolio-optimizer .optimizer-exposure-map__layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.875rem 1.5rem;
+    align-items: start;
+    min-width: 0;
+  }
+
+  @media (min-width: 640px) {
+    .portfolio-optimizer .optimizer-exposure-map__layout {
+      grid-template-columns: minmax(0, 21rem) minmax(13rem, 1fr);
+    }
+  }
+
+  .portfolio-optimizer .optimizer-exposure-map__pad-col {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    width: min(100%, 21rem);
+    max-width: 21rem;
+    min-width: 0;
+  }
+
+  .portfolio-optimizer .optimizer-exposure-map__controls {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    min-width: 0;
+  }
+
+  .portfolio-optimizer .optimizer-exposure-map__profile {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.4rem;
+  }
+
+  .portfolio-optimizer .optimizer-exposure-map__profile-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+  }
+
+  .portfolio-optimizer .optimizer-exposure-map__profile-btn {
+    border: 1px solid var(--optimizer-border);
+    background-color: transparent;
+    padding: 0.15rem 0.45rem;
+    font-family: var(--font-mono, monospace);
+    font-size: 0.625rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--optimizer-text-2);
+    cursor: pointer;
+  }
+
+  /* Frame: Y-axis title across the top, numeric Y ticks in the left gutter aligned with the pad,
+     and the X-axis (short ◄ · net bias · ► long) below. */
+  .portfolio-optimizer .optimizer-exposure-map__frame {
+    position: relative;
+    display: grid;
+    /* columns: rotated y-axis title | y ticks | pad */
+    grid-template-columns: auto auto 1fr;
+    grid-template-rows: auto 1fr auto;
+    gap: 0.3rem 0.45rem;
+    min-width: 0;
+  }
+
+  /* The gross-leverage title reads bottom-up along the y axis, left of the
+     tick labels, so each axis is labeled ON its axis. */
+  .portfolio-optimizer .optimizer-exposure-map__y-axis-label {
+    grid-column: 1;
+    grid-row: 2;
+    align-self: center;
+    justify-self: center;
+    writing-mode: vertical-rl;
+    transform: rotate(180deg);
+  }
+
+  .portfolio-optimizer .optimizer-exposure-map__pad {
+    grid-column: 3;
+    grid-row: 2;
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    border: 1px solid var(--optimizer-border-strong);
+    background-color: var(--optimizer-bg);
+    cursor: crosshair;
+    touch-action: none;
+  }
+
+  .portfolio-optimizer .optimizer-exposure-map__pad[data-gross-infeasible="true"],
+  .portfolio-optimizer .optimizer-exposure-map__pad[data-net-infeasible="true"] {
+    border-color: var(--optimizer-warn);
+  }
+
+  /* Axis titles are the load-bearing labels, so they read at full text weight, not the faint
+     tertiary tone the old direction hints used. */
+  .portfolio-optimizer .optimizer-exposure-map__axis-title {
+    font-family: var(--font-mono, monospace);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--optimizer-text);
+    white-space: nowrap;
+  }
+
+  /* Header row: just the explicit zoom control, right-aligned (the axis
+     titles live on their axes). */
+  .portfolio-optimizer .optimizer-exposure-map__axis-header {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    min-width: 0;
+  }
+
+  .portfolio-optimizer .optimizer-exposure-map__zoom {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+  }
+
+  .portfolio-optimizer .optimizer-exposure-map__zoom-range {
+    font-family: var(--font-mono, monospace);
+    font-size: 0.625rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--optimizer-text-3);
+    white-space: nowrap;
+  }
+
+  .portfolio-optimizer .optimizer-exposure-map__zoom-btn {
+    width: 1.35rem;
+    height: 1.35rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--optimizer-border);
+    background-color: transparent;
+    font-family: var(--font-mono, monospace);
+    font-size: 0.75rem;
+    line-height: 1;
+    color: var(--optimizer-text-2);
+    cursor: pointer;
+  }
+
+  .portfolio-optimizer .optimizer-exposure-map__zoom-btn:disabled {
+    opacity: 0.35;
+    cursor: default;
+  }
+
+  .portfolio-optimizer .optimizer-exposure-map__yticks {
+    grid-column: 2;
+    grid-row: 2;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: flex-end;
+    font-family: var(--font-mono, monospace);
+    font-size: 0.6875rem;
+    color: var(--optimizer-text-2);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .portfolio-optimizer .optimizer-exposure-map__xaxis {
+    grid-column: 3;
+    grid-row: 3;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.4rem;
+    min-width: 0;
+  }
+
+  .portfolio-optimizer .optimizer-exposure-map__axis-end {
+    font-family: var(--font-mono, monospace);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  /* Short = red, Long = green: the trading convention makes the X axis meaning obvious at a glance. */
+  .portfolio-optimizer .optimizer-exposure-map__axis-end--short {
+    color: var(--optimizer-short);
+  }
+
+  .portfolio-optimizer .optimizer-exposure-map__axis-end--long {
+    color: var(--optimizer-long);
+  }
+
+  /* SVG primitives reference tokens via class so no raw colors live in the view. */
+  .portfolio-optimizer .optimizer-exposure-map__surface {
+    fill: var(--optimizer-surface);
+  }
+
+  .portfolio-optimizer .optimizer-exposure-map__grid {
+    stroke: var(--optimizer-border);
+    stroke-width: 0.5;
+  }
+
+  .portfolio-optimizer .optimizer-exposure-map__grid--mid {
+    stroke: var(--optimizer-border-strong);
+  }
+
+  .portfolio-optimizer .optimizer-exposure-map__band-stripe {
+    fill: color-mix(in srgb, var(--optimizer-accent) 8%, transparent);
+  }
+
+  .portfolio-optimizer .optimizer-exposure-map__band {
+    fill: color-mix(in srgb, var(--optimizer-accent) 18%, transparent);
+    stroke: color-mix(in srgb, var(--optimizer-accent) 55%, transparent);
+    stroke-width: 0.75;
+  }
+
+  .portfolio-optimizer .optimizer-exposure-map__range {
+    stroke: var(--optimizer-accent);
+    stroke-width: 1;
+  }
+
+  .portfolio-optimizer .optimizer-exposure-map__handle {
+    fill: var(--optimizer-accent);
+    stroke: var(--optimizer-bg);
+    stroke-width: 1;
+    cursor: grab;
+  }
+
+  /* Outer grab ring: the target must read as a draggable control, not a
+     plotted marker. */
+  .portfolio-optimizer .optimizer-exposure-map__handle-ring {
+    fill: none;
+    stroke: color-mix(in srgb, var(--optimizer-accent) 60%, transparent);
+    stroke-width: 0.75;
+    cursor: grab;
+  }
+
+  .portfolio-optimizer .optimizer-exposure-map__current {
+    fill: none;
+    stroke: var(--optimizer-text-2);
+    stroke-width: 1;
+    stroke-dasharray: 1.5 1.5;
+  }
+
+  /* The large live readout under the pad: the tiny axis ticks orient, THIS is where the trader
+     reads the exact leverage/bias the drag is asking for. */
+  .portfolio-optimizer .optimizer-exposure-map__readout {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.35rem;
+    font-family: var(--font-mono, monospace);
+    font-size: 0.9375rem;
+    font-weight: 600;
+    color: var(--optimizer-text);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .portfolio-optimizer .optimizer-exposure-map__readout-label {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--optimizer-text-3);
+  }
+
+  .portfolio-optimizer .optimizer-exposure-map__readout-sep {
+    color: var(--optimizer-text-3);
+    font-size: 0.6875rem;
+  }
+
+  .portfolio-optimizer .optimizer-exposure-map__caption {
+    max-width: 21rem;
+    font-size: 0.75rem;
+    line-height: 1.45;
+    color: var(--optimizer-text-2);
+    overflow-wrap: anywhere;
+  }
+
+  .portfolio-optimizer .optimizer-exposure-map__legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 0.75rem;
+    font-size: 0.6875rem;
+    color: var(--optimizer-text-2);
+  }
+
+  .portfolio-optimizer .optimizer-exposure-map__legend-target {
+    color: var(--optimizer-accent);
+  }
+
+  @media (max-width: 420px) {
+    .portfolio-optimizer .optimizer-exposure-map__frame {
+      gap: 0.25rem 0.35rem;
+    }
+
+    .portfolio-optimizer .optimizer-exposure-map__axis-title {
+      font-size: 0.625rem;
+      letter-spacing: 0.04em;
+    }
+
+    .portfolio-optimizer .optimizer-exposure-map__axis-end {
+      font-size: 0.625rem;
+      letter-spacing: 0.02em;
+    }
+
+    .portfolio-optimizer .optimizer-exposure-map__zoom {
+      gap: 0.2rem;
+    }
+  }
+
+  .portfolio-optimizer
+    .optimizer-exposure-map__readout-net[data-net-direction="long"] {
+    color: var(--optimizer-long);
+  }
+
+  .portfolio-optimizer
+    .optimizer-exposure-map__readout-net[data-net-direction="short"] {
+    color: var(--optimizer-short);
+  }
+
+  .portfolio-optimizer .optimizer-exposure-map__presets-block {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+
+  .portfolio-optimizer .optimizer-exposure-map__bands {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+  }
+
+  .portfolio-optimizer .optimizer-exposure-map__band-row {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+  }
+
+  .portfolio-optimizer .optimizer-exposure-map__band-value {
+    font-family: var(--font-mono, monospace);
+    font-size: 0.625rem;
+    color: var(--optimizer-text-2);
+  }
+
+  .portfolio-optimizer .optimizer-exposure-map__echo {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.4rem;
+    border: 1px solid var(--optimizer-border);
+    background-color: var(--optimizer-surface-2);
+    padding: 0.35rem 0.5rem;
+  }
+
+  .portfolio-optimizer .optimizer-exposure-map__echo-value {
+    font-family: var(--font-mono, monospace);
+    font-size: 0.6875rem;
+    color: var(--optimizer-text);
+  }
+
+  .portfolio-optimizer .optimizer-exposure-map__echo-current {
+    font-family: var(--font-mono, monospace);
+    font-size: 0.625rem;
+    color: var(--optimizer-text-3);
+  }
+
+  .portfolio-optimizer .optimizer-exposure-map__presets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+  }
+
+  .portfolio-optimizer .optimizer-exposure-map__preset {
+    border: 1px solid var(--optimizer-border);
+    background-color: transparent;
+    padding: 0.2rem 0.5rem;
+    font-family: var(--font-mono, monospace);
+    font-size: 0.625rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--optimizer-text-2);
+    cursor: pointer;
+  }
+
+  .portfolio-optimizer .optimizer-exposure-map__preset[aria-pressed="true"] {
+    border-color: var(--optimizer-accent-border);
+    background-color: var(--optimizer-accent-soft);
+    color: var(--optimizer-text);
+  }
+
+  .portfolio-optimizer .optimizer-exposure-map__preview {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.4rem;
+  }
+
+  .portfolio-optimizer .optimizer-exposure-map__preview-value {
+    font-family: var(--font-mono, monospace);
+    font-size: 0.625rem;
+    color: var(--optimizer-text-2);
+  }
+
+  .portfolio-optimizer .optimizer-exposure-map__preview-verdict {
+    font-family: var(--font-mono, monospace);
+    font-size: 0.625rem;
+    color: var(--optimizer-warn);
+  }
+
+  .portfolio-optimizer
+    .optimizer-exposure-map__preview[data-on-policy="true"]
+    .optimizer-exposure-map__preview-verdict {
+    color: var(--optimizer-long);
+  }
+}

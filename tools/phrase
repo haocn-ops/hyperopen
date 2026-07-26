@@ -1,0 +1,262 @@
+#!/usr/bin/env bb
+;; Lookup shared command phrases from /hyperopen/command-phrases.edn.
+
+(ns phrase.lookup
+  (:require
+   [clojure.edn :as edn]
+   [clojure.java.io :as io]
+   [clojure.pprint :as pprint]
+   [clojure.string :as str]))
+
+(def required-command-fields
+  [:preconditions :steps :failure_policy :postconditions])
+
+(def fuzzy-min-score 0.85)
+(def fuzzy-min-gap 0.08)
+(def max-suggestions 3)
+
+(defn normalize-alias [value]
+  (->> (str/split (str/trim (str value)) #"\s+")
+       (remove str/blank?)
+       (str/join " ")
+       (str/lower-case)))
+
+(defn usage []
+  (str "Usage: tools/phrase get [--suggest] [--accept-fuzzy] \"<phrase>\"\n"
+       "Examples:\n"
+       "  tools/phrase get \"land the worktree\"\n"
+       "  tools/phrase get --suggest \"land the work tree\"\n"
+       "  tools/phrase get --accept-fuzzy \"land the work tree\"\n"
+       "Lookup: normalize phrase once, then :alias->id + :commands map lookups."))
+
+(defn repo-root []
+  (-> *file*
+      io/file
+      .getAbsoluteFile
+      .getParentFile
+      .getParentFile))
+
+(defn fail [message exit-code]
+  (binding [*out* *err*]
+    (println (str "tools/phrase: " message)))
+  exit-code)
+
+(defn fail-with-suggestions [phrase suggestions]
+  (binding [*out* *err*]
+    (println (str "tools/phrase: no phrase match for '" phrase "'"))
+    (if (seq suggestions)
+      (do
+        (println "tools/phrase: did you mean:")
+        (doseq [{:keys [alias score]} suggestions]
+          (println (format "  - %s (score %.3f)" alias (double score)))))
+      (println "tools/phrase: no suggestions available")))
+  2)
+
+(defn ensure-valid-command [command-id command]
+  (when-not (string? command-id)
+    (throw (ex-info "command ids under :commands must be strings" {})))
+  (when-not (map? command)
+    (throw (ex-info (str "command '" command-id "' must be a map") {})))
+  (let [missing-fields (remove #(contains? command %) required-command-fields)]
+    (when (seq missing-fields)
+      (throw (ex-info (str "command '" command-id
+                           " missing required field(s): "
+                           (str/join ", " (map name missing-fields)))
+                      {}))))
+  (doseq [field required-command-fields]
+    (let [value (get command field)]
+      (when-not (and (sequential? value) (every? string? value))
+        (throw (ex-info (str "command '" command-id
+                             " field '" (name field)
+                             "' must be a list of strings")
+                        {}))))))
+
+(defn ensure-valid-alias-entry [commands alias command-id]
+  (when-not (string? alias)
+    (throw (ex-info ":alias->id keys must be strings" {})))
+  (when-not (= alias (normalize-alias alias))
+    (throw (ex-info (str "alias key '" alias
+                         "' must already be normalized (trimmed, single spaces, lowercase)")
+                    {})))
+  (when-not (string? command-id)
+    (throw (ex-info (str "alias '" alias "' must map to a string command id") {})))
+  (when-not (contains? commands command-id)
+    (throw (ex-info (str "alias '" alias "' points to unknown command id '" command-id "'")
+                    {}))))
+
+(defn load-registry []
+  (let [registry-path (io/file (repo-root) "command-phrases.edn")
+        data (try
+               (-> registry-path slurp edn/read-string)
+               (catch java.io.FileNotFoundException _
+                 (throw (ex-info (str "registry not found: " (.getPath registry-path)) {})))
+               (catch Exception error
+                 (throw (ex-info (str "invalid EDN in " (.getPath registry-path) ": "
+                                      (.getMessage error))
+                                 {}))))]
+    (when-not (map? data)
+      (throw (ex-info "registry root must be a map" {})))
+    (when-not (= 2 (:schema-version data))
+      (throw (ex-info "registry ':schema-version' must be 2" {})))
+    (let [commands (:commands data)
+          alias->id (:alias->id data)]
+      (when-not (map? commands)
+        (throw (ex-info "registry key ':commands' must be a map" {})))
+      (when-not (map? alias->id)
+        (throw (ex-info "registry key ':alias->id' must be a map" {})))
+      (doseq [[command-id command] commands]
+        (ensure-valid-command command-id command))
+      (doseq [[alias command-id] alias->id]
+        (ensure-valid-alias-entry commands alias command-id))
+      {:commands commands
+       :alias->id alias->id})))
+
+(defn command-by-id [registry command-id]
+  (when-let [command (get (:commands registry) command-id)]
+    (assoc command :id command-id)))
+
+(defn resolve-direct-entry [registry phrase]
+  (let [query (normalize-alias phrase)]
+    (when-not (str/blank? query)
+      (when-let [command-id (get (:alias->id registry) query)]
+        (command-by-id registry command-id)))))
+
+(defn levenshtein-distance [left right]
+  (let [left-len (count left)
+        right-len (count right)]
+    (cond
+      (zero? left-len) right-len
+      (zero? right-len) left-len
+      :else
+      (loop [left-index 0
+             previous-row (vec (range (inc right-len)))]
+        (if (= left-index left-len)
+          (nth previous-row right-len)
+          (let [left-char (.charAt left left-index)
+                next-row
+                (loop [right-index 0
+                       row [(inc left-index)]]
+                  (if (= right-index right-len)
+                    (vec row)
+                    (let [right-char (.charAt right right-index)
+                          cost (if (= left-char right-char) 0 1)
+                          deletion (inc (nth previous-row (inc right-index)))
+                          insertion (inc (peek row))
+                          substitution (+ (nth previous-row right-index) cost)]
+                      (recur (inc right-index)
+                             (conj row (min deletion insertion substitution))))))]
+            (recur (inc left-index) next-row)))))))
+
+(defn similarity-score [left right]
+  (let [max-len (max (count left) (count right))]
+    (if (zero? max-len)
+      1.0
+      (- 1.0
+         (/ (double (levenshtein-distance left right))
+            (double max-len))))))
+
+(defn ranked-fuzzy-candidates [registry phrase]
+  (let [query (normalize-alias phrase)]
+    (if (str/blank? query)
+      []
+      (->> (:alias->id registry)
+           (map (fn [[alias command-id]]
+                  {:alias alias
+                   :id command-id
+                   :score (similarity-score query alias)}))
+           (sort-by (fn [{:keys [score alias]}]
+                      [(- score) alias]))
+           vec))))
+
+(defn ranked-fuzzy-command-candidates [registry phrase]
+  (->> (ranked-fuzzy-candidates registry phrase)
+       (group-by :id)
+       (map (fn [[command-id candidates]]
+              (let [best-candidate (first
+                                     (sort-by (fn [{:keys [score alias]}]
+                                                [(- score) alias])
+                                              candidates))]
+                (assoc best-candidate :id command-id))))
+       (sort-by (fn [{:keys [score id alias]}]
+                  [(- score) id alias]))
+       vec))
+
+(defn top-suggestions [registry phrase]
+  (->> (ranked-fuzzy-command-candidates registry phrase)
+       (take max-suggestions)))
+
+(defn acceptable-fuzzy-match [registry phrase]
+  (let [ranked (ranked-fuzzy-command-candidates registry phrase)
+        best (first ranked)
+        second-best (second ranked)
+        best-score (:score best 0.0)
+        score-gap (if second-best
+                    (- best-score (:score second-best))
+                    best-score)]
+    (when (and best
+               (>= best-score fuzzy-min-score)
+               (>= score-gap fuzzy-min-gap))
+      best)))
+
+(defn parse-get-args [args]
+  (loop [remaining args
+         options {:suggest false
+                  :accept-fuzzy false}
+         phrase-parts []]
+    (if-let [token (first remaining)]
+      (cond
+        (= token "--suggest")
+        (recur (rest remaining) (assoc options :suggest true) phrase-parts)
+
+        (= token "--accept-fuzzy")
+        (recur (rest remaining) (assoc options :accept-fuzzy true) phrase-parts)
+
+        (str/starts-with? token "--")
+        {:error (str "unknown option '" token "'\n" (usage))}
+
+        :else
+        (recur (rest remaining) options (conj phrase-parts token)))
+      (if (seq phrase-parts)
+        {:options options
+         :phrase (str/join " " phrase-parts)}
+        {:error (usage)}))))
+
+(defn run-get [args]
+  (let [{:keys [options phrase error]} (parse-get-args args)]
+    (if error
+      (fail error 1)
+      (let [registry-result (try
+                              {:registry (load-registry)}
+                              (catch clojure.lang.ExceptionInfo load-error
+                                {:error (.getMessage load-error)}))]
+        (if-let [error-message (:error registry-result)]
+          (fail error-message 1)
+          (let [registry (:registry registry-result)
+                direct-match (resolve-direct-entry registry phrase)]
+            (if direct-match
+              (do
+                (pprint/pprint direct-match)
+                0)
+              (if (:accept-fuzzy options)
+                (if-let [fuzzy-match (acceptable-fuzzy-match registry phrase)]
+                  (let [{:keys [alias id score]} fuzzy-match]
+                    (binding [*out* *err*]
+                      (println (format "tools/phrase: accepted fuzzy match '%s' (score %.3f)" alias (double score))))
+                    (pprint/pprint (command-by-id registry id))
+                    0)
+                  (if (:suggest options)
+                    (fail-with-suggestions phrase (top-suggestions registry phrase))
+                    (fail (str "no phrase match for '" phrase "'") 2)))
+                (if (:suggest options)
+                  (fail-with-suggestions phrase (top-suggestions registry phrase))
+                  (fail (str "no phrase match for '" phrase "'") 2))))))))))
+
+(defn -main [& args]
+  (if (empty? args)
+    (fail (usage) 1)
+    (let [[command & rest-args] args]
+      (case command
+        "get" (run-get rest-args)
+        (fail (usage) 1)))))
+
+(System/exit (apply -main *command-line-args*))

@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark" data-ui-font="system">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="Hyperopen - Open Source Trading Interface"
+    />
+    <title>HyperOpen</title>
+    <!-- HYPEROPEN_RELEASE_SEO_HEAD -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="shortcut icon" href="/favicon.ico" />
+    <link rel="stylesheet" href="/css/main.css" />
+    <script src="/theme-preload.js"></script>
+  </head>
+  <body>
+    <div id="app" class="h-full"><!-- HYPEROPEN_RELEASE_APP_LOADING_SHELL --></div>
+    <template id="boot-loading-shell-template">
+      <div
+        id="boot-loading-shell"
+        class="h-full bg-base-100 text-trading-text"
+        aria-live="polite"
+        aria-busy="true"
+      >
+        <div class="flex min-h-full flex-col">
+          <div class="border-b border-base-300/70 bg-base-100/95">
+            <div
+              class="app-shell-gutter flex items-center justify-between gap-3 py-3"
+            >
+              <div class="space-y-1">
+                <div
+                  class="text-sm font-semibold uppercase tracking-[0.12em] text-trading-text-secondary"
+                >
+                  Loading Vaults
+                </div>
+                <p class="text-sm text-trading-text-secondary">
+                  Preparing vault data and route surface...
+                </p>
+              </div>
+              <div class="flex items-center gap-2 text-xs text-trading-text-secondary">
+                <span class="h-2 w-2 rounded-full bg-emerald-300 animate-pulse"></span>
+                <span>Booting UI</span>
+              </div>
+            </div>
+          </div>
+          <div class="app-shell-gutter flex-1 py-4 md:py-5">
+            <div class="mx-auto w-full max-w-[1280px] space-y-4">
+              <div class="rounded-xl border border-base-300/80 bg-base-100/95 p-4 md:p-5">
+                <div class="space-y-3">
+                  <div class="flex items-center gap-2 text-xs text-trading-text-secondary">
+                    <span class="h-2 w-2 rounded-full bg-emerald-300 animate-pulse"></span>
+                    <span>Loading vault workspace...</span>
+                  </div>
+                  <div class="overflow-hidden rounded-lg border border-base-300/60">
+                    <div class="border-b border-base-300/60 px-3 py-2">
+                      <span class="ui-loading-shimmer block h-3.5 w-24 rounded"></span>
+                    </div>
+                    <div class="space-y-0">
+                      <div class="grid grid-cols-[72px_minmax(0,1fr)_repeat(4,minmax(0,1fr))] gap-3 border-b border-base-300/40 px-3 py-3">
+                        <span class="ui-loading-shimmer block h-3.5 w-10 rounded"></span>
+                        <span class="ui-loading-shimmer block h-3.5 w-32 rounded"></span>
+                        <span class="ui-loading-shimmer block h-3.5 w-24 rounded"></span>
+                        <span class="ui-loading-shimmer block h-3.5 w-20 rounded"></span>
+                        <span class="ui-loading-shimmer block h-3.5 w-16 rounded"></span>
+                        <span class="ui-loading-shimmer block h-3.5 w-24 rounded"></span>
+                      </div>
+                      <div class="grid grid-cols-[72px_minmax(0,1fr)_repeat(4,minmax(0,1fr))] gap-3 border-b border-base-300/40 px-3 py-3">
+                        <span class="ui-loading-shimmer block h-3.5 w-10 rounded"></span>
+                        <span class="ui-loading-shimmer block h-3.5 w-28 rounded"></span>
+                        <span class="ui-loading-shimmer block h-3.5 w-24 rounded"></span>
+                        <span class="ui-loading-shimmer block h-3.5 w-20 rounded"></span>
+                        <span class="ui-loading-shimmer block h-3.5 w-16 rounded"></span>
+                        <span class="ui-loading-shimmer block h-3.5 w-24 rounded"></span>
+                      </div>
+                      <div class="grid grid-cols-[72px_minmax(0,1fr)_repeat(4,minmax(0,1fr))] gap-3 px-3 py-3">
+                        <span class="ui-loading-shimmer block h-3.5 w-10 rounded"></span>
+                        <span class="ui-loading-shimmer block h-3.5 w-36 rounded"></span>
+                        <span class="ui-loading-shimmer block h-3.5 w-24 rounded"></span>
+                        <span class="ui-loading-shimmer block h-3.5 w-20 rounded"></span>
+                        <span class="ui-loading-shimmer block h-3.5 w-16 rounded"></span>
+                        <span class="ui-loading-shimmer block h-3.5 w-24 rounded"></span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </template>
+    <script>
+      (function () {
+        const buildInfoUrl = "/build-info.json";
+        const buildIdUrl = "/build-id.txt";
+        const manifestUrl = "/js/manifest.json";
+        const defaultMainScriptUrl = "/js/main.js";
+        const pathname = window.location.pathname || "/";
+
+        function normalizePath(path) {
+          if (typeof path !== "string" || path.length === 0) {
+            return "/";
+          }
+          const trimmed = path.replace(/\/+$/, "");
+          return trimmed.length === 0 ? "/" : trimmed;
+        }
+
+        function mountBootShell() {
+          if (normalizePath(pathname) !== "/vaults") {
+            return;
+          }
+
+          const appRoot = document.getElementById("app");
+          const template = document.getElementById("boot-loading-shell-template");
+          if (!appRoot || !(template instanceof HTMLTemplateElement)) {
+            return;
+          }
+
+          appRoot.replaceChildren(template.content.cloneNode(true));
+        }
+
+        function normalizeScriptUrl(outputName) {
+          if (typeof outputName !== "string" || outputName.length === 0) {
+            return null;
+          }
+
+          if (outputName.startsWith("/")) {
+            return outputName;
+          }
+
+          const normalized = outputName.replace(/^\.?\//, "");
+          return normalized.startsWith("js/") ? `/${normalized}` : `/js/${normalized}`;
+        }
+
+        function resolveMainScriptUrl(manifest) {
+          if (!Array.isArray(manifest)) {
+            return null;
+          }
+
+          for (const moduleInfo of manifest) {
+            if (!moduleInfo || typeof moduleInfo !== "object") {
+              continue;
+            }
+
+            const moduleId =
+              moduleInfo["module-id"] ??
+              moduleInfo.moduleId ??
+              moduleInfo.name;
+
+            if (moduleId === "main" || moduleId === ":main") {
+              return normalizeScriptUrl(
+                moduleInfo["output-name"] ?? moduleInfo.outputName
+              );
+            }
+          }
+
+          return null;
+        }
+
+        function loadMainScript(src) {
+          const script = document.createElement("script");
+          script.src = src;
+          document.body.appendChild(script);
+        }
+
+        function safeBuildToken(value) {
+          const token = typeof value === "string" ? value.trim() : "";
+          return token && !token.startsWith("<") && !/\s/.test(token) ? token : "";
+        }
+
+        function syncBuildId() {
+          return fetch(buildIdUrl, { cache: "no-cache" })
+            .then((response) => (response.ok ? response.text() : ""))
+            .then((text) => {
+              const buildId = safeBuildToken(text);
+              if (buildId) {
+                globalThis.HYPEROPEN_BUILD_ID = buildId;
+              }
+            })
+            .catch(() => {});
+        }
+
+        function syncBuildInfo() {
+          return fetch(buildInfoUrl, { cache: "no-cache" })
+            .then((response) => (response.ok ? response.json() : null))
+            .then((build) => {
+              if (!build || typeof build !== "object") {
+                return syncBuildId();
+              }
+
+              const sha = safeBuildToken(build.sha);
+              if (!sha) {
+                return syncBuildId();
+              }
+
+              globalThis.HYPEROPEN_BUILD = build;
+              globalThis.HYPEROPEN_BUILD_ID = sha;
+              return null;
+            })
+            .catch(() => syncBuildId());
+        }
+
+        mountBootShell();
+
+        syncBuildInfo().finally(() => {
+          fetch(manifestUrl, { cache: "no-cache" })
+            .then((response) => (response.ok ? response.json() : null))
+            .then((manifest) => {
+              loadMainScript(resolveMainScriptUrl(manifest) || defaultMainScriptUrl);
+            })
+            .catch(() => {
+              loadMainScript(defaultMainScriptUrl);
+            });
+        });
+      })();
+    </script>
+  </body>
+</html>

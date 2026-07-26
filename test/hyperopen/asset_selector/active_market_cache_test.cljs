@@ -1,0 +1,206 @@
+(ns hyperopen.asset-selector.active-market-cache-test
+  (:require [clojure.string :as str]
+            [cljs.test :refer-macros [deftest is testing]]
+            [hyperopen.asset-selector.active-market-cache :as cache]
+            [hyperopen.asset-selector.markets :as markets]
+            [hyperopen.asset-selector.outcome-fixtures :as outcome-fixtures]
+            [hyperopen.platform :as platform]))
+
+(def normalize-deps
+  {:normalize-display-text (fn [value]
+                             (cond
+                               (string? value)
+                               (let [trimmed (str/trim value)]
+                                 (when (seq trimmed) trimmed))
+
+                               (number? value)
+                               (str value)
+
+                               :else nil))
+   :normalize-market-type (fn [value]
+                            (let [normalized (cond
+                                               (keyword? value) (name value)
+                                               (string? value) (-> value str/trim str/lower-case)
+                                               :else nil)]
+                              (case normalized
+                                "perp" :perp
+                                "spot" :spot
+                                "outcome" :outcome
+                                nil)))
+   :parse-max-leverage (fn [value]
+                         (let [n (js/parseInt (str value) 10)]
+                           (when (and (number? n)
+                                      (not (js/isNaN n)))
+                             n)))
+   :parse-market-index (fn [value]
+                         (let [n (js/parseInt (str value) 10)]
+                           (when (and (number? n)
+                                      (not (js/isNaN n)))
+                             n)))})
+
+(deftest normalize-active-market-display-covers-required-and-optional-fields-test
+  (is (nil? (cache/normalize-active-market-display nil normalize-deps)))
+  (is (nil? (cache/normalize-active-market-display {:coin "   "} normalize-deps)))
+
+  (is (= {:coin "ETH"}
+         (cache/normalize-active-market-display {:coin " ETH "} normalize-deps)))
+
+  (is (= {:coin "#0"
+          :key "outcome:0"
+          :symbol "BTC above 78213 on May 3 at 2:00 AM?"
+          :base "BTC"
+          :quote "USDH"
+          :market-type :outcome
+          :asset-id 100000000
+          :outcome-id 0
+          :period "1d"
+          :expiry-ms 1777788000000
+          :target-price "78213"
+          :outcome-sides [{:side-index 0 :side-name "Yes" :coin "#0" :asset-id 100000000}
+                          {:side-index 1 :side-name "No" :coin "#1" :asset-id 100000001}]}
+         (cache/normalize-active-market-display
+          {:coin "#0"
+           :key "outcome:0"
+           :symbol "BTC above 78213 on May 3 at 2:00 AM?"
+           :base "BTC"
+           :quote "USDH"
+           :market-type "outcome"
+           :asset-id "100000000"
+           :outcome-id "0"
+           :period "1d"
+           :expiry-ms "1777788000000"
+           :target-price "78213"
+           :outcome-sides [{:side-index "0" :side-name "Yes" :coin "#0" :asset-id "100000000"}
+                           {:side-index "1" :side-name "No" :coin "#1" :asset-id "100000001"}]}
+          normalize-deps)))
+
+	  (is (= {:coin "BTC"
+          :key "perp:BTC"
+          :symbol "BTC-USDC"
+          :base "BTC"
+          :quote "USDC"
+          :dex "hyna"
+          :market-type :perp
+          :only-isolated? true
+          :margin-mode :no-cross
+          :idx 3
+          :perp-dex-index 1
+          :asset-id 110003
+          :maxLeverage 25}
+         (cache/normalize-active-market-display
+           {:coin " BTC "
+            :key " perp:BTC "
+            :symbol " BTC-USDC "
+            :base " BTC "
+            :quote " USDC "
+            :dex " hyna "
+            :market-type " perp "
+            :onlyIsolated "true"
+            :marginMode "noCross"
+            :idx "3"
+            :perp-dex-index "1"
+            :asset-id "110003"
+            :maxLeverage "25"}
+	           normalize-deps))))
+
+(deftest normalize-active-market-display-preserves-grouped-outcome-question-fields-test
+  (let [outcome-markets (markets/build-outcome-markets outcome-fixtures/live-outcome-meta
+                                                        outcome-fixtures/live-outcome-ctxs)
+        range-market (first (filter #(= "question:30" (:key %)) outcome-markets))
+        normalized (cache/normalize-active-market-display range-market normalize-deps)]
+    (is (= "question:30" (:key normalized)))
+    (is (= :question (:outcome-kind normalized)))
+    (is (= :crypto (:outcome-category normalized)))
+    (is (= 30 (:question-id normalized)))
+    (is (= ["Below 61044" "61044 to 63535" "Above 63535"]
+           (mapv :label (:question-options normalized))))
+    (is (= ["#1610" "#1611" "#1620" "#1621" "#1630" "#1631"]
+           (:outcome-subscription-coins normalized)))
+    (is (= "#1620" (get-in normalized [:question-options 1 :yes-coin])))
+    (is (= "#1621" (get-in normalized [:question-options 1 :no-coin])))
+    (is (= "#1620" (get-in normalized [:outcome-side-aliases "#1620" :coin])))))
+
+(deftest persist-active-market-display-persists-normalized-json-and-guards-errors-test
+  (testing "valid normalized payload is persisted"
+    (let [captured (atom nil)]
+      (with-redefs [platform/local-storage-set! (fn [k v]
+                                                  (reset! captured [k v]))]
+        (cache/persist-active-market-display!
+          {:coin " ETH "
+           :symbol " ETH-USDC "
+           :dex " hyna "
+           :asset-id "110000"
+           :onlyIsolated true
+           :marginMode "strictIsolated"
+           :market-type :perp
+           :maxLeverage "30"}
+          normalize-deps))
+      (let [[k raw] @captured
+            payload (js->clj (js/JSON.parse raw) :keywordize-keys true)]
+        (is (= "active-market-display" k))
+        (is (= "ETH" (:coin payload)))
+        (is (= "ETH-USDC" (:symbol payload)))
+        (is (= "hyna" (:dex payload)))
+        (is (= 110000 (:asset-id payload)))
+        (is (= true (:only-isolated? payload)))
+        (is (= "strict-isolated" (:margin-mode payload)))
+        (is (= "perp" (:market-type payload)))
+        (is (= 30 (:maxLeverage payload))))))
+
+  (testing "invalid normalized payload does not touch local storage"
+    (let [calls (atom 0)]
+      (with-redefs [platform/local-storage-set! (fn [_ _]
+                                                  (swap! calls inc))]
+        (cache/persist-active-market-display!
+          {:coin "   "
+           :symbol "ETH-USDC"}
+          normalize-deps))
+      (is (= 0 @calls))))
+
+  (testing "local-storage failures are caught"
+    (let [threw? (atom false)]
+      (let [original-warn (.-warn js/console)]
+        (set! (.-warn js/console) (fn [& _] nil))
+        (try
+          (with-redefs [platform/local-storage-set! (fn [_ _]
+                                                      (throw (js/Error. "disk-full")))]
+            (try
+              (cache/persist-active-market-display!
+                {:coin "ETH" :symbol "ETH-USDC"}
+                normalize-deps)
+              (catch :default _
+                (reset! threw? true))))
+          (finally
+            (set! (.-warn js/console) original-warn))))
+      (is (false? @threw?)))))
+
+(deftest load-active-market-display-rejects-missing-mismatched-and-invalid-cached-data-test
+  (testing "matching coin returns parsed normalized payload"
+    (with-redefs [platform/local-storage-get
+                  (fn [_]
+                    (js/JSON.stringify
+                      (clj->js {:coin "ETH"
+                                :symbol "ETH-USDC"
+                                :asset-id "7"
+                                :onlyIsolated "true"
+                                :marginMode "strictIsolated"
+                                :market-type "perp"
+                                :maxLeverage "25"})))]
+      (is (= {:coin "ETH"
+              :symbol "ETH-USDC"
+              :asset-id 7
+              :only-isolated? true
+              :margin-mode :strict-isolated
+              :market-type :perp
+              :maxLeverage 25}
+             (cache/load-active-market-display "ETH" normalize-deps)))))
+
+  (testing "mismatched coin and invalid JSON return nil"
+    (with-redefs [platform/local-storage-get (fn [_]
+                                               (js/JSON.stringify (clj->js {:coin "BTC"})))]
+      (is (nil? (cache/load-active-market-display "ETH" normalize-deps))))
+    (with-redefs [platform/local-storage-get (fn [_] "{")]
+      (is (nil? (cache/load-active-market-display "ETH" normalize-deps)))))
+
+  (testing "blank active-asset short-circuits"
+    (is (nil? (cache/load-active-market-display nil normalize-deps)))))

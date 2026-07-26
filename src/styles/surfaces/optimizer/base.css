@@ -1,0 +1,321 @@
+@layer components {
+  .portfolio-optimizer {
+    --optimizer-bg: #0a0b0d;
+    --optimizer-surface: #111316;
+    --optimizer-surface-2: #15181c;
+    --optimizer-surface-3: #1a1d22;
+    --optimizer-border: #1d2025;
+    --optimizer-border-strong: #292d33;
+    --optimizer-text: #e6e7ea;
+    --optimizer-text-2: #8a8f98;
+    --optimizer-text-3: #5a5f68;
+    --optimizer-accent: #d4b558;
+    --optimizer-accent-soft: rgb(212 181 88 / 0.06);
+    --optimizer-accent-strong: rgb(212 181 88 / 0.2);
+    --optimizer-accent-border: rgb(212 181 88 / 0.58);
+    --optimizer-long: #4ea674;
+    --optimizer-short: #c25b5b;
+    --optimizer-warn: #d49a3a;
+    --optimizer-info: #6b8db5;
+    /* Target/equal-budget color for the Equal Risk balance chart (designer
+       spec 2026-07-11): purple so it can never be confused with the long/short
+       signal pair or the amber accent. */
+    --optimizer-target: #a78bfa;
+    --optimizer-target-border: rgb(167 139 250 / 0.55);
+    --optimizer-target-soft: rgb(167 139 250 / 0.14);
+    /* Pin DaisyUI base surfaces to the optimizer charcoal so every bg-base-100/200/300
+       (and opacity variant, which all resolve to oklch(var(--b1|2|3)/a)) stays
+       theme-independent — the design surface is near-black, not the active theme's
+       tinted base. OKLCH equivalents of --optimizer-surface / -2 / -3. */
+    --b1: 18.5877% 0.006899 258.369891;
+    --b2: 20.7611% 0.009203 255.618180;
+    --b3: 22.9793% 0.010692 260.683815;
+    background-color: var(--optimizer-bg);
+    color: var(--optimizer-text);
+    font-family: "Inter Variable", var(--font-ui-system);
+    font-size: 12px;
+    letter-spacing: -0.005em;
+    line-height: 1.4;
+  }
+
+  .portfolio-optimizer .border-base-300 {
+    border-color: var(--optimizer-border);
+  }
+
+  .portfolio-optimizer .text-trading-text {
+    color: var(--optimizer-text);
+  }
+
+  .portfolio-optimizer .text-trading-muted {
+    color: var(--optimizer-text-2);
+  }
+
+  .portfolio-optimizer .text-trading-muted\/70 {
+    color: var(--optimizer-text-3);
+  }
+
+  .portfolio-optimizer .text-trading-muted\/60 {
+    color: rgb(90 95 104 / 0.72);
+  }
+
+  .portfolio-optimizer .text-warning,
+  .portfolio-optimizer .text-primary {
+    color: var(--optimizer-accent);
+  }
+
+  .portfolio-optimizer .text-success,
+  .portfolio-optimizer .text-trading-green {
+    color: var(--optimizer-long);
+  }
+
+  .portfolio-optimizer .text-error,
+  .portfolio-optimizer .text-trading-red {
+    color: var(--optimizer-short);
+  }
+
+  .portfolio-optimizer .text-info {
+    color: var(--optimizer-info);
+  }
+
+  .portfolio-optimizer .bg-info {
+    background-color: var(--optimizer-info);
+  }
+
+  /* ── Signal-tint leak fix ────────────────────────────────────────
+     DaisyUI emits the bg-/border- *opacity* utilities (e.g. bg-primary/10,
+     border-warning/50) from its own theme vars. The text-primary /
+     text-warning / text-success / text-error remaps above never covered
+     them, so in the default theme these tinted backgrounds and borders
+     pulled the global teal-green primary, yellow warning, and bright
+     green/red signals into this amber/charcoal surface (most visibly the
+     primary-tinted CTAs). Remap the variants the optimizer views actually
+     use to the --optimizer-* signal colors. color-mix keeps these on the
+     existing tokens so no raw color literals are introduced. */
+  .portfolio-optimizer .bg-primary\/10 { background-color: color-mix(in srgb, var(--optimizer-accent) 10%, transparent); }
+  .portfolio-optimizer .bg-primary\/20 { background-color: color-mix(in srgb, var(--optimizer-accent) 20%, transparent); }
+  .portfolio-optimizer .bg-primary\/70 { background-color: color-mix(in srgb, var(--optimizer-accent) 70%, transparent); }
+  .portfolio-optimizer .hover\:bg-primary\/30:hover { background-color: color-mix(in srgb, var(--optimizer-accent) 30%, transparent); }
+  .portfolio-optimizer .border-primary\/40 { border-color: color-mix(in srgb, var(--optimizer-accent) 40%, transparent); }
+  .portfolio-optimizer .border-primary\/50 { border-color: color-mix(in srgb, var(--optimizer-accent) 50%, transparent); }
+  .portfolio-optimizer .border-primary\/60 { border-color: color-mix(in srgb, var(--optimizer-accent) 60%, transparent); }
+  .portfolio-optimizer .border-primary\/70 { border-color: color-mix(in srgb, var(--optimizer-accent) 70%, transparent); }
+
+  .portfolio-optimizer .bg-warning\/5 { background-color: color-mix(in srgb, var(--optimizer-warn) 5%, transparent); }
+  .portfolio-optimizer .bg-warning\/10 { background-color: color-mix(in srgb, var(--optimizer-warn) 10%, transparent); }
+  .portfolio-optimizer .bg-warning\/80 { background-color: color-mix(in srgb, var(--optimizer-warn) 80%, transparent); }
+  .portfolio-optimizer .border-warning\/40 { border-color: color-mix(in srgb, var(--optimizer-warn) 40%, transparent); }
+  .portfolio-optimizer .border-warning\/50 { border-color: color-mix(in srgb, var(--optimizer-warn) 50%, transparent); }
+  .portfolio-optimizer .border-warning\/60 { border-color: color-mix(in srgb, var(--optimizer-warn) 60%, transparent); }
+  .portfolio-optimizer .border-warning\/70 { border-color: color-mix(in srgb, var(--optimizer-warn) 70%, transparent); }
+
+  .portfolio-optimizer .bg-success\/70 { background-color: color-mix(in srgb, var(--optimizer-long) 70%, transparent); }
+  .portfolio-optimizer .border-success\/40 { border-color: color-mix(in srgb, var(--optimizer-long) 40%, transparent); }
+
+  .portfolio-optimizer .bg-error\/10 { background-color: color-mix(in srgb, var(--optimizer-short) 10%, transparent); }
+  .portfolio-optimizer .bg-error\/70 { background-color: color-mix(in srgb, var(--optimizer-short) 70%, transparent); }
+  .portfolio-optimizer .border-error\/40 { border-color: color-mix(in srgb, var(--optimizer-short) 40%, transparent); }
+  .portfolio-optimizer .border-error\/60 { border-color: color-mix(in srgb, var(--optimizer-short) 60%, transparent); }
+
+  .portfolio-optimizer :is(.font-mono, .tabular-nums) {
+    font-family: "JetBrains Mono", var(--font-mono);
+    font-feature-settings: "tnum", "zero";
+    font-variant-numeric: tabular-nums;
+  }
+
+  .portfolio-optimizer :is(.rounded-xl, .rounded-lg, .rounded-md) {
+    border-radius: 2px;
+  }
+
+  .portfolio-optimizer .rounded-full {
+    border-radius: 9999px;
+  }
+
+  .portfolio-optimizer details:not([open]) > :not(summary) {
+    display: none;
+  }
+
+  .portfolio-optimizer
+    :is(table, th, td, .optimizer-row, .optimizer-kpi-card, .optimizer-exposure-row) {
+    font-variant-numeric: tabular-nums;
+  }
+
+  .portfolio-optimizer :is(input, select, button) {
+    min-height: 26px;
+    border-radius: 2px;
+  }
+
+  .portfolio-optimizer :is(input, select) {
+    background-color: var(--optimizer-bg);
+    border-color: var(--optimizer-border-strong);
+    color: var(--optimizer-text);
+    height: 26px;
+  }
+
+  .portfolio-optimizer input::placeholder {
+    color: var(--optimizer-text-3);
+    opacity: 1;
+  }
+
+  .portfolio-optimizer :is(input, select):focus {
+    border-color: var(--optimizer-accent);
+    box-shadow: 0 0 0 1px rgba(212, 181, 88, 0.75);
+    outline: none;
+  }
+
+  /* Target-sigma dial sliders render the bare native range control: the
+     input chrome above (background box, fixed height, amber focus ring)
+     reads as a border wall around the track, and the accent fill already
+     signals the control's state. */
+  .portfolio-optimizer input.optimizer-target-sigma-slider,
+  .portfolio-optimizer input.optimizer-target-sigma-slider:focus,
+  .portfolio-optimizer input.optimizer-exposure-band,
+  .portfolio-optimizer input.optimizer-exposure-band:focus {
+    background-color: transparent;
+    border-color: transparent;
+    box-shadow: none;
+    height: auto;
+    min-height: 0;
+  }
+
+  .portfolio-optimizer input.optimizer-exposure-band:focus-visible {
+    outline: 2px solid var(--optimizer-accent);
+    outline-offset: 3px;
+  }
+
+  .portfolio-optimizer button:not(:disabled):hover {
+    border-color: var(--optimizer-border-strong);
+    background-color: var(--optimizer-surface-3);
+  }
+
+  .portfolio-optimizer .optimizer-primary-action:not(:disabled) {
+    border-color: var(--optimizer-accent);
+    background-color: var(--optimizer-accent);
+    color: #1a1408;
+    font-weight: 600;
+  }
+
+  .portfolio-optimizer .optimizer-primary-action:not(:disabled):hover {
+    background-color: #e0c067;
+    border-color: #e0c067;
+  }
+
+  .portfolio-optimizer .optimizer-chip {
+    border-color: var(--optimizer-border-strong);
+    background-color: var(--optimizer-surface-2);
+    color: var(--optimizer-text-2);
+  }
+
+  .portfolio-optimizer .optimizer-chip[data-active="true"] {
+    border-color: var(--optimizer-accent-border);
+    background-color: var(--optimizer-accent-soft);
+    color: var(--optimizer-accent);
+  }
+
+  .portfolio-optimizer .optimizer-chip[data-tone="accent"] {
+    border-color: rgb(212 181 88 / 0.4);
+    color: var(--optimizer-accent);
+  }
+
+  .portfolio-optimizer .optimizer-chip[data-tone="info"] {
+    border-color: rgb(107 141 181 / 0.4);
+    color: var(--optimizer-info, #6b8db5);
+  }
+
+  .portfolio-optimizer .optimizer-chip[data-tone="long"] {
+    border-color: rgb(78 166 116 / 0.4);
+    color: var(--optimizer-long);
+  }
+
+  .portfolio-optimizer .optimizer-chip[data-tone="warn"] {
+    border-color: rgb(212 154 58 / 0.45);
+    color: var(--optimizer-warn, #d49a3a);
+  }
+
+  .portfolio-optimizer .optimizer-chip[data-tone="short"] {
+    border-color: rgb(194 91 91 / 0.4);
+    color: var(--optimizer-short);
+  }
+
+  .portfolio-optimizer .optimizer-chip[data-tone="live"] {
+    border-color: rgb(78 166 116 / 0.4);
+    color: var(--optimizer-long);
+  }
+
+  /* Shared optimizer checkbox — the frontier toolbar's custom control generalized
+     (appearance:none square, accent fill, drawn check glyph) so every optimizer
+     checkbox reads as one design instead of the browser default. */
+  .portfolio-optimizer .optimizer-checkbox {
+    appearance: none;
+    -webkit-appearance: none;
+    display: grid;
+    place-content: center;
+    flex: 0 0 14px;
+    width: 14px;
+    height: 14px;
+    min-height: 14px;
+    margin: 0;
+    border: 1px solid var(--optimizer-border-strong);
+    border-radius: 2px;
+    background-color: var(--optimizer-bg);
+    color: var(--optimizer-accent);
+    box-shadow: none;
+    cursor: pointer;
+    transition: border-color 120ms ease, background-color 120ms ease;
+  }
+
+  .portfolio-optimizer .optimizer-checkbox::before {
+    content: "";
+    width: 4px;
+    height: 7px;
+    border-right: 2px solid var(--optimizer-bg);
+    border-bottom: 2px solid var(--optimizer-bg);
+    transform: rotate(45deg) scale(0);
+    transform-origin: center;
+    transition: transform 120ms ease;
+  }
+
+  .portfolio-optimizer .optimizer-checkbox:hover {
+    border-color: var(--optimizer-accent-border);
+  }
+
+  .portfolio-optimizer .optimizer-checkbox:checked {
+    border-color: var(--optimizer-accent);
+    background-color: var(--optimizer-accent);
+  }
+
+  .portfolio-optimizer .optimizer-checkbox:checked::before {
+    transform: rotate(45deg) scale(1);
+  }
+
+  .portfolio-optimizer .optimizer-checkbox:focus-visible,
+  .portfolio-optimizer .optimizer-checkbox:focus {
+    border-color: var(--optimizer-accent-border);
+    box-shadow: none;
+    outline: none;
+  }
+
+  .portfolio-optimizer .optimizer-note {
+    background-color: var(--optimizer-surface);
+    border: 1px solid var(--optimizer-border);
+    border-left: 2px solid var(--optimizer-text-3);
+    color: var(--optimizer-text);
+    padding: 10px 12px;
+  }
+
+  .portfolio-optimizer .optimizer-note > p {
+    color: var(--optimizer-text-2);
+  }
+
+  .portfolio-optimizer .optimizer-note li {
+    position: relative;
+    padding-left: 14px;
+    color: var(--optimizer-text-2);
+  }
+
+  .portfolio-optimizer .optimizer-note li::before {
+    content: "·";
+    position: absolute;
+    left: 4px;
+    color: var(--optimizer-accent);
+  }
+}

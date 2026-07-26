@@ -1,0 +1,138 @@
+(ns hyperopen.runtime.action-adapters.wallet
+  (:require [clojure.string :as str]
+            [nexus.registry :as nxr]
+            [hyperopen.api.trading :as trading-api]
+            [hyperopen.config :as app-config]
+            [hyperopen.platform :as platform]
+            [hyperopen.portfolio.routes :as portfolio-routes]
+            [hyperopen.staking.actions :as staking-actions]
+            [hyperopen.trading-crypto-modules :as trading-crypto-modules]
+            [hyperopen.wallet.actions :as wallet-actions]
+            [hyperopen.wallet.agent-lockbox :as agent-lockbox]
+            [hyperopen.wallet.agent-runtime :as agent-runtime]
+            [hyperopen.wallet.agent-session :as agent-session]
+            [hyperopen.wallet.connection-runtime :as wallet-connection-runtime]))
+
+(def connect-wallet-action wallet-actions/connect-wallet-action)
+
+(defn disconnect-wallet-action
+  [_state]
+  (wallet-actions/disconnect-wallet-action nil))
+
+(def should-auto-enable-agent-trading?
+  wallet-connection-runtime/should-auto-enable-agent-trading?)
+
+(defn handle-wallet-connected
+  [store connected-address]
+  (let [result (wallet-connection-runtime/handle-wallet-connected!
+                {:store store
+                 :connected-address connected-address
+                 :should-auto-enable-agent-trading? should-auto-enable-agent-trading?
+                 :dispatch! nxr/dispatch})
+        route (get-in @store [:router :path])]
+    (nxr/dispatch store nil [[:effects/record-attribution-event
+                              :wallet-connected
+                              {:wallet/address connected-address
+                               :outcome :observed}]])
+    (when (str/starts-with? (or route "") "/vaults")
+      (nxr/dispatch store nil [[:actions/load-vault-route route]]))
+    (when (staking-actions/staking-route? route)
+      (nxr/dispatch store nil [[:actions/load-staking-route route]]))
+    (when (portfolio-routes/portfolio-optimize-route? route)
+      (nxr/dispatch store nil [[:actions/load-portfolio-optimizer-route route]]))
+    result))
+
+(defn enable-agent-trading
+  [_ store options]
+  (let [{:keys [storage-mode local-protection-mode is-mainnet agent-name signature-chain-id]} options
+        selected-network (:hyperliquid app-config/config)
+        storage-mode (or storage-mode :local)
+        local-protection-mode (or local-protection-mode :plain)
+        is-mainnet (if (contains? options :is-mainnet)
+                     is-mainnet
+                     (:is-mainnet selected-network))
+        signature-chain-id (if (contains? options :signature-chain-id)
+                             signature-chain-id
+                             (:signature-chain-id selected-network))]
+    (letfn [(set-agent-load-error! [err]
+            (swap! store update-in [:wallet :agent] merge
+                   {:status :error
+                    :error (agent-runtime/runtime-error-message err)
+                    :agent-address nil
+                    :last-approved-at nil
+                    :nonce-cursor nil}))
+          (enable-with-crypto! [crypto]
+            (agent-runtime/enable-agent-trading!
+             {:store store
+              :options {:storage-mode storage-mode
+                        :local-protection-mode local-protection-mode
+                        :is-mainnet is-mainnet
+                        :agent-name agent-name
+                        :signature-chain-id signature-chain-id}
+              :create-agent-credentials! (:create-agent-credentials! crypto)
+              :now-ms-fn platform/now-ms
+              :normalize-storage-mode agent-session/normalize-storage-mode
+              :normalize-local-protection-mode agent-session/normalize-local-protection-mode
+              :ensure-device-label! agent-session/ensure-device-label!
+              :passkey-lock-supported? agent-lockbox/passkey-lock-supported?
+              :create-locked-session! agent-lockbox/create-locked-session!
+              :cache-unlocked-session! agent-lockbox/cache-unlocked-session!
+              :persist-passkey-session-metadata! agent-session/persist-passkey-session-metadata!
+              :delete-locked-session! agent-lockbox/delete-locked-session!
+              :default-signature-chain-id-for-environment
+              agent-session/default-signature-chain-id-for-environment
+              :build-approve-agent-action agent-session/build-approve-agent-action
+              :format-agent-name-with-valid-until agent-session/format-agent-name-with-valid-until
+              :approve-agent! trading-api/approve-agent!
+              :persist-agent-session-by-mode! agent-session/persist-agent-session-by-mode!
+              :clear-agent-session-by-mode! agent-session/clear-agent-session-by-mode!
+              :clear-unlocked-session! agent-lockbox/clear-unlocked-session!
+              :runtime-error-message agent-runtime/runtime-error-message
+              :exchange-response-error agent-runtime/exchange-response-error}))]
+      (if-let [crypto (trading-crypto-modules/resolved-trading-crypto)]
+        (enable-with-crypto! crypto)
+        (-> (trading-crypto-modules/load-trading-crypto-module!)
+            (.then enable-with-crypto!)
+            (.catch set-agent-load-error!))))))
+
+(defn enable-agent-trading-action
+  [state]
+  (wallet-actions/enable-agent-trading-action
+   state
+   agent-session/normalize-storage-mode
+   agent-session/normalize-local-protection-mode))
+
+(defn set-agent-storage-mode-action
+  [state storage-mode]
+  (wallet-actions/set-agent-storage-mode-action
+   state
+   storage-mode
+   agent-session/normalize-storage-mode))
+
+(defn unlock-agent-trading
+  [_ store]
+  (agent-runtime/unlock-agent-trading!
+   {:store store
+    :normalize-storage-mode agent-session/normalize-storage-mode
+    :normalize-local-protection-mode agent-session/normalize-local-protection-mode
+    :load-passkey-session-metadata agent-session/load-passkey-session-metadata
+    :unlock-locked-session! (fn [opts]
+                              (agent-lockbox/unlock-locked-session!
+                               (assoc opts :cache-session? false)))
+    :cache-unlocked-session! agent-lockbox/cache-unlocked-session!
+    :runtime-error-message agent-runtime/runtime-error-message}))
+
+(defn unlock-agent-trading-action
+  ([state]
+   (wallet-actions/unlock-agent-trading-action state))
+  ([state payload]
+   (wallet-actions/unlock-agent-trading-action state payload)))
+
+(defn set-agent-local-protection-mode-action
+  [state local-protection-mode]
+  (wallet-actions/set-agent-local-protection-mode-action
+   state
+   local-protection-mode
+   agent-session/normalize-local-protection-mode))
+
+(def copy-wallet-address-action wallet-actions/copy-wallet-address-action)

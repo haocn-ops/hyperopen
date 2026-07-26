@@ -1,0 +1,10 @@
+{
+  "reporter": ["text-summary", "html", "lcov", "json-summary"],
+  "reports-dir": "coverage",
+  "include": [".shadow-cljs/builds/**/cljs-runtime/hyperopen*.js"],
+  "exclude": [
+    "**/*_test.js",
+    "**/test_runner.js",
+    "**/websocket_test_runner.js"
+  ]
+}

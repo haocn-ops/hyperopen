@@ -1,0 +1,94 @@
+{
+  "id": "portfolio-interaction-states",
+  "title": "Portfolio route interaction states",
+  "route": "/portfolio",
+  "severity": "high",
+  "tags": [
+    "portfolio",
+    "interaction",
+    "desktop"
+  ],
+  "viewports": [
+    "desktop"
+  ],
+  "url": "http://localhost:8080/portfolio",
+  "steps": [
+    {
+      "type": "debug_call",
+      "method": "qaReset"
+    },
+    {
+      "type": "navigate"
+    },
+    {
+      "type": "wait_for_idle",
+      "options": {
+        "quietMs": 250,
+        "timeoutMs": 4000
+      }
+    },
+    {
+      "type": "oracle",
+      "name": "parity-element",
+      "args": {
+        "parityId": "portfolio-root"
+      },
+      "expect": {
+        "present": true
+      }
+    },
+    {
+      "type": "eval",
+      "allowUnsafeEval": true,
+      "expression": "(() => { const trigger = document.querySelector(\"[data-role='portfolio-summary-scope-selector-trigger']\"); if (!trigger) { return { clicked: false, reason: \"missing-trigger\" }; } trigger.click(); return { clicked: true }; })()",
+      "expect": {
+        "clicked": true
+      }
+    },
+    {
+      "type": "wait_for_eval",
+      "expression": "(() => ({ scopeExpanded: document.querySelector(\"[data-role='portfolio-summary-scope-selector-trigger']\")?.getAttribute(\"aria-expanded\") === \"true\" }))()",
+      "timeoutMs": 4000,
+      "pollMs": 100,
+      "expect": {
+        "scopeExpanded": true
+      }
+    },
+    {
+      "type": "eval",
+      "allowUnsafeEval": true,
+      "expression": "(() => { const perpsOption = document.querySelector(\"[data-role='portfolio-summary-scope-selector-option-perps']\"); const pnlTab = document.querySelector(\"[data-role='portfolio-chart-tab-pnl']\"); const balancesTab = document.querySelector(\"[data-role='account-info-tab-balances']\"); if (!perpsOption || !pnlTab || !balancesTab) { return { selectedPerps: Boolean(perpsOption), selectedPnl: Boolean(pnlTab), selectedBalances: Boolean(balancesTab) }; } perpsOption.click(); pnlTab.click(); balancesTab.click(); return { selectedPerps: true, selectedPnl: true, selectedBalances: true }; })()",
+      "expect": {
+        "selectedPerps": true,
+        "selectedPnl": true,
+        "selectedBalances": true
+      }
+    },
+    {
+      "type": "wait_for_idle",
+      "options": {
+        "quietMs": 200,
+        "timeoutMs": 4000
+      }
+    },
+    {
+      "type": "eval",
+      "saveAs": "interactionState",
+      "expression": "(() => { const trigger = document.querySelector(\"[data-role='portfolio-summary-scope-selector-trigger']\"); const pnlTab = document.querySelector(\"[data-role='portfolio-chart-tab-pnl']\"); const balancesTab = document.querySelector(\"[data-role='account-info-tab-balances']\"); const performanceTab = document.querySelector(\"[data-role='account-info-tab-performance-metrics']\"); const perpsSpotAction = document.querySelector(\"[data-role='portfolio-action-perps-spot']\"); const depositAction = document.querySelector(\"[data-role='portfolio-action-deposit']\"); const withdrawAction = document.querySelector(\"[data-role='portfolio-action-withdraw']\"); const removedActionsPresent = [\"portfolio-action-swap-stablecoins\", \"portfolio-action-evm-core\", \"portfolio-action-portfolio-margin\", \"portfolio-action-send\"].some((role) => Boolean(document.querySelector(`[data-role='${role}']`))); return { scopeExpanded: trigger?.getAttribute(\"aria-expanded\") === \"true\", scopeLabel: trigger?.textContent?.trim() || null, pnlPressed: pnlTab?.getAttribute(\"aria-pressed\") || null, balancesPressed: balancesTab?.getAttribute(\"aria-pressed\") || null, performancePressed: performanceTab?.getAttribute(\"aria-pressed\") || null, perpsSpotPresent: Boolean(perpsSpotAction), depositPresent: Boolean(depositAction), withdrawPresent: Boolean(withdrawAction), removedActionsPresent }; })()",
+      "expect": {
+        "scopeExpanded": false,
+        "scopeLabel": "Perps",
+        "pnlPressed": "true",
+        "balancesPressed": "true",
+        "performancePressed": null,
+        "perpsSpotPresent": true,
+        "depositPresent": true,
+        "withdrawPresent": true,
+        "removedActionsPresent": false
+      }
+    },
+    {
+      "type": "capture"
+    }
+  ]
+}

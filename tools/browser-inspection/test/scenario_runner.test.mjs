@@ -1,0 +1,334 @@
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import test from "node:test";
+import assert from "node:assert/strict";
+import { runScenarioBundle } from "../src/scenario_runner.mjs";
+
+async function writeJson(filePath, value) {
+  await fs.mkdir(path.dirname(filePath), { recursive: true });
+  await fs.writeFile(filePath, `${JSON.stringify(value, null, 2)}\n`);
+}
+
+function buildFakeService(artifactRoot, overrides = {}) {
+  return {
+    config: {
+      artifactRoot,
+      localApp: { url: "http://localhost:8080/trade" },
+      targets: { remote: { url: "https://app.hyperliquid.xyz/trade", label: "hyperliquid" } },
+      viewports: { desktop: { width: 1440, height: 900 } }
+    },
+    sessionManager: {
+      store: {
+        async createRun(kind) {
+          const runId = `${kind}-test-run`;
+          const runDir = path.join(artifactRoot, runId);
+          await fs.mkdir(runDir, { recursive: true });
+          return { runId, runDir };
+        },
+        async appendArtifact() {},
+        async completeRun(_runDir, metadata) {
+          return metadata;
+        },
+        async failRun() {}
+      }
+    },
+    async preflight() {
+      return { ok: true, mode: "local", checks: [] };
+    },
+    async startSession() {
+      return { id: "session-1" };
+    },
+    async stopSession() {
+      return true;
+    },
+    async navigate({ url, viewportName }) {
+      return { navigated: true, url, viewportName };
+    },
+    async compare() {
+      return { runId: "compare-1", runDir: path.join(artifactRoot, "compare-1") };
+    },
+    ...overrides
+  };
+}
+
+test("runScenarioBundle dry-run lists selected scenarios", async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "hyperopen-scenario-runner-"));
+  await writeJson(path.join(root, "one.json"), {
+    id: "one",
+    title: "One",
+    tags: ["critical"],
+    viewports: ["desktop"],
+    url: "http://localhost:8080/trade",
+    steps: [{ type: "navigate" }]
+  });
+
+  const service = buildFakeService(root);
+  const result = await runScenarioBundle(service, {
+    scenarioDir: root,
+    tags: ["critical"],
+    dryRun: true
+  });
+
+  assert.equal(result.dryRun, true);
+  assert.deepEqual(result.selected.map((entry) => entry.id), ["one"]);
+
+  await fs.rm(root, { recursive: true, force: true });
+});
+
+test("runScenarioBundle records pass and expectation failures", async () => {
+  const scenarioDir = await fs.mkdtemp(path.join(os.tmpdir(), "hyperopen-scenario-manifests-"));
+  const artifactRoot = await fs.mkdtemp(path.join(os.tmpdir(), "hyperopen-scenario-artifacts-"));
+  await writeJson(path.join(scenarioDir, "pass.json"), {
+    id: "pass-scenario",
+    title: "Pass",
+    severity: "high",
+    tags: ["critical"],
+    viewports: ["desktop"],
+    url: "http://localhost:8080/trade",
+    steps: [{ type: "navigate" }]
+  });
+  await writeJson(path.join(scenarioDir, "fail.json"), {
+    id: "fail-scenario",
+    title: "Fail",
+    severity: "high",
+    tags: ["critical"],
+    viewports: ["desktop"],
+    url: "http://localhost:8080/trade",
+    steps: [
+      {
+        type: "sleep",
+        ms: 1,
+        expect: { sleptMs: 2 }
+      }
+    ]
+  });
+
+  const service = buildFakeService(artifactRoot);
+  const result = await runScenarioBundle(service, {
+    scenarioDir,
+    tags: ["critical"],
+    runKind: "scenario"
+  });
+
+  assert.equal(result.state, "product-regression");
+  assert.equal(result.results.length, 2);
+  assert.equal(result.results.find((entry) => entry.scenarioId === "pass-scenario").state, "pass");
+  assert.equal(
+    result.results.find((entry) => entry.scenarioId === "fail-scenario").state,
+    "product-regression"
+  );
+
+  const summaryPath = path.join(result.runDir, "summary.json");
+  const summary = JSON.parse(await fs.readFile(summaryPath, "utf8"));
+  assert.equal(summary.state, "product-regression");
+
+  await fs.rm(scenarioDir, { recursive: true, force: true });
+  await fs.rm(artifactRoot, { recursive: true, force: true });
+});
+
+test("runScenarioBundle waits for oracle expectations to settle", async () => {
+  const scenarioDir = await fs.mkdtemp(path.join(os.tmpdir(), "hyperopen-scenario-wait-"));
+  const artifactRoot = await fs.mkdtemp(path.join(os.tmpdir(), "hyperopen-scenario-wait-artifacts-"));
+  await writeJson(path.join(scenarioDir, "wait.json"), {
+    id: "wait-scenario",
+    title: "Wait",
+    severity: "high",
+    tags: ["critical"],
+    viewports: ["desktop"],
+    url: "http://localhost:8080/trade",
+    steps: [
+      {
+        type: "wait_for_oracle",
+        name: "first-position",
+        timeoutMs: 100,
+        pollMs: 1,
+        expect: { present: true }
+      }
+    ]
+  });
+
+  const oracleResults = [{ present: false }, { present: true }];
+  const service = buildFakeService(artifactRoot, {
+    async evaluate() {
+      return { result: oracleResults.shift() ?? { present: true } };
+    }
+  });
+
+  const result = await runScenarioBundle(service, {
+    scenarioDir,
+    tags: ["critical"],
+    runKind: "scenario"
+  });
+
+  assert.equal(result.state, "pass");
+  assert.equal(result.results[0].state, "pass");
+
+  await fs.rm(scenarioDir, { recursive: true, force: true });
+  await fs.rm(artifactRoot, { recursive: true, force: true });
+});
+
+test("runScenarioBundle supports eval steps with unsafe opt-in", async () => {
+  const scenarioDir = await fs.mkdtemp(path.join(os.tmpdir(), "hyperopen-scenario-eval-"));
+  const artifactRoot = await fs.mkdtemp(path.join(os.tmpdir(), "hyperopen-scenario-eval-artifacts-"));
+  await writeJson(path.join(scenarioDir, "eval.json"), {
+    id: "eval-scenario",
+    title: "Eval",
+    severity: "high",
+    tags: ["critical"],
+    viewports: ["desktop"],
+    url: "http://localhost:8080/trade",
+    steps: [
+      {
+        type: "eval",
+        expression: "({ clicked: true })",
+        allowUnsafeEval: true,
+        expect: { clicked: true }
+      }
+    ]
+  });
+
+  const evaluateCalls = [];
+  const service = buildFakeService(artifactRoot, {
+    async evaluate(options) {
+      evaluateCalls.push(options);
+      return { result: { clicked: true } };
+    }
+  });
+
+  const result = await runScenarioBundle(service, {
+    scenarioDir,
+    tags: ["critical"],
+    runKind: "scenario"
+  });
+
+  assert.equal(result.state, "pass");
+  assert.equal(evaluateCalls.length, 1);
+  assert.equal(evaluateCalls[0].allowUnsafeEval, true);
+  assert.equal(evaluateCalls[0].expression, "({ clicked: true })");
+
+  await fs.rm(scenarioDir, { recursive: true, force: true });
+  await fs.rm(artifactRoot, { recursive: true, force: true });
+});
+
+test("runScenarioBundle waits for eval expectations to settle", async () => {
+  const scenarioDir = await fs.mkdtemp(path.join(os.tmpdir(), "hyperopen-scenario-wait-eval-"));
+  const artifactRoot = await fs.mkdtemp(path.join(os.tmpdir(), "hyperopen-scenario-wait-eval-artifacts-"));
+  await writeJson(path.join(scenarioDir, "wait-eval.json"), {
+    id: "wait-eval-scenario",
+    title: "Wait eval",
+    severity: "high",
+    tags: ["critical"],
+    viewports: ["desktop"],
+    url: "http://localhost:8080/trade",
+    steps: [
+      {
+        type: "wait_for_eval",
+        expression: "({ ready: true })",
+        timeoutMs: 100,
+        pollMs: 1,
+        expect: { ready: true }
+      }
+    ]
+  });
+
+  const evaluateResults = [{ result: { ready: false } }, { result: { ready: true } }];
+  const service = buildFakeService(artifactRoot, {
+    async evaluate() {
+      return evaluateResults.shift() ?? { result: { ready: true } };
+    }
+  });
+
+  const result = await runScenarioBundle(service, {
+    scenarioDir,
+    tags: ["critical"],
+    runKind: "scenario"
+  });
+
+  assert.equal(result.state, "pass");
+  assert.equal(result.results[0].state, "pass");
+
+  await fs.rm(scenarioDir, { recursive: true, force: true });
+  await fs.rm(artifactRoot, { recursive: true, force: true });
+});
+
+test("runScenarioBundle rebases managed-local navigation URLs to the session origin", async () => {
+  const scenarioDir = await fs.mkdtemp(path.join(os.tmpdir(), "hyperopen-scenario-managed-local-"));
+  const artifactRoot = await fs.mkdtemp(path.join(os.tmpdir(), "hyperopen-scenario-managed-local-artifacts-"));
+  await writeJson(path.join(scenarioDir, "managed-local.json"), {
+    id: "managed-local-scenario",
+    title: "Managed local",
+    severity: "high",
+    tags: ["critical"],
+    viewports: ["desktop"],
+    url: "http://localhost:8080/trade",
+    steps: [{ type: "navigate" }]
+  });
+
+  const navigateCalls = [];
+  const service = buildFakeService(artifactRoot, {
+    async startSession() {
+      return {
+        id: "session-1",
+        localApp: {
+          url: "http://127.0.0.1:8086/index.html",
+          requestedUrl: "http://localhost:8080/index.html"
+        }
+      };
+    },
+    async navigate(options) {
+      navigateCalls.push(options);
+      return { navigated: true, url: options.url, viewportName: options.viewportName };
+    }
+  });
+
+  const result = await runScenarioBundle(service, {
+    scenarioDir,
+    tags: ["critical"],
+    manageLocalApp: true,
+    runKind: "scenario"
+  });
+
+  assert.equal(result.state, "pass");
+  assert.equal(navigateCalls.length, 1);
+  assert.equal(navigateCalls[0].url, "http://127.0.0.1:8086/trade");
+
+  await fs.rm(scenarioDir, { recursive: true, force: true });
+  await fs.rm(artifactRoot, { recursive: true, force: true });
+});
+
+test("runScenarioBundle accepts in-memory scenarios", async () => {
+  const artifactRoot = await fs.mkdtemp(path.join(os.tmpdir(), "hyperopen-scenario-inline-artifacts-"));
+  const service = buildFakeService(artifactRoot);
+
+  const result = await runScenarioBundle(service, {
+    scenarios: [
+      {
+        id: "inline-pass",
+        title: "Inline pass",
+        severity: "high",
+        tags: ["critical"],
+        viewports: ["desktop"],
+        url: "http://localhost:8080/trade",
+        steps: [{ type: "navigate" }]
+      },
+      {
+        id: "inline-skip",
+        title: "Inline skip",
+        severity: "high",
+        tags: ["wallet"],
+        viewports: ["desktop"],
+        url: "http://localhost:8080/trade",
+        steps: [{ type: "navigate" }]
+      }
+    ],
+    tags: ["critical"],
+    runKind: "scenario"
+  });
+
+  assert.equal(result.state, "pass");
+  assert.equal(result.results.length, 1);
+  assert.equal(result.results[0].scenarioId, "inline-pass");
+
+  await fs.rm(artifactRoot, { recursive: true, force: true });
+});

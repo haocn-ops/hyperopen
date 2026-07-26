@@ -1,0 +1,281 @@
+(ns hyperopen.portfolio.optimizer.infrastructure.history-client-fallback-test
+  (:require [cljs.test :refer-macros [async deftest is]]
+            [hyperopen.portfolio.optimizer.infrastructure.history-client :as history-client]
+            [hyperopen.test-support.async :as async-support]))
+
+(defn- json-response
+  [status payload]
+  #js {:ok (<= 200 status 299)
+       :status status
+       :json (fn []
+               (js/Promise.resolve (clj->js payload)))})
+
+(deftest request-history-bundle-falls-back-only-for-api-v2-gaps-test
+  (async done
+    (let [api-body (atom nil)
+          progress-events (atom [])
+          legacy-calls (atom [])
+          deps {:optimizer-history-api {:enabled? true
+                                        :base-url "https://history.test"
+                                        :fallback-to-legacy? true
+                                        :legacy-fallback-request-spacing-ms 0}
+                :fetch-fn
+                (fn [_url init]
+                  (let [body (js->clj
+                              (js/JSON.parse (aget init "body")))]
+                    (reset! api-body body)
+                    (js/Promise.resolve
+                     (json-response
+                      200
+                      {:contract_version "optimizer-history-api-v2"
+                       :request_id "rid-partial"
+                       :dataset_version "dv-partial"
+                       :status "partial"
+                       :series_by_instrument
+                       {"hl:perp:BTC" {:instrument_id "hl:perp:BTC"
+                                       :lineage_kind "native"
+                                       :series_kind "market_price"
+                                       :points [{:time_ms 1000
+                                                 :close 100
+                                                 :return nil}
+                                                {:time_ms 2000
+                                                 :close 110
+                                                 :return 0.1}]
+                                       :funding {:status "available"
+                                                 :annualized_carry 0.01}
+                                       :warnings []}
+                        "hl:perp:ETH" {:instrument_id "hl:perp:ETH"
+                                       :lineage_kind "missing"
+                                       :series_kind "market_price"
+                                       :points []
+                                       :funding {:status "missing"}
+                                       :warnings [{:code "missing-candle-history"}]}}
+                       :warnings []}))))
+                :request-id (fn [] "rid-partial")
+                :request-candle-snapshot!
+                (fn [coin _opts]
+                  (swap! legacy-calls conj [:candle coin])
+                  (js/Promise.resolve [{:time 1000 :close "100"}
+                                       {:time 2000 :close "120"}]))
+                :request-market-funding-history!
+                (fn [coin _opts]
+                  (swap! legacy-calls conj [:funding coin])
+                  (js/Promise.resolve [{:time-ms 1000
+                                        :funding-rate-raw "0.001"}]))
+                :on-progress #(swap! progress-events conj %)}
+          request {:universe [{:instrument-id "perp:BTC"
+                               :market-type :perp
+                               :coin "BTC"
+                               :optimizer-history/instrument-id "hl:perp:BTC"}
+                              {:instrument-id "perp:ETH"
+                               :market-type :perp
+                               :coin "ETH"
+                               :optimizer-history/instrument-id "hl:perp:ETH"}
+                              {:instrument-id "perp:DOGE"
+                               :market-type :perp
+                               :coin "DOGE"}]
+                   :bars 30
+                   :interval :1d
+                   :now-ms 2000}]
+      (-> (history-client/request-history-bundle! deps request)
+          (.then
+           (fn [bundle]
+             (is (= [{"client_instrument_id" "perp:BTC"
+                      "instrument_id" "hl:perp:BTC"}
+                     {"client_instrument_id" "perp:ETH"
+                      "instrument_id" "hl:perp:ETH"}]
+                    (get @api-body "instruments")))
+             (is (= [[:candle "ETH"]
+                     [:candle "DOGE"]
+                     [:funding "ETH"]
+                     [:funding "DOGE"]]
+                    @legacy-calls))
+             (is (= #{"ETH" "DOGE"}
+                    (set (keys (:candle-history-by-coin bundle)))))
+             (is (contains? (set (map :code (:warnings bundle)))
+                            :optimizer-history-api-legacy-fallback))
+             (let [backend-events (filterv #(= :backend-api (:source %))
+                                           @progress-events)
+                   info-events (filterv #(= :info-endpoint (:source %))
+                                        @progress-events)
+                   backend-succeeded (first (filter #(= :succeeded (:status %))
+                                                    backend-events))
+                   info-started (first (filter #(= :started (:status %))
+                                               info-events))]
+               (is (= [:started :loading :succeeded]
+                      (mapv :status backend-events)))
+               (is (= {:requested-count 2
+                       :returned-count 2
+                       :usable-count 1
+                       :fallback-asset-count 2}
+                      (select-keys backend-succeeded
+                                   [:requested-count
+                                    :returned-count
+                                    :usable-count
+                                    :fallback-asset-count])))
+               (is (= {:asset-count 2
+                       :completed 0
+                       :total 4
+                       :percent 0}
+                      (select-keys info-started
+                                   [:asset-count :completed :total :percent])))
+               (is (= [1 2 3 4]
+                      (mapv :completed (filter #(not= :started (:status %))
+                                               info-events)))))
+             (done)))
+          (.catch (async-support/unexpected-error done))))))
+
+(deftest request-history-bundle-does-not-targeted-fallback-hard-api-v2-rejections-test
+  (async done
+    (let [legacy-calls (atom [])
+          deps {:optimizer-history-api {:enabled? true
+                                        :base-url "https://history.test"
+                                        :fallback-to-legacy? true
+                                        :legacy-fallback-request-spacing-ms 0}
+                :fetch-fn
+                (fn [_url _init]
+                  (js/Promise.resolve
+                   (json-response
+                    200
+                    {:contract_version "optimizer-history-api-v2"
+                     :request_id "rid-hard-warning"
+                     :dataset_version "dv-hard-warning"
+                     :status "partial"
+                     :series_by_instrument
+                     {"hl:perp:BTC" {:instrument_id "hl:perp:BTC"
+                                     :lineage_kind "native"
+                                     :series_kind "market_price"
+                                     :points [{:time_ms 1000
+                                               :close 100
+                                               :return nil}
+                                              {:time_ms 2000
+                                               :close 110
+                                               :return 0.1}]
+                                     :funding {:status "available"
+                                               :annualized_carry 0.01}
+                                     :warnings []}
+                      "hl:perp:BAD" {:instrument_id "hl:perp:BAD"
+                                     :lineage_kind "rejected"
+                                     :series_kind "market_price"
+                                     :points []
+                                     :funding {:status "rejected"}
+                                     :warnings [{:code "validation-failed"
+                                                 :instrument_id "hl:perp:BAD"}]}}
+                     :warnings [{:code "validation-failed"
+                                 :instrument_id "hl:perp:BAD"}]})))
+                :request-id (fn [] "rid-hard-warning")
+                :request-candle-snapshot!
+                (fn [coin _opts]
+                  (swap! legacy-calls conj [:candle coin])
+                  (js/Promise.resolve [{:time 1000 :close "10"}
+                                       {:time 2000 :close "12"}]))
+                :request-market-funding-history!
+                (fn [coin _opts]
+                  (swap! legacy-calls conj [:funding coin])
+                  (js/Promise.resolve [{:time-ms 1000
+                                        :funding-rate-raw "0.001"}]))}
+          request {:universe [{:instrument-id "perp:BTC"
+                               :market-type :perp
+                               :coin "BTC"
+                               :optimizer-history/instrument-id "hl:perp:BTC"}
+                              {:instrument-id "perp:BAD"
+                               :market-type :perp
+                               :coin "BAD"
+                               :optimizer-history/instrument-id "hl:perp:BAD"}]
+                   :bars 30
+                   :interval :1d
+                   :now-ms 2000}]
+      (-> (history-client/request-history-bundle! deps request)
+          (.then
+           (fn [bundle]
+             (is (= [] @legacy-calls))
+             (is (= #{:validation-failed}
+                    (set (map :code (:warnings bundle)))))
+             (is (not (contains? (set (map :code (:warnings bundle)))
+                                 :optimizer-history-api-legacy-fallback)))
+             (done)))
+          (.catch (async-support/unexpected-error done))))))
+
+(deftest request-history-bundle-throttles-legacy-info-requests-test
+  (async done
+    (let [active (atom 0)
+          max-active (atom 0)
+          progress-events (atom [])
+          request! (fn [kind id]
+                     (swap! active inc)
+                     (swap! max-active max @active)
+                     (js/Promise.
+                      (fn [resolve _reject]
+                        (js/setTimeout
+                         (fn []
+                           (swap! active dec)
+                           (resolve (case kind
+                                      :funding [{:time-ms 1000
+                                                 :funding-rate-raw "0.001"}]
+                                      [{:time 1000 :close "100"}
+                                       {:time 2000 :close "110"}])))
+                         0))))
+          deps {:optimizer-history-api {:enabled? false
+                                        :legacy-fallback-request-spacing-ms 0}
+                :request-candle-snapshot!
+                (fn [coin _opts] (request! :candle coin))
+                :request-market-funding-history!
+                (fn [coin _opts] (request! :funding coin))
+                :on-progress #(swap! progress-events conj %)}
+          request {:universe [{:instrument-id "perp:BTC"
+                               :market-type :perp
+                               :coin "BTC"}
+                              {:instrument-id "perp:ETH"
+                               :market-type :perp
+                               :coin "ETH"}]
+                   :now-ms 2000}]
+      (-> (history-client/request-history-bundle! deps request)
+          (.then
+           (fn [_bundle]
+             (is (= 1 @max-active))
+             (is (= #{:info-endpoint}
+                    (set (map :source @progress-events))))
+             (is (= {:status :started
+                     :completed 0
+                     :total 4}
+                    (select-keys (first @progress-events)
+                                 [:status :completed :total])))
+             (done)))
+          (.catch (async-support/unexpected-error done))))))
+
+(deftest request-history-bundle-does-not-legacy-fallback-when-disabled-for-request-test
+  (async done
+    (let [legacy-called? (atom false)
+          deps {:optimizer-history-api {:enabled? true
+                                        :base-url "https://history.test"
+                                        :fallback-to-legacy? true}
+                :fetch-fn (fn [& _]
+                            (is false "backend API should not be called without backend ids")
+                            (js/Promise.resolve
+                             (json-response
+                              200
+                              {:contract_version "optimizer-history-api-v2"
+                               :status "ok"})))
+                :request-candle-snapshot!
+                (fn [& _]
+                  (reset! legacy-called? true)
+                  (js/Promise.resolve []))
+                :request-market-funding-history!
+                (fn [& _]
+                  (reset! legacy-called? true)
+                  (js/Promise.resolve []))}
+          request {:universe [{:instrument-id "perp:DUST"
+                               :market-type :perp
+                               :coin "DUST"}]
+                   :allow-legacy-fallback? false}]
+      (-> (history-client/request-history-bundle! deps request)
+          (.then
+           (fn [_bundle]
+             (is false "missing backend ids should reject when request fallback is disabled")
+             (done)))
+          (.catch
+           (fn [err]
+             (is (false? @legacy-called?))
+             (is (= "Optimizer history API request has no backend instrument ids."
+                    (.-message err)))
+             (done)))))))

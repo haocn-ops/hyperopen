@@ -1,0 +1,59 @@
+# ClojureScript build artifacts
+/resources/public/js/
+/.shadow-cljs/
+/node_modules/
+
+# Clojure artifacts
+/target/
+/classes/
+/checkouts/
+pom.xml
+pom.xml.asc
+*.jar
+*.class
+/.lein-*
+/.nrepl-port
+/.cpcache/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Tailwind generated CSS
+/resources/public/css/main.css
+/resources/public/build-id.txt
+/resources/public/build-info.json
+
+# Local tooling and temp output
+/.calva/
+/.clj-kondo/*
+!/.clj-kondo/config.edn
+/.clj-kondo/.cache/
+/.lsp/
+/out/
+/output/
+/.coverage/
+/coverage/
+/tmp/
+/.wrangler/
+.claude/
+PRDs/
+
+# Dolt database files (added by bd init)
+.dolt/
+*.db
+
+# Local bd runtime/worktree artifacts
+.beads/
+.beats/
+.beads.local.*.backup/

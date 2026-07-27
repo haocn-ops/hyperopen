@@ -42,3 +42,11 @@
     (is (true? (get-in confirm-button [1 :disabled])))
     (is (contains? (set (collect-strings confirm-button))
                    "Awaiting signature..."))))
+
+(deftest recovery-modal-does-not-render-stringified-nil-errors-test
+  (let [view-node (modal/agent-trading-recovery-modal-view
+                   {:wallet {:agent {:recovery-modal-open? true
+                                     :status :error
+                                     :error "nil"}}})]
+    (is (nil? (node-by-role view-node "agent-trading-recovery-modal-message")))
+    (is (not (contains? (set (collect-strings view-node)) "nil")))))

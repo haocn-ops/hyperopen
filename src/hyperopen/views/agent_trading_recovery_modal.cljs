@@ -7,6 +7,13 @@
 (def ^:private approving-description
   "Approve the wallet signature request to restore trading.")
 
+(defn- display-error-text
+  [error]
+  (let [text (some-> error str str/trim not-empty)]
+    (when (and text
+               (not= "nil" (str/lower-case text)))
+      text)))
+
 (defn- close-icon []
   [:svg {:viewBox "0 0 20 20"
          :class ["h-4" "w-4"]
@@ -23,7 +30,7 @@
   (let [agent-state (get-in state [:wallet :agent] {})
         open? (true? (:recovery-modal-open? agent-state))
         approving? (= :approving (:status agent-state))
-        error-text (some-> (:error agent-state) str str/trim not-empty)]
+        error-text (display-error-text (:error agent-state))]
     (when open?
       [:div {:class ["fixed"
                      "inset-0"
@@ -32,35 +39,43 @@
                      "items-center"
                      "justify-center"
                      "bg-[#041016]/80"
-                     "p-4"]
+                     "p-4"
+                     "sm:p-6"]
              :data-role "agent-trading-recovery-modal-overlay"}
        [:div {:class ["w-full"
-                      "max-w-md"
-                      "rounded-2xl"
+                      "max-w-4xl"
+                      "rounded-[1.75rem]"
                       "border"
                       "border-base-300"
                       "bg-ho-bg-deep"
-                      "p-4"
+                      "p-5"
+                      "sm:p-8"
                       "shadow-2xl"
-                      "space-y-4"]
+                      "space-y-6"
+                      "sm:space-y-8"]
               :role "dialog"
               :aria-modal true
               :aria-label "Enable Trading Again"
               :data-role "agent-trading-recovery-modal"}
         [:div {:class ["flex" "items-start" "justify-between" "gap-4"]}
-         [:div {:class ["space-y-1"]}
-          [:p {:class ["text-xs"
+         [:div {:class ["space-y-2"]}
+          [:p {:class ["text-sm"
+                       "sm:text-xl"
                        "font-semibold"
                        "uppercase"
                        "tracking-[0.12em]"
                        "text-[#8fd8cb]"]}
            "Trading Recovery"]
-          [:h2 {:class ["text-lg" "font-semibold" "text-white"]}
+          [:h2 {:class ["text-3xl"
+                        "sm:text-4xl"
+                        "font-semibold"
+                        "leading-tight"
+                        "text-white"]}
            "Enable Trading Again"]]
          [:button {:type "button"
                    :class ["inline-flex"
-                           "h-8"
-                           "w-8"
+                           "h-10"
+                           "w-10"
                            "shrink-0"
                            "items-center"
                            "justify-center"
@@ -76,18 +91,27 @@
                    :data-role "agent-trading-recovery-modal-close"}
           (close-icon)]]
         [:div {:class ["space-y-3"]}
-         [:p {:class ["text-sm" "leading-6" "text-[#d7e7e8]"]}
+         [:p {:class ["text-base"
+                      "leading-7"
+                      "sm:text-2xl"
+                      "sm:leading-[1.9]"
+                      "text-[#d7e7e8]"]}
           (if approving?
             approving-description
             idle-description)]
          (when error-text
            [:div {:class ["rounded-lg"
+                          "sm:rounded-xl"
                           "border"
                           "border-[#23505a]"
                           "bg-[#0b2630]"
-                          "px-3"
-                          "py-2.5"
-                          "text-sm"
+                          "px-4"
+                          "py-3"
+                          "sm:px-6"
+                          "sm:py-4"
+                          "text-base"
+                          "sm:text-xl"
+                          "leading-7"
                           "text-[#b7d7dd]"]
                   :data-role "agent-trading-recovery-modal-message"}
             error-text])]
@@ -96,9 +120,12 @@
                    :class ["rounded-lg"
                            "border"
                            "border-[#2c4b50]"
-                           "px-3.5"
-                           "py-2"
-                           "text-sm"
+                           "px-4"
+                           "py-2.5"
+                           "sm:px-6"
+                           "sm:py-3"
+                           "text-base"
+                           "sm:text-xl"
                            "text-[#b7c8cc]"
                            "hover:border-[#3d666b]"
                            "hover:text-[#e5eef1]"
@@ -112,9 +139,12 @@
                    :disabled approving?
                    :class (into ["rounded-lg"
                                  "border"
-                                 "px-3.5"
-                                 "py-2"
-                                 "text-sm"
+                                 "px-4"
+                                 "py-2.5"
+                                 "sm:px-6"
+                                 "sm:py-3"
+                                 "text-base"
+                                 "sm:text-xl"
                                  "font-medium"
                                  "focus:outline-none"
                                  "focus:ring-0"

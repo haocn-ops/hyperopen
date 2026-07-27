@@ -342,14 +342,22 @@
                  "portfolio-optimizer-execution-health")))
         flat (rail {:source :fallback-bps :slippage-bps 25 :estimated-slippage-usd 2.5})
         live (rail {:source :snapshot :slippage-bps 5 :estimated-slippage-usd 5
-                    :age-ms 4200})]
+                    :age-ms 4200})
+        ;; The readiness-time contexts price off the trade-view orderbook's own touch and
+        ;; carry their own source keywords — they are book data, not assumptions.
+        book (rail {:source :live-orderbook :slippage-bps 5 :estimated-slippage-usd 5})
+        untrusted (rail {:source :untrusted-snapshot-fill :slippage-bps 25
+                         :estimated-slippage-usd 2.5})]
     (is (str/includes? flat "Book data"))
     (is (str/includes? flat "flat estimate"))
     (is (str/includes? flat "no live book"))
     (is (str/includes? flat "TWAP cannot be sliced"))
     (is (str/includes? live "1 of 1 live"))
     (is (str/includes? live "book 4.2s old"))
-    (is (not (str/includes? live "flat estimate")))))
+    (is (not (str/includes? live "flat estimate")))
+    (is (str/includes? book "1 of 1 live"))
+    ;; A book that implied an implausible fill was NOT used — the flat fallback was.
+    (is (str/includes? untrusted "flat estimate"))))
 
 (deftest execution-tab-row-expansion-shows-cost-breakdown-test
   ;; Expanding a market row reveals the execution-cost breakdown: spread crossing + book

@@ -658,10 +658,15 @@
        (for [item items] [:li item])]]]))
 
 (def ^:private live-book-cost-sources
-  "Cost sources derived from a real order book. Everything else is an assumption:
-  :fallback-bps / :fallback-cost-assumption (no book was fetched) and
-  :untrusted-snapshot-fill (a book arrived but implied an implausible fill)."
-  #{:snapshot :orderbook :depth-extrapolated})
+  "Cost sources priced against a real order book — the L2 snapshot refresh (:snapshot,
+  :depth-extrapolated when the order outruns visible depth) and the readiness-time
+  orderbook contexts (:live-orderbook / :stale-orderbook, which price off the book's own
+  touch either way; staleness rides the age line).
+
+  Everything else is an assumption: :fallback-bps (the normalized :fallback-cost-assumption
+  / nil — no book at all) and :untrusted-snapshot-fill (a book arrived but implied an
+  implausible fill, so the flat fallback was charged instead)."
+  #{:snapshot :depth-extrapolated :live-orderbook :stale-orderbook})
 
 (defn- book-data-diag
   "What the cost estimates are actually standing on. A snapshot fetch that fails, is

@@ -221,3 +221,40 @@
                         node (str "portfolio-optimizer-execution-mode-" id "-consequence"))))]
     (is (str/includes? (consequence "market") "≥ $1,060"))
     (is (str/includes? (consequence "twap") "≥ $"))))
+
+(deftest passive-tile-never-prints-a-confident-zero-for-an-unknown-fee-test
+  ;; The reported bug: a preview built without the maker-fee assumption gave every
+  ;; resting row a $0 fee, and a resting row pays no spread or impact — so the Passive
+  ;; tile advertised "est. all-in $0.00" for a six-figure rebalance. An unknown fee makes
+  ;; the projection a lower bound ("≥"), never a cheap-looking point estimate.
+  (let [feeless (update-in depth-plan [:rows 0 :cost] dissoc :maker-fee-bps :maker-fee-usd)
+        node (depth-view {:plan feeless})
+        consequence (fn [id]
+                      (h/node-text
+                       (h/find-by-data-role
+                        node (str "portfolio-optimizer-execution-mode-" id "-consequence"))))]
+    (is (str/includes? (consequence "passive") "≥ $0"))
+    (is (not= "est. all-in $0" (consequence "passive")))
+    ;; The crossing tiles still know their taker fee, so they stay point estimates.
+    (is (str/includes? (consequence "market") "$1,060"))
+    (is (not (str/includes? (consequence "market") "≥")))))
+
+(deftest twap-tile-discloses-when-there-is-no-book-to-slice-test
+  ;; Without a spread/impact split, twap-cost passes the flat estimate through unchanged
+  ;; (slicing an assumption would fabricate precision) — so the tile matches Market
+  ;; exactly. Say why, instead of showing two identical numbers.
+  (let [flat (assoc-in depth-plan [:rows 0 :cost]
+                       {:source :fallback-bps :slippage-bps 25 :estimated-slippage-usd 250
+                        :notional-usd 100000 :fee-bps 4 :estimated-fee-usd 40
+                        :maker-fee-bps 1 :maker-fee-usd 10})
+        consequence (fn [node id]
+                      (h/node-text
+                       (h/find-by-data-role
+                        node (str "portfolio-optimizer-execution-mode-" id "-consequence"))))
+        flat-node (depth-view {:plan flat})]
+    (is (str/includes? (consequence flat-node "twap") "same as Market — no live book to slice"))
+    (is (= (str/replace (consequence flat-node "twap") " · same as Market — no live book to slice" "")
+           (consequence flat-node "market"))
+        "the disclosure is honest: the two projections really are the same number")
+    ;; A splittable book gets the sliced model, so the note must NOT appear.
+    (is (not (str/includes? (consequence (depth-view nil) "twap") "no live book to slice")))))

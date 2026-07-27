@@ -2,6 +2,19 @@
 
 (def result-payload-schema-version 1)
 
+(def maker-fee-bps
+  "Canonical Hyperliquid maker fee in basis points — the lower fee a resting
+  (limit/passive) execution order pays. It lives here, in the dependency-free
+  contracts namespace, because BOTH rebalance-preview build sites must charge the
+  same maker fee: the worker payload (application.engine.payload) and the frontend
+  refresh (application.rebalance-preview). A preview built without it renders a
+  resting order's all-in cost as a confident $0.
+
+  Pinned to (* 100 (:maker hyperopen.domain.trading.core/default-fees)) by
+  rebalance_preview_test — this namespace stays require-free so the engine payload
+  can read it without pulling the trading core into the worker bundle."
+  1.5)
+
 (def draft-statuses
   #{:draft :saved :archived :tracking})
 

@@ -365,7 +365,11 @@
                     0)
         ;; Maker fee for the same notional: a resting (limit/passive) order fills as a
         ;; maker, so the Execution tab can show the lower fee when a row is routed that way.
-        maker-fee-bps (or (:maker-fee-bps opts) 0)
+        ;; A missing assumption is UNKNOWN, never 0: a resting row pays no spread or impact,
+        ;; so coercing its fee to zero would render a confident "$0.00 all-in" for a real
+        ;; order. Callers pass contracts.constants/maker-fee-bps; the keys stay off the cost
+        ;; map otherwise and the surfaces render "—".
+        maker-fee-bps (:maker-fee-bps opts)
         notional (abs-num delta-notional-usd)
         ;; Price cost (:slippage-bps) already bundles crossing the spread and walking the
         ;; book, so split it at the touch: spread = touch vs mark, impact = the residual.
@@ -378,9 +382,11 @@
                     :slippage-bps slippage-bps
                     :estimated-slippage-usd (* notional (/ slippage-bps 10000))
                     :fee-bps fee-bps
-                    :estimated-fee-usd (* notional (/ fee-bps 10000))
-                    :maker-fee-bps maker-fee-bps
-                    :maker-fee-usd (* notional (/ maker-fee-bps 10000))})
+                    :estimated-fee-usd (* notional (/ fee-bps 10000))})
+      (finite-number? maker-fee-bps)
+      (assoc :maker-fee-bps maker-fee-bps
+             :maker-fee-usd (* notional (/ maker-fee-bps 10000)))
+
       (some? spread-bps) (assoc :spread-bps spread-bps
                                 :impact-bps impact-bps
                                 :spread-usd (* notional (/ spread-bps 10000))

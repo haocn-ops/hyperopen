@@ -33,10 +33,25 @@
   (+ (:slippage-usd costs) (:fees-usd costs)))
 
 (defn- all-in-label
-  ;; "≥" when any crossing estimate in the projection is a depth-overrun floor — a
-  ;; capped lower bound, not a point estimate.
+  ;; "≥" when the projection understates what will be paid: a depth-overrun floor (a
+  ;; capped lower bound, not a point estimate), or a row whose fee the estimate is
+  ;; missing — a resting row pays no spread or impact, so an unknown fee read as 0
+  ;; would print a confident "$0.00" for a real order.
   [costs]
-  (shared/floor-prefixed (:floor? costs) (opt-format/format-usdc (all-in-usd costs))))
+  (shared/floor-prefixed (shared/cost-total-incomplete? costs)
+                         (opt-format/format-usdc (all-in-usd costs))))
+
+(defn- twap-unsliced?
+  "True when NO row this strategy would work as a TWAP actually gets the sliced model:
+  without a live book to split, twap-cost passes the flat one-shot estimate through
+  unchanged, so the tile's number is identical to Market. Saying so beats showing two
+  tiles with the same figure and no explanation."
+  [model rows]
+  (let [selections (selections-for model :twap)
+        twap-rows (filter #(= :twap (shared/effective-type selections %)) rows)]
+    (and (seq twap-rows)
+         (not-any? #(:twap-adjusted? (shared/effective-crossing-cost selections %))
+                   twap-rows))))
 
 (def ^:private strategies
   [{:id :recommended
@@ -81,10 +96,15 @@
   (when (seq sendable)
     (let [costs (projected-costs model strategy sendable)
           cost-text (str "est. all-in " (all-in-label costs))]
-      (if (= :recommended strategy)
+      (cond
+        (= :recommended strategy)
         (let [mix (shared/type-mix-summary (selections-for model :recommended) sendable)]
           (if mix (str mix " · " cost-text) cost-text))
-        cost-text))))
+
+        (and (= :twap strategy) (twap-unsliced? model sendable))
+        (str cost-text " · same as Market — no live book to slice")
+
+        :else cost-text))))
 
 ;; ── high-cost crossing warning ─────────────────────────────────────────────
 

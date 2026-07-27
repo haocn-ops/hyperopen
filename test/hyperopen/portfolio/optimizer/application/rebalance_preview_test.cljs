@@ -1,8 +1,12 @@
 (ns hyperopen.portfolio.optimizer.application.rebalance-preview-test
   (:require [cljs.test :refer-macros [deftest is]]
             [clojure.string :as str]
+            [hyperopen.domain.trading.core :as trading-core]
+            [hyperopen.portfolio.optimizer.application.engine :as engine]
             [hyperopen.portfolio.optimizer.application.rebalance-preview
-             :as rebalance-preview]))
+             :as rebalance-preview]
+            [hyperopen.portfolio.optimizer.contracts.constants :as contracts-constants]
+            [hyperopen.portfolio.optimizer.fixtures :as fixtures]))
 
 (defn- sample-request
   []
@@ -141,3 +145,68 @@
     ;; No exits opts ⇒ the excluded-holdings HOLD contract is untouched.
     (is (= :excluded (:status held-row)))
     (is (= 1 (get-in without-exit [:rebalance-preview :summary :ready-count])))))
+
+;; ── build-site parity ─────────────────────────────────────────────────────
+;; The preview on screen comes from ONE of two build sites — the worker payload
+;; (application.engine.payload, stamped on every solved run) or this frontend refresh
+;; (run when a book snapshot lands or an exit is toggled). Which one produced it must
+;; never change what a row is estimated to cost. A maker fee missing from one site
+;; renders a resting order's all-in as a confident "$0.00".
+
+(deftest canonical-maker-fee-tracks-the-venue-fee-schedule-test
+  ;; contracts.constants stays require-free so the worker payload can read the fee without
+  ;; pulling the trading core into its bundle — this pins the copy to the schedule.
+  (is (= contracts-constants/maker-fee-bps
+         (* 100 (:maker trading-core/default-fees)))))
+
+(defn- maker-fees-by-id
+  [preview]
+  (into {}
+        (map (fn [row] [(:instrument-id row) (get-in row [:cost :maker-fee-bps])]))
+        (:rows preview)))
+
+(deftest both-preview-build-sites-charge-the-same-maker-fee-test
+  (let [request (fixtures/sample-engine-request)
+        engine-result (engine/run-optimization
+                       request
+                       {:solve-problem (fn [_]
+                                         {:status :solved
+                                          :solver :fixture-solver
+                                          :weights [0.5 0.35 0.15]
+                                          :iterations 3
+                                          :elapsed-ms 1})})
+        engine-preview (:rebalance-preview engine-result)
+        ;; The frontend refresh rebuilds the SAME result from the SAME request.
+        refreshed-preview (-> (rebalance-preview/result-with-refreshed-rebalance-preview
+                               request
+                               engine-result)
+                              :rebalance-preview)
+        engine-fees (maker-fees-by-id engine-preview)
+        refreshed-fees (maker-fees-by-id refreshed-preview)]
+    (is (= :solved (:status engine-result)))
+    (is (seq (:rows engine-preview)))
+    ;; Parity over the rows both sites build. (The frontend refresh additionally unions in
+    ;; held-but-excluded portfolio rows, which carry no order and no cost — a separate,
+    ;; intended difference.)
+    (is (= (select-keys refreshed-fees (keys engine-fees)) engine-fees))
+    (is (seq engine-fees))
+    (is (every? #(= contracts-constants/maker-fee-bps %) (vals engine-fees)))))
+
+(deftest worker-preview-charges-a-maker-fee-on-resting-notional-test
+  ;; The regression itself: a worker-built preview whose rows carry :maker-fee-bps 0 /
+  ;; :maker-fee-usd 0 makes the Execution tab's Passive strategy read "est. all-in $0".
+  (let [request (fixtures/sample-engine-request)
+        result (engine/run-optimization
+                request
+                {:solve-problem (fn [_]
+                                  {:status :solved
+                                   :solver :fixture-solver
+                                   :weights [0.5 0.35 0.15]
+                                   :iterations 3
+                                   :elapsed-ms 1})})
+        traded-rows (->> (get-in result [:rebalance-preview :rows])
+                         (filter #(= :ready (:status %))))]
+    (is (seq traded-rows))
+    (doseq [row traded-rows]
+      (is (= contracts-constants/maker-fee-bps (get-in row [:cost :maker-fee-bps])))
+      (is (pos? (get-in row [:cost :maker-fee-usd]))))))

@@ -593,15 +593,19 @@
              :sub (price-cost-sub costs avg-bps)}))
      (kpi {:data-role "portfolio-optimizer-execution-kpi-fees"
            :label "Est. fees"
-           :info "Exchange fees: taker for crossing orders, the lower maker fee for resting ones."
-           :value (opt-format/format-usdc (:fees-usd costs))
+           :info "Exchange fees: taker for crossing orders, the lower maker fee for resting ones. \"≥\" marks a lower bound: a row's fee is missing from the estimate, so it is not in this total."
+           :value (shared/floor-prefixed (:fees-unknown? costs)
+                                         (opt-format/format-usdc (:fees-usd costs)))
            :sub (fee-mix-label costs)})
      (kpi {:data-role "portfolio-optimizer-execution-kpi-all-in"
            :label (if show-realized? "Realized all-in" "Est. all-in cost")
            :info "Total cost to execute = price cost + fees."
-           :value (shared/floor-prefixed (and (not show-realized?) (:floor? costs))
+           :value (shared/floor-prefixed (and (not show-realized?)
+                                              (shared/cost-total-incomplete? costs))
                                          (opt-format/format-usdc all-in-usd))
-           :sub "price cost + fees"})]))
+           :sub (if (:fees-unknown? costs)
+                  "price cost + fees — a row's fee is unknown"
+                  "price cost + fees")})]))
 
 ;; ── Execution-health rail ───────────────────────────────────────────────
 
@@ -712,12 +716,15 @@
            (or (not-empty (str/join " · " (remove nil? [(price-cost-split-text costs) sources])))
                "no ready rows sampled"))
      (diag "Est. fees"
-           (opt-format/format-usdc (:fees-usd costs))
+           (shared/floor-prefixed (:fees-unknown? costs)
+                                  (opt-format/format-usdc (:fees-usd costs)))
            (str (fee-mix-label costs) " on ready notional"))
      (diag "Est. all-in cost"
-           (shared/floor-prefixed (:floor? costs)
+           (shared/floor-prefixed (shared/cost-total-incomplete? costs)
                                   (opt-format/format-usdc (+ (:slippage-usd costs) (:fees-usd costs))))
-           "price cost + fees")
+           (if (:fees-unknown? costs)
+             "price cost + fees — a row's fee is unknown"
+             "price cost + fees"))
      (health-note model)]))
 
 ;; ── latest attempt (retry context) ──────────────────────────────────────

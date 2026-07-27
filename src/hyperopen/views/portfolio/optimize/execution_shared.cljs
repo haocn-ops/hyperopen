@@ -80,14 +80,18 @@
   divided across venue suborders with a permanent-impact residue -- plus the taker fee;
   resting (limit/passive) rows contribute no spread/impact and the maker fee. Returns the
   totals, the spread/impact split, the maker/taker split, the crossing-row price-cost bps
-  samples for the average, and :floor? true when any included crossing estimate is a
-  depth-overrun lower bound (surfaces render totals with a \"≥\" prefix)."
+  samples for the average, :floor? true when any included crossing estimate is a
+  depth-overrun lower bound, and :fees-unknown? true when a row's cost map carries no fee
+  for its effective type (surfaces render such totals with a \"≥\" prefix — the sum is
+  missing a term, and a resting row pays no spread or impact, so silently reading its fee
+  as 0 would publish a confident $0.00 all-in for a real order)."
   [model rows]
   (reduce
    (fn [acc row]
      (let [{:keys [crossing? slippage-bps estimated-slippage-usd spread-usd impact-usd
                    estimate-floor?]} (effective-crossing-cost model row)
            cost (:cost row)
+           fee-usd (if crossing? (:estimated-fee-usd cost) (:maker-fee-usd cost))
            slip-usd (if crossing? (or estimated-slippage-usd 0) 0)
            has-split? (some? spread-usd)
            spread-usd* (if (and crossing? has-split?) spread-usd 0)
@@ -100,22 +104,29 @@
          true (update :slippage-usd + slip-usd)
          true (update :spread-usd + spread-usd*)
          true (update :impact-usd + impact-usd*)
-         true (update :fees-usd + (if crossing?
-                                    (or (:estimated-fee-usd cost) 0)
-                                    (or (:maker-fee-usd cost) 0)))
+         true (update :fees-usd + (if (finite fee-usd) fee-usd 0))
          true (update (if crossing? :taker-count :maker-count) inc)
+         (not (finite fee-usd)) (assoc :fees-unknown? true)
          (and crossing? estimate-floor?) (assoc :floor? true)
          (and crossing? (finite slippage-bps)) (update :slip-bps conj (abs-num slippage-bps)))))
    {:slippage-usd 0 :spread-usd 0 :impact-usd 0 :fees-usd 0
-    :taker-count 0 :maker-count 0 :slip-bps [] :floor? false}
+    :taker-count 0 :maker-count 0 :slip-bps [] :floor? false :fees-unknown? false}
    rows))
 
 (defn fee-mix-label
-  [{:keys [taker-count maker-count]}]
-  (cond
-    (and (pos? taker-count) (pos? maker-count)) (str taker-count " taker · " maker-count " maker")
-    (pos? maker-count) "maker · resting rows"
-    :else "taker · ready rows"))
+  [{:keys [taker-count maker-count fees-unknown?]}]
+  (str (cond
+         (and (pos? taker-count) (pos? maker-count)) (str taker-count " taker · " maker-count " maker")
+         (pos? maker-count) "maker · resting rows"
+         :else "taker · ready rows")
+       ;; Never let a missing fee assumption pass as a cheap total.
+       (when fees-unknown? " · fee unknown for some rows")))
+
+(defn cost-total-incomplete?
+  "True when a cost total understates what will be paid — a depth-overrun floor, or a row
+  whose fee the estimate doesn't know. Both make the printed number a lower bound (\"≥\")."
+  [{:keys [floor? fees-unknown?]}]
+  (boolean (or floor? fees-unknown?)))
 
 (defn price-cost-split-text
   "\"spread $X + impact $Y\" for the crossing rows, or nil when nothing crosses the book."

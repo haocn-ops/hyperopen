@@ -284,6 +284,7 @@
 	   [:actions/set-portfolio-optimizer-execution-order-filter :set-portfolio-optimizer-execution-order-filter]
 	   [:actions/set-portfolio-optimizer-execution-overlap-cancel :set-portfolio-optimizer-execution-overlap-cancel]
 	   [:actions/set-portfolio-optimizer-execution-exit :set-portfolio-optimizer-execution-exit]
+	   [:actions/restage-portfolio-optimizer-execution-plan :restage-portfolio-optimizer-execution-plan]
 	   [:actions/set-portfolio-optimizer-execution-auto-exit :set-portfolio-optimizer-execution-auto-exit]
 	   [:actions/refresh-portfolio-optimizer-tracking :refresh-portfolio-optimizer-tracking]
 	   [:actions/enable-portfolio-optimizer-manual-tracking

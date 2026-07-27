@@ -260,7 +260,10 @@
    (refresh-portfolio-optimizer-rebalance-slippage-snapshots-effect nil store {}))
   ([_ store opts]
    (let [last-run (get-in @store contracts/last-successful-run-path)
-         plan (rebalance-snapshot/build-snapshot-refresh-plan last-run opts)]
+         plan (rebalance-snapshot/build-snapshot-refresh-plan last-run opts)
+         ;; Resolved here, not at the call site: the dispatch happens in a .then, long
+         ;; after a with-redefs around the effect call would have been unwound.
+         dispatch! (or (:dispatch! opts) *dispatch!*)]
      (if-not (seq (:requests plan))
        (js/Promise.resolve plan)
        (-> (fetch-snapshot-contexts! {:request-l2-book-snapshot!
@@ -282,7 +285,13 @@
                            (rebalance-snapshot/last-run-with-snapshot-contexts
                             current-run
                             contexts-by-id)
-                           current-run))))
+                           current-run)))
+                ;; The Execution tab holds a plan SNAPSHOT, so re-costing the run is only
+                ;; half the job — without this the surface keeps showing the estimate it
+                ;; staged before the books arrived. The action itself refuses to touch an
+                ;; armed, submitting, or post-run plan.
+                (dispatch! store nil
+                           [[:actions/restage-portfolio-optimizer-execution-plan]]))
               {:plan plan
                :contexts-by-id contexts-by-id})))))))
 

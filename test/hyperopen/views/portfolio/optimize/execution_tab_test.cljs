@@ -326,6 +326,31 @@
     (is (str/includes? all-in "≥"))
     (is (str/includes? (node-text row) "≥"))))
 
+(deftest execution-tab-health-rail-discloses-what-the-costs-stand-on-test
+  ;; A snapshot fetch that fails, is rate-limited, or never fires leaves every row priced
+  ;; from the flat fallback — silently degrading the estimates (no spread/impact split, and
+  ;; TWAP collapses onto Market). The rail must say so instead of letting an assumption
+  ;; read like a measurement, and must credit a real book when one is there.
+  (let [rail (fn [cost]
+               (node-text
+                (node-by-role
+                 (scenario-view :execution
+                                {:execution {:status :idle :history []}
+                                 :execution-modal {:open? true :phase :staged
+                                                   :plan (assoc-in staged-plan
+                                                                   [:rows 0 :cost] cost)}})
+                 "portfolio-optimizer-execution-health")))
+        flat (rail {:source :fallback-bps :slippage-bps 25 :estimated-slippage-usd 2.5})
+        live (rail {:source :snapshot :slippage-bps 5 :estimated-slippage-usd 5
+                    :age-ms 4200})]
+    (is (str/includes? flat "Book data"))
+    (is (str/includes? flat "flat estimate"))
+    (is (str/includes? flat "no live book"))
+    (is (str/includes? flat "TWAP cannot be sliced"))
+    (is (str/includes? live "1 of 1 live"))
+    (is (str/includes? live "book 4.2s old"))
+    (is (not (str/includes? live "flat estimate")))))
+
 (deftest execution-tab-row-expansion-shows-cost-breakdown-test
   ;; Expanding a market row reveals the execution-cost breakdown: spread crossing + book
   ;; impact = price cost, + fees = all-in. all-in = price cost $0.68 + fees $0.23 = $0.91.

@@ -657,6 +657,46 @@
       [:ul {:class ["mt-2" "space-y-1" "text-xs"]}
        (for [item items] [:li item])]]]))
 
+(def ^:private live-book-cost-sources
+  "Cost sources derived from a real order book. Everything else is an assumption:
+  :fallback-bps / :fallback-cost-assumption (no book was fetched) and
+  :untrusted-snapshot-fill (a book arrived but implied an implausible fill)."
+  #{:snapshot :orderbook :depth-extrapolated})
+
+(defn- book-data-diag
+  "What the cost estimates are actually standing on. A snapshot fetch that fails, is
+  rate-limited, or never fires leaves every row priced from the flat fallback — which
+  silently degrades the numbers (no spread/impact split, and TWAP collapses onto Market
+  because there is nothing to slice). Say so here rather than letting an assumption
+  read like a measurement."
+  [priced-rows]
+  (let [sources (map #(get-in % [:cost :source]) priced-rows)
+        live (filter #(contains? live-book-cost-sources %) sources)
+        live-count (count live)
+        total (count sources)
+        ages (keep #(when (contains? live-book-cost-sources (get-in % [:cost :source]))
+                      (get-in % [:cost :age-ms]))
+                   priced-rows)
+        oldest (when (seq ages) (apply max ages))
+        flat-count (- total live-count)]
+    (cond
+      (zero? total)
+      (diag "Book data" "—" "no ready rows sampled")
+
+      (zero? live-count)
+      (diag "Book data" "flat estimate"
+            "no live book — costs are assumptions and TWAP cannot be sliced"
+            "assumed" "text-warning")
+
+      :else
+      (diag "Book data"
+            (str live-count " of " total " live")
+            (str/join " · "
+                      (remove nil?
+                              [(when oldest (str "book " (opt-format/format-duration oldest) " old"))
+                               (when (pos? flat-count)
+                                 (str flat-count " priced from a flat assumption"))]))))))
+
 (defn- health-rail
   [{:keys [summary phase] :as model} rows]
   (let [ready (filter #(contains? #{:ready :working} (:status %)) rows)
@@ -725,6 +765,8 @@
            (if (:fees-unknown? costs)
              "price cost + fees — a row's fee is unknown"
              "price cost + fees"))
+     (book-data-diag (filter #(get-in % [:cost :source])
+                             (concat ready submitted resting)))
      (health-note model)]))
 
 ;; ── latest attempt (retry context) ──────────────────────────────────────

@@ -184,6 +184,91 @@
              (done)))
           (.catch (async-support/unexpected-error done))))))
 
+(deftest refresh-portfolio-optimizer-rebalance-slippage-snapshots-effect-restages-the-staged-plan-test
+  ;; Re-costing the run is only half the job: the Execution tab holds a plan SNAPSHOT, so
+  ;; without a restage dispatch the surface keeps quoting the estimate it staged before the
+  ;; books arrived (flat fallback bps, which also collapse TWAP onto Market).
+  (async done
+    (let [dispatched (atom [])
+          instruments [{:instrument-id "perp:BTC" :instrument-type :perp :coin "BTC"}]
+          last-run {:request-signature
+                    {:request {:current-portfolio {:capital {:nav-usdc 300}}
+                               :constraints {:rebalance-tolerance 0}
+                               :execution-assumptions {:fallback-slippage-bps 25
+                                                       :prices-by-id {"perp:BTC" 100}}
+                               :requested-universe instruments
+                               :universe instruments}}
+                    :result {:status :solved
+                             :instrument-ids ["perp:BTC"]
+                             :current-weights [0]
+                             :target-weights [1]
+                             :rebalance-preview
+                             {:rows [{:instrument-id "perp:BTC"
+                                      :instrument-type :perp
+                                      :coin "BTC"
+                                      :status :ready
+                                      :side :buy
+                                      :cost {:source :fallback-bps}}]}}}
+          store (atom {:portfolio {:optimizer {:last-successful-run last-run}}})]
+      (-> (portfolio-optimizer-adapters/refresh-portfolio-optimizer-rebalance-slippage-snapshots-effect
+           nil
+           store
+           {:now-ms-fn (fn [] 10000)
+            :dispatch! (fn [_store _ actions] (swap! dispatched conj actions))
+            :request-l2-book-snapshot!
+            (fn [_coin _opts]
+              (js/Promise.resolve
+               {:time 9000
+                :levels [[{:px "99" :sz "10"}] [{:px "101" :sz "10"}]]}))})
+          (.then
+           (fn [_]
+             (is (= [[[:actions/restage-portfolio-optimizer-execution-plan]]]
+                    @dispatched))
+             (done)))
+          (.catch (async-support/unexpected-error done))))))
+
+(deftest refresh-portfolio-optimizer-rebalance-slippage-snapshots-effect-does-not-restage-without-fresh-books-test
+  ;; Every snapshot request failed (a rate-limited /info, say). Nothing was re-costed, so
+  ;; there is nothing to restage — and the rows stay visibly flat for the health rail.
+  (async done
+    (let [dispatched (atom [])
+          instruments [{:instrument-id "perp:BTC" :instrument-type :perp :coin "BTC"}]
+          last-run {:request-signature
+                    {:request {:current-portfolio {:capital {:nav-usdc 300}}
+                               :constraints {:rebalance-tolerance 0}
+                               :execution-assumptions {:fallback-slippage-bps 25
+                                                       :prices-by-id {"perp:BTC" 100}}
+                               :requested-universe instruments
+                               :universe instruments}}
+                    :result {:status :solved
+                             :instrument-ids ["perp:BTC"]
+                             :current-weights [0]
+                             :target-weights [1]
+                             :rebalance-preview
+                             {:rows [{:instrument-id "perp:BTC"
+                                      :instrument-type :perp
+                                      :coin "BTC"
+                                      :status :ready
+                                      :side :buy
+                                      :cost {:source :fallback-bps}}]}}}
+          store (atom {:portfolio {:optimizer {:last-successful-run last-run}}})]
+      (-> (portfolio-optimizer-adapters/refresh-portfolio-optimizer-rebalance-slippage-snapshots-effect
+           nil
+           store
+           {:now-ms-fn (fn [] 10000)
+            :dispatch! (fn [_store _ actions] (swap! dispatched conj actions))
+            :request-l2-book-snapshot!
+            (fn [_coin _opts] (js/Promise.reject (js/Error. "rate limited")))})
+          (.then
+           (fn [_]
+             (is (= [] @dispatched))
+             (is (= :fallback-bps
+                    (get-in @store
+                            (into optimizer-contracts/last-successful-run-result-path
+                                  [:rebalance-preview :rows 0 :cost :source]))))
+             (done)))
+          (.catch (async-support/unexpected-error done))))))
+
 (deftest refresh-portfolio-optimizer-rebalance-slippage-snapshots-effect-ignores-late-stale-run-response-test
   (async done
     (let [instruments [{:instrument-id "perp:BTC"

@@ -135,9 +135,15 @@
   trader removed from the allocation are pre-staged as closing orders: the modal's
   exit set is seeded with the candidates and the plan is re-derived with them, so the
   realized portfolio matches the allocation the optimizer actually produced. The
-  per-row revert and the surface toggle both remain available."
+  per-row revert and the surface toggle both remain available.
+
+  The plan is ALWAYS re-derived through the exits arity, even for an empty exit set:
+  that arity rebuilds the rebalance preview from the stored run request, so a run
+  restored from autosave or a saved scenario — whose frozen preview may predate a cost
+  fix, e.g. the worker preview that charged no maker fee — is re-costed on entry
+  instead of quoting a stale estimate."
   [state]
-  (let [base-plan (staged-plan state)
+  (let [base-plan (staged-plan state #{})
         exits (if (and (map? base-plan)
                        (trading-settings/optimizer-auto-exit-excluded? state))
                 (auto-exit-candidate-ids
@@ -161,6 +167,12 @@
      ;; rows). By confirm time the run can then recognize and cancel its own resting
      ;; orders from previous sessions, and surface untagged overlaps for review.
      [:effects/refresh-portfolio-optimizer-open-orders]
+     ;; Re-price the plan against live books. This used to fire ONLY on run success, so a
+     ;; tab entry that did not follow a fresh solve — a deep link, a reload, a restored
+     ;; autosave, a loaded scenario — quoted flat fallback costs with no live book at all
+     ;; (which also collapses the TWAP estimate onto Market). The effect restages the plan
+     ;; when the snapshots land.
+     [:effects/refresh-portfolio-optimizer-rebalance-slippage-snapshots]
      [:effects/save contracts/ui-results-tab-path :execution]
      [:effects/replace-shareable-route-query]]))
 
@@ -213,6 +225,31 @@
 
 (def ^:private exit-instrument-ids-path
   (conj contracts/execution-modal-path :exit-instrument-ids))
+
+(defn restage-portfolio-optimizer-execution-plan
+  "Rebuilds the staged plan in place from the CURRENT run, keeping every staging choice
+  (exit set, order-type default, per-row overrides/params, open row, filter).
+
+  The snapshot-refresh effect dispatches this when fresher order-book data lands: the
+  modal holds a plan SNAPSHOT taken at tab entry, so without a restage the surface keeps
+  quoting costs estimated before the books arrived — flat fallback bps, which also make
+  TWAP project identically to Market. The estimate a trader reads must be the freshest
+  one the app has.
+
+  No-ops unless the surface is still pre-commit and idle: an armed, submitting, or
+  post-run plan must never change under the trader's hands."
+  [state]
+  (let [modal (get-in state contracts/execution-modal-path)
+        run-status (or (get-in state (conj contracts/execution-path :status)) :idle)]
+    (if (or (not (:open? modal))
+            (not (map? (:plan modal)))
+            (:submitting? modal)
+            (not= :idle run-status)
+            (not= :staged (:phase modal)))
+      []
+      (if-let [plan (staged-plan state (or (get-in state exit-instrument-ids-path) #{}))]
+        [[:effects/save (conj contracts/execution-modal-path :plan) plan]]
+        []))))
 
 (defn set-portfolio-optimizer-execution-exit
   "Marks (exit? true) or unmarks (exit? false) held instruments the allocator excluded

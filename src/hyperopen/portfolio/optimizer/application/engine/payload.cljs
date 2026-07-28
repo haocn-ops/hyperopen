@@ -289,7 +289,11 @@
       :cost-contexts-by-id (:cost-contexts-by-id execution-assumptions)
       :leverage-by-id (get-in request [:constraints :perp-leverage])
       :fee-bps-by-id (:fee-bps-by-id execution-assumptions)
-      :default-fee-bps (:default-fee-bps execution-assumptions)})))
+      :default-fee-bps (:default-fee-bps execution-assumptions)
+      ;; Same maker fee the frontend refresh charges (application.rebalance-preview):
+      ;; both build sites must agree, or which one happened to produce the preview on
+      ;; screen decides whether a resting row's all-in reads $0.
+      :maker-fee-bps contracts-constants/maker-fee-bps})))
 
 (defn- solved-payload
   [request

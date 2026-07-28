@@ -440,6 +440,7 @@
 	   :actions/set-portfolio-optimizer-execution-order-filter ::common/keyword-or-string-args
 	   :actions/set-portfolio-optimizer-execution-overlap-cancel ::portfolio-optimizer-execution-overlap-cancel-args
 	   :actions/set-portfolio-optimizer-execution-exit ::portfolio-optimizer-execution-exit-args
+	   :actions/restage-portfolio-optimizer-execution-plan ::common/no-args
 	   :actions/set-portfolio-optimizer-execution-auto-exit ::common/boolean-args
 	   :actions/refresh-portfolio-optimizer-tracking ::common/no-args
 	   :actions/enable-portfolio-optimizer-manual-tracking ::common/no-args

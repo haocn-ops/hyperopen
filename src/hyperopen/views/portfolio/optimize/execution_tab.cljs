@@ -593,15 +593,19 @@
              :sub (price-cost-sub costs avg-bps)}))
      (kpi {:data-role "portfolio-optimizer-execution-kpi-fees"
            :label "Est. fees"
-           :info "Exchange fees: taker for crossing orders, the lower maker fee for resting ones."
-           :value (opt-format/format-usdc (:fees-usd costs))
+           :info "Exchange fees: taker for crossing orders, the lower maker fee for resting ones. \"≥\" marks a lower bound: a row's fee is missing from the estimate, so it is not in this total."
+           :value (shared/floor-prefixed (:fees-unknown? costs)
+                                         (opt-format/format-usdc (:fees-usd costs)))
            :sub (fee-mix-label costs)})
      (kpi {:data-role "portfolio-optimizer-execution-kpi-all-in"
            :label (if show-realized? "Realized all-in" "Est. all-in cost")
            :info "Total cost to execute = price cost + fees."
-           :value (shared/floor-prefixed (and (not show-realized?) (:floor? costs))
+           :value (shared/floor-prefixed (and (not show-realized?)
+                                              (shared/cost-total-incomplete? costs))
                                          (opt-format/format-usdc all-in-usd))
-           :sub "price cost + fees"})]))
+           :sub (if (:fees-unknown? costs)
+                  "price cost + fees — a row's fee is unknown"
+                  "price cost + fees")})]))
 
 ;; ── Execution-health rail ───────────────────────────────────────────────
 
@@ -652,6 +656,51 @@
       [:p {:class ["font-mono" "text-[0.6rem]" "uppercase" "tracking-[0.12em]" tone-class]} title]
       [:ul {:class ["mt-2" "space-y-1" "text-xs"]}
        (for [item items] [:li item])]]]))
+
+(def ^:private live-book-cost-sources
+  "Cost sources priced against a real order book — the L2 snapshot refresh (:snapshot,
+  :depth-extrapolated when the order outruns visible depth) and the readiness-time
+  orderbook contexts (:live-orderbook / :stale-orderbook, which price off the book's own
+  touch either way; staleness rides the age line).
+
+  Everything else is an assumption: :fallback-bps (the normalized :fallback-cost-assumption
+  / nil — no book at all) and :untrusted-snapshot-fill (a book arrived but implied an
+  implausible fill, so the flat fallback was charged instead)."
+  #{:snapshot :depth-extrapolated :live-orderbook :stale-orderbook})
+
+(defn- book-data-diag
+  "What the cost estimates are actually standing on. A snapshot fetch that fails, is
+  rate-limited, or never fires leaves every row priced from the flat fallback — which
+  silently degrades the numbers (no spread/impact split, and TWAP collapses onto Market
+  because there is nothing to slice). Say so here rather than letting an assumption
+  read like a measurement."
+  [priced-rows]
+  (let [sources (map #(get-in % [:cost :source]) priced-rows)
+        live (filter #(contains? live-book-cost-sources %) sources)
+        live-count (count live)
+        total (count sources)
+        ages (keep #(when (contains? live-book-cost-sources (get-in % [:cost :source]))
+                      (get-in % [:cost :age-ms]))
+                   priced-rows)
+        oldest (when (seq ages) (apply max ages))
+        flat-count (- total live-count)]
+    (cond
+      (zero? total)
+      (diag "Book data" "—" "no ready rows sampled")
+
+      (zero? live-count)
+      (diag "Book data" "flat estimate"
+            "no live book — costs are assumptions and TWAP cannot be sliced"
+            "assumed" "text-warning")
+
+      :else
+      (diag "Book data"
+            (str live-count " of " total " live")
+            (str/join " · "
+                      (remove nil?
+                              [(when oldest (str "book " (opt-format/format-duration oldest) " old"))
+                               (when (pos? flat-count)
+                                 (str flat-count " priced from a flat assumption"))]))))))
 
 (defn- health-rail
   [{:keys [summary phase] :as model} rows]
@@ -712,12 +761,17 @@
            (or (not-empty (str/join " · " (remove nil? [(price-cost-split-text costs) sources])))
                "no ready rows sampled"))
      (diag "Est. fees"
-           (opt-format/format-usdc (:fees-usd costs))
+           (shared/floor-prefixed (:fees-unknown? costs)
+                                  (opt-format/format-usdc (:fees-usd costs)))
            (str (fee-mix-label costs) " on ready notional"))
      (diag "Est. all-in cost"
-           (shared/floor-prefixed (:floor? costs)
+           (shared/floor-prefixed (shared/cost-total-incomplete? costs)
                                   (opt-format/format-usdc (+ (:slippage-usd costs) (:fees-usd costs))))
-           "price cost + fees")
+           (if (:fees-unknown? costs)
+             "price cost + fees — a row's fee is unknown"
+             "price cost + fees"))
+     (book-data-diag (filter #(get-in % [:cost :source])
+                             (concat ready submitted resting)))
      (health-note model)]))
 
 ;; ── latest attempt (retry context) ──────────────────────────────────────

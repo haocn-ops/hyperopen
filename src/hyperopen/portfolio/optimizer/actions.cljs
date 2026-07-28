@@ -293,6 +293,9 @@
 (def set-portfolio-optimizer-execution-exit
   execution/set-portfolio-optimizer-execution-exit)
 
+(def restage-portfolio-optimizer-execution-plan
+  execution/restage-portfolio-optimizer-execution-plan)
+
 (def set-portfolio-optimizer-execution-auto-exit
   execution/set-portfolio-optimizer-execution-auto-exit)
 

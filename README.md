@@ -49,6 +49,7 @@
 - [Current Focus](#current-focus)
 - [Project Status](#project-status)
 - [Architecture Overview](#architecture-overview)
+- [Cloudflare Worker Deployment](#cloudflare-worker-deployment)
 - [Validation](#validation)
 - [Contributing](#contributing)
 - [License](#license)
@@ -115,6 +116,30 @@ This command fails closed if the deployed origin is missing the expected CSP, an
 
 ---
 
+## Cloudflare Worker Deployment
+
+Cloudflare deployment is opt-in. `npm run dev` retains its existing direct HyperUnit development defaults; use the Worker commands only to test or publish the Cloudflare release artifact.
+
+```bash
+npm run build:cloudflare
+npm run test:cloudflare-worker
+npm run cloudflare:dev
+```
+
+`build:cloudflare` rebuilds `out/release-public` and replaces only its JavaScript HyperUnit origins with same-origin `/api/hyperunit/*` paths. The Worker serves that artifact through Workers Static Assets and proxies only those fixed API paths. Before an opt-in deployment, check the prepared Worker configuration:
+
+```bash
+npm run cloudflare:check
+npx wrangler whoami
+npm run deploy:cloudflare
+HYPEROPEN_VERIFY_ORIGIN="https://hyperopen.<account>.workers.dev" npm run verify:deployment-headers
+HYPEROPEN_VERIFY_ORIGIN="https://hyperopen.<account>.workers.dev" npm run verify:cloudflare-worker
+```
+
+Do not put Cloudflare API credentials in this repository. `wrangler whoami` uses the local authenticated Wrangler session; `deploy:cloudflare` is the only script that publishes externally.
+
+---
+
 ## Why Hyperopen
 
 Hyperopen is a community-driven trading interface built around a simple idea: **traders should have control over the software they trade through.**
@@ -151,6 +176,7 @@ Start here to understand the project:
 | [Security and Signing Safety](docs/SECURITY.md) | Crypto signing rules and credential handling |
 | [Reliability Invariants](docs/RELIABILITY.md) | Runtime guarantees and validation gates |
 | [Product Specs](docs/product-specs/index.md) | Roadmap and feature specifications |
+| [Hyperliquid Testnet Runbook](docs/runbooks/hyperliquid-testnet-implementation.md) | Testnet implementation, deployment, signed flows, and live verification |
 
 ---
 
@@ -217,6 +243,7 @@ For the full architecture, see [ARCHITECTURE.md](ARCHITECTURE.md).
 | `npm run check` | Lint and compile gates for app, worker, docs, and test builds |
 | `npm test` | Compile and run the main Node test suite |
 | `npm run test:websocket` | Websocket-focused test suite |
+| `npm run smoke:hyperliquid:testnet` | Opt-in live Testnet transport probe; sends only `/info` meta, an empty `/exchange` object, and `allMids` |
 | `npm run test:ci` | Full local CI gate (`check` + `test`) |
 | `npm run test:watch` | Watch mode for iterating on tests |
 | `npm run lint:delimiters -- --changed` | Fast reader-level syntax preflight on changed files |

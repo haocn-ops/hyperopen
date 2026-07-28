@@ -13,16 +13,8 @@
 (def ^:private finite-number? coercion/finite-number?)
 
 (defn equal-risk-result?
-  "True when the result is an Equal Risk run carrying its contribution
-  section. Section PRESENCE alone stopped implying the objective when the
-  covariance-only sibling (:inverse-volatility) started emitting
-  :risk-contributions as a diagnostic — the recorded objective kind must
-  agree. A result with no recorded kind (persisted pre-kind payloads,
-  hand-built fixtures) could only have come from Equal Risk."
   [result]
-  (and (some? (:risk-contributions result))
-       (let [kind (get-in result [:solver :objective-kind])]
-         (or (nil? kind) (= :equal-risk kind)))))
+  (some? (:risk-contributions result)))
 
 (def display-row-cap
   "Chart rows shown before the remainder line takes over. Universes here reach
@@ -43,14 +35,9 @@
     "—"))
 
 (defn format-signed-pts
-  "Signed points with an honest zero: anything below the 0.1-pt display
-  resolution renders as unsigned \"0.0 pts\" — a -0.04 that rounds to zero
-  must never show as \"-0.0 pts\"."
   [value]
   (if (finite-number? value)
-    (if (< (js/Math.abs value) 0.05)
-      "0.0 pts"
-      (str (when (>= value 0) "+") (.toFixed value 1) " pts"))
+    (str (when (>= value 0) "+") (.toFixed value 1) " pts")
     "—"))
 
 (defn- format-share
@@ -81,103 +68,55 @@
         (<= fraction 0.5) :caution
         :else :bad))))
 
-(defn contribution-rows
-  "Per-instrument signed-share rows from the result's :risk-contributions /
-  :current-risk-contributions sections — the objective-agnostic core the
-  Equal Risk balance model and the Risk-weighted sizing contributions view
-  both build on. Each row: id/label/weight, the recommended :share, the
-  nil-safe :current-share, the per-row :target-share (per-instrument section
-  with the uniform-target fallback), signed :deviation-pts / :shift-pts, and
-  :negative?. Deliberately NOT kind-gated: a consumer that does not target
-  contributions simply ignores the target-derived fields."
+(defn balance-model
+  "Chart model from the payload's contribution sections. The `display-row-cap`
+  worst rows by |deviation from target| are selected (so the rows that explain
+  an Approximate verdict always survive the cap), then DISPLAYED in signed
+  share descending order — longs high-to-low with hedges at the bottom, the
+  designer's diverging silhouette. The remainder is summarized honestly
+  instead of silently truncated. Current shares are nil-safe (old persisted
+  results, flat books); per-row targets read the per-instrument section and
+  fall back to the uniform equal target."
   [result]
   (when-let [contributions (:risk-contributions result)]
     (let [{:keys [instrument-ids relative-contributions
-                  target-relative-contributions]} contributions
+                  target-relative-contributions quality rms-error
+                  max-absolute-error negative-contribution-count]} contributions
           labels (:labels-by-instrument result)
           weights (:target-weights-by-instrument result)
           targets-by-id (:target-relative-contributions-by-instrument contributions)
           current-by-id (get-in result [:current-risk-contributions
                                         :relative-contributions-by-instrument])
-          target-share (first target-relative-contributions)]
-      (mapv (fn [instrument-id share]
-              (let [row-target (let [target (get targets-by-id instrument-id)]
-                                 (if (finite-number? target)
-                                   target
-                                   target-share))
-                    current-share (get current-by-id instrument-id)
-                    deviation (when (and (finite-number? share)
-                                         (finite-number? row-target))
-                                (- share row-target))]
-                {:instrument-id instrument-id
-                 :label (or (get labels instrument-id) instrument-id)
-                 :weight (get weights instrument-id)
-                 :share share
-                 :current-share current-share
-                 :target-share row-target
-                 :deviation-pts (pts deviation)
-                 :shift-pts (when (and (finite-number? share)
-                                       (finite-number? current-share))
-                              (pts (- share current-share)))
-                 :negative? (and (finite-number? share) (neg? share))}))
-            instrument-ids
-            relative-contributions))))
-
-(defn balance-model
-  "Chart model from the payload's contribution sections, in one of two display
-  modes (`:display-mode`). Nil for non-Equal-Risk results — the sibling
-  covariance-only objective carries the same sections as diagnostics, and its
-  card owns their presentation.
-
-  `:deviation` (default): the `display-row-cap` worst rows by |deviation from
-  target| are selected (so the rows that explain an Approximate verdict always
-  survive the cap), then DISPLAYED in signed share descending order — longs
-  high-to-low with hedges at the bottom, the designer's diverging silhouette.
-
-  `:shift` (an :exact fit whose result carries current shares): every bar ends
-  on the target line, so deviations are ties and the story is the MOVE. Each
-  row's `:shift-pts` is recommended − current in points, the cap keeps the
-  largest |shift| rows, and display order is current share descending — the
-  gray current markers form the descending silhouette and risk visibly drains
-  from the top rows into the bottom ones.
-
-  The remainder is summarized honestly instead of silently truncated
-  (`:hidden-max-pts` is max |deviation| or max |shift| to match the mode).
-  Current shares are nil-safe (old persisted results, flat books); per-row
-  targets read the per-instrument section and fall back to the uniform equal
-  target. `:current` additionally carries `:biggest-shift`, picked over EVERY
-  row before capping."
-  [result]
-  (when-let [contributions (and (equal-risk-result? result)
-                                (:risk-contributions result))]
-    (let [{:keys [instrument-ids target-relative-contributions quality
-                  rms-error max-absolute-error
-                  negative-contribution-count]} contributions
           target-share (first target-relative-contributions)
-          all-rows (contribution-rows result)
-          shift-mode? (and (= :exact quality)
-                           (some #(finite-number? (:shift-pts %)) all-rows))
-          cap-key (if shift-mode? :shift-pts :deviation-pts)
-          rows (sort-by (fn [row]
-                          (- (js/Math.abs (or (get row cap-key) 0))))
-                        all-rows)
-          display-key (if shift-mode?
-                        (fn [{:keys [current-share]}]
-                          (- (if (finite-number? current-share)
-                               current-share
-                               ##-Inf)))
-                        (fn [{:keys [share]}]
-                          (- (or share ##-Inf))))
+          rows (->> (map (fn [instrument-id share]
+                           (let [row-target (let [target (get targets-by-id instrument-id)]
+                                              (if (finite-number? target)
+                                                target
+                                                target-share))
+                                 deviation (when (and (finite-number? share)
+                                                      (finite-number? row-target))
+                                             (- share row-target))]
+                             {:instrument-id instrument-id
+                              :label (or (get labels instrument-id) instrument-id)
+                              :weight (get weights instrument-id)
+                              :share share
+                              :current-share (get current-by-id instrument-id)
+                              :target-share row-target
+                              :deviation-pts (pts deviation)
+                              :negative? (and (finite-number? share) (neg? share))}))
+                         instrument-ids
+                         relative-contributions)
+                    (sort-by (fn [{:keys [deviation-pts]}]
+                               (- (js/Math.abs (or deviation-pts 0))))))
           visible (->> (take display-row-cap rows)
-                       (sort-by display-key)
+                       (sort-by (fn [{:keys [share]}]
+                                  (- (or share ##-Inf))))
                        vec)
           hidden (drop display-row-cap rows)]
       {:rows visible
-       :display-mode (if shift-mode? :shift :deviation)
-       :asset-count (count instrument-ids)
        :hidden-count (count hidden)
        :hidden-max-pts (when (seq hidden)
-                         (reduce max 0 (map #(js/Math.abs (or (get % cap-key) 0))
+                         (reduce max 0 (map #(js/Math.abs (or (:deviation-pts %) 0))
                                             hidden)))
        ;; Largest contributor over EVERY row (not just the visible cap): on a
        ;; wide near-balanced universe the largest share can carry a small
@@ -195,34 +134,7 @@
        :negative-count negative-contribution-count
        :current (when-let [current (:current-risk-contributions result)]
                   {:rms-pts (pts (:rms-error current))
-                   :max-pts (pts (:max-absolute-error current))
-                   :biggest-shift
-                   (let [movers (filter #(finite-number? (:shift-pts %))
-                                        all-rows)]
-                     (when (seq movers)
-                       (-> (apply max-key
-                                  #(js/Math.abs (:shift-pts %))
-                                  movers)
-                           (select-keys [:instrument-id :label
-                                         :shift-pts]))))})})))
-
-(defn floored-instrument-ids
-  "Assets Equal Risk held at 0%: a zero binding bound plus a zero published
-  target weight — the side-locked hedges the objective's positive equal target
-  can never include. These drive the Risk-weighted sizing cross-link (the
-  objective built to keep every selected asset)."
-  [result]
-  (let [weights (:target-weights-by-instrument result)]
-    (->> (get-in result [:diagnostics :binding-constraints])
-         (filter (fn [{:keys [instrument-id bound]}]
-                   (and (finite-number? bound)
-                        (<= (js/Math.abs bound) 1e-10)
-                        (let [weight (get weights instrument-id)]
-                          (and (finite-number? weight)
-                               (<= (js/Math.abs weight) 1e-10))))))
-         (keep :instrument-id)
-         distinct
-         vec)))
+                   :max-pts (pts (:max-absolute-error current))})})))
 
 (defn kpi-risk-balance
   "Values for the KPI strip's Risk balance tile: current → recommended max
@@ -359,12 +271,9 @@
 (defn verdict-body
   "The recommendation sentence. Constraint-determined books get the honest
   'the optimizer could not change these weights' framing instead of implying
-  a choice was made. Kind-gated (see equal-risk-result?) so the verdict
-  or-site never speaks Equal Risk over a sibling objective's diagnostic
-  contribution section."
+  a choice was made."
   [result]
-  (when-let [contributions (and (equal-risk-result? result)
-                                (:risk-contributions result))]
+  (when-let [contributions (:risk-contributions result)]
     (let [n (count (:instrument-ids contributions))
           target-share (first (:target-relative-contributions contributions))
           max-pts* (pts (:max-absolute-error contributions))

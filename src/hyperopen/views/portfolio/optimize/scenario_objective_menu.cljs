@@ -24,10 +24,6 @@
    {:key :equal-risk
     :title "Equal Risk"
     :description "Balances each position's contribution to portfolio volatility as closely as possible while preserving your long/short sides, gross leverage, and position limits. Covariance-only — return forecasts never move the weights; resulting net is determined by the risk balance"}
-   {:key :inverse-volatility
-    :title "Risk-weighted sizing"
-    :description "Sizes every selected asset on its chosen side by the inverse of its own volatility — keeps every asset, ignores correlations, never reads return forecasts"
-    :specialist? true}
    {:key :target-volatility
     :title "Target volatility"
     :description "Pin σ to a fixed level, max return at that σ"}
@@ -44,7 +40,6 @@
     (cond
       (= :minimum-variance objective-kind) :minimum-volatility
       (= :equal-risk objective-kind) :equal-risk
-      (= :inverse-volatility objective-kind) :inverse-volatility
       (= :target-volatility objective-kind) :target-volatility
       (= :target-return objective-kind) :maximum-return
       :else :max-sharpe)))
@@ -192,16 +187,7 @@
         current-key (current-objective-menu-key draft result)
         pending-key (or (get-in state optimizer-contracts/ui-objective-menu-selection-path)
                         current-key)
-        ;; :specialist? goals are discovered through the More-goals card and
-        ;; the floored-state cross-link, not the quick-switch menu: their rows
-        ;; render by exception, only while one is the current or pending
-        ;; objective (so the menu can honestly show and re-apply the
-        ;; selection). The mainstream goals always render.
-        rendered-options (vec (remove (fn [{:keys [key specialist?]}]
-                                        (and specialist?
-                                             (not= key current-key)
-                                             (not= key pending-key)))
-                                      (objective-menu-options)))
+        rendered-options (objective-menu-options)
         option-ctx {:state state
                     :draft draft
                     :current-key current-key

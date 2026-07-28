@@ -125,12 +125,25 @@
   [persisted storage-mode local-protection-mode]
   (if (and (map? persisted)
            (seq (:agent-address persisted)))
-    {:status (if (= :locked (:persisted-kind persisted)) :locked :ready)
-     :agent-address (:agent-address persisted)
+    {:status (cond
+               (= :locked (:persisted-kind persisted)) :locked
+               (contains? #{:legacy-local-raw :legacy-session-raw}
+                          (:persisted-kind persisted)) :error
+               :else :ready)
+     :agent-address (when-not (contains? #{:legacy-local-raw :legacy-session-raw}
+                                         (:persisted-kind persisted))
+                      (:agent-address persisted))
      :storage-mode storage-mode
      :local-protection-mode local-protection-mode
      :last-approved-at (:last-approved-at persisted)
-     :error nil
+     :error (case (:persisted-kind persisted)
+              :legacy-local-raw
+              "A legacy local trading credential was quarantined. Choose a secure storage mode and enable trading again."
+
+              :legacy-session-raw
+              "A legacy session trading credential was removed. Enable Trading again to trade in this tab."
+
+              nil)
      :nonce-cursor (:nonce-cursor persisted)}
     (agent-session/default-agent-state :storage-mode storage-mode
                                        :local-protection-mode local-protection-mode)))
@@ -199,6 +212,16 @@
 (defn set-error! [store e]
   (swap! store update-in [:wallet] merge {:error (.-message e)
                                           :connecting? false}))
+
+(def provider-unavailable-message
+  "No browser wallet detected. Install or enable a wallet extension, then refresh.")
+
+(defn set-provider-unavailable!
+  [store]
+  (swap! store update-in [:wallet] merge {:connected? false
+                                          :address nil
+                                          :connecting? false
+                                          :error provider-unavailable-message}))
 
 (defn- selected-provider-for-request
   [store provider-id]
@@ -298,7 +321,7 @@
   ([store provider-id]
    (let [provider* (selected-provider-for-request store provider-id)]
      (if-not provider*
-       (set-disconnected! store)
+       (set-provider-unavailable! store)
        (do
          ;; Set connecting state
          (swap! store update-in [:wallet] merge {:connecting? true :error nil})

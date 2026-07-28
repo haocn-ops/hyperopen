@@ -7,7 +7,7 @@ import { performance } from 'node:perf_hooks';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const DEFAULT_SIZES = [20, 40, 60];
-const DEFAULT_CANDIDATES = ['projected-gradient-js', 'quadprog', 'osqp'];
+const DEFAULT_CANDIDATES = ['projected-gradient-js', 'quadprog'];
 const SIMPLEX_TOLERANCE = 1e-10;
 
 function makeRng(seed) {

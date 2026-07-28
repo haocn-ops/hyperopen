@@ -705,12 +705,14 @@
                   (is (= "Connect first." (.-message err)))
                   (done))))))
 
-(deftest enable-agent-trading-sets-error-when-session-persist-fails-test
+(deftest enable-agent-trading-keeps-session-mode-credentials-in-memory-test
   (async done
     (let [store (atom {:wallet {:address "0x111"
                                 :chain-id "0xa4b1"
                                 :agent {:status :approving
-                                        :storage-mode :session}}})]
+                                        :storage-mode :session}}})
+          persist-calls (atom [])
+          cached-sessions (atom [])]
       (agent-runtime/enable-agent-trading!
        {:store store
         :options {:storage-mode :session}
@@ -726,15 +728,25 @@
         :approve-agent! (fn [& _]
                           (js/Promise.resolve #js {:json (fn []
                                                           (js/Promise.resolve #js {:status "ok"}))}))
-        :persist-agent-session-by-mode! (fn [& _] false)
+        :persist-agent-session-by-mode! (fn [& args]
+                                          (swap! persist-calls conj args)
+                                          false)
+        :cache-unlocked-session! (fn [owner-address session]
+                                   (swap! cached-sessions conj [owner-address session]))
         :runtime-error-message (fn [err] (str err))
         :exchange-response-error (fn [resp] (pr-str resp))})
       (js/setTimeout
        (fn []
          (try
-           (is (= :error (get-in @store [:wallet :agent :status])))
-           (is (= "Unable to persist agent credentials."
-                  (get-in @store [:wallet :agent :error])))
+           (is (= :ready (get-in @store [:wallet :agent :status])))
+           (is (empty? @persist-calls))
+           (is (= [["0x111" {:agent-address "0x999"
+                               :private-key "0xpriv"
+                               :last-approved-at 1700000000001
+                               :nonce-cursor 1700000000001
+                               :storage-mode :session
+                               :local-protection-mode :plain}]]
+                  @cached-sessions))
            (finally
              (done))))
        0))))

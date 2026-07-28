@@ -113,6 +113,8 @@
          "flex-col"
          "min-h-0"]
         ["lg:flex"
+         "lg:relative"
+         "lg:z-20"
          "lg:col-start-2"
          "lg:row-start-1"
          "lg:border-l"

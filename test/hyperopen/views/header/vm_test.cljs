@@ -1,9 +1,16 @@
 (ns hyperopen.views.header.vm-test
   (:require [cljs.test :refer-macros [deftest is]]
+            [hyperopen.service.fixtures :as fixtures]
+            [hyperopen.service.tenant-config :as tenant-config]
             [hyperopen.views.header.vm :as vm]))
 
 (def connected-address
   "0x1234567890abcdef1234567890abcdef12345678")
+
+(def alternate-tenant-state
+  {:tenant/override (assoc-in fixtures/alternate-tenant-raw
+                              [:affiliate :status]
+                              :configured)})
 
 (defn- row-by-id
   [sections section-id row-id]
@@ -51,6 +58,40 @@
            (get-in locked-vm [:wallet :enable-trading :action])))
     (is (false? (get-in locked-vm [:wallet :enable-trading :disabled?])))
     (is (nil? (get-in ready-vm [:wallet :enable-trading])))))
+
+(deftest header-vm-exposes-custom-logo-and-initial-fallback-for-tenant-branding-test
+  (let [custom-vm (vm/header-vm alternate-tenant-state)
+        fallback-vm (vm/header-vm {:tenant/override fixtures/malformed-tenant-raw})]
+    (is (= "Desk Alpha" (get-in custom-vm [:brand :wordmark])))
+    (is (= "D" (get-in custom-vm [:brand :mark])))
+    (is (= "https://cdn.example.test/desk-alpha.svg"
+           (get-in custom-vm [:brand :logo-url])))
+    (is (= "HyperOpen" (get-in fallback-vm [:brand :wordmark])))
+    (is (= "HO" (get-in fallback-vm [:brand :mark])))
+    (is (= "" (get-in fallback-vm [:brand :logo-url])))))
+
+(deftest header-vm-hides-failed-tenant-logo-and-keeps-initial-fallback-test
+  (let [logo-url "https://cdn.example.test/desk-alpha.svg"
+        result (vm/header-vm
+                (assoc alternate-tenant-state
+                       :tenant {:failed-logo-urls #{logo-url}}))]
+    (is (= "" (get-in result [:brand :logo-url])))
+    (is (true? (get-in result [:brand :logo-failed?])))
+    (is (= "D" (get-in result [:brand :mark])))))
+
+(deftest analytics-disabled-tenant-hides-portfolio-navigation-test
+  (let [tenant (assoc-in tenant-config/default-tenant-raw
+                         [:features :analytics]
+                         false)
+        result (vm/header-vm {:router {:path "/trade"}
+                              :tenant/override tenant})
+        all-items (concat (:desktop-nav-items result)
+                          (get-in result [:mobile-nav :primary-items])
+                          (get-in result [:mobile-nav :secondary-items]))
+        ids (set (map :id all-items))]
+    (is (not (contains? ids :portfolio)))
+    (is (not (contains? ids :optimize)))
+    (is (contains? ids :trade))))
 
 (deftest header-vm-projects-data-driven-settings-sections-test
   (let [result (vm/header-vm {:wallet {:agent {:storage-mode :session}}

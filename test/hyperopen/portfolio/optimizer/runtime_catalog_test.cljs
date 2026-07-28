@@ -33,15 +33,6 @@
   [handler-key]
   (str/includes? (name handler-key) "portfolio-optimizer"))
 
-(deftest optimizer-catalog-exposes-switch-objective-and-run-test
-  ;; ExecPlan optimizer-inverse-volatility-objective, item 10: the floored-state
-  ;; cross-link dispatches :actions/switch-portfolio-optimizer-objective-and-run,
-  ;; so the optimizer runtime catalog must expose its handler (the drift test
-  ;; below then enforces the full six-file wiring chain).
-  (is (contains? (set (keys (:portfolio-optimizer
-                             (optimizer-runtime-catalog/action-deps))))
-                 :switch-portfolio-optimizer-objective-and-run)))
-
 (deftest optimizer-catalog-covers-registration-handler-keys-test
   (let [action-catalog-keys (set (keys (:portfolio-optimizer
                                         (optimizer-runtime-catalog/action-deps))))

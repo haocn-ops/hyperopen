@@ -458,69 +458,6 @@ test.describe("equal risk correlation view (workbench scenes)", () => {
     expect(heatmapBox.width).toBeGreaterThan(cardBox.width * 0.9);
   });
 
-  test("an exact fit flips to the rebalance story: impact strip, shift columns, imbalance KPIs", async ({
-    page
-  }) => {
-    const frame = await openScene(page, "balance-exact-fit");
-
-    // The strip leads with current → target facts.
-    const strip = frame.locator(
-      role("portfolio-optimizer-equal-risk-impact-strip")
-    );
-    await expect(strip).toBeVisible();
-    await expect(strip).toContainText("What changes if you execute");
-    await expect(
-      strip.locator(role("portfolio-optimizer-equal-risk-impact-balance"))
-    ).toContainText("→");
-    // 2.31x gross clears the leverage gate, so the outcome chip renders and
-    // carries the ruin-floor odds on its sub line.
-    await expect(
-      strip.locator(role("portfolio-optimizer-equal-risk-impact-outcome"))
-    ).toContainText("Touch −50% odds");
-
-    // Exact fit + current book → the chart tells the move, not the misfit:
-    // Current/Shift columns, no constant Target column, no dead-zero KPIs.
-    const chart = frame.locator(
-      role("portfolio-optimizer-risk-contribution-chart")
-    );
-    await expect(chart).toContainText("Shift");
-    await expect(
-      frame.locator(role("portfolio-optimizer-risk-contribution-shift")).first()
-    ).toBeVisible();
-    await expect(
-      frame.locator(role("portfolio-optimizer-risk-contribution-target"))
-    ).toHaveCount(0);
-    // The shared KPI strip renders once per tab panel — assert the balance
-    // tab's copy.
-    await expect(
-      frame
-        .locator(role("portfolio-optimizer-risk-contributions-imbalance"))
-        .first()
-    ).toContainText("→");
-    await expect(
-      frame
-        .locator(role("portfolio-optimizer-risk-contributions-biggest-shift"))
-        .first()
-    ).toContainText("BTC");
-
-    // The volatility chip is a plain label→radio deep-link into the
-    // Diversification tab, where the verdict leads and the bridge renders.
-    await frame
-      .locator(role("portfolio-optimizer-equal-risk-impact-volatility"))
-      .click();
-    await expect(
-      frame.locator(role("portfolio-optimizer-risk-diversification-comparison"))
-    ).toBeVisible();
-    await expect(
-      frame.locator(role("portfolio-optimizer-risk-divbridge"))
-    ).toBeVisible();
-    await expect(
-      frame.locator(
-        role("portfolio-optimizer-risk-diversification-decision-summary")
-      )
-    ).toContainText(/Modeled volatility/);
-  });
-
   test("a 28-asset book caps the heatmap at 24 and says how many it dropped", async ({
     page
   }) => {

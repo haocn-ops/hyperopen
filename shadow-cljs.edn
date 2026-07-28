@@ -10,6 +10,7 @@
  
   :builds
  {:app {:target :browser
+        :compiler-options {:closure-defines {hyperopen.config/DEPLOYMENT_HYPERLIQUID_NETWORK "mainnet"}}
         :output-dir "resources/public/js"
         :asset-path "/js"
         :module-hash-names true
@@ -115,13 +116,15 @@
   :test {:target :node-script
          :output-to "out/test.js"
          :main test-runner/-main
-         :compiler-options {:source-map true}
+         :compiler-options {:source-map true
+                            :closure-defines {hyperopen.config/DEPLOYMENT_HYPERLIQUID_NETWORK "mainnet"}}
          :js-options {:resolve {"lightweight-charts" {:target :file
                                                       :file "test/shims/lightweight_charts_stub.cjs"}}}}
 
   :ws-test {:target :node-test
             :output-to "out/ws-test.js"
-            :compiler-options {:source-map true}
+            :compiler-options {:source-map true
+                               :closure-defines {hyperopen.config/DEPLOYMENT_HYPERLIQUID_NETWORK "mainnet"}}
             :ns-regexp "^(hyperopen\\.websocket\\..*-test|hyperopen\\.wallet\\.address-watcher-test|hyperopen\\.startup\\.runtime-test)$"}
   
   :release {:target :browser

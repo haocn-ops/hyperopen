@@ -26,16 +26,18 @@ async function readTradeShellGeometry(page) {
     const chart = byParity("trade-chart-panel");
     const orderbook = byParity("trade-orderbook-panel");
     const account = byParity("trade-account-tables-panel");
+    const accountTables = byParity("account-tables");
     const chartCanvas = byParity("chart-canvas");
     const chartLibrary = chartCanvas?.querySelector(".tv-lightweight-charts");
     const scrollShell = byRole("trade-scroll-shell");
     const chartRect = chart?.getBoundingClientRect();
     const orderbookRect = orderbook?.getBoundingClientRect();
     const accountRect = account?.getBoundingClientRect();
+    const accountTablesRect = accountTables?.getBoundingClientRect();
     const chartCanvasRect = chartCanvas?.getBoundingClientRect();
     const chartLibraryRect = chartLibrary?.getBoundingClientRect();
 
-    if (!chartRect || !orderbookRect || !accountRect || !chartCanvasRect || !chartLibraryRect || !scrollShell) {
+    if (!chartRect || !orderbookRect || !accountRect || !accountTablesRect || !chartCanvasRect || !chartLibraryRect || !scrollShell) {
       throw new Error("trade shell geometry unavailable");
     }
 
@@ -45,6 +47,8 @@ async function readTradeShellGeometry(page) {
       chartHeight: chartRect.height,
       accountHeight: accountRect.height,
       accountWidth: accountRect.width,
+      accountTablesHeight: accountTablesRect.height,
+      accountTablesWidth: accountTablesRect.width,
       lowerPanelShare,
       chartFlushDelta: accountRect.top - chartRect.bottom,
       orderbookFlushDelta: accountRect.top - orderbookRect.bottom,
@@ -2234,6 +2238,8 @@ test("desktop trade shell keeps the chart dominant while account tabs stay geome
 
       expect(Math.abs(geometry.accountHeight - baselineGeometry.accountHeight)).toBeLessThanOrEqual(1);
       expect(Math.abs(geometry.accountWidth - baselineGeometry.accountWidth)).toBeLessThanOrEqual(1);
+      expect(Math.abs(geometry.accountTablesHeight - baselineGeometry.accountTablesHeight)).toBeLessThanOrEqual(1);
+      expect(Math.abs(geometry.accountTablesWidth - baselineGeometry.accountTablesWidth)).toBeLessThanOrEqual(1);
     }
   }
 });
@@ -3287,6 +3293,39 @@ test("trade funding openers launch the funding modal on real click @regression",
   }
 });
 
+test("intermediate desktop trade funding actions stay above orderbook depth @regression", async ({ page }) => {
+  await page.setViewportSize({ width: 1116, height: 643 });
+  await visitRoute(page, "/trade");
+  await seedOutcomeSideOrderbook(page, { coin: "BTC", bidPx: "65000", askPx: "65001" });
+  await expect(page.locator("[data-role='orderbook-depth-body']")).toBeVisible();
+
+  for (const dataRole of [
+    "funding-action-deposit",
+    "funding-action-transfer",
+    "funding-action-withdraw"
+  ]) {
+    const action = page.locator(`[data-role='${dataRole}']`);
+    await expect(action).toBeVisible();
+    await action.scrollIntoViewIfNeeded();
+
+    const hitTest = await action.evaluate((button) => {
+      const rect = button.getBoundingClientRect();
+      const topNode = document.elementFromPoint(
+        rect.left + rect.width / 2,
+        rect.top + rect.height / 2
+      );
+      return {
+        ownsCenter:
+          topNode === button ||
+          topNode?.closest(`[data-role='${button.dataset.role}']`) === button,
+        topRole: topNode?.closest("[data-role]")?.getAttribute("data-role") ?? null
+      };
+    });
+
+    expect(hitTest.ownsCenter, `${dataRole} center should remain clickable`).toBe(true);
+  }
+});
+
 test("funding modal accessibility keeps focus in dialog, restores opener focus, and exposes labels @regression", async ({ page }) => {
   await visitRoute(page, "/trade");
 
@@ -4001,23 +4040,24 @@ test("trading settings session toggles gate passkey lock behind remembered sessi
     .first();
   const passkeyToggleInput = passkeyToggleLabel;
 
-  await expect(rememberToggleInput).toHaveAttribute("aria-checked", "true");
-  await expect(passkeyToggleInput).toBeEnabled();
+  await expect(rememberToggleInput).toHaveAttribute("aria-checked", "false");
+  await expect(passkeyToggleInput).toBeDisabled();
 
-  await passkeyToggleLabel.click();
+  await passkeyToggleLabel.click({ force: true });
   await waitForIdle(page, { quietMs: 250, timeoutMs: 4_000, pollMs: 50 });
-  await expect(passkeyToggleInput).toHaveAttribute("aria-checked", "true");
+  await expect(passkeyToggleInput).toHaveAttribute("aria-checked", "false");
   await expect
     .poll(
       () => page.evaluate(() => localStorage.getItem("hyperopen:agent-local-protection-mode:v1")),
       { timeout: 4_000 }
     )
-    .toBe("passkey");
+    .toBe(null);
 });
 
 test("ready remembered session keeps submit usable after enabling passkey lock @regression", async ({
   page
 }) => {
+  await seedAssetSelectorMarketsCache(page);
   await visitRoute(page, "/trade");
   await installPasskeyLockboxMock(page);
   await seedRememberedTradingSession(page, {
@@ -4069,6 +4109,9 @@ test("ready remembered session keeps submit usable after enabling passkey lock @
       { timeout: 4_000 }
     )
     .toBe(null);
+
+  await settingsSurface.locator('[data-role="trading-settings-close"]').click();
+  await waitForIdle(page, { quietMs: 150, timeoutMs: 2_000, pollMs: 50 });
 
   await dispatch(page, [":actions/select-order-entry-mode", ":limit"]);
   await waitForIdle(page, { quietMs: 100, timeoutMs: 2_000, pollMs: 50 });
@@ -4122,6 +4165,7 @@ test("locked remembered passkey session disables downgrade until unlock @regress
 test("locked remembered passkey session submit unlocks and submits original order @regression", async ({
   page
 }) => {
+  await seedAssetSelectorMarketsCache(page);
   await visitRoute(page, "/trade");
   await freezeAccountSurfaceSync(page, "0x1111111111111111111111111111111111111111");
   await waitForIdle(page, { quietMs: 500, timeoutMs: 10_000, pollMs: 50 });

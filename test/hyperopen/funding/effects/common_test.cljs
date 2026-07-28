@@ -81,11 +81,14 @@
          (common/wallet-error-message (js/Error. "   ")))))
 
 (deftest funding-effect-common-config-resolution-prefers-action-wallet-and-default-branches-test
-  (is (= "Arbitrum Sepolia"
-         (:network-label
-          (common/resolve-deposit-chain-config
-           (atom {:wallet {:chain-id "0xa4b1"}})
-           {:chainId "0x66eee"}))))
+  (let [testnet-config (common/resolve-deposit-chain-config
+                        (atom {:wallet {:chain-id "0xa4b1"}})
+                        {:chainId "0x66eee"})]
+    (is (= "Arbitrum Sepolia" (:network-label testnet-config)))
+    (is (= "0x1baAbB04529D43a73232B713C0FE471f7c7334d5"
+           (:usdc-address testnet-config)))
+    (is (= "0x08cfc1B6b2dCF36A1480b99353A354AA8AC56f89"
+           (:bridge-address testnet-config))))
   (is (= "Arbitrum Sepolia"
          (:network-label
           (common/resolve-deposit-chain-config

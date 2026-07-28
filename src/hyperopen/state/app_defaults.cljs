@@ -447,6 +447,7 @@
    :ui (default-ui-state)
    :order-submit-confirmation (submit-confirmation/default-state)
    :header-ui (default-header-ui-state)
+   :tenant {:failed-logo-urls #{}}
    :trading-settings (default-trading-settings-state)
    :account {:mode :classic
              :abstraction-raw nil}

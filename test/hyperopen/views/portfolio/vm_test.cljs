@@ -129,6 +129,48 @@
       (is (= "Trading Equity" (get-in view-model [:summary :spot-equity-label])))
       (is (false? (get-in view-model [:summary :show-earn-balance?]))))))
 
+(deftest portfolio-vm-adds-one-address-scoped-analytics-model-without-changing-existing-shell-models-test
+  (with-redefs [account-equity-view/account-equity-metrics (fn [_]
+                                                              {:spot-equity 50
+                                                               :perps-value 75
+                                                               :cross-account-value 75
+                                                               :unrealized-pnl 7})]
+    (let [address "0x1111111111111111111111111111111111111111"
+          loaded-at-ms (.now js/Date)
+          state {:wallet {:address address}
+                 :account {:mode :classic}
+                 :portfolio-ui {:summary-scope :all
+                                :summary-time-range :month
+                                :chart-tab :returns}
+                 :portfolio {:summary-by-key {:month {:account address
+                                                      :pnlHistory [[1000 0] [2000 25]]
+                                                      :accountValueHistory [[1000 100] [2000 125]]
+                                                      :vlm 4321}}
+                             :loading? false
+                             :loaded-at-ms loaded-at-ms
+                             :user-fees {:userCrossRate 0.0005
+                                         :userAddRate 0.0001
+                                         :dailyUserVlm [{:userCross 20 :userAdd 5}]}
+                             :user-fees-loaded-for-address address
+                             :user-fees-loaded-at-ms loaded-at-ms}
+                 :webdata2 {:clearinghouseState {:marginSummary {:accountValue 75}}
+                            :totalVaultEquity 0}
+                 :borrow-lend {:total-supplied-usd 0}}
+          view-model (vm/portfolio-vm state)
+          analytics (:analytics view-model)]
+      (is (= address (:account analytics)))
+      (is (= :live (:data-quality analytics)))
+      (is (= 125 (:equity analytics)))
+      (is (= 25 (:pnl analytics)))
+      (is (= 4321 (:volume analytics)))
+      (is (= {:maker 0.0001 :taker 0.0005} (:fee-rates analytics)))
+      (is (number? (:as-of-ms analytics)))
+      (is (string? (:message analytics)))
+      (is (= :all (get-in view-model [:selectors :summary-scope :value])))
+      (is (= :month (get-in view-model [:selectors :summary-time-range :value])))
+      (is (= :returns (get-in view-model [:chart :selected-tab])))
+      (is (map? (:performance-metrics view-model))))))
+
 (deftest portfolio-vm-defaults-selector-labels-and-fallbacks-when-summary-missing-test
   (with-redefs [account-equity-view/account-equity-metrics (fn [_]
                                                               {:spot-equity 0

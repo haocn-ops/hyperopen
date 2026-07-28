@@ -3,6 +3,7 @@
             [hyperopen.account.context :as account-context]
             [hyperopen.route-modules :as route-modules]
             [hyperopen.router :as router]
+            [hyperopen.service.product-context :as product-context]
             [hyperopen.staking.actions :as staking-actions]
             [hyperopen.surface-modules :as surface-modules]
             [hyperopen.trade.layout-actions :as trade-layout-actions]
@@ -132,19 +133,24 @@
          "Retry"])]]))
 
 (defn app-view [state]
-  (let [route (get-in state [:router :path] "/trade")
+  (let [requested-route (get-in state [:router :path] "/trade")
+        context (product-context/build-product-context-view-model state)
+        route (product-context/safe-route context requested-route)
+        state* (if (= route requested-route)
+                 state
+                 (assoc-in state [:router :path] route))
         trade-route? (router/trade-route? route)
         deferred-route? (some? (route-modules/route-module-id route))
-        route-error (route-modules/route-error state route)
+        route-error (route-modules/route-error state* route)
         route-ready? (if deferred-route?
-                       (route-modules/route-ready? state route)
+                       (route-modules/route-ready? state* route)
                        true)
         unresolved-vault-list-route? (and deferred-route?
                                            (not route-error)
                                            (not route-ready?)
                                            (= :list (:kind (vault-routes/parse-vault-route route))))
         mobile-surface (trade-layout-actions/normalize-trade-mobile-surface
-                        (get-in state [:trade-ui :mobile-surface]))
+                        (get-in state* [:trade-ui :mobile-surface]))
         mobile-account-surface? (and trade-route? (= mobile-surface :account))
         app-main-classes (into ["flex-1"
                                 "min-h-0"
@@ -153,32 +159,32 @@
                                 "flex-col"]
                                (if mobile-account-surface?
                                  ["pb-[calc(3rem+env(safe-area-inset-bottom))]"]
-                                 ["pb-[5rem]"]))
+                                 ["pb-16"]))
         root-classes (into ["h-screen" "bg-base-100" "flex" "flex-col" "overflow-y-auto" "scrollbar-hide"]
                            (when trade-route?
                              ["xl:overflow-y-hidden"]))]
     [:div {:class root-classes
            :data-parity-id "app-root"}
-     (header-view/header-view state)
-     (spectate-mode-banner state)
+     (header-view/header-view state*)
+     (spectate-mode-banner state*)
      [:main {:class app-main-classes
              :id "main-content"
              :data-parity-id "app-main"}
       (cond
-        trade-route? (trade-view/trade-view state)
-        unresolved-vault-list-route? (vaults-route-shell/vaults-route-loading-shell state)
+        trade-route? (trade-view/trade-view state*)
+        unresolved-vault-list-route? (vaults-route-shell/vaults-route-loading-shell state*)
         (and deferred-route?
              route-error)
-        (deferred-route-loading-shell state route)
+        (deferred-route-loading-shell state* route)
         (and deferred-route?
              route-ready?)
-        (or (route-modules/render-route-view state route)
-            (deferred-route-loading-shell state route))
-        deferred-route? (deferred-route-loading-shell state route)
-        :else (trade-view/trade-view state))]
-     (surface-modules/render-surface-view state :funding-modal)
-     (surface-modules/render-surface-view state :spectate-mode-modal)
-     (agent-trading-recovery-modal/agent-trading-recovery-modal-view state)
-     (order-submit-confirmation-modal/order-submit-confirmation-modal-view state)
-     (notifications-view/notifications-view state)
-     (footer-view/footer-view state)]))
+        (or (route-modules/render-route-view state* route)
+            (deferred-route-loading-shell state* route))
+        deferred-route? (deferred-route-loading-shell state* route)
+        :else (trade-view/trade-view state*))]
+     (surface-modules/render-surface-view state* :funding-modal)
+     (surface-modules/render-surface-view state* :spectate-mode-modal)
+     (agent-trading-recovery-modal/agent-trading-recovery-modal-view state*)
+     (order-submit-confirmation-modal/order-submit-confirmation-modal-view state*)
+     (notifications-view/notifications-view state*)
+     (footer-view/footer-view state*)]))

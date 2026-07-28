@@ -290,7 +290,10 @@
                     portfolio-optimizer-adapters/*save-scenario-index!*
                     (fn [addr index]
                       (swap! calls conj [:save-index addr index])
-                      (js/Promise.resolve true))]
+                      (js/Promise.resolve true))
+                    portfolio-optimizer-adapters/*dispatch!*
+                    (fn [store* ctx effects]
+                      (swap! calls conj [:dispatch store* ctx effects]))]
         (-> (portfolio-optimizer-adapters/save-portfolio-optimizer-scenario-effect nil store)
             (.then (fn [record]
                      (is (= "scn_3700" (:id record)))

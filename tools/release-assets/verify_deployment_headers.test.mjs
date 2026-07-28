@@ -12,8 +12,13 @@ import {
 } from "./security_headers.mjs";
 import { verifyDeploymentHeaders } from "./verify_deployment_headers.mjs";
 
-function createServer(headersByPath = {}) {
-  const documentHeaders = expectedDocumentHeaders();
+function createServer(headersByPath = {}, tenantManifest = null) {
+  const logoUrl = tenantManifest?.tenant?.["brand/logo-url"];
+  const eventEndpoint = tenantManifest?.tenant?.affiliate?.["event-endpoint"];
+  const documentHeaders = expectedDocumentHeaders({
+    imageSources: logoUrl ? [new URL(logoUrl).origin] : [],
+    connectSources: eventEndpoint ? [new URL(eventEndpoint).origin] : [],
+  });
   const tradeHtml = `<!DOCTYPE html>
 <html>
   <head>
@@ -38,6 +43,15 @@ function createServer(headersByPath = {}) {
         ...headers,
       });
       response.end(tradeHtml);
+      return;
+    }
+
+    if (request.url === "/tenant-manifest.json" && tenantManifest) {
+      response.writeHead(200, {
+        "content-type": "application/json; charset=utf-8",
+        "cache-control": CONTROL_CACHE_CONTROL,
+      });
+      response.end(JSON.stringify(tenantManifest));
       return;
     }
 
@@ -116,6 +130,31 @@ test("verifyDeploymentHeaders fails closed when the document CSP drifts", async 
       verifyDeploymentHeaders({ origin }),
       /expected content-security-policy/i
     );
+  } finally {
+    await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
+  }
+});
+
+test("verifyDeploymentHeaders derives branded CSP sources from the public tenant manifest", async () => {
+  const tenantManifest = {
+    tenant: {
+      "brand/logo-url": "https://testnet.dexhelm.com/brand/dexhelm-mark.svg",
+      affiliate: {
+        "event-endpoint": "https://events.dexhelm.com/affiliate",
+      },
+    },
+  };
+  const server = createServer({}, tenantManifest);
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const address = server.address();
+  const origin = `http://127.0.0.1:${address.port}`;
+
+  try {
+    const summary = await verifyDeploymentHeaders({ origin });
+    assert.deepEqual(summary.tenantSecuritySources, {
+      imageSources: ["https://testnet.dexhelm.com"],
+      connectSources: ["https://events.dexhelm.com"],
+    });
   } finally {
     await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
   }

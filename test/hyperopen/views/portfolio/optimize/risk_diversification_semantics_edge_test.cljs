@@ -4,8 +4,7 @@
             [clojure.string :as str]
             [hyperopen.views.portfolio.optimize.risk-contributions-card :as card]
             [hyperopen.views.portfolio.optimize.test-support
-             :refer [collect-nodes collect-strings node-by-role
-                     solved-result]]))
+             :refer [collect-nodes collect-strings node-by-role solved-result]]))
 
 (def ^:private base-result
   (assoc solved-result
@@ -275,10 +274,8 @@
                                  (get-in % [1 :data-role])))
         connectors (nodes-with-class
                     matrix "optimizer-risk-diversification-connector")
-        ;; The decision summary is the tab's LEAD now — above the bridge and
-        ;; matrix, inside the comparison section.
         summary (node-by-role
-                 view "portfolio-optimizer-risk-diversification-decision-summary")
+                 matrix "portfolio-optimizer-risk-diversification-decision-summary")
         em-dashes (filter #{"—"} (collect-strings matrix))]
     (is (= 0 (count current-markers)))
     (is (= 0 (count connectors)))

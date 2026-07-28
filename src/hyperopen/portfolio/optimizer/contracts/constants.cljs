@@ -15,14 +15,7 @@
   #{:solved :infeasible :error :failed})
 
 (def objective-kinds
-  #{:minimum-variance :max-sharpe :target-return :target-volatility :equal-risk
-    :inverse-volatility})
-
-(def covariance-only-objective-kinds
-  "Objectives that never consume expected returns: an invalid return model
-  must not block their solve, dust removal must not drop their positions, and
-  the setup flow never solicits return views for them."
-  #{:equal-risk :inverse-volatility})
+  #{:minimum-variance :max-sharpe :target-return :target-volatility :equal-risk})
 
 (def return-model-kinds
   #{:historical-mean :ew-mean :black-litterman})

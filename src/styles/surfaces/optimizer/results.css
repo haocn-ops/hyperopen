@@ -1314,24 +1314,6 @@
     margin-top: 12px;
   }
 
-  /* The Risk-weighted sizing card shares the risk-balance tab grammar. Its
-     default (no radio checked) panel is the sizing-fidelity view — scoped by
-     the card's own modifier class so the sibling card's default-contribution
-     rule above stays untouched — and its CONTRIBUTIONS diagnostic panel keys
-     on the "contributions" view value, so neither card's default state can
-     leak a second visible panel into the other. */
-  .portfolio-optimizer
-    .optimizer-risk-balance--sizing:not(:has(input[data-risk-view]:checked))
-    .optimizer-risk-balance-panel--sizing,
-  .portfolio-optimizer
-    .optimizer-risk-balance:has(input[data-risk-view="sizing"]:checked)
-    .optimizer-risk-balance-panel--sizing,
-  .portfolio-optimizer
-    .optimizer-risk-balance:has(input[data-risk-view="contributions"]:checked)
-    .optimizer-risk-balance-panel--contributions {
-    display: block;
-  }
-
   /* KPI strip: one bordered band, hairline-divided cells (1px grid-gap trick
      so the hairlines survive responsive column wraps). */
   .portfolio-optimizer .optimizer-risk-balance-kpis {
@@ -1588,21 +1570,6 @@
     font-size: 12px;
     text-align: right;
     color: var(--optimizer-text-2);
-  }
-
-  /* Exact-fit (:shift) mode columns: Current is quiet context, Shift is the
-     row's story — brighter but never sign-colored (a risk shift carries no
-     good/bad judgment, unlike a deviation from target). */
-  .portfolio-optimizer .optimizer-risk-balance-current-cell {
-    font-size: 12px;
-    text-align: right;
-    color: var(--optimizer-text-2);
-  }
-
-  .portfolio-optimizer .optimizer-risk-balance-shift-cell {
-    font-size: 12px;
-    text-align: right;
-    color: var(--optimizer-text);
   }
 
   .portfolio-optimizer
@@ -1982,77 +1949,6 @@
     padding: 10px;
     border-top: 1px solid var(--optimizer-border);
     font-size: 11.5px;
-    line-height: 1.5;
-    color: var(--optimizer-text-2);
-  }
-
-  /* The verdict as the tab's LEAD (above the bridge + matrix) instead of a
-     matrix footer: brighter, bigger, no table framing. */
-  .portfolio-optimizer .optimizer-risk-diversification-decision--lead {
-    margin: 10px 0 0;
-    padding: 0;
-    border-top: 0;
-    font-size: 13px;
-    color: var(--optimizer-text);
-  }
-
-  /* Volatility bridge: modeled (solid) vs all-move-together (soft) with the
-     zero-correlation baseline tick, on the matrix lanes' shared scale. */
-  .portfolio-optimizer .optimizer-risk-divbridge {
-    margin: 10px 0 12px;
-  }
-
-  .portfolio-optimizer .optimizer-risk-divbridge-lane {
-    position: relative;
-    height: 14px;
-    overflow: hidden;
-    border: 1px solid var(--optimizer-border);
-    border-radius: 3px;
-    background: var(--optimizer-bg);
-  }
-
-  .portfolio-optimizer .optimizer-risk-divbridge-kept {
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    left: 0;
-    background: var(--optimizer-target);
-    opacity: 0.75;
-  }
-
-  .portfolio-optimizer .optimizer-risk-divbridge-saved {
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    border-left: 1px solid var(--optimizer-target-border);
-    background: var(--optimizer-target-soft);
-  }
-
-  .portfolio-optimizer .optimizer-risk-divbridge-tick {
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    width: 0;
-    border-left: 1px dashed var(--optimizer-text-2);
-  }
-
-  .portfolio-optimizer .optimizer-risk-divbridge-labels {
-    display: flex;
-    justify-content: space-between;
-    gap: 12px;
-    margin-top: 4px;
-    font-size: 10.5px;
-    color: var(--optimizer-text-2);
-  }
-
-  .portfolio-optimizer .optimizer-risk-divbridge-label--stress {
-    color: var(--optimizer-text-3);
-  }
-
-  .portfolio-optimizer .optimizer-risk-divbridge-note {
-    margin-top: 6px;
-    max-width: 88ch;
-    font-size: 11px;
     line-height: 1.5;
     color: var(--optimizer-text-2);
   }

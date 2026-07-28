@@ -1,6 +1,5 @@
 (ns hyperopen.portfolio.optimizer.application.engine.context
   (:require [hyperopen.portfolio.optimizer.application.display-frontier :as display-frontier]
-            [hyperopen.portfolio.optimizer.contracts.constants :as contracts-constants]
             [hyperopen.portfolio.optimizer.domain.black-litterman :as black-litterman]
             [hyperopen.portfolio.optimizer.domain.constraints :as constraints]
             [hyperopen.portfolio.optimizer.domain.history-assumption-proxy :as history-assumption-proxy]
@@ -356,13 +355,11 @@
              :detail "encoding constraints"})
          current-portfolio-analysis* (current-portfolio-analysis request
                                                                  return-result)]
-     ;; Covariance-only objectives (Equal Risk, Risk-weighted sizing) never
-     ;; consume returns: an invalid return model must not block their solve
-     ;; (risk-model readiness still applies). Return-dependent objectives keep
-     ;; the invalid-return-model infeasibility.
+     ;; Equal Risk is covariance-only: an invalid return model must not block
+     ;; the solve (risk-model readiness still applies). Return-dependent
+     ;; objectives keep the invalid-return-model infeasibility.
      (if (and (= :invalid (:status return-result))
-              (not (contains? contracts-constants/covariance-only-objective-kinds
-                              (get-in request [:objective :kind]))))
+              (not= :equal-risk (get-in request [:objective :kind])))
        {:risk-result risk-result
         :return-result return-result
         :expected-returns expected-returns

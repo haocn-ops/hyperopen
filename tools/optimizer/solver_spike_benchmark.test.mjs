@@ -61,21 +61,19 @@ test('solveWithProjectedGradient produces a feasible signed result summary for f
   assert.ok(Number.isFinite(summary.expectedReturn));
 });
 
-test('benchmarkCandidates uses locally installed optional solver packages when present', async () => {
+test('benchmarkCandidates uses the reviewed production solver packages when present', async () => {
   const problems = buildBenchmarkProblems({ sizes: [20], seed: 3 });
   const result = await benchmarkCandidates({
     problems,
-    candidates: ['projected-gradient-js', 'quadprog', 'osqp'],
+    candidates: ['projected-gradient-js', 'quadprog'],
     externalRoot: '/definitely/missing/solver/packages',
     warmupRuns: 1,
     measuredRuns: 1,
   });
 
-  assert.deepEqual(candidateNames(result), ['projected-gradient-js', 'quadprog', 'osqp']);
+  assert.deepEqual(candidateNames(result), ['projected-gradient-js', 'quadprog']);
   assert.equal(result.candidates['projected-gradient-js'].available, true);
   assert.equal(result.candidates.quadprog.available, true);
   assert.equal(result.candidates.quadprog.metadata.packageName, 'quadprog');
-  assert.equal(result.candidates.osqp.available, true);
-  assert.equal(result.candidates.osqp.metadata.packageName, 'osqp');
   assert.equal(result.problemCount, 4);
 });

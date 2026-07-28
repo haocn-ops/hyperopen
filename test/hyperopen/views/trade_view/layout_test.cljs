@@ -69,13 +69,16 @@
 (deftest trade-view-account-info-cell-bounds-overflow-test
   (let [view-node (trade-view/trade-view (support/base-state))
         account-info-cell (support/find-by-parity-id view-node "trade-account-tables-panel")
+        desktop-account-panel (support/find-by-parity-id view-node "trade-desktop-account-panel")
         account-info-cell-classes (support/node-class-set account-info-cell)]
     (is (some? account-info-cell))
+    (is (some? desktop-account-panel))
     (is (contains? account-info-cell-classes "border-t"))
     (is (contains? account-info-cell-classes "lg:flex"))
     (is (contains? account-info-cell-classes "flex-col"))
     (is (contains? account-info-cell-classes "min-h-0"))
-    (is (contains? account-info-cell-classes "overflow-hidden"))))
+    (is (contains? account-info-cell-classes "overflow-hidden"))
+    (is (contains? (support/node-class-set desktop-account-panel) "lg:h-full"))))
 
 (deftest trade-view-keeps-account-table-height-stable-across-standard-tabs-test
   (let [standard-tabs [:balances

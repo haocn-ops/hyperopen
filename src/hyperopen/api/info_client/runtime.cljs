@@ -1,11 +1,12 @@
 (ns hyperopen.api.info-client.runtime
   (:require [hyperopen.api.info-client.flow :as flow]
             [hyperopen.api.info-client.stats :as stats]
+            [hyperopen.config :as app-config]
             [hyperopen.platform :as platform]
             [hyperopen.telemetry :as telemetry]))
 
 (def default-config
-  {:info-url "https://api.hyperliquid.xyz/info"
+  {:info-url (get-in app-config/config [:hyperliquid :info-url])
    :max-retries 4
    :base-retry-ms 400
    :max-retry-ms 5000

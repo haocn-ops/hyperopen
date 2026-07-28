@@ -170,7 +170,7 @@
        :data-role "wallet-menu-chevron"})]))
 
 (defn- connect-wallet-button
-  [{:keys [connect-action connecting?]}]
+  [{:keys [connect-action connecting? error]}]
   (into
    [:button {:class ["bg-teal-700"
                      "hover:bg-teal-800"
@@ -187,6 +187,7 @@
                      "transition-colors"]
              :disabled connecting?
              :on {:click connect-action}
+             :aria-describedby (when (seq error) "wallet-connect-error")
              :data-role "wallet-connect-button"}]
    (if connecting?
      [[:span {:class ["sm:hidden"]} "Connecting…"]
@@ -230,10 +231,11 @@
       rdns])])
 
 (defn- provider-connect-menu
-  [{:keys [connecting? providers]}]
+  [{:keys [connecting? error providers]}]
   (if connecting?
     (connect-wallet-button {:connect-action [[:actions/connect-wallet]]
-                            :connecting? true})
+                            :connecting? true
+                            :error error})
     [:details {:class ["relative" "group"]
                :data-role "wallet-connect-provider-details"}
      [:summary {:class ["bg-teal-700"
@@ -270,12 +272,41 @@
       (for [provider providers]
         (provider-connect-option provider connecting?))]]))
 
+(defn- wallet-connect-error
+  [message]
+  (when (seq message)
+    [:div {:id "wallet-connect-error"
+           :class ["absolute"
+                   "right-0"
+                   "top-full"
+                   "z-[260]"
+                   "mt-2"
+                   "w-72"
+                   "max-w-[calc(100vw-1.5rem)]"
+                   "rounded-lg"
+                   "border"
+                   "border-error/40"
+                   "bg-trading-bg"
+                   "px-3"
+                   "py-2"
+                   "text-xs"
+                   "leading-relaxed"
+                   "text-error"
+                   "shadow-xl"]
+           :role "alert"
+           :aria-live "polite"
+           :data-role "wallet-connect-error"}
+     message]))
+
 (defn render
-  [{:keys [connected? providers] :as wallet}]
+  [{:keys [connected? error providers] :as wallet}]
   (if connected?
     [:details {:class ["relative" "group"] :data-role "wallet-menu-details"}
      (wallet-trigger wallet)
      (wallet-menu wallet)]
-    (if (> (count providers) 1)
-      (provider-connect-menu wallet)
-      (connect-wallet-button wallet))))
+    [:div {:class ["relative"]
+           :data-role "wallet-connect-control"}
+     (if (> (count providers) 1)
+       (provider-connect-menu wallet)
+       (connect-wallet-button wallet))
+     (wallet-connect-error error)]))

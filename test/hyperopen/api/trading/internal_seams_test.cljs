@@ -4,6 +4,7 @@
             [hyperopen.api.trading :as trading]
             [hyperopen.api.gateway.orders.commands :as commands]
             [hyperopen.api.trading.test-support :as support]
+            [hyperopen.config :as app-config]
             [hyperopen.platform :as platform]
             [hyperopen.schema.contracts]
             [hyperopen.wallet.agent-session :as agent-session]
@@ -171,10 +172,17 @@
             :hyperliquid-chain "Mainnet"}
            (@#'hyperopen.api.trading/resolve-user-signing-context
             (atom {:wallet {:chain-id "0x1"}}))))
-    (is (= {:signature-chain-id "0x66eee"
-            :hyperliquid-chain "Testnet"}
+    (is (= {:signature-chain-id "0xa4b1"
+            :hyperliquid-chain "Mainnet"}
            (@#'hyperopen.api.trading/resolve-user-signing-context
-            (atom {:wallet {:chain-id "0x66eee"}}))))))
+            (atom {:wallet {:chain-id "0x66eee"}}))))
+    (with-redefs [app-config/config {:hyperliquid {:trading-enabled? true
+                                                    :signature-chain-id "0x66eee"
+                                                    :hyperliquid-chain "Testnet"}}]
+      (is (= {:signature-chain-id "0x66eee"
+              :hyperliquid-chain "Testnet"}
+             (@#'hyperopen.api.trading/resolve-user-signing-context
+              (atom {:wallet {:chain-id "0xa4b1"}})))))))
 
 (deftest post-signed-action-private-helper-includes-optional-fields-test
   (async done

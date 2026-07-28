@@ -356,11 +356,8 @@
              (map? (:return-decomposition-by-instrument value)))
          (or (nil? (:diagnostics value))
              (map? (:diagnostics value)))
-         ;; Present only on covariance-only runs (:equal-risk,
-         ;; :inverse-volatility): the signed Euler risk-contribution section
-         ;; (:quality is objective-owned — a convergence quality for Equal
-         ;; Risk, :diagnostic for Risk-weighted sizing) and, on :equal-risk
-         ;; only, the sequential-solver metadata.
+         ;; Present only on :equal-risk runs: the signed Euler risk-contribution
+         ;; section and the sequential-solver metadata.
          (or (nil? (:risk-contributions value))
              (let [contributions (:risk-contributions value)]
                (and (map? contributions)
@@ -373,18 +370,7 @@
                      (:target-relative-contributions-by-instrument contributions)))))
          (optional? map? (:current-risk-contributions value))
          (optional? map? (:equal-risk-solver value))
-         ;; Present only on :inverse-volatility runs: the sizing-fidelity
-         ;; section (per-asset |w|·σ rows, the ideal pre-projection seed, and
-         ;; the realized parity deviation among unbound rows).
-         (or (nil? (:inverse-volatility value))
-             (let [sizing (:inverse-volatility value)]
-               (and (map? sizing)
-                    (vector? (:sizing-rows sizing))
-                    (every? map? (:sizing-rows sizing))
-                    (finite-number-vector? (:seed-weights sizing))
-                    (coercion/finite-number? (:max-sizing-deviation sizing)))))
-         ;; Present only on covariance-only runs (:equal-risk,
-         ;; :inverse-volatility): the correlation-view section —
+         ;; Present only on :equal-risk runs: the correlation-view section —
          ;; standalone/diversification decomposition maps plus the capped
          ;; underlying correlation matrix (square, aligned to its own id list;
          ;; entries may be nil for degenerate-variance assets).

@@ -3,17 +3,66 @@
   chart replaces the frontier chart (and the frontier-density refinement
   card), the Risk/Return context disclosure replaces frontier framing, the
   why-card and confidence rail speak in risk contributions, and everything
-  degrades gracefully on persisted pre-redesign payloads. The
-  :risk-structure tab coverage lives in
-  results-panel-equal-risk-structure-test; shared fixtures in
-  results-panel-equal-risk-fixtures."
+  degrades gracefully on persisted pre-redesign payloads."
   (:require [cljs.test :refer-macros [deftest is testing]]
             [clojure.string :as str]
-            [hyperopen.views.portfolio.optimize.results-panel-equal-risk-fixtures
-             :refer [approximate-result render]]
+            [hyperopen.views.portfolio.optimize.results-panel :as results-panel]
             [hyperopen.views.portfolio.optimize.test-support
              :refer [collect-nodes collect-strings data-role-order index-of
-                     node-by-role]]))
+                     node-by-role solved-result]]))
+
+(def ^:private equal-risk-solver-section
+  {:strategy :sequential-equal-risk
+   :converged? true
+   :termination-reason :step-tolerance
+   :iterations 7
+   :initialization-count 4
+   :selected-initialization :inverse-volatility
+   :objective-value 1.2e-4
+   :exactness-tolerance 0.005
+   :allocation-freedom {:status :limited
+                        :free-degrees 1
+                        :binding-count 2
+                        :books {:long 1 :short 1}}
+   :initializations [{:seed-kind :equal-notional :status :completed
+                      :objective 1.2e-4 :converged? true}
+                     {:seed-kind :inverse-volatility :status :completed
+                      :objective 1.2e-4 :converged? true}]})
+
+(def ^:private approximate-result
+  (-> solved-result
+      (assoc :solver {:strategy :sequential-equal-risk
+                      :objective-kind :equal-risk})
+      (assoc :risk-contributions
+             {:method :signed-euler-volatility
+              :instrument-ids ["perp:BTC" "spot:PURR"]
+              :variance-contributions [0.002 0.002]
+              :volatility-contributions [0.031 0.031]
+              :relative-contributions [0.62 0.38]
+              :target-relative-contributions [0.5 0.5]
+              :relative-contributions-by-instrument {"perp:BTC" 0.62
+                                                     "spot:PURR" 0.38}
+              :target-relative-contributions-by-instrument {"perp:BTC" 0.5
+                                                            "spot:PURR" 0.5}
+              :sum-relative-contributions 1.0
+              :rms-error 0.12
+              :max-absolute-error 0.12
+              :negative-contribution-count 0
+              :quality :approximate})
+      (assoc :current-risk-contributions
+             {:relative-contributions-by-instrument {"perp:BTC" 0.9
+                                                     "spot:PURR" 0.1}
+              :rms-error 0.4
+              :max-absolute-error 0.4})
+      (assoc :equal-risk-solver equal-risk-solver-section)))
+
+(defn- render
+  [result]
+  (results-panel/results-panel
+   {:result result
+    :computed-at-ms 2600}
+   {:objective {:kind :equal-risk}}
+   {:frontier-overlay-mode :standalone}))
 
 (deftest results-panel-equal-risk-shows-balance-chart-and-hides-frontier-test
   (let [view-node (render approximate-result)
@@ -172,73 +221,6 @@
     (is (some #(re-find #"hedges the book" %) strings)
         "negative contributions are named, never absolute-valued away")))
 
-(deftest results-panel-equal-risk-exact-fit-shows-shift-columns-test
-  ;; An exact fit with current contributions flips the chart to the rebalance
-  ;; story (:shift display mode): Current/Shift columns replace the constant
-  ;; Target and all-zero Deviation columns, the KPI strip swaps its dead
-  ;; deviation cells for current imbalance + biggest shift, rows order by
-  ;; current share descending, and the per-row target ticks disappear (on
-  ;; uniform targets they only re-drew the continuous dashed line).
-  (let [exact-result (-> approximate-result
-                         (update :risk-contributions merge
-                                 {:relative-contributions [0.5 0.5]
-                                  :relative-contributions-by-instrument
-                                  {"perp:BTC" 0.5 "spot:PURR" 0.5}
-                                  :rms-error 0.0
-                                  :max-absolute-error 0.0
-                                  :negative-contribution-count 0
-                                  :quality :exact}))
-        view-node (render exact-result)
-        strings (set (collect-strings view-node))]
-    (testing "the columns tell the move, not the (zero) misfit"
-      (is (some? (node-by-role view-node
-                               "portfolio-optimizer-risk-contribution-current-cell")))
-      (is (some? (node-by-role view-node
-                               "portfolio-optimizer-risk-contribution-shift")))
-      (is (nil? (node-by-role view-node
-                              "portfolio-optimizer-risk-contribution-target")))
-      (is (nil? (node-by-role view-node
-                              "portfolio-optimizer-risk-contribution-deviation")))
-      (is (every? strings ["Current" "Shift"]))
-      (is (contains? strings "-40.0 pts")
-          "BTC sheds 40 pts of risk share (90% current → 50% target)")
-      (is (contains? strings "+40.0 pts")
-          "PURR gains 40 pts of risk share (10% current → 50% target)"))
-    (testing "the KPI strip swaps dead zeros for the before/after story"
-      (is (nil? (node-by-role view-node
-                              "portfolio-optimizer-risk-contributions-rms")))
-      (is (nil? (node-by-role view-node
-                              "portfolio-optimizer-risk-contributions-max")))
-      (is (some? (node-by-role view-node
-                               "portfolio-optimizer-risk-contributions-imbalance")))
-      (is (some? (node-by-role view-node
-                               "portfolio-optimizer-risk-contributions-biggest-shift")))
-      (is (contains? strings "Current imbalance"))
-      (is (contains? strings "40.0 → 0.0 pts")
-          "current RMS imbalance 40 pts flattens to 0")
-      (is (contains? strings "Biggest shift")))
-    (testing "uniform per-row target ticks vanish; the dashed line remains the target"
-      (is (nil? (node-by-role view-node
-                              "portfolio-optimizer-risk-contribution-target-tick"))))
-    (testing "rows order by current share descending (risk drains top to bottom)"
-      (is (= ["perp:BTC" "spot:PURR"]
-             (->> (collect-nodes
-                   view-node
-                   #(= "portfolio-optimizer-risk-contribution-row"
-                       (get-in % [1 :data-role])))
-                  (mapv #(get-in % [1 :data-instrument-id]))))))
-    (testing "the approximate fixture keeps the deviation columns and ticks"
-      (let [approx-view (render approximate-result)]
-        (is (some? (node-by-role approx-view
-                                 "portfolio-optimizer-risk-contribution-target")))
-        (is (some? (node-by-role approx-view
-                                 "portfolio-optimizer-risk-contribution-deviation")))
-        (is (nil? (node-by-role approx-view
-                                "portfolio-optimizer-risk-contribution-current-cell")))
-        (is (nil? (node-by-role approx-view
-                                "portfolio-optimizer-risk-contribution-target-tick"))
-            "uniform ticks are suppressed in deviation mode too — the dashed line carries the target")))))
-
 (deftest results-panel-equal-risk-degrades-on-persisted-pre-redesign-results-test
   ;; A scenario saved before this redesign has no current contributions, no
   ;; allocation freedom, and no initializations — the page must still render
@@ -258,3 +240,227 @@
     (is (some #(str/includes? % "Not recorded on this result") strings)
         "allocation freedom degrades honestly")
     (is (contains? strings "No initialization record on this result"))))
+
+;; --- Correlation / breakdown views (:risk-structure section) --------------------
+
+(def ^:private structured-result
+  ;; approximate-result + the correlation-view section. BTC is held long,
+  ;; PURR short (target weights 0.35 / -0.02), underlying correlation 0.6, so
+  ;; the position-P&L view must flip their pair negative. The decomposition
+  ;; obeys standalone + diversification = net for both assets.
+  (assoc approximate-result
+         :risk-structure
+         {:method :signed-euler-decomposition
+          :portfolio-volatility 0.4
+          :current-diversification {:modeled-volatility 0.24
+                                    :all-move-together-volatility 0.32
+                                    :zero-correlation-volatility 0.20
+                                    :reduction-vs-all-move-together 0.08
+                                    :reduction-ratio-vs-all-move-together 0.25
+                                    :modeled-minus-zero-correlation 0.04}
+          :target-diversification {:modeled-volatility 0.40
+                                   :all-move-together-volatility 0.60
+                                   :zero-correlation-volatility 0.35
+                                   :reduction-vs-all-move-together 0.20
+                                   :reduction-ratio-vs-all-move-together (/ 1 3)
+                                   :modeled-minus-zero-correlation 0.05}
+          :standalone-share-by-instrument {"perp:BTC" 0.75
+                                           "spot:PURR" 0.5}
+          :diversification-share-by-instrument {"perp:BTC" -0.13
+                                                "spot:PURR" -0.12}
+          :pnl-portfolio-correlation-by-instrument {"perp:BTC" 0.9
+                                                    "spot:PURR" 0.55}
+          :correlation {:instrument-ids ["perp:BTC" "spot:PURR"]
+                        :matrix [[1.0 0.6]
+                                 [0.6 1.0]]
+                        :hidden-count 0}}))
+
+(defn- render-with-state
+  [result state]
+  (results-panel/results-panel
+   {:result result
+    :computed-at-ms 2600}
+   {:objective {:kind :equal-risk}}
+   {:frontier-overlay-mode :standalone
+    :state state}))
+
+(deftest results-panel-equal-risk-correlation-view-renders-test
+  (let [view-node (render structured-result)
+        strings (set (collect-strings view-node))]
+    (testing "the four stable tab identities get truthful visible labels"
+      (is (some? (node-by-role view-node "portfolio-optimizer-risk-view-tab-contribution")))
+      (is (some? (node-by-role view-node "portfolio-optimizer-risk-view-tab-breakdown")))
+      (is (some? (node-by-role view-node "portfolio-optimizer-risk-view-tab-correlation")))
+      (is (some? (node-by-role view-node "portfolio-optimizer-risk-view-tab-risk-return")))
+      (is (every? strings ["Risk Balance" "Diversification"
+                           "Correlation Drivers" "Risk / Return"])))
+    (testing "both heatmap modes pre-render; position P&L flips the long × short pair"
+      (is (some? (node-by-role view-node "portfolio-optimizer-risk-corr-mode-position")))
+      (is (some? (node-by-role view-node "portfolio-optimizer-risk-corr-mode-underlying")))
+      (let [position-grid (node-by-role view-node
+                                        "portfolio-optimizer-risk-corr-grid-position")
+            underlying-grid (node-by-role view-node
+                                          "portfolio-optimizer-risk-corr-grid-underlying")]
+        (is (some #{"-0.60"} (collect-strings position-grid)))
+        (is (some #{"0.60"} (collect-strings underlying-grid)))
+        (let [off-diagonal (first
+                            (collect-nodes
+                             position-grid
+                             #(and (= "portfolio-optimizer-risk-corr-cell"
+                                      (get-in % [1 :data-role]))
+                                   (= "spot:PURR" (get-in % [1 :data-col]))
+                                   (= "perp:BTC" (get-in % [1 :data-row])))))
+              title (get-in off-diagonal [1 :title])]
+          (is (str/includes? title "Underlying-return correlation +0.60"))
+          (is (str/includes? title "Position-P&L correlation -0.60"))
+          (is (str/includes? title "Effect on portfolio risk: Diversifying")))))
+    (testing "the per-tab KPI strips carry their View cells"
+      (is (contains? strings "Correlation matrix"))
+      (is (contains? strings "Diversification details")))
+    (testing "the correlation tab is the full-width heatmap alone — the
+              breakdown block moved to the BREAKDOWN tab"
+      (let [corr-panel (first
+                        (collect-nodes
+                         view-node
+                         #(some #{"optimizer-risk-balance-panel--correlation"}
+                                (get-in % [1 :class]))))]
+        (is (some? (node-by-role corr-panel
+                                 "portfolio-optimizer-risk-correlation-heatmap")))
+        (is (nil? (node-by-role corr-panel
+                                "portfolio-optimizer-risk-selected-breakdown")))))
+    (testing "the selected-asset breakdown defaults to the largest |net| and
+              tells the own + cross-covariance = net story"
+      (let [selected (node-by-role view-node
+                                   "portfolio-optimizer-risk-selected-asset")]
+        (is (= "true"
+               (-> (collect-nodes view-node
+                                  #(= "portfolio-optimizer-target-exposure-asset-BTC"
+                                      (get-in % [1 :data-role])))
+                   first
+                   (get-in [1 :data-selected])))
+            "the allocation highlight agrees with the defaulted selection")
+        (is (some #{"BTC"} (collect-strings selected))
+            "the panel title names the asset; the side rides the badge"))
+      (is (some? (node-by-role view-node "portfolio-optimizer-risk-selected-standalone")))
+      (is (some? (node-by-role view-node "portfolio-optimizer-risk-selected-diversification")))
+      (is (some? (node-by-role view-node "portfolio-optimizer-risk-selected-net")))
+      (let [identity-node (node-by-role view-node
+                                        "portfolio-optimizer-risk-selected-identity")
+            identity-strings (set (collect-strings identity-node))]
+        (is (contains? identity-strings "Net risk contribution"))
+        (is (contains? identity-strings "Own-variance term"))
+        (is (contains? identity-strings "Cross-covariance effect"))
+        (is (contains? identity-strings "75.0%")
+            "the equation carries the actual standalone number")
+        (is (contains? identity-strings "(-13.0%)")
+            "the diversification term keeps its sign in parentheses")))
+    (testing "the all-assets chart survives as the second sub-view, with a
+              legend that names both diversification directions"
+      (is (some? (node-by-role view-node "portfolio-optimizer-risk-breakdown-chart")))
+      (is (some? (node-by-role view-node "portfolio-optimizer-risk-breakdown-row")))
+      (is (contains? strings "Own-variance term"))
+      (is (contains? strings "Offsets risk"))
+      (is (contains? strings "Amplifies risk")))
+    (testing "the why-card's third card becomes the Correlation view tab link"
+      (is (contains? strings "Correlation view"))
+      (is (not (contains? strings "Largest risk contributor")))
+      (let [card (node-by-role view-node
+                               "portfolio-optimizer-equal-risk-context-correlation")]
+        (is (= :label (first card)))
+        (is (re-find #"-correlation$" (get-in card [1 :for])))))))
+
+(deftest results-panel-equal-risk-per-asset-breakdown-panel-test
+  (let [view-node (render structured-result)
+        strings (set (collect-strings view-node))]
+    (testing "the sub-view toggle renders with Selected asset first (the
+              unchecked-default view) and All assets second"
+      (let [tabs (node-by-role view-node
+                               "portfolio-optimizer-risk-breakdown-view-tabs")]
+        (is (some? (node-by-role tabs
+                                 "portfolio-optimizer-risk-breakdown-view-asset")))
+        (is (some? (node-by-role tabs
+                                 "portfolio-optimizer-risk-breakdown-view-all")))
+        (is (= ["Selected asset" "All assets"]
+               (filterv #{"Selected asset" "All assets"}
+                        (collect-strings tabs))))))
+    (testing "the Change-asset select lists every held asset, tracks the
+              effective selection, and dispatches the shared action"
+      (let [select (node-by-role view-node
+                                 "portfolio-optimizer-risk-asset-select")
+            selected-options (collect-nodes
+                              select
+                              #(true? (get-in % [1 :selected])))]
+        (is (= ["perp:BTC"]
+               (mapv #(get-in % [1 :value]) selected-options))
+            "exactly the rendered (defaulted) selection is marked :selected —
+             selection rides the options, never a select-level :value (set
+             before options mount, it falls back to the first option)")
+        (is (= [[:actions/set-portfolio-optimizer-selected-risk-instrument
+                 [:event.target/value]]]
+               (get-in select [1 :on :change])))
+        (is (= #{"BTC" "PURR"} (set (collect-strings select))))))
+    (testing "the per-asset block carries the labeled component rows and the
+              designer axis title"
+      (is (some? (node-by-role view-node
+                               "portfolio-optimizer-risk-selected-breakdown")))
+      (is (contains? strings "Own-variance term"))
+      (is (contains? strings "Cross-covariance effect"))
+      (is (contains? strings "Net risk contribution"))
+      (is (contains? strings "Contribution to Total Portfolio Volatility")))
+    (testing "the four summary tiles render with honest copy"
+      (is (some? (node-by-role view-node
+                               "portfolio-optimizer-risk-asset-tile-summary")))
+      (is (some? (node-by-role view-node
+                               "portfolio-optimizer-risk-asset-tile-diversification")))
+      (is (some? (node-by-role view-node
+                               "portfolio-optimizer-risk-asset-tile-net")))
+      (is (some? (node-by-role view-node
+                               "portfolio-optimizer-risk-asset-tile-freedom")))
+      (is (contains? strings "RMS deviation 12.0 pts"))
+      (is (contains? strings "-13.0 pts offsets"))
+      (is (contains? strings "62.0% of total risk"))
+      (is (contains? strings "+12.0 pts vs 50.0% target"))
+      (is (contains? strings "Limited · 2 binding caps"))
+      (is (contains? strings "Caps constrain exact equality")))))
+
+(deftest results-panel-equal-risk-allocation-selection-test
+  (let [view-node (render structured-result)]
+    (testing "held rows show the P&L-correlation line and dispatch selection"
+      (let [btc-row (first (collect-nodes
+                            view-node
+                            #(= "portfolio-optimizer-target-exposure-asset-BTC"
+                                (get-in % [1 :data-role]))))]
+        (is (= [[:actions/set-portfolio-optimizer-selected-risk-instrument
+                 "perp:BTC"]]
+               (get-in btc-row [1 :on :click])))
+        (is (some? (node-by-role view-node
+                                 "portfolio-optimizer-target-exposure-pnl-corr-perp-BTC")))
+        (is (some #{"+0.90"}
+                  (collect-strings
+                   (node-by-role view-node
+                                 "portfolio-optimizer-target-exposure-pnl-corr-perp-BTC"))))))
+    (testing "explicit app-state selection re-targets the breakdown and the ring"
+      (let [state (assoc-in {}
+                            [:portfolio-ui :optimizer :selected-risk-instrument]
+                            "spot:PURR")
+            selected-view (render-with-state structured-result state)
+            selected (node-by-role selected-view
+                                   "portfolio-optimizer-risk-selected-asset")]
+        (is (some #{"PURR"} (collect-strings selected)))
+        (is (= "true"
+               (-> (collect-nodes selected-view
+                                  #(= "portfolio-optimizer-target-exposure-asset-PURR"
+                                      (get-in % [1 :data-role])))
+                   first
+                   (get-in [1 :data-selected]))))))))
+
+(deftest results-panel-equal-risk-hides-structure-tabs-without-the-section-test
+  (let [view-node (render approximate-result)]
+    (is (nil? (node-by-role view-node "portfolio-optimizer-risk-view-tab-breakdown")))
+    (is (nil? (node-by-role view-node "portfolio-optimizer-risk-view-tab-correlation")))
+    (is (nil? (node-by-role view-node "portfolio-optimizer-risk-correlation-heatmap")))
+    (is (nil? (node-by-role view-node "portfolio-optimizer-risk-asset-select"))
+        "no per-asset panel without the structure section")
+    (is (nil? (node-by-role view-node
+                            "portfolio-optimizer-equal-risk-context-correlation"))
+        "the why-card falls back to the largest-contributor fact")))

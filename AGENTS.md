@@ -15,6 +15,7 @@ Root operating contract for Codex in this repository. Keep the first screen prac
 - Use `$feature-flow` for complex features, significant refactors, or multi-file behavior changes.
 - Use `$bug-flow` for unclear bugs or regressions that need structured diagnosis.
 - Use `$ui-flow` for UI work under `/hyperopen/src/hyperopen/views/**`, `/hyperopen/src/styles/**`, or interaction flows.
+- Use `$deploy-hyperopen-cloudflare` to change, dry-run, publish, verify, diagnose, or recover the Hyperopen Cloudflare Worker release.
 - Use the repo-local `playwright-e2e` skill for committed deterministic browser coverage.
 - Use the repo-local `browser-mcp-explore` skill for exploratory browser debugging, live attach, design review, and parity investigation.
 - If a workflow skill is unavailable, follow `/hyperopen/docs/MULTI_AGENT.md` and use exact agent `name` values.

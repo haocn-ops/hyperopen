@@ -270,13 +270,9 @@
   assets toggle, the per-asset block + tiles (default view), and the
   pre-rendered all-assets chart. Nil when `rows` are empty (the card then
   drops the tab); the per-asset half quietly disappears if the result somehow
-  has rows but no selectable contributions, leaving the all-assets chart.
-  `summary-tiles?` (default true) drops the four summary tiles — they grade
-  the equal-risk fit and freedom, which the Risk-weighted sizing card's
-  diagnostic reuse must not imply."
+  has rows but no selectable contributions, leaving the all-assets chart."
   [{:keys [result rows target-share kpi-strip overflow-note
-           selected-instrument-id summary-tiles?]
-    :or {summary-tiles? true}}]
+           selected-instrument-id]}]
   (when (seq rows)
     (let [selected (structure-model/selected-breakdown result
                                                        selected-instrument-id)
@@ -297,8 +293,7 @@
              (view-tab radio-name "all" "All assets")]]
            [:div {:data-breakdown-only "asset"}
             (asset-block result selected)
-            (when summary-tiles?
-              (tiles-row (structure-model/asset-breakdown-tiles result
-                                                                selected)))]
+            (tiles-row (structure-model/asset-breakdown-tiles result
+                                                              selected))]
            [:div {:data-breakdown-only "all"}
             all-panel]])))))

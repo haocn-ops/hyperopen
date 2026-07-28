@@ -1,6 +1,7 @@
 (ns hyperopen.views.portfolio.vm
   (:require [hyperopen.account.context :as account-context]
             [hyperopen.domain.trading :as trading]
+            [hyperopen.portfolio.application.analytics-state :as analytics-state]
             [hyperopen.portfolio.application.metrics-bridge :as vm-metrics-bridge]
             [hyperopen.portfolio.actions :as portfolio-actions]
             [hyperopen.views.portfolio.vm.benchmarks :as vm-benchmarks]
@@ -361,6 +362,7 @@
         summary-context (selected-summary-context summary-by-key summary-scope summary-time-range)
         summary-entry (:entry summary-context)
         selected-key (:requested-key summary-context)
+        analytics (analytics-state/build-analytics-state state (.now js/Date))
         top-up-enabled? (vm-equity/top-up-abstraction-enabled? state)
         pnl (or (vm-summary/pnl-delta summary-entry)
                 (optional-number (:unrealized-pnl metrics))
@@ -410,6 +412,7 @@
                            benchmark-context)]
     {:volume-14d-usd volume-14d
      :fees fees
+     :analytics analytics
      :volume-history (vm-volume/volume-history-model state)
      :background-status (background-status-model state
                                                 chart

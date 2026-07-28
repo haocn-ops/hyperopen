@@ -67,6 +67,52 @@ test("trade direct load returns the trade-specific title @smoke", async ({ reque
   expect(inlineScripts).toEqual([THEME_PRELOAD_INLINE_SOURCE]);
 });
 
+test("trade runtime enforces the narrow Trusted Types policy @smoke", async ({ page }) => {
+  const pageErrors = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  page.on("dialog", (dialog) => dialog.dismiss());
+
+  const response = await page.goto("/trade", { waitUntil: "domcontentloaded" });
+  expect(response?.ok()).toBe(true);
+  const responseHeaders = await response.allHeaders();
+  expect(responseHeaders["content-security-policy"]).toContain(
+    "require-trusted-types-for 'script'"
+  );
+  expect(responseHeaders["content-security-policy"]).toContain("trusted-types default");
+
+  await expect(page.locator("#tv-attr-logo")).toHaveCount(1);
+
+  const enforcement = await page.evaluate(() => {
+    const captureError = (operation) => {
+      try {
+        operation();
+        return null;
+      } catch (error) {
+        return { message: error.message, name: error.name };
+      }
+    };
+
+    return {
+      arbitraryHtml: captureError(() => {
+        document.body.innerHTML = '<img src=x onerror="alert(1)">';
+      }),
+      duplicateDefaultPolicy: captureError(() => {
+        trustedTypes.createPolicy("default", { createHTML: (value) => value });
+      }),
+      unapprovedPolicy: captureError(() => {
+        trustedTypes.createPolicy("unapproved", { createHTML: (value) => value });
+      }),
+      trustedTypesAvailable: typeof trustedTypes !== "undefined",
+    };
+  });
+
+  expect(enforcement.trustedTypesAvailable).toBe(true);
+  expect(enforcement.arbitraryHtml?.name).toBe("TypeError");
+  expect(enforcement.duplicateDefaultPolicy?.name).toBe("TypeError");
+  expect(enforcement.unapprovedPolicy?.name).toBe("TypeError");
+  expect(pageErrors).toEqual([]);
+});
+
 test("portfolio direct load returns the portfolio-specific title @smoke", async ({ request }) => {
   const response = await request.get(
     "/portfolio?spectate=0x162cc7c861ebd0c06b3d72319201150482518185&range=1y&scope=all&chart=returns&bench=BTC&tab=performance-metrics",

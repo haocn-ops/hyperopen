@@ -10,6 +10,7 @@
             [hyperopen.referrals.actions :as referrals-actions]
             [hyperopen.route-modules :as route-modules]
             [hyperopen.router :as router]
+            [hyperopen.service.product-context :as product-context]
             [hyperopen.staking.actions :as staking-actions]
             [hyperopen.subaccounts.actions :as subaccounts-actions]
             [hyperopen.surface-modules :as surface-modules]
@@ -132,7 +133,9 @@
 
 (defn navigate
   [state path & [opts]]
-  (let [normalized-path (router/normalize-path path)
+  (let [requested-path (router/normalize-path path)
+        context (product-context/build-product-context-view-model state)
+        normalized-path (product-context/safe-route context requested-path)
         browser-path (navigation-browser-path state normalized-path)
         replace? (boolean (:replace? opts))
         {:keys [projection-effects follow-up-effects]}

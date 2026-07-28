@@ -3,6 +3,8 @@
 (def effect-binding-rows
   [[:effects/connect-wallet :connect-wallet]
    [:effects/disconnect-wallet :disconnect-wallet]
+   [:effects/record-attribution-event :record-attribution-event]
+   [:effects/set-affiliate-consent :set-affiliate-consent]
    [:effects/enable-agent-trading :enable-agent-trading]
    [:effects/set-agent-storage-mode :set-agent-storage-mode]
    [:effects/set-agent-local-protection-mode :set-agent-local-protection-mode]
@@ -22,6 +24,7 @@
    [:actions/close-mobile-header-menu :close-mobile-header-menu]
    [:actions/open-header-settings :open-header-settings]
    [:actions/close-header-settings :close-header-settings]
+   [:actions/mark-brand-logo-failed :mark-brand-logo-failed]
    [:actions/set-fill-alerts-enabled :set-fill-alerts-enabled]
    [:actions/set-sound-on-fill-enabled :set-sound-on-fill-enabled]
    [:actions/set-animate-orderbook-enabled :set-animate-orderbook-enabled]
@@ -44,4 +47,5 @@
    [:actions/close-agent-recovery-modal :close-agent-recovery-modal-action]
    [:actions/set-agent-storage-mode :set-agent-storage-mode-action]
    [:actions/set-agent-local-protection-mode :set-agent-local-protection-mode-action]
-   [:actions/copy-wallet-address :copy-wallet-address-action]])
+   [:actions/copy-wallet-address :copy-wallet-address-action]
+   [:actions/set-affiliate-consent :set-affiliate-consent]])

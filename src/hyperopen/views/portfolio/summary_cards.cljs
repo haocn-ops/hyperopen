@@ -96,10 +96,82 @@
                 (portfolio-format/format-currency (js/Math.abs n)))
      :class [color-class]}))
 
-(defn summary-card [{:keys [summary selectors]}]
+(defn- analytics-value
+  [value formatter]
+  (if (some? value)
+    (formatter value)
+    "Unavailable"))
+
+(defn- analytics-pnl-value
+  [pnl]
+  (when (some? pnl)
+    (pnl-summary pnl)))
+
+(defn- analytics-fee-rates-value
+  [fee-rates]
+  (if (and (number? (:taker fee-rates))
+           (number? (:maker fee-rates)))
+    (str (portfolio-format/format-fee-pct (* 100 (:taker fee-rates)))
+         " / "
+         (portfolio-format/format-fee-pct (* 100 (:maker fee-rates))))
+    "Unavailable"))
+
+(defn- analytics-status
+  [{:keys [data-quality quality as-of-ms message retry?]}]
+  (let [quality* (or data-quality quality :unavailable)]
+    [:div {:class ["flex" "flex-wrap" "items-center" "gap-x-3" "gap-y-1"
+                   "border-b" "border-base-300" "px-4" "py-2" "text-xs"]
+           :data-role "portfolio-analytics-status"
+           :data-quality (name quality*)}
+     [:span {:class ["font-medium" "text-trading-text"]}
+      (str "Analytics: " (name quality*))]
+     [:span {:class ["text-trading-text-secondary"]}
+      (or message "Portfolio analytics status is unavailable")]
+     (when (and (= :stale quality*) (number? as-of-ms))
+       [:span {:class ["text-trading-text-secondary"]
+               :data-role "portfolio-analytics-as-of"}
+        (str "As of " (.toISOString (js/Date. as-of-ms)))])
+     (when retry?
+       [:span {:class ["text-warning"]
+               :data-role "portfolio-analytics-retry"}
+        (str "Refresh: " (or message "Retry the existing portfolio refresh"))])]))
+
+(defn- analytics-summary-rows
+  [analytics]
+  (let [pnl-info (analytics-pnl-value (:pnl analytics))]
+    [[:div {:class ["summary-kv-row" "grid" "grid-cols-[1fr_auto]" "items-center" "gap-3"]}
+      [:span {:class ["text-sm" "text-trading-text-secondary"]} "PNL"]
+      [:span {:class (into ["num" "text-sm" "text-trading-text"]
+                           (or (:class pnl-info) []))
+              :data-role "portfolio-analytics-pnl"}
+       (or (:value pnl-info) "Unavailable")]]
+     [:div {:class ["summary-kv-row" "grid" "grid-cols-[1fr_auto]" "items-center" "gap-3"]}
+      [:span {:class ["text-sm" "text-trading-text-secondary"]} "Return"]
+      [:span {:class ["num" "text-sm" "text-trading-text"]
+              :data-role "portfolio-analytics-return"}
+       (analytics-value (:return-pct analytics) portfolio-format/format-percent)]]
+     [:div {:class ["summary-kv-row" "grid" "grid-cols-[1fr_auto]" "items-center" "gap-3"]}
+      [:span {:class ["text-sm" "text-trading-text-secondary"]} "Max Drawdown"]
+      [:span {:class ["num" "text-sm" "text-trading-text"]
+              :data-role "portfolio-analytics-drawdown"}
+       (analytics-value (:max-drawdown-pct analytics) portfolio-format/format-percent)]]
+     [:div {:class ["summary-kv-row" "grid" "grid-cols-[1fr_auto]" "items-center" "gap-3"]}
+      [:span {:class ["text-sm" "text-trading-text-secondary"]} "Total Equity"]
+      [:span {:class ["num" "text-sm" "text-trading-text"]
+              :data-role "portfolio-analytics-equity"}
+       (analytics-value (:equity analytics) portfolio-format/format-currency)]]
+     ]))
+
+(defn summary-card [{:keys [analytics summary selectors]}]
   (let [pnl-info (pnl-summary (:pnl summary))
         summary-scope (:summary-scope selectors)
-        summary-time-range (:summary-time-range selectors)]
+        summary-time-range (:summary-time-range selectors)
+        summary-rows (if (map? analytics)
+                       (analytics-summary-rows analytics)
+                       [(summary-row "PNL" (:value pnl-info) (:class pnl-info))
+                        (summary-row "Volume" (portfolio-format/format-currency (:volume summary)))
+                        (summary-row "Max Drawdown" (portfolio-format/format-drawdown (:max-drawdown-pct summary)))
+                        (summary-row "Total Equity" (portfolio-format/format-currency (:total-equity summary)))])]
     (section-card
      "portfolio-account-summary-card"
      [:div {:class ["summary-card-head" "flex" "items-center" "justify-between" "border-b" "border-base-300" "px-4" "py-3"]}
@@ -111,31 +183,64 @@
                         :actions/toggle-portfolio-summary-time-range-dropdown
                         :actions/select-portfolio-summary-time-range
                         "portfolio-summary-time-range-selector")]
-     [:div {:class ["space-y-2.5" "px-4" "py-3"]}
-      (summary-row "PNL" (:value pnl-info) (:class pnl-info))
-      (summary-row "Volume" (portfolio-format/format-currency (:volume summary)))
-      (summary-row "Max Drawdown" (portfolio-format/format-drawdown (:max-drawdown-pct summary)))
-      (summary-row "Total Equity" (portfolio-format/format-currency (:total-equity summary)))
-      (when (:show-perps-account-equity? summary)
-        (summary-row "Perps Account Equity" (portfolio-format/format-currency (:perps-account-equity summary))))
-      (summary-row (:spot-equity-label summary) (portfolio-format/format-currency (:spot-account-equity summary)))
-      (when (:show-vault-equity? summary)
-        (summary-row "Vault Equity" (portfolio-format/format-currency (:vault-equity summary))))
-      (when (:show-earn-balance? summary)
-        (summary-row "Earn Balance" (portfolio-format/format-currency (:earn-balance summary))))
-      (when (:show-staking-account? summary)
-        (summary-row "Staking Account" (portfolio-format/format-hype (:staking-account-hype summary))))])))
+     (when (map? analytics)
+       (analytics-status analytics))
+     (into [:div {:class ["space-y-2.5" "px-4" "py-3"]}]
+           (concat summary-rows
+                   (when (:show-perps-account-equity? summary)
+                     [(summary-row "Perps Account Equity"
+                                   (if (map? analytics)
+                                     (analytics-value (:perps-account-equity summary) portfolio-format/format-currency)
+                                     (portfolio-format/format-currency (:perps-account-equity summary))))])
+                   [(summary-row (:spot-equity-label summary)
+                                 (if (map? analytics)
+                                   (analytics-value (:spot-account-equity summary) portfolio-format/format-currency)
+                                   (portfolio-format/format-currency (:spot-account-equity summary))))]
+                   (when (:show-vault-equity? summary)
+                     [(summary-row "Vault Equity"
+                                   (if (map? analytics)
+                                     (analytics-value (:vault-equity summary) portfolio-format/format-currency)
+                                     (portfolio-format/format-currency (:vault-equity summary))))])
+                   (when (:show-earn-balance? summary)
+                     [(summary-row "Earn Balance"
+                                   (if (map? analytics)
+                                     (analytics-value (:earn-balance summary) portfolio-format/format-currency)
+                                     (portfolio-format/format-currency (:earn-balance summary))))])
+                   (when (:show-staking-account? summary)
+                     [(summary-row "Staking Account"
+                                   (if (map? analytics)
+                                     (analytics-value (:staking-account-hype summary) portfolio-format/format-hype)
+                                     (portfolio-format/format-hype (:staking-account-hype summary))))]))))))
 
-(defn metric-cards [{:keys [volume-14d-usd fees fee-schedule]}]
+(defn- analytics-volume-label
+  [range]
+  (case range
+    :day "24 Hour Volume"
+    :week "7 Day Volume"
+    :month "30 Day Volume"
+    :three-month "3 Month Volume"
+    :six-month "6 Month Volume"
+    :one-year "1 Year Volume"
+    :two-year "2 Year Volume"
+    :all-time "All-time Volume"
+    "Selected Range Volume"))
+
+(defn metric-cards [{:keys [analytics volume-14d-usd fees fee-schedule]}]
   (let [fee-schedule-open? (if (:open? fee-schedule) "true" "false")]
     [:div {:class ["grid" "grid-cols-2" "gap-3" "lg:grid-cols-1"]}
    (section-card
     "portfolio-14d-volume-card"
     [:div {:class ["space-y-2.5" "px-3" "py-3" "sm:px-4"]}
      [:div {:class ["text-xs" "uppercase" "tracking-wide" "text-trading-text-secondary" "sm:text-sm" "sm:normal-case" "sm:tracking-normal"]}
-      "14 Day Volume"]
-     [:div {:class ["num" "text-2xl" "font-medium" "text-trading-text" "sm:text-4xl"]}
-      (portfolio-format/format-compact-currency volume-14d-usd)]
+      (if (and (map? analytics)
+               (not= :unavailable (:data-quality analytics)))
+        (analytics-volume-label (:range analytics))
+        "14 Day Volume")]
+     [:div {:class ["num" "text-2xl" "font-medium" "text-trading-text" "sm:text-4xl"]
+            :data-role (when (map? analytics) "portfolio-analytics-volume")}
+      (if (map? analytics)
+        (analytics-value (:volume analytics) portfolio-format/format-currency)
+        (portfolio-format/format-compact-currency volume-14d-usd))]
      [:button {:type "button"
                :class ["btn" "btn-xs" "btn-spectate" "justify-start" "px-0" "text-xs" "text-trading-green" "hover:bg-transparent" "sm:text-xs"]
                :data-role "portfolio-volume-history-trigger"
@@ -148,10 +253,16 @@
      [:div {:class ["flex" "items-center" "justify-between" "gap-2"]}
       [:span {:class ["text-xs" "uppercase" "tracking-wide" "text-trading-text-secondary" "sm:text-sm" "sm:normal-case" "sm:tracking-normal"]}
        "Fees (Taker / Maker)"]
+      (when (map? analytics)
+        [:span {:class ["text-xs" "text-trading-text-secondary"]}
+         "Current maker / taker rates"])
       [:button {:class ["btn" "btn-spectate" "btn-xs" "px-2" "text-xs" "text-trading-text" "sm:text-xs"]}
        "Perps"]]
-     [:div {:class ["num" "text-2xl" "font-medium" "leading-tight" "text-trading-text" "sm:text-4xl"]}
-      (str (portfolio-format/format-fee-pct (:taker fees)) " / " (portfolio-format/format-fee-pct (:maker fees)))]
+     [:div {:class ["num" "text-2xl" "font-medium" "leading-tight" "text-trading-text" "sm:text-4xl"]
+            :data-role (when (map? analytics) "portfolio-analytics-fee-rates")}
+      (if (map? analytics)
+        (analytics-fee-rates-value (:fee-rates analytics))
+        (str (portfolio-format/format-fee-pct (:taker fees)) " / " (portfolio-format/format-fee-pct (:maker fees))))]
      [:button {:type "button"
                :class ["btn" "btn-xs" "btn-spectate" "justify-start" "px-0" "text-xs" "text-trading-green" "hover:bg-transparent" "sm:text-xs"]
                :aria-haspopup "dialog"

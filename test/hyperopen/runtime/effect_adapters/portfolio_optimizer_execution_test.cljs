@@ -159,7 +159,9 @@
                                                                :totalSz "0.25"
                                                                :avgPx "101"}}]}}}))
                     portfolio-optimizer-adapters/*dispatch!*
-                    (fn [_ _ _] nil)]
+                    (fn [_ _ _] nil)
+                    portfolio-optimizer-adapters/*refresh-account-open-orders!*
+                    (fn [_store] nil)]
         (-> (portfolio-optimizer-adapters/execute-portfolio-optimizer-plan-effect
              nil
              store
@@ -233,7 +235,9 @@
                          {:status "ok"
                           :response {:data {:statuses [{:resting {:oid 42}}]}}})))
                     portfolio-optimizer-adapters/*dispatch!*
-                    (fn [_ _ _] nil)]
+                    (fn [_ _ _] nil)
+                    portfolio-optimizer-adapters/*refresh-account-open-orders!*
+                    (fn [_store] nil)]
         (-> (portfolio-optimizer-adapters/execute-portfolio-optimizer-plan-effect
              nil
              store
@@ -280,7 +284,9 @@
                         :response {:data {:statuses [{:resting {:oid 7}}]}}}))
                     portfolio-optimizer-adapters/*dispatch!*
                     (fn [runtime-store ctx effects]
-                      (swap! dispatches conj [runtime-store ctx effects]))]
+                      (swap! dispatches conj [runtime-store ctx effects]))
+                    portfolio-optimizer-adapters/*refresh-account-open-orders!*
+                    (fn [_store] nil)]
         (-> (portfolio-optimizer-adapters/execute-portfolio-optimizer-plan-effect
              nil
              store
@@ -512,21 +518,25 @@
                                                             :plan ready-plan}}}})
           resting-store (base-store)
           filled-store (base-store)
+          original-now portfolio-optimizer-adapters/*now-ms*
+          original-submit portfolio-optimizer-adapters/*submit-order!*
+          original-dispatch portfolio-optimizer-adapters/*dispatch!*
+          original-refresh portfolio-optimizer-adapters/*refresh-account-open-orders!*
           execute-plan! (fn [store response]
-                          (with-redefs [portfolio-optimizer-adapters/*now-ms*
-                                        (fn []
-                                          (let [t (first @ticks)]
-                                            (swap! ticks rest)
-                                            t))
-                                        portfolio-optimizer-adapters/*submit-order!*
-                                        (fn [_store _address _action]
-                                          (js/Promise.resolve response))
-                                        portfolio-optimizer-adapters/*dispatch!*
-                                        (fn [_ _ _] nil)
-                                        portfolio-optimizer-adapters/*refresh-account-open-orders!*
-                                        (fn [_store] (swap! refreshes inc))]
-                            (portfolio-optimizer-adapters/execute-portfolio-optimizer-plan-effect
-                             nil store ready-plan)))]
+                          (set! portfolio-optimizer-adapters/*now-ms*
+                                (fn []
+                                  (let [t (first @ticks)]
+                                    (swap! ticks rest)
+                                    t)))
+                          (set! portfolio-optimizer-adapters/*submit-order!*
+                                (fn [_store _address _action]
+                                  (js/Promise.resolve response)))
+                          (set! portfolio-optimizer-adapters/*dispatch!*
+                                (fn [_ _ _] nil))
+                          (set! portfolio-optimizer-adapters/*refresh-account-open-orders!*
+                                (fn [_store] (swap! refreshes inc)))
+                          (portfolio-optimizer-adapters/execute-portfolio-optimizer-plan-effect
+                           nil store ready-plan))]
       (-> (execute-plan! resting-store
                          {:status "ok"
                           :response {:data {:statuses [{:resting {:oid 7}}]}}})
@@ -540,5 +550,10 @@
           (.then (fn [_]
                    (is (= 1 @refreshes)
                        "a fully filled run rests nothing — no forced refresh")
+                   (set! portfolio-optimizer-adapters/*now-ms* original-now)
+                   (set! portfolio-optimizer-adapters/*submit-order!* original-submit)
+                   (set! portfolio-optimizer-adapters/*dispatch!* original-dispatch)
+                   (set! portfolio-optimizer-adapters/*refresh-account-open-orders!*
+                         original-refresh)
                    (done)))
           (.catch (async-support/unexpected-error done))))))

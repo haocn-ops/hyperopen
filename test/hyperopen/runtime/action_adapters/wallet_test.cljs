@@ -1,6 +1,7 @@
 (ns hyperopen.runtime.action-adapters.wallet-test
   (:require [cljs.test :refer-macros [async deftest is]]
             [nexus.registry :as nxr]
+            [hyperopen.config :as app-config]
             [hyperopen.platform :as platform]
             [hyperopen.runtime.action-adapters.wallet :as wallet-adapters]
             [hyperopen.trading-crypto-modules :as trading-crypto-modules]
@@ -16,6 +17,29 @@
                     nil)]
       (wallet-adapters/enable-agent-trading nil (atom {}) {}))
     (is (= 4242 @captured-now-ms))))
+
+(deftest enable-agent-trading-derives-network-defaults-while-preserving-explicit-options-test
+  (let [captured-options (atom [])]
+    (with-redefs [app-config/config {:hyperliquid {:trading-enabled? true
+                                                    :is-mainnet false
+                                                    :signature-chain-id "0x66eee"}}
+                  trading-crypto-modules/resolved-trading-crypto
+                  (fn [] {:create-agent-credentials! (fn [] {})})
+                  agent-runtime/enable-agent-trading!
+                  (fn [{:keys [options]}]
+                    (swap! captured-options conj options)
+                    :enabled)]
+      (is (= :enabled
+             (wallet-adapters/enable-agent-trading nil (atom {}) {})))
+      (is (= :enabled
+             (wallet-adapters/enable-agent-trading nil
+                                                   (atom {})
+                                                   {:is-mainnet true
+                                                    :signature-chain-id "0xa4b1"}))))
+    (is (= [false true]
+           (mapv :is-mainnet @captured-options)))
+    (is (= ["0x66eee" "0xa4b1"]
+           (mapv :signature-chain-id @captured-options)))))
 
 (deftest unlock-agent-trading-action-forwards-continuation-payload-test
   (let [state {:wallet {:connected? true
@@ -37,7 +61,10 @@
       (let [store (atom {:router {:path "/vaults/0x1234567890abcdef1234567890abcdef12345678"}})
             result (wallet-adapters/handle-wallet-connected store "0xabc")]
         (is (= :handled result))
-        (is (= [[store [[:actions/load-vault-route "/vaults/0x1234567890abcdef1234567890abcdef12345678"]]]]
+        (is (= [[store [[:effects/record-attribution-event
+                         :wallet-connected
+                         {:wallet/address "0xabc" :outcome :observed}]]]
+                [store [[:actions/load-vault-route "/vaults/0x1234567890abcdef1234567890abcdef12345678"]]]]
                @dispatch-calls))))))
 
 (deftest handle-wallet-connected-refreshes-staking-route-when-active-test
@@ -50,7 +77,10 @@
       (let [store (atom {:router {:path "/staking"}})
             result (wallet-adapters/handle-wallet-connected store "0xabc")]
         (is (= :handled result))
-        (is (= [[store [[:actions/load-staking-route "/staking"]]]]
+        (is (= [[store [[:effects/record-attribution-event
+                         :wallet-connected
+                         {:wallet/address "0xabc" :outcome :observed}]]]
+                [store [[:actions/load-staking-route "/staking"]]]]
                @dispatch-calls))))))
 
 (deftest handle-wallet-connected-refreshes-portfolio-optimizer-route-when-active-test
@@ -65,7 +95,11 @@
                     store
                     "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")]
         (is (= :handled result))
-        (is (= [[store [[:actions/load-portfolio-optimizer-route
+        (is (= [[store [[:effects/record-attribution-event
+                         :wallet-connected
+                         {:wallet/address "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                          :outcome :observed}]]]
+                [store [[:actions/load-portfolio-optimizer-route
                          "/portfolio/optimize"]]]]
                @dispatch-calls))))))
 

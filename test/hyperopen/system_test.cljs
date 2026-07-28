@@ -11,3 +11,8 @@
 (deftest default-store-state-defers-desktop-secondary-trade-panels-until-post-render-test
   (is (false? (get-in (system/default-store-state)
                       [:trade-ui :desktop-secondary-panels-ready?]))))
+
+(deftest default-store-state-exposes-empty-tenant-override-slot-test
+  (let [state (system/default-store-state)]
+    (is (contains? state :tenant/override))
+    (is (nil? (:tenant/override state)))))

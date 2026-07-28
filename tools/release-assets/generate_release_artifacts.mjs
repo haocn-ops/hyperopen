@@ -33,6 +33,9 @@ export const DEFAULT_OUTPUT_ROOT = path.resolve("out/release-public");
 export const APP_INDEX_PATH = "index.html";
 export const APP_CSS_PATH = path.join("css", "main.css");
 export const APP_CSS_HREF = "/css/main.css";
+export const TENANT_MANIFEST_FILE_PATH = "tenant-manifest.json";
+export const TENANT_DEPLOYMENT_FILE_PATH = "DEPLOYMENT.md";
+export const TENANT_NOT_FOUND_FILE_PATH = "404.html";
 const JS_DIR = "js";
 const FONTS_DIR = "fonts";
 const REQUIRED_JS_METADATA_FILES = ["module-loader.json"];
@@ -42,13 +45,16 @@ const REQUIRED_WORKER_FILES = [
   "vault_detail_worker.js",
 ];
 
-export function hashContent(content) {
+export function hashFullContent(content) {
   return crypto
     .createHash("sha256")
     .update(content)
     .digest("hex")
-    .slice(0, 16)
     .toUpperCase();
+}
+
+export function hashContent(content) {
+  return hashFullContent(content).slice(0, 16);
 }
 
 export function fingerprintFileName(fileName, fingerprint) {
@@ -253,7 +259,7 @@ function isFingerprintedReleaseJavaScriptFile(fileName) {
 }
 
 const JS_IDENTIFIER_SOURCE = String.raw`[$A-Za-z_][$A-Za-z0-9_]*`;
-const JS_PROPERTY_ACCESS_SOURCE = String.raw`${JS_IDENTIFIER_SOURCE}(?:\.${JS_IDENTIFIER_SOURCE})?`;
+const JS_PROPERTY_ACCESS_SOURCE = String.raw`${JS_IDENTIFIER_SOURCE}(?:\.${JS_IDENTIFIER_SOURCE})*`;
 const SHADOW_LOADER_RUNTIME_ASSIGNMENT_PATTERN = new RegExp(
   String.raw`var\s+(${JS_IDENTIFIER_SOURCE})=new\s+(${JS_IDENTIFIER_SOURCE});\1\.(${JS_IDENTIFIER_SOURCE})=!0;`,
   "g"
@@ -421,10 +427,79 @@ export function resolveReleaseBuildId() {
   return firstNonEmpty(nonEmptyEnv("CF_PAGES_COMMIT_SHA"), readGit(["rev-parse", "HEAD"]));
 }
 
+function tenantEnabledRoutes(siteMetadata) {
+  return siteMetadata.routes
+    .map((route) => route.path)
+    .filter((routePath) => routePath === "/trade" || routePath === "/portfolio");
+}
+
+function defaultTenantManifest(tenant, siteMetadata) {
+  return {
+    version: 1,
+    tenant,
+    canonicalOrigin: siteMetadata.origin,
+    enabledRoutes: tenantEnabledRoutes(siteMetadata),
+    buildId: siteMetadata.buildId || "white-label-release",
+    configDigest: "",
+  };
+}
+
+function buildTenantDeploymentInstructions() {
+  return [
+    "# White-Label Deployment",
+    "",
+    "Deploy this complete generated directory as a static site with HTML fallback for enabled routes.",
+    "Before deployment, run the white-label verify command against the generated directory.",
+    "This release contains public tenant configuration only; do not add credentials, wallet material, or runtime secrets.",
+    "",
+  ].join("\n");
+}
+
+function tenantConnectSources(tenant) {
+  const endpoint = tenant?.affiliate?.["event-endpoint"];
+  if (typeof endpoint !== "string" || !endpoint.trim()) {
+    return [];
+  }
+  try {
+    const parsed = new URL(endpoint);
+    return parsed.protocol === "https:" && parsed.hostname ? [parsed.origin] : [];
+  } catch (_error) {
+    return [];
+  }
+}
+
+function escapeTenantHtmlText(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+function buildTenantNotFoundHtml(tenant) {
+  const brandName = escapeTenantHtmlText(tenant?.["brand/name"] || "Hyperopen");
+  return [
+    "<!doctype html>",
+    '<html lang="en">',
+    "<head>",
+    '  <meta charset="utf-8" />',
+    '  <meta name="robots" content="noindex" />',
+    `  <title>Page not found | ${brandName}</title>`,
+    "</head>",
+    "<body>",
+    `  <main><h1>Page not found</h1><p>Return to ${brandName}.</p></main>`,
+    "</body>",
+    "</html>",
+    "",
+  ].join("\n");
+}
+
 export async function generateReleaseArtifacts({
   sourceRoot = DEFAULT_SOURCE_ROOT,
   outputRoot = DEFAULT_OUTPUT_ROOT,
   canonicalOrigin = process.env.HYPEROPEN_SITE_ORIGIN,
+  tenant = null,
+  tenantManifest = null,
+  rewriteMainModule = true,
 } = {}) {
   const manifestPath = path.join(sourceRoot, JS_DIR, "manifest.json");
   const moduleLoaderPath = path.join(sourceRoot, JS_DIR, "module-loader.json");
@@ -451,8 +526,9 @@ export async function generateReleaseArtifacts({
   const siteMetadata = buildSiteMetadata({
     canonicalOrigin: normalizeCanonicalOrigin(canonicalOrigin),
     indexHtml: sourceIndexHtml,
-    buildId: resolveReleaseBuildId(),
-    buildInfo: resolveReleaseBuildInfo(),
+    buildId: tenant ? tenantManifest?.buildId || "white-label-release" : resolveReleaseBuildId(),
+    buildInfo: tenant ? null : resolveReleaseBuildInfo(),
+    tenant,
   });
   const releaseMetadataScriptSource = buildReleaseMetadataSyncScript(siteMetadata);
   const releaseMetadataScriptOutputPath = path.join(outputRoot, RELEASE_ROUTE_METADATA_SCRIPT_PATH);
@@ -484,7 +560,7 @@ export async function generateReleaseArtifacts({
 
   await fs.writeFile(
     path.join(outputRoot, SITE_METADATA_FILE_PATH),
-    `${JSON.stringify(siteMetadata, null, 2)}\n`
+    `${tenant ? JSON.stringify(siteMetadata) : JSON.stringify(siteMetadata, null, 2)}\n`
   );
   await fs.writeFile(path.join(outputRoot, ROBOTS_FILE_PATH), `${buildRobotsTxt(siteMetadata)}\n`);
   await fs.writeFile(path.join(outputRoot, SITEMAP_FILE_PATH), `${buildSitemapXml(siteMetadata)}\n`);
@@ -515,7 +591,7 @@ export async function generateReleaseArtifacts({
     const destinationPath = path.join(outputRoot, relativePath);
     await fs.mkdir(path.dirname(destinationPath), { recursive: true });
 
-    if (fileName === mainModule["output-name"]) {
+    if (fileName === mainModule["output-name"] && rewriteMainModule) {
       const rewrittenMainModule = rewriteMainModuleLoaderRuntime(
         await fs.readFile(sourcePath, "utf8")
       );
@@ -535,8 +611,23 @@ export async function generateReleaseArtifacts({
 
   await fs.writeFile(
     path.join(outputRoot, SECURITY_HEADERS_FILE_PATH),
-    buildReleaseHeadersFile({ immutableAssetPaths })
+    buildReleaseHeadersFile({
+      immutableAssetPaths,
+      imageSources: tenant?.["brand/logo-url"]
+        ? [new URL(tenant["brand/logo-url"]).origin]
+        : [],
+      connectSources: tenantConnectSources(tenant),
+    })
   );
+
+  if (tenant) {
+    await fs.writeFile(
+      path.join(outputRoot, TENANT_MANIFEST_FILE_PATH),
+      `${JSON.stringify(tenantManifest || defaultTenantManifest(tenant, siteMetadata), null, 2)}\n`
+    );
+    await fs.writeFile(path.join(outputRoot, TENANT_DEPLOYMENT_FILE_PATH), buildTenantDeploymentInstructions());
+    await fs.writeFile(path.join(outputRoot, TENANT_NOT_FOUND_FILE_PATH), buildTenantNotFoundHtml(tenant));
+  }
 
   const outputIndexPath = path.join(outputRoot, APP_INDEX_PATH);
 

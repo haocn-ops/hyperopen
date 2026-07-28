@@ -3,6 +3,7 @@
             [cljs.test :refer-macros [deftest is]]
             [hyperopen.account.context :as account-context]
             [hyperopen.platform :as platform]
+            [hyperopen.service.tenant-config :as tenant-config]
             [hyperopen.test-support.hiccup :as hiccup]
             [hyperopen.views.header-view :as header-view]
             [hyperopen.wallet.core :as wallet]))
@@ -61,6 +62,17 @@
     (is (contains? connect-text "Connect Wallet"))
     (is (nil? trigger))))
 
+(deftest disconnected-header-surfaces-wallet-provider-error-test
+  (let [message "No browser wallet detected. Install or enable a wallet extension, then refresh."
+        view (header-view/header-view {:wallet {:connected? false
+                                                :connecting? false
+                                                :error message}})
+        connect-btn (find-node-by-role view "wallet-connect-button")
+        error-row (find-node-by-role view "wallet-connect-error")]
+    (is (= "wallet-connect-error" (get-in connect-btn [1 :aria-describedby])))
+    (is (= "alert" (get-in error-row [1 :role])))
+    (is (contains? (set (collect-strings error-row)) message))))
+
 (deftest disconnected-header-renders-provider-menu-for-multiple-wallets-test
   (let [view (header-view/header-view
               {:wallet {:connected? false
@@ -107,18 +119,66 @@
 (deftest header-renders-mobile-menu-trigger-and-settings-button-test
   (let [view (header-view/header-view {:wallet {:connected? false}
                                        :router {:path "/trade"}})
+        menu (find-node-by-role view "mobile-header-menu")
         menu-trigger (find-node-by-role view "mobile-header-menu-trigger")
         mobile-brand (find-node-by-role view "mobile-brand")
+        desktop-logo-shell (find-node #(and (contains? (class-token-set %) "hidden")
+                                            (contains? (class-token-set %) "lg:flex")
+                                            (some? (find-node-by-role % "header-brand-fallback")))
+                                     view)
+        brand-name (find-node-by-role view "header-brand-name")
         menu-panel (find-node-by-role view "mobile-header-menu-panel")
         settings-button (find-node-by-role view "header-settings-button")]
+    (is (contains? (class-token-set menu) "lg:hidden"))
+    (is (not (contains? (class-token-set menu) "md:hidden")))
     (is (some? menu-trigger))
     (is (= [[:actions/open-mobile-header-menu]]
            (get-in menu-trigger [1 :on :click])))
     (is (some? mobile-brand))
+    (is (contains? (class-token-set mobile-brand) "lg:hidden"))
+    (is (not (contains? (class-token-set mobile-brand) "md:hidden")))
     (is (= [[:actions/navigate "/trade"]]
            (get-in mobile-brand [1 :on :click])))
+    (is (some? desktop-logo-shell))
+    (is (not (contains? (class-token-set desktop-logo-shell) "md:flex")))
+    (is (contains? (class-token-set brand-name) "truncate"))
+    (is (contains? (class-token-set brand-name) "lg:text-2xl"))
+    (is (not (contains? (class-token-set brand-name) "lg:text-3xl")))
     (is (nil? menu-panel))
     (is (some? settings-button))))
+
+(deftest tenant-logo-image-dispatches-failure-action-test
+  (let [logo-url "https://cdn.example.test/broken.svg"
+        tenant (-> tenant-config/default-tenant-raw
+                   (assoc :tenant/id "logo-tenant"
+                          :brand/name "Logo Tenant"
+                          :brand/logo-url logo-url))
+        view (header-view/header-view {:tenant/override tenant
+                                       :wallet {:connected? false}})
+        desktop-logo (find-node-by-role view "header-brand-logo")
+        mobile-logo (find-node-by-role view "mobile-brand-logo")]
+    (is (= [[:actions/mark-brand-logo-failed logo-url]]
+           (get-in desktop-logo [1 :on :error])))
+    (is (= [[:actions/mark-brand-logo-failed logo-url]]
+           (get-in mobile-logo [1 :on :error])))))
+
+(deftest failed-tenant-logo-renders-initial-fallback-without-image-test
+  (let [logo-url "https://cdn.example.test/broken.svg"
+        tenant (-> tenant-config/default-tenant-raw
+                   (assoc :tenant/id "logo-tenant"
+                          :brand/name "Logo Tenant"
+                          :brand/logo-url logo-url))
+        view (header-view/header-view {:tenant/override tenant
+                                       :tenant {:failed-logo-urls #{logo-url}}
+                                       :wallet {:connected? false}})
+        desktop-logo (find-node-by-role view "header-brand-logo")
+        mobile-logo (find-node-by-role view "mobile-brand-logo")
+        desktop-fallback (find-node-by-role view "header-brand-fallback")
+        mobile-fallback (find-node-by-role view "mobile-brand-fallback")]
+    (is (nil? desktop-logo))
+    (is (nil? mobile-logo))
+    (is (= ["L"] (vec (collect-strings desktop-fallback))))
+    (is (= ["L"] (vec (collect-strings mobile-fallback))))))
 
 (deftest header-renders-settings-trigger-at-tablet-breakpoint-with-open-dispatch-test
   (let [view (header-view/header-view {:wallet {:connected? false}
@@ -130,6 +190,31 @@
            (get-in settings-button [1 :on :click])))
     (is (some? settings-toolbar))
     (is (not (contains? (class-token-set settings-toolbar) "md:hidden")))))
+
+(deftest header-renders-affiliate-consent-only-for-enabled-tenant-test
+  (let [tenant (-> tenant-config/default-tenant-raw
+                   (assoc-in [:features :affiliate] true)
+                   (assoc-in [:affiliate :provider] :hyperliquid)
+                   (assoc-in [:affiliate :id] "hyperopen-test-affiliate")
+                   (assoc-in [:affiliate :status] :enabled)
+                   (assoc-in [:affiliate :referral-url]
+                             "https://events.example.test/referral")
+                   (assoc-in [:affiliate :event-endpoint]
+                             "https://events.example.test/attribution"))
+        view (header-view/header-view
+              {:tenant/override tenant
+               :wallet {:connected? false}
+               :header-ui {:settings-open? true
+                           :settings-confirmation nil}
+               :attribution {:affiliate-consent? false}})
+        section (find-node-by-role view "trading-settings-affiliate-section")
+        row (find-node-by-role view "trading-settings-affiliate-consent-row")
+        toggle (find-node-by-role view "trading-settings-affiliate-consent-row-toggle")]
+    (is (some? section))
+    (is (some? row))
+    (is (= [[:actions/set-affiliate-consent true]]
+           (get-in toggle [1 :on :click])))
+    (is (= "false" (get-in toggle [1 :aria-checked])))))
 
 (deftest header-renders-trading-settings-shell-when-open-test
   (let [view (header-view/header-view {:wallet {:connected? false
@@ -249,7 +334,7 @@
     (is (not (contains? all-text "Chart")))
     (is (not (contains? all-text "Active Asset")))))
 
-(deftest header-renders-remembered-session-default-when-storage-mode-is-missing-test
+(deftest header-renders-session-only-default-when-storage-mode-is-missing-test
   (let [view (header-view/header-view {:wallet {:connected? false}
                                        :router {:path "/trade"}
                                        :header-ui {:settings-open? true
@@ -261,7 +346,7 @@
                                   storage-row)
         all-text (set (collect-strings view))]
     (is (contains? all-text "Remember session"))
-    (is (= "true" (get-in storage-toggle [1 :aria-checked])))
+    (is (= "false" (get-in storage-toggle [1 :aria-checked])))
     (is (contains? all-text "Fill alerts"))
     (is (not (contains? all-text "Available when Remember session is on.")))
     (is (not (contains? all-text "This session")))
@@ -603,7 +688,7 @@
                                            (and (vector? candidate)
                                                 (keyword? (first candidate))
                                                 (str/starts-with? (name (first candidate)) "nav."))))]
-    (is (= :nav.hidden.md:flex.flex-1.items-center.justify-start.space-x-8.ml-8
+    (is (= :nav.hidden.lg:flex.flex-1.items-center.justify-start.space-x-8.ml-8
            (first nav-node)))))
 
 (deftest header-navigation-links-use-hyperliquid-typography-classes-test

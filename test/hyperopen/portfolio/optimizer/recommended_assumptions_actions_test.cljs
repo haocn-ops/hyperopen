@@ -179,61 +179,6 @@
         (is (= :error (:kind note)))
         (is (str/includes? (:message note) "No recommendations applied"))))))
 
-(deftest run-click-on-blocked-draft-auto-applies-recommendations-then-runs-test
-  ;; GRAM's 10 native observations sit below the assumption-required threshold,
-  ;; so base-state readiness is blocked — clicking Run used to dead-end in the
-  ;; pipeline's readiness throw. With server recommendations pending, the click
-  ;; now applies them all (the same bulk funnel as the banner) and then runs.
-  (let [effects (actions/run-portfolio-optimizer-from-draft base-state)
-        assumptions (save-many-value effects contracts/draft-history-assumptions-path)
-        [_ _ note] (effect-by-id effects :effects/save)]
-    (is (= [:effects/run-portfolio-optimizer-pipeline] (last effects))
-        "The pipeline effect still runs, after the apply projections.")
-    (is (= #{"perp:WLFI" "perp:GRAM"} (set (keys assumptions)))
-        "Every pending recommendation applies, exactly like the banner click.")
-    (is (some? (effect-by-id effects
-                             :effects/sync-portfolio-optimizer-assumption-library))
-        "The auto-apply mirrors into the wallet library like any apply.")
-    (is (= :success (:kind note))
-        "The outcome note discloses what Run just did on the user's behalf.")))
-
-(deftest run-click-on-blocked-draft-without-recommendations-runs-plain-test
-  ;; No recommendations to lean on -> today's behavior is preserved verbatim:
-  ;; the click reaches the pipeline alone and fails with the honest readiness
-  ;; message downstream.
-  (let [no-recs (update-in base-state
-                           (conj contracts/history-discovery-path
-                                 :instruments-by-backend-id)
-                           (fn [rows]
-                             (into {}
-                                   (map (fn [[id row]]
-                                          [id (dissoc row :default-assumption)]))
-                                   rows)))
-        effects (actions/run-portfolio-optimizer-from-draft no-recs)]
-    (is (= [[:effects/run-portfolio-optimizer-pipeline]] effects))))
-
-(deftest run-click-on-runnable-draft-never-auto-applies-test
-  ;; Without GRAM the draft is runnable (WLFI is thin but above the blocking
-  ;; threshold) while WLFI's recommendation is still pending — a Run click must
-  ;; not silently reconfigure a draft that would run as authored; the explicit
-  ;; banner/rail buttons stay the opt-in for that.
-  (let [runnable (-> base-state
-                     (assoc-in contracts/draft-universe-path
-                               [btc-instrument wlfi-instrument])
-                     (assoc-in contracts/history-load-state-path
-                               {:status :succeeded
-                                :request-signature
-                                {:universe [btc-instrument wlfi-instrument]}}))
-        effects (actions/run-portfolio-optimizer-from-draft runnable)]
-    (is (contains? (save-many-value
-                    (actions/apply-portfolio-optimizer-recommended-history-assumptions
-                     runnable)
-                    contracts/draft-history-assumptions-path)
-                   "perp:WLFI")
-        "Sanity: a recommendation IS still pending on the runnable draft…")
-    (is (= [[:effects/run-portfolio-optimizer-pipeline]] effects)
-        "…and the Run click leaves it untouched.")))
-
 (deftest all-members-unavailable-is-disclosed-not-half-applied-test
   (let [held-only (assoc-in base-state
                             (conj contracts/history-discovery-path

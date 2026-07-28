@@ -6,6 +6,7 @@
             [hyperopen.runtime.action-adapters :as runtime-action-adapters]
             [hyperopen.runtime.bootstrap :as runtime-bootstrap]
             [hyperopen.runtime.effect-adapters :as runtime-effect-adapters]
+            [hyperopen.runtime.effect-adapters.attribution :as attribution-effects]
             [hyperopen.runtime.state :as runtime-state]
             [hyperopen.runtime.validation :as runtime-validation]
             [hyperopen.runtime.wiring :as runtime-wiring]
@@ -99,7 +100,13 @@
 
 (defn bootstrap-runtime!
   [{:keys [runtime store]}]
-  (bootstrap-runtime-once! runtime store))
+  (let [result (bootstrap-runtime-once! runtime store)]
+    (attribution-effects/install-operator-api! store)
+    (try
+      (attribution-effects/resume-pending-delivery! store)
+      (catch :default _
+        nil))
+    result))
 
 (defn ensure-runtime-bootstrapped!
   [runtime bootstrap-fn]

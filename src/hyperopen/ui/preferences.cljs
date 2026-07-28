@@ -43,7 +43,13 @@
                     (platform/local-storage-get theme/local-storage-key)
                     (catch :default _
                       nil))
-           normalized (theme/apply-theme-attribute! stored)]
+           tenant-theme (when store
+                          (get-in @store [:tenant/override :theme/id]))
+           preferred (cond
+                       (theme/valid-theme-id? stored) stored
+                       (theme/valid-theme-id? tenant-theme) tenant-theme
+                       :else theme/default-theme-id)
+           normalized (theme/apply-theme-attribute! preferred)]
        (when store
          (swap! store assoc-in [:ui :theme] normalized))
        normalized))))

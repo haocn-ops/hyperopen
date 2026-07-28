@@ -313,7 +313,7 @@
                         "font-mono" "text-[0.5rem]" "font-semibold" "uppercase"
                         "tracking-[0.08em]" "text-warning"]
                 :title (if floored?
-                         "Held at 0% — the optimizer would have taken this asset past zero, but the side setting blocks that direction. To keep every asset with a risk-based size, try Risk-weighted sizing in Optimization goal."
+                         "Held at 0% — the optimizer would have taken this asset past zero, but the side setting blocks that direction."
                          "The target sits on this asset's weight cap.")
                 :data-binding-kind (name (or binding-kind :capped))}
          (if floored? "floored" "capped")]))

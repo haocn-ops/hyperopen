@@ -2,6 +2,7 @@
   (:require [clojure.string :as str]
             [hyperopen.api.trading.debug-exchange-simulator :as debug-exchange-simulator]
             [hyperopen.api.trading.http :as http]
+            [hyperopen.config :as app-config]
             [hyperopen.trading-crypto-modules :as trading-crypto-modules]
             [hyperopen.wallet.agent-session :as agent-session]))
 
@@ -30,11 +31,6 @@
 
     :else nil))
 
-(defn- testnet-signature-chain-id-int
-  []
-  (parse-chain-id-int
-   (agent-session/default-signature-chain-id-for-environment false)))
-
 (defn- supported-wallet-signature-chain-id
   [wallet-chain-id]
   (let [candidate (normalize-signature-chain-id wallet-chain-id)
@@ -51,15 +47,20 @@
       :else nil)))
 
 (defn resolve-user-signing-context
-  [store]
-  (let [wallet-chain-id (get-in @store [:wallet :chain-id])
-        signature-chain-id (or (supported-wallet-signature-chain-id wallet-chain-id)
-                               (agent-session/default-signature-chain-id-for-environment true))
-        chain-id-int (parse-chain-id-int signature-chain-id)]
+  [_store]
+  (let [{:keys [signature-chain-id hyperliquid-chain]} (:hyperliquid app-config/config)]
     {:signature-chain-id signature-chain-id
-     :hyperliquid-chain (if (= chain-id-int (testnet-signature-chain-id-int))
-                          "Testnet"
-                          "Mainnet")}))
+     :hyperliquid-chain hyperliquid-chain}))
+
+(defn- wallet-network-mismatch-error
+  [store expected-signature-chain-id expected-hyperliquid-chain]
+  (let [wallet-signature-chain-id
+        (supported-wallet-signature-chain-id (get-in @store [:wallet :chain-id]))]
+    (when (and wallet-signature-chain-id
+               (not= wallet-signature-chain-id expected-signature-chain-id))
+      (js/Error.
+       (str "Wallet network does not match Hyperliquid " expected-hyperliquid-chain
+            ". Switch the wallet network or reload with the matching hyperliquidNetwork selector.")))))
 
 (defn- next-user-signed-nonce!
   [store]
@@ -70,40 +71,48 @@
 
 (defn approve-agent!
   [store address action]
-  (-> (trading-crypto-modules/load-trading-crypto-module!)
-      (.then (fn [crypto]
-               ((:sign-approve-agent-action! crypto) address action)))
-      (.then (fn [sig]
-               (let [{:keys [r s v]} (js->clj sig :keywordize-keys true)
-                     payload {:action action
-                              :nonce (:nonce action)
-                              :signature {:r r
-                                          :s s
-                                          :v v}}]
-                 (or (debug-exchange-simulator/simulated-fetch-response [[:approveAgent]])
-                     (http/json-post! http/exchange-url payload)))))))
+  (if-let [rejection (http/reject-when-trading-disabled!)]
+    rejection
+    (-> (trading-crypto-modules/load-trading-crypto-module!)
+        (.then (fn [crypto]
+                 ((:sign-approve-agent-action! crypto) address action)))
+        (.then (fn [sig]
+                 (let [{:keys [r s v]} (js->clj sig :keywordize-keys true)
+                       payload {:action action
+                                :nonce (:nonce action)
+                                :signature {:r r
+                                            :s s
+                                            :v v}}]
+                   (or (debug-exchange-simulator/simulated-fetch-response [[:approveAgent]])
+                       (http/json-post! http/exchange-url payload))))))))
 
 (defn- sign-and-post-user-action!
   [store address action nonce-field sign-action-key]
-  (let [{:keys [signature-chain-id hyperliquid-chain]} (resolve-user-signing-context store)
-        nonce (next-user-signed-nonce! store)
-        action* (-> action
-                    (assoc :signatureChainId signature-chain-id
-                           :hyperliquidChain hyperliquid-chain)
-                    (assoc nonce-field nonce))]
-    (-> (trading-crypto-modules/load-trading-crypto-module!)
-        (.then (fn [crypto]
-                 (when-not (contains? crypto sign-action-key)
-                   (throw (js/Error.
-                           (str "Missing trading crypto signer: " sign-action-key))))
-                 ((get crypto sign-action-key) address action*)))
-        (.then (fn [sig]
-                 (let [{:keys [r s v]} (js->clj sig :keywordize-keys true)
-                       signature {:r r
-                                  :s s
-                                  :v v}]
-                   (-> (http/post-signed-action! action* nonce signature)
-                       (.then http/parse-json!))))))))
+  (if-let [rejection (http/reject-when-trading-disabled!)]
+    rejection
+    (let [{:keys [signature-chain-id hyperliquid-chain]} (resolve-user-signing-context store)]
+      (if-let [mismatch-error (wallet-network-mismatch-error store
+                                                             signature-chain-id
+                                                             hyperliquid-chain)]
+        (js/Promise.reject mismatch-error)
+        (let [nonce (next-user-signed-nonce! store)
+              action* (-> action
+                          (assoc :signatureChainId signature-chain-id
+                                 :hyperliquidChain hyperliquid-chain)
+                          (assoc nonce-field nonce))]
+          (-> (trading-crypto-modules/load-trading-crypto-module!)
+              (.then (fn [crypto]
+                       (when-not (contains? crypto sign-action-key)
+                         (throw (js/Error.
+                                 (str "Missing trading crypto signer: " sign-action-key))))
+                       ((get crypto sign-action-key) address action*)))
+              (.then (fn [sig]
+                       (let [{:keys [r s v]} (js->clj sig :keywordize-keys true)
+                             signature {:r r
+                                        :s s
+                                        :v v}]
+                         (-> (http/post-signed-action! action* nonce signature)
+                             (.then http/parse-json!)))))))))))
 
 (defn submit-usd-class-transfer! [store address action]
   (sign-and-post-user-action! store address action :nonce :sign-usd-class-transfer-action!))

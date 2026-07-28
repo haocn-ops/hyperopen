@@ -1,5 +1,6 @@
 (ns hyperopen.views.trading-chart.vm
   (:require [clojure.string :as str]
+            [hyperopen.service.product-context :as product-context]
             [hyperopen.state.trading :as trading-state]
             [hyperopen.trading-indicators-modules :as trading-indicators-modules]
             [hyperopen.trading-settings :as trading-settings]
@@ -114,10 +115,10 @@
 
 (def ^:private memoized-legend-meta
   (memoize-last
-   (fn [symbol timeframe-label candle-data]
+   (fn [symbol timeframe-label venue candle-data]
      {:symbol symbol
       :timeframe-label timeframe-label
-      :venue "Hyperopen"
+      :venue venue
       :market-open? true
       :candle-data candle-data})))
 
@@ -220,6 +221,8 @@
                                             0))
         symbol (or active-asset "—")
         timeframe-label (str/upper-case (name selected-timeframe))
+        venue (or (:brand-label (product-context/build-product-context-view-model state))
+                  "Hyperopen")
         price-decimals (or (:price-decimals active-market)
                            (:priceDecimals active-market)
                            (:pxDecimals active-market)
@@ -241,7 +244,7 @@
                                position-overlay
                                fill-markers
                                show-fill-markers?)
-        legend-meta (memoized-legend-meta symbol timeframe-label candle-data)]
+        legend-meta (memoized-legend-meta symbol timeframe-label venue candle-data)]
     {:has-error? has-error?
      :candle-data candle-data
      :selected-chart-type selected-chart-type

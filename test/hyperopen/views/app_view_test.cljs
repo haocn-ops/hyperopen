@@ -132,7 +132,7 @@
         app-main (hiccup/find-by-parity-id view-node "app-main")
         app-main-classes (hiccup/node-class-set app-main)]
     (is (contains? app-main-classes "pb-[calc(3rem+env(safe-area-inset-bottom))]"))
-    (is (not (contains? app-main-classes "pb-[5rem]")))))
+    (is (not (contains? app-main-classes "pb-16")))))
 
 (deftest app-view-keeps-standard-footer-reserve-for-trade-market-surface-test
   (let [view-node (app-view/app-view (assoc (base-state)
@@ -141,7 +141,7 @@
                                             :trade-ui {:mobile-surface :chart}))
         app-main (hiccup/find-by-parity-id view-node "app-main")
         app-main-classes (hiccup/node-class-set app-main)]
-    (is (contains? app-main-classes "pb-[5rem]"))
+    (is (contains? app-main-classes "pb-16"))
     (is (not (contains? app-main-classes "pb-[calc(3rem+env(safe-area-inset-bottom))]")))))
 
 (deftest app-view-renders-portfolio-route-with-portfolio-root-test

@@ -1,5 +1,6 @@
 (ns hyperopen.views.trade-view.render-cache-test
   (:require [cljs.test :refer-macros [deftest is]]
+            [hyperopen.service.fixtures :as fixtures]
             [hyperopen.trade-modules :as trade-modules]
             [hyperopen.views.account-equity-view :as account-equity-view]
             [hyperopen.views.account-info-view :as account-info-view]
@@ -21,6 +22,21 @@
                            (apply account-equity-view/account-equity-view args))
     :funding-actions-view (fn [& args]
                             (apply account-equity-view/funding-actions-view args))}))
+
+(deftest trade-view-projects-tenant-override-into-memoized-chart-renderer-test
+  (let [projected-overrides (atom [])
+        state (support/active-asset-state)
+        branded-state (assoc state :tenant/override fixtures/alternate-tenant-raw)]
+    (support/with-viewport-width
+      1280
+      (fn []
+        (with-redefs [trade-modules/render-trade-chart-view (fn [chart-state]
+                                                              (swap! projected-overrides conj (:tenant/override chart-state))
+                                                              [:div {:data-role "stub-chart"}])]
+          (trade-view/trade-view state)
+          (trade-view/trade-view branded-state)
+          (is (= [nil fixtures/alternate-tenant-raw]
+                 @projected-overrides)))))))
 
 (deftest trade-view-active-asset-panel-memoization-ignores-closed-selector-bookkeeping-test
   (let [active-asset-calls (atom 0)

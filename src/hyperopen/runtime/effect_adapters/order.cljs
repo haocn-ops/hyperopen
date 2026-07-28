@@ -5,6 +5,7 @@
             [hyperopen.order.submit-confirmation :as submit-confirmation]
             [hyperopen.platform :as platform]
             [hyperopen.runtime.effect-adapters.common :as common]
+            [hyperopen.runtime.effect-adapters.attribution :as attribution-adapters]
             [hyperopen.runtime.state :as runtime-state]))
 
 (defn- set-order-feedback-toast!
@@ -58,6 +59,7 @@
    :exchange-response-error common/exchange-response-error
    :prune-canceled-open-orders-fn order-effects/prune-canceled-open-orders
    :runtime-error-message common/runtime-error-message
+   :record-attribution-event! attribution-adapters/record-attribution-event!
    :show-toast! (fn [store kind message]
                   (show-order-feedback-toast! runtime store kind message))})
 

@@ -1,5 +1,6 @@
 (ns hyperopen.views.trade-view
   (:require [hyperopen.surface-modules :as surface-modules]
+            [hyperopen.service.product-context :as product-context]
             [hyperopen.trade-modules :as trade-modules]
             [hyperopen.views.active-asset.vm :as active-asset-vm]
             [hyperopen.views.active-asset-view :as active-asset-view]
@@ -10,6 +11,7 @@
             [hyperopen.views.trade.order-form-view :as order-form-view]
             [hyperopen.views.trade-view.layout-state :as layout-state]
             [hyperopen.views.trade-view.loading-shell :as loading-shell]
+            [hyperopen.views.product-context :as product-context-view]
             [hyperopen.views.trade-view.shell :as shell]))
 
 (def ^:private trade-chart-view-base-state-keys
@@ -24,6 +26,7 @@
    :positions-ui
    :router
    :spot
+   :tenant/override
    :trading-settings
    :trade-modules
    :webdata2])
@@ -385,6 +388,7 @@
 
 (defn trade-view [state]
   (let [{:keys [mobile-surface] :as layout-context} (trade-view-layout-context state)
+        product-context-vm (product-context/build-product-context-view-model state)
         panel-context (trade-view-panel-context state layout-context)
         renderers {:mobile-account-surface mobile-account-surface
                    :render-account-equity-panel-state render-account-equity-panel-state
@@ -409,6 +413,9 @@
                     "scrollbar-hide"
                     "overflow-y-auto"]
             :data-role "trade-scroll-shell"}
+      (product-context-view/render-inline-banner
+       product-context-vm
+       "trade-product-context-banner")
       (degen-widgets/stats-strip state)
       (shell/render-mobile-active-asset-strip state layout-context renderers)
       (shell/render-mobile-surface-tabs mobile-surface

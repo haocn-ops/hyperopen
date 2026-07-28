@@ -187,3 +187,12 @@
          (actions/reset-degen-life {})))
   (is (= [[:effects/save [:degen :life-resets] 3]]
          (actions/reset-degen-life {:degen {:life-resets 2}}))))
+
+(deftest mark-brand-logo-failed-records-the-public-url-test
+  (let [existing-url "https://cdn.example.test/existing.svg"
+        failed-url "https://cdn.example.test/broken.svg"]
+    (is (= [[:effects/save [:tenant :failed-logo-urls]
+             #{existing-url failed-url}]]
+           (actions/mark-brand-logo-failed
+            {:tenant {:failed-logo-urls #{existing-url}}}
+            failed-url)))))

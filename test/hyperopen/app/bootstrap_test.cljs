@@ -1,6 +1,7 @@
 (ns hyperopen.app.bootstrap-test
   (:require [cljs.test :refer-macros [deftest is]]
             [hyperopen.app.bootstrap :as app-bootstrap]
+            [hyperopen.service.fixtures :as fixtures]
             [hyperopen.views.app-view :as app-view]
             [replicant.dom :as r]))
 
@@ -44,3 +45,23 @@
                (.-title document)))
         (is (= [[app-node [:main {:data-state state}]]]
                @render-calls))))))
+
+(deftest render-app-syncs-browser-title-with-active-tenant-brand-test
+  (with-fake-document
+    (fn [document app-node]
+      (let [state {:active-asset "xyz:SILVER"
+                   :active-market {:coin "xyz:SILVER"
+                                   :symbol "SILVER"
+                                   :base "SILVER"
+                                   :dex "xyz"
+                                   :market-type :perp}
+                   :active-assets {:contexts {"xyz:SILVER" {:coin "xyz:SILVER"
+                                                            :mark 82.65
+                                                            :markRaw "82.65"}}}
+                   :tenant/override fixtures/alternate-tenant-raw
+                   :ui {:locale "en-US"}}]
+        (with-redefs [app-view/app-view (constantly [:main])
+                      r/render (fn [_node _view])]
+          (app-bootstrap/render-app! state))
+        (is (= "82.65 | SILVER (xyz) | Desk Alpha"
+               (.-title document)))))))

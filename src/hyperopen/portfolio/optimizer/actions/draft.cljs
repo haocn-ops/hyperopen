@@ -31,7 +31,6 @@
     (cond
       (= :minimum-variance objective-kind) :minimum-volatility
       (= :equal-risk objective-kind) :equal-risk
-      (= :inverse-volatility objective-kind) :inverse-volatility
       (= :target-volatility objective-kind) :target-volatility
       (= :target-return objective-kind) :maximum-return
       :else :max-sharpe)))
@@ -429,23 +428,6 @@
         (into effects
               (run-actions/run-portfolio-optimizer-from-draft state*)))
       [])))
-
-(defn switch-portfolio-optimizer-objective-and-run
-  "Argument-taking objective switch for cross-links (the floored-state nudge in
-  the Risk Balance card): takes the objective MENU-OPTION key, saves the
-  option's objective (and return model when the option carries one), and reruns
-  from the updated draft. Unlike the apply action above, it never reads the
-  pending menu selection from UI state, so it works with no menu open."
-  [state option-key]
-  (if-let [{:keys [objective return-model]} (objective-menu-model-for-state state option-key)]
-    (let [path-values (cond-> [[contracts/draft-objective-path objective]]
-                        return-model
-                        (conj [contracts/draft-return-model-path return-model]))
-          effects (common/save-draft-path-values path-values)
-          state* (projected-state-after-save-effects state effects)]
-      (into effects
-            (run-actions/run-portfolio-optimizer-from-draft state*)))
-    []))
 
 (defn set-portfolio-optimizer-objective-kind
   [_state kind]

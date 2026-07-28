@@ -175,8 +175,7 @@
     (is (= {:action {:type "updateIsolatedMargin"
                      :asset 100001
                      :isBuy true
-                     :ntli 6220000}
-            :position {:coin "xyz:TSM" :dex "xyz" :side :long}}
+                     :ntli 6220000}}
            (second submit)))))
 
 (deftest process-intents-guards
@@ -295,8 +294,7 @@
     (is (= {:action {:type "updateIsolatedMargin"
                      :asset 100001
                      :isBuy true
-                     :ntli 6220000}
-            :position {:coin "xyz:TSM" :dex "xyz" :side :long}}
+                     :ntli 6220000}}
            (second (second effects))))))
 
 (deftest apply-batch-guards

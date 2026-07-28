@@ -46,7 +46,10 @@
       (with-redefs [nxr/dispatch (fn [_ _ actions]
                                    (swap! dispatched conj actions))]
         (core/handle-wallet-connected store "0xabc")
-        (is (= [[[:actions/enable-agent-trading]]]
+        (is (= [[[:actions/enable-agent-trading]]
+                [[:effects/record-attribution-event
+                  :wallet-connected
+                  {:wallet/address "0xabc" :outcome :observed}]]]
                @dispatched)))
       (finally
         (set! js/queueMicrotask original-queue-microtask)))))
@@ -62,7 +65,10 @@
       (with-redefs [nxr/dispatch (fn [_ _ actions]
                                    (swap! dispatched conj actions))]
         (core/handle-wallet-connected store "0xabc")
-        (is (= [] @dispatched)))
+        (is (= [[[:effects/record-attribution-event
+                  :wallet-connected
+                  {:wallet/address "0xabc" :outcome :observed}]]]
+               @dispatched)))
       (finally
         (set! js/queueMicrotask original-queue-microtask)))))
 
@@ -114,4 +120,3 @@
         (if original-navigator-descriptor
           (js/Object.defineProperty js/globalThis navigator-prop original-navigator-descriptor)
           (js/Reflect.deleteProperty js/globalThis navigator-prop))))))
-

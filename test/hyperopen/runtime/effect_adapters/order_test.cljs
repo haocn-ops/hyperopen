@@ -120,6 +120,7 @@
                           (:prune-canceled-open-orders-fn deps)))
           (is (identical? common/runtime-error-message
                           (:runtime-error-message deps)))
+          (is (fn? (:record-attribution-event! deps)))
           (is (fn? (:show-toast! deps)))))
       (try
         ((:show-toast! (:deps (get captured :submit-default))) store :success "Placed")

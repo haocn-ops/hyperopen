@@ -31,8 +31,6 @@
     actions/add-portfolio-optimizer-objective-menu-view
     :apply-portfolio-optimizer-objective-menu-selection-and-run
     actions/apply-portfolio-optimizer-objective-menu-selection-and-run
-    :switch-portfolio-optimizer-objective-and-run
-    actions/switch-portfolio-optimizer-objective-and-run
     :set-portfolio-optimizer-return-views-filter
     actions/set-portfolio-optimizer-return-views-filter
     :export-portfolio-optimizer-return-views

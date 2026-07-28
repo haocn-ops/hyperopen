@@ -2,6 +2,7 @@
   (:require [hyperopen.account.context :as account-context]
             [hyperopen.portfolio.fee-schedule :as fee-schedule]
             [hyperopen.portfolio.routes :as portfolio-routes]
+            [hyperopen.service.product-context :as product-context]
             [hyperopen.views.account-info-view :as account-info-view]
             [hyperopen.views.chart.d3.hover-state :as chart-hover-state]
             [hyperopen.views.portfolio.account-tabs :as account-tabs]
@@ -11,7 +12,8 @@
             [hyperopen.views.portfolio.optimize.view :as optimize-view]
             [hyperopen.views.portfolio.summary-cards :as summary-cards]
             [hyperopen.views.portfolio.volume-history-popover :as volume-history-popover]
-            [hyperopen.views.portfolio.vm :as portfolio-vm]))
+            [hyperopen.views.portfolio.vm :as portfolio-vm]
+            [hyperopen.views.product-context :as product-context-view]))
 
 (defonce ^:private portfolio-view-cache
   (atom nil))
@@ -47,6 +49,7 @@
   (let [route (get-in state [:router :path])
         optimizer-route? (portfolio-routes/portfolio-optimize-route? route)
         fee-schedule-model (fee-schedule/fee-schedule-model state)
+        product-context-vm (product-context/build-product-context-view-model state)
         fee-schedule-cache-key (:open? fee-schedule-model)
         hover-active? (chart-hover-state/surface-hover-active? :portfolio)
         volume-history-open? (true? (get-in state [:portfolio-ui :volume-history-open?]))
@@ -88,6 +91,9 @@
                       :padding-bottom "3.5rem"}
               :data-parity-id "portfolio-root"}]
        [(:header sections)
+        (product-context-view/render-inline-banner
+         product-context-vm
+         "portfolio-product-context-banner")
         (:background-status sections)
         (:summary-grid sections)
         (:account-table sections)

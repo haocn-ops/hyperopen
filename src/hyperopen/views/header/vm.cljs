@@ -1,6 +1,8 @@
 (ns hyperopen.views.header.vm
   (:require [hyperopen.account.context :as account-context]
             [hyperopen.account.spectate-mode-links :as spectate-mode-links]
+            [hyperopen.service.product-context :as product-context]
+            [hyperopen.service.tenant-config :as tenant-config]
             [hyperopen.trading-settings :as trading-settings]
             [hyperopen.ui.theme :as ui-theme]
             [hyperopen.ui.voice :as voice]
@@ -42,20 +44,30 @@
          :href (nav-href state (:route item))
          :action [[:actions/navigate (:route item)]]))
 
+(defn- nav-item-enabled?
+  [context item]
+  (case (:id item)
+    :trade (product-context/feature-enabled? context :terminal)
+    :portfolio (product-context/feature-enabled? context :analytics)
+    :optimize (product-context/feature-enabled? context :analytics)
+    true))
+
 (defn- desktop-nav-vm
-  [state route]
-  (mapv (comp (partial with-desktop-action state)
-              (partial with-voice-label state))
-        (nav/items-for-placement route :desktop)))
+  [state context route]
+  (->> (nav/items-for-placement route :desktop)
+       (filter #(nav-item-enabled? context %))
+       (mapv (comp (partial with-desktop-action state)
+                   (partial with-voice-label state)))))
 
 (defn- mobile-nav-vm
-  [state route]
+  [state context route]
   (let [present (comp with-mobile-action
-                      (partial with-voice-label state))]
-    {:primary-items (mapv present
-                          (nav/items-for-placement route :mobile-primary))
-     :secondary-items (mapv present
-                            (nav/items-for-placement route :mobile-secondary))}))
+                      (partial with-voice-label state))
+        enabled-items (fn [placement]
+                        (filter #(nav-item-enabled? context %)
+                                (nav/items-for-placement route placement)))]
+    {:primary-items (mapv present (enabled-items :mobile-primary))
+     :secondary-items (mapv present (enabled-items :mobile-secondary))}))
 
 (defn- more-nav-vm
   [state route]
@@ -109,6 +121,7 @@
         short-address (wallet/short-addr (:address wallet-state))]
     {:connected? connected?
      :connecting? (boolean (:connecting? wallet-state))
+     :error (some-> wallet-state :error str not-empty)
      :trigger-label (or short-address "Connected")
      :menu-address-label (or short-address "Unavailable")
      :providers (:providers wallet-state)
@@ -123,7 +136,7 @@
   [state]
   (if-some [storage-mode (get-in state [:wallet :agent :storage-mode])]
     (agent-session/normalize-storage-mode storage-mode)
-    :local))
+    :session))
 
 (defn- remember-trading-session?
   [state]
@@ -274,6 +287,27 @@
                        :action [[:actions/set-open-order-safety-mode value]]})
                     open-order-safety-options)}))
 
+(defn- affiliate-consent-section
+  [state]
+  (let [tenant (tenant-config/active-tenant-config state)
+        endpoint (get-in tenant [:affiliate :event-endpoint])
+        enabled? (and (true? (get-in tenant [:features :affiliate]))
+                      (= :enabled (get-in tenant [:affiliate :status]))
+                      (tenant-config/valid-affiliate-event-endpoint? endpoint))]
+    (when enabled?
+      (settings-section
+       :affiliate
+       "Affiliate data"
+       "Optional attribution"
+       [(settings-row :affiliate-consent
+                      "Share trading attribution"
+                      "Send redacted activity to the configured affiliate provider."
+                      (true? (get-in state [:attribution :affiliate-consent?]))
+                      :key
+                      [[:actions/set-affiliate-consent
+                        (not (true? (get-in state [:attribution :affiliate-consent?])))]]
+                      :tooltip "Only redacted attribution fields are sent after you opt in.")]))))
+
 (defn- settings-vm
   [state]
   (let [confirmation (settings-confirmation-copy
@@ -289,7 +323,8 @@
         passkey-disabled? (passkey-toggle-disabled? remember-session?
                                                     passkey-capable?
                                                     passkey-enabled?
-                                                    agent-status)]
+                                                    agent-status)
+        affiliate-section (affiliate-consent-section state)]
     {:open? (true? (get-in state [:header-ui :settings-open?]))
      :return-focus? (true? (get-in state [:header-ui :settings-return-focus?]))
      :trigger-key (str "header-settings-button:"
@@ -302,7 +337,7 @@
      :title "Trading Settings"
      :close-actions trading-settings-close-actions
      :footer-note trading-settings-footer-copy
-     :sections [(settings-section
+     :sections (cond-> [(settings-section
                 :session
                 "Session"
                 "Sign-in behavior"
@@ -404,23 +439,42 @@
                  :appearance
                  "Appearance"
                  "Look and feel"
-                 [(theme-choice-row state)])]}))
+                 [(theme-choice-row state)])]
+                 affiliate-section (conj affiliate-section))}))
 
 (defn- brand-vm
-  [state]
-  {:wordmark (voice/label state :brand/wordmark)
-   :mark (voice/label state :brand/mark)
-   :tagline (when (voice/degen? state) "formerly responsible")})
+  [state context]
+  (let [brand-name (or (:brand-label context) "Hyperopen")
+        logo-url (or (get-in context [:brand :logo-url]) "")
+        custom-brand? (and (contains? state :tenant/override)
+                           (not= "Hyperopen" brand-name))
+        logo-failed? (and (seq logo-url)
+                          (contains? (get-in state
+                                             [:tenant :failed-logo-urls]
+                                             #{})
+                                     logo-url))]
+    (cond-> {:wordmark (if custom-brand?
+                        brand-name
+                        (voice/label state :brand/wordmark))
+             :mark (if custom-brand?
+                     (subs brand-name 0 1)
+                     (voice/label state :brand/mark))
+             :tagline (when (voice/degen? state) "formerly responsible")}
+      (contains? state :tenant/override)
+      (assoc :logo-url (if logo-failed? "" logo-url)
+             :logo-failed? (boolean logo-failed?)))))
 
 (defn header-vm
   [state]
   (let [route (get-in state [:router :path] "/trade")
+        context (product-context/build-product-context-view-model state)
         spectate-active? (account-context/spectate-mode-active? state)]
     {:route route
-     :brand (brand-vm state)
+     :brand (brand-vm state context)
+     :product-context context
      :mobile-menu-open? (true? (get-in state [:header-ui :mobile-menu-open?]))
-     :desktop-nav-items (desktop-nav-vm state route)
-     :mobile-nav (mobile-nav-vm state route)
+     :desktop-nav-items (desktop-nav-vm state context route)
+     :mobile-nav (mobile-nav-vm state context route)
      :more-nav (more-nav-vm state route)
      :spectate (spectate-vm spectate-active?)
      :account-selector (account-selector/vm state)

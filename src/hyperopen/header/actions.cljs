@@ -24,6 +24,14 @@
    [:effects/save [:header-ui :settings-open?] false]
    [:effects/save [:header-ui :settings-return-focus?] true]])
 
+(defn mark-brand-logo-failed
+  [state logo-url]
+  (let [failed-logo-urls (get-in state [:tenant :failed-logo-urls] #{})]
+    (if (contains? failed-logo-urls logo-url)
+    []
+      [[:effects/save [:tenant :failed-logo-urls]
+        (conj failed-logo-urls logo-url)]])))
+
 (defn- normalize-storage-mode-request
   [storage-mode]
   (cond
@@ -151,6 +159,10 @@
       [[:effects/save [:ui :theme] normalized]
        [:effects/local-storage-set ui-theme/local-storage-key normalized]
        [:effects/apply-ui-theme normalized]])))
+
+(defn set-affiliate-consent
+  [_state enabled?]
+  [[:effects/set-affiliate-consent (boolean enabled?)]])
 
 (defn reset-degen-life
   "Joke control on the degen Feeling Gauge widget. Bumps a session-local

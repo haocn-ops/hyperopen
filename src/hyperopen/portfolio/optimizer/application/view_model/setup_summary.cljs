@@ -4,7 +4,6 @@
   Split from view-model.setup at the namespace-size gate (2026-07-10)."
   (:require [clojure.string :as str]
             [hyperopen.portfolio.optimizer.application.return-views :as return-views]
-            [hyperopen.portfolio.optimizer.contracts.constants :as contracts-constants]
             [hyperopen.portfolio.optimizer.application.view-model.universe :as universe]
             [hyperopen.portfolio.optimizer.domain.exposure-policy :as exposure-policy]))
 
@@ -68,16 +67,13 @@
   {:minimum-variance "Minimum risk"
    :max-sharpe "Maximum Sharpe"
    :equal-risk "Equal Risk"
-   :inverse-volatility "Risk-weighted sizing"
    :target-volatility "Target volatility"
    :target-return "Target return"})
 
 (def return-free-objective-kinds
-  "Objectives whose weights never consume expected returns, so the Run summary
-  shows \"Not used\" under Return forecast for them: the contracts
-  covariance-only kinds plus Minimum risk (return-free in the UI sense, but
-  not engine-exempted from return-model validity like the contracts set)."
-  (conj contracts-constants/covariance-only-objective-kinds :minimum-variance))
+  "Objectives whose weights never consume expected returns (covariance-only),
+  so the Run summary shows \"Not used\" under Return forecast for them."
+  #{:minimum-variance :equal-risk})
 
 (defn- universe-label
   [instrument]

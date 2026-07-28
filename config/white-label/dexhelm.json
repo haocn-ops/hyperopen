@@ -1,0 +1,25 @@
+{
+  "tenant/id": "dexhelm",
+  "brand/name": "DEXHelm",
+  "brand/logo-url": "https://testnet.dexhelm.com/brand/dexhelm-mark.svg",
+  "theme/id": "dark",
+  "hyperliquid-network": "testnet",
+  "features": {
+    "terminal": true,
+    "analytics": true,
+    "affiliate": false
+  },
+  "venue": {
+    "id": "hyperliquid",
+    "label": "Hyperliquid",
+    "url": "https://app.hyperliquid.xyz"
+  },
+  "affiliate": {
+    "provider": null,
+    "id": null,
+    "status": "unavailable",
+    "referral-url": "",
+    "event-endpoint": "",
+    "disclosure": "官方 affiliate 服务当前不可用；交易不受影响。"
+  }
+}

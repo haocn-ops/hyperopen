@@ -26,8 +26,11 @@
 (def app-version
   (:app-version config))
 
+(def hyperliquid-network
+  (:hyperliquid config))
+
 (def websocket-url
-  (:ws-url config))
+  (:ws-url hyperliquid-network))
 
 (def wallet-copy-feedback-duration-ms
   (get-in config [:ui :wallet-copy-feedback-ms]))

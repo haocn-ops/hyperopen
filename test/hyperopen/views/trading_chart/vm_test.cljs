@@ -1,5 +1,6 @@
 (ns hyperopen.views.trading-chart.vm-test
   (:require [cljs.test :refer-macros [deftest is]]
+            [hyperopen.service.fixtures :as fixtures]
             [hyperopen.state.trading :as trading-state]
             [hyperopen.views.trading-chart.derived-cache :as derived-cache]
             [hyperopen.views.trading-chart.utils.position-overlay-model :as position-overlay-model]
@@ -141,6 +142,19 @@
         (is (= :long (:side valid-overlay)))
         (is (= 90 (:liquidation-price invalid-overlay)))
         (is (= 90 (:liquidation-price malformed-overlay)))))))
+
+(deftest chart-view-model-uses-normalized-tenant-brand-for-legend-venue-test
+  (binding [derived-cache/*process-candle-data* (fn [_] transformed-candles)]
+    (with-redefs [trading-state/position-for-active-asset (fn [_] nil)
+                  position-overlay-model/build-position-overlay (fn [_] nil)]
+      (let [dispatch-fn (fn [_event _actions] nil)
+            default-model (vm/chart-view-model (base-state) dispatch-fn)
+            branded-model (vm/chart-view-model
+                           (assoc (base-state)
+                                  :tenant/override fixtures/alternate-tenant-raw)
+                           dispatch-fn)]
+        (is (= "Hyperopen" (get-in default-model [:legend-meta :venue])))
+        (is (= "Desk Alpha" (get-in branded-model [:legend-meta :venue])))))))
 
 (deftest chart-view-model-history-backfill-callback-dispatches-action-test
   (let [dispatch-calls (atom [])

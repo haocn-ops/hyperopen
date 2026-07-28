@@ -73,6 +73,10 @@
          local-protection-mode (current-local-protection-mode agent-state)]
      (cond
        (and (= :local storage-mode)
+            (= :plain local-protection-mode))
+       nil
+
+       (and (= :local storage-mode)
             (= :passkey local-protection-mode))
        (when-let [metadata (agent-session/load-passkey-session-metadata owner-address)]
          (when-let [session (agent-lockbox/load-unlocked-session owner-address)]
@@ -81,21 +85,23 @@
                   {:storage-mode storage-mode
                    :local-protection-mode local-protection-mode})))
 
+       (= :session storage-mode)
+       (when-let [session (agent-lockbox/load-unlocked-session owner-address)]
+         (let [session* (if crypto
+                          (reconcile-session-agent-address! store
+                                                            owner-address
+                                                            storage-mode
+                                                            local-protection-mode
+                                                            session
+                                                            crypto)
+                          session)]
+           (agent-lockbox/cache-unlocked-session! owner-address session*)
+           (assoc session*
+                  :storage-mode storage-mode
+                  :local-protection-mode local-protection-mode)))
+
        :else
-       (let [session (agent-session/load-agent-session-by-mode owner-address storage-mode)]
-         (when (map? session)
-           (let [session* (if crypto
-                            (reconcile-session-agent-address! store
-                                                              owner-address
-                                                              storage-mode
-                                                              local-protection-mode
-                                                              session
-                                                              crypto)
-                            session)]
-             (agent-lockbox/cache-unlocked-session! owner-address session*)
-             (assoc session*
-                    :storage-mode storage-mode
-                     :local-protection-mode local-protection-mode))))))))
+       nil))))
 
 (defn- persist-agent-nonce-cursor!
   [store owner-address session nonce]
@@ -147,7 +153,9 @@
                     expires-after
                     (+ (platform/now-ms)
                        runtime-state/agent-expires-after-ms))
-   :is-mainnet (if (nil? is-mainnet) true is-mainnet)
+   :is-mainnet (if (nil? is-mainnet)
+                 (get runtime-state/hyperliquid-network :is-mainnet true)
+                 is-mainnet)
    :max-nonce-retries (if (nil? max-nonce-retries) 1 max-nonce-retries)}))
 
 (defn- agent-session-available?
@@ -233,30 +241,32 @@
   ([store owner-address action]
    (sign-and-post-agent-action! store owner-address action {}))
   ([store owner-address action raw-options]
-   (let [options (normalize-agent-action-options raw-options)]
-     (-> (trading-crypto-modules/load-trading-crypto-module!)
-         (.then
-          (fn [crypto]
-            (let [session (resolve-agent-session store owner-address crypto)]
-              (if-let [rejection (missing-agent-session-rejection store session)]
-                rejection
-                (letfn [(attempt! [cursor retries-left]
-                          (let [nonce (http/next-nonce cursor)]
-                            (-> (sign-agent-action! crypto session action nonce options)
-                                (.then (fn [sig]
-                                         (post-signed-agent-action! action nonce sig options)))
-                                (.then (fn [resp]
-                                         (handle-agent-action-response!
-                                          store
-                                          owner-address
-                                          session
-                                          nonce
-                                          resp
-                                          retries-left
-                                          (next-retry-callback attempt! nonce retries-left)))))))]
-                  (attempt! (or (:nonce-cursor session)
-                                (get-in @store [:wallet :agent :nonce-cursor]))
-                            (:max-nonce-retries options)))))))))))
+   (if-let [rejection (http/reject-when-trading-disabled!)]
+     rejection
+     (let [options (normalize-agent-action-options raw-options)]
+       (-> (trading-crypto-modules/load-trading-crypto-module!)
+           (.then
+            (fn [crypto]
+              (let [session (resolve-agent-session store owner-address crypto)]
+                (if-let [rejection (missing-agent-session-rejection store session)]
+                  rejection
+                  (letfn [(attempt! [cursor retries-left]
+                            (let [nonce (http/next-nonce cursor)]
+                              (-> (sign-agent-action! crypto session action nonce options)
+                                  (.then (fn [sig]
+                                           (post-signed-agent-action! action nonce sig options)))
+                                  (.then (fn [resp]
+                                           (handle-agent-action-response!
+                                            store
+                                            owner-address
+                                            session
+                                            nonce
+                                            resp
+                                            retries-left
+                                            (next-retry-callback attempt! nonce retries-left)))))))]
+                    (attempt! (or (:nonce-cursor session)
+                                  (get-in @store [:wallet :agent :nonce-cursor]))
+                              (:max-nonce-retries options))))))))))))
 
 (defn submit-order!
   ([store address action]

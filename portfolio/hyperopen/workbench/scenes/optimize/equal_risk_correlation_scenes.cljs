@@ -23,8 +23,6 @@
             [hyperopen.portfolio.optimizer.domain.risk-structure :as risk-structure]
             [hyperopen.workbench.support.layout :as layout]
             [hyperopen.workbench.support.state :as ws]
-            [hyperopen.views.portfolio.optimize.equal-risk-impact-strip
-             :as impact-strip]
             [hyperopen.views.portfolio.optimize.results-summary :as results-summary]
             [hyperopen.views.portfolio.optimize.risk-contributions-card
              :as risk-contributions-card]
@@ -59,15 +57,9 @@
 (defn- structured-result
   "Solved-result fixture whose contribution + structure sections come from the
   real domain namespaces. `assets` are [symbol weight vol] rows; `rho` is the
-  sparse underlying-correlation map. The current book's contributions and
-  benchmarks are computed by the SAME math over `current-weights`, so the
-  balance chart's current markers, the impact strip, and the leverage tiles
-  can never disagree with a real solve. `:quality` overrides the recorded
-  solve quality (default :approximate; pass :exact only for fixtures whose
-  weights genuinely balance, e.g. the symmetric balance-exact-fit book)."
-  [{:keys [assets rho rho-fallback correlation-cap current-weights quality]
-    :or {rho-fallback 0.25
-         quality :approximate}}]
+  sparse underlying-correlation map."
+  [{:keys [assets rho rho-fallback correlation-cap current-weights]
+    :or {rho-fallback 0.25}}]
   (let [symbols (mapv first assets)
         ids (mapv (comp instrument-id first) assets)
         weights (mapv second assets)
@@ -86,11 +78,6 @@
                         :covariance covariance
                         :weights weights
                         :targets targets})
-        current-contributions (risk-contributions/contribution-summary
-                               {:instrument-ids ids
-                                :covariance covariance
-                                :weights current-weights*
-                                :targets targets})
         structure (risk-structure/structure-summary
                    (cond-> {:instrument-ids ids
                             :covariance covariance
@@ -107,58 +94,46 @@
                      (= :ok (:status current-diversification))
                      (assoc :current-diversification
                             (dissoc current-diversification :status)))]
-    (cond->
-     {:status :solved
-      :as-of-ms 1752300000000
-      :solver {:strategy :sequential-equal-risk
-               :objective-kind :equal-risk}
-      :instrument-ids ids
-      :labels-by-instrument (zipmap ids symbols)
-      :target-weights-by-instrument (zipmap ids weights)
-      :current-weights-by-instrument (zipmap ids current-weights*)
-      :expected-return 0.11
-      :current-expected-return 0.08
-      :volatility (:portfolio-volatility structure)
-      :current-volatility (when (= :ok (:status current-diversification))
-                            (:modeled-volatility current-diversification))
-      :rebalance-preview {:capital-usd 100000}
-      :performance {:in-sample-sharpe 0.52}
-      :frontier-overlays {:standalone (map (fn [symbol vol]
-                                             {:label symbol
-                                              :volatility vol
-                                              :expected-return (* 0.15 vol)})
-                                           symbols
-                                           vols)}
-      :risk-contributions (-> contributions
-                              (dissoc :status)
-                              (assoc :quality quality))
-      :risk-structure structure*
-      :equal-risk-solver {:strategy :sequential-equal-risk
-                          :converged? true
-                          :termination-reason :step-tolerance
-                          :iterations 14
-                          :initialization-count 4
-                          :selected-initialization :inverse-volatility
-                          :allocation-freedom {:status :limited
-                                               :free-degrees 3
-                                               :binding-count 2
-                                               :books {:long 3 :short 2}}
-                          :initializations [{:seed-kind :inverse-volatility
-                                             :status :completed
-                                             :objective 2.1e-4
-                                             :converged? true}]}
-      :diagnostics {:gross-exposure (reduce + 0 (map js/Math.abs weights))
-                    :net-exposure (reduce + 0 weights)
-                    :long-exposure (reduce + 0 (filter pos? weights))
-                    :short-exposure (- (reduce + 0 (filter neg? weights)))
-                    :binding-constraints []}}
-
-      (= :ok (:status current-contributions))
-      (assoc :current-risk-contributions
-             {:relative-contributions-by-instrument
-              (zipmap ids (:relative-contributions current-contributions))
-              :rms-error (:rms-error current-contributions)
-              :max-absolute-error (:max-absolute-error current-contributions)}))))
+    {:status :solved
+     :as-of-ms 1752300000000
+     :solver {:strategy :sequential-equal-risk
+              :objective-kind :equal-risk}
+     :instrument-ids ids
+     :labels-by-instrument (zipmap ids symbols)
+     :target-weights-by-instrument (zipmap ids weights)
+     :current-weights-by-instrument (zipmap ids current-weights*)
+     :expected-return 0.11
+     :volatility (:portfolio-volatility structure)
+     :performance {:in-sample-sharpe 0.52}
+     :frontier-overlays {:standalone (map (fn [symbol vol]
+                                            {:label symbol
+                                             :volatility vol
+                                             :expected-return (* 0.15 vol)})
+                                          symbols
+                                          vols)}
+     :risk-contributions (-> contributions
+                             (dissoc :status)
+                             (assoc :quality :approximate))
+     :risk-structure structure*
+     :equal-risk-solver {:strategy :sequential-equal-risk
+                         :converged? true
+                         :termination-reason :step-tolerance
+                         :iterations 14
+                         :initialization-count 4
+                         :selected-initialization :inverse-volatility
+                         :allocation-freedom {:status :limited
+                                              :free-degrees 3
+                                              :binding-count 2
+                                              :books {:long 3 :short 2}}
+                         :initializations [{:seed-kind :inverse-volatility
+                                            :status :completed
+                                            :objective 2.1e-4
+                                            :converged? true}]}
+     :diagnostics {:gross-exposure (reduce + 0 (map js/Math.abs weights))
+                   :net-exposure (reduce + 0 weights)
+                   :long-exposure (reduce + 0 (filter pos? weights))
+                   :short-exposure (- (reduce + 0 (filter neg? weights)))
+                   :binding-constraints []}}))
 
 ;; The mock's book: BTC/ETH/SP500 long, MSTR/SOL short, underlying
 ;; correlations chosen so the POSITION P&L view reproduces the mock's signs
@@ -213,27 +188,6 @@
              ["FLAT" 0.20 0.0]]
     :rho {[0 1] 0.72}}))
 
-;; An EXACT fit with a lopsided current book: uniform pairwise correlation
-;; (0.3) and equal per-position risk scale (every weight = 0.198 / vol, all
-;; long) make the true contributions exactly 1/6 by symmetry, so the :exact
-;; quality override is honest — the real math's deviations are float noise.
-;; Gross 2.31x clears the leverage gate, so the impact strip's outcome chip
-;; and the leverage panel's Now-comparators are exercised too. The current
-;; book concentrates risk in BTC, giving the :shift display mode a real
-;; story: Current/Shift columns, current-imbalance + biggest-shift KPIs.
-(def ^:private balance-exact-fit-result
-  (structured-result
-   {:assets [["BTC" 0.220 0.90]
-             ["ETH" 0.330 0.60]
-             ["SOL" 0.440 0.45]
-             ["HYPE" 0.660 0.30]
-             ["MSTR" 0.264 0.75]
-             ["GOLD" 0.396 0.50]]
-    :current-weights [1.40 0.20 0.15 0.10 0.25 0.15]
-    :rho {}
-    :rho-fallback 0.3
-    :quality :exact}))
-
 ;; --- Interactive selection ------------------------------------------------------
 
 (def ^:private selection-reducers
@@ -263,7 +217,6 @@
          result
          {:selected-risk-instrument selected})
         [:div {:class ["optimizer-results-center-panel" "space-y-4"]}
-         (impact-strip/equal-risk-impact-strip result)
          (risk-contributions-card/risk-contributions-card
           result
           {:selected-risk-instrument selected})
@@ -275,7 +228,6 @@
    [:div {:class ["portfolio-optimizer" "mx-auto" "w-full"]
           :style {:max-width "1040px"}}
     [:div {:class ["optimizer-results-center-panel" "space-y-4" "p-4"]}
-     (impact-strip/equal-risk-impact-strip result)
      (risk-contributions-card/risk-contributions-card result)
      (results-summary/equal-risk-context-card result)]]))
 
@@ -291,7 +243,3 @@
 (portfolio/defscene correlation-degenerate-column
   []
   (static-card-scene degenerate-column-result))
-
-(portfolio/defscene balance-exact-fit
-  []
-  (static-card-scene balance-exact-fit-result))

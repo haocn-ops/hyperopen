@@ -201,6 +201,7 @@
    :actions/close-mobile-header-menu ::common/no-args
    :actions/open-header-settings ::common/no-args
    :actions/close-header-settings ::common/no-args
+   :actions/mark-brand-logo-failed ::common/path-args
    :actions/request-agent-storage-mode-change ::common/storage-mode-request-args
    :actions/cancel-agent-storage-mode-change ::common/no-args
    :actions/confirm-agent-storage-mode-change ::common/no-args
@@ -240,6 +241,7 @@
    :actions/close-agent-recovery-modal ::common/no-args
    :actions/set-agent-storage-mode ::common/set-agent-storage-mode-args
    :actions/set-agent-local-protection-mode ::common/set-agent-local-protection-mode-args
+   :actions/set-affiliate-consent ::common/boolean-args
    :actions/copy-wallet-address ::common/no-args
    :actions/reconnect-websocket ::common/no-args
    :actions/toggle-ws-diagnostics ::common/no-args
@@ -325,7 +327,6 @@
    :actions/remove-portfolio-optimizer-objective-menu-view ::portfolio-optimizer-instrument-id-args
    :actions/add-portfolio-optimizer-objective-menu-view ::common/no-args
    :actions/apply-portfolio-optimizer-objective-menu-selection-and-run ::common/no-args
-   :actions/switch-portfolio-optimizer-objective-and-run ::portfolio-optimizer-model-kind-args
    :actions/set-portfolio-optimizer-return-views-filter ::portfolio-optimizer-model-kind-args
    :actions/export-portfolio-optimizer-return-views ::common/no-args
    :actions/import-portfolio-optimizer-return-views ::common/no-args

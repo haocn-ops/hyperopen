@@ -93,7 +93,7 @@
 
 (defn render-desktop-nav
   [desktop-nav-items {:keys [active? items menu-key]}]
-  [:nav.hidden.md:flex.flex-1.items-center.justify-start.space-x-8.ml-8
+  [:nav.hidden.lg:flex.flex-1.items-center.justify-start.space-x-8.ml-8
    {:data-parity-id "header-nav"}
    (for [{:keys [id route] :as item} desktop-nav-items]
      ^{:key (str "desktop-nav:" (name id) ":" route)}
@@ -163,7 +163,7 @@
   [{:keys [primary-items secondary-items]}
    {:keys [active? mobile-action mobile-label]}
    menu-open?]
-  [:div {:class ["md:hidden"] :data-role "mobile-header-menu"}
+  [:div {:class ["lg:hidden"] :data-role "mobile-header-menu"}
    [:button {:type "button"
              :class ["flex"
                      "h-9"

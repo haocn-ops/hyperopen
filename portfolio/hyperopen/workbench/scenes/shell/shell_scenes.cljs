@@ -6,7 +6,6 @@
             [hyperopen.views.footer.build-badge :as build-badge]
             [hyperopen.views.footer-view :as footer-view]
             [hyperopen.views.header-view :as header-view]
-            [hyperopen.order.toast-payloads :as toast-payloads]
             [hyperopen.views.notifications-view :as notifications-view]
             [hyperopen.views.trade-confirmation-toasts :as trade-toasts]))
 
@@ -115,36 +114,6 @@
                                                 :kind :error
                                                 :headline "Withdrawal failed"
                                                 :subline "Address checksum does not match network."}]}})))
-
-(defn- margin-toast
-  "Render a margin toast through the real payload builder, so this scene stays
-  honest about what the effect actually shows."
-  [id ntli position]
-  (merge {:id id :kind :success}
-         (toast-payloads/position-margin-success-toast-payload
-          {:action {:type "updateIsolatedMargin" :ntli ntli}
-           :position position})))
-
-(defonce margin-updates-store
-  (ws/create-store ::margin-updates
-                   (shell-state
-                    {:ui {:toasts [(margin-toast "margin-btc" 250000000
-                                                 {:coin "BTC" :side :long})
-                                   (margin-toast "margin-hype" -125500000
-                                                 {:coin "HYPE" :side :short})
-                                   (margin-toast "margin-tsm" 6220000
-                                                 {:coin "xyz:TSM" :dex "xyz"
-                                                  :side :long})
-                                   ;; Worst case for the truncated headline.
-                                   (margin-toast "margin-melania" -1250000000000
-                                                 {:coin "MELANIA" :side :short})
-                                   ;; Failure variant: error rides in :detail.
-                                   (merge {:id "margin-sol-fail" :kind :error}
-                                          (toast-payloads/position-margin-failure-toast-payload
-                                           {:action {:type "updateIsolatedMargin"
-                                                     :ntli 40000000}
-                                            :position {:coin "SOL" :side :long}}
-                                           "Insufficient withdrawable collateral to add margin."))]}})))
 
 (defn- fill
   [id side symbol qty price offset-ms]
@@ -345,16 +314,6 @@
 
 (portfolio/defscene notifications-stacked
   :params notifications-store
-  [store]
-  (layout/page-shell
-   (layout/interactive-shell
-    store
-    (shell-reducers)
-    [:div {:class ["min-h-[320px]"]}
-     (notifications-view/notifications-view @store)])))
-
-(portfolio/defscene notifications-margin-updates
-  :params margin-updates-store
   [store]
   (layout/page-shell
    (layout/interactive-shell

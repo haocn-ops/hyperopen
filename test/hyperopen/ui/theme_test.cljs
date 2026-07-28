@@ -1,5 +1,6 @@
 (ns hyperopen.ui.theme-test
   (:require [cljs.test :refer-macros [deftest is]]
+            [hyperopen.service.tenant-config :as tenant-config]
             [hyperopen.ui.theme :as theme]))
 
 (defn- has-own?
@@ -44,3 +45,41 @@
   (is (= "institutional" (theme/active-theme-id {:ui {:theme "institutional"}})))
   (is (= theme/default-theme-id (theme/active-theme-id {})))
   (is (= theme/default-theme-id (theme/active-theme-id {:ui {:theme "junk"}}))))
+
+(deftest active-theme-id-projects-tenant-theme-unless-user-theme-wins-test
+  (let [tenant-override (assoc tenant-config/default-tenant-raw
+                               :theme/id "institutional")
+        tenant-state {:tenant/override tenant-override}
+        user-state (assoc-in tenant-state [:ui :theme] "hyperdegen")]
+    (is (= "institutional" (theme/active-theme-id tenant-state)))
+    (is (= "hyperdegen" (theme/active-theme-id user-state)))))
+
+(deftest active-theme-id-uses-first-valid-theme-candidate-test
+  (let [tenant-state {:tenant/override {:theme/id "institutional"}}]
+    (is (= "hyperdegen"
+           (theme/active-theme-id
+            (assoc-in tenant-state [:ui :theme] "hyperdegen"))))
+    (is (= "institutional"
+           (theme/active-theme-id
+            (assoc-in tenant-state [:ui :theme] "not-a-theme"))))
+    (is (= theme/default-theme-id
+           (theme/active-theme-id
+            {:ui {:theme "not-a-theme"}
+             :tenant/override {:theme/id "future-theme"}})))))
+
+(deftest tenant-theme-projects-to-the-document-attribute-test
+  (let [orig-document (.-document js/globalThis)
+        had-document? (has-own? js/globalThis "document")
+        html-el (js-obj "dataset" (js-obj))
+        tenant-override (assoc tenant-config/default-tenant-raw
+                               :theme/id "institutional")]
+    (try
+      (set! (.-document js/globalThis) (js-obj "documentElement" html-el))
+      (theme/apply-theme-attribute!
+       (theme/active-theme-id {:tenant/override tenant-override}))
+      (is (= "institutional"
+             (.. js/document -documentElement -dataset -theme)))
+      (finally
+        (if had-document?
+          (set! (.-document js/globalThis) orig-document)
+          (js-delete js/globalThis "document"))))))

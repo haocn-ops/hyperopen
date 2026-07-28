@@ -139,7 +139,7 @@
           (desktop-secondary-panel-placeholder "Account"
                                                "trade-mobile-account-panel-placeholder"
                                                :fill-height? true)))]
-   [:div {:class ["hidden" "w-full" "min-h-0" "lg:flex"]
+   [:div {:class ["hidden" "w-full" "min-h-0" "lg:flex" "lg:h-full"]
           :data-parity-id "trade-desktop-account-panel"}
     (when (and (:account-panel-visible? layout)
                desktop-layout?)

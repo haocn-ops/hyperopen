@@ -15,6 +15,7 @@ import {
 } from "./site_metadata.mjs";
 import {
   CONTROL_CACHE_CONTROL,
+  STRICT_TRANSPORT_SECURITY,
   IMMUTABLE_CACHE_CONTROL,
   THEME_PRELOAD_INLINE_SOURCE,
   THEME_PRELOAD_SCRIPT_HASH,
@@ -105,6 +106,62 @@ const SAMPLE_SCRIPT_TAG_MAIN_RELEASE_BUNDLE = [
   "boot();",
   "",
 ].join("\n");
+const RELEASE_BUILD_METADATA_ENV_KEYS = [
+  "HYPEROPEN_BUILD_ID",
+  "HYPEROPEN_GIT_SHA",
+  "VITE_GIT_SHA",
+  "GIT_COMMIT_SHA",
+  "GITHUB_SHA",
+  "CF_PAGES_COMMIT_SHA",
+  "HYPEROPEN_BUILD_BRANCH",
+  "GIT_BRANCH",
+  "GITHUB_REF_NAME",
+  "CF_PAGES_BRANCH",
+  "HYPEROPEN_BUILD_MESSAGE",
+  "GIT_COMMIT_MESSAGE",
+  "HYPEROPEN_DEPLOYED_AT",
+  "HYPEROPEN_BUILD_DEPLOYED_AT",
+  "HYPEROPEN_BUILD_ENV",
+  "HYPEROPEN_BUILD_REGION",
+  "CF_PAGES",
+];
+const DETERMINISTIC_RELEASE_BUILD_INFO = {
+  sha: "9b2ef51a8cc0d4e19bf832a04eebfc71c2a09a81d6",
+  short: "9b2ef51",
+  branch: "release/route-fixture",
+  message: "test(release): deterministic route metadata",
+  deployedAt: "2026-07-20T00:00:00.000Z",
+  env: "staging",
+  region: "global",
+};
+
+async function withDeterministicReleaseBuildMetadata(callback) {
+  const previousEnv = Object.fromEntries(
+    RELEASE_BUILD_METADATA_ENV_KEYS.map((key) => [key, process.env[key]])
+  );
+
+  for (const key of RELEASE_BUILD_METADATA_ENV_KEYS) {
+    delete process.env[key];
+  }
+  process.env.HYPEROPEN_BUILD_ID = DETERMINISTIC_RELEASE_BUILD_INFO.sha;
+  process.env.HYPEROPEN_BUILD_BRANCH = DETERMINISTIC_RELEASE_BUILD_INFO.branch;
+  process.env.HYPEROPEN_BUILD_MESSAGE = DETERMINISTIC_RELEASE_BUILD_INFO.message;
+  process.env.HYPEROPEN_DEPLOYED_AT = DETERMINISTIC_RELEASE_BUILD_INFO.deployedAt;
+  process.env.HYPEROPEN_BUILD_ENV = DETERMINISTIC_RELEASE_BUILD_INFO.env;
+  process.env.HYPEROPEN_BUILD_REGION = DETERMINISTIC_RELEASE_BUILD_INFO.region;
+
+  try {
+    return await callback();
+  } finally {
+    for (const [key, value] of Object.entries(previousEnv)) {
+      if (value === undefined) {
+        delete process.env[key];
+      } else {
+        process.env[key] = value;
+      }
+    }
+  }
+}
 
 test("release CSP permits the optimizer history API origin", () => {
   assert.ok(
@@ -112,6 +169,33 @@ test("release CSP permits the optimizer history API origin", () => {
       "https://price-history.hyperopen.xyz"
     )
   );
+});
+
+test("release CSP permits Hyperliquid Testnet REST and websocket origins", () => {
+  const connectSrc = extractCspDirective(buildContentSecurityPolicy(), "connect-src");
+
+  assert.ok(connectSrc.includes("https://api.hyperliquid-testnet.xyz"));
+  assert.ok(connectSrc.includes("wss://api.hyperliquid-testnet.xyz"));
+});
+
+test("release document policy excludes Cloudflare Insights scripts and declares HSTS", () => {
+  const policy = buildContentSecurityPolicy();
+  const scriptSrc = extractCspDirective(policy, "script-src");
+  const scriptSrcAttr = extractCspDirective(policy, "script-src-attr");
+  const requireTrustedTypes = extractCspDirective(policy, "require-trusted-types-for");
+  const trustedTypes = extractCspDirective(policy, "trusted-types");
+  const connectSrc = extractCspDirective(policy, "connect-src");
+
+  assert.deepEqual(scriptSrc, ["'self'", THEME_PRELOAD_SCRIPT_HASH]);
+  assert.deepEqual(scriptSrcAttr, ["'none'"]);
+  assert.equal(scriptSrc.includes("'unsafe-inline'"), false);
+  assert.equal(scriptSrc.includes("'unsafe-eval'"), false);
+  assert.equal(scriptSrc.includes("*"), false);
+  assert.equal(scriptSrc.includes("https://static.cloudflareinsights.com"), false);
+  assert.equal(connectSrc.includes("https://cloudflareinsights.com"), false);
+  assert.deepEqual(requireTrustedTypes, ["'script'"]);
+  assert.deepEqual(trustedTypes, ["default"]);
+  assert.equal(STRICT_TRANSPORT_SECURITY, "max-age=31536000; includeSubDomains");
 });
 
 function buildSampleIndexHtml() {
@@ -415,6 +499,17 @@ test("rewriteMainModuleLoaderRuntime tolerates constructor minification changes"
   assert.doesNotMatch(rewritten, /loaderManager\.pk=!0/);
 });
 
+test("rewriteMainModuleLoaderRuntime rewrites a nested property runtime", () => {
+  const source =
+    "$APP.d=vda.prototype;$APP.d.Sj=!1;$APP.d.rk=!1;$APP.d.wk=!1;\n" +
+    "var jxc=new vda;jxc.rk=!0;\n";
+
+  const rewritten = rewriteMainModuleLoaderRuntime(source);
+
+  assert.match(rewritten, /var jxc=new vda;jxc\.wk=!0;/);
+  assert.doesNotMatch(rewritten, /var jxc=new vda;jxc\.rk=!0/);
+});
+
 test("rewriteMainModuleLoaderRuntime derives shifted closure-minified loader flags", () => {
   const rewritten = rewriteMainModuleLoaderRuntime(
     SAMPLE_CURRENT_MINIFIED_MAIN_RELEASE_BUNDLE
@@ -472,6 +567,7 @@ test("buildSiteMetadata keeps /api lowercase in the generated metadata", () => {
   });
 
   assert.equal(metadata.origin, SAMPLE_CANONICAL_ORIGIN);
+  assert.equal(metadata.build, null);
   assert.equal(metadata.routes.find((route) => route.id === "api")?.path, "/api");
   assert.ok(!metadata.routes.some((route) => route.path === "/API"));
 });
@@ -620,11 +716,13 @@ test("generateReleaseArtifacts assembles deterministic route-specific release pa
 
   await writeReleaseFixture(sourceRoot);
 
-  const result = await generateReleaseArtifacts({
-    sourceRoot,
-    outputRoot,
-    canonicalOrigin: SAMPLE_CANONICAL_ORIGIN,
-  });
+  const result = await withDeterministicReleaseBuildMetadata(() =>
+    generateReleaseArtifacts({
+      sourceRoot,
+      outputRoot,
+      canonicalOrigin: SAMPLE_CANONICAL_ORIGIN,
+    })
+  );
 
   const generatedRootIndex = await fs.readFile(path.join(outputRoot, "index.html"), "utf8");
   const generatedTrade = await fs.readFile(path.join(outputRoot, "trade.html"), "utf8");
@@ -676,6 +774,10 @@ test("generateReleaseArtifacts assembles deterministic route-specific release pa
   assert.match(
     generatedTrade,
     /<link rel="preconnect" href="https:\/\/api\.hyperliquid\.xyz" crossorigin data-hyperopen-perf="preconnect" \/>/
+  );
+  assert.match(
+    generatedTrade,
+    /<link rel="preconnect" href="https:\/\/api\.hyperliquid-testnet\.xyz" crossorigin data-hyperopen-perf="preconnect" \/>/
   );
   assert.match(
     generatedTrade,
@@ -793,9 +895,7 @@ test("generateReleaseArtifacts assembles deterministic route-specific release pa
   }
 
   assert.equal(siteMetadata.origin, SAMPLE_CANONICAL_ORIGIN);
-  assert.equal(siteMetadata.build.sha.length, 40);
-  assert.equal(siteMetadata.build.short.length, 7);
-  assert.match(siteMetadata.build.deployedAt, /^\d{4}-\d{2}-\d{2}T/);
+  assert.deepEqual(siteMetadata.build, DETERMINISTIC_RELEASE_BUILD_INFO);
   assert.equal(Object.hasOwn(siteMetadata.build, "commitHref"), false);
   assert.equal(siteMetadata.routes.find((route) => route.id === "api")?.path, "/api");
   assert.deepEqual(result.immutableAssetPaths, [

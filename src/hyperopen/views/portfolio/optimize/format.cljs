@@ -107,7 +107,6 @@
   {:minimum-variance "Minimum risk"
    :max-sharpe "Maximum Sharpe"
    :equal-risk "Equal Risk"
-   :inverse-volatility "Risk-weighted sizing"
    :target-volatility "Target volatility"
    :target-return "Target return"
    :historical-mean "Historical mean"

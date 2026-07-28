@@ -1,0 +1,25 @@
+{
+  "tenant/id": "enterprise-example",
+  "brand/name": "Enterprise Desk",
+  "brand/logo-url": "",
+  "theme/id": "institutional",
+  "hyperliquid-network": "mainnet",
+  "features": {
+    "terminal": false,
+    "analytics": true,
+    "affiliate": true
+  },
+  "venue": {
+    "id": "hyperliquid",
+    "label": "Hyperliquid",
+    "url": "https://app.hyperliquid.xyz"
+  },
+  "affiliate": {
+    "provider": "hyperliquid",
+    "id": "enterprise-example-affiliate",
+    "status": "configured",
+    "referral-url": "https://app.hyperliquid.xyz/?ref=enterprise-example-affiliate",
+    "event-endpoint": "",
+    "disclosure": "Enterprise Desk may use a public Hyperliquid affiliate referral. Trading remains non-custodial."
+  }
+}

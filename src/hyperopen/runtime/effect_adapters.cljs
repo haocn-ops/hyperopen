@@ -402,6 +402,7 @@
           :default-agent-state agent-session/default-agent-state
           :now-ms-fn platform/now-ms
           :normalize-storage-mode agent-session/normalize-storage-mode
+          :is-mainnet (:is-mainnet runtime-state/hyperliquid-network) :signature-chain-id (:signature-chain-id runtime-state/hyperliquid-network)
           :default-signature-chain-id-for-environment agent-session/default-signature-chain-id-for-environment
           :build-approve-agent-action agent-session/build-approve-agent-action
           :format-agent-name-with-valid-until agent-session/format-agent-name-with-valid-until

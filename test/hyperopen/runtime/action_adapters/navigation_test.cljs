@@ -7,12 +7,28 @@
             [hyperopen.referrals.actions :as referrals-actions]
             [hyperopen.runtime.action-adapters.navigation :as navigation-adapters]
             [hyperopen.runtime.effect-order-contract :as effect-order-contract]
+            [hyperopen.service.tenant-config :as tenant-config]
             [hyperopen.staking.actions :as staking-actions]
             [hyperopen.subaccounts.actions :as subaccounts-actions]
             [hyperopen.surface-modules :as surface-modules]
             [hyperopen.trade-modules :as trade-modules]
             [hyperopen.trading-indicators-modules :as trading-indicators-modules]
             [hyperopen.vaults.actions :as vault-actions]))
+
+(deftest analytics-disabled-tenant-falls-back-from-portfolio-routes-test
+  (let [tenant (assoc-in tenant-config/default-tenant-raw
+                         [:features :analytics]
+                         false)
+        state {:router {:path "/trade"}
+               :tenant/override tenant}]
+    (doseq [path ["/portfolio" "/portfolio/optimize"]]
+      (let [effects (navigation-adapters/navigate state path)]
+        (is (= [:effects/save [:router :path] "/trade"]
+               (first effects)))
+        (is (some #{[:effects/push-state "/trade"]} effects))
+        (is (not-any? #(and (= :effects/load-route-module (first %))
+                            (= path (second %)))
+                      effects))))))
 
 (deftest navigate-appends-vault-route-effects-after-route-projection-test
   (with-redefs [vault-actions/load-vault-route (fn [_state _path]

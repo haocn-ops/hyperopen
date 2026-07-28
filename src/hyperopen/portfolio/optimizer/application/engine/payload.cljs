@@ -3,9 +3,6 @@
             [hyperopen.portfolio.optimizer.application.display-frontier :as display-frontier]
             [hyperopen.portfolio.optimizer.application.engine.equal-risk-payload
              :as equal-risk-payload]
-            [hyperopen.portfolio.optimizer.application.engine.inverse-volatility-payload
-             :as inverse-volatility-payload]
-            [hyperopen.portfolio.optimizer.contracts.constants :as contracts-constants]
             [hyperopen.portfolio.optimizer.application.engine.target-selection :as target-selection]
             [hyperopen.portfolio.optimizer.application.instrument-labels :as instrument-labels]
             [hyperopen.portfolio.optimizer.domain.diagnostics :as diagnostics]
@@ -40,25 +37,15 @@
   [request]
   (= :equal-risk (get-in request [:objective :kind])))
 
-(defn- covariance-only-request?
-  [request]
-  (contains? contracts-constants/covariance-only-objective-kinds
-             (get-in request [:objective :kind])))
-
-(defn- inverse-volatility-request?
-  [request]
-  (= :inverse-volatility (get-in request [:objective :kind])))
-
 (defn- aligned-clean-weights
   [instrument-ids weights encoded-constraints request]
   (let [cleaned (weight-cleaning/clean-weights
                  {:instrument-ids instrument-ids
                   :weights weights
-                  ;; Covariance-only objectives publish the validated solver
-                  ;; weights verbatim: dust removal would break the exact book
-                  ;; equalities and every position in the fixed universe is
-                  ;; intentional.
-                  :dust-threshold (if (covariance-only-request? request)
+                  ;; Equal Risk publishes the validated solver weights verbatim:
+                  ;; dust removal would break the exact book equalities and
+                  ;; every position in the fixed universe is intentional.
+                  :dust-threshold (if (equal-risk-request? request)
                                     0
                                     (dust-threshold request))
                   :long-only? (:long-only? encoded-constraints)
@@ -73,13 +60,6 @@
   [request sections-inputs]
   (when (equal-risk-request? request)
     (equal-risk-payload/equal-risk-sections sections-inputs)))
-
-(defn- inverse-volatility-sections
-  "Risk-weighted sizing payload section (see
-  engine.inverse-volatility-payload); nil for every other objective."
-  [request sections-inputs]
-  (when (inverse-volatility-request? request)
-    (inverse-volatility-payload/inverse-volatility-sections sections-inputs)))
 
 (defn- normalized-instruments-by-id
   [universe]
@@ -349,10 +329,9 @@
                                       current-weights*)
         current-expected-return (:expected-return current-portfolio-metrics*)
         current-volatility (:volatility current-portfolio-metrics*)
-        ;; Covariance-only objectives solve through an invalid return model
-        ;; (they never use returns); return-based display metrics are then
-        ;; omitted, not faked.
-        returns-unavailable? (and (covariance-only-request? request)
+        ;; Equal Risk solves through an invalid return model (it never uses
+        ;; returns); return-based display metrics are then omitted, not faked.
+        returns-unavailable? (and (equal-risk-request? request)
                                   (= :invalid (:status return-result)))
         expected-return (when-not returns-unavailable?
                           (math/portfolio-return target-weights expected-returns))
@@ -365,13 +344,6 @@
                                                    :instrument-ids instrument-ids
                                                    :target-weights target-weights
                                                    :current-weights current-weights*})
-        inverse-volatility-sections* (inverse-volatility-sections
-                                      request
-                                      {:solver-plan solver-plan
-                                       :risk-result risk-result
-                                       :instrument-ids instrument-ids
-                                       :target-weights target-weights
-                                       :current-weights current-weights*})
         labels-by-instrument* (labels-by-instrument
                                request
                                (vec (distinct (concat instrument-ids
@@ -394,7 +366,7 @@
                             (:warnings equal-risk-sections*)
                             (when returns-unavailable?
                               [{:code :return-model-unavailable-for-display
-                                :message "Expected-return estimates are unavailable; this objective's weights never use them, so only return-based display metrics are hidden."}])
+                                :message "Expected-return estimates are unavailable; Equal Risk weights never use them, so only return-based display metrics are hidden."}])
                             (when cash-warning [cash-warning])
                             (when sparse-warning [sparse-warning]))))]
     (merge
@@ -403,14 +375,6 @@
                                         :current-risk-contributions
                                         :equal-risk-solver
                                         :risk-structure])
-     ;; :inverse-volatility only: the sizing-fidelity section plus the same
-     ;; objective-agnostic contribution/structure analytics Equal Risk
-     ;; publishes (:quality :diagnostic — no convergence quality applies to
-     ;; the deterministic projection).
-     (select-keys inverse-volatility-sections* [:inverse-volatility
-                                                :risk-contributions
-                                                :current-risk-contributions
-                                                :risk-structure])
     {:status :solved
      :scenario-id (:scenario-id request)
      :as-of-ms (:as-of-ms request)

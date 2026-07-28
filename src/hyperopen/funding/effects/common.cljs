@@ -53,8 +53,8 @@
                               :network-label "Arbitrum Sepolia"
                               :rpc-url "https://sepolia-rollup.arbitrum.io/rpc"
                               :explorer-url "https://sepolia.arbiscan.io"
-                              :usdc-address "0x75faf114eafb1bdbe2f0316df893fd58ce46aa4d"
-                              :bridge-address "0xccd552b49b4383aa0a4f45689de3e29f142fa3ad"}})
+                              :usdc-address "0x1baAbB04529D43a73232B713C0FE471f7c7334d5"
+                              :bridge-address "0x08cfc1B6b2dCF36A1480b99353A354AA8AC56f89"}})
 
 (defn fallback-exchange-response-error
   [resp]

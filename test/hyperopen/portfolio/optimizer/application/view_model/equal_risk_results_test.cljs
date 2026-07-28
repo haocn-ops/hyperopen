@@ -6,8 +6,7 @@
 
 (defn- result-with-shares
   "Solved-result skeleton for n assets with the given signed shares."
-  [shares & {:keys [current-shares solver diagnostics quality]
-             :or {quality :approximate}}]
+  [shares & {:keys [current-shares solver diagnostics]}]
   (let [n (count shares)
         ids (mapv #(str "perp:A" %) (range n))
         targets (vec (repeat n (/ 1 n)))]
@@ -18,7 +17,7 @@
               :rms-error 0.01
               :max-absolute-error 0.02
               :negative-contribution-count (count (filter neg? shares))
-              :quality quality}
+              :quality :approximate}
              :target-weights-by-instrument (zipmap ids (repeat 0.1))
              :labels-by-instrument (zipmap ids ids)}
       current-shares
@@ -84,67 +83,6 @@
       (is (not-any? #(= "perp:A0" (:instrument-id %)) (:rows model))
           "A0's small deviation loses the cap to the 2-pt rows")
       (is (= 0.05 (:share (:largest model)))))))
-
-(deftest balance-model-shift-mode-flips-on-exact-with-current-test
-  (testing "an exact fit with current shares flips to :shift display mode,
-            ordered by current share descending with shift-pts on every row"
-    (let [model (equal-risk-results/balance-model
-                 (result-with-shares [0.25 0.25 0.25 0.25]
-                                     :quality :exact
-                                     :current-shares [0.1 0.5 0.3 0.1]))]
-      (is (= :shift (:display-mode model)))
-      (is (= ["perp:A1" "perp:A2" "perp:A0" "perp:A3"]
-             (mapv :instrument-id (:rows model)))
-          "current shares high-to-low: 0.5 > 0.3 > 0.1 = 0.1")
-      (is (= -25.0 (:shift-pts (first (:rows model))))
-          "the biggest donor sheds 25 pts (25% target − 50% current)")
-      (is (= 4 (:asset-count model)))))
-  (testing "an approximate fit keeps :deviation mode and the share-desc order"
-    (let [model (equal-risk-results/balance-model
-                 (result-with-shares [0.5 0.1 0.4]
-                                     :current-shares [0.9 0.05 0.05]))]
-      (is (= :deviation (:display-mode model)))
-      (is (= ["perp:A0" "perp:A2" "perp:A1"]
-             (mapv :instrument-id (:rows model))))))
-  (testing "an exact fit WITHOUT current shares stays in :deviation mode"
-    (let [model (equal-risk-results/balance-model
-                 (result-with-shares [0.5 0.5] :quality :exact))]
-      (is (= :deviation (:display-mode model)))
-      (is (nil? (:current model))))))
-
-(deftest balance-model-shift-mode-caps-by-shift-and-reports-movers-test
-  (testing "the cap keeps the largest |shift| rows and the remainder reports
-            the largest hidden |shift|"
-    ;; 32 assets at the exact 1/32 = 3.125% target (binary-exact values so
-    ;; equality assertions carry no float noise). A31 moved the most
-    ;; (current 53.125%), the rest each shed 1.5625 pts — the big mover must
-    ;; survive the cap even though every deviation is zero.
-    (let [n 32
-          shares (vec (repeat n 0.03125))
-          current (assoc (vec (repeat n 0.046875)) 31 0.53125)
-          model (equal-risk-results/balance-model
-                 (result-with-shares shares
-                                     :quality :exact
-                                     :current-shares current))]
-      (is (= :shift (:display-mode model)))
-      (is (= equal-risk-results/display-row-cap (count (:rows model))))
-      (is (= "perp:A31" (:instrument-id (first (:rows model))))
-          "biggest current share displays first")
-      (is (= (- n equal-risk-results/display-row-cap) (:hidden-count model)))
-      (is (= 1.5625 (:hidden-max-pts model))
-          "hidden rows all shifted 1.5625 pts (4.6875% -> 3.125%)")
-      (is (= {:instrument-id "perp:A31"
-              :label "perp:A31"
-              :shift-pts -50.0}
-             (get-in model [:current :biggest-shift]))))))
-
-(deftest format-signed-pts-never-renders-signed-zero-test
-  (is (= "0.0 pts" (equal-risk-results/format-signed-pts -0.04)))
-  (is (= "0.0 pts" (equal-risk-results/format-signed-pts 0.04)))
-  (is (= "0.0 pts" (equal-risk-results/format-signed-pts 0)))
-  (is (= "-0.6 pts" (equal-risk-results/format-signed-pts -0.6)))
-  (is (= "+1.2 pts" (equal-risk-results/format-signed-pts 1.23)))
-  (is (= "—" (equal-risk-results/format-signed-pts nil))))
 
 (deftest deviation-tone-grades-against-the-target-test
   (is (= :good (equal-risk-results/deviation-tone 1.8 20.0)))

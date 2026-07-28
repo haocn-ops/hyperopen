@@ -13,6 +13,7 @@
             [hyperopen.route-query-state :as route-query-state]
             [hyperopen.route-modules :as route-modules]
             [hyperopen.router :as router]
+            [hyperopen.service.product-context :as product-context]
             [hyperopen.surface-modules :as surface-modules]
             [hyperopen.runtime.action-adapters :as runtime-action-adapters]
             [hyperopen.runtime.effect-adapters :as runtime-effect-adapters]
@@ -267,9 +268,14 @@
   (let [defer-initial-trade-module-loads?* (atom defer-initial-trade-module-loads?)]
     (fn [path]
       (route-query-state/restore-current-route-query-state! startup-store)
-      (let [effects (route-change-effects
+      (let [context (product-context/build-product-context-view-model
+                     @startup-store)
+            safe-path (product-context/safe-route context path)
+            _ (when (not= safe-path path)
+                (swap! startup-store assoc-in [:router :path] safe-path))
+            effects (route-change-effects
                      @startup-store
-                     path
+                     safe-path
                      {:defer-trade-chart? @defer-initial-trade-module-loads?*
                       :defer-trading-indicators? @defer-initial-trade-module-loads?*
                       :defer-account-surfaces? @defer-initial-trade-module-loads?*

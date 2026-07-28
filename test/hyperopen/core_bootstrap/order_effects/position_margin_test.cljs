@@ -60,21 +60,14 @@
       (set! trading-api/submit-order!
             (fn [_store _address _action]
               (js/Promise.resolve {:status "ok"})))
-      (order-effects/api-submit-position-margin
-       deps
-       nil
-       store
-       {:action {:type "updateIsolatedMargin" :ntli 250000000}
-        :position {:coin "BTC" :dex nil :side :long}})
+      (order-effects/api-submit-position-margin deps nil store {:action {:type "updateIsolatedMargin"}})
       (js/setTimeout
        (fn []
          (try
            (is (= (position-margin/default-modal-state)
                   (get-in @store [:positions-ui :margin-modal])))
            (is (= {:kind :success
-                   :message {:headline "BTC long: added 250.00 USDC"
-                             :subline "Isolated margin"
-                             :message "BTC long: added 250.00 USDC."}}
+                   :message "Margin updated."}
                   (get-in @store [:ui :toast])))
            (is (= [[[:actions/refresh-order-history]]]
                   @dispatched))
@@ -99,22 +92,14 @@
               (js/Promise.resolve {:status "error"
                                    :response {:type "error"
                                               :data "margin rejected"}})))
-      (order-effects/api-submit-position-margin
-       deps
-       nil
-       store
-       {:action {:type "updateIsolatedMargin"}
-        :position {:coin "BTC" :dex nil :side :long}})
+      (order-effects/api-submit-position-margin deps nil store {:action {:type "updateIsolatedMargin"}})
       (js/setTimeout
        (fn []
          (try
            (is (= false (get-in @store [:positions-ui :margin-modal :submitting?])))
            (is (= "margin rejected" (get-in @store [:positions-ui :margin-modal :error])))
            (is (= {:kind :error
-                   :message {:headline "BTC long: margin update failed"
-                             :subline "Isolated margin"
-                             :message "BTC long margin update failed: margin rejected"
-                             :detail "margin rejected"}}
+                   :message "Margin update failed: margin rejected"}
                   (get-in @store [:ui :toast])))
            (finally
              (set! trading-api/submit-order! original-submit-order)

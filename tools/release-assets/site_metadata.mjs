@@ -304,27 +304,108 @@ export function normalizeBuildInfo(buildInfo) {
   };
 }
 
-export function buildSiteMetadata({ canonicalOrigin, indexHtml, buildId = null, buildInfo = null }) {
+function tenantRouteMetadata(route, tenant) {
+  const tenantName = typeof tenant?.["brand/name"] === "string" ? tenant["brand/name"].trim() : "";
+  if (!tenantName) {
+    return route;
+  }
+
+  const isHome = normalizePublicPath(route.path) === "/";
+  const replaceSourceBrand = (value) => String(value).replace(/\bHyperopen\b/gi, tenantName);
+  const title = replaceSourceBrand(route.title);
+  const description = replaceSourceBrand(route.description);
+  const heroTitle = replaceSourceBrand(route.heroTitle);
+  const heroDescription = replaceSourceBrand(route.heroDescription);
+  return {
+    ...route,
+    title: isHome ? title : `${title} | ${tenantName}`,
+    description: description.includes(tenantName) ? description : `${tenantName}. ${description}`,
+    heroTitle: isHome ? tenantName : `${heroTitle} | ${tenantName}`,
+    heroDescription: heroDescription.includes(tenantName)
+      ? heroDescription
+      : `${tenantName}. ${heroDescription}`,
+  };
+}
+
+function sameOriginTenantLogoPublicPath(tenant, canonicalOrigin) {
+  const logoUrl = tenant?.["brand/logo-url"];
+  if (typeof logoUrl !== "string" || !logoUrl.trim()) {
+    return null;
+  }
+  try {
+    const parsed = new URL(logoUrl);
+    if (parsed.origin !== canonicalOrigin) {
+      return null;
+    }
+    const normalized = normalizePublicPath(parsed.pathname);
+    const relativePath = publicPathToRelativePath(normalized);
+    const decodedPath = decodeURIComponent(relativePath);
+    if (
+      decodedPath.includes("\\") ||
+      decodedPath.split("/").some((segment) => segment === "." || segment === "..") ||
+      !path.extname(relativePath)
+    ) {
+      throw new Error("Same-origin tenant logo must use a safe file path.");
+    }
+    return normalized;
+  } catch (error) {
+    if (error.message === "Same-origin tenant logo must use a safe file path.") {
+      throw error;
+    }
+    return null;
+  }
+}
+
+function tenantEnabledRoute(route, tenant) {
+  const path = normalizePublicPath(route.path);
+  if (path === "/trade" && tenant?.features?.terminal === false) {
+    return false;
+  }
+  if (path === "/portfolio" && tenant?.features?.analytics === false) {
+    return false;
+  }
+  return true;
+}
+
+export function buildSiteMetadata({
+  canonicalOrigin,
+  indexHtml,
+  buildId = null,
+  buildInfo = null,
+  tenant = null,
+}) {
   const origin = normalizeCanonicalOrigin(canonicalOrigin);
   const normalizedBuildId =
     typeof buildId === "string" && buildId.trim().length > 0 ? buildId.trim() : null;
   const normalizedBuild = normalizeBuildInfo(buildInfo);
   const resolvedBuildId = normalizedBuild?.sha || normalizedBuildId;
 
+  const tenantLogoPublicPath = sameOriginTenantLogoPublicPath(tenant, origin);
   return {
-    siteName: "Hyperopen",
+    siteName:
+      typeof tenant?.["brand/name"] === "string" && tenant["brand/name"].trim()
+        ? tenant["brand/name"].trim()
+        : "Hyperopen",
     origin,
     buildId: resolvedBuildId,
     build: normalizedBuild,
-    routes: PUBLIC_ROUTE_METADATA.map((route) => ({
-      ...validateRouteMetadata(route),
-      path: normalizePublicPath(route.path),
-      twitterCard:
-        typeof route.twitterCard === "string" && route.twitterCard.trim()
-          ? route.twitterCard
-          : DEFAULT_TWITTER_CARD,
-    })),
-    rootAssetPaths: collectReleaseRootAssetPublicPaths(indexHtml),
+    routes: PUBLIC_ROUTE_METADATA.filter((route) => tenantEnabledRoute(route, tenant)).map((route) => {
+      const brandedRoute = tenantRouteMetadata(route, tenant);
+      return {
+        ...validateRouteMetadata(brandedRoute),
+        path: normalizePublicPath(brandedRoute.path),
+        twitterCard:
+          typeof brandedRoute.twitterCard === "string" && brandedRoute.twitterCard.trim()
+            ? brandedRoute.twitterCard
+            : DEFAULT_TWITTER_CARD,
+      };
+    }),
+    rootAssetPaths: [
+      ...new Set([
+        ...collectReleaseRootAssetPublicPaths(indexHtml),
+        ...(tenantLogoPublicPath ? [tenantLogoPublicPath] : []),
+      ]),
+    ].sort(),
   };
 }
 
@@ -537,7 +618,10 @@ export function buildReleaseSeoHeadMarkup(siteMetadata, routeMetadata) {
   ].join("\n");
 }
 
-export const PRECONNECT_ORIGINS = ["https://api.hyperliquid.xyz"];
+export const PRECONNECT_ORIGINS = [
+  "https://api.hyperliquid.xyz",
+  "https://api.hyperliquid-testnet.xyz",
+];
 
 export const ROUTE_PRELOAD_MODULE_IDS = {
   home: ["trade_chart", "account_surfaces"],

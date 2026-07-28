@@ -182,12 +182,9 @@
     [:span {:class ["optimizer-risk-balance-legend-item"]}
      [:span {:class ["optimizer-risk-decomp-net"]}]
      "Net contribution"]
-    ;; No target entry when the objective has none (Risk-weighted sizing's
-    ;; diagnostic reuse passes nil — the backdrop draws no target line).
-    (when (number? target-share)
-      [:span {:class ["optimizer-risk-balance-legend-item"]}
-       [:span {:class ["optimizer-risk-balance-legend-dash"]}]
-       (str "Target (" (structure-model/format-pct target-share) ")")])]
+    [:span {:class ["optimizer-risk-balance-legend-item"]}
+     [:span {:class ["optimizer-risk-balance-legend-dash"]}]
+     (str "Target (" (structure-model/format-pct target-share) ")")]]
    [:span {:class ["optimizer-risk-balance-col-head"]} "Cross"]
    [:span {:class ["optimizer-risk-balance-col-head"]} "Net"]])
 

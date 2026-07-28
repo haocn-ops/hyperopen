@@ -1,17 +1,36 @@
 (ns hyperopen.api.trading.http
   (:require [clojure.string :as str]
             [hyperopen.api.trading.debug-exchange-simulator :as debug-exchange-simulator]
+            [hyperopen.config :as app-config]
             [hyperopen.platform :as platform]
             [hyperopen.runtime.validation :as validation]))
 
-(def exchange-url "https://api.hyperliquid.xyz/exchange")
-(def info-url "https://api.hyperliquid.xyz/info")
+(def exchange-url (get-in app-config/config [:hyperliquid :exchange-url]))
+(def info-url (get-in app-config/config [:hyperliquid :info-url]))
+(def trading-disabled-error-message
+  "Trading is disabled because this release has no valid network declaration.")
+
+(defn trading-enabled?
+  []
+  (true? (get-in app-config/config [:hyperliquid :trading-enabled?])))
+
+(defn trading-disabled-error
+  []
+  (js/Error. trading-disabled-error-message))
+
+(defn reject-when-trading-disabled!
+  []
+  (if (trading-enabled?)
+    nil
+    (js/Promise.reject (trading-disabled-error))))
 
 (defn json-post! [url body]
-  (js/fetch url
-            (clj->js {:method "POST"
-                      :headers {"Content-Type" "application/json"}
-                      :body (js/JSON.stringify (clj->js body))})))
+  (if (and (string? url) (seq url))
+    (js/fetch url
+              (clj->js {:method "POST"
+                        :headers {"Content-Type" "application/json"}
+                        :body (js/JSON.stringify (clj->js body))}))
+    (js/Promise.reject (trading-disabled-error))))
 
 (defn parse-text-body
   [raw status]

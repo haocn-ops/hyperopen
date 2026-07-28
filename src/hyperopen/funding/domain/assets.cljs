@@ -1,5 +1,6 @@
 (ns hyperopen.funding.domain.assets
   (:require [clojure.string :as str]
+            [hyperopen.config :as app-config]
             [hyperopen.domain.trading :as trading-domain]))
 
 (def withdraw-min-usdc
@@ -176,8 +177,10 @@
 
 (defn- resolve-deposit-network
   [state]
-  (let [wallet-chain-id (normalize-chain-id (get-in state [:wallet :chain-id]))]
-    (if (= wallet-chain-id deposit-chain-id-testnet)
+  (let [wallet-chain-id (normalize-chain-id (get-in state [:wallet :chain-id]))
+        testnet-configured? (false? (get-in app-config/config [:hyperliquid :is-mainnet]))]
+    (if (or testnet-configured?
+            (= wallet-chain-id deposit-chain-id-testnet))
       {:chain-id deposit-chain-id-testnet
        :chain-label "Arbitrum Sepolia"}
       {:chain-id deposit-chain-id-mainnet

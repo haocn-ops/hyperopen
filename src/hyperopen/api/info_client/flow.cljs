@@ -188,7 +188,9 @@
       (-> (enqueue-info-request!
            priority
            (fn []
-             (if (stats/request-active? opts*)
+             (if (and (stats/request-active? opts*)
+                      (string? info-url)
+                      (seq info-url))
                (fetch-with-timeout!
                 env
                 info-url
@@ -196,7 +198,9 @@
                           :headers {"Content-Type" "application/json"}
                           :body (js/JSON.stringify (clj->js body))}))
                (js/Promise.reject
-                (stats/inactive-request-error request-type request-source))))
+                (if (stats/request-active? opts*)
+                  (js/Error. "Trading is disabled because this release has no valid network declaration.")
+                  (stats/inactive-request-error request-type request-source)))))
            request-meta)
         (.then
          (fn [resp]

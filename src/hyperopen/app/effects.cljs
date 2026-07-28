@@ -4,6 +4,7 @@
             [hyperopen.route-modules :as route-modules]
             [hyperopen.runtime.collaborators :as runtime-collaborators]
             [hyperopen.runtime.effect-adapters :as effect-adapters]
+            [hyperopen.runtime.effect-adapters.attribution :as attribution-effects]
             [hyperopen.runtime.effect-adapters.margin-rec :as margin-rec-effects]
             [hyperopen.runtime.effect-adapters.spectate-mode :as spectate-mode-effects]
             [hyperopen.runtime.state :as runtime-state]
@@ -70,6 +71,8 @@
                  :refresh-websocket-health (effect-adapters/make-refresh-websocket-health runtime)}
      :wallet {:connect-wallet effect-adapters/connect-wallet
               :disconnect-wallet (effect-adapters/make-disconnect-wallet runtime)
+              :record-attribution-event attribution-effects/effect
+              :set-affiliate-consent attribution-effects/set-affiliate-consent!
               :enable-agent-trading action-adapters/enable-agent-trading
               :set-agent-storage-mode effect-adapters/set-agent-storage-mode
               :set-agent-local-protection-mode effect-adapters/set-agent-local-protection-mode

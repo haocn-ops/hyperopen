@@ -1,8 +1,7 @@
 (ns hyperopen.views.portfolio.optimize.risk-return-context
   "The RISK / RETURN tab of the risk-contribution balance card (designer spec
   2026-07-11): a real vol/return chart for objectives that are NOT selected
-  from an efficient frontier (the covariance-only pair — Equal Risk and
-  Risk-weighted sizing, which passes its own :objective-label). Built on the same chart chrome as
+  from an efficient frontier (Equal Risk). Built on the same chart chrome as
   the frontier chart — shared geometry, nice ticks, gridlines, and the
   standalone asset icon markers with hover callouts — but deliberately NEVER
   drawing a frontier curve: none was calculated and none is implied, and the
@@ -31,10 +30,8 @@
 (def ^:private guide-color "var(--optimizer-text-3)")
 (def ^:private marker-fill "var(--optimizer-bg)")
 
-(defn- context-note
-  [objective-label]
-  (str "Expected returns are shown for context and did not determine the "
-       objective-label " allocation."))
+(def ^:private context-note
+  "Expected returns are shown for context and did not determine the Equal Risk allocation.")
 
 (def ^:private analytics-only-note
   "Expected returns come from the return model (analytics only). Not used to size positions.")
@@ -46,14 +43,14 @@
 ;; --- Scatter model --------------------------------------------------------------
 
 (defn- scatter-points
-  [result objective-label]
+  [result]
   (let [standalone (->> (get-in result [:frontier-overlays :standalone])
                         (filter #(and (finite?* (:volatility %))
                                       (finite?* (:expected-return %))))
                         vec)
         target (when (and (finite?* (:volatility result))
                           (finite?* (:expected-return result)))
-                 {:label (str "Recommended (" objective-label ")")
+                 {:label "Recommended (Equal Risk)"
                   :volatility (:volatility result)
                   :expected-return (:expected-return result)
                   :sharpe (get-in result [:performance :in-sample-sharpe])})
@@ -354,7 +351,7 @@
      (opt-format/format-pct (:expected-return point))]]])
 
 (defn- context-boxes
-  [current target objective-label]
+  [current target]
   [:div {:class ["optimizer-risk-return-boxes"]}
    (when current
      [:div {:class ["optimizer-risk-return-box"]
@@ -364,8 +361,7 @@
    (when target
      [:div {:class ["optimizer-risk-return-box" "optimizer-risk-return-box--recommended"]
             :data-role "portfolio-optimizer-risk-return-recommended-box"}
-      [:p {:class ["optimizer-risk-return-box-title"]}
-       (str "Recommended (" objective-label ")")]
+      [:p {:class ["optimizer-risk-return-box-title"]} "Recommended (Equal Risk)"]
       (point-stats target)])
    [:div {:class ["optimizer-risk-return-box"]
           :data-role "portfolio-optimizer-risk-return-context-box"}
@@ -389,7 +385,7 @@
      (overlay-model/overlay-label point)]))
 
 (defn- legend-row
-  [assets current? objective-label]
+  [assets current?]
   (let [shown (take legend-asset-cap assets)
         hidden (- (count assets) (count shown))]
     (into [:div {:class ["optimizer-risk-return-legend"]
@@ -407,7 +403,7 @@
            [[:span {:class ["optimizer-risk-return-legend-item"]}
              [:span {:class ["optimizer-risk-return-legend-swatch"
                              "optimizer-risk-return-legend-swatch--recommended"]}]
-             (str "Recommended (" objective-label ")")]]))))
+             "Recommended (Equal Risk)"]]))))
 
 ;; --- Footnote ---------------------------------------------------------------------
 
@@ -426,30 +422,24 @@
 (defn risk-return-panel
   "The RISK / RETURN tab panel body; nil when neither portfolio point exists
   (e.g. return metrics omitted because the return model was invalid) — the
-  caller then omits the tab entirely. `objective-label` names the
-  covariance-only objective in the recommended-marker copy and the
-  context-only framing; the one-argument form keeps the Equal Risk default."
-  ([result]
-   (risk-return-panel result nil))
-  ([result {:keys [objective-label] :or {objective-label "Equal Risk"}}]
-   (let [{:keys [target current] :as points} (scatter-points result
-                                                             objective-label)
-         note (context-note objective-label)]
-     (when (or target current)
-       (let [scale (scatter-scale points)]
-         [:div {:data-role "portfolio-optimizer-risk-return-context"}
-          [:div {:class ["optimizer-risk-return-header"]}
-           [:div {:class ["optimizer-risk-return-title-wrap"]}
-            [:p {:class ["optimizer-risk-return-title"]} "Risk / return context"]
-            [:span {:class ["optimizer-risk-return-info"]
-                    :title (str note " " analytics-only-note
-                                " No efficient frontier was calculated.")}
-             "ⓘ"]]
-           [:p {:class ["optimizer-risk-return-note"]
-                :data-role "portfolio-optimizer-risk-return-note"}
-            note]]
-          (context-boxes current target objective-label)
-          [:div {:class ["mt-3"]}
-           (chart-svg points scale)]
-          (legend-row (:assets points) (some? current) objective-label)
-          (sharpe-line result)])))))
+  caller then omits the tab entirely."
+  [result]
+  (let [{:keys [target current] :as points} (scatter-points result)]
+    (when (or target current)
+      (let [scale (scatter-scale points)]
+        [:div {:data-role "portfolio-optimizer-risk-return-context"}
+         [:div {:class ["optimizer-risk-return-header"]}
+          [:div {:class ["optimizer-risk-return-title-wrap"]}
+           [:p {:class ["optimizer-risk-return-title"]} "Risk / return context"]
+           [:span {:class ["optimizer-risk-return-info"]
+                   :title (str context-note " " analytics-only-note
+                               " No efficient frontier was calculated.")}
+            "ⓘ"]]
+          [:p {:class ["optimizer-risk-return-note"]
+               :data-role "portfolio-optimizer-risk-return-note"}
+           context-note]]
+         (context-boxes current target)
+         [:div {:class ["mt-3"]}
+          (chart-svg points scale)]
+         (legend-row (:assets points) (some? current))
+         (sharpe-line result)]))))

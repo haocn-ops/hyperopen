@@ -19,12 +19,23 @@
 (def local-storage-key
   "hyperopen-ui-theme")
 
+(defn- theme-id-token
+  [value]
+  (-> (cond
+        (keyword? value) (name value)
+        (nil? value) default-theme-id
+        :else (str value))
+      str/trim
+      str/lower-case))
+
+(defn valid-theme-id?
+  [value]
+  (and (some? value)
+       (contains? theme-ids (theme-id-token value))))
+
 (defn normalize-theme-id
   [value]
-  (let [candidate (-> (or value default-theme-id)
-                      str
-                      str/trim
-                      str/lower-case)]
+  (let [candidate (theme-id-token value)]
     (if (contains? theme-ids candidate)
       candidate
       default-theme-id)))
@@ -40,4 +51,9 @@
 
 (defn active-theme-id
   [state]
-  (normalize-theme-id (get-in state [:ui :theme])))
+  (let [ui-theme (get-in state [:ui :theme])
+        tenant-theme (get-in state [:tenant/override :theme/id])]
+    (cond
+      (valid-theme-id? ui-theme) (normalize-theme-id ui-theme)
+      (valid-theme-id? tenant-theme) (normalize-theme-id tenant-theme)
+      :else default-theme-id)))

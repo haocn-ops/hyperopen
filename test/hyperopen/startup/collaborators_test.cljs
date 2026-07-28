@@ -163,6 +163,9 @@
                    (is (= [request-address 500 2500 {:priority :high}]
                           (first @ledger-calls)))
                    (is (= 2 (count summary)))
+                   (is (= request-address
+                          (get-in @store [:portfolio :loaded-for-address])))
+                   (is (nil? (get-in @store [:portfolio :loading-for-address])))
                    (is (= [{:time 1500
                             :hash "0xabc"
                             :delta {:type "deposit"
@@ -174,6 +177,27 @@
                    (done)))
           (.catch (fn [err]
                     (is false (str "Unexpected error: " err))
+                    (done)))))))
+
+(deftest startup-base-deps-fetch-portfolio-scopes-initial-error-to-requested-address-test
+  (async done
+    (let [request-address "0x1111111111111111111111111111111111111111"
+          store (atom {:wallet {:address request-address}
+                       :portfolio {}})
+          deps (collaborators/startup-base-deps
+                {:api {:get-request-stats (fn [] {:source :injected})
+                       :request-portfolio! (fn [_address _opts]
+                                             (js/Promise.reject (js/Error. "portfolio-fail")))}})]
+      (-> ((:fetch-portfolio! deps) store request-address {:priority :high})
+          (.then (fn [_]
+                   (is false "Expected portfolio request to reject")
+                   (done)))
+          (.catch (fn [_]
+                    (is (= false (get-in @store [:portfolio :loading?])))
+                    (is (nil? (get-in @store [:portfolio :loading-for-address])))
+                    (is (= "Error: portfolio-fail" (get-in @store [:portfolio :error])))
+                    (is (= request-address
+                           (get-in @store [:portfolio :error-for-address])))
                     (done)))))))
 
 (deftest startup-base-deps-fetch-portfolio-uses-empty-ledger-window-fallback-test

@@ -10,6 +10,7 @@ import {
 import { fileURLToPath } from "node:url";
 
 const DEFAULT_DOCUMENT_PATH = "/trade";
+const TENANT_MANIFEST_PATH = "/tenant-manifest.json";
 
 function resolveOrigin(argvValue = process.argv[2], envValue = process.env.HYPEROPEN_VERIFY_ORIGIN) {
   const rawValue = typeof argvValue === "string" && argvValue.trim()
@@ -53,12 +54,48 @@ async function requestOk(fetchFn, url) {
   return response;
 }
 
-async function verifyDocument(fetchFn, origin, pathName) {
+function httpsOrigin(value) {
+  if (typeof value !== "string" || !value.trim()) {
+    return null;
+  }
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === "https:" && parsed.hostname ? parsed.origin : null;
+  } catch (_error) {
+    return null;
+  }
+}
+
+async function resolveTenantSecuritySources(fetchFn, origin) {
+  const url = new URL(TENANT_MANIFEST_PATH, origin);
+  const response = await fetchFn(url, { redirect: "follow" });
+  if (response.status === 404) {
+    return { imageSources: [], connectSources: [] };
+  }
+  if (!response.ok) {
+    throw new Error(`Expected ${url} to return 2xx or 404, received ${response.status}.`);
+  }
+
+  const manifest = await response.json();
+  const tenant = manifest?.tenant;
+  if (!tenant || typeof tenant !== "object") {
+    throw new Error(`${TENANT_MANIFEST_PATH} must contain a public tenant object.`);
+  }
+
+  const logoOrigin = httpsOrigin(tenant["brand/logo-url"]);
+  const eventOrigin = httpsOrigin(tenant.affiliate?.["event-endpoint"]);
+  return {
+    imageSources: logoOrigin ? [logoOrigin] : [],
+    connectSources: eventOrigin ? [eventOrigin] : [],
+  };
+}
+
+async function verifyDocument(fetchFn, origin, pathName, securitySources) {
   const url = new URL(pathName, origin);
   const response = await requestOk(fetchFn, url);
   const html = await response.text();
 
-  for (const [headerName, expectedValue] of Object.entries(expectedDocumentHeaders())) {
+  for (const [headerName, expectedValue] of Object.entries(expectedDocumentHeaders(securitySources))) {
     assertHeaderEquals(response, headerName, expectedValue, url.pathname);
   }
 
@@ -99,7 +136,13 @@ export async function verifyDeploymentHeaders({
   logFn = () => {},
 } = {}) {
   const normalizedOrigin = resolveOrigin(origin);
-  const documentResult = await verifyDocument(fetchFn, normalizedOrigin, DEFAULT_DOCUMENT_PATH);
+  const securitySources = await resolveTenantSecuritySources(fetchFn, normalizedOrigin);
+  const documentResult = await verifyDocument(
+    fetchFn,
+    normalizedOrigin,
+    DEFAULT_DOCUMENT_PATH,
+    securitySources
+  );
 
   const verifiedPaths = [];
   verifiedPaths.push(
@@ -126,6 +169,7 @@ export async function verifyDeploymentHeaders({
   const summary = {
     origin: normalizedOrigin,
     documentPath: DEFAULT_DOCUMENT_PATH,
+    tenantSecuritySources: securitySources,
     verifiedPaths,
   };
 

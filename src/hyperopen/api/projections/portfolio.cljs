@@ -7,25 +7,41 @@
   (api-errors/normalize-error err))
 
 (defn begin-portfolio-load
-  [state]
-  (-> state
-      (assoc-in [:portfolio :loading?] true)
-      (assoc-in [:portfolio :error] nil)))
+  ([state]
+   (begin-portfolio-load state nil))
+  ([state address]
+   (-> state
+       (assoc-in [:portfolio :loading?] true)
+       (assoc-in [:portfolio :loading-for-address]
+                 (account-context/normalize-address address))
+       (assoc-in [:portfolio :error] nil)
+       (assoc-in [:portfolio :error-for-address] nil))))
 
 (defn apply-portfolio-success
-  [state summary-by-key]
-  (-> state
-      (assoc-in [:portfolio :summary-by-key] (or summary-by-key {}))
-      (assoc-in [:portfolio :loading?] false)
-      (assoc-in [:portfolio :error] nil)
-      (assoc-in [:portfolio :loaded-at-ms] (.now js/Date))))
+  ([state summary-by-key]
+   (apply-portfolio-success state nil summary-by-key))
+  ([state address summary-by-key]
+   (-> state
+       (assoc-in [:portfolio :summary-by-key] (or summary-by-key {}))
+       (assoc-in [:portfolio :loading?] false)
+       (assoc-in [:portfolio :loading-for-address] nil)
+       (assoc-in [:portfolio :error] nil)
+       (assoc-in [:portfolio :error-for-address] nil)
+       (assoc-in [:portfolio :loaded-at-ms] (.now js/Date))
+       (assoc-in [:portfolio :loaded-for-address]
+                 (account-context/normalize-address address)))))
 
 (defn apply-portfolio-error
-  [state err]
-  (let [{:keys [message]} (normalized-error err)]
-    (-> state
-        (assoc-in [:portfolio :loading?] false)
-        (assoc-in [:portfolio :error] message))))
+  ([state err]
+   (apply-portfolio-error state nil err))
+  ([state address err]
+   (let [{:keys [message]} (normalized-error err)]
+     (-> state
+         (assoc-in [:portfolio :loading?] false)
+         (assoc-in [:portfolio :loading-for-address] nil)
+         (assoc-in [:portfolio :error] message)
+         (assoc-in [:portfolio :error-for-address]
+                   (account-context/normalize-address address))))))
 
 (defn- benchmark-address
   [address]

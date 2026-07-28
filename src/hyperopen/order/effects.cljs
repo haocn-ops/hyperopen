@@ -376,6 +376,18 @@
       (assoc-in [:order-form-runtime :submitting?] false)
       (assoc-in [:order-form-runtime :error] error-text)))
 
+(defn- record-order-attribution!
+  [record-attribution-event! store event-type market outcome]
+  (when (fn? record-attribution-event!)
+    (try
+      (record-attribution-event!
+       store
+       event-type
+       (cond-> {:outcome outcome}
+         (string? market) (assoc :market market)))
+      (catch :default _
+        nil))))
+
 (defn- open-enable-trading-recovery
   ([state]
    (-> state
@@ -454,11 +466,13 @@
       (submit-next! pre-actions))))
 
 (defn api-submit-order
-  [{:keys [dispatch! exchange-response-error runtime-error-message show-toast!]} _ store request]
+  [{:keys [dispatch! exchange-response-error record-attribution-event!
+           runtime-error-message show-toast!]} _ store request]
   (let [state @store
         spectate-mode-message (spectate-mode-precondition-error state)
         {:keys [owner-address account-address options]} (order-mutation-target state)
         address owner-address
+        market (when (string? (:active-asset state)) (:active-asset state))
         agent-status (get-in state [:wallet :agent :status])]
     (if (seq spectate-mode-message)
       (do
@@ -492,9 +506,19 @@
             (swap! store open-enable-trading-recovery message)))
         (do
           (swap! store assoc-in [:order-form-runtime :submitting?] true)
+          (record-order-attribution! record-attribution-event!
+                                     store
+                                     :trade-submit-requested
+                                     market
+                                     :submitted)
           (let [refresh-opts {:refresh-spot? (spot-refresh/outcome-order-mutation? request)}]
             (letfn [(handle-submit-runtime-error! [err]
                       (let [error-text (runtime-error-message err)]
+                        (record-order-attribution! record-attribution-event!
+                                                   store
+                                                   :trade-submit-result
+                                                   market
+                                                   :unavailable)
                         (swap! store update-order-submit-runtime error-text)
                         (show-toast! store :error (str "Order placement failed: " error-text))))]
             (-> (run-pre-submit-actions! store
@@ -506,6 +530,11 @@
                 (.then (fn [pre-submit-result]
                          (if-not (:ok? pre-submit-result)
                            (do
+                             (record-order-attribution! record-attribution-event!
+                                                        store
+                                                        :trade-submit-result
+                                                        market
+                                                        :rejected)
                              (swap! store update-order-submit-runtime (:error-text pre-submit-result))
                              (show-toast! store :error (:toast-message pre-submit-result)))
                            (-> (submit-order-for-target! store address (:action request) options)
@@ -514,13 +543,29 @@
                                               (submit-outcome exchange-response-error resp)]
                                           (if ok?
                                             (do
+                                              (record-order-attribution! record-attribution-event!
+                                                                         store
+                                                                         :trade-submit-result
+                                                                         market
+                                                                         :accepted)
                                               (swap! store update-order-submit-runtime nil)
                                               (show-toast! store :success {:toast-surface :order-submitted :headline "Order submitted" :subline "Awaiting fill confirmation" :message "Order submitted."})
                                               (refresh-account-surfaces-after-order-mutation! store account-address refresh-opts)
                                               (dispatch! store nil [[:actions/refresh-order-history]]))
                                             (if (trading-api/enable-trading-recovery-error? error-text)
-                                              (swap! store open-enable-trading-recovery)
                                               (do
+                                                (record-order-attribution! record-attribution-event!
+                                                                           store
+                                                                           :trade-submit-result
+                                                                           market
+                                                                           :rejected)
+                                                (swap! store open-enable-trading-recovery))
+                                              (do
+                                                (record-order-attribution! record-attribution-event!
+                                                                           store
+                                                                           :trade-submit-result
+                                                                           market
+                                                                           :rejected)
                                                 (swap! store update-order-submit-runtime error-text)
                                                 (show-toast! store :error toast-message)
                                                 (when (pos? success-count)
@@ -645,25 +690,22 @@
   (show-toast! store :error error-text))
 
 (defn- handle-position-margin-submit-response!
-  [store dispatch! exchange-response-error show-toast! address request resp]
+  [store dispatch! exchange-response-error show-toast! address resp]
   (if (= "ok" (:status resp))
     (do
       (swap! store assoc-in [:positions-ui :margin-modal]
              (position-margin/default-modal-state))
-      (show-toast! store :success
-                   (toast-payloads/position-margin-success-toast-payload request))
+      (show-toast! store :success "Margin updated.")
       (refresh-order-surfaces-after-submit! store dispatch! address))
     (let [error-text (str (exchange-response-error resp))]
       (set-position-margin-modal-error! store error-text)
-      (show-toast! store :error
-                   (toast-payloads/position-margin-failure-toast-payload request error-text)))))
+      (show-toast! store :error (str "Margin update failed: " error-text)))))
 
 (defn- handle-position-margin-submit-runtime-error!
-  [store runtime-error-message show-toast! request err]
+  [store runtime-error-message show-toast! err]
   (let [error-text (runtime-error-message err)]
     (set-position-margin-modal-error! store error-text)
-    (show-toast! store :error
-                 (toast-payloads/position-margin-failure-toast-payload request error-text))))
+    (show-toast! store :error (str "Margin update failed: " error-text))))
 
 (defn api-submit-position-margin
   [{:keys [dispatch! exchange-response-error runtime-error-message show-toast!]} _ store request]
@@ -679,13 +721,11 @@
                           dispatch!
                           exchange-response-error
                           show-toast!
-                          account-address
-                          request))
+                          account-address))
           (.catch (partial handle-position-margin-submit-runtime-error!
                            store
                            runtime-error-message
-                           show-toast!
-                           request))))))
+                           show-toast!))))))
 
 (defn api-cancel-order
   [{:keys [dispatch!

@@ -6,6 +6,7 @@
 (s/def ::order-submit-confirmation-variant
   #{:open-order :close-position})
 (s/def ::enable-agent-trading-args (s/tuple map?))
+(s/def ::record-attribution-event-args (s/tuple keyword? map?))
 (s/def ::api-submit-request (s/keys :req-un [::common/action]))
 (s/def ::api-submit-order-args (s/tuple ::api-submit-request))
 
@@ -286,6 +287,7 @@
    :effects/unsubscribe-webdata2 ::common/address-args
    :effects/connect-wallet ::common/optional-string-args
    :effects/disconnect-wallet ::common/no-args
+   :effects/set-affiliate-consent ::common/boolean-args
    :effects/enable-agent-trading ::enable-agent-trading-args
    :effects/set-agent-storage-mode ::common/set-agent-storage-mode-args
    :effects/set-agent-local-protection-mode ::common/set-agent-local-protection-mode-args
@@ -298,6 +300,7 @@
    :effects/spectate-watchlist-feedback ::spectate-watchlist-feedback-args
    :effects/reconnect-websocket ::common/no-args
    :effects/refresh-websocket-health ::common/no-args
+   :effects/record-attribution-event ::record-attribution-event-args
    :effects/confirm-ws-diagnostics-reveal ::common/no-args
    :effects/copy-websocket-diagnostics ::common/no-args
    :effects/ws-reset-subscriptions ::common/ws-reset-subscriptions-args

@@ -7,6 +7,7 @@
    :close-mobile-header-menu header-actions/close-mobile-header-menu
    :open-header-settings header-actions/open-header-settings
    :close-header-settings header-actions/close-header-settings
+   :mark-brand-logo-failed header-actions/mark-brand-logo-failed
    :request-agent-storage-mode-change header-actions/request-agent-storage-mode-change
    :cancel-agent-storage-mode-change header-actions/cancel-agent-storage-mode-change
    :confirm-agent-storage-mode-change header-actions/confirm-agent-storage-mode-change
@@ -25,6 +26,7 @@
    :set-confirm-market-orders-enabled header-actions/set-confirm-market-orders-enabled
    :set-open-order-safety-mode header-actions/set-open-order-safety-mode
    :set-ui-theme header-actions/set-ui-theme
+   :set-affiliate-consent header-actions/set-affiliate-consent
    :reset-degen-life header-actions/reset-degen-life
    :navigate-mobile-header-menu header-actions/navigate-mobile-header-menu
    :open-spectate-mode-mobile-header-menu header-actions/open-spectate-mode-mobile-header-menu

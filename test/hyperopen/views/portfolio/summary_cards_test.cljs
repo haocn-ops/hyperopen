@@ -75,3 +75,116 @@
     (is (contains? all-text "0.450% / 0.150%"))
     (is (contains? all-text "View Volume"))
     (is (contains? all-text "View Fee Schedule"))))
+
+(deftest analytics-metrics-render-stable-evidence-anchors-without-zero-fallbacks-test
+  (let [live-analytics {:data-quality :live
+                        :range :month
+                        :equity 1234
+                        :pnl -56
+                        :return-pct -4.5
+                        :max-drawdown-pct -7.25
+                        :volume 7890
+                        :fee-rates {:taker 0.0005 :maker 0.0001}
+                        :as-of-ms 2000
+                        :message "Live provider data"}
+        unavailable-analytics {:data-quality :unavailable
+                               :equity nil
+                               :pnl nil
+                               :return-pct nil
+                               :max-drawdown-pct nil
+                               :volume nil
+                               :fee-rates nil
+                               :message "Connect a wallet to view portfolio analytics"}
+        expired-fee-rates-analytics (assoc live-analytics :fee-rates nil)
+        selectors {:summary-scope {:label "Perps + Spot + Vaults"
+                                   :open? false
+                                   :value :all
+                                   :options [{:value :all :label "Perps + Spot + Vaults"}]}
+                   :summary-time-range {:label "30D"
+                                        :open? false
+                                        :value :month
+                                        :options [{:value :month :label "30D"}]}}
+        render (fn [analytics]
+                 [:div
+                  (summary-cards/summary-card {:analytics analytics
+                                               :summary {}
+                                               :selectors selectors})
+                  (summary-cards/metric-cards {:analytics analytics
+                                               :fee-schedule {:open? false}})])
+        live-view (render live-analytics)
+        unavailable-view (render unavailable-analytics)
+        expired-fee-rates-view (render expired-fee-rates-analytics)
+        live-text (set (hiccup/collect-strings live-view))
+        unavailable-text (set (hiccup/collect-strings unavailable-view))]
+    (is (= "live" (get-in (hiccup/find-by-data-role live-view "portfolio-analytics-status")
+                            [1 :data-quality])))
+    (doseq [[data-role expected-text] [["portfolio-analytics-equity" "$1,234.00"]
+                                      ["portfolio-analytics-pnl" "-$56.00"]
+                                      ["portfolio-analytics-return" "-4.50%"]
+                                      ["portfolio-analytics-drawdown" "-7.25%"]
+                                      ["portfolio-analytics-volume" "$7,890.00"]
+                                      ["portfolio-analytics-fee-rates" "0.050% / 0.010%"]]]
+      (is (some? (hiccup/find-by-data-role live-view data-role)))
+      (is (contains? live-text expected-text)))
+    (is (contains? live-text "Current maker / taker rates"))
+    (is (contains? live-text "30 Day Volume"))
+    (is (= "unavailable"
+           (get-in (hiccup/find-by-data-role unavailable-view "portfolio-analytics-status")
+                   [1 :data-quality])))
+    (is (contains? unavailable-text "14 Day Volume"))
+    (doseq [data-role ["portfolio-analytics-equity"
+                       "portfolio-analytics-pnl"
+                       "portfolio-analytics-return"
+                       "portfolio-analytics-drawdown"
+                       "portfolio-analytics-volume"
+                       "portfolio-analytics-fee-rates"]]
+      (is (contains? (set (hiccup/collect-strings
+                           (hiccup/find-by-data-role unavailable-view data-role)))
+                     "Unavailable")))
+    (is (not (contains? unavailable-text "$0.00")))
+    (is (not (contains? unavailable-text "0.000%")))
+    (is (contains? (set (hiccup/collect-strings
+                         (hiccup/find-by-data-role expired-fee-rates-view
+                                                   "portfolio-analytics-fee-rates")))
+                   "Unavailable"))))
+
+(deftest analytics-summary-preserves-supported-account-composition-values-test
+  (let [analytics {:data-quality :live
+                   :equity 1234
+                   :pnl 20
+                   :return-pct 2
+                   :max-drawdown-pct -1
+                   :volume 100
+                   :message "Live provider data"}
+        selectors {:summary-scope {:label "All"
+                                   :open? false
+                                   :value :all
+                                   :options [{:value :all :label "All"}]}
+                   :summary-time-range {:label "30D"
+                                        :open? false
+                                        :value :month
+                                        :options [{:value :month :label "30D"}]}}
+        summary {:show-perps-account-equity? true
+                 :perps-account-equity 222.22
+                 :spot-equity-label "Spot Account Equity"
+                 :spot-account-equity 333.33
+                 :show-vault-equity? true
+                 :vault-equity 444.44
+                 :show-earn-balance? true
+                 :earn-balance 555.55
+                 :show-staking-account? true
+                 :staking-account-hype 7}
+        render #(summary-cards/summary-card {:analytics analytics
+                                              :summary %
+                                              :selectors selectors})
+        supported-text (set (hiccup/collect-strings (render summary)))
+        unavailable-text (hiccup/collect-strings
+                          (render (assoc summary
+                                         :perps-account-equity nil
+                                         :spot-account-equity nil
+                                         :vault-equity nil
+                                         :earn-balance nil
+                                         :staking-account-hype nil)))]
+    (doseq [value ["$222.22" "$333.33" "$444.44" "$555.55" "7 HYPE"]]
+      (is (contains? supported-text value)))
+    (is (= 5 (count (filter #(= "Unavailable" %) unavailable-text))))))

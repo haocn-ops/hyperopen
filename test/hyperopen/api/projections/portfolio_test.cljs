@@ -21,6 +21,23 @@
     (is (= false (get-in failed [:portfolio :loading?])))
     (is (= "Error: portfolio-fail" (get-in failed [:portfolio :error])))))
 
+(deftest portfolio-projections-track-request-address-scope-test
+  (let [address "0xabcdefabcdefabcdefabcdefabcdefabcdef1234"
+        summary {:month {:accountValueHistory [[1 100] [2 110]]}}
+        loading (portfolio/begin-portfolio-load {} address)
+        success (portfolio/apply-portfolio-success loading address summary)
+        failed (portfolio/apply-portfolio-error loading address (js/Error. "portfolio-fail"))]
+    (is (= true (get-in loading [:portfolio :loading?])))
+    (is (= address (get-in loading [:portfolio :loading-for-address])))
+    (is (= summary (get-in success [:portfolio :summary-by-key])))
+    (is (nil? (get-in success [:portfolio :loading-for-address])))
+    (is (= address (get-in success [:portfolio :loaded-for-address])))
+    (is (nil? (get-in success [:portfolio :error-for-address])))
+    (is (= false (get-in failed [:portfolio :loading?])))
+    (is (nil? (get-in failed [:portfolio :loading-for-address])))
+    (is (= "Error: portfolio-fail" (get-in failed [:portfolio :error])))
+    (is (= address (get-in failed [:portfolio :error-for-address])))))
+
 (deftest trader-benchmark-portfolio-projections-track-keyed-loading-success-and-error-test
   (let [address "0xabcdefabcdefabcdefabcdefabcdefabcdef1234"
         other-address "0x1111111111111111111111111111111111111111"

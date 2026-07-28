@@ -43,8 +43,8 @@
   (is (= "0x66eee" (agent-session/default-signature-chain-id-for-environment false)))
   (is (= :session (agent-session/normalize-storage-mode :session)))
   (is (= :session (agent-session/normalize-storage-mode " SESSION ")))
-  (is (= :local (agent-session/normalize-storage-mode "unknown")))
-  (is (= :local (agent-session/normalize-storage-mode nil)))
+  (is (= :session (agent-session/normalize-storage-mode "unknown")))
+  (is (= :session (agent-session/normalize-storage-mode nil)))
   (is (= :session (:storage-mode (agent-session/default-agent-state :storage-mode "SESSION"))))
   (is (nil? (:agent-address (agent-session/default-agent-state))))
   (is (= 14 (agent-session/normalize-agent-valid-days 14.8)))
@@ -86,37 +86,36 @@
              (agent-session/session-storage-key wallet-address)))
       (is (nil? (agent-session/session-storage-key "0xabc123")))
 
-      (is (= :local (agent-session/load-storage-mode-preference)))
+      (is (= :session (agent-session/load-storage-mode-preference)))
       (is (true? (agent-session/persist-storage-mode-preference! :session)))
       (is (= :session (agent-session/load-storage-mode-preference)))
       (.setItem local "hyperopen:agent-storage-mode:v1" "unknown")
-      (is (= :local (agent-session/load-storage-mode-preference)))
+      (is (= :session (agent-session/load-storage-mode-preference)))
       (.setItem local "hyperopen:agent-device-label:v1" "Hyperopen Device 72905e")
       (is (= "Hyperopen 72905e"
              (agent-session/load-device-label)))
       (is (= "Hyperopen 72905e"
              (.getItem local "hyperopen:agent-device-label:v1")))
 
-      (is (true? (agent-session/persist-agent-session-by-mode!
-                  wallet-address
-                  :session
-                  valid-session)))
+      (is (false? (agent-session/persist-agent-session-by-mode!
+                   wallet-address
+                   :session
+                   valid-session)))
       (is (nil? (.getItem local (agent-session/session-storage-key wallet-address))))
+      (.setItem session
+                (agent-session/session-storage-key wallet-address)
+                (js/JSON.stringify (clj->js valid-session)))
       (is (= {:agent-address "0x9999999999999999999999999999999999999999"
               :private-key "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
               :last-approved-at 1700000002222
               :nonce-cursor 1700000003333}
              (agent-session/load-agent-session-by-mode wallet-address :session)))
-      (is (true? (agent-session/persist-agent-session-by-mode!
+      (is (false? (agent-session/persist-agent-session-by-mode!
                   wallet-address
                   :local
                   valid-session)))
-      (is (some? (.getItem local (agent-session/session-storage-key wallet-address))))
-      (is (= {:agent-address "0x9999999999999999999999999999999999999999"
-              :private-key "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-              :last-approved-at 1700000002222
-              :nonce-cursor 1700000003333}
-             (agent-session/load-agent-session-by-mode wallet-address :local)))
+      (is (nil? (.getItem local (agent-session/session-storage-key wallet-address))))
+      (is (nil? (agent-session/load-agent-session-by-mode wallet-address :local)))
       (is (true? (agent-session/clear-agent-session-by-mode! wallet-address :session)))
       (is (true? (agent-session/clear-agent-session-by-mode! wallet-address :local)))
       (is (nil? (agent-session/load-agent-session-by-mode wallet-address :session)))

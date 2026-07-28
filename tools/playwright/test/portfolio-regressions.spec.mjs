@@ -408,6 +408,38 @@ async function seedPortfolioWalletAddress(page, address) {
   await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
 }
 
+async function seedPortfolioAnalyticsFixture(page, fixture) {
+  await page.evaluate((payload) => {
+    const c = globalThis.cljs.core;
+    const kw = (name) => c.keyword(name);
+    const path = (...segments) =>
+      c.PersistentVector.fromArray(segments.map((segment) => kw(segment)), true);
+    const opts = c.PersistentArrayMap.fromArray([kw("keywordize-keys"), true], true);
+    const summary = c.js__GT_clj(payload.summary, opts);
+    const userFees = c.js__GT_clj(payload.userFees, opts);
+    const summaryByKey = c.PersistentArrayMap.fromArray([kw("month"), summary], true);
+    const loadedAtMs = payload.loadedAtMs ?? Date.now();
+    const store = globalThis.hyperopen.system.store;
+    let nextState = c.deref(store);
+    nextState = c.assoc_in(nextState, path("wallet", "address"), payload.walletAddress);
+    nextState = c.assoc_in(nextState, path("portfolio-ui", "summary-time-range"), kw("month"));
+    nextState = c.assoc_in(nextState, path("portfolio", "summary-by-key"), summaryByKey);
+    nextState = c.assoc_in(nextState, path("portfolio", "loading?"), false);
+    nextState = c.assoc_in(nextState, path("portfolio", "error"), payload.portfolioError ?? null);
+    nextState = c.assoc_in(nextState, path("portfolio", "loaded-at-ms"), loadedAtMs);
+    nextState = c.assoc_in(nextState, path("portfolio", "user-fees"), userFees);
+    nextState = c.assoc_in(nextState, path("portfolio", "user-fees-loading?"), false);
+    nextState = c.assoc_in(
+      nextState,
+      path("portfolio", "user-fees-loaded-for-address"),
+      payload.userFeesAddress
+    );
+    nextState = c.assoc_in(nextState, path("portfolio", "user-fees-loaded-at-ms"), loadedAtMs);
+    c.reset_BANG_(store, nextState);
+  }, fixture);
+  await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
+}
+
 async function seedPortfolioWebdata2(page, webdata2) {
   await page.evaluate((payload) => {
     const c = globalThis.cljs.core;
@@ -1450,6 +1482,89 @@ test("portfolio route exposes deterministic interaction states @regression", asy
 
   await expect(page.locator("[data-role='account-info-tab-performance-metrics']"))
     .not.toHaveAttribute("aria-pressed", "true");
+});
+
+test("portfolio analytics fixtures stay address-scoped across connected and observed routes @analytics @regression", async ({ page }) => {
+  const connected = {
+    walletAddress: "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    userFeesAddress: "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    summary: {
+      account: "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      accountValueHistory: [[1_000, 10_000], [2_000, 13_000], [3_000, 12_345]],
+      pnlHistory: [[1_000, 0], [2_000, 3_000], [3_000, 2_345]],
+      vlm: 54_321
+    },
+    userFees: {
+      userCrossRate: 0.0005,
+      userAddRate: 0.0001,
+      dailyUserVlm: [{ userCross: 50_000, userAdd: 4_321 }]
+    }
+  };
+  const observed = {
+    walletAddress: connected.walletAddress,
+    userFeesAddress: TRADER_ADDRESS,
+    summary: {
+      account: TRADER_ADDRESS,
+      accountValueHistory: [[1_000, 100_000], [2_000, 120_000], [3_000, 98_765]],
+      pnlHistory: [[1_000, 0], [2_000, 20_000], [3_000, 12_345]],
+      vlm: 87_654
+    },
+    userFees: {
+      userCrossRate: 0.0008,
+      userAddRate: 0.0002,
+      dailyUserVlm: [{ userCross: 80_000, userAdd: 7_654 }]
+    }
+  };
+  const metricRoles = [
+    "portfolio-analytics-equity",
+    "portfolio-analytics-pnl",
+    "portfolio-analytics-return",
+    "portfolio-analytics-drawdown",
+    "portfolio-analytics-volume",
+    "portfolio-analytics-fee-rates"
+  ];
+  const assertContained = async (value) => {
+    await expect.poll(async () => page.evaluate(() => (
+      document.documentElement.scrollWidth <= window.innerWidth
+    ))).toBe(true);
+    for (const role of metricRoles) {
+      await expect(page.locator(`[data-role='${role}']`)).toBeVisible();
+    }
+    await expect(page.locator("[data-role='portfolio-analytics-status']"))
+      .toHaveAttribute("data-quality", "live");
+    await expect(page.locator("[data-role='portfolio-analytics-equity']")).toContainText(value.equity);
+    await expect(page.locator("[data-role='portfolio-analytics-pnl']")).toContainText(value.pnl);
+    await expect(page.locator("[data-role='portfolio-analytics-volume']")).toContainText(value.volume);
+    await expect(page.locator("[data-role='portfolio-analytics-fee-rates']")).toContainText(value.feeRate);
+  };
+
+  await visitRoute(page, "/portfolio");
+  await seedPortfolioAnalyticsFixture(page, connected);
+  for (const viewport of PORTFOLIO_LEDGER_REVIEW_VIEWPORTS) {
+    await page.setViewportSize(viewport);
+    await assertContained({ equity: "12,345", pnl: "2,345", volume: "54,321", feeRate: "0.050" });
+  }
+
+  await visitRoute(page, `/portfolio/trader/${TRADER_ADDRESS}`);
+  await seedPortfolioAnalyticsFixture(page, observed);
+  for (const viewport of PORTFOLIO_LEDGER_REVIEW_VIEWPORTS) {
+    await page.setViewportSize(viewport);
+    await assertContained({ equity: "98,765", pnl: "12,345", volume: "87,654", feeRate: "0.080" });
+    await expect(page.locator("[data-role='portfolio-inspection-header']")).toBeVisible();
+    await expect(page.locator("[data-role='portfolio-analytics-equity']")).not.toContainText("12,345");
+    await expect(page.locator("[data-role='portfolio-analytics-volume']")).not.toContainText("54,321");
+  }
+
+  await seedPortfolioAnalyticsFixture(page, {
+    ...observed,
+    portfolioError: "Observed portfolio refresh failed",
+    loadedAtMs: 1
+  });
+  await expect(page.locator("[data-role='portfolio-analytics-status']"))
+    .toHaveAttribute("data-quality", "stale");
+  await expect(page.locator("[data-role='portfolio-analytics-equity']")).toContainText("98,765");
+  await expect(page.locator("[data-role='portfolio-analytics-as-of']")).toBeVisible();
+  await expect(page.locator("[data-role='portfolio-analytics-retry']")).toContainText("Observed portfolio refresh failed");
 });
 
 test("portfolio optimizer route lands on the setup workspace with a scenario library @regression", async ({ page }) => {

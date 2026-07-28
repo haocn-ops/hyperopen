@@ -1,5 +1,5 @@
 (ns hyperopen.views.portfolio-view-status-test
-  (:require [cljs.test :refer-macros [deftest is use-fixtures]]
+  (:require [cljs.test :refer-macros [deftest is testing use-fixtures]]
             [hyperopen.views.account-info-view :as account-info-view]
             [hyperopen.views.chart.d3.hover-state :as chart-hover-state]
             [hyperopen.views.portfolio.test-support :refer [collect-strings
@@ -12,6 +12,63 @@
     (chart-hover-state/clear-hover-state!)
     (f)
     (chart-hover-state/clear-hover-state!)))
+
+(defn- analytics-status-vm
+  [analytics]
+  {:analytics analytics
+   :volume-14d-usd nil
+   :fees nil
+   :background-status {:visible? false}
+   :chart {:selected-tab :returns
+           :axis-kind :percent
+           :tabs [{:value :returns :label "Returns"}]
+           :points []
+           :series []
+           :y-ticks []
+           :has-data? false}
+   :selectors {:summary-scope {:value :all
+                               :label "Perps + Spot + Vaults"
+                               :open? false
+                               :options [{:value :all :label "Perps + Spot + Vaults"}]}
+               :summary-time-range {:value :month
+                                    :label "30D"
+                                    :open? false
+                                    :options [{:value :month :label "30D"}]}
+               :performance-metrics-time-range {:value :month
+                                                 :label "30D"
+                                                 :open? false
+                                                 :options [{:value :month :label "30D"}]}
+               :returns-benchmark {:selected-coins []
+                                   :selected-options []
+                                   :coin-search ""
+                                   :suggestions-open? false
+                                   :candidates []
+                                   :top-coin nil
+                                   :empty-message nil
+                                   :label-by-coin {}}}
+   :summary {:selected-key :month
+             :pnl nil
+             :volume nil
+             :max-drawdown-pct nil
+             :total-equity nil
+             :show-perps-account-equity? false
+             :spot-equity-label "Spot Account Equity"
+             :show-vault-equity? false
+             :show-earn-balance? false
+             :show-staking-account? false}
+   :performance-metrics {:loading? false
+                         :benchmark-selected? false
+                         :benchmark-columns []
+                         :values {}
+                         :groups []}})
+
+(defn- render-analytics-status-fixture
+  [analytics]
+  (with-redefs [portfolio-vm/portfolio-vm (fn [_] (analytics-status-vm analytics))
+                account-info-view/account-info-view (fn
+                                                      ([_] [:div {:data-role "stub-account-info"}])
+                                                      ([_ _] [:div {:data-role "stub-account-info"}]))]
+    (portfolio-view/portfolio-view {:router {:path "/portfolio"}})))
 
 (deftest portfolio-view-renders-background-status-banner-when-pending-work-exists-test
   (with-redefs [portfolio-vm/portfolio-vm (fn [_]
@@ -105,3 +162,67 @@
       (is (contains? banner-strings "The chart is ready. The remaining analytics will fill in automatically."))
       (is (= "Benchmark history" (first (collect-strings benchmark-item))))
       (is (= "Performance metrics" (first (collect-strings metrics-item)))))))
+
+(deftest portfolio-view-renders-the-complete-inline-analytics-quality-matrix-test
+  (let [qualities [{:quality :loading
+                    :message "Loading portfolio analytics"}
+                   {:quality :empty
+                    :message "No portfolio activity is available"}
+                   {:quality :live
+                    :equity 1200
+                    :pnl 200
+                    :return-pct 20
+                    :max-drawdown-pct -4
+                    :volume 4321
+                    :fee-rates {:maker 0.0001 :taker 0.0005}
+                    :message "Live provider data"}
+                   {:quality :stale
+                    :equity 1200
+                    :pnl 200
+                    :as-of-ms 2000
+                    :message "Refresh failed; showing the last known portfolio result"
+                    :retry? true}
+                   {:quality :partial
+                    :equity 1200
+                    :pnl 200
+                    :message "Some portfolio analytics are not supplied"}
+                   {:quality :provider-error
+                    :message "Portfolio provider is unavailable"
+                    :retry? true}
+                   {:quality :demo
+                    :equity 1200
+                    :message "Demo portfolio data"}
+                   {:quality :unavailable
+                    :message "Connect a wallet to view portfolio analytics"}]]
+    (doseq [{:keys [quality] :as analytics} qualities]
+      (testing (name quality)
+        (let [page (render-analytics-status-fixture analytics)
+              status (find-first-node page #(= "portfolio-analytics-status" (get-in % [1 :data-role])))]
+          (is (some? status))
+          (is (= (name quality) (get-in status [1 :data-quality]))))))
+    (let [loading-page (render-analytics-status-fixture (first qualities))
+          stale-page (render-analytics-status-fixture (nth qualities 3))
+          provider-error-page (render-analytics-status-fixture (nth qualities 5))
+          empty-page (render-analytics-status-fixture (second qualities))
+          demo-page (render-analytics-status-fixture (nth qualities 6))
+          partial-page (render-analytics-status-fixture (nth qualities 4))
+          unavailable-page (render-analytics-status-fixture (last qualities))
+          role-text (fn [page data-role]
+                      (set (collect-strings
+                            (find-first-node page #(= data-role (get-in % [1 :data-role]))))))]
+      (is (some? (find-first-node loading-page #(= "portfolio-summary-scope-selector-trigger" (get-in % [1 :data-role])))))
+      (is (some? (find-first-node loading-page #(= "portfolio-account-table" (get-in % [1 :data-role])))))
+      (is (some? (find-first-node stale-page #(= "portfolio-analytics-as-of" (get-in % [1 :data-role])))))
+      (is (some? (find-first-node stale-page #(= "portfolio-analytics-retry" (get-in % [1 :data-role])))))
+      (is (contains? (set (collect-strings stale-page)) "Refresh failed; showing the last known portfolio result"))
+      (is (not= (set (collect-strings provider-error-page))
+                (set (collect-strings empty-page))))
+      (is (not (contains? (set (collect-strings demo-page)) "Live provider data")))
+      (is (contains? (role-text partial-page "portfolio-analytics-volume") "Unavailable"))
+      (doseq [data-role ["portfolio-analytics-equity"
+                         "portfolio-analytics-pnl"
+                         "portfolio-analytics-return"
+                         "portfolio-analytics-drawdown"
+                         "portfolio-analytics-volume"
+                         "portfolio-analytics-fee-rates"]]
+        (is (contains? (role-text unavailable-page data-role) "Unavailable"))))))

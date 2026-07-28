@@ -1,9 +1,33 @@
 (ns hyperopen.api.trading.approve-agent-test
   (:require [cljs.test :refer-macros [async deftest is]]
             [hyperopen.api.trading :as trading]
+            [hyperopen.api.trading.http :as http]
             [hyperopen.api.trading.test-support :as support]
             [hyperopen.trading-crypto-modules :as trading-crypto-modules]
             [hyperopen.utils.hl-signing :as signing]))
+
+(deftest disabled-network-approval-rejects-before-wallet-signature-test
+  (async done
+    (let [sign-calls (atom 0)
+          original-sign signing/sign-approve-agent-action!]
+      (set! signing/sign-approve-agent-action!
+            (fn [& _]
+              (swap! sign-calls inc)
+              (js/Promise.reject (js/Error. "signer must not run"))))
+      (with-redefs [http/trading-enabled? (constantly false)]
+        (-> (trading/approve-agent! (atom {})
+                                    support/owner-address
+                                    {:type "approveAgent"
+                                     :nonce 1})
+            (.then (fn [_]
+                     (is false "Expected disabled-network rejection")
+                     (done)))
+            (.catch (fn [err]
+                      (is (re-find #"Trading is disabled" (str err)))
+                      (is (= 0 @sign-calls))
+                      (done)))
+            (.finally (fn []
+                        (set! signing/sign-approve-agent-action! original-sign))))))))
 
 (deftest approve-agent-signs-and-posts-exchange-payload-test
   (async done

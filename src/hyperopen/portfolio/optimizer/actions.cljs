@@ -53,9 +53,6 @@
 (def apply-portfolio-optimizer-objective-menu-selection-and-run
   draft/apply-portfolio-optimizer-objective-menu-selection-and-run)
 
-(def switch-portfolio-optimizer-objective-and-run
-  draft/switch-portfolio-optimizer-objective-and-run)
-
 (def set-portfolio-optimizer-return-views-filter
   draft/set-portfolio-optimizer-return-views-filter)
 

@@ -1,6 +1,5 @@
 (ns hyperopen.portfolio.optimizer.application.progress
-  (:require [clojure.string :as str]
-            [hyperopen.portfolio.optimizer.contracts.constants :as contracts-constants]))
+  (:require [clojure.string :as str]))
 
 (defn- clamp-percent
   [value]
@@ -46,9 +45,7 @@
                                (:universe request)))
         return-model (:return-model request)
         risk-model (:risk-model request)
-        objective-kind (get-in request [:objective :kind])
-        covariance-only? (contains? contracts-constants/covariance-only-objective-kinds
-                                    objective-kind)
+        equal-risk? (= :equal-risk (get-in request [:objective :kind]))
         frontier-count (or (get-in request [:objective :frontier-points])
                            40)]
     [{:id :fetch-returns
@@ -68,27 +65,20 @@
       :detail (keyword-label (:kind return-model))
       :status :pending
       :percent 0}
-     (case objective-kind
-       :equal-risk
+     (if equal-risk?
        {:id :solve
         :label "equal-risk solve"
         :detail "sequential QP"
         :status :pending
         :percent 0}
-       :inverse-volatility
-       {:id :solve
-        :label "risk-weighted sizing"
-        :detail "projection QP"
-        :status :pending
-        :percent 0}
        {:id :solve
         :label "QP solve"
-        :detail "OSQP"
+        :detail "quadprog"
         :status :pending
         :percent 0})
-     ;; Covariance-only objectives produce one selected portfolio - there is no
-     ;; return-tilt sweep, so the frontier step only covers target selection.
-     (if covariance-only?
+     ;; Equal Risk produces one selected portfolio - there is no return-tilt
+     ;; sweep, so the frontier step only covers target selection.
+     (if equal-risk?
        {:id :frontier
         :label "target selection"
         :detail "selected point"

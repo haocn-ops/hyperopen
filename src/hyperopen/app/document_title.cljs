@@ -1,6 +1,7 @@
 (ns hyperopen.app.document-title
   (:require [clojure.string :as str]
             [hyperopen.asset-selector.markets :as markets]
+            [hyperopen.service.product-context :as product-context]
             [hyperopen.ui.voice :as voice]
             [hyperopen.domain.market.instrument :as instrument]
             [hyperopen.utils.formatting :as fmt]))
@@ -113,6 +114,15 @@
     (spot-label active-asset active-market)
     (perp-label active-asset active-market)))
 
+(defn- active-brand-title
+  [state]
+  (let [context (product-context/build-product-context-view-model state)
+        tenant-id (:tenant/id context)
+        brand-name (:brand-label context)]
+    (when (and (not= "hyperopen-default" tenant-id)
+               (seq (non-blank-text brand-name)))
+      brand-name)))
+
 (defn title-for-state
   [state]
   (let [active-asset (non-blank-text (:active-asset state))
@@ -122,7 +132,9 @@
         mark-text (format-mark-price context active-market locale)
         asset-text (when (seq active-asset)
                      (active-asset-label active-asset active-market))
-        brand (or (voice/label state :brand/title) brand-title)
+        brand (or (active-brand-title state)
+                  (voice/label state :brand/title)
+                  brand-title)
         parts (cond-> []
                 (seq mark-text) (conj mark-text)
                 (seq asset-text) (conj asset-text)

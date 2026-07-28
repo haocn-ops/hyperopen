@@ -256,7 +256,7 @@
        (if-not requested-address
          (js/Promise.resolve {})
          (do
-           (swap! store api-projections/begin-portfolio-load)
+           (swap! store api-projections/begin-portfolio-load requested-address)
            (-> (request-portfolio! address opts)
                (.then (fn [summary-by-key]
                         (let [summary* (or summary-by-key {})
@@ -264,7 +264,7 @@
                           (if-not (requested-address-current? store requested-address)
                             summary*
                             (do
-                              (swap! store api-projections/apply-portfolio-success summary*)
+                              (swap! store api-projections/apply-portfolio-success requested-address summary*)
                               (if (fn? request-user-non-funding-ledger-updates!)
                                 (do
                                   (swap! store
@@ -310,7 +310,8 @@
                (.catch (apply-error-and-reject-when-current
                         store
                         requested-address
-                        api-projections/apply-portfolio-error)))))))))
+                        api-projections/apply-portfolio-error
+                        requested-address)))))))))
 
 (defn- fetch-user-fees!
   ([api-ops store address]

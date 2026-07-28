@@ -5,14 +5,6 @@
 
 (def cross-effect-neutral-threshold 0.0005)
 
-(def material-change-threshold-pts
-  "Displayed points below which a current → recommended change is presented
-  as noise, not signal: the row's tone goes :neutral and the view renders
-  '≈ unchanged' instead of a red/green direction verdict. The factual
-  `:direction` and the signed pts value are NOT thresholded — only the
-  judgment is. 0.5 pts ≈ the smallest change a person would act on here."
-  0.5)
-
 (def ^:private marker-overlap-position-threshold 6.0)
 
 (defn cross-effect-direction
@@ -96,9 +88,6 @@
                         (/ (- recommended-point-tenths current-point-tenths)
                            10))
         direction (comparison-direction change-points)
-        material? (and (coercion/finite-number? change-points)
-                       (>= (js/Math.abs change-points)
-                           material-change-threshold-pts))
         marker-overlap? (and comparable?
                              (coercion/finite-number? current-position)
                              (coercion/finite-number? recommended-position)
@@ -120,15 +109,7 @@
      :change-points change-points
      :relative-change (relative-change current change)
      :direction direction
-     :material? material?
-     ;; Sub-threshold moves keep their factual direction but tone as
-     ;; :neutral — red/green fire only on material change.
-     :tone (comparison-tone (if (or material?
-                                    (= direction :unchanged)
-                                    (= direction :unavailable))
-                              direction
-                              :unchanged)
-                            favorable-direction)}))
+     :tone (comparison-tone direction favorable-direction)}))
 
 (defn comparison-model
   [result]

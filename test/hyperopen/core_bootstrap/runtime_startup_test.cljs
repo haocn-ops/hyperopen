@@ -4,7 +4,11 @@
             [hyperopen.app.bootstrap :as app-bootstrap]
             [hyperopen.app.startup :as app-startup]
             [hyperopen.core :as app-core]
+            [hyperopen.platform :as platform]
+            [hyperopen.runtime.bootstrap :as runtime-bootstrap]
+            [hyperopen.runtime.effect-adapters.attribution :as attribution-effects]
             [hyperopen.runtime.state :as runtime-state]
+            [hyperopen.service.fixtures :as service-fixtures]
             [hyperopen.startup.collaborators :as startup-collaborators]
             [hyperopen.telemetry :as telemetry]
             [hyperopen.telemetry.console-warning :as console-warning]
@@ -23,6 +27,28 @@
 (use-fixtures :each fixtures/per-test-runtime-fixture)
 
 (def with-test-navigator browser-mocks/with-test-navigator)
+
+(defn- json-key
+  [key]
+  (if (keyword? key)
+    (if-let [key-namespace (namespace key)]
+      (str key-namespace "/" (name key))
+      (name key))
+    (str key)))
+
+(defn- json-wire-value
+  [value]
+  (cond
+    (map? value)
+    (reduce-kv (fn [result key nested-value]
+                 (aset result (json-key key) (json-wire-value nested-value))
+                 result)
+               #js {}
+               value)
+
+    (sequential? value) (into-array (map json-wire-value value))
+    (keyword? value) (name value)
+    :else value))
 
 (deftest initialize-remote-data-streams-keeps-full-selector-expansion-demand-driven-test
   (let [phases (atom [])
@@ -77,6 +103,57 @@
     (is (= 1 @calls))
     (is (true? (runtime-state/runtime-bootstrapped? runtime-state/runtime)))
     (swap! runtime-state/runtime assoc :runtime-bootstrapped? true)))
+
+(deftest bootstrap-resumes-persisted-attribution-once-without-changing-its-result-test
+  (let [event {:event/id "evt-bootstrap-recovery"
+               :event/type :trade-submit-requested
+               :tenant/id "hyperopen-default"
+               :affiliate/id "hyperopen-official"
+               :venue/id :hyperliquid
+               :session/id "session-bootstrap-recovery"
+               :wallet/address-hash "wallet-hash-bootstrap-recovery"
+               :occurred-at-ms 1700000000000
+               :market "BTC"
+               :outcome :submitted}
+        record {:event event
+                :delivery/status :pending
+                :delivery/attempt-count 0}
+        tenant (-> service-fixtures/default-tenant-raw
+                   (assoc-in [:features :affiliate] true)
+                   (assoc-in [:affiliate :status] :enabled)
+                   (assoc-in [:affiliate :event-endpoint]
+                             "https://events.example.test/attribution"))
+        storage (atom {attribution-effects/storage-key
+                       (js/JSON.stringify (json-wire-value [record]))
+                       "hyperopen:affiliate-consent:v1:hyperopen-default" "true"})
+        calls (atom [])
+        runtime (atom {})
+        store (atom {:tenant/override tenant})
+        original-fetch (.-fetch js/globalThis)]
+    (set! (.-fetch js/globalThis)
+          (fn [_endpoint request]
+            (swap! calls conj :fetch)
+            (js/Promise.resolve
+             #js {:ok true
+                  :json (fn []
+                          (js/Promise.resolve #js {:outcome "accepted"}))})))
+    (try
+      (with-redefs [runtime-bootstrap/bootstrap-runtime! (fn [_]
+                                                            (swap! calls conj :runtime)
+                                                            :runtime-bootstrap-result)
+                    attribution-effects/install-operator-api! (fn [_]
+                                                                  (swap! calls conj :operator)
+                                                                  :operator-api)
+                    platform/local-storage-get (fn [key] (get @storage key))
+                    platform/local-storage-set! (fn [key value]
+                                                  (swap! storage assoc key value))]
+        (is (= :runtime-bootstrap-result
+               (app-bootstrap/bootstrap-runtime! {:runtime runtime :store store})))
+        (is (= :runtime-bootstrap-result
+               (app-bootstrap/bootstrap-runtime! {:runtime runtime :store store})))
+        (is (= [:runtime :operator :fetch :runtime :operator] @calls)))
+      (finally
+        (set! (.-fetch js/globalThis) original-fetch)))))
 
 (deftest init-runs-startup-sequence-once-test
   (let [ensure-calls (atom 0)

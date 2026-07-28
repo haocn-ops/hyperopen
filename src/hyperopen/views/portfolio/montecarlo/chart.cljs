@@ -287,8 +287,24 @@
 
 (defn- tip-row
   [label value color]
-  (str "<div class=\"mc-tip-row\"><span class=\"mc-tip-key\">" label "</span>"
-       "<span" (if color (str " style=\"color:" color "\"") "") ">" value "</span></div>"))
+  (let [row (.createElement js/document "div")
+        key-node (.createElement js/document "span")
+        value-node (.createElement js/document "span")]
+    (set! (.-className row) "mc-tip-row")
+    (set! (.-className key-node) "mc-tip-key")
+    (set! (.-textContent key-node) (str label))
+    (set! (.-textContent value-node) (str value))
+    (when color
+      (set! (.. value-node -style -color) color))
+    (.appendChild row key-node)
+    (.appendChild row value-node)
+    row))
+
+(defn- replace-tip-rows!
+  [tip rows]
+  (set! (.-textContent tip) "")
+  (doseq [row rows]
+    (.appendChild tip row)))
 
 (defn- show-spaghetti-tip!
   "Populate and position the tooltip from the pointer event, reading pixel
@@ -307,11 +323,12 @@
             gi (nearest-grid-index times day)
             ret (fn [v] (fmt/signed-pct (- (/ v start) 1) 1))
             elapsed (if (pos? horizon) (* span-years (/ (nth times gi) horizon)) 0)]
-        (set! (.-innerHTML tip)
-              (str (tip-row "Time" (chart-model/axis-time-label elapsed) nil)
-                   (tip-row "P95" (ret (nth (:p95 band) gi)) "var(--mc-accent)")
-                   (tip-row "Median" (ret (nth (:p50 band) gi)) nil)
-                   (tip-row "P5" (ret (nth (:p5 band) gi)) "var(--mc-red)")))
+        (replace-tip-rows!
+         tip
+         [(tip-row "Time" (chart-model/axis-time-label elapsed) nil)
+          (tip-row "P95" (ret (nth (:p95 band) gi)) "var(--mc-accent)")
+          (tip-row "Median" (ret (nth (:p50 band) gi)) nil)
+          (tip-row "P5" (ret (nth (:p5 band) gi)) "var(--mc-red)")])
         (set! (.. tip -style -left)
               (str (min (- (.-innerWidth js/window) 150) (+ (.-clientX e) 16)) "px"))
         (set! (.. tip -style -top) (str (- (.-clientY e) 10) "px"))

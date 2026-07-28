@@ -206,11 +206,8 @@
                newer-enable))
             (.then
              (fn [_]
-               (is (= [["0xowner" :session {:agent-address "0xnew-agent"
-                                             :private-key "0xnew-priv"
-                                             :last-approved-at 1700000001000
-                                             :nonce-cursor 1700000001000}]]
-                      @persist-calls))
+               (is (empty? @persist-calls)
+                   "memory-only session completion must not write raw credentials")
                (is (= "0xnew-agent" (get-in @store [:wallet :agent :agent-address])))
                (is (= :session (get-in @store [:wallet :agent :storage-mode])))
                (done)))

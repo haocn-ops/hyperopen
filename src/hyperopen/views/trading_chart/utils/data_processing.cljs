@@ -9,7 +9,6 @@
   (theme-colors/token "--ho-chart-down"))
 
 (defn process-candle-data [raw-data]
-  "Transform raw API candle data to Lightweight.Charts format"
   (if (seq raw-data)
     (->> raw-data
          (keep (fn [c]
@@ -30,7 +29,6 @@
     []))
 
 (defn process-volume-data [candle-data]
-  "Extract volume data from candle data for volume chart"
   (let [up-color (volume-up-color)
         down-color (volume-down-color)]
     (->> candle-data
@@ -41,7 +39,6 @@
                                   down-color))))))
 
 (defn generate-mock-candles []
-  "Generate mock candle data for development"
   (let [base-time (- (js/Math.floor (/ (platform/now-ms) 1000)) (* 100 60))  ; 100 minutes ago
         base-price 46000]
     (->> (range 100)
@@ -60,7 +57,6 @@
                    :volume volume}))))))
 
 (defn update-last-candle [candles current-time new-price volume]
-  "Update the last candle with new price data"
   (if (empty? candles)
     [{:time current-time :open new-price :high new-price :low new-price :close new-price :volume volume}]
     (let [last-candle (last candles)
@@ -82,13 +78,11 @@
                        :volume volume})))))
 
 (defn format-price [price]
-  "Format price with appropriate decimal places"
   (if (>= price 1)
     (.toFixed price 2)
     (.toFixed price 6)))
 
 (defn format-volume [volume]
-  "Format volume with K/M/B suffixes"
   (cond
     (>= volume 1000000000) (str (.toFixed (/ volume 1000000000) 1) "B")
     (>= volume 1000000) (str (.toFixed (/ volume 1000000) 1) "M")

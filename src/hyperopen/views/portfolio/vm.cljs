@@ -184,15 +184,8 @@
 (defn- normalize-summary-by-key [summary-by-key]
   (vm-summary/normalize-summary-by-key summary-by-key))
 
-(defn- selected-summary-key [scope time-range]
-  (vm-summary/selected-summary-key scope time-range))
-
 (defn- selected-summary-context [summary-by-key scope time-range]
   (vm-summary/selected-summary-context summary-by-key scope time-range))
-
-(defn- selected-summary-entry [summary-by-key scope time-range]
-  (vm-summary/selected-summary-entry summary-by-key scope time-range))
-
 (defn- summary-context-source-version
   [summary-context]
   (hash [(summary-entry-source-version (:entry summary-context))

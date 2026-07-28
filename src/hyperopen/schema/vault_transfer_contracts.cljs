@@ -1,6 +1,5 @@
 (ns hyperopen.schema.vault-transfer-contracts
   (:require [cljs.spec.alpha :as s]
-            [clojure.string :as str]
             [hyperopen.vaults.domain.identity :as identity]))
 
 (def ^:private max-safe-integer

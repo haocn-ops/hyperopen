@@ -17,10 +17,6 @@ export function repoRelative(repoRoot, absolutePath) {
   return path.relative(repoRoot, absolutePath).replaceAll(path.sep, "/");
 }
 
-export function toAbsoluteRepoPath(repoRoot, repoPath) {
-  return path.resolve(repoRoot, repoPath);
-}
-
 export function ensureRepoRelative(inputPath) {
   return inputPath.replaceAll(path.sep, "/").replace(/^\.\/+/, "");
 }

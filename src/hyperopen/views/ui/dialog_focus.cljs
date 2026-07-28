@@ -21,10 +21,6 @@
   []
   (some-> js/globalThis .-document .-activeElement))
 
-(defn- document-body
-  []
-  (some-> js/globalThis .-document .-body))
-
 (defn- contained-by?
   [parent child]
   (and parent

@@ -222,19 +222,11 @@
                                   view-state
                                   (assoc opts :metrics equity-metrics))))
 
-(defn- render-account-equity-metrics
-  [state]
-  (render-account-equity-metrics-state (account-equity-view-state state)))
-
 (defn- render-account-equity-metrics-state
   [view-state]
   (when-let [metrics-fn (account-surface-export :account-equity-metrics)]
     (memoized-account-equity-metrics metrics-fn
                                      view-state)))
-
-(defn- trade-chart-panel-content
-  [state]
-  (trade-chart-panel-content-state (trade-chart-view-state state)))
 
 (defn- trade-chart-panel-content-state
   [view-state]

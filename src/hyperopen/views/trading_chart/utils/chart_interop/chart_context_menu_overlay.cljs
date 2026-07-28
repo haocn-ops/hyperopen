@@ -264,12 +264,6 @@
         (set-style-value! style "pointerEvents" (if visible? "auto" "none"))
         (set-style-value! style "visibility" (if visible? "visible" "hidden"))))))
 
-(defn- menu-items
-  [chart-obj]
-  (let [{:keys [reset-button copy-button copy-enabled?]} (overlay-state chart-obj)]
-    (cond-> [reset-button]
-      copy-enabled? (conj copy-button))))
-
 (defn- focus-node!
   [node]
   (when node

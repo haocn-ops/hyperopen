@@ -1,8 +1,7 @@
 (ns hyperopen.views.portfolio.vm.history
   (:require [clojure.string :as str]
             [hyperopen.portfolio.actions :as portfolio-actions]
-            [hyperopen.portfolio.metrics.parsing :as parsing]
-            [hyperopen.views.portfolio.vm.constants :as constants]))
+            [hyperopen.portfolio.metrics.parsing :as parsing]))
 
 (def ^:private supported-benchmark-time-ranges
   #{:day :week :month :three-month :six-month :one-year :two-year :all-time})

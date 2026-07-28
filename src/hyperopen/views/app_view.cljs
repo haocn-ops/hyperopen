@@ -1,9 +1,7 @@
 (ns hyperopen.views.app-view
-  (:require [clojure.string :as str]
-            [hyperopen.account.context :as account-context]
+  (:require [hyperopen.account.context :as account-context]
             [hyperopen.route-modules :as route-modules]
             [hyperopen.router :as router]
-            [hyperopen.staking.actions :as staking-actions]
             [hyperopen.surface-modules :as surface-modules]
             [hyperopen.trade.layout-actions :as trade-layout-actions]
             [hyperopen.vaults.infrastructure.routes :as vault-routes]

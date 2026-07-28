@@ -624,40 +624,6 @@ export function resolvePassRegistry(designConfig) {
   return PASS_REGISTRY;
 }
 
-export const configuredPassRegistry = resolvePassRegistry;
-
 export function requiredProbeNames(passRegistry = PASS_REGISTRY) {
   return [...new Set(passRegistry.flatMap((entry) => entry.requires || []))];
-}
-
-export function evaluatePass({
-  definition,
-  ctx,
-  probes,
-  artifacts,
-  policy
-}) {
-  for (const probeName of definition.requires || []) {
-    const probeResult = probes[probeName];
-    if (!probeResult?.ok) {
-      return makeUnavailablePassResult({
-        passName: definition.name,
-        target: ctx.target,
-        viewportName: ctx.viewportName,
-        reason: probeResult?.message || `${probeName} probe failed.`,
-        evidenceRefs: artifacts.evidenceRefs
-      });
-    }
-  }
-
-  const probeValues = Object.fromEntries(
-    Object.entries(probes).map(([name, result]) => [name, result?.value ?? null])
-  );
-
-  return definition.grade({
-    ctx,
-    probes: probeValues,
-    artifacts,
-    policy
-  });
 }

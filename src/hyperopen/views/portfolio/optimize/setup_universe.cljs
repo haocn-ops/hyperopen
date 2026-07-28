@@ -3,9 +3,6 @@
             [hyperopen.portfolio.optimizer.application.view-model :as optimizer-view-model]
             [hyperopen.portfolio.optimizer.application.view-model.universe :as universe-vm]))
 
-(def ^:private eyebrow-class
-  ["font-mono" "text-[0.6875rem]" "font-semibold" "uppercase" "tracking-[0.08em]" "text-trading-muted/70"])
-
 ;; Sentence-case 14px, matching setup-controls/section-title-class — see the
 ;; type-ladder note there.
 (def ^:private section-title-class

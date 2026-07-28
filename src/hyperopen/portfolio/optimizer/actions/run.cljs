@@ -90,15 +90,6 @@
   (or (= :running (get-in state contracts/run-state-status-path))
       (= :running (get-in state contracts/optimization-progress-status-path))))
 
-(defn- current-solved-run?
-  [state]
-  (run-identity/current-solved-run?
-   {:draft (get-in state contracts/draft-path)
-    :readiness (setup-readiness/build-readiness state)
-    :run-state (get-in state contracts/run-state-path)
-    :running? (optimizer-running? state)
-    :last-successful-run (get-in state contracts/last-successful-run-path)}))
-
 (defn- stale-solved-run?
   [state readiness]
   (let [last-successful-run (get-in state contracts/last-successful-run-path)]

@@ -66,13 +66,6 @@
   [modal]
   (data-role-selector (:opener-data-role modal)))
 
-(defn- anchor-number
-  [anchor k default]
-  (let [value (get anchor k)]
-    (if (number? value)
-      value
-      default)))
-
 (defn- modal-viewport-width
   [anchor]
   (max 320

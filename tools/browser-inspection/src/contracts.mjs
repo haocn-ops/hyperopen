@@ -117,7 +117,3 @@ export function assertArtifactManifest(value) {
     fail("artifactManifest.artifacts must be an array");
   }
 }
-
-export function isContractError(error) {
-  return error?.name === "ContractError";
-}

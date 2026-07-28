@@ -7,10 +7,6 @@
             [hyperopen.runtime.effect-adapters.common :as common]
             [hyperopen.runtime.state :as runtime-state]))
 
-(defn- set-order-feedback-toast!
-  [store kind message]
-  (order-feedback-runtime/set-order-feedback-toast! store kind message))
-
 (defn clear-order-feedback-toast!
   [store]
   (order-feedback-runtime/clear-order-feedback-toast! store))

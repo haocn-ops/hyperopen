@@ -3,7 +3,6 @@
             [hyperopen.portfolio.optimizer.actions :as portfolio-optimizer-actions]
             [hyperopen.portfolio.optimizer.black-litterman-actions :as portfolio-optimizer-bl-actions]
             [hyperopen.portfolio.optimizer.frontier-actions :as portfolio-optimizer-frontier-actions]
-            [hyperopen.referrals.actions :as referrals-actions]
             [hyperopen.runtime.action-adapters.leaderboard :as leaderboard-adapters]
             [hyperopen.runtime.action-adapters.navigation :as navigation-adapters]
             [hyperopen.runtime.action-adapters.spectate-mode :as spectate-mode-adapters]

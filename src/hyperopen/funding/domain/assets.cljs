@@ -1,6 +1,5 @@
 (ns hyperopen.funding.domain.assets
-  (:require [clojure.string :as str]
-            [hyperopen.domain.trading :as trading-domain]))
+  (:require [clojure.string :as str]))
 
 (def withdraw-min-usdc
   5)
@@ -139,10 +138,6 @@
   (let [text (some-> value str str/trim)]
     (when (seq text)
       text)))
-
-(defn- parse-num
-  [value]
-  (trading-domain/parse-num value))
 
 (defn- normalize-chain-id
   [value]

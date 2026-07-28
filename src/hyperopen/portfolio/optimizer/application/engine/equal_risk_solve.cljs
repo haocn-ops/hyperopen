@@ -11,8 +11,8 @@
   realized contribution error is truthful (:exact / :approximate /
   :not-converged) and computed by the payload from the PUBLISHED weights.
 
-  Every subproblem goes through the injected `solve-problem` (the existing
-  quadprog/OSQP adapter). quadprog returns plain maps, OSQP returns Promises;
+  Every subproblem goes through the injected `solve-problem`. The production
+  quadprog adapter returns plain maps; test adapters may return Promises.
   `chain` below threads both, so the synchronous engine path stays
   synchronous and the worker path becomes a single Promise. All numeric
   tolerances live in domain.equal-risk/tolerances."

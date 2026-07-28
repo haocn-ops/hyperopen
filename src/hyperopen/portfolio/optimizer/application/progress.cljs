@@ -73,7 +73,7 @@
         :percent 0}
        {:id :solve
         :label "QP solve"
-        :detail "OSQP"
+        :detail "quadprog"
         :status :pending
         :percent 0})
      ;; Equal Risk produces one selected portfolio - there is no return-tilt

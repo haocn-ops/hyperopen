@@ -125,12 +125,25 @@
   [persisted storage-mode local-protection-mode]
   (if (and (map? persisted)
            (seq (:agent-address persisted)))
-    {:status (if (= :locked (:persisted-kind persisted)) :locked :ready)
-     :agent-address (:agent-address persisted)
+    {:status (cond
+               (= :locked (:persisted-kind persisted)) :locked
+               (contains? #{:legacy-local-raw :legacy-session-raw}
+                          (:persisted-kind persisted)) :error
+               :else :ready)
+     :agent-address (when-not (contains? #{:legacy-local-raw :legacy-session-raw}
+                                         (:persisted-kind persisted))
+                      (:agent-address persisted))
      :storage-mode storage-mode
      :local-protection-mode local-protection-mode
      :last-approved-at (:last-approved-at persisted)
-     :error nil
+     :error (case (:persisted-kind persisted)
+              :legacy-local-raw
+              "A legacy local trading credential was quarantined. Choose a secure storage mode and enable trading again."
+
+              :legacy-session-raw
+              "A legacy session trading credential was removed. Enable Trading again to trade in this tab."
+
+              nil)
      :nonce-cursor (:nonce-cursor persisted)}
     (agent-session/default-agent-state :storage-mode storage-mode
                                        :local-protection-mode local-protection-mode)))

@@ -2,6 +2,7 @@
   (:require [hyperopen.account.context :as account-context]
             [hyperopen.account.spectate-mode-links :as spectate-mode-links]
             [hyperopen.service.product-context :as product-context]
+            [hyperopen.service.tenant-config :as tenant-config]
             [hyperopen.trading-settings :as trading-settings]
             [hyperopen.ui.theme :as ui-theme]
             [hyperopen.ui.voice :as voice]
@@ -135,7 +136,7 @@
   [state]
   (if-some [storage-mode (get-in state [:wallet :agent :storage-mode])]
     (agent-session/normalize-storage-mode storage-mode)
-    :local))
+    :session))
 
 (defn- remember-trading-session?
   [state]
@@ -286,6 +287,27 @@
                        :action [[:actions/set-open-order-safety-mode value]]})
                     open-order-safety-options)}))
 
+(defn- affiliate-consent-section
+  [state]
+  (let [tenant (tenant-config/active-tenant-config state)
+        endpoint (get-in tenant [:affiliate :event-endpoint])
+        enabled? (and (true? (get-in tenant [:features :affiliate]))
+                      (= :enabled (get-in tenant [:affiliate :status]))
+                      (tenant-config/valid-affiliate-event-endpoint? endpoint))]
+    (when enabled?
+      (settings-section
+       :affiliate
+       "Affiliate data"
+       "Optional attribution"
+       [(settings-row :affiliate-consent
+                      "Share trading attribution"
+                      "Send redacted activity to the configured affiliate provider."
+                      (true? (get-in state [:attribution :affiliate-consent?]))
+                      :key
+                      [[:actions/set-affiliate-consent
+                        (not (true? (get-in state [:attribution :affiliate-consent?])))]]
+                      :tooltip "Only redacted attribution fields are sent after you opt in.")]))))
+
 (defn- settings-vm
   [state]
   (let [confirmation (settings-confirmation-copy
@@ -301,7 +323,8 @@
         passkey-disabled? (passkey-toggle-disabled? remember-session?
                                                     passkey-capable?
                                                     passkey-enabled?
-                                                    agent-status)]
+                                                    agent-status)
+        affiliate-section (affiliate-consent-section state)]
     {:open? (true? (get-in state [:header-ui :settings-open?]))
      :return-focus? (true? (get-in state [:header-ui :settings-return-focus?]))
      :trigger-key (str "header-settings-button:"
@@ -314,7 +337,7 @@
      :title "Trading Settings"
      :close-actions trading-settings-close-actions
      :footer-note trading-settings-footer-copy
-     :sections [(settings-section
+     :sections (cond-> [(settings-section
                 :session
                 "Session"
                 "Sign-in behavior"
@@ -416,7 +439,8 @@
                  :appearance
                  "Appearance"
                  "Look and feel"
-                 [(theme-choice-row state)])]}))
+                 [(theme-choice-row state)])]
+                 affiliate-section (conj affiliate-section))}))
 
 (defn- brand-vm
   [state context]

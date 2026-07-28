@@ -1,6 +1,7 @@
-const PROXY_PATHS = [
-  "/api/hyperunit/mainnet/v2/estimate-fees",
-  "/api/hyperunit/testnet/v2/estimate-fees",
+const PROXY_CHECKS = [
+  { pathname: "/api/hyperunit/testnet/v2/estimate-fees", expectedStatus: null },
+  { pathname: "/api/hyperunit/mainnet/v2/estimate-fees", expectedStatus: 404 },
+  { pathname: "/api/hyperunit/v2/estimate-fees", expectedStatus: 404 },
 ];
 
 function verificationOrigin(value) {
@@ -22,7 +23,7 @@ function verificationOrigin(value) {
   return origin;
 }
 
-async function verifyProxyEndpoint(origin, pathname) {
+async function verifyProxyEndpoint(origin, { pathname, expectedStatus }) {
   const endpoint = new URL(pathname, origin);
   const response = await fetch(endpoint, {
     headers: { accept: "application/json" },
@@ -31,10 +32,13 @@ async function verifyProxyEndpoint(origin, pathname) {
   const contentType = response.headers.get("content-type") ?? "";
   await response.body?.cancel();
 
-  if (response.status >= 500) {
+  if (expectedStatus !== null && response.status !== expectedStatus) {
+    throw new Error(`${endpoint.pathname} returned ${response.status}; expected ${expectedStatus}.`);
+  }
+  if (expectedStatus === null && response.status >= 500) {
     throw new Error(`${endpoint.pathname} returned ${response.status}.`);
   }
-  if (!/^application\/json(?:;|$)/i.test(contentType)) {
+  if (expectedStatus === null && !/^application\/json(?:;|$)/i.test(contentType)) {
     throw new Error(`${endpoint.pathname} returned a non-JSON content type.`);
   }
 
@@ -44,8 +48,8 @@ async function verifyProxyEndpoint(origin, pathname) {
 async function main() {
   const origin = verificationOrigin(process.env.HYPEROPEN_VERIFY_ORIGIN);
   console.log(`Verifying Cloudflare Worker at ${origin.origin}`);
-  for (const pathname of PROXY_PATHS) {
-    await verifyProxyEndpoint(origin, pathname);
+  for (const check of PROXY_CHECKS) {
+    await verifyProxyEndpoint(origin, check);
   }
 }
 

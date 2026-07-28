@@ -36,22 +36,23 @@ function closeServer(server) {
   });
 }
 
-test("verify_cloudflare_worker probes only non-mutating fee endpoints, accepts non-5xx JSON, and never prints response bodies", async () => {
+test("verify_cloudflare_worker probes Testnet and proves Mainnet and generic routes are closed", async () => {
   const observedRequests = [];
   const mainnetPath = "/api/hyperunit/mainnet/v2/estimate-fees";
   const testnetPath = "/api/hyperunit/testnet/v2/estimate-fees";
+  const genericPath = "/api/hyperunit/v2/estimate-fees";
   const server = http.createServer((request, response) => {
     observedRequests.push({ method: request.method, url: request.url });
 
-    if (request.url === mainnetPath) {
+    if (request.url === testnetPath) {
       response.writeHead(429, { "content-type": "application/json; charset=utf-8" });
-      response.end('{"privateBody":"mainnet-fee-body-must-not-be-printed"}');
+      response.end('{"privateBody":"testnet-fee-body-must-not-be-printed"}');
       return;
     }
 
-    if (request.url === testnetPath) {
-      response.writeHead(404, { "content-type": "application/json; charset=utf-8" });
-      response.end('{"privateBody":"testnet-fee-body-must-not-be-printed"}');
+    if (request.url === mainnetPath || request.url === genericPath) {
+      response.writeHead(404, { "content-type": "text/plain; charset=utf-8" });
+      response.end("closed-route-body-must-not-be-printed");
       return;
     }
 
@@ -68,15 +69,16 @@ test("verify_cloudflare_worker probes only non-mutating fee endpoints, accepts n
     assert.equal(result.exitCode, 0, `${result.stderr}\n${result.stdout}`);
     assert.equal(result.signal, null);
     assert.deepEqual(observedRequests, [
-      { method: "GET", url: mainnetPath },
       { method: "GET", url: testnetPath },
+      { method: "GET", url: mainnetPath },
+      { method: "GET", url: genericPath },
     ]);
     assert.match(result.stdout, new RegExp(origin.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
     assert.match(result.stdout, /429/);
     assert.match(result.stdout, /404/);
     assert.doesNotMatch(
       `${result.stdout}\n${result.stderr}`,
-      /mainnet-fee-body-must-not-be-printed|testnet-fee-body-must-not-be-printed|unexpected-path/
+      /closed-route-body-must-not-be-printed|testnet-fee-body-must-not-be-printed|unexpected-path/
     );
   } finally {
     await closeServer(server);

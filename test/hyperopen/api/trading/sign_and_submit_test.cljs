@@ -2,13 +2,44 @@
   (:require [cljs.test :refer-macros [async deftest is]]
             [hyperopen.api.trading :as trading]
             [hyperopen.api.trading.agent-actions :as agent-actions]
+            [hyperopen.api.trading.http :as http]
             [hyperopen.runtime.state :as runtime-state]
             [hyperopen.test-support.api-stubs :as api-stubs]
             [hyperopen.test-support.async :as async-support]
             [hyperopen.api.trading.test-support :as support]
             [hyperopen.trading-crypto-modules :as trading-crypto-modules]
+            [hyperopen.wallet.agent-lockbox :as agent-lockbox]
             [hyperopen.wallet.agent-session :as agent-session]
             [hyperopen.utils.hl-signing :as signing]))
+
+(deftest disabled-network-agent-action-rejects-before-crypto-or-nonce-test
+  (async done
+    (let [store (support/ready-agent-store 1700000099000)
+          load-calls (atom 0)
+          original-load trading-crypto-modules/load-trading-crypto-module!
+          original-nonce (get-in @store [:wallet :agent :nonce-cursor])]
+      (set! trading-crypto-modules/load-trading-crypto-module!
+            (fn []
+              (swap! load-calls inc)
+              (js/Promise.reject (js/Error. "crypto must not load"))))
+      (with-redefs [http/trading-enabled? (constantly false)]
+        (-> (trading/submit-order! store
+                                   support/owner-address
+                                   {:type "order"
+                                    :orders []
+                                    :grouping "na"})
+            (.then (fn [_]
+                     (is false "Expected disabled-network rejection")))
+            (.catch (fn [err]
+                      (is (re-find #"Trading is disabled" (str err)))
+                      (is (= 0 @load-calls))
+                      (is (= original-nonce
+                             (get-in @store [:wallet :agent :nonce-cursor])))
+                      nil))
+            (.finally (fn []
+                        (set! trading-crypto-modules/load-trading-crypto-module!
+                              original-load)
+                        (done))))))))
 
 (deftest agent-action-options-default-to-selected-testnet-test
   (with-redefs [runtime-state/hyperliquid-network {:is-mainnet false}]
@@ -26,7 +57,7 @@
           sign-calls (atom [])
           persist-calls (atom [])
           fetch-calls (atom [])
-          original-load agent-session/load-agent-session-by-mode
+          original-load agent-lockbox/load-unlocked-session
           original-persist agent-session/persist-agent-session-by-mode!
           original-sign signing/sign-l1-action-with-private-key!
           restore-fetch! (support/install-fetch-stub!
@@ -34,8 +65,8 @@
                             (swap! fetch-calls conj [url opts])
                             (js/Promise.resolve
                              (support/json-response {:status "ok"}))))]
-      (set! agent-session/load-agent-session-by-mode
-            (fn [_wallet-address _storage-mode]
+      (set! agent-lockbox/load-unlocked-session
+            (fn [_wallet-address & [_storage-mode]]
               {:agent-address "0x8fd379246834eac74b8419ffda202cf8051f7a03"
                :private-key "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
                :nonce-cursor 1700000005555}))
@@ -69,7 +100,7 @@
           (.catch (async-support/unexpected-error done))
           (.finally
            (fn []
-             (set! agent-session/load-agent-session-by-mode original-load)
+             (set! agent-lockbox/load-unlocked-session original-load)
              (set! agent-session/persist-agent-session-by-mode! original-persist)
              (set! signing/sign-l1-action-with-private-key! original-sign)
              (restore-fetch!)))))))
@@ -79,7 +110,7 @@
     (let [store (support/ready-agent-store 1700000006666)
           sign-nonces (atom [])
           fetch-count (atom 0)
-          original-load agent-session/load-agent-session-by-mode
+          original-load agent-lockbox/load-unlocked-session
           original-persist agent-session/persist-agent-session-by-mode!
           original-sign signing/sign-l1-action-with-private-key!
           restore-fetch! (support/install-fetch-stub!
@@ -91,8 +122,8 @@
                                                        :error "nonce too low"}))
                               (js/Promise.resolve
                                (support/json-response {:status "ok"})))))]
-      (set! agent-session/load-agent-session-by-mode
-            (fn [_wallet-address _storage-mode]
+      (set! agent-lockbox/load-unlocked-session
+            (fn [_wallet-address & [_storage-mode]]
               {:agent-address "0x88f9b82462f6c4bf4a0fb15e5c3971559a316e7f"
                :private-key "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
                :nonce-cursor 1700000006666}))
@@ -120,7 +151,7 @@
           (.catch (async-support/unexpected-error done))
           (.finally
            (fn []
-             (set! agent-session/load-agent-session-by-mode original-load)
+             (set! agent-lockbox/load-unlocked-session original-load)
              (set! agent-session/persist-agent-session-by-mode! original-persist)
              (set! signing/sign-l1-action-with-private-key! original-sign)
              (restore-fetch!)))))))
@@ -129,9 +160,9 @@
   (async done
     (let [store (atom {:wallet {:agent {:status :ready
                                         :storage-mode :session}}})
-          original-load agent-session/load-agent-session-by-mode]
-      (set! agent-session/load-agent-session-by-mode
-            (fn [_wallet-address _storage-mode] nil))
+          original-load agent-lockbox/load-unlocked-session]
+      (set! agent-lockbox/load-unlocked-session
+            (fn [_wallet-address & [_storage-mode]] nil))
       (-> (trading/submit-order! store
                                  support/owner-address
                                  {:type "order"
@@ -145,14 +176,14 @@
                     (done)))
           (.finally
            (fn []
-             (set! agent-session/load-agent-session-by-mode original-load)))))))
+             (set! agent-lockbox/load-unlocked-session original-load)))))))
 
 (deftest sign-and-post-agent-action-private-helper-rejects-without-private-key-test
   (async done
     (let [store (support/ready-agent-store 1700000017000)
-          original-load agent-session/load-agent-session-by-mode]
-      (set! agent-session/load-agent-session-by-mode
-            (fn [_wallet-address _storage-mode]
+          original-load agent-lockbox/load-unlocked-session]
+      (set! agent-lockbox/load-unlocked-session
+            (fn [_wallet-address & [_storage-mode]]
               {:agent-address "0x8fd379246834eac74b8419ffda202cf8051f7a03"
                :private-key nil
                :nonce-cursor 1700000017000}))
@@ -170,20 +201,20 @@
                     (done)))
           (.finally
            (fn []
-             (set! agent-session/load-agent-session-by-mode original-load)))))))
+             (set! agent-lockbox/load-unlocked-session original-load)))))))
 
 (deftest submit-order-reconciles-agent-address-from-private-key-before-signing-test
   (async done
     (let [store (support/ready-agent-store 1700000012222)
           persisted (atom [])
-          original-load agent-session/load-agent-session-by-mode
+          original-load agent-lockbox/load-unlocked-session
           original-persist agent-session/persist-agent-session-by-mode!
           restore-fetch! (support/install-fetch-stub!
                           (fn [_url _opts]
                             (js/Promise.resolve
                              (support/json-response {:status "ok"}))))]
-      (set! agent-session/load-agent-session-by-mode
-            (fn [_wallet-address _storage-mode]
+      (set! agent-lockbox/load-unlocked-session
+            (fn [_wallet-address & [_storage-mode]]
               {:agent-address "0x1111111111111111111111111111111111111111"
                :private-key "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
                :nonce-cursor 1700000012222}))
@@ -213,7 +244,7 @@
             (.catch (async-support/unexpected-error done))
             (.finally
              (fn []
-               (set! agent-session/load-agent-session-by-mode original-load)
+               (set! agent-lockbox/load-unlocked-session original-load)
                (set! agent-session/persist-agent-session-by-mode! original-persist)
                (restore-fetch!))))))))
 
@@ -222,7 +253,7 @@
     (let [store (support/ready-agent-store 1700000009999)
           cleared (atom [])
           persisted (atom [])
-          original-load agent-session/load-agent-session-by-mode
+          original-load agent-lockbox/load-unlocked-session
           original-clear agent-session/clear-agent-session-by-mode!
           original-persist agent-session/persist-agent-session-by-mode!
           original-sign signing/sign-l1-action-with-private-key!
@@ -231,13 +262,13 @@
                             (js/Promise.resolve
                              (support/json-response {:status "err"
                                                      :response "Vault not registered: 0xabc"}))))]
-      (set! agent-session/load-agent-session-by-mode
-            (fn [_wallet-address _storage-mode]
+      (set! agent-lockbox/load-unlocked-session
+            (fn [_wallet-address & [_storage-mode]]
               {:agent-address "0x46a23e25df9a0f6c18729dda9ad1af3b6a131160"
                :private-key "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
                :nonce-cursor 1700000009999}))
       (set! agent-session/clear-agent-session-by-mode!
-            (fn [wallet-address storage-mode]
+            (fn [wallet-address & [storage-mode]]
               (swap! cleared conj [wallet-address storage-mode])
               true))
       (set! agent-session/persist-agent-session-by-mode!
@@ -261,7 +292,7 @@
           (.catch (async-support/unexpected-error done))
           (.finally
            (fn []
-             (set! agent-session/load-agent-session-by-mode original-load)
+             (set! agent-lockbox/load-unlocked-session original-load)
              (set! agent-session/clear-agent-session-by-mode! original-clear)
              (set! agent-session/persist-agent-session-by-mode! original-persist)
              (set! signing/sign-l1-action-with-private-key! original-sign)
@@ -273,7 +304,7 @@
           sign-calls (atom [])
           persist-calls (atom [])
           fetch-count (atom 0)
-          original-load agent-session/load-agent-session-by-mode
+          original-load agent-lockbox/load-unlocked-session
           original-persist agent-session/persist-agent-session-by-mode!
           original-sign signing/sign-l1-action-with-private-key!
           restore-fetch! (support/install-fetch-stub!
@@ -282,8 +313,8 @@
                             (js/Promise.resolve
                              (support/json-response {:status "err"
                                                      :error "nonce too low"}))))]
-      (set! agent-session/load-agent-session-by-mode
-            (fn [_wallet-address _storage-mode]
+      (set! agent-lockbox/load-unlocked-session
+            (fn [_wallet-address & [_storage-mode]]
               {:agent-address "0x8fd379246834eac74b8419ffda202cf8051f7a03"
                :private-key "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
                :nonce-cursor 1700000019500}))
@@ -310,7 +341,7 @@
           (.catch (async-support/unexpected-error done))
           (.finally
            (fn []
-             (set! agent-session/load-agent-session-by-mode original-load)
+             (set! agent-lockbox/load-unlocked-session original-load)
              (set! agent-session/persist-agent-session-by-mode! original-persist)
              (set! signing/sign-l1-action-with-private-key! original-sign)
              (restore-fetch!)))))))
@@ -321,7 +352,7 @@
           sign-calls (atom [])
           fetch-calls (atom [])
           persisted (atom [])
-          original-load agent-session/load-agent-session-by-mode
+          original-load agent-lockbox/load-unlocked-session
           original-persist agent-session/persist-agent-session-by-mode!
           original-sign signing/sign-l1-action-with-private-key!
           restore-fetch! (support/install-fetch-stub!
@@ -329,8 +360,8 @@
                             (swap! fetch-calls conj [url opts])
                             (js/Promise.resolve
                              (support/json-response {:status "ok"}))))]
-      (set! agent-session/load-agent-session-by-mode
-            (fn [_wallet-address _storage-mode]
+      (set! agent-lockbox/load-unlocked-session
+            (fn [_wallet-address & [_storage-mode]]
               {:agent-address "0x8fd379246834eac74b8419ffda202cf8051f7a03"
                :private-key "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
                :nonce-cursor 1700000018000}))
@@ -367,7 +398,7 @@
           (.catch (async-support/unexpected-error done))
           (.finally
            (fn []
-             (set! agent-session/load-agent-session-by-mode original-load)
+             (set! agent-lockbox/load-unlocked-session original-load)
              (set! agent-session/persist-agent-session-by-mode! original-persist)
              (set! signing/sign-l1-action-with-private-key! original-sign)
              (restore-fetch!)))))))
@@ -377,7 +408,7 @@
     (let [store (support/ready-agent-store 1700000022500)
           sign-calls (atom [])
           fetch-count (atom 0)
-          original-load agent-session/load-agent-session-by-mode
+          original-load agent-lockbox/load-unlocked-session
           original-persist agent-session/persist-agent-session-by-mode!
           original-sign signing/sign-l1-action-with-private-key!
           restore-fetch! (support/install-fetch-stub!
@@ -386,8 +417,8 @@
                             (js/Promise.resolve
                              (support/json-response {:status "err"
                                                      :error "nonce too low"}))))]
-      (set! agent-session/load-agent-session-by-mode
-            (fn [_wallet-address _storage-mode]
+      (set! agent-lockbox/load-unlocked-session
+            (fn [_wallet-address & [_storage-mode]]
               {:agent-address "0x8fd379246834eac74b8419ffda202cf8051f7a03"
                :private-key "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
                :nonce-cursor 1700000022500}))
@@ -410,7 +441,7 @@
           (.catch (async-support/unexpected-error done))
           (.finally
            (fn []
-             (set! agent-session/load-agent-session-by-mode original-load)
+             (set! agent-lockbox/load-unlocked-session original-load)
              (set! agent-session/persist-agent-session-by-mode! original-persist)
              (set! signing/sign-l1-action-with-private-key! original-sign)
              (restore-fetch!)))))))
@@ -418,7 +449,7 @@
 (deftest submit-order-surfaces-plain-text-exchange-errors-test
   (async done
     (let [store (support/ready-agent-store 1700000021000)
-          original-load agent-session/load-agent-session-by-mode
+          original-load agent-lockbox/load-unlocked-session
           original-persist agent-session/persist-agent-session-by-mode!
           original-sign signing/sign-l1-action-with-private-key!
           restore-fetch! (support/install-fetch-stub!
@@ -429,8 +460,8 @@
                                   :text (fn []
                                           (js/Promise.resolve
                                            "Failed to deserialize the JSON body into the target type"))})))]
-      (set! agent-session/load-agent-session-by-mode
-            (fn [_wallet-address _storage-mode]
+      (set! agent-lockbox/load-unlocked-session
+            (fn [_wallet-address & [_storage-mode]]
               {:agent-address "0x8fd379246834eac74b8419ffda202cf8051f7a03"
                :private-key "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
                :nonce-cursor 1700000021000}))
@@ -450,7 +481,7 @@
           (.catch (async-support/unexpected-error done))
           (.finally
            (fn []
-             (set! agent-session/load-agent-session-by-mode original-load)
+             (set! agent-lockbox/load-unlocked-session original-load)
              (set! agent-session/persist-agent-session-by-mode! original-persist)
              (set! signing/sign-l1-action-with-private-key! original-sign)
              (restore-fetch!)))))))

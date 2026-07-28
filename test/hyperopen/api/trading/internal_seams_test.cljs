@@ -176,7 +176,8 @@
             :hyperliquid-chain "Mainnet"}
            (@#'hyperopen.api.trading/resolve-user-signing-context
             (atom {:wallet {:chain-id "0x66eee"}}))))
-    (with-redefs [app-config/config {:hyperliquid {:signature-chain-id "0x66eee"
+    (with-redefs [app-config/config {:hyperliquid {:trading-enabled? true
+                                                    :signature-chain-id "0x66eee"
                                                     :hyperliquid-chain "Testnet"}}]
       (is (= {:signature-chain-id "0x66eee"
               :hyperliquid-chain "Testnet"}

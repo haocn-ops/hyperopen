@@ -160,6 +160,10 @@
        [:effects/local-storage-set ui-theme/local-storage-key normalized]
        [:effects/apply-ui-theme normalized]])))
 
+(defn set-affiliate-consent
+  [_state enabled?]
+  [[:effects/set-affiliate-consent (boolean enabled?)]])
+
 (defn reset-degen-life
   "Joke control on the degen Feeling Gauge widget. Bumps a session-local
    counter; the gauge reports lives used and the degen tip re-rolls."

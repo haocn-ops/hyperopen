@@ -15,6 +15,7 @@ import {
 } from "./site_metadata.mjs";
 import {
   CONTROL_CACHE_CONTROL,
+  STRICT_TRANSPORT_SECURITY,
   IMMUTABLE_CACHE_CONTROL,
   THEME_PRELOAD_INLINE_SOURCE,
   THEME_PRELOAD_SCRIPT_HASH,
@@ -175,6 +176,26 @@ test("release CSP permits Hyperliquid Testnet REST and websocket origins", () =>
 
   assert.ok(connectSrc.includes("https://api.hyperliquid-testnet.xyz"));
   assert.ok(connectSrc.includes("wss://api.hyperliquid-testnet.xyz"));
+});
+
+test("release document policy excludes Cloudflare Insights scripts and declares HSTS", () => {
+  const policy = buildContentSecurityPolicy();
+  const scriptSrc = extractCspDirective(policy, "script-src");
+  const scriptSrcAttr = extractCspDirective(policy, "script-src-attr");
+  const requireTrustedTypes = extractCspDirective(policy, "require-trusted-types-for");
+  const trustedTypes = extractCspDirective(policy, "trusted-types");
+  const connectSrc = extractCspDirective(policy, "connect-src");
+
+  assert.deepEqual(scriptSrc, ["'self'", THEME_PRELOAD_SCRIPT_HASH]);
+  assert.deepEqual(scriptSrcAttr, ["'none'"]);
+  assert.equal(scriptSrc.includes("'unsafe-inline'"), false);
+  assert.equal(scriptSrc.includes("'unsafe-eval'"), false);
+  assert.equal(scriptSrc.includes("*"), false);
+  assert.equal(scriptSrc.includes("https://static.cloudflareinsights.com"), false);
+  assert.equal(connectSrc.includes("https://cloudflareinsights.com"), false);
+  assert.deepEqual(requireTrustedTypes, ["'script'"]);
+  assert.deepEqual(trustedTypes, ["default"]);
+  assert.equal(STRICT_TRANSPORT_SECURITY, "max-age=31536000; includeSubDomains");
 });
 
 function buildSampleIndexHtml() {

@@ -30,6 +30,29 @@
         (is (string? (:wallet/address-hash event-a)))
         (is (not (attribution/contains-secret? event-a)))))))
 
+(deftest attribution-identifiers-use-synchronous-sha256-vectors-test
+  (is (= "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+         (attribution/sha256-hex "")))
+  (is (= "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+         (attribution/sha256-hex "abc")))
+  (is (= "670d9743542cae3ea7ebe36af56bd53648b0a1126162e78d81a32934a711302e"
+         (attribution/sha256-hex "你好")))
+  (let [tenant (tenant-config/normalize-tenant-config fixtures/default-tenant-raw)
+        context (attribution/build-attribution-context tenant fixtures/attribution-context)
+        event-a (attribution/build-attribution-event
+                 context :trade-submit-requested {:market "BTC" :outcome :submitted})
+        event-b (attribution/build-attribution-event
+                 (into {} (reverse (seq context)))
+                 :trade-submit-requested
+                 {:outcome :submitted :market "BTC"})]
+    (is (= "sha256-a8a32d43f025ad68e5ff8068c742779477b7504e89e89bb9d1e9ec5088ce7e9a"
+           (:wallet/address-hash context)))
+    (is (= "sha256-64a248ea643f96b4c3d85a0d74ec420aa7c5f5004cd575888be2bd8186c177ef"
+           (:event/id event-a)))
+    (is (= (:event/id event-a) (:event/id event-b)))
+    (is (= (:event/id event-a) (attribution/idempotency-key event-a)))
+    (is (re-matches #"sha256-[0-9a-f]{64}" (:event/id event-a)))))
+
 (deftest attribution-redaction-omits-secrets-and-local-settlement-claims-test
   (let [tenant (tenant-config/normalize-tenant-config fixtures/default-tenant-raw)
         context (attribution/build-attribution-context tenant fixtures/attribution-context)

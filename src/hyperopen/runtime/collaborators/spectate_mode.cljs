@@ -26,6 +26,7 @@
    :set-confirm-market-orders-enabled header-actions/set-confirm-market-orders-enabled
    :set-open-order-safety-mode header-actions/set-open-order-safety-mode
    :set-ui-theme header-actions/set-ui-theme
+   :set-affiliate-consent header-actions/set-affiliate-consent
    :reset-degen-life header-actions/reset-degen-life
    :navigate-mobile-header-menu header-actions/navigate-mobile-header-menu
    :open-spectate-mode-mobile-header-menu header-actions/open-spectate-mode-mobile-header-menu

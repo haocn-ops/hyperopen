@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 
 const MAINNET_ORIGIN = "https://api.hyperunit.xyz";
 const TESTNET_ORIGIN = "https://api.hyperunit-testnet.xyz";
-const MAINNET_PROXY_BASE = "/api/hyperunit/mainnet";
+const MAINNET_DISABLED_BASE = "/__hyperopen_disabled__/hyperunit-mainnet";
 const TESTNET_PROXY_BASE = "/api/hyperunit/testnet";
 const URL_BOUNDARY = String.raw`(?=$|[/?#"'\x60\s])`;
 
@@ -88,7 +88,7 @@ export async function rewriteReleaseJavaScript(releaseDirectory) {
     rewrites.push({
       filePath,
       contents: contents
-        .replace(mainnetPattern, MAINNET_PROXY_BASE)
+        .replace(mainnetPattern, MAINNET_DISABLED_BASE)
         .replace(testnetPattern, TESTNET_PROXY_BASE),
       mainnetCount: fileMainnetCount,
       testnetCount: fileTestnetCount,

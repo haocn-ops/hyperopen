@@ -18,14 +18,31 @@ const viewports = [
   { width: 1440, height: 900 },
 ];
 
-function installFailureCapture(page) {
+function isExpectedTrustedTypesProbe(message) {
+  return message.includes("TrustedTypePolicy named 'goog#html'")
+    || message.includes('Policy "goog#html" disallowed');
+}
+
+function installFailureCapture(page, localOrigin) {
   const failures = [];
   page.on("console", (message) => {
-    if (message.type() === "error") {
+    const text = message.text();
+    if (message.type() === "error"
+        && !text.startsWith("Failed to load resource:")
+        && !isExpectedTrustedTypesProbe(text)) {
       failures.push(`console: ${message.text()}`);
     }
   });
-  page.on("requestfailed", (request) => failures.push(`request: ${request.url()}`));
+  page.on("requestfailed", (request) => {
+    if (new URL(request.url()).origin === localOrigin) {
+      failures.push(`request: ${request.url()}`);
+    }
+  });
+  page.on("response", (response) => {
+    if (new URL(response.url()).origin === localOrigin && response.status() >= 400) {
+      failures.push(`response: ${response.status()} ${response.url()}`);
+    }
+  });
   return failures;
 }
 
@@ -38,8 +55,8 @@ for (const viewport of viewports) {
     );
 
     test("renders compiled tenant identity, public metadata, and enabled routes only", async ({ page, request }) => {
-      const failures = installFailureCapture(page);
       const metadataResponse = await request.get("/site-metadata.json");
+      const failures = installFailureCapture(page, new URL(metadataResponse.url()).origin);
       const metadata = await metadataResponse.json();
       const disabledArtifact = expected.disabledRoute
         ? await request.get(`${expected.disabledRoute}.html`)
@@ -68,7 +85,7 @@ for (const viewport of viewports) {
         expect(disabledArtifact.status()).toBe(404);
       }
 
-      await page.goto("/", { waitUntil: "networkidle" });
+      await page.goto("/", { waitUntil: "domcontentloaded" });
       await expect(page.locator("html")).toHaveAttribute("data-theme", expected.theme);
       await expect(page.getByText(expected.brand, { exact: true }).first()).toBeVisible();
       await expect(page).toHaveTitle(new RegExp(expected.brand));
@@ -82,7 +99,7 @@ for (const viewport of viewports) {
       expect(mainBundle).toContain(expected.tenantId);
       expect(mainBundle).toContain(expected.brand);
 
-      await page.goto(expected.enabledRoute, { waitUntil: "networkidle" });
+      await page.goto(expected.enabledRoute, { waitUntil: "domcontentloaded" });
       await expect(page.locator("link[rel='canonical']")).toHaveAttribute(
         "href",
         `${expected.origin}${expected.enabledRoute}`

@@ -46,8 +46,11 @@
   [_ store options]
   (let [{:keys [storage-mode local-protection-mode is-mainnet agent-name signature-chain-id]} options
         selected-network (:hyperliquid app-config/config)
-        storage-mode (or storage-mode :local)
-        local-protection-mode (or local-protection-mode :plain)
+        {:keys [storage-mode local-protection-mode]}
+        (agent-session/resolve-secure-storage-posture
+         storage-mode
+         local-protection-mode
+         (agent-lockbox/passkey-lock-supported?))
         is-mainnet (if (contains? options :is-mainnet)
                      is-mainnet
                      (:is-mainnet selected-network))
@@ -89,11 +92,18 @@
               :clear-unlocked-session! agent-lockbox/clear-unlocked-session!
               :runtime-error-message agent-runtime/runtime-error-message
               :exchange-response-error agent-runtime/exchange-response-error}))]
-      (if-let [crypto (trading-crypto-modules/resolved-trading-crypto)]
-        (enable-with-crypto! crypto)
-        (-> (trading-crypto-modules/load-trading-crypto-module!)
-            (.then enable-with-crypto!)
-            (.catch set-agent-load-error!))))))
+      (if-not (:trading-enabled? selected-network)
+        (swap! store update-in [:wallet :agent] merge
+               {:status :error
+                :error (:error selected-network)
+                :agent-address nil
+                :last-approved-at nil
+                :nonce-cursor nil})
+        (if-let [crypto (trading-crypto-modules/resolved-trading-crypto)]
+          (enable-with-crypto! crypto)
+          (-> (trading-crypto-modules/load-trading-crypto-module!)
+              (.then enable-with-crypto!)
+              (.catch set-agent-load-error!)))))))
 
 (defn enable-agent-trading-action
   [state]

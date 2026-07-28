@@ -1,6 +1,6 @@
 # ADR 0027: Portfolio Optimizer Solver Selection
 
-- Status: Accepted
+- Status: Superseded (2026-07-27; quadprog-only production path)
 - Date: 2026-04-23
 
 ## Context
@@ -16,8 +16,11 @@ into a custom numerical-methods project.
 
 ## Decision
 
-Use a worker-isolated OSQP adapter as the first production solver path for V1, with a quadprog
-adapter retained as a fallback and parity oracle during engine development.
+Historical decision: use a worker-isolated OSQP adapter as the first production solver path for V1,
+with a quadprog adapter retained as a fallback and parity oracle during engine development. This
+decision is superseded by the 2026-07-27 security remediation: production optimization now uses
+quadprog only, the OSQP adapter and npm package are removed, and the worker ignores the retired
+OSQP selector. The benchmark table below remains historical evidence for that replacement.
 
 Do not build a custom in-repo constrained QP solver for V1. The internal projected-gradient harness
 may remain as a deterministic spike baseline only; it is not accepted as the production optimizer.
@@ -66,7 +69,11 @@ be frontier-driven, not a direct nonlinear target-volatility QP.
   wrapper is old, minified, and reports OSQP runtime version `0.0.0` even though the npm package is
   `0.0.2`.
 
-## Implementation Rules
+## Historical Implementation Rules
+
+The rules in this section describe the superseded OSQP path and must not be used for new
+production work. Refer to `docs/exec-plans/active/2026-07-27-security-remediation.md` for the
+current quadprog-only and dependency-governance contract.
 
 - Configure OSQP with `verbose: false`, tighter tolerances, and worker-only execution.
 - Keep a quadprog adapter available for deterministic fixture parity and fallback investigation.

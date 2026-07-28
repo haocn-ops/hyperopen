@@ -118,11 +118,14 @@
         record {:event event
                 :delivery/status :pending
                 :delivery/attempt-count 0}
-        tenant (assoc-in service-fixtures/default-tenant-raw
-                         [:affiliate :event-endpoint]
-                         "https://events.example.test/attribution")
+        tenant (-> service-fixtures/default-tenant-raw
+                   (assoc-in [:features :affiliate] true)
+                   (assoc-in [:affiliate :status] :enabled)
+                   (assoc-in [:affiliate :event-endpoint]
+                             "https://events.example.test/attribution"))
         storage (atom {attribution-effects/storage-key
-                       (js/JSON.stringify (json-wire-value [record]))})
+                       (js/JSON.stringify (json-wire-value [record]))
+                       "hyperopen:affiliate-consent:v1:hyperopen-default" "true"})
         calls (atom [])
         runtime (atom {})
         store (atom {:tenant/override tenant})

@@ -36,7 +36,7 @@ test("DEXHelm Cloudflare release uses the checked-in public tenant identity", as
   const wrangler = JSON.parse(await fs.readFile(path.join(repositoryRoot, "wrangler.jsonc"), "utf8"));
   assert.equal(
     packageJson.scripts["build:cloudflare"],
-    "node tools/cloudflare/build_dexhelm_release.mjs"
+    "node tools/cloudflare/build_dexhelm_release.mjs && node tools/security/release_xss_contract.mjs --release-root out/white-label/dexhelm"
   );
   assert.equal(wrangler.assets.directory, "./out/white-label/dexhelm");
 });

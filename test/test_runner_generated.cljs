@@ -447,6 +447,11 @@
             [hyperopen.schema.order-form-command-catalog-test]
             [hyperopen.schema.order-request-contracts-test]
             [hyperopen.schema.vault-transfer-contracts-test]
+            [hyperopen.security.affiliate-consent-persistence-edge-cases-test]
+            [hyperopen.security.attribution-authority-acceptance-test]
+            [hyperopen.security.attribution-authority-edge-cases-test]
+            [hyperopen.security.memory-only-agent-acceptance-test]
+            [hyperopen.security.memory-only-agent-edge-cases-test]
             [hyperopen.service.portfolio-analytics-acceptance-test]
             [hyperopen.service.product-context-view-model-test]
             [hyperopen.service.tenant-build-config-test]
@@ -1297,6 +1302,11 @@
              'hyperopen.schema.order-form-command-catalog-test
              'hyperopen.schema.order-request-contracts-test
              'hyperopen.schema.vault-transfer-contracts-test
+             'hyperopen.security.affiliate-consent-persistence-edge-cases-test
+             'hyperopen.security.attribution-authority-acceptance-test
+             'hyperopen.security.attribution-authority-edge-cases-test
+             'hyperopen.security.memory-only-agent-acceptance-test
+             'hyperopen.security.memory-only-agent-edge-cases-test
              'hyperopen.service.portfolio-analytics-acceptance-test
              'hyperopen.service.product-context-view-model-test
              'hyperopen.service.tenant-build-config-test

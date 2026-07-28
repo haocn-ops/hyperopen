@@ -3,6 +3,7 @@
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 function parseArguments(args) {
   let repoRoot = process.cwd();
@@ -93,7 +94,7 @@ function checkPackageContract(repoRoot) {
   if (!packageJson) return;
 
   const expectedScripts = {
-    "build:cloudflare": "node tools/cloudflare/build_dexhelm_release.mjs",
+    "build:cloudflare": "node tools/cloudflare/build_dexhelm_release.mjs && node tools/security/release_xss_contract.mjs --release-root out/white-label/dexhelm",
     "cloudflare:check": "npm run build:cloudflare && wrangler deploy --dry-run",
     "cloudflare:dev": "npm run build:cloudflare && wrangler dev --local",
     "deploy:cloudflare": "npm run build:cloudflare && wrangler deploy",
@@ -120,65 +121,80 @@ function checkPackageContract(repoRoot) {
     : fail("local Wrangler binary is missing; run npm run setup:worktree or npm ci");
 }
 
-function checkWranglerContract(repoRoot) {
-  const config = readJson(path.join(repoRoot, "wrangler.jsonc"), "wrangler.jsonc");
-  if (!config) return;
+const DEXHELM_DOMAINS = [
+  "dexhelm.com",
+  "app.dexhelm.com",
+  "testnet.dexhelm.com",
+  "status.dexhelm.com",
+];
 
-  const expected = [
-    [config.name === "hyperopen", "Worker name is hyperopen"],
-    [config.main === "./workers/hyperopen-worker.mjs", "Worker main module is repository-owned"],
-    [config.workers_dev === true, "workers.dev publishing is enabled"],
-    [config.assets?.directory === "./out/white-label/dexhelm", "static asset directory is the verified DEXHelm white-label release"],
-    [config.assets?.binding === "ASSETS", "static asset binding is ASSETS"],
-    [config.vars?.HYPERUNIT_MAINNET_URL === "https://api.hyperunit.xyz", "mainnet upstream is fixed"],
-    [config.vars?.HYPERUNIT_TESTNET_URL === "https://api.hyperunit-testnet.xyz", "testnet upstream is fixed"],
-  ];
-  for (const [condition, message] of expected) {
-    condition ? pass(message) : fail(message);
-  }
+export function checkWranglerConfiguration(config, { workerSource = "" } = {}) {
+  const contractFailures = [];
+  if (config?.name !== "hyperopen") contractFailures.push("Worker name must be hyperopen.");
+  if (config?.main !== "./workers/hyperopen-worker.mjs") contractFailures.push("Worker main module must be repository-owned.");
+  if (config?.workers_dev !== false) contractFailures.push("workers.dev publishing must remain disabled.");
+  if (config?.assets?.directory !== "./out/white-label/dexhelm") contractFailures.push("Static asset directory must be the verified DEXHelm release.");
+  if (config?.assets?.binding !== "ASSETS") contractFailures.push("Static asset binding must be ASSETS.");
+  if (config?.vars?.HYPERUNIT_TESTNET_URL !== "https://api.hyperunit-testnet.xyz") contractFailures.push("Testnet upstream must be fixed.");
+  if (Object.hasOwn(config?.vars ?? {}, "HYPERUNIT_MAINNET_URL")) contractFailures.push("Mainnet upstream binding must be absent.");
+  const unexpectedBindings = Object.keys(config?.vars ?? {})
+    .filter((key) => key.startsWith("HYPERUNIT_") && key !== "HYPERUNIT_TESTNET_URL");
+  if (unexpectedBindings.length > 0) contractFailures.push("Unexpected HyperUnit Worker binding is configured.");
 
-  const workerFirst = config.assets?.run_worker_first;
-  const dexhelmDomains = [
-    "dexhelm.com",
-    "app.dexhelm.com",
-    "testnet.dexhelm.com",
-    "status.dexhelm.com",
-  ];
-  const configuredCustomDomains = Array.isArray(config.routes)
+  const configuredDomains = Array.isArray(config?.routes)
     ? config.routes
         .filter((route) => route?.custom_domain === true && typeof route.pattern === "string")
         .map((route) => route.pattern)
         .sort()
     : [];
-  const hasExactDexhelmDomains =
-    JSON.stringify(configuredCustomDomains) === JSON.stringify([...dexhelmDomains].sort());
+  if (JSON.stringify(configuredDomains) !== JSON.stringify([...DEXHELM_DOMAINS].sort())) {
+    contractFailures.push("Custom-domain routes must contain only the four exact DEXHelm hostnames.");
+  }
+  if (config?.assets?.run_worker_first !== true) contractFailures.push("Worker-first delivery must enforce the exact-host policy.");
+  if (!DEXHELM_DOMAINS.every((hostname) => workerSource.includes(hostname))) {
+    contractFailures.push("Worker source must contain an explicit policy for every DEXHelm hostname.");
+  }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(config?.compatibility_date ?? "")) {
+    contractFailures.push("Compatibility date is missing or invalid.");
+  }
+  return contractFailures;
+}
 
-  if (config.routes === undefined) {
-    pass("no custom domains are configured");
-  } else if (hasExactDexhelmDomains) {
+export function inspectArtifactJavaScript(files) {
+  const contractFailures = [];
+  let hasTestnetProxy = false;
+  for (const file of files) {
+    const contents = String(file?.contents ?? "");
+    const label = file?.relativePath ?? "unknown JavaScript file";
+    if (/https:\/\/api\.hyperunit(?:-testnet)?\.xyz/.test(contents)) {
+      contractFailures.push(`${label} contains a direct HyperUnit origin.`);
+    }
+    if (contents.includes("/api/hyperunit/mainnet")) {
+      contractFailures.push(`${label} contains a Mainnet proxy route.`);
+    }
+    if (/\/api\/hyperunit(?=["'`?#\s;)]|$)/.test(contents)) {
+      contractFailures.push(`${label} contains a generic HyperUnit proxy route.`);
+    }
+    if (contents.includes("/api/hyperunit/testnet")) hasTestnetProxy = true;
+  }
+  if (!hasTestnetProxy) contractFailures.push("Release JavaScript is missing the Testnet proxy base.");
+  return { failures: contractFailures };
+}
+
+function checkWranglerContract(repoRoot) {
+  const config = readJson(path.join(repoRoot, "wrangler.jsonc"), "wrangler.jsonc");
+  if (!config) return;
+  const workerSource = fs.readFileSync(path.join(repoRoot, "workers", "hyperopen-worker.mjs"), "utf8");
+  const contractFailures = checkWranglerConfiguration(config, { workerSource });
+  if (contractFailures.length > 0) {
+    contractFailures.forEach(fail);
+  } else {
+    pass("Worker name, module, asset binding, and compatibility date match the release contract");
+    pass("workers.dev publishing is disabled");
+    pass("only the fixed Testnet HyperUnit upstream is bound");
     pass("custom domains are limited to the four DEXHelm public surfaces");
-  } else {
-    fail("custom-domain routes must be absent or contain only the four exact DEXHelm hostnames");
+    pass("Worker-first delivery is enabled for the validated DEXHelm host policy");
   }
-
-  if (Array.isArray(workerFirst) && workerFirst.length === 2 && workerFirst.includes("/api/health") && workerFirst.includes("/api/hyperunit/*")) {
-    pass("Worker-first routes are limited to health and the HyperUnit proxy");
-  } else if (workerFirst === true && hasExactDexhelmDomains) {
-    const workerSource = fs.readFileSync(
-      path.join(repoRoot, "workers", "hyperopen-worker.mjs"),
-      "utf8"
-    );
-    const hasHostPolicy = dexhelmDomains.every((hostname) => workerSource.includes(hostname));
-    hasHostPolicy
-      ? pass("Worker-first delivery is enabled for the validated DEXHelm host policy")
-      : fail("Worker-first delivery requires an explicit policy for every DEXHelm hostname");
-  } else {
-    fail("assets.run_worker_first must use the narrow API rules or the validated DEXHelm host policy");
-  }
-
-  /^\d{4}-\d{2}-\d{2}$/.test(config.compatibility_date ?? "")
-    ? pass(`compatibility_date is set to ${config.compatibility_date}`)
-    : fail("wrangler compatibility_date is missing or invalid");
 }
 
 function checkRuntime(repoRoot) {
@@ -239,13 +255,13 @@ function checkArtifact(repoRoot) {
 
   try {
     const files = collectJavaScriptFiles(javascriptRoot);
-    const contents = files.map((filePath) => fs.readFileSync(filePath, "utf8")).join("\n");
-    /https:\/\/api\.hyperunit(?:-testnet)?\.xyz/.test(contents)
-      ? fail("release JavaScript still contains a direct HyperUnit origin")
-      : pass("release JavaScript contains no direct HyperUnit origin");
-    contents.includes("/api/hyperunit/mainnet") && contents.includes("/api/hyperunit/testnet")
-      ? pass("release JavaScript contains both same-origin proxy bases")
-      : fail("release JavaScript is missing one or both same-origin HyperUnit proxy bases");
+    const inspection = inspectArtifactJavaScript(files.map((filePath) => ({
+      relativePath: path.relative(releaseRoot, filePath),
+      contents: fs.readFileSync(filePath, "utf8"),
+    })));
+    inspection.failures.length > 0
+      ? inspection.failures.forEach(fail)
+      : pass("release JavaScript contains only the Testnet same-origin HyperUnit proxy base");
 
     const tenantManifest = readJson(path.join(releaseRoot, "tenant-manifest.json"), "tenant-manifest.json");
     if (tenantManifest) {
@@ -267,7 +283,10 @@ function printResults() {
   console.log(`Preflight summary: ${passes.length} passed, ${warnings.length} warnings, ${failures.length} failures`);
 }
 
-try {
+const invokedDirectly = process.argv[1]
+  && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+
+if (invokedDirectly) try {
   const { checkArtifact: shouldCheckArtifact, repoRoot } = parseArguments(process.argv.slice(2));
   for (const relativePath of [
     "package.json",

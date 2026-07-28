@@ -5,6 +5,7 @@
             [hyperopen.test-support.api-stubs :as api-stubs]
             [hyperopen.test-support.async :as async-support]
             [hyperopen.utils.hl-signing :as signing]
+            [hyperopen.wallet.agent-lockbox :as agent-lockbox]
             [hyperopen.wallet.agent-session :as agent-session]))
 
 (defn- captured-sign-options
@@ -25,7 +26,7 @@
         sign-calls (atom [])
         fetch-calls (atom [])
         persist-calls (atom [])
-        original-load agent-session/load-agent-session-by-mode
+        original-load agent-lockbox/load-unlocked-session
         original-persist agent-session/persist-agent-session-by-mode!
         original-sign signing/sign-l1-action-with-private-key!
         restore-fetch! (support/install-fetch-stub!
@@ -34,13 +35,13 @@
                           (js/Promise.resolve
                            (support/json-response {:status "ok"}))))
         restore! (fn []
-                   (set! agent-session/load-agent-session-by-mode original-load)
+                   (set! agent-lockbox/load-unlocked-session original-load)
                    (set! agent-session/persist-agent-session-by-mode! original-persist)
                    (set! signing/sign-l1-action-with-private-key! original-sign)
                    (restore-fetch!))]
-    (set! agent-session/load-agent-session-by-mode
-          (fn [wallet-address storage-mode]
-            (swap! load-calls conj [wallet-address storage-mode])
+    (set! agent-lockbox/load-unlocked-session
+          (fn [wallet-address & _]
+            (swap! load-calls conj [wallet-address])
             {:agent-address "0x8fd379246834eac74b8419ffda202cf8051f7a03"
              :private-key "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
              :nonce-cursor 1700000040000}))
@@ -58,7 +59,7 @@
           (.then
            (fn [resp]
              (is (= "ok" (:status resp)))
-             (is (= [[support/owner-address :session]]
+             (is (= [[support/owner-address]]
                     @load-calls))
              (is (= 1 (count @sign-calls)))
              (is (= 1 (count @fetch-calls)))

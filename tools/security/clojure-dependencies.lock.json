@@ -1,0 +1,301 @@
+{
+  "schemaVersion": 1,
+  "clojureCliVersion": "Clojure CLI version 1.12.5.1654",
+  "command": "clojure -A:dev:test -Stree",
+  "directDependencies": [
+    {
+      "name": "coderafting:memsearch",
+      "version": "0.1.1"
+    },
+    {
+      "name": "com.fasterxml.jackson.core:jackson-core",
+      "version": "2.18.8"
+    },
+    {
+      "name": "no.cjohansen:nexus",
+      "version": "2025.07.1"
+    },
+    {
+      "name": "no.cjohansen:portfolio",
+      "version": "2026.03.1"
+    },
+    {
+      "name": "no.cjohansen:replicant",
+      "version": "2025.06.21"
+    },
+    {
+      "name": "org.clojure:clojure",
+      "version": "1.12.0"
+    },
+    {
+      "name": "org.clojure:clojurescript",
+      "version": "1.11.132"
+    },
+    {
+      "name": "org.clojure:core.async",
+      "version": "1.6.681"
+    },
+    {
+      "name": "org.clojure:test.check",
+      "version": "1.1.1"
+    },
+    {
+      "name": "org.yaml:snakeyaml",
+      "version": "2.0"
+    },
+    {
+      "name": "thheller:shadow-cljs",
+      "version": "3.4.0"
+    }
+  ],
+  "dependencies": [
+    {
+      "name": "cider:cider-nrepl",
+      "version": "0.25.8"
+    },
+    {
+      "name": "cider:piggieback",
+      "version": "0.6.0"
+    },
+    {
+      "name": "cjohansen:dumdom",
+      "version": "2024.02.19"
+    },
+    {
+      "name": "clj-commons:clj-yaml",
+      "version": "1.0.26"
+    },
+    {
+      "name": "clj-fuzzy:clj-fuzzy",
+      "version": "0.4.1"
+    },
+    {
+      "name": "coderafting:memsearch",
+      "version": "0.1.1"
+    },
+    {
+      "name": "com.bhauman:cljs-test-display",
+      "version": "0.1.1"
+    },
+    {
+      "name": "com.cognitect:transit-clj",
+      "version": "1.0.333"
+    },
+    {
+      "name": "com.cognitect:transit-cljs",
+      "version": "0.8.280"
+    },
+    {
+      "name": "com.cognitect:transit-java",
+      "version": "1.0.371"
+    },
+    {
+      "name": "com.cognitect:transit-js",
+      "version": "0.8.874"
+    },
+    {
+      "name": "com.fasterxml.jackson.core:jackson-core",
+      "version": "2.18.8"
+    },
+    {
+      "name": "com.google.javascript:closure-compiler",
+      "version": "v20250407"
+    },
+    {
+      "name": "com.google.javascript:closure-compiler-unshaded",
+      "version": "v20220502"
+    },
+    {
+      "name": "com.googlecode.json-simple:json-simple",
+      "version": "1.1.1"
+    },
+    {
+      "name": "com.thheller:shadow-http",
+      "version": "0.1.2"
+    },
+    {
+      "name": "commons-codec:commons-codec",
+      "version": "1.15"
+    },
+    {
+      "name": "commons-io:commons-io",
+      "version": "2.20.0"
+    },
+    {
+      "name": "crypto-equality:crypto-equality",
+      "version": "1.0.1"
+    },
+    {
+      "name": "crypto-random:crypto-random",
+      "version": "1.2.1"
+    },
+    {
+      "name": "expound:expound",
+      "version": "0.9.0"
+    },
+    {
+      "name": "fipp:fipp",
+      "version": "0.6.27"
+    },
+    {
+      "name": "hiccup:hiccup",
+      "version": "1.0.5"
+    },
+    {
+      "name": "javax.activation:javax.activation-api",
+      "version": "1.2.0"
+    },
+    {
+      "name": "javax.xml.bind:jaxb-api",
+      "version": "2.4.0-b180830.0359"
+    },
+    {
+      "name": "markdown-clj:markdown-clj",
+      "version": "1.11.4"
+    },
+    {
+      "name": "no.cjohansen:nexus",
+      "version": "2025.07.1"
+    },
+    {
+      "name": "no.cjohansen:phosphor-clj",
+      "version": "2025.04.16"
+    },
+    {
+      "name": "no.cjohansen:portfolio",
+      "version": "2026.03.1"
+    },
+    {
+      "name": "no.cjohansen:replicant",
+      "version": "2025.06.21"
+    },
+    {
+      "name": "nrepl:nrepl",
+      "version": "1.3.1"
+    },
+    {
+      "name": "org.apache.commons:commons-fileupload2-core",
+      "version": "2.0.0-M4"
+    },
+    {
+      "name": "org.clojure:clojure",
+      "version": "1.12.0"
+    },
+    {
+      "name": "org.clojure:clojurescript",
+      "version": "1.11.132"
+    },
+    {
+      "name": "org.clojure:core.async",
+      "version": "1.6.681"
+    },
+    {
+      "name": "org.clojure:core.cache",
+      "version": "1.0.225"
+    },
+    {
+      "name": "org.clojure:core.memoize",
+      "version": "1.0.253"
+    },
+    {
+      "name": "org.clojure:core.rrb-vector",
+      "version": "0.1.2"
+    },
+    {
+      "name": "org.clojure:core.specs.alpha",
+      "version": "0.4.74"
+    },
+    {
+      "name": "org.clojure:data.json",
+      "version": "2.5.2"
+    },
+    {
+      "name": "org.clojure:data.priority-map",
+      "version": "1.1.0"
+    },
+    {
+      "name": "org.clojure:google-closure-library",
+      "version": "0.0-20250515-f04e4c0e"
+    },
+    {
+      "name": "org.clojure:google-closure-library-third-party",
+      "version": "0.0-20250515-f04e4c0e"
+    },
+    {
+      "name": "org.clojure:spec.alpha",
+      "version": "0.5.238"
+    },
+    {
+      "name": "org.clojure:test.check",
+      "version": "1.1.1"
+    },
+    {
+      "name": "org.clojure:tools.analyzer",
+      "version": "1.1.1"
+    },
+    {
+      "name": "org.clojure:tools.analyzer.jvm",
+      "version": "1.2.3"
+    },
+    {
+      "name": "org.clojure:tools.cli",
+      "version": "1.1.230"
+    },
+    {
+      "name": "org.clojure:tools.reader",
+      "version": "1.6.0"
+    },
+    {
+      "name": "org.flatland:ordered",
+      "version": "1.5.9"
+    },
+    {
+      "name": "org.javassist:javassist",
+      "version": "3.18.1-GA"
+    },
+    {
+      "name": "org.msgpack:msgpack",
+      "version": "0.6.12"
+    },
+    {
+      "name": "org.ow2.asm:asm",
+      "version": "9.2"
+    },
+    {
+      "name": "org.ring-clojure:ring-core-protocols",
+      "version": "1.15.3"
+    },
+    {
+      "name": "org.ring-clojure:ring-websocket-protocols",
+      "version": "1.15.3"
+    },
+    {
+      "name": "org.yaml:snakeyaml",
+      "version": "2.0"
+    },
+    {
+      "name": "ring:ring-codec",
+      "version": "1.3.0"
+    },
+    {
+      "name": "ring:ring-core",
+      "version": "1.15.3"
+    },
+    {
+      "name": "thheller:shadow-client",
+      "version": "1.4.0"
+    },
+    {
+      "name": "thheller:shadow-cljs",
+      "version": "3.4.0"
+    },
+    {
+      "name": "thheller:shadow-cljsjs",
+      "version": "0.0.22"
+    },
+    {
+      "name": "thheller:shadow-util",
+      "version": "0.7.0"
+    }
+  ]
+}

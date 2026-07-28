@@ -71,12 +71,32 @@
                      :last-approved-at 1700000003333
                      :nonce-cursor 1700000003333})]
       (wallet/set-connected! store "0xnew")
-      (is (= [["0xold" :session]] @cleared))
+      (is (= [["0xold" :session]
+              ["0xnew" :session]] @cleared))
       (is (= [["0xnew" :session]] @loaded))
       (is (= true (get-in @store [:wallet :connected?])))
       (is (= "0xnew" (get-in @store [:wallet :address])))
-      (is (= :ready (get-in @store [:wallet :agent :status])))
-      (is (= "0xnewagent" (get-in @store [:wallet :agent :agent-address]))))))
+      (is (= :error (get-in @store [:wallet :agent :status])))
+      (is (nil? (get-in @store [:wallet :agent :agent-address])))
+      (is (re-find #"Enable Trading again"
+                   (get-in @store [:wallet :agent :error]))))))
+
+(deftest set-connected-quarantines-local-legacy-credentials-without-restoring-them-test
+  (let [store (atom {:wallet {:connected? false
+                              :address nil
+                              :agent {:status :not-ready
+                                      :storage-mode :local
+                                      :local-protection-mode :plain}}})]
+    (with-redefs [agent-session/load-agent-session-by-mode
+                  (fn [_ storage-mode]
+                    (when (= :local storage-mode)
+                      {:agent-address "0xlegacy-agent"
+                       :private-key "0xlegacy-private"}))]
+      (wallet/set-connected! store "0xnew")
+      (is (= :error (get-in @store [:wallet :agent :status])))
+      (is (nil? (get-in @store [:wallet :agent :agent-address])))
+      (is (re-find #"legacy local trading credential was quarantined"
+                   (get-in @store [:wallet :agent :error]))))))
 
 (deftest set-connected-notifies-handler-when-notify-option-enabled-test
   (let [store (atom {:wallet {:connected? false

@@ -6,19 +6,9 @@
 (def ^:dynamic run-optimization-async
   engine/run-optimization-async)
 
-(def ^:private worker-solver-env-key
-  "HYPEROPEN_OPTIMIZER_WORKER_SOLVER")
-
-(defn- env-value
-  [key]
-  (when (exists? js/process)
-    (some-> js/process .-env (aget key))))
-
 (defn- worker-solver
   []
-  (case (env-value worker-solver-env-key)
-    "quadprog" solver-adapter/solve-with-quadprog
-    solver-adapter/solve-with-osqp))
+  solver-adapter/solve-with-quadprog)
 
 (defn- post-message!
   [id type payload]

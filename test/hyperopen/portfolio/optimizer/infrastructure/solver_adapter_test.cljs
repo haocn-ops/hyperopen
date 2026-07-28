@@ -99,7 +99,7 @@
     (-> (solver-adapter/solve-with-osqp min-variance-problem)
         (.then (fn [result]
                  (is (= :solved (:status result)))
-                 (is (= :osqp (:solver result)))
+                 (is (= :quadprog (:solver result)))
                  (is (near? 0.5 (first (:weights result))))
                  (is (near? 0.5 (second (:weights result))))
                  (done)))
@@ -112,7 +112,7 @@
     (-> (solver-adapter/solve-with-osqp signed-gross-problem)
         (.then (fn [result]
                  (is (= :solved (:status result)))
-                 (is (= :osqp (:solver result)))
+                 (is (= :quadprog (:solver result)))
                  (is (near? 0.5 (first (:weights result))))
                  (is (near? -0.5 (second (:weights result))))
                  (done)))

@@ -50,3 +50,24 @@
          (:theme/id
           (tenant-config/normalize-tenant-config
            (assoc tenant-config/default-tenant-raw :theme/id "midnight"))))))
+
+(deftest enabled-affiliate-event-endpoints-normalize-to-a-canonical-href-test
+  (let [raw (-> fixtures/default-tenant-raw
+                (assoc-in [:affiliate :status] :enabled)
+                (assoc-in [:affiliate :event-endpoint]
+                          " HTTPS://EVENTS.Example.COM:443/a/../collect?campaign=one "))
+        normalized (tenant-config/normalize-tenant-config raw)]
+    (is (= "https://events.example.com/collect?campaign=one"
+           (get-in normalized [:affiliate :event-endpoint])))
+    (is (= "https://events.example.com/collect?campaign=one"
+           (tenant-config/normalize-affiliate-event-endpoint
+            "HTTPS://EVENTS.Example.COM:443/a/../collect?campaign=one")))
+    (doseq [endpoint ["http://events.example.com/collect"
+                      "https://user:pass@events.example.com/collect"
+                      "https://events.example.com/collect#fragment"
+                      "https://events.example.com:444/collect"]]
+      (is (nil? (tenant-config/normalize-affiliate-event-endpoint endpoint)))))
+  (is (= ""
+         (get-in (tenant-config/normalize-tenant-config
+                  fixtures/affiliate-disabled-tenant-raw)
+                 [:affiliate :event-endpoint]))))

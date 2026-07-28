@@ -55,14 +55,13 @@ Canonical examples in the current codebase:
 - The user experience intentionally differs between session-only and device-persistent modes.
 - Cross-tab or cross-session reuse is not required.
 
-Canonical example in the current codebase:
-- Agent session persistence when the user explicitly chooses session-only mode instead of device-persistent mode.
+There is currently no credential use of `sessionStorage`. Agent keys in browsers without passkey support are held only in the in-memory lockbox for the current document and are not recovered after reload.
 
 ## Anti-Patterns (DO NOT)
 - Do not put large or high-churn caches in `localStorage`.
 - Do not use `localStorage` for write-heavy flows just because it is easier to read synchronously.
 - Do not move tiny startup preferences to IndexedDB unless async restore is already acceptable for that surface.
-- Do not assume IndexedDB, `localStorage`, or `sessionStorage` provides meaningful protection against Cross-Site Scripting. Browser-readable storage is still browser-readable storage.
+- Do not assume IndexedDB, `localStorage`, or `sessionStorage` provides meaningful protection against Cross-Site Scripting. Browser-readable storage is still browser-readable storage; raw signing credentials must not be written to any of them.
 - Do not add direct browser storage calls inside reducers, domain policy, or other pure decision code.
 
 ## Agent Decision Checklist

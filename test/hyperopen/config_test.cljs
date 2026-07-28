@@ -7,6 +7,8 @@
    :is-mainnet
    :signature-chain-id
    :hyperliquid-chain
+   :trading-enabled?
+   :error
    :info-url
    :exchange-url
    :ws-url])
@@ -16,6 +18,8 @@
    :is-mainnet true
    :signature-chain-id "0xa4b1"
    :hyperliquid-chain "Mainnet"
+   :trading-enabled? true
+   :error nil
    :info-url "https://api.hyperliquid.xyz/info"
    :exchange-url "https://api.hyperliquid.xyz/exchange"
    :ws-url "wss://api.hyperliquid.xyz/ws"})
@@ -25,6 +29,8 @@
    :is-mainnet false
    :signature-chain-id "0x66eee"
    :hyperliquid-chain "Testnet"
+   :trading-enabled? true
+   :error nil
    :info-url "https://api.hyperliquid-testnet.xyz/info"
    :exchange-url "https://api.hyperliquid-testnet.xyz/exchange"
    :ws-url "wss://api.hyperliquid-testnet.xyz/ws"})
@@ -34,36 +40,47 @@
   (select-keys (app-config/resolve-hyperliquid-network inputs)
                hyperliquid-network-contract-keys))
 
-(deftest resolve-hyperliquid-network-selects-one-complete-contract-test
+(def disabled-hyperliquid-network
+  {:network :disabled
+   :is-mainnet false
+   :signature-chain-id nil
+   :hyperliquid-chain nil
+   :trading-enabled? false
+   :error "Trading is disabled because this release has no valid network declaration."
+   :info-url nil
+   :exchange-url nil
+   :ws-url nil})
+
+(deftest resolve-hyperliquid-network-selects-one-build-bound-contract-test
   (doseq [[label inputs expected]
-          [["query testnet wins over global mainnet"
-            {:query-network "testnet"
+          [["testnet deployment ignores mutable mainnet selectors"
+            {:deployment-network "testnet"
+             :query-network "mainnet"
              :global-network "mainnet"}
             testnet-hyperliquid-network]
-           ["query mainnet wins over global testnet"
-            {:query-network "mainnet"
+           ["mainnet deployment ignores mutable testnet selectors"
+            {:deployment-network "mainnet"
+             :query-network "testnet"
              :global-network "testnet"}
             mainnet-hyperliquid-network]
-           ["global testnet applies when query is absent"
-            {:query-network nil
-             :global-network "testnet"}
-            testnet-hyperliquid-network]
-           ["missing selectors retain the mainnet fallback"
+           ["missing deployment declaration fails closed"
             {:query-network nil
              :global-network nil}
-            mainnet-hyperliquid-network]
-           ["blank selectors retain the mainnet fallback"
-            {:query-network " "
-             :global-network ""}
-            mainnet-hyperliquid-network]
-           ["invalid selectors retain the mainnet fallback"
-            {:query-network "test-net"
-             :global-network "unsupported"}
-            mainnet-hyperliquid-network]]]
+            disabled-hyperliquid-network]
+           ["blank deployment declaration fails closed"
+            {:deployment-network " "}
+            disabled-hyperliquid-network]
+           ["invalid deployment declaration fails closed"
+            {:deployment-network "test-net"}
+            disabled-hyperliquid-network]
+           ["case-variant deployment declaration fails closed"
+            {:deployment-network "MAINNET"}
+            disabled-hyperliquid-network]]]
     (is (= expected (selected-network-contract inputs)) label)))
 
 (deftest config-publishes-the-startup-network-snapshot-and-websocket-facade-test
   (let [network (:hyperliquid app-config/config)]
+    (is (true? (:trading-enabled? network)))
     (is (= mainnet-hyperliquid-network
            (select-keys network hyperliquid-network-contract-keys)))
     (is (= (:ws-url network) (:ws-url app-config/config)))))

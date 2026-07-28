@@ -3,6 +3,7 @@
   "brand/name": "Enterprise Desk",
   "brand/logo-url": "",
   "theme/id": "institutional",
+  "hyperliquid-network": "mainnet",
   "features": {
     "terminal": false,
     "analytics": true,

@@ -76,7 +76,7 @@ test("rewrite_hyperunit_release_endpoints rewrites only the exact mainnet and te
     assert.equal(
       await fs.readFile(path.join(releaseDirectory, "js", "app.HASH.js"), "utf8"),
       [
-        'const mainnet = "/api/hyperunit/mainnet/v2/estimate-fees";',
+        'const mainnet = "/__hyperopen_disabled__/hyperunit-mainnet/v2/estimate-fees";',
         'const testnet = "/api/hyperunit/testnet/v2/estimate-fees";',
         'const lookalike = "https://api.hyperunit.xyz.evil/v2/estimate-fees";',
         'const unrelated = "https://example.test/api.hyperunit.xyz";',

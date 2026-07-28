@@ -1,18 +1,19 @@
-const HYPERUNIT_MAINNET_PREFIX = "/api/hyperunit/mainnet";
 const HYPERUNIT_TESTNET_PREFIX = "/api/hyperunit/testnet";
-const HYPERUNIT_PREFIX = "/api/hyperunit";
+const HYPERUNIT_ROOT_PREFIX = "/api/hyperunit";
 const PORTFOLIO_SHELL_PATH = "/portfolio";
 const DEXHELM_APEX_HOST = "dexhelm.com";
 const DEXHELM_MAINNET_HOST = "app.dexhelm.com";
 const DEXHELM_TESTNET_HOST = "testnet.dexhelm.com";
 const DEXHELM_STATUS_HOST = "status.dexhelm.com";
 const HYPERLIQUID_NETWORK_QUERY_KEY = "hyperliquidNetwork";
+const MAX_PROXY_BODY_BYTES = 1024 * 1024;
+const PROXY_TIMEOUT_MS = 15_000;
+const HYPERUNIT_METHOD_ALLOWLIST = new Set(["GET", "HEAD", "POST"]);
 
-const HYPERUNIT_PREFIXES = [
-  { prefix: HYPERUNIT_MAINNET_PREFIX, environmentKey: "HYPERUNIT_MAINNET_URL" },
-  { prefix: HYPERUNIT_TESTNET_PREFIX, environmentKey: "HYPERUNIT_TESTNET_URL" },
-  { prefix: HYPERUNIT_PREFIX, environmentKey: "HYPERUNIT_MAINNET_URL" },
-];
+const HYPERUNIT_TESTNET_ROUTE = {
+  prefix: HYPERUNIT_TESTNET_PREFIX,
+  environmentKey: "HYPERUNIT_TESTNET_URL",
+};
 
 const REQUEST_HEADER_ALLOWLIST = new Set([
   "accept",
@@ -45,6 +46,7 @@ const DOCUMENT_SECURITY_HEADERS = {
   "cross-origin-opener-policy": "same-origin",
   "permissions-policy": "camera=(), geolocation=(), microphone=(), payment=(), usb=()",
   "referrer-policy": "strict-origin-when-cross-origin",
+  "strict-transport-security": "max-age=31536000; includeSubDomains",
   "x-content-type-options": "nosniff",
   "x-frame-options": "DENY",
 };
@@ -290,21 +292,9 @@ async function fetchStaticAsset(request, env) {
 }
 
 function matchingHyperunitRoute(pathname) {
-  for (const route of HYPERUNIT_PREFIXES) {
-    if (!matchesPathPrefix(pathname, route.prefix)) {
-      continue;
-    }
-
-    if (route.prefix === HYPERUNIT_PREFIX) {
-      const firstSuffixSegment = pathname.slice(route.prefix.length + 1).split("/", 1)[0];
-      if (firstSuffixSegment.startsWith("mainnet") || firstSuffixSegment.startsWith("testnet")) {
-        return null;
-      }
-    }
-
-    return route;
-  }
-  return null;
+  return matchesPathPrefix(pathname, HYPERUNIT_TESTNET_PREFIX)
+    ? HYPERUNIT_TESTNET_ROUTE
+    : null;
 }
 
 function validatedUpstreamOrigin(value) {
@@ -353,8 +343,159 @@ function genericProxyFailureResponse() {
   });
 }
 
+function proxyMethodNotAllowedResponse() {
+  return new Response(JSON.stringify({ error: "HyperUnit proxy method not allowed." }), {
+    status: 405,
+    headers: {
+      allow: "GET, HEAD, POST",
+      "content-type": "application/json",
+    },
+  });
+}
+
+function proxyBodyTooLargeResponse() {
+  return new Response(JSON.stringify({ error: "HyperUnit proxy request body is too large." }), {
+    status: 413,
+    headers: { "content-type": "application/json" },
+  });
+}
+
+function hostMayProxyHyperunit(hostname) {
+  return hostname === DEXHELM_TESTNET_HOST;
+}
+
+function hostMayServeAssets(hostname) {
+  return hostname === DEXHELM_TESTNET_HOST;
+}
+
+function notFoundResponse() {
+  return new Response("Not found", {
+    status: 404,
+    headers: { "cache-control": "no-store", "content-type": "text/plain; charset=utf-8" },
+  });
+}
+
+function proxyAbortError() {
+  const error = new Error("proxy request deadline exceeded");
+  error.name = "AbortError";
+  error.code = "PROXY_ABORTED";
+  return error;
+}
+
+async function readBoundedRequestBody(request, signal) {
+  const declaredLength = request.headers.get("content-length");
+  if (declaredLength !== null) {
+    const parsedLength = Number(declaredLength);
+    if (!Number.isSafeInteger(parsedLength) || parsedLength < 0) {
+      throw new Error("invalid request content length");
+    }
+    if (parsedLength > MAX_PROXY_BODY_BYTES) {
+      const error = new Error("request body is too large");
+      error.code = "BODY_TOO_LARGE";
+      throw error;
+    }
+  }
+
+  if (!request.body) {
+    return null;
+  }
+
+  const reader = request.body.getReader();
+  const chunks = [];
+  let total = 0;
+  let abortListener;
+  const aborted = new Promise((_resolve, reject) => {
+    abortListener = () => {
+      reject(proxyAbortError());
+      void reader.cancel(proxyAbortError()).catch(() => {});
+    };
+    signal?.addEventListener("abort", abortListener, { once: true });
+  });
+  try {
+    if (signal?.aborted) {
+      abortListener();
+    }
+    while (true) {
+      const read = reader.read();
+      const { done, value } = signal ? await Promise.race([read, aborted]) : await read;
+      if (signal?.aborted) throw proxyAbortError();
+      if (done) break;
+      total += value.byteLength;
+      if (total > MAX_PROXY_BODY_BYTES) {
+        const error = new Error("request body is too large");
+        error.code = "BODY_TOO_LARGE";
+        await reader.cancel();
+        throw error;
+      }
+      chunks.push(value);
+    }
+  } finally {
+    if (abortListener) {
+      signal?.removeEventListener("abort", abortListener);
+    }
+    reader.releaseLock();
+  }
+
+  const body = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    body.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return body;
+}
+
+function responseBodyWithDeadline(body, signal, finish) {
+  const reader = body.getReader();
+  let ended = false;
+  let controller;
+
+  const finishOnce = () => {
+    if (ended) return false;
+    ended = true;
+    signal.removeEventListener("abort", abortListener);
+    finish();
+    return true;
+  };
+  const abortListener = () => {
+    if (!finishOnce()) return;
+    void reader.cancel(proxyAbortError()).catch(() => {});
+    controller?.error(proxyAbortError());
+  };
+  signal.addEventListener("abort", abortListener, { once: true });
+
+  return new ReadableStream({
+    start(streamController) {
+      controller = streamController;
+      if (signal.aborted) abortListener();
+    },
+    async pull(streamController) {
+      if (ended) return;
+      try {
+        const { done, value } = await reader.read();
+        if (ended) return;
+        if (done) {
+          finishOnce();
+          streamController.close();
+          return;
+        }
+        streamController.enqueue(value);
+      } catch (error) {
+        if (finishOnce()) streamController.error(error);
+      }
+    },
+    async cancel(reason) {
+      if (!finishOnce()) return;
+      await reader.cancel(reason);
+    },
+  });
+}
+
 export function resolveHyperunitTarget(requestUrl, env) {
   const incoming = requestUrl instanceof URL ? requestUrl : new URL(requestUrl);
+  if (incoming.hostname !== DEXHELM_TESTNET_HOST) {
+    return null;
+  }
   const route = matchingHyperunitRoute(incoming.pathname);
   if (!route) {
     return null;
@@ -369,7 +510,7 @@ export function resolveHyperunitTarget(requestUrl, env) {
   return new URL(`${suffix}${incoming.search}`, upstream);
 }
 
-export function buildHyperunitRequest(request, targetUrl) {
+export function buildHyperunitRequest(request, targetUrl, body = undefined, signal = undefined) {
   const method = request.method.toUpperCase();
   const init = {
     method,
@@ -377,15 +518,25 @@ export function buildHyperunitRequest(request, targetUrl) {
     redirect: "manual",
   };
 
+  if (signal) {
+    init.signal = signal;
+  }
+
   if (method !== "GET" && method !== "HEAD") {
-    init.body = request.body;
+    init.body = body === undefined ? request.body : body;
     init.duplex = "half";
   }
 
   return new Request(targetUrl, init);
 }
 
-export async function handleRequest(request, env, { fetchImpl = fetch } = {}) {
+export async function handleRequest(request, env, {
+  fetchImpl = fetch,
+  setTimeoutImpl = setTimeout,
+  clearTimeoutImpl = clearTimeout,
+  AbortControllerImpl = AbortController,
+  timeoutMs = PROXY_TIMEOUT_MS,
+} = {}) {
   const requestUrl = new URL(request.url);
 
   if (requestUrl.hostname === DEXHELM_MAINNET_HOST) {
@@ -393,6 +544,9 @@ export async function handleRequest(request, env, { fetchImpl = fetch } = {}) {
   }
 
   if (requestUrl.pathname === "/api/health") {
+    if (![DEXHELM_STATUS_HOST, DEXHELM_TESTNET_HOST].includes(requestUrl.hostname)) {
+      return notFoundResponse();
+    }
     return new Response(JSON.stringify({ status: "ok" }), {
       headers: {
         "cache-control": "no-store",
@@ -438,7 +592,25 @@ export async function handleRequest(request, env, { fetchImpl = fetch } = {}) {
 
   const route = matchingHyperunitRoute(requestUrl.pathname);
   if (!route) {
+    if (matchesPathPrefix(requestUrl.pathname, HYPERUNIT_ROOT_PREFIX)) {
+      return notFoundResponse();
+    }
+    if (!hostMayServeAssets(requestUrl.hostname)) {
+      return notFoundResponse();
+    }
     return fetchStaticAsset(request, env);
+  }
+
+  if (
+    !hostMayProxyHyperunit(requestUrl.hostname) ||
+    route.prefix !== HYPERUNIT_TESTNET_PREFIX
+  ) {
+    return notFoundResponse();
+  }
+
+  const method = request.method.toUpperCase();
+  if (!HYPERUNIT_METHOD_ALLOWLIST.has(method)) {
+    return proxyMethodNotAllowedResponse();
   }
 
   const targetUrl = resolveHyperunitTarget(requestUrl, env);
@@ -446,13 +618,40 @@ export async function handleRequest(request, env, { fetchImpl = fetch } = {}) {
     return genericProxyFailureResponse();
   }
 
+  const controller = new AbortControllerImpl();
+  const timeout = setTimeoutImpl(() => controller.abort(), timeoutMs);
+  let deadlineFinished = false;
+  const finishDeadline = () => {
+    if (deadlineFinished) return;
+    deadlineFinished = true;
+    clearTimeoutImpl(timeout);
+  };
+
+  let body;
   try {
-    const upstreamResponse = await fetchImpl(buildHyperunitRequest(request, targetUrl));
-    return new Response(upstreamResponse.body, {
+    body = method === "POST" ? await readBoundedRequestBody(request, controller.signal) : null;
+  } catch (error) {
+    finishDeadline();
+    if (error?.code === "BODY_TOO_LARGE") {
+      return proxyBodyTooLargeResponse();
+    }
+    return genericProxyFailureResponse();
+  }
+
+  try {
+    const upstreamResponse = await fetchImpl(
+      buildHyperunitRequest(request, targetUrl, body, controller.signal)
+    );
+    const responseBody = method === "HEAD" || !upstreamResponse.body
+      ? null
+      : responseBodyWithDeadline(upstreamResponse.body, controller.signal, finishDeadline);
+    if (!responseBody) finishDeadline();
+    return new Response(responseBody, {
       status: upstreamResponse.status,
       headers: filteredResponseHeaders(upstreamResponse.headers),
     });
   } catch (_error) {
+    finishDeadline();
     return genericProxyFailureResponse();
   }
 }

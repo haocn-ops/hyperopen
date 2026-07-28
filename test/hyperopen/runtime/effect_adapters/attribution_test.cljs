@@ -11,13 +11,51 @@
    :local-storage-set! (fn [key value] (swap! storage assoc key value))
    :now-ms-fn now-ms-fn
    :random-value-fn (constantly 0.25)
-   :schedule-retry! schedule-retry!})
+   :schedule-retry! schedule-retry!
+   :affiliate-consent? (constantly true)})
 
 (defn- endpoint-tenant
   []
-  (assoc-in fixtures/default-tenant-raw
-            [:affiliate :event-endpoint]
-            "https://events.example.test/attribution"))
+  (-> fixtures/default-tenant-raw
+      (assoc-in [:features :affiliate] true)
+      (assoc-in [:affiliate :status] :enabled)
+      (assoc-in [:affiliate :event-endpoint]
+                "https://events.example.test/attribution")))
+
+(deftest affiliate-consent-write-and-revoke-clears-stale-retries-test
+  (async done
+    (let [storage (atom {})
+          retry (atom nil)
+          fetch-count (atom 0)
+          store (atom {:tenant/override (endpoint-tenant)
+                       :wallet {:address fixtures/wallet-address}})
+          deps (memory-deps
+                storage
+                (fn [& _]
+                  (swap! fetch-count inc)
+                  (js/Promise.reject (js/Error. "offline")))
+                (constantly 1700000000000)
+                (fn [retry-fn _delay-ms]
+                  (reset! retry retry-fn)))]
+      (runtime/set-affiliate-consent-with-deps! deps store true)
+      (is (= "true" (get @storage "hyperopen:affiliate-consent:v1:hyperopen-default")))
+      (runtime/record-attribution-event!
+       deps store :trade-submit-requested {:market "BTC" :outcome :submitted})
+      (is (= 1 @fetch-count))
+      (runtime/set-affiliate-consent-with-deps! deps store false)
+      (is (= "false" (get @storage "hyperopen:affiliate-consent:v1:hyperopen-default")))
+      (is (not-any? #(= :pending (:delivery/status %))
+                    (get-in @store [:attribution :queue])))
+      (runtime/set-affiliate-consent-with-deps! deps store true)
+      (js/setTimeout
+       (fn []
+         (try
+           (is (fn? @retry))
+           (@retry)
+           (is (= 1 @fetch-count))
+           (finally
+             (done))))
+       0))))
 
 (defn- safe-event
   [event-id market]
@@ -37,6 +75,22 @@
   {:event event
    :delivery/status delivery-status
    :delivery/attempt-count attempt-count})
+
+(deftest affiliate-consent-revoke-clears-live-state-when-storage-write-fails-test
+  (let [storage (atom {})
+        event (safe-event "evt-legacy-queue-record" "BTC")
+        store (atom {:tenant/override (endpoint-tenant)
+                     :attribution {:affiliate-consent? true
+                                   :queue [(queue-record event :pending 1)]}})
+        deps (assoc (memory-deps storage
+                                 (fn [& _] (js/Promise.resolve nil))
+                                 (constantly 1700000000000)
+                                 (fn [& _] nil))
+                    :local-storage-set! (fn [& _]
+                                          (throw (js/Error. "storage unavailable"))))]
+    (is (false? (runtime/set-affiliate-consent-with-deps! deps store false)))
+    (is (false? (get-in @store [:attribution :affiliate-consent?])))
+    (is (empty? (get-in @store [:attribution :queue])))))
 
 (defn- json-key
   [key]
@@ -171,9 +225,7 @@
   (async done
     (let [storage (atom {})
           calls (atom [])
-          tenant (assoc-in fixtures/default-tenant-raw
-                           [:affiliate :event-endpoint]
-                           "https://events.example.test/attribution")
+          tenant (endpoint-tenant)
           store (atom {:tenant/override tenant
                        :wallet {:address fixtures/wallet-address}})
           deps (memory-deps

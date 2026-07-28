@@ -59,7 +59,7 @@
 (deftest default-agent-state-shape-test
   (let [agent (agent-session/default-agent-state)]
     (is (= :not-ready (:status agent)))
-    (is (= :local (:storage-mode agent)))
+    (is (= :session (:storage-mode agent)))
     (is (nil? (:agent-address agent)))
     (is (nil? (:last-approved-at agent)))
     (is (nil? (:error agent)))
@@ -72,14 +72,14 @@
 (deftest storage-mode-preference-roundtrip-and-normalization-test
   (with-test-local-storage
     (fn [storage]
-      (is (= :local (agent-session/load-storage-mode-preference)))
+      (is (= :session (agent-session/load-storage-mode-preference)))
       (is (true? (agent-session/persist-storage-mode-preference! :local)))
       (is (= "local" (.getItem storage "hyperopen:agent-storage-mode:v1")))
       (is (= :local (agent-session/load-storage-mode-preference)))
       (.setItem storage "hyperopen:agent-storage-mode:v1" "SESSION")
       (is (= :session (agent-session/load-storage-mode-preference)))
       (.setItem storage "hyperopen:agent-storage-mode:v1" "unknown")
-      (is (= :local (agent-session/load-storage-mode-preference))))))
+      (is (= :session (agent-session/load-storage-mode-preference))))))
 
 (deftest local-protection-mode-preference-roundtrip-and-normalization-test
   (with-test-local-storage
@@ -142,13 +142,16 @@
     (is (re-matches #"0x[0-9a-f]{64}" private-key))
     (is (re-matches #"0x[0-9a-f]{40}" agent-address))))
 
-(deftest persist-load-and-clear-agent-session-test
+(deftest legacy-raw-agent-session-loads-only-for-removal-test
   (let [storage (fake-storage)
         session {:agent-address "0x9999999999999999999999999999999999999999"
                  :private-key "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
                  :last-approved-at 1700000002222
                  :nonce-cursor 1700000002222}]
-    (agent-session/persist-agent-session! storage wallet-address session)
+    (is (false? (agent-session/persist-agent-session! storage wallet-address session)))
+    (.setItem storage
+              (agent-session/session-storage-key wallet-address)
+              (js/JSON.stringify (clj->js session)))
     (is (= session
            (agent-session/load-agent-session storage wallet-address)))
     (agent-session/clear-agent-session! storage wallet-address)
@@ -210,27 +213,32 @@
                (agent-session/load-persisted-agent-session-snapshot wallet-address
                                                                     :local
                                                                     :passkey)))
-        (is (true? (agent-session/persist-agent-session-by-mode! wallet-address
-                                                                 :session
-                                                                 {:agent-address "0x9999999999999999999999999999999999999999"
-                                                                  :private-key "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-                                                                  :last-approved-at 1700000005555
-                                                                  :nonce-cursor 1700000006666})))
+        (let [legacy-session {:agent-address "0x9999999999999999999999999999999999999999"
+                              :private-key "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                              :last-approved-at 1700000005555
+                              :nonce-cursor 1700000006666}]
+          (is (false? (agent-session/persist-agent-session-by-mode! wallet-address
+                                                                      :session
+                                                                      legacy-session)))
+          (.setItem session
+                    (agent-session/session-storage-key wallet-address)
+                    (js/JSON.stringify (clj->js legacy-session)))
         (is (= {:agent-address "0x9999999999999999999999999999999999999999"
                 :private-key "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
                 :last-approved-at 1700000005555
                 :nonce-cursor 1700000006666
-                :persisted-kind :raw
+                :persisted-kind :legacy-session-raw
                 :storage-mode :session
                 :local-protection-mode :plain}
                (agent-session/load-persisted-agent-session-snapshot wallet-address
                                                                     :session
-                                                                    :plain)))
+                                                                    :plain))
+          (is (nil? (.getItem session (agent-session/session-storage-key wallet-address)))))
         (agent-session/clear-persisted-agent-session! wallet-address :local :passkey)
         (is (nil? (.getItem local passkey-key)))
         (agent-session/clear-all-agent-persistence! wallet-address)
         (is (nil? (.getItem local passkey-key)))
-        (is (nil? (.getItem session (agent-session/session-storage-key wallet-address))))))))
+        (is (nil? (.getItem session (agent-session/session-storage-key wallet-address)))))))))
 
 (deftest signature-chain-id-and-storage-mode-normalization-helpers-test
   (is (= "0xa4b1" (agent-session/default-signature-chain-id-for-environment true)))
@@ -238,8 +246,20 @@
   (is (= :session (agent-session/normalize-storage-mode :session)))
   (is (= :session (agent-session/normalize-storage-mode " SESSION ")))
   (is (= :local (agent-session/normalize-storage-mode :local)))
-  (is (= :local (agent-session/normalize-storage-mode "unknown")))
-  (is (= :local (agent-session/normalize-storage-mode nil))))
+  (is (= :session (agent-session/normalize-storage-mode "unknown")))
+  (is (= :session (agent-session/normalize-storage-mode nil))))
+
+(deftest raw-agent-private-keys-cannot-be-persisted-to-browser-storage-test
+  (with-test-storages
+    (fn [{:keys [local session]}]
+      (is (false?
+           (agent-session/persist-agent-session-by-mode!
+            wallet-address
+            :session
+            {:agent-address "0x9999999999999999999999999999999999999999"
+             :private-key "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"})))
+      (is (nil? (.getItem local (agent-session/session-storage-key wallet-address))))
+      (is (nil? (.getItem session (agent-session/session-storage-key wallet-address)))))))
 
 (deftest default-agent-state-and-address-normalization-variants-test
   (let [agent (agent-session/default-agent-state :storage-mode "SESSION")]
@@ -263,14 +283,14 @@
   (let [original-local-storage (.-localStorage js/globalThis)]
     (try
       (set! (.-localStorage js/globalThis) nil)
-      (is (= :local (agent-session/load-storage-mode-preference)))
+      (is (= :session (agent-session/load-storage-mode-preference)))
       (is (false? (agent-session/persist-storage-mode-preference! :session)))
       (set! (.-localStorage js/globalThis)
             #js {:getItem (fn [_]
                             (throw (js/Error. "read boom")))
                  :setItem (fn [_ _]
                             (throw (js/Error. "write boom")))})
-      (is (= :local (agent-session/load-storage-mode-preference)))
+      (is (= :session (agent-session/load-storage-mode-preference)))
       (is (false? (agent-session/persist-storage-mode-preference! :session)))
       (finally
         (set! (.-localStorage js/globalThis) original-local-storage)))))
@@ -290,7 +310,9 @@
     (is (nil? (agent-session/persist-agent-session! (fake-storage) wallet-address {:agent-address "0xabc"})))
     (is (false? (agent-session/persist-agent-session! throwing-storage wallet-address valid-session)))
     (let [storage (fake-storage)]
-      (agent-session/persist-agent-session! storage wallet-address valid-session)
+      (.setItem storage
+                (agent-session/session-storage-key wallet-address)
+                (js/JSON.stringify (clj->js valid-session)))
       (is (= {:agent-address "0x9999999999999999999999999999999999999999"
               :private-key "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
               :last-approved-at 1700000002222
@@ -316,28 +338,28 @@
     (is (nil? (agent-session/load-agent-session malformed-storage wallet-address)))
     (is (nil? (agent-session/load-agent-session invalid-shape-storage wallet-address)))))
 
-(deftest by-mode-storage-wrappers-target-local-and-session-storage-test
+(deftest by-mode-storage-wrappers-never-write-new-raw-sessions-test
   (with-test-storages
-    (fn [{:keys [local]}]
+    (fn [{:keys [local session]}]
       (let [session-payload {:agent-address "0x9999999999999999999999999999999999999999"
                              :private-key "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
                              :last-approved-at 1700000002222
                              :nonce-cursor 1700000002222}
             key (agent-session/session-storage-key wallet-address)]
-        (is (true? (agent-session/persist-agent-session-by-mode!
-                    wallet-address
-                    :session
-                    session-payload)))
+        (is (false? (agent-session/persist-agent-session-by-mode!
+                     wallet-address
+                     :session
+                     session-payload)))
+        (.setItem session key (js/JSON.stringify (clj->js session-payload)))
         (is (= session-payload
                (agent-session/load-agent-session-by-mode wallet-address :session)))
         (is (nil? (.getItem local key)))
-        (is (true? (agent-session/persist-agent-session-by-mode!
+        (is (false? (agent-session/persist-agent-session-by-mode!
                     wallet-address
                     :local
                     session-payload)))
-        (is (= session-payload
-               (agent-session/load-agent-session-by-mode wallet-address :local)))
-        (is (some? (.getItem local key)))
+        (is (nil? (agent-session/load-agent-session-by-mode wallet-address :local)))
+        (is (nil? (.getItem local key)))
         (is (true? (agent-session/clear-agent-session-by-mode! wallet-address :session)))
         (is (true? (agent-session/clear-agent-session-by-mode! wallet-address :local)))
         (is (nil? (agent-session/load-agent-session-by-mode wallet-address :session)))

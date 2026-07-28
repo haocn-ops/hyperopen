@@ -34,12 +34,12 @@ function escapeEdnString(value) {
   return String(value).replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 }
 
-function buildShadowConfigMerge(canonicalConfig, stagingRoot, target) {
+function buildShadowConfigMerge(canonicalConfig, deploymentNetwork, stagingRoot, target) {
   const stagingSourceRoot = path.join(stagingRoot, "public");
   const stagedJsRoot = path.join(stagingSourceRoot, "js");
   const closureConfig = escapeEdnString(canonicalConfig);
   const compilerOptions = target === "app"
-    ? ` :compiler-options {:closure-defines {hyperopen.config/TENANT_CONFIG_JSON "${closureConfig}"}}`
+    ? ` :compiler-options {:closure-defines {hyperopen.config/TENANT_CONFIG_JSON "${closureConfig}" hyperopen.config/DEPLOYMENT_HYPERLIQUID_NETWORK "${escapeEdnString(deploymentNetwork)}"}}`
     : "";
 
   // shadow-cljs applies --config-merge directly to the selected build.
@@ -295,6 +295,10 @@ export async function buildWhiteLabelRelease(options = {}, dependencies = {}) {
   const repositoryRoot = path.resolve(options.repositoryRoot || process.cwd());
   const configPath = path.resolve(repositoryRoot, options.configPath || "");
   const normalizedTenant = await readNormalizedTenant(configPath);
+  const deploymentNetwork = normalizedTenant["hyperliquid-network"];
+  if (!deploymentNetwork) {
+    throw new Error("White-label release requires hyperliquid-network to be mainnet or testnet.");
+  }
   const canonicalOrigin = normalizeWhiteLabelOrigin(options.canonicalOrigin);
   const canonicalConfig = canonicalTenantJson(normalizedTenant);
   const configDigest = tenantConfigDigest(normalizedTenant);
@@ -343,7 +347,7 @@ export async function buildWhiteLabelRelease(options = {}, dependencies = {}) {
     );
 
     for (const target of SHADOW_TARGETS) {
-      const configMerge = buildShadowConfigMerge(canonicalConfig, stagingPath, target);
+      const configMerge = buildShadowConfigMerge(canonicalConfig, deploymentNetwork, stagingPath, target);
       await runRequiredCommand(
         runCommand,
         "npx",

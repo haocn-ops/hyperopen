@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   tests:
@@ -14,19 +14,19 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           ref: ${{ github.ref }}
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
           cache: npm
           cache-dependency-path: package-lock.json
 
       - name: Setup Java
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9 # v4
         with:
           distribution: temurin
           java-version: "21"
@@ -34,7 +34,8 @@ jobs:
       - name: Setup Babashka
         run: |
           BB_VERSION=1.12.197
-          curl -sSL -o bb.tar.gz "https://github.com/babashka/babashka/releases/download/v${BB_VERSION}/babashka-${BB_VERSION}-linux-amd64-static.tar.gz"
+          curl -fsSL -o bb.tar.gz "https://github.com/babashka/babashka/releases/download/v${BB_VERSION}/babashka-${BB_VERSION}-linux-amd64-static.tar.gz"
+          echo "1fff1d97fa08b6b43cb9b4f8726a1c72c3115a15611ab1248d3d57c3c70ed908  bb.tar.gz" | sha256sum -c -
           tar -xzf bb.tar.gz bb
           mkdir -p "$HOME/.local/bin"
           mv bb "$HOME/.local/bin/"
@@ -42,7 +43,7 @@ jobs:
           "$HOME/.local/bin/bb" --version
 
       - name: Cache Clojure Dependencies
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: |
             ~/.m2/repository
@@ -53,7 +54,10 @@ jobs:
             ${{ runner.os }}-clojure-
 
       - name: Install Dependencies
-        run: npm ci
+        run: |
+          npm ci --ignore-scripts
+          npm run security:npm-contract
+          npm run security:ci-contract
 
       - name: Run CI Test Gate
         id: test_main
@@ -110,7 +114,7 @@ jobs:
 
       - name: Upload Coverage Artifact
         if: always() && hashFiles('coverage/**') != ''
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: coverage-report
           path: coverage
@@ -118,41 +122,11 @@ jobs:
 
       - name: Upload Raw Coverage Diagnostics
         if: always() && steps.coverage.outcome == 'failure' && hashFiles('.coverage/**') != ''
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: raw-v8-coverage
           path: .coverage
           if-no-files-found: warn
-
-      - name: Commit Coverage Badge
-        if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main' && github.actor != 'github-actions[bot]'
-        run: |
-          if git diff --quiet -- \
-            .github/badges/tests-status.json \
-            .github/badges/tests-status.svg \
-            .github/badges/coverage.json \
-            .github/badges/coverage.svg \
-            .github/badges/tests-total.json \
-            .github/badges/tests-total.svg \
-            .github/badges/assertions-total.json \
-            .github/badges/assertions-total.svg; then
-            echo "Badges unchanged."
-            exit 0
-          fi
-
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add \
-            .github/badges/tests-status.json \
-            .github/badges/tests-status.svg \
-            .github/badges/coverage.json \
-            .github/badges/coverage.svg \
-            .github/badges/tests-total.json \
-            .github/badges/tests-total.svg \
-            .github/badges/assertions-total.json \
-            .github/badges/assertions-total.svg
-          git commit -m "chore: update test and coverage badges [skip ci]"
-          git push origin "HEAD:${GITHUB_REF#refs/heads/}"
 
       - name: Fail Workflow If Any Gate Failed
         if: always()

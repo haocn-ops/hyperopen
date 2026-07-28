@@ -3,6 +3,7 @@
   "brand/name": "DEXHelm",
   "brand/logo-url": "https://testnet.dexhelm.com/brand/dexhelm-mark.svg",
   "theme/id": "dark",
+  "hyperliquid-network": "testnet",
   "features": {
     "terminal": true,
     "analytics": true,

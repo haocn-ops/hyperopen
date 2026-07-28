@@ -16,6 +16,7 @@
 (def ^:private secret-value-pattern
   #"(?i)(sk_(?:live|test)_[A-Za-z0-9_-]+|0x[0-9a-f]{32,}|(?:seed|private)[-_ ]?(?:phrase|key)|access[-_ ]?token)")
 (def ^:private url-pattern #"^https://[^\s]+$")
+(def ^:private max-affiliate-endpoint-length 2048)
 
 (def default-tenant-raw
   {:tenant/id "hyperopen-default"
@@ -65,6 +66,28 @@
   (or (= "" value)
       (and (string? value) (re-matches url-pattern value))))
 
+(defn normalize-affiliate-event-endpoint
+  [value]
+  (let [endpoint (some-> value str str/trim)]
+    (when (and (seq endpoint)
+               (<= (count endpoint) max-affiliate-endpoint-length))
+      (try
+        (let [parsed (js/URL. endpoint)
+              port (.-port parsed)]
+          (when (and (= "https:" (.-protocol parsed))
+                     (seq (.-hostname parsed))
+                     (empty? (.-username parsed))
+                     (empty? (.-password parsed))
+                     (empty? (.-hash parsed))
+                     (or (empty? port) (= "443" port)))
+            (.-href parsed)))
+        (catch :default _
+          nil)))))
+
+(defn valid-affiliate-event-endpoint?
+  [value]
+  (boolean (normalize-affiliate-event-endpoint value)))
+
 (defn normalize-tenant-theme-id
   "Normalize a tenant theme id against the UI theme catalog.
 
@@ -96,7 +119,13 @@
        (non-empty-string? (get-in tenant [:venue :label]))
        (public-url? (get-in tenant [:venue :url]))
        (contains? affiliate-statuses (get-in tenant [:affiliate :status]))
-       (public-url? (or (get-in tenant [:affiliate :event-endpoint]) ""))
+       (let [endpoint (or (get-in tenant [:affiliate :event-endpoint]) "")
+             enabled? (= :enabled (get-in tenant [:affiliate :status]))]
+         (if (seq endpoint)
+           (and enabled?
+                (true? (get-in tenant [:features :affiliate]))
+                (valid-affiliate-event-endpoint? endpoint))
+           (not enabled?)))
        (if (contains? #{:configured :enabled} (get-in tenant [:affiliate :status]))
          (and (= :hyperliquid (get-in tenant [:affiliate :provider]))
               (non-empty-string? (get-in tenant [:affiliate :id]))
@@ -130,7 +159,10 @@
                             :id (get-in raw* [:affiliate :id])
                             :status (or (get-in raw* [:affiliate :status]) :unavailable)
                             :referral-url (get-in raw* [:affiliate :referral-url])
-                            :event-endpoint (or (get-in raw* [:affiliate :event-endpoint]) "")
+                            :event-endpoint
+                            (let [endpoint (or (get-in raw* [:affiliate :event-endpoint]) "")]
+                              (or (normalize-affiliate-event-endpoint endpoint)
+                                  endpoint))
                             :disclosure (get-in raw* [:affiliate :disclosure])}}]
     (when (and (contains? known-themes (:theme/id tenant))
                (valid-tenant-config? tenant))

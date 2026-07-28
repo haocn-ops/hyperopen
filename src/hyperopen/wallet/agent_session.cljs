@@ -61,8 +61,8 @@
   (let [mode (cond
                (keyword? storage-mode) storage-mode
                (string? storage-mode) (keyword (str/lower-case (str/trim storage-mode)))
-               :else :local)]
-    (if (= :session mode) :session :local)))
+               :else :session)]
+    (if (= :local mode) :local :session)))
 
 (defn normalize-local-protection-mode
   [local-protection-mode]
@@ -72,8 +72,21 @@
                :else :plain)]
     (if (= :passkey mode) :passkey :plain)))
 
+(defn resolve-secure-storage-posture
+  [storage-mode local-protection-mode passkey-supported?]
+  (let [local-requested? (contains? #{:local "local" "LOCAL"} storage-mode)
+        passkey-requested? (contains? #{:passkey "passkey" "PASSKEY"}
+                                      local-protection-mode)]
+    (if (and passkey-supported?
+             (or (nil? storage-mode) local-requested?)
+             (or (nil? local-protection-mode) passkey-requested?))
+      {:storage-mode :local
+       :local-protection-mode :passkey}
+      {:storage-mode :session
+       :local-protection-mode :plain})))
+
 (defn load-storage-mode-preference
-  ([] (load-storage-mode-preference :local))
+  ([] (load-storage-mode-preference :session))
   ([missing-default]
    (let [storage (some-> js/globalThis .-localStorage)
          fallback (normalize-storage-mode missing-default)]
@@ -84,7 +97,17 @@
            (normalize-storage-mode raw)
            fallback)
          (catch :default _
-           fallback))))))
+          fallback))))))
+
+(defn fresh-storage-posture?
+  []
+  (let [storage (some-> js/globalThis .-localStorage)]
+    (and storage
+         (try
+           (and (nil? (.getItem storage storage-mode-preference-key))
+                (nil? (.getItem storage local-protection-mode-preference-key)))
+           (catch :default _
+             false)))))
 
 (defn persist-storage-mode-preference!
   [storage-mode]
@@ -275,7 +298,7 @@
 
 (defn default-agent-state
   [& {:keys [storage-mode local-protection-mode passkey-supported?]
-      :or {storage-mode :local
+      :or {storage-mode :session
            local-protection-mode :plain
            passkey-supported? false}}]
   {:status :not-ready
@@ -380,14 +403,11 @@
 
 (defn persist-agent-session!
   [storage wallet-address session]
-  (let [key (session-storage-key wallet-address)
-        normalized (sanitize-agent-session session)]
-    (when (and storage (seq key) normalized)
-      (try
-        (.setItem storage key (js/JSON.stringify (clj->js normalized)))
-        true
-        (catch :default _
-          false)))))
+  ;; Raw credentials may only be held in the process-local lockbox cache.
+  (when (and storage
+             (seq (session-storage-key wallet-address))
+             (sanitize-agent-session session))
+    false))
 
 (defn load-agent-session
   [storage wallet-address]
@@ -413,7 +433,7 @@
 
 (defn persist-agent-session-by-mode!
   [wallet-address storage-mode session]
-  (persist-agent-session! (storage-by-mode storage-mode) wallet-address session))
+  false)
 
 (defn load-agent-session-by-mode
   [wallet-address storage-mode]
@@ -462,40 +482,44 @@
 (defn load-persisted-agent-session-snapshot
   [wallet-address storage-mode local-protection-mode]
   (let [storage-mode* (normalize-storage-mode storage-mode)
-        local-protection-mode* (normalize-local-protection-mode local-protection-mode)]
+        local-protection-mode* (normalize-local-protection-mode local-protection-mode)
+        legacy-session (load-agent-session-by-mode wallet-address :session)
+        _ (when legacy-session
+            (clear-agent-session-by-mode! wallet-address :session))]
     (cond
-      (= :session storage-mode*)
-      (some-> (load-agent-session-by-mode wallet-address :session)
-              (assoc :persisted-kind :raw
-                     :storage-mode :session
-                     :local-protection-mode :plain))
-
       (= :passkey local-protection-mode*)
       (some-> (load-passkey-session-metadata wallet-address)
               (assoc :persisted-kind :locked
                      :storage-mode :local
                      :local-protection-mode :passkey))
 
-      :else
+      (= :local storage-mode*)
       (some-> (load-agent-session-by-mode wallet-address :local)
-              (assoc :persisted-kind :raw
+              (assoc :persisted-kind :legacy-local-raw
                      :storage-mode :local
-                     :local-protection-mode :plain)))))
+                     :local-protection-mode :plain))
+
+      legacy-session
+      (assoc legacy-session
+             :persisted-kind :legacy-session-raw
+             :storage-mode :session
+             :local-protection-mode :plain)
+
+      :else
+      nil)))
 
 (defn clear-persisted-agent-session!
   [wallet-address storage-mode local-protection-mode]
   (let [storage-mode* (normalize-storage-mode storage-mode)
         local-protection-mode* (normalize-local-protection-mode local-protection-mode)]
+    (clear-agent-session-by-mode! wallet-address :session)
     (cond
-      (= :session storage-mode*)
-      (clear-agent-session-by-mode! wallet-address :session)
-
       (= :passkey local-protection-mode*)
       (do
         (clear-agent-session-by-mode! wallet-address :local)
         (clear-passkey-session-metadata! wallet-address))
 
-      :else
+      (= :local storage-mode*)
       (clear-agent-session-by-mode! wallet-address :local))))
 
 (defn clear-local-agent-persistence!

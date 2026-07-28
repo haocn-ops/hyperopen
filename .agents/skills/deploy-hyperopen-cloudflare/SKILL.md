@@ -95,8 +95,8 @@ Reuse those contracts. Add Cloudflare as an opt-in release adapter around the ex
 - Treat `wrangler.jsonc` `assets.directory` as the authoritative upload root. It may select the generic `out/release-public` artifact or a verified `out/white-label/<tenant>` artifact.
 - Rewrite only generated JavaScript inside that authoritative asset directory through `build:cloudflare`; never rewrite `/src/**` or a different tenant's artifact.
 - When rewriting a white-label artifact changes bundle bytes, refresh `tenant-manifest.json` `mainBundleDigest` and `artifactDigests`, then rerun white-label verification before upload.
-- Keep proxy targets fixed to the configured HTTPS mainnet and testnet origins. Never accept a caller-selected host.
-- Match `mainnet` and `testnet` on complete path segments; reject lookalikes such as `mainnetx`.
+- Keep the current proxy target fixed to the configured HTTPS Testnet origin. Never accept a caller-selected host.
+- Reject generic, Mainnet, and lookalike paths such as `mainnetx`. Adding a Mainnet target requires the separately authorized Mainnet-opening plan.
 - Forward only the request and response header allowlists already encoded in `workers/hyperopen-worker.mjs`. Never forward cookies, authorization, host, connection, or content-length.
 - Preserve upstream response streaming and return a generic JSON 502 without internal error details when the upstream fetch rejects.
 - Keep static delivery selective by default. Worker-first paths are `/api/health` and `/api/hyperunit/*` unless an approved exact-host policy must run before document assets; that exception requires preflight validation of the exact custom domains, immediate `ASSETS` delegation for unowned requests, and `_headers` compatibility verification.
@@ -170,7 +170,7 @@ npm run verify:white-label -- --config config/white-label/dexhelm.json --origin 
 PLAYWRIGHT_WHITE_LABEL_ROOT=out/white-label/dexhelm HYPEROPEN_EXPECT_BRAND=DEXHelm HYPEROPEN_EXPECT_TENANT_ID=dexhelm HYPEROPEN_EXPECT_ORIGIN=https://testnet.dexhelm.com HYPEROPEN_EXPECT_ENABLED_ROUTE=/trade HYPEROPEN_EXPECT_LOGO_URL=https://testnet.dexhelm.com/brand/dexhelm-mark.svg npm run test:playwright:white-label
 ```
 
-`build:cloudflare` must report at least one mainnet and testnet rewrite and, for white-label output, a successful post-rewrite manifest verification. Confirm the selected release JavaScript has no direct origin while source retains its development defaults. Use the actual `assets.directory`; these examples show the current DEXHelm target:
+`build:cloudflare` must report at least one Mainnet-to-disabled-sentinel rewrite and one Testnet-to-proxy rewrite and, for white-label output, a successful post-rewrite manifest verification. Confirm the selected release JavaScript has no direct HyperUnit origin or Mainnet proxy base while source retains its development defaults. Use the actual `assets.directory`; these examples show the current DEXHelm target:
 
 ```bash
 rg -n 'https://api\.hyperunit' out/white-label/dexhelm/js --glob '*.js'
@@ -215,7 +215,7 @@ curl -sS -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8790/this-route-must-
 curl -sS http://127.0.0.1:8790/api/health
 ```
 
-Require `/trade` 200, the unknown route 404, health 200 JSON with `no-store`, document security headers, immutable caching on fingerprinted assets, and non-5xx JSON from both fee probes. Confirm Wrangler logs that `_headers` rules were parsed. If `_headers` is not applied, stop: add and test a Worker-first static header adapter before deployment.
+Require `/trade` 200, the unknown route 404, health 200 JSON with `no-store`, document security headers, immutable caching on fingerprinted assets, non-5xx JSON from the Testnet fee probe, and 404 from the Mainnet and generic proxy probes. Confirm Wrangler logs that `_headers` rules were parsed. If `_headers` is not applied, stop: add and test a Worker-first static header adapter before deployment.
 
 Stop the local Wrangler process cleanly before continuing. Let Playwright exit on its own and run `npm run browser:cleanup` only if a Browser MCP or browser-inspection session was created.
 
@@ -243,18 +243,18 @@ Then run the repository deploy command, which rebuilds the Cloudflare artifact b
 env JAVA_HOME=/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home PATH=/opt/homebrew/opt/openjdk@21/bin:$PATH npm run deploy:cloudflare
 ```
 
-Capture the exact `workers.dev` URL and `Current Version ID` from Wrangler. Do not infer the subdomain or reuse an old URL from documentation.
+Capture the exact configured custom-domain targets and `Current Version ID` from Wrangler. `workers_dev=false` must remain in effect; do not infer or reuse an old `workers.dev` URL from documentation.
 
 ## Verify Publicly
 
 Use the exact returned origin:
 
 ```bash
-HYPEROPEN_VERIFY_ORIGIN=https://<returned-worker-origin> npm run verify:deployment-headers
-HYPEROPEN_VERIFY_ORIGIN=https://<returned-worker-origin> npm run verify:cloudflare-worker
+HYPEROPEN_VERIFY_ORIGIN=https://<verified-testnet-origin> npm run verify:deployment-headers
+HYPEROPEN_VERIFY_ORIGIN=https://<verified-testnet-origin> npm run verify:cloudflare-worker
 ```
 
-The proxy verifier intentionally calls only the non-mutating mainnet and testnet fee endpoints and never prints response bodies. Also confirm `/trade` contains its route-specific title and `/api/health` returns 200 JSON.
+The proxy verifier intentionally calls the non-mutating Testnet fee endpoint, proves the Mainnet and generic paths are closed, and never prints response bodies. Also confirm `/trade` contains its route-specific title and `/api/health` returns 200 JSON.
 
 For custom domains, derive the expected host policy from the Worker and verify the entire matrix, not only the trading origin. The current DEXHelm policy requires:
 

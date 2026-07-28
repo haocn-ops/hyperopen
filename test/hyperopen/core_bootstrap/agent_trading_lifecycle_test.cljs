@@ -66,6 +66,7 @@
                     true)]
       (core/set-agent-storage-mode nil store :local)
       (is (= [["0xabc" :session]
+              ["0xabc" :session]
               ["0xabc" :local]]
              @cleared))
       (is (= [:local] @persisted-modes))
@@ -128,8 +129,7 @@
                   (get-in @store [:wallet :agent :agent-address])))
            (is (number? (get-in @store [:wallet :agent :last-approved-at])))
            (is (nil? (get-in @store [:wallet :agent :private-key])))
-           (is (= "0xabc" (first @persisted)))
-           (is (= :session (second @persisted)))
+           (is (nil? @persisted))
            (restore!)
            (done))
          0)))))

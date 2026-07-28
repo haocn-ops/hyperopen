@@ -36,7 +36,7 @@ test("handleRequest returns a generic JSON 502 without upstream failure details"
   );
 
   const response = await handleRequest(
-    new Request("https://hyperopen.example/api/hyperunit/testnet/v2/estimate-fees"),
+    new Request("https://testnet.dexhelm.com/api/hyperunit/testnet/v2/estimate-fees"),
     env,
     {
       fetchImpl: async () => {
@@ -56,11 +56,11 @@ test("optimizer shell fallback rejects unsafe methods, lookalikes, and unknown r
   const { handleRequest } = await loadWorker();
 
   for (const request of [
-    new Request("https://hyperopen.example/portfolio/optimizer"),
-    new Request("https://hyperopen.example/portfolio/optimizex"),
-    new Request("https://hyperopen.example/portfolio/optimize/scn_01/unowned"),
-    new Request("https://hyperopen.example/this-route-must-not-exist"),
-    new Request("https://hyperopen.example/portfolio/optimize", { method: "POST" }),
+    new Request("https://testnet.dexhelm.com/portfolio/optimizer"),
+    new Request("https://testnet.dexhelm.com/portfolio/optimizex"),
+    new Request("https://testnet.dexhelm.com/portfolio/optimize/scn_01/unowned"),
+    new Request("https://testnet.dexhelm.com/this-route-must-not-exist"),
+    new Request("https://testnet.dexhelm.com/portfolio/optimize", { method: "POST" }),
   ]) {
     const receivedUrls = [];
     const response = await handleRequest(request, {

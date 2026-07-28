@@ -73,9 +73,11 @@
     (let [storage (atom {})
           attribution-calls (atom 0)
           submit-count (atom 0)
-          tenant (assoc-in fixtures/default-tenant-raw
-                           [:affiliate :event-endpoint]
-                           "https://events.example.test/attribution")
+          tenant (-> fixtures/default-tenant-raw
+                     (assoc-in [:features :affiliate] true)
+                     (assoc-in [:affiliate :status] :enabled)
+                     (assoc-in [:affiliate :event-endpoint]
+                               "https://events.example.test/attribution"))
           store (atom (merge (support/base-submit-order-store {:active-asset "BTC"})
                              {:tenant/override tenant
                               :wallet {:address fixtures/wallet-address
@@ -92,7 +94,8 @@
            :local-storage-set! (fn [key value] (swap! storage assoc key value))
            :now-ms-fn (constantly 1700000000000)
            :random-value-fn (constantly 0.25)
-           :schedule-retry! (fn [retry-fn _delay-ms] (retry-fn))}
+           :schedule-retry! (fn [retry-fn _delay-ms] (retry-fn))
+           :affiliate-consent? (constantly true)}
           record! (fn [attribution-store event-type attrs]
                     (attribution-runtime/record-attribution-event!
                      attribution-deps attribution-store event-type attrs))

@@ -21,6 +21,61 @@ const themePreloadSource = fs.readFileSync(
   "utf8",
 );
 
+test("theme preload installs a narrow Trusted Types policy before application code", () => {
+  const policies = [];
+  vm.runInNewContext(themePreloadSource, {
+    trustedTypes: {
+      createPolicy(name, rules) {
+        policies.push({ name, rules });
+      },
+    },
+    localStorage: { getItem: () => null },
+    document: { documentElement: { dataset: {} } },
+  });
+
+  assert.equal(policies.length, 1);
+  assert.equal(policies[0].name, "default");
+  assert.deepEqual(Object.keys(policies[0].rules), ["createHTML", "createScriptURL"]);
+
+  const { createHTML } = policies[0].rules;
+  const svgMatch = themePreloadSource.match(/var tradingViewAttributionSvg = '([^']+)'/);
+  assert.ok(svgMatch, "reviewed TradingView attribution SVG must remain explicit");
+  const chartSource = fs.readFileSync(
+    path.join(repoRoot, "node_modules", "lightweight-charts", "dist", "lightweight-charts.production.mjs"),
+    "utf8",
+  );
+  const vendorSvgStart = chartSource.indexOf('<svg xmlns="http://www.w3.org/2000/svg"');
+  const vendorSvgEnd = chartSource.indexOf("</svg>", vendorSvgStart);
+  assert.notEqual(vendorSvgStart, -1, "Lightweight Charts attribution SVG must remain discoverable");
+  assert.notEqual(vendorSvgEnd, -1, "Lightweight Charts attribution SVG must be complete");
+  assert.equal(svgMatch[1], chartSource.slice(vendorSvgStart, vendorSvgEnd + 6));
+  assert.equal(createHTML(""), "");
+  assert.equal(createHTML(svgMatch[1]), svgMatch[1]);
+  assert.throws(() => createHTML(`${svgMatch[1]} `), /Unapproved HTML assignment blocked/);
+  assert.throws(() => createHTML('<img src=x onerror="alert(1)">'), /Unapproved HTML assignment blocked/);
+
+  const { createScriptURL } = policies[0].rules;
+  const fingerprint = "0123456789ABCDEF0123456789ABCDEF";
+  assert.equal(
+    createScriptURL(`/js/trade_chart.${fingerprint}.js`),
+    `/js/trade_chart.${fingerprint}.js`,
+  );
+  for (const rejected of [
+    `/js/main.${fingerprint}.js`,
+    `/js/unknown_module.${fingerprint}.js`,
+    `/js/trade_chart.${fingerprint.toLowerCase()}.js`,
+    `/js/trade_chart.${fingerprint}.js?override=1`,
+    `https://example.invalid/js/trade_chart.${fingerprint}.js`,
+    `/js/../trade_chart.${fingerprint}.js`,
+  ]) {
+    assert.throws(() => createScriptURL(rejected), /Unapproved script URL assignment blocked/);
+  }
+
+  assert.match(themePreloadSource, /createHTML/);
+  assert.match(themePreloadSource, /throw new TypeError/);
+  assert.doesNotMatch(themePreloadSource, /createScript\s*:/);
+});
+
 function preloadedTheme(storedTheme) {
   const dataset = {};
   vm.runInNewContext(themePreloadSource, {

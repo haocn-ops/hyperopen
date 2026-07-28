@@ -191,6 +191,31 @@
     (is (some? settings-toolbar))
     (is (not (contains? (class-token-set settings-toolbar) "md:hidden")))))
 
+(deftest header-renders-affiliate-consent-only-for-enabled-tenant-test
+  (let [tenant (-> tenant-config/default-tenant-raw
+                   (assoc-in [:features :affiliate] true)
+                   (assoc-in [:affiliate :provider] :hyperliquid)
+                   (assoc-in [:affiliate :id] "hyperopen-test-affiliate")
+                   (assoc-in [:affiliate :status] :enabled)
+                   (assoc-in [:affiliate :referral-url]
+                             "https://events.example.test/referral")
+                   (assoc-in [:affiliate :event-endpoint]
+                             "https://events.example.test/attribution"))
+        view (header-view/header-view
+              {:tenant/override tenant
+               :wallet {:connected? false}
+               :header-ui {:settings-open? true
+                           :settings-confirmation nil}
+               :attribution {:affiliate-consent? false}})
+        section (find-node-by-role view "trading-settings-affiliate-section")
+        row (find-node-by-role view "trading-settings-affiliate-consent-row")
+        toggle (find-node-by-role view "trading-settings-affiliate-consent-row-toggle")]
+    (is (some? section))
+    (is (some? row))
+    (is (= [[:actions/set-affiliate-consent true]]
+           (get-in toggle [1 :on :click])))
+    (is (= "false" (get-in toggle [1 :aria-checked])))))
+
 (deftest header-renders-trading-settings-shell-when-open-test
   (let [view (header-view/header-view {:wallet {:connected? false
                                                 :agent {:storage-mode :local}}
@@ -309,7 +334,7 @@
     (is (not (contains? all-text "Chart")))
     (is (not (contains? all-text "Active Asset")))))
 
-(deftest header-renders-remembered-session-default-when-storage-mode-is-missing-test
+(deftest header-renders-session-only-default-when-storage-mode-is-missing-test
   (let [view (header-view/header-view {:wallet {:connected? false}
                                        :router {:path "/trade"}
                                        :header-ui {:settings-open? true
@@ -321,7 +346,7 @@
                                   storage-row)
         all-text (set (collect-strings view))]
     (is (contains? all-text "Remember session"))
-    (is (= "true" (get-in storage-toggle [1 :aria-checked])))
+    (is (= "false" (get-in storage-toggle [1 :aria-checked])))
     (is (contains? all-text "Fill alerts"))
     (is (not (contains? all-text "Available when Remember session is on.")))
     (is (not (contains? all-text "This session")))

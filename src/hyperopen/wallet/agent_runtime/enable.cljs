@@ -23,6 +23,11 @@
   (and (= :local storage-mode)
        (= :passkey local-protection-mode)))
 
+(defn- memory-only-session?
+  [storage-mode local-protection-mode]
+  (and (= :session storage-mode)
+       (= :plain local-protection-mode)))
+
 (defn- cleanup-failed-persistence!
   [{:keys [owner-address
            storage-mode
@@ -102,6 +107,23 @@
                             (js/Promise.reject
                              (errors/known-error persist-session-error))))))))))
 
+    (memory-only-session? storage-mode local-protection-mode)
+    (do
+      (when (fn? clear-agent-session-by-mode!)
+        (clear-agent-session-by-mode! owner-address :session))
+      (cache-unlocked-session! owner-address
+                               {:agent-address agent-address
+                                :private-key private-key
+                                :last-approved-at last-approved-at
+                                :nonce-cursor nonce-cursor
+                                :storage-mode storage-mode
+                                :local-protection-mode local-protection-mode})
+      (js/Promise.resolve {:storage-mode storage-mode
+                           :local-protection-mode local-protection-mode
+                           :agent-address agent-address
+                           :last-approved-at last-approved-at
+                           :nonce-cursor nonce-cursor}))
+
     (persist-agent-session-by-mode!
      owner-address
      storage-mode
@@ -124,13 +146,8 @@
                            :nonce-cursor nonce-cursor}))
 
     :else
-    (do
-      (cleanup-failed-persistence! {:owner-address owner-address
-                                    :storage-mode storage-mode
-                                    :clear-agent-session-by-mode! clear-agent-session-by-mode!
-                                    :clear-unlocked-session! clear-unlocked-session!})
-      (js/Promise.reject
-       (errors/known-error persist-session-error)))))
+    (js/Promise.reject
+     (errors/known-error persist-session-error))))
 
 (defn enable-agent-trading!
   [{:keys [store
@@ -165,7 +182,7 @@
          runtime-error-message errors/runtime-error-message
          exchange-response-error errors/exchange-response-error}}]
   (let [{:keys [storage-mode local-protection-mode is-mainnet agent-name signature-chain-id]
-         :or {storage-mode :local
+         :or {storage-mode :session
               local-protection-mode :plain
               is-mainnet true
               agent-name nil
@@ -237,8 +254,18 @@
               (.catch
                (fn [err]
                  (when (current-operation?)
+                   (cleanup-failed-persistence!
+                    {:owner-address owner-address
+                     :storage-mode normalized-storage-mode
+                     :clear-agent-session-by-mode! clear-agent-session-by-mode!
+                     :clear-unlocked-session! clear-unlocked-session!})
                    (state/set-agent-error!
                     store
                     (errors/known-or-runtime-error-message runtime-error-message err)))))))
         (catch :default err
+          (cleanup-failed-persistence!
+           {:owner-address owner-address
+            :storage-mode (normalize-storage-mode (:storage-mode options))
+            :clear-agent-session-by-mode! clear-agent-session-by-mode!
+            :clear-unlocked-session! clear-unlocked-session!})
           (state/set-agent-error! store (runtime-error-message err)))))))

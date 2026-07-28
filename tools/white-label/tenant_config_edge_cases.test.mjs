@@ -47,6 +47,7 @@ test("strict public tenant parsing normalizes the checked-in example into stable
     venue: (await sampleObject()).venue,
     features: (await sampleObject()).features,
     "theme/id": "institutional",
+    "hyperliquid-network": "mainnet",
     "brand/logo-url": "",
     "brand/name": "Enterprise Desk",
     "tenant/id": "enterprise-example",
@@ -61,6 +62,7 @@ test("strict public tenant parsing normalizes the checked-in example into stable
     "brand/name": "Enterprise Desk",
     "brand/logo-url": "",
     "theme/id": "institutional",
+    "hyperliquid-network": "mainnet",
     features: { terminal: false, analytics: true, affiliate: true },
     venue: {
       id: "hyperliquid",
@@ -83,6 +85,43 @@ test("strict public tenant parsing normalizes the checked-in example into stable
   assert.match(tenantConfigDigest(normalized), /^[A-F0-9]{16,64}$/);
   assert.equal(tenantConfigDigest(normalized), tenantConfigDigest(reorderedNormalized));
   assert.deepEqual(enabledTenantRoutes(normalized), ["/portfolio"]);
+});
+
+test("enabled affiliate event endpoints normalize to their canonical URL href", async () => {
+  const { parseAndNormalizeTenantConfig } = await loadTenantConfig();
+  const valid = await sampleObject();
+  const normalized = parseAndNormalizeTenantConfig(
+    JSON.stringify({
+      ...valid,
+      features: { ...valid.features, affiliate: true },
+      affiliate: {
+        ...valid.affiliate,
+        status: "enabled",
+        "event-endpoint": "HTTPS://EVENTS.Example.COM:443/a/../collect?campaign=one",
+      },
+    }),
+  );
+
+  assert.equal(
+    normalized.affiliate["event-endpoint"],
+    "https://events.example.com/collect?campaign=one",
+  );
+
+  for (const endpoint of [
+    "http://events.example.com/collect",
+    "https://user:pass@events.example.com/collect",
+    "https://events.example.com/collect#fragment",
+    "https://events.example.com:444/collect",
+  ]) {
+    assert.throws(
+      () => parseAndNormalizeTenantConfig(JSON.stringify({
+        ...valid,
+        features: { ...valid.features, affiliate: true },
+        affiliate: { ...valid.affiliate, status: "enabled", "event-endpoint": endpoint },
+      })),
+      /affiliate\.event-endpoint/i,
+    );
+  }
 });
 
 test("strict public tenant parsing rejects malformed, duplicate, unknown, unsafe, and secret-shaped input without fallback", async () => {

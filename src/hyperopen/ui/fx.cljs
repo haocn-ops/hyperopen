@@ -74,7 +74,6 @@
        (set! (.-id overlay) "degen-rekt-overlay")
        (set! (.-className overlay)
              "fixed inset-0 z-[9999] flex items-center justify-center bg-ho-bg/85 cursor-pointer")
-       (set! (.-innerHTML overlay) "")
        (let [box (.createElement document "div")
              skull (.createElement document "div")
              title (.createElement document "div")

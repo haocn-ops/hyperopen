@@ -20,7 +20,8 @@
 
 (deftest enable-agent-trading-derives-network-defaults-while-preserving-explicit-options-test
   (let [captured-options (atom [])]
-    (with-redefs [app-config/config {:hyperliquid {:is-mainnet false
+    (with-redefs [app-config/config {:hyperliquid {:trading-enabled? true
+                                                    :is-mainnet false
                                                     :signature-chain-id "0x66eee"}}
                   trading-crypto-modules/resolved-trading-crypto
                   (fn [] {:create-agent-credentials! (fn [] {})})

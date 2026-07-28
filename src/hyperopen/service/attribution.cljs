@@ -1,6 +1,8 @@
 (ns hyperopen.service.attribution
   "Pure, redacted attribution contracts. Provider settlement is never inferred locally."
   (:require [clojure.string :as str]
+            [goog.crypt :as crypt]
+            [goog.crypt.Sha256]
             [hyperopen.service.tenant-config :as tenant-config]))
 
 (def ^:private secret-key-pattern
@@ -30,6 +32,13 @@
   [key]
   (if (keyword? key) (name key) (str key)))
 
+(defn- canonical-key-sort-key
+  [key]
+  (cond
+    (keyword? key) [0 (or (namespace key) "") (name key)]
+    (string? key) [1 "" key]
+    :else [2 "" (str key)]))
+
 (defn contains-secret?
   [value]
   (cond
@@ -49,32 +58,23 @@
               (->> item
                    (map (fn [[key val]]
                           [key (canonical val)]))
-                   (sort-by (fn [[key _]] [(if (keyword? key) 0 1) (key-name key)]))
+                   (sort-by (fn [[key _]] (canonical-key-sort-key key)))
                    vec)
               (set? item) (vec (sort-by str (map canonical item)))
               (sequential? item) (mapv canonical item)
               :else item))]
     (pr-str (canonical value))))
 
-(defn- digest-string
-  "Deterministic 128-bit display digest; it is an idempotency identifier, not a secret hash." 
+(defn sha256-hex
+  "Synchronous SHA-256 over UTF-8 text for stable pseudonymous identifiers."
   [text]
-  (let [hash32 (fn [seed multiplier]
-                 (reduce (fn [acc idx]
-                           (js/Math.imul
-                            (bit-xor acc
-                                     (+ (.charCodeAt text idx)
-                                        (* (inc idx) 97)))
-                            multiplier))
-                         seed
-                         (range (count text))))
-        words (mapv hash32 [2166136261 2246822519 3266489917 668265263]
-                    [16777619 3266489917 2246822519 668265263])
-        hex-word (fn [word]
-                   (let [unsigned-word (unsigned-bit-shift-right word 0)
-                         hex (.toString unsigned-word 16)]
-                     (str (apply str (repeat (max 0 (- 8 (count hex))) "0")) hex)))]
-    (str "evt-" (apply str (map hex-word words)))))
+  (let [digest (goog.crypt.Sha256.)]
+    (.update digest (crypt/stringToUtf8ByteArray (str (or text ""))))
+    (str/lower-case (crypt/byteArrayToHex (.digest digest)))))
+
+(defn- digest-string
+  [text]
+  (str "sha256-" (sha256-hex text)))
 
 (defn- public-wallet-hash
   [address]

@@ -7,6 +7,7 @@ export const SECURITY_HEADERS_FILE_PATH = "_headers";
 export const CONTROL_CACHE_CONTROL = "public, max-age=0, must-revalidate";
 export const IMMUTABLE_CACHE_CONTROL = "public, max-age=31556952, immutable";
 export const FONT_CACHE_CONTROL = "public, max-age=2592000";
+export const STRICT_TRANSPORT_SECURITY = "max-age=31536000; includeSubDomains";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -37,7 +38,6 @@ export const DOCUMENT_REFERRER_POLICY = "strict-origin-when-cross-origin";
 
 const DOCUMENT_CONNECT_SRC = [
   "'self'",
-  "https://cloudflareinsights.com",
   "https://price-history.hyperopen.xyz",
   "https://api.hyperliquid.xyz",
   "wss://api.hyperliquid.xyz",
@@ -120,8 +120,10 @@ export function buildContentSecurityPolicy({ imageSources = [], connectSources =
   appendDirective(directives, "script-src", [
     "'self'",
     THEME_PRELOAD_SCRIPT_HASH,
-    "https://static.cloudflareinsights.com",
   ]);
+  appendDirective(directives, "script-src-attr", ["'none'"]);
+  appendDirective(directives, "require-trusted-types-for", ["'script'"]);
+  appendDirective(directives, "trusted-types", ["default"]);
   appendDirective(directives, "style-src", ["'self'", "'unsafe-inline'"]);
   appendDirective(directives, "style-src-elem", ["'self'", "'unsafe-inline'"]);
   appendDirective(directives, "style-src-attr", ["'unsafe-inline'"]);
@@ -148,6 +150,7 @@ export function expectedDocumentHeaders(options = {}) {
     "x-content-type-options": "nosniff",
     "referrer-policy": DOCUMENT_REFERRER_POLICY,
     "permissions-policy": DOCUMENT_PERMISSIONS_POLICY,
+    "strict-transport-security": STRICT_TRANSPORT_SECURITY,
     "cache-control": CONTROL_CACHE_CONTROL,
   };
 }
@@ -178,6 +181,10 @@ export function buildReleaseHeadersFile({
       {
         name: "Permissions-Policy",
         value: documentHeaders["permissions-policy"],
+      },
+      {
+        name: "Strict-Transport-Security",
+        value: documentHeaders["strict-transport-security"],
       },
       { name: "Cache-Control", value: documentHeaders["cache-control"] },
     ]),

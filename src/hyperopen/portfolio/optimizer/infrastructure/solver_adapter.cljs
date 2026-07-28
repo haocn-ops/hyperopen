@@ -1,6 +1,5 @@
 (ns hyperopen.portfolio.optimizer.infrastructure.solver-adapter
-  (:require [hyperopen.portfolio.optimizer.infrastructure.osqp :as osqp]
-            [hyperopen.portfolio.optimizer.infrastructure.quadprog :as quadprog]))
+  (:require [hyperopen.portfolio.optimizer.infrastructure.quadprog :as quadprog]))
 
 (defn solve-with-quadprog
   [problem]
@@ -8,4 +7,6 @@
 
 (defn solve-with-osqp
   [problem]
-  (osqp/solve problem))
+  ;; Compatibility shim for callers/tests while the retired OSQP adapter is
+  ;; removed from production bundles. Preserve its historical async shape.
+  (js/Promise.resolve (quadprog/solve problem)))

@@ -16,7 +16,7 @@
 
 (defn restore-agent-storage-mode!
   [store]
-  (let [storage-mode (agent-session/load-storage-mode-preference :local)
+  (let [storage-mode (agent-session/load-storage-mode-preference :session)
         local-protection-mode (agent-session/load-local-protection-mode-preference :plain)]
     (swap! store
            (fn [state]
@@ -26,8 +26,18 @@
 
 (defn restore-agent-passkey-capability!
   [store]
-  (swap! store assoc-in [:wallet :agent :passkey-supported?]
-         (webauthn/passkey-lock-supported?)))
+  (let [passkey-supported? (webauthn/passkey-lock-supported?)
+        secure-default? (and passkey-supported?
+                             (agent-session/fresh-storage-posture?))]
+    (swap! store
+           (fn [state]
+             (cond-> (assoc-in state [:wallet :agent :passkey-supported?]
+                               passkey-supported?)
+               secure-default?
+               (assoc-in [:wallet :agent :storage-mode] :local)
+
+               secure-default?
+               (assoc-in [:wallet :agent :local-protection-mode] :passkey))))))
 
 (defn restore-ui-locale-preference!
   [store]

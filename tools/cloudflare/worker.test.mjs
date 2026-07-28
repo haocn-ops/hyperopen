@@ -9,36 +9,35 @@ async function loadWorker() {
 
 function workerEnv(overrides = {}) {
   return {
-    HYPERUNIT_MAINNET_URL: "https://api.hyperunit.xyz",
     HYPERUNIT_TESTNET_URL: "https://api.hyperunit-testnet.xyz",
     ...overrides,
   };
 }
 
-test("resolveHyperunitTarget maps mainnet, testnet, and default proxy routes while preserving suffixes and queries", async () => {
+test("resolveHyperunitTarget maps only the canonical Testnet host and route", async () => {
   const { resolveHyperunitTarget } = await loadWorker();
   const env = workerEnv();
 
   assert.equal(
     resolveHyperunitTarget(
-      new URL("https://hyperopen.example/api/hyperunit/mainnet/v2/estimate-fees?asset=HYPE"),
-      env
-    ).href,
-    "https://api.hyperunit.xyz/v2/estimate-fees?asset=HYPE"
-  );
-  assert.equal(
-    resolveHyperunitTarget(
-      new URL("https://hyperopen.example/api/hyperunit/testnet/v2/estimate-fees?asset=HYPE"),
+      new URL("https://testnet.dexhelm.com/api/hyperunit/testnet/v2/estimate-fees?asset=HYPE"),
       env
     ).href,
     "https://api.hyperunit-testnet.xyz/v2/estimate-fees?asset=HYPE"
   );
   assert.equal(
     resolveHyperunitTarget(
-      new URL("https://hyperopen.example/api/hyperunit/v2/estimate-fees?asset=HYPE"),
+      new URL("https://hyperopen.example/api/hyperunit/testnet/v2/estimate-fees?asset=HYPE"),
       env
-    ).href,
-    "https://api.hyperunit.xyz/v2/estimate-fees?asset=HYPE"
+    ),
+    null
+  );
+  assert.equal(
+    resolveHyperunitTarget(
+      new URL("https://testnet.dexhelm.com/api/hyperunit/mainnet/v2/estimate-fees?asset=HYPE"),
+      env
+    ),
+    null
   );
 });
 
@@ -86,7 +85,7 @@ test("handleRequest forwards a JSON request exactly once and returns only safe u
   const payload = JSON.stringify({ asset: "HYPE" });
   const fetchCalls = [];
   const response = await handleRequest(
-    new Request("https://hyperopen.example/api/hyperunit/mainnet/v2/estimate-fees?asset=HYPE", {
+    new Request("https://testnet.dexhelm.com/api/hyperunit/testnet/v2/estimate-fees?asset=HYPE", {
       method: "POST",
       headers: {
         accept: "application/json",
@@ -132,7 +131,7 @@ test("handleRequest forwards a JSON request exactly once and returns only safe u
         "content-type": "application/json",
       },
       method: "POST",
-      url: "https://api.hyperunit.xyz/v2/estimate-fees?asset=HYPE",
+      url: "https://api.hyperunit-testnet.xyz/v2/estimate-fees?asset=HYPE",
     },
   ]);
   assert.equal(response.status, 207);
@@ -152,7 +151,7 @@ test("handleRequest delegates non-proxy requests directly to Workers Static Asse
   const { handleRequest } = await loadWorker();
   const receivedRequests = [];
   const staticResponse = await handleRequest(
-    new Request("https://hyperopen.example/trade"),
+    new Request("https://testnet.dexhelm.com/trade"),
     workerEnv({
       ASSETS: {
         fetch: async (request) => {
@@ -172,7 +171,7 @@ test("handleRequest delegates non-proxy requests directly to Workers Static Asse
   );
 
   assert.equal(receivedRequests.length, 1);
-  assert.equal(receivedRequests[0].url, "https://hyperopen.example/trade");
+  assert.equal(receivedRequests[0].url, "https://testnet.dexhelm.com/trade");
   assert.equal(staticResponse.status, 200);
   assert.equal(await staticResponse.text(), "trade asset");
 });
@@ -188,6 +187,7 @@ test("DEXHelm apex serves product, documentation, risk, source, and license info
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type"), /^text\/html/i);
   assert.match(response.headers.get("content-security-policy"), /frame-ancestors 'none'/);
+  assert.equal(response.headers.get("strict-transport-security"), "max-age=31536000; includeSubDomains");
   assert.equal(response.headers.get("x-content-type-options"), "nosniff");
   assert.match(body, /<h1>DEXHelm<\/h1>/);
   assert.match(body, /id="documentation"/);
@@ -214,6 +214,7 @@ test("DEXHelm status host serves a no-store status document and the shared healt
 
   assert.equal(statusResponse.status, 200);
   assert.equal(statusResponse.headers.get("cache-control"), "no-store");
+  assert.equal(statusResponse.headers.get("strict-transport-security"), "max-age=31536000; includeSubDomains");
   const statusBody = await statusResponse.text();
   assert.match(statusBody, /DEXHelm is reachable/);
   assert.match(statusBody, /Mainnet terminal delivery<\/span><span>SUSPENDED/);
@@ -250,6 +251,7 @@ test("DEXHelm Mainnet host is temporarily closed before assets or the HyperUnit 
 
     assert.equal(response.status, 503, request.url);
     assert.equal(response.headers.get("cache-control"), "no-store", request.url);
+    assert.equal(response.headers.get("strict-transport-security"), "max-age=31536000; includeSubDomains", request.url);
     assert.match(await response.text(), /Mainnet terminal is temporarily unavailable/, request.url);
   }
 
@@ -311,7 +313,7 @@ test("DEXHelm terminal roots open trade and canonical document URLs do not redir
   ]);
 });
 
-test("DEXHelm host policy leaves assets, non-document methods, and unrelated hosts unchanged", async () => {
+test("DEXHelm host policy serves Testnet assets and rejects the public Workers hostname", async () => {
   const { handleRequest } = await loadWorker();
   const assetRequests = [];
   const assets = {
@@ -321,22 +323,23 @@ test("DEXHelm host policy leaves assets, non-document methods, and unrelated hos
     },
   };
 
-  for (const request of [
-    new Request("https://testnet.dexhelm.com/js/main.HASH.js", {
-      headers: { accept: "*/*" },
-    }),
+  const assetRequest = new Request("https://testnet.dexhelm.com/js/main.HASH.js", {
+    headers: { accept: "*/*" },
+  });
+  const assetResponse = await handleRequest(assetRequest, workerEnv({ ASSETS: assets }));
+  assert.equal(assetResponse.status, 200);
+  assert.equal(await assetResponse.text(), "asset response");
+
+  const workersResponse = await handleRequest(
     new Request("https://hyperopen.izhenghaocn.workers.dev/trade", {
       headers: { accept: "text/html" },
     }),
-  ]) {
-    const response = await handleRequest(request, workerEnv({ ASSETS: assets }));
-    assert.equal(response.status, 200, request.url);
-    assert.equal(await response.text(), "asset response", request.url);
-  }
+    workerEnv({ ASSETS: assets })
+  );
+  assert.equal(workersResponse.status, 404);
 
   assert.deepEqual(assetRequests, [
     "GET https://testnet.dexhelm.com/js/main.HASH.js",
-    "GET https://hyperopen.izhenghaocn.workers.dev/trade",
   ]);
 });
 
@@ -365,15 +368,15 @@ test("handleRequest serves the portfolio shell for canonical optimizer deep link
   ]) {
     receivedUrls.length = 0;
     const response = await handleRequest(
-      new Request(`https://hyperopen.example${pathname}?hyperliquidNetwork=testnet`),
+      new Request(`https://testnet.dexhelm.com${pathname}?hyperliquidNetwork=testnet`),
       workerEnv({ ASSETS: assets })
     );
 
     assert.equal(response.status, 200, pathname);
     assert.equal(await response.text(), "portfolio shell", pathname);
     assert.deepEqual(receivedUrls, [
-      `https://hyperopen.example${pathname}?hyperliquidNetwork=testnet`,
-      "https://hyperopen.example/portfolio",
+      `https://testnet.dexhelm.com${pathname}?hyperliquidNetwork=testnet`,
+      "https://testnet.dexhelm.com/portfolio",
     ]);
   }
 });

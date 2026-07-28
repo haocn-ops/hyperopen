@@ -24,7 +24,7 @@
            persist-agent-session-by-mode!
            runtime-error-message
            exchange-response-error]
-    :or {storage-mode :local
+    :or {storage-mode :session
          is-mainnet true
          persist-session? false
          missing-owner-error "Connect your wallet before approving an agent."

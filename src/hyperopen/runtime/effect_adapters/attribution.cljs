@@ -6,6 +6,7 @@
             [hyperopen.service.tenant-config :as tenant-config]))
 
 (def storage-key "hyperopen:attribution-events:v1")
+(def ^:private consent-storage-prefix "hyperopen:affiliate-consent:v1:")
 (def queue-limit 200)
 (def max-delivery-attempts 3)
 
@@ -308,10 +309,31 @@
 
 (defn- endpoint-for-state
   [state]
-  (let [endpoint (get-in (tenant-config/active-tenant-config state)
-                         [:affiliate :event-endpoint])]
-    (when (and (string? endpoint) (seq (str/trim endpoint)))
+  (let [tenant (tenant-config/active-tenant-config state)
+        endpoint (get-in tenant [:affiliate :event-endpoint])]
+    (when (and (true? (get-in tenant [:features :affiliate]))
+               (= :enabled (get-in tenant [:affiliate :status]))
+               (tenant-config/valid-affiliate-event-endpoint? endpoint))
       endpoint)))
+
+(defn- consent-storage-key
+  [state]
+  (str consent-storage-prefix (:tenant/id (tenant-config/active-tenant-config state))))
+
+(defn- stored-affiliate-consent?
+  [state]
+  (= "true" (platform/local-storage-get (consent-storage-key state))))
+
+(defn affiliate-consent?
+  [state]
+  (if (contains? (get-in state [:attribution] {}) :affiliate-consent?)
+    (true? (get-in state [:attribution :affiliate-consent?]))
+    (stored-affiliate-consent? state)))
+
+(defn- delivery-allowed?
+  [deps state endpoint]
+  (and (= endpoint (endpoint-for-state state))
+       (true? ((:affiliate-consent? deps) state))))
 
 (defn- active-tenant-identity
   [state]
@@ -324,6 +346,55 @@
   [event tenant-identity]
   (= (select-keys event [:tenant/id :affiliate/id :venue/id])
      tenant-identity))
+
+(defn- pending-event-record?
+  [state event]
+  (let [tenant-identity (active-tenant-identity state)
+        event-id (:event/id event)]
+    (some (fn [record]
+            (and (= event-id (get-in record [:event :event/id]))
+                 (= :pending (:delivery/status record))
+                 (event-matches-active-tenant? (:event record) tenant-identity)))
+          (get-in state [:attribution :queue] []))))
+
+(defn- clear-pending-for-tenant!
+  [store tenant-identity local-storage-set!]
+  (swap! store
+         (fn [state]
+           (let [queue (get-in state [:attribution :queue] [])
+                 next-queue (vec (remove (fn [record]
+                                           (and (= :pending (:delivery/status record))
+                                                (event-matches-active-tenant?
+                                                 (:event record)
+                                                 tenant-identity)))
+                                         queue))]
+             (sync-attribution-state state next-queue))))
+  (persist-queue! store local-storage-set!)
+  true)
+
+(declare default-deps)
+
+(defn set-affiliate-consent-with-deps!
+  [deps store consent?]
+  (let [deps* (merge (default-deps) deps)
+        consent? (true? consent?)
+        state @store
+        tenant-identity (active-tenant-identity state)
+        key (consent-storage-key state)]
+    (swap! store assoc-in [:attribution :affiliate-consent?] consent?)
+    (when-not consent?
+      (clear-pending-for-tenant! store tenant-identity (:local-storage-set! deps*)))
+    (try
+      ((:local-storage-set! deps*) key (if consent? "true" "false"))
+      (catch :default _
+        nil))
+    consent?))
+
+(defn set-affiliate-consent!
+  ([store consent?]
+   (set-affiliate-consent-with-deps! (default-deps) store consent?))
+  ([_ store consent?]
+   (set-affiliate-consent-with-deps! (default-deps) store consent?)))
 
 (defn- delivery-request
   [event]
@@ -390,28 +461,36 @@
 
 (defn- attempt-delivery!
   [deps store endpoint event attempt-count]
-  (update-delivery! store (:event/id event) :pending attempt-count
-                    (:local-storage-set! deps))
-  (try
-    (-> ((:fetch-fn deps) endpoint (delivery-request event))
-        (.then (fn [response]
-                 (if (true? (.-ok response))
-                   (read-provider-result! response)
-                   (js/Promise.reject
-                    (js/Error. "Provider response was not successful")))))
-        (.then (fn [provider-result]
-                 (let [normalized-result
-                       (attribution/normalize-provider-result
-                        (provider-context event)
-                        provider-result)]
-                   (if (accepted-provider-result? provider-result normalized-result)
-                     (update-provider-result! store (:event/id event) normalized-result
-                                              attempt-count (:local-storage-set! deps))
-                     (throw (js/Error. "Provider response did not validate"))))))
-        (.catch (fn [_]
-                  (handle-delivery-failure! deps store endpoint event attempt-count))))
-    (catch :default _
-      (handle-delivery-failure! deps store endpoint event attempt-count))))
+  (let [state @store
+        pending? (pending-event-record? state event)]
+    (if-not (and pending?
+                 (delivery-allowed? deps state endpoint))
+      (when pending?
+        (update-delivery! store (:event/id event) :observed (max 0 (dec attempt-count))
+                          (:local-storage-set! deps)))
+    (do
+      (update-delivery! store (:event/id event) :pending attempt-count
+                        (:local-storage-set! deps))
+      (try
+        (-> ((:fetch-fn deps) endpoint (delivery-request event))
+            (.then (fn [response]
+                     (if (true? (.-ok response))
+                       (read-provider-result! response)
+                       (js/Promise.reject
+                        (js/Error. "Provider response was not successful")))))
+            (.then (fn [provider-result]
+                     (let [normalized-result
+                           (attribution/normalize-provider-result
+                            (provider-context event)
+                            provider-result)]
+                       (if (accepted-provider-result? provider-result normalized-result)
+                         (update-provider-result! store (:event/id event) normalized-result
+                                                  attempt-count (:local-storage-set! deps))
+                         (throw (js/Error. "Provider response did not validate"))))))
+            (.catch (fn [_]
+                      (handle-delivery-failure! deps store endpoint event attempt-count))))
+        (catch :default _
+          (handle-delivery-failure! deps store endpoint event attempt-count)))))))
 
 (defn default-deps
   []
@@ -420,7 +499,8 @@
    :local-storage-set! platform/local-storage-set!
    :now-ms-fn platform/now-ms
    :random-value-fn platform/random-value
-   :schedule-retry! platform/set-timeout!})
+   :schedule-retry! platform/set-timeout!
+   :affiliate-consent? affiliate-consent?})
 
 (defn resume-pending-delivery!
   "Restore and resume eligible pending deliveries once for this live store."
@@ -433,18 +513,22 @@
        (when-not (true? (get-in @store [:attribution :pending-delivery-resumed?]))
          (swap! store assoc-in [:attribution :pending-delivery-resumed?] true)
          (let [state @store
-               tenant-identity (active-tenant-identity state)]
-           (when-let [endpoint (endpoint-for-state state)]
-           (doseq [record (get-in @store [:attribution :queue] [])]
-             (let [event (:event record)
-                   status (:delivery/status record)
-                   attempt-count (:delivery/attempt-count record)]
-               (when (and (= :pending status)
-                          (event-matches-active-tenant? event tenant-identity))
-                 (if (>= attempt-count max-delivery-attempts)
-                   (update-delivery! store (:event/id event) :unavailable attempt-count
-                                     (:local-storage-set! deps*))
-                   (attempt-delivery! deps* store endpoint event (inc attempt-count)))))))))
+               tenant-identity (active-tenant-identity state)
+               consent? (true? ((:affiliate-consent? deps*) state))]
+           (swap! store assoc-in [:attribution :affiliate-consent?] consent?)
+           (if-not consent?
+             (clear-pending-for-tenant! store tenant-identity (:local-storage-set! deps*))
+             (when-let [endpoint (endpoint-for-state state)]
+               (doseq [record (get-in @store [:attribution :queue] [])]
+                 (let [event (:event record)
+                       status (:delivery/status record)
+                       attempt-count (:delivery/attempt-count record)]
+                   (when (and (= :pending status)
+                              (event-matches-active-tenant? event tenant-identity))
+                     (if (>= attempt-count max-delivery-attempts)
+                       (update-delivery! store (:event/id event) :unavailable attempt-count
+                                         (:local-storage-set! deps*))
+                       (attempt-delivery! deps* store endpoint event (inc attempt-count))))))))))
        nil
        (catch :default _
          nil)))))
@@ -476,6 +560,9 @@
        (let [queue (get-in @store [:attribution :queue] [])
              existing? (some? (queue-index queue event-id))
              endpoint (endpoint-for-state @store)
+             endpoint (when (and endpoint
+                                 (delivery-allowed? deps* @store endpoint))
+                        endpoint)
              initial-status (if endpoint :pending :observed)]
          (when-not existing?
            (swap! store

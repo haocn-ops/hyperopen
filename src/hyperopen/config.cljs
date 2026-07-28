@@ -4,6 +4,7 @@
 
 (goog-define APP_VERSION "0.1.0")
 (goog-define TENANT_CONFIG_JSON "")
+(goog-define DEPLOYMENT_HYPERLIQUID_NETWORK "")
 
 (defn parse-tenant-config-json
   "Parse and normalize public tenant JSON.
@@ -63,25 +64,36 @@
    :exchange-url "https://api.hyperliquid-testnet.xyz/exchange"
    :ws-url "wss://api.hyperliquid-testnet.xyz/ws"})
 
+(def ^:private disabled-hyperliquid-network
+  {:network :disabled
+   :is-mainnet false
+   :signature-chain-id nil
+   :hyperliquid-chain nil
+   :trading-enabled? false
+   :error "Trading is disabled because this release has no valid network declaration."
+   :info-url nil
+   :exchange-url nil
+   :ws-url nil})
+
 (defn- normalize-hyperliquid-network
   [value]
-  (let [network (some-> value str str/trim str/lower-case)]
+  (let [network (some-> value str str/trim)]
     (when (contains? #{"mainnet" "testnet"} network)
       network)))
 
 (defn resolve-hyperliquid-network
   "Resolve a complete Hyperliquid transport and signing contract without I/O."
-  [{:keys [query-network global-network]}]
-  (let [selected-network (or (normalize-hyperliquid-network query-network)
-                             (normalize-hyperliquid-network global-network))]
+  [{:keys [deployment-network]}]
+  (let [selected-network (normalize-hyperliquid-network deployment-network)]
     (case selected-network
-      "testnet" testnet-hyperliquid-network
-      "mainnet" mainnet-hyperliquid-network
-      mainnet-hyperliquid-network)))
+      "testnet" (assoc testnet-hyperliquid-network :trading-enabled? true :error nil)
+      "mainnet" (assoc mainnet-hyperliquid-network :trading-enabled? true :error nil)
+      disabled-hyperliquid-network)))
 
 (defn- startup-hyperliquid-network-inputs
   []
-  {:query-network (when (exists? js/location)
+  {:deployment-network DEPLOYMENT_HYPERLIQUID_NETWORK
+   :query-network (when (exists? js/location)
                     (.get (js/URLSearchParams. (or (.-search js/location) ""))
                           "hyperliquidNetwork"))
    :global-network (when (exists? js/globalThis)

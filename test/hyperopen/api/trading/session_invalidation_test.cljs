@@ -4,6 +4,7 @@
             [hyperopen.test-support.api-stubs :as api-stubs]
             [hyperopen.test-support.async :as async-support]
             [hyperopen.api.trading.test-support :as support]
+            [hyperopen.wallet.agent-lockbox :as agent-lockbox]
             [hyperopen.wallet.agent-session :as agent-session]
             [hyperopen.utils.hl-signing :as signing]))
 
@@ -12,7 +13,7 @@
     (let [store (support/ready-agent-store 1700000007777)
           cleared (atom [])
           persisted (atom 0)
-          original-load agent-session/load-agent-session-by-mode
+          original-load agent-lockbox/load-unlocked-session
           original-clear agent-session/clear-agent-session-by-mode!
           original-persist agent-session/persist-agent-session-by-mode!
           original-sign signing/sign-l1-action-with-private-key!
@@ -22,13 +23,13 @@
                              (support/json-response
                               {:status "err"
                                :error "User or API Wallet 0x7777777777777777777777777777777777777777 does not exist."}))))]
-      (set! agent-session/load-agent-session-by-mode
-            (fn [_wallet-address _storage-mode]
+      (set! agent-lockbox/load-unlocked-session
+            (fn [_wallet-address & [_storage-mode]]
               {:agent-address "0xe8acf143afbf8b1371a20ea934d334180190eac1"
                :private-key "0xcccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
                :nonce-cursor 1700000007777}))
       (set! agent-session/clear-agent-session-by-mode!
-            (fn [wallet-address storage-mode]
+            (fn [wallet-address & [storage-mode]]
               (swap! cleared conj [wallet-address storage-mode])
               true))
       (set! agent-session/persist-agent-session-by-mode!
@@ -54,7 +55,7 @@
           (.catch (async-support/unexpected-error done))
           (.finally
            (fn []
-             (set! agent-session/load-agent-session-by-mode original-load)
+             (set! agent-lockbox/load-unlocked-session original-load)
              (set! agent-session/clear-agent-session-by-mode! original-clear)
              (set! agent-session/persist-agent-session-by-mode! original-persist)
              (set! signing/sign-l1-action-with-private-key! original-sign)
@@ -65,7 +66,7 @@
     (let [store (support/ready-agent-store 1700000008888)
           cleared (atom [])
           persisted (atom 0)
-          original-load agent-session/load-agent-session-by-mode
+          original-load agent-lockbox/load-unlocked-session
           original-clear agent-session/clear-agent-session-by-mode!
           original-persist agent-session/persist-agent-session-by-mode!
           original-sign signing/sign-l1-action-with-private-key!
@@ -75,13 +76,13 @@
                              (support/json-response
                               {:status "err"
                                :response "User or API Wallet 0x6666666666666666666666666666666666666666 does not exist."}))))]
-      (set! agent-session/load-agent-session-by-mode
-            (fn [_wallet-address _storage-mode]
+      (set! agent-lockbox/load-unlocked-session
+            (fn [_wallet-address & [_storage-mode]]
               {:agent-address "0xa84585fb6728f413d4d89ec972c45e94686bf38e"
                :private-key "0xdddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
                :nonce-cursor 1700000008888}))
       (set! agent-session/clear-agent-session-by-mode!
-            (fn [wallet-address storage-mode]
+            (fn [wallet-address & [storage-mode]]
               (swap! cleared conj [wallet-address storage-mode])
               true))
       (set! agent-session/persist-agent-session-by-mode!
@@ -106,7 +107,7 @@
           (.catch (async-support/unexpected-error done))
           (.finally
            (fn []
-             (set! agent-session/load-agent-session-by-mode original-load)
+             (set! agent-lockbox/load-unlocked-session original-load)
              (set! agent-session/clear-agent-session-by-mode! original-clear)
              (set! agent-session/persist-agent-session-by-mode! original-persist)
              (set! signing/sign-l1-action-with-private-key! original-sign)
@@ -118,7 +119,7 @@
           cleared (atom [])
           persisted (atom 0)
           info-lookups (atom 0)
-          original-load agent-session/load-agent-session-by-mode
+          original-load agent-lockbox/load-unlocked-session
           original-clear agent-session/clear-agent-session-by-mode!
           original-persist agent-session/persist-agent-session-by-mode!
           original-sign signing/sign-l1-action-with-private-key!
@@ -134,13 +135,13 @@
                                (support/json-response
                                 {:status "err"
                                  :response "User or API Wallet 0x8fd379246834eac74b8419ffda202cf8051f7a03 does not exist."})))))]
-      (set! agent-session/load-agent-session-by-mode
-            (fn [_wallet-address _storage-mode]
+      (set! agent-lockbox/load-unlocked-session
+            (fn [_wallet-address & [_storage-mode]]
               {:agent-address "0x8fd379246834eac74b8419ffda202cf8051f7a03"
                :private-key "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
                :nonce-cursor 1700000011111}))
       (set! agent-session/clear-agent-session-by-mode!
-            (fn [wallet-address storage-mode]
+            (fn [wallet-address & [storage-mode]]
               (swap! cleared conj [wallet-address storage-mode])
               true))
       (set! agent-session/persist-agent-session-by-mode!
@@ -164,7 +165,7 @@
           (.catch (async-support/unexpected-error done))
           (.finally
            (fn []
-             (set! agent-session/load-agent-session-by-mode original-load)
+             (set! agent-lockbox/load-unlocked-session original-load)
              (set! agent-session/clear-agent-session-by-mode! original-clear)
              (set! agent-session/persist-agent-session-by-mode! original-persist)
              (set! signing/sign-l1-action-with-private-key! original-sign)
@@ -176,7 +177,7 @@
           cleared (atom [])
           persisted (atom 0)
           info-lookups (atom 0)
-          original-load agent-session/load-agent-session-by-mode
+          original-load agent-lockbox/load-unlocked-session
           original-clear agent-session/clear-agent-session-by-mode!
           original-persist agent-session/persist-agent-session-by-mode!
           original-sign signing/sign-l1-action-with-private-key!
@@ -190,13 +191,13 @@
                                (support/json-response
                                 {:status "err"
                                  :response "User or API Wallet 0x8fd379246834eac74b8419ffda202cf8051f7a03 does not exist."})))))]
-      (set! agent-session/load-agent-session-by-mode
-            (fn [_wallet-address _storage-mode]
+      (set! agent-lockbox/load-unlocked-session
+            (fn [_wallet-address & [_storage-mode]]
               {:agent-address "0x8fd379246834eac74b8419ffda202cf8051f7a03"
                :private-key "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
                :nonce-cursor 1700000013333}))
       (set! agent-session/clear-agent-session-by-mode!
-            (fn [wallet-address storage-mode]
+            (fn [wallet-address & [storage-mode]]
               (swap! cleared conj [wallet-address storage-mode])
               true))
       (set! agent-session/persist-agent-session-by-mode!
@@ -221,7 +222,7 @@
           (.catch (async-support/unexpected-error done))
           (.finally
            (fn []
-             (set! agent-session/load-agent-session-by-mode original-load)
+             (set! agent-lockbox/load-unlocked-session original-load)
              (set! agent-session/clear-agent-session-by-mode! original-clear)
              (set! agent-session/persist-agent-session-by-mode! original-persist)
              (set! signing/sign-l1-action-with-private-key! original-sign)

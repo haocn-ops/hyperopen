@@ -4040,23 +4040,24 @@ test("trading settings session toggles gate passkey lock behind remembered sessi
     .first();
   const passkeyToggleInput = passkeyToggleLabel;
 
-  await expect(rememberToggleInput).toHaveAttribute("aria-checked", "true");
-  await expect(passkeyToggleInput).toBeEnabled();
+  await expect(rememberToggleInput).toHaveAttribute("aria-checked", "false");
+  await expect(passkeyToggleInput).toBeDisabled();
 
-  await passkeyToggleLabel.click();
+  await passkeyToggleLabel.click({ force: true });
   await waitForIdle(page, { quietMs: 250, timeoutMs: 4_000, pollMs: 50 });
-  await expect(passkeyToggleInput).toHaveAttribute("aria-checked", "true");
+  await expect(passkeyToggleInput).toHaveAttribute("aria-checked", "false");
   await expect
     .poll(
       () => page.evaluate(() => localStorage.getItem("hyperopen:agent-local-protection-mode:v1")),
       { timeout: 4_000 }
     )
-    .toBe("passkey");
+    .toBe(null);
 });
 
 test("ready remembered session keeps submit usable after enabling passkey lock @regression", async ({
   page
 }) => {
+  await seedAssetSelectorMarketsCache(page);
   await visitRoute(page, "/trade");
   await installPasskeyLockboxMock(page);
   await seedRememberedTradingSession(page, {
@@ -4108,6 +4109,9 @@ test("ready remembered session keeps submit usable after enabling passkey lock @
       { timeout: 4_000 }
     )
     .toBe(null);
+
+  await settingsSurface.locator('[data-role="trading-settings-close"]').click();
+  await waitForIdle(page, { quietMs: 150, timeoutMs: 2_000, pollMs: 50 });
 
   await dispatch(page, [":actions/select-order-entry-mode", ":limit"]);
   await waitForIdle(page, { quietMs: 100, timeoutMs: 2_000, pollMs: 50 });
@@ -4161,6 +4165,7 @@ test("locked remembered passkey session disables downgrade until unlock @regress
 test("locked remembered passkey session submit unlocks and submits original order @regression", async ({
   page
 }) => {
+  await seedAssetSelectorMarketsCache(page);
   await visitRoute(page, "/trade");
   await freezeAccountSurfaceSync(page, "0x1111111111111111111111111111111111111111");
   await waitForIdle(page, { quietMs: 500, timeoutMs: 10_000, pollMs: 50 });

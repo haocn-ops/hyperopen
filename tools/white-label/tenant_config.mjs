@@ -8,6 +8,7 @@ const ROOT_FIELDS = new Set([
   "features",
   "venue",
   "affiliate",
+  "hyperliquid-network",
 ]);
 const FEATURE_FIELDS = new Set(["terminal", "analytics", "affiliate"]);
 const VENUE_FIELDS = new Set(["id", "label", "url"]);
@@ -178,7 +179,7 @@ function parseJsonWithDuplicateKeys(rawText) {
   }
 }
 
-function assertExactObject(value, fields, field) {
+function assertExactObject(value, fields, field, optionalFields = new Set()) {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     fieldError(field, "must be an object.");
   }
@@ -191,7 +192,7 @@ function assertExactObject(value, fields, field) {
     }
   }
   for (const key of fields) {
-    if (!Object.hasOwn(value, key)) {
+    if (!optionalFields.has(key) && !Object.hasOwn(value, key)) {
       fieldError(`${field}.${key}`, "is required.");
     }
   }
@@ -236,6 +237,20 @@ function optionalPublicUrl(value, field) {
     fieldError(field, "must be a credential-free HTTPS URL without a fragment.");
   }
   return normalized;
+}
+
+function optionalAffiliateEventEndpoint(value, field) {
+  const normalized = optionalPublicUrl(value, field);
+  if (!normalized) return "";
+  if (normalized.length > 2048) {
+    fieldError(field, "must use the default HTTPS port and be at most 2048 characters.");
+  }
+  const parsed = new URL(normalized);
+  const canonical = parsed.href;
+  if (parsed.port && parsed.port !== "443") {
+    fieldError(field, "must use the default HTTPS port and be at most 2048 characters.");
+  }
+  return canonical;
 }
 
 function requiredBoolean(value, field) {
@@ -287,10 +302,16 @@ export function normalizeWhiteLabelOrigin(value) {
 
 export function parseAndNormalizeTenantConfig(rawText) {
   const raw = parseJsonWithDuplicateKeys(rawText);
-  assertExactObject(raw, ROOT_FIELDS, "tenant");
+  assertExactObject(raw, ROOT_FIELDS, "tenant", new Set(["hyperliquid-network"]));
   assertNoSecretValues(raw, "tenant");
 
   const tenantId = requiredString(raw["tenant/id"], "tenant/id");
+  const deploymentNetwork = raw["hyperliquid-network"] == null
+    ? null
+    : requiredString(raw["hyperliquid-network"], "hyperliquid-network");
+  if (deploymentNetwork != null && !["mainnet", "testnet"].includes(deploymentNetwork)) {
+    fieldError("hyperliquid-network", "must be mainnet or testnet.");
+  }
   if (!/^[a-z0-9][a-z0-9-]{0,63}$/i.test(tenantId)) {
     fieldError("tenant/id", "must use letters, numbers, and hyphens only.");
   }
@@ -333,7 +354,10 @@ export function parseAndNormalizeTenantConfig(rawText) {
     id: rawAffiliate.id,
     status,
     "referral-url": optionalPublicUrl(rawAffiliate["referral-url"], "affiliate.referral-url"),
-    "event-endpoint": optionalPublicUrl(rawAffiliate["event-endpoint"], "affiliate.event-endpoint"),
+    "event-endpoint": optionalAffiliateEventEndpoint(
+      rawAffiliate["event-endpoint"],
+      "affiliate.event-endpoint",
+    ),
     disclosure: requiredString(rawAffiliate.disclosure, "affiliate.disclosure"),
   };
   if (status === "configured" || status === "enabled") {
@@ -341,6 +365,12 @@ export function parseAndNormalizeTenantConfig(rawText) {
       fieldError("affiliate.provider", "must be hyperliquid when configured.");
     }
     affiliate.id = requiredString(affiliate.id, "affiliate.id");
+    if (status === "enabled" && (!features.affiliate || !affiliate["event-endpoint"])) {
+      fieldError("affiliate.event-endpoint", "is required for an enabled affiliate feature.");
+    }
+    if (status !== "enabled" && affiliate["event-endpoint"]) {
+      fieldError("affiliate.event-endpoint", "requires affiliate.status=enabled.");
+    }
   } else if (affiliate.provider !== null || affiliate.id !== null || affiliate["referral-url"] !== "") {
     fieldError("affiliate", "must not include provider, id, or referral URL when unavailable.");
   }
@@ -353,6 +383,7 @@ export function parseAndNormalizeTenantConfig(rawText) {
     features,
     venue,
     affiliate,
+    ...(deploymentNetwork ? { "hyperliquid-network": deploymentNetwork } : {}),
   };
 }
 

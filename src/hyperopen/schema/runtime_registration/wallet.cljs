@@ -4,6 +4,7 @@
   [[:effects/connect-wallet :connect-wallet]
    [:effects/disconnect-wallet :disconnect-wallet]
    [:effects/record-attribution-event :record-attribution-event]
+   [:effects/set-affiliate-consent :set-affiliate-consent]
    [:effects/enable-agent-trading :enable-agent-trading]
    [:effects/set-agent-storage-mode :set-agent-storage-mode]
    [:effects/set-agent-local-protection-mode :set-agent-local-protection-mode]
@@ -46,4 +47,5 @@
    [:actions/close-agent-recovery-modal :close-agent-recovery-modal-action]
    [:actions/set-agent-storage-mode :set-agent-storage-mode-action]
    [:actions/set-agent-local-protection-mode :set-agent-local-protection-mode-action]
-   [:actions/copy-wallet-address :copy-wallet-address-action]])
+   [:actions/copy-wallet-address :copy-wallet-address-action]
+   [:actions/set-affiliate-consent :set-affiliate-consent]])

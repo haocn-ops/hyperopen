@@ -2,14 +2,42 @@
   (:require [cljs.test :refer-macros [async deftest is]]
             [hyperopen.platform :as platform]
             [hyperopen.api.trading :as trading]
+            [hyperopen.api.trading.http :as http]
             [hyperopen.api.trading.test-support :as support]
             [hyperopen.config :as app-config]
             [hyperopen.trading-crypto-modules :as trading-crypto-modules]
             [hyperopen.utils.hl-signing :as signing]
             [hyperopen.wallet.agent-session :as agent-session]))
 
+(deftest disabled-network-user-action-rejects-before-wallet-signature-test
+  (async done
+    (let [store (atom {:wallet {:chain-id "0x66eee"}})
+          sign-calls (atom 0)
+          original-sign signing/sign-usd-class-transfer-action!]
+      (set! signing/sign-usd-class-transfer-action!
+            (fn [& _]
+              (swap! sign-calls inc)
+              (js/Promise.reject (js/Error. "signer must not run"))))
+      (with-redefs [http/trading-enabled? (constantly false)]
+        (-> (trading/submit-usd-class-transfer! store
+                                                support/owner-address
+                                                {:type "usdClassTransfer"
+                                                 :amount "1"
+                                                 :toPerp true})
+            (.then (fn [_]
+                     (is false "Expected disabled-network rejection")))
+            (.catch (fn [err]
+                      (is (re-find #"Trading is disabled" (str err)))
+                      (is (= 0 @sign-calls))
+                      (is (nil? (get-in @store [:wallet :user-signed-nonce-cursor])))
+                      nil))
+            (.finally (fn []
+                        (set! signing/sign-usd-class-transfer-action! original-sign)
+                        (done))))))))
+
 (def testnet-hyperliquid-config
-  {:hyperliquid {:signature-chain-id "0x66eee"
+  {:hyperliquid {:trading-enabled? true
+                 :signature-chain-id "0x66eee"
                  :hyperliquid-chain "Testnet"}})
 
 (deftest build-cancel-order-request-public-seam-produces-cancel-action-test

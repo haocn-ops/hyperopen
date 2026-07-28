@@ -3,24 +3,25 @@
             [hyperopen.account.context :as account-context]
             [hyperopen.platform :as platform]
             [hyperopen.startup.restore :as startup-restore]
+            [hyperopen.platform.webauthn :as webauthn]
             [hyperopen.wallet.agent-session :as agent-session]))
 
 (defn- restore-trading-settings-fn
   []
   (resolve 'hyperopen.startup.restore/restore-trading-settings!))
 
-(deftest restore-agent-storage-mode-uses-local-default-for-missing-preference-test
+(deftest restore-agent-storage-mode-uses-session-default-for-missing-preference-test
   (let [store (atom {})
         defaults (atom [])]
     (with-redefs [agent-session/load-storage-mode-preference
                   (fn
-                    ([] :local)
+                    ([] :session)
                     ([missing-default]
                      (swap! defaults conj missing-default)
-                     :local))]
+                     missing-default))]
       (startup-restore/restore-agent-storage-mode! store)
-      (is (= [:local] @defaults))
-      (is (= :local (get-in @store [:wallet :agent :storage-mode]))))))
+      (is (= [:session] @defaults))
+      (is (= :session (get-in @store [:wallet :agent :storage-mode]))))))
 
 (deftest restore-agent-storage-mode-preserves-existing-stored-choice-test
   (let [store (atom {})]
@@ -30,6 +31,24 @@
                     ([_missing-default] :local))]
       (startup-restore/restore-agent-storage-mode! store)
       (is (= :local (get-in @store [:wallet :agent :storage-mode]))))))
+
+(deftest restore-agent-passkey-capability-selects-passkey-only-for-a-fresh-posture-test
+  (let [fresh-store (atom {:wallet {:agent {:storage-mode :session
+                                             :local-protection-mode :plain}}})
+        existing-store (atom {:wallet {:agent {:storage-mode :session
+                                                :local-protection-mode :plain}}})]
+    (with-redefs [webauthn/passkey-lock-supported? (constantly true)
+                  agent-session/fresh-storage-posture? (constantly true)]
+      (startup-restore/restore-agent-passkey-capability! fresh-store))
+    (is (= {:storage-mode :local
+            :local-protection-mode :passkey
+            :passkey-supported? true}
+           (get-in @fresh-store [:wallet :agent])))
+    (with-redefs [webauthn/passkey-lock-supported? (constantly true)
+                  agent-session/fresh-storage-posture? (constantly false)]
+      (startup-restore/restore-agent-passkey-capability! existing-store))
+    (is (= :session (get-in @existing-store [:wallet :agent :storage-mode])))
+    (is (= :plain (get-in @existing-store [:wallet :agent :local-protection-mode])))))
 
 (deftest restore-spectate-mode-preferences-loads-watchlist-and-search-test
   (let [store (atom {:account-context {:spectate-ui {:search-error "old"}}})]

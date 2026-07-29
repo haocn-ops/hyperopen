@@ -6,7 +6,7 @@
             [hyperopen.api.endpoints.account :as account-endpoints]
             [hyperopen.api.promise-effects :as promise-effects]
             [hyperopen.api.projections :as api-projections]
-            [hyperopen.account.history.effects :as account-history-effects]
+            [hyperopen.account.history.effects :as account-history-effects] [hyperopen.builder-fee.effects :as builder-fee-effects]
             [hyperopen.platform :as platform]
             [hyperopen.runtime.api-effects :as runtime-api-effects]
             [hyperopen.runtime.effect-adapters.websocket :as ws-adapters]
@@ -462,7 +462,7 @@
                                      :request-id request-id
                                      :request-historical-orders! (:request-historical-orders! api-ops)
                                      :opts opts})))
-      :fetch-and-merge-funding-history! account-history-effects/fetch-and-merge-funding-history!
+      :fetch-and-merge-funding-history! account-history-effects/fetch-and-merge-funding-history! :refresh-builder-fee-approval! builder-fee-effects/refresh-builder-fee-approval!
       :ensure-perp-dexs! (fn
                            ([store]
                             (ensure-perp-dexs! api-ops store))

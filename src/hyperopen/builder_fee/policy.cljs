@@ -17,13 +17,14 @@
        (string? disclosure)
        (seq (str/trim disclosure))))
 
-(defn- approved?
+(defn approved?
   [approval owner-address builder-address network fee-tenths-bp]
   (and (= :ready (:status approval))
        (= owner-address (:owner-address approval))
        (= builder-address (:builder-address approval))
        (= network (:network approval))
        (integer? (:max-builder-fee approval))
+       (integer? fee-tenths-bp)
        (>= (:max-builder-fee approval) fee-tenths-bp)))
 
 (defn- eligible-market?

@@ -3,6 +3,7 @@
             [hyperopen.api.default :as api]
             [hyperopen.api.trading :as trading]
             [hyperopen.builder-fee.approval-state :as approval-state]
+            [hyperopen.builder-fee.policy :as policy]
             [hyperopen.config :as app-config]
             [hyperopen.service.tenant-config :as tenant-config]))
 
@@ -77,11 +78,11 @@
 (defn- fee-approved?
   [state identity approval]
   (let [configured (configured-builder-fee state)]
-    (and (= :ready (:status approval))
-         (same-identity? identity approval)
-         (integer? (:max-builder-fee approval))
-         (integer? (:fee-tenths-bp configured))
-         (>= (:max-builder-fee approval) (:fee-tenths-bp configured)))))
+    (policy/approved? approval
+                      (:owner-address identity)
+                      (:builder-address identity)
+                      (:network identity)
+                      (:fee-tenths-bp configured))))
 
 (defn- set-builder-fee-review-error!
   [store error]

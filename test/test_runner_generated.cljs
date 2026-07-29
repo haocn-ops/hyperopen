@@ -469,6 +469,7 @@
             [hyperopen.staking.actions-test]
             [hyperopen.staking.effects-test]
             [hyperopen.startup.account-lifecycle-test]
+            [hyperopen.startup.builder-fee-recovery-test]
             [hyperopen.startup.collaborators-test]
             [hyperopen.startup.deferred-bootstrap-outcome-cache-test]
             [hyperopen.startup.init-test]
@@ -1334,6 +1335,7 @@
              'hyperopen.staking.actions-test
              'hyperopen.staking.effects-test
              'hyperopen.startup.account-lifecycle-test
+             'hyperopen.startup.builder-fee-recovery-test
              'hyperopen.startup.collaborators-test
              'hyperopen.startup.deferred-bootstrap-outcome-cache-test
              'hyperopen.startup.init-test

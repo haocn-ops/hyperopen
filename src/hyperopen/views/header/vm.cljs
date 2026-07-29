@@ -1,6 +1,7 @@
 (ns hyperopen.views.header.vm
   (:require [hyperopen.account.context :as account-context]
             [hyperopen.account.spectate-mode-links :as spectate-mode-links]
+            [hyperopen.builder-fee.settings-state :as builder-fee-settings]
             [hyperopen.service.product-context :as product-context]
             [hyperopen.service.tenant-config :as tenant-config]
             [hyperopen.trading-settings :as trading-settings]
@@ -313,7 +314,7 @@
   (let [builder-fee (tenant-config/active-builder-fee-config state)
         fee-rate (or (:max-fee-rate builder-fee)
                      (tenant-config/max-fee-rate (:fee-tenths-bp builder-fee)))
-        review-status (get-in state [:header-ui :builder-fee-review :status])]
+        review-row (builder-fee-settings/review-row-state state builder-fee)]
     (when (= :configured (:status builder-fee))
       (assoc
        (settings-section
@@ -323,17 +324,13 @@
         [{:id :builder-fee-review
           :kind :button
           :data-role "builder-fee-review"
-          :title (if (= :reviewing review-status)
-                   "Confirm and enable"
-                   "Review and enable")
+          :title (:title review-row)
           :hint (str (:disclosure builder-fee)
                      " Fee " fee-rate
                      ". Recipient " (:builder-address builder-fee)
                      ". Eligible on perp and spot sell orders.")
-          :disabled? (= :submitting review-status)
-          :action [[(if (= :reviewing review-status)
-                      :actions/confirm-builder-fee-review
-                      :actions/request-builder-fee-review)]]}])
+          :disabled? (:disabled? review-row)
+          :action (:action review-row)}])
        :data-role "builder-fee-section"))))
 
 (defn- settings-vm

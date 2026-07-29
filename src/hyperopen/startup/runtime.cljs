@@ -380,6 +380,7 @@
 
 (defn bootstrap-account-data!
   [{:keys [store address fetch-historical-orders!
+           refresh-builder-fee-approval!
            startup-funding-history-lookback-ms
            non-visible-account-bootstrap-delay-ms]
     :as deps}]
@@ -392,6 +393,9 @@
             (account-surface-service/portfolio-performance-metrics-route? @store)]
         (swap-startup-state! deps assoc :bootstrapped-address address)
         (swap! store reset-account-surface-state)
+        (when (fn? refresh-builder-fee-approval!)
+          (some-> (refresh-builder-fee-approval! nil store)
+                  (.catch (fn [_error] nil))))
         (when-not portfolio-performance-route?
           (prefetch-order-history! {:store store
                                     :fetch-historical-orders! fetch-historical-orders!}))

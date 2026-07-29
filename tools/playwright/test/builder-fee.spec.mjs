@@ -115,89 +115,132 @@ async function seedReadyTradingSession(page) {
   );
 }
 
-async function seedSpotMarket(page) {
-  await page.evaluate(() => {
+async function seedMarket(page, market) {
+  await page.evaluate((marketConfig) => {
     const c = globalThis.cljs?.core;
     const store = globalThis.hyperopen?.system?.store;
     const renderApp = globalThis.hyperopen?.app?.bootstrap?.render_app_BANG_;
     if (!c || !store || typeof renderApp !== "function") {
-      throw new Error("builder-fee spot market test seam unavailable");
+      throw new Error("builder-fee market test seam unavailable");
     }
 
     const keyword = c.keyword;
     const path = (...segments) =>
       c.PersistentVector.fromArray(segments.map((segment) => keyword(segment)), true);
     const options = c.PersistentArrayMap.fromArray([keyword("keywordize-keys"), true], true);
-    const spotMarket = c.js__GT_clj(
-      {
-        key: "spot:PURR",
-        coin: "PURR",
-        symbol: "PURR/USDC",
-        base: "PURR",
-        "market-type": "spot",
-        "asset-id": 10000,
-        szDecimals: 4,
-        mark: 100
-      },
-      options
-    );
+    const seededMarket = c.js__GT_clj({
+      ...marketConfig,
+      "market-type": keyword(marketConfig.marketType)
+    }, options);
 
     let nextState = c.deref(store);
-    nextState = c.assoc_in(nextState, path("active-asset"), "PURR");
-    nextState = c.assoc_in(nextState, path("selected-asset"), "PURR");
-    nextState = c.assoc_in(nextState, path("active-market"), spotMarket);
+    nextState = c.assoc_in(nextState, path("router", "path"), `/trade/${marketConfig.coin}`);
     nextState = c.assoc_in(
       nextState,
       path("asset-selector", "market-by-key"),
-      c.PersistentArrayMap.fromArray(["spot:PURR", spotMarket], true)
+      c.PersistentArrayMap.fromArray([marketConfig.key, seededMarket], true)
     );
     c.reset_BANG_(store, nextState);
     renderApp(c.deref(store));
-  });
-}
+  }, market);
 
-async function seedPerpMarket(page) {
-  await page.evaluate(() => {
+  await dispatch(page, [":actions/select-asset-by-market-key", market.key]);
+  await expect.poll(async () => {
+    const assetSelector = await debugCall(page, "oracle", "asset-selector", {});
+    return assetSelector.activeAsset;
+  }).toBe(market.coin);
+  await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
+
+  await page.evaluate((marketConfig) => {
     const c = globalThis.cljs?.core;
     const store = globalThis.hyperopen?.system?.store;
     const renderApp = globalThis.hyperopen?.app?.bootstrap?.render_app_BANG_;
-    if (!c || !store || typeof renderApp !== "function") {
-      throw new Error("builder-fee perp market test seam unavailable");
-    }
-
     const keyword = c.keyword;
     const path = (...segments) =>
       c.PersistentVector.fromArray(segments.map((segment) => keyword(segment)), true);
     const options = c.PersistentArrayMap.fromArray([keyword("keywordize-keys"), true], true);
-    const perpMarket = c.js__GT_clj(
-      {
-        key: "perp:BTC",
-        coin: "BTC",
-        symbol: "BTC",
-        "market-type": "perp",
-        "asset-id": 0,
-        szDecimals: 4,
-        mark: 100
-      },
-      options
-    );
-
+    const seededMarket = c.js__GT_clj({
+      ...marketConfig,
+      "market-type": keyword(marketConfig.marketType)
+    }, options);
     let nextState = c.deref(store);
-    nextState = c.assoc_in(nextState, path("active-asset"), "BTC");
-    nextState = c.assoc_in(nextState, path("selected-asset"), "BTC");
-    nextState = c.assoc_in(nextState, path("active-market"), perpMarket);
+    nextState = c.assoc_in(nextState, path("active-asset"), marketConfig.coin);
+    nextState = c.assoc_in(nextState, path("selected-asset"), marketConfig.coin);
+    nextState = c.assoc_in(nextState, path("active-market"), seededMarket);
+    nextState = c.assoc_in(
+      nextState,
+      path("asset-selector", "market-by-key"),
+      c.PersistentArrayMap.fromArray([marketConfig.key, seededMarket], true)
+    );
     c.reset_BANG_(store, nextState);
     renderApp(c.deref(store));
+  }, market);
+}
+
+async function seedSpotMarket(page) {
+  const market = {
+    key: "spot:PWSPOT",
+    coin: "PWSPOT",
+    symbol: "PWSPOT/USDC",
+    base: "PWSPOT",
+    marketType: "spot",
+    "asset-id": 10000,
+    szDecimals: 4,
+    mark: 0.06
+  };
+  await seedMarket(page, market);
+  return market;
+}
+
+async function seedPerpMarket(page) {
+  await seedMarket(page, {
+    key: "perp:BTC",
+    coin: "BTC",
+    symbol: "BTC",
+    marketType: "perp",
+    "asset-id": 0,
+    szDecimals: 4,
+    mark: 100
   });
 }
 
 async function prepareLimitOrder(page, side, inputMode = ":base") {
+  const price = inputMode === ":quote" ? "0.06" : "100";
   await dispatch(page, [":actions/select-order-entry-mode", ":limit"]);
   await dispatch(page, [":actions/set-order-size-input-mode", inputMode]);
   await dispatch(page, [":actions/update-order-form", [":side"], side]);
-  await dispatch(page, [":actions/update-order-form", [":price"], "100"]);
+  await dispatch(page, [":actions/update-order-form", [":price"], price]);
   await dispatch(page, [":actions/set-order-size-display", "1"]);
   await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
+}
+
+async function submitOrderInMarket(page, market) {
+  return page.evaluate((marketConfig) => {
+    const c = globalThis.cljs?.core;
+    const store = globalThis.hyperopen?.system?.store;
+    const debug = globalThis.HYPEROPEN_DEBUG;
+    const keyword = c.keyword;
+    const path = (...segments) =>
+      c.PersistentVector.fromArray(segments.map((segment) => keyword(segment)), true);
+    const options = c.PersistentArrayMap.fromArray([keyword("keywordize-keys"), true], true);
+    const seededMarket = c.js__GT_clj({
+      ...marketConfig,
+      "market-type": keyword(marketConfig.marketType)
+    }, options);
+    let nextState = c.deref(store);
+    nextState = c.assoc_in(nextState, path("active-asset"), marketConfig.coin);
+    nextState = c.assoc_in(nextState, path("selected-asset"), marketConfig.coin);
+    nextState = c.assoc_in(nextState, path("active-market"), seededMarket);
+    nextState = c.assoc_in(
+      nextState,
+      path("asset-selector", "market-by-key"),
+      c.PersistentArrayMap.fromArray([marketConfig.key, seededMarket], true)
+    );
+    c.reset_BANG_(store, nextState);
+    const orderForm = debug.oracle("order-form", {});
+    const dispatchResult = debug.dispatch([":actions/submit-order"]);
+    return { orderForm, dispatchResult };
+  }, market);
 }
 
 async function signedOrderActions(page) {
@@ -237,7 +280,11 @@ for (const viewport of [
         const body = request.postDataJSON?.();
         if (body?.type === "maxBuilderFee") {
           maxBuilderFeeRequests.push(body);
-          await route.fulfill({ status: 200, contentType: "application/json", body: "10" });
+          await route.fulfill({
+            status: 200,
+            contentType: "application/json",
+            body: "10"
+          });
           return;
         }
         await route.continue();
@@ -251,6 +298,7 @@ for (const viewport of [
       await debugCall(page, "installExchangeSimulator", {
         signedActions: {
           approveBuilderFee: { responses: [{ status: "ok" }] },
+          updateLeverage: { responses: [{ status: "ok" }] },
           order: { responses: [{ status: "ok" }, { status: "ok" }] }
         }
       });
@@ -290,6 +338,7 @@ for (const viewport of [
         user: OWNER_ADDRESS,
         builder: BUILDER_ADDRESS
       }]);
+      await expect(section.getByRole("button", { name: "Enabled" })).toBeDisabled();
       await page.locator('[data-role="trading-settings-close"]').click();
       await expect(page.locator('[data-role="trading-settings-panel"]')).toBeHidden();
       await seedPerpMarket(page);
@@ -313,13 +362,13 @@ for (const viewport of [
         f: 10
       });
 
-      await seedSpotMarket(page);
+      const spotMarket = await seedSpotMarket(page);
       await prepareLimitOrder(page, ":buy", ":quote");
-      expect(await debugCall(page, "oracle", "order-form", {})).toMatchObject({
+      const spotSubmission = await submitOrderInMarket(page, spotMarket);
+      expect(spotSubmission.orderForm).toMatchObject({
         submitDisabled: false,
         submitReason: null
       });
-      await dispatch(page, [":actions/submit-order"]);
       await waitForIdle(page, { quietMs: 250, timeoutMs: 4_000, pollMs: 50 });
       expect(await debugCall(page, "oracle", "wallet-status", {})).toMatchObject({
         agentStatus: "ready",

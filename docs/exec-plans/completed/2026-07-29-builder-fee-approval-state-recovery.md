@@ -41,6 +41,8 @@ This change does not alter wallet persistence, provider selection, `eth_accounts
 - [x] (2026-07-29 14:35+08:00) Added startup and settings regression coverage and updated Builder Fee Playwright coverage. The focused Playwright scenario passed repeatedly at 375px and 1280px, and the final full Builder Fee file passed all 4 tests.
 - [x] (2026-07-29 15:35+08:00) Completed final review and governed QA accounting. All six live visual-review passes are explicitly `BLOCKED` because no inspectable session contained the authorized wallet and the managed local app could not be made reachable; the deterministic Playwright checks remain green.
 - [x] (2026-07-29 15:40+08:00) Ran the complete repository gate matrix with local-loopback permission: 35/35 gates passed, including 5861 ClojureScript tests with 32574 assertions and 561 websocket tests with 3184 assertions. Cleaned browser sessions and moved this plan to completed.
+- [x] (2026-07-29 17:00+08:00) Committed the repair as `b36614ff8baed00398fe9ea4e80ffada31ab7abb` and pushed `main` to `https://github.com/haocn-ops/hyperopen.git`.
+- [x] (2026-07-29 17:05+08:00) Deployed the existing `hyperopen` Cloudflare Worker as version `dc9a974c-0512-403a-a330-8a2073e9bcd4`. Public header, proxy, host-policy, asset, health, title, and release-fingerprint verification passed on the four existing DEXHelm domains.
 
 ## Surprises & Discoveries
 
@@ -64,6 +66,9 @@ This change does not alter wallet persistence, provider selection, `eth_accounts
 
 - Observation: governed live browser review could not observe the authorized connected-wallet state.
   Evidence: the only attachable tab was disconnected and reconnecting, while three managed local-app attempts could not make the inspection target reachable. `tmp/browser-inspection/inspect-2026-07-29T05-58-28-548Z-679b76f2/browser-report.json` records all six required passes as `BLOCKED` and the session cleanup as `PASS`.
+
+- Observation: Wrangler local mode requires `--local-upstream testnet.dexhelm.com` for this exact-host Worker; the local static-asset runtime also substitutes the local request origin for a same-origin CSP source.
+  Evidence: with the configured local upstream, `/trade` and `/api/health` returned 200, Testnet proxy verification passed, Mainnet and generic proxy routes returned 404, `_headers` parsed 24 rules, and fingerprinted CSS and JavaScript returned immutable caching. The production-origin header verifier subsequently passed without substitution.
 
 ## Decision Log
 
@@ -97,7 +102,7 @@ The implemented solution is narrower than the original callback-based proposal. 
 
 The final implementation restores the authoritative approval once per initial or changed account address, projects `Enabled` from the same fail-closed predicate used by order policy, and leaves wallet restoration, storage, signing, and order eligibility contracts unchanged. The focused Builder Fee Playwright scenario passed repeatedly at both committed viewports, the final Builder Fee file passed all 4 tests, and the repository gate matrix passed 35/35.
 
-The remaining limitation is environmental rather than an open implementation task: live governed visual QA could not reach an authorized connected-wallet browser session. Its six passes are explicitly recorded as `BLOCKED` with artifacts and a deterministic post-fix reproduction recipe. No deployment or real order was performed.
+The repair was pushed to the maintained GitHub fork and deployed to the existing Cloudflare Worker. The remaining limitation is environmental rather than an open implementation task: live governed visual QA could not reach an authorized connected-wallet browser session. Its six passes are explicitly recorded as `BLOCKED` with artifacts and a deterministic post-fix reproduction recipe. No real order, wallet signature, transfer, or Mainnet action was performed.
 
 ## Context and Orientation
 
@@ -139,6 +144,24 @@ Completed evidence:
     npm run browser:cleanup
     # PASS: no managed browser sessions remained
 
+    npm run test:cloudflare-worker
+    npm run test:release-assets
+    npm run test:playwright:seo
+    npm run build:cloudflare
+    node .agents/skills/deploy-hyperopen-cloudflare/scripts/preflight.mjs --artifact
+    npm run white-label:validate -- --config config/white-label/dexhelm.json --origin https://testnet.dexhelm.com
+    npm run verify:white-label -- --config config/white-label/dexhelm.json --origin https://testnet.dexhelm.com --output out/white-label/dexhelm
+    npm run test:playwright:white-label
+    npm run cloudflare:check
+    # PASS: Worker 32/32, release assets 51/51, SEO 7/7,
+    # white-label 4/4 at 375/768/1280/1440, artifact preflight 33 PASS,
+    # and Wrangler dry-run read all 57 release files.
+
+    npm run deploy:cloudflare
+    HYPEROPEN_VERIFY_ORIGIN=https://testnet.dexhelm.com npm run verify:deployment-headers
+    HYPEROPEN_VERIFY_ORIGIN=https://testnet.dexhelm.com npm run verify:cloudflare-worker
+    # PASS: deployed Worker version dc9a974c-0512-403a-a330-8a2073e9bcd4
+
 Governed live browser QA was attempted against the existing browser session and three times with managed local-app startup. It is `BLOCKED`, not failed: no inspectable browser contained the authorized wallet and the managed inspection app did not become reachable. The report accounts for visual, native-control, styling-consistency, interaction, layout-regression, and jank/perf individually.
 
 ## Validation and Acceptance
@@ -152,6 +175,18 @@ Governed live browser QA was attempted against the existing browser session and 
 4. Request failure, malformed or stale response, insufficient fee, owner mismatch, Builder mismatch, or network mismatch never expose `Enabled`, never show an active Builder Fee summary, and never authorize the Builder payload.
 
 5. The full ClojureScript suite remains green at 5861 tests and 32574 assertions, the repeated focused Builder Fee Playwright suite passes at 375px and 1280px, review finds no blocking regression, governed browser QA records its explicit environment blocker, and `npm run gates` passes 35/35.
+
+## Deployment Record
+
+- GitHub source: `https://github.com/haocn-ops/hyperopen.git`, branch `main`, commit `b36614ff8baed00398fe9ea4e80ffada31ab7abb`.
+- Cloudflare account: `a95e39ff9f1a66e7630e6639a0edb86c`; existing Worker name `hyperopen`; new version `dc9a974c-0512-403a-a330-8a2073e9bcd4` at 100% traffic.
+- Rollback baseline: prior verified version `61d73b90-1779-4c4b-adfa-a26dab2e94d1`. No rollback was required or performed.
+- Release identity: build ID `white-label-995F705A89523B89`, config digest `995F705A89523B891DF0BA64C80204B44BB97AF6985A0529FA34150C1A07365C`, main script `/js/main.94F287B54727575D33C66F649D4164F7.js`.
+- Public matrix: `https://dexhelm.com` 200; `https://testnet.dexhelm.com` and `/trade` 200; `https://app.dexhelm.com` intentional 503; `https://status.dexhelm.com` 200; the public logo 200 as `image/svg+xml`; `/api/health` 200 JSON with `no-store`.
+- Proxy matrix: the non-mutating Testnet fee probe returned 200 JSON; Mainnet and generic HyperUnit proxy paths returned 404. Mainnet remains closed.
+- Static assets: Wrangler accepted and locally parsed all 24 `_headers` rules; the production verifier passed the document CSP and immutable/control cache contracts.
+- Residual release note: the release SEO build reported a soft main-bundle gzip budget warning, 659039 bytes against 640000, a delta of +19039 bytes. This warning is non-blocking but remains a bundle-size follow-up.
+- Evidence boundary: deterministic local browser coverage passed, but a public connected-wallet visual check remains `BLOCKED` because no inspectable browser session contained the authorized wallet. Deployment verification did not sign an approval or submit an order.
 
 ## Idempotence and Recovery
 
@@ -170,3 +205,5 @@ Revision note: created on 2026-07-29 to capture the direct user request and the 
 Revision note: updated on 2026-07-29 after implementation to replace the proposed wallet-callback design with the completed address-bootstrap refresh, record the completed source and test changes, and preserve final review, QA, and gate work as active.
 
 Revision note: completed on 2026-07-29 after repeated two-viewport Playwright validation, explicit six-pass browser-QA blocker accounting, a clean browser-session cleanup, final diff review, and a 35/35 repository gate result.
+
+Revision note: deployed on 2026-07-29 from GitHub commit `b36614ff8baed00398fe9ea4e80ffada31ab7abb`; public verification confirmed Cloudflare Worker version `dc9a974c-0512-403a-a330-8a2073e9bcd4`, the DEXHelm host matrix, release fingerprint, security headers, and Testnet-only proxy policy.

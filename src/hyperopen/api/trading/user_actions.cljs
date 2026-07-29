@@ -3,6 +3,7 @@
             [hyperopen.api.trading.debug-exchange-simulator :as debug-exchange-simulator]
             [hyperopen.api.trading.http :as http]
             [hyperopen.config :as app-config]
+            [hyperopen.service.tenant-config :as tenant-config]
             [hyperopen.trading-crypto-modules :as trading-crypto-modules]
             [hyperopen.wallet.agent-session :as agent-session]))
 
@@ -86,6 +87,13 @@
                    (or (debug-exchange-simulator/simulated-fetch-response [[:approveAgent]])
                        (http/json-post! http/exchange-url payload))))))))
 
+(defn- configured-builder-fee
+  [store]
+  (let [builder-fee (tenant-config/active-builder-fee-config @store)]
+    (when (= :configured (:status builder-fee))
+      {:builder (:builder-address builder-fee)
+       :max-fee-rate (:max-fee-rate builder-fee)})))
+
 (defn- sign-and-post-user-action!
   [store address action nonce-field sign-action-key]
   (if-let [rejection (http/reject-when-trading-disabled!)]
@@ -96,6 +104,7 @@
                                                              hyperliquid-chain)]
         (js/Promise.reject mismatch-error)
         (let [nonce (next-user-signed-nonce! store)
+              post-signed-action-fn http/post-signed-action!
               action* (-> action
                           (assoc :signatureChainId signature-chain-id
                                  :hyperliquidChain hyperliquid-chain)
@@ -111,7 +120,7 @@
                              signature {:r r
                                         :s s
                                         :v v}]
-                         (-> (http/post-signed-action! action* nonce signature)
+                         (-> (post-signed-action-fn action* nonce signature)
                              (.then http/parse-json!)))))))))))
 
 (defn submit-usd-class-transfer! [store address action]
@@ -131,3 +140,16 @@
 
 (defn submit-withdraw3! [store address action]
   (sign-and-post-user-action! store address action :time :sign-withdraw3-action!))
+
+(defn approve-builder-fee!
+  [store address]
+  (if-let [{:keys [builder max-fee-rate]} (configured-builder-fee store)]
+    (sign-and-post-user-action! store
+                                address
+                                {:type "approveBuilderFee"
+                                 :builder builder
+                                 :maxFeeRate max-fee-rate}
+                                :nonce
+                                :sign-approve-builder-fee-action!)
+    (js/Promise.reject
+     (js/Error. "Builder fee is not configured for this tenant."))))

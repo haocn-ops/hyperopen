@@ -161,6 +161,10 @@
   [store address action]
   (user-actions/approve-agent! store address action))
 
+(defn approve-builder-fee!
+  [store address]
+  (user-actions/approve-builder-fee! store address))
+
 (defn submit-usd-class-transfer!
   [store address action]
   (user-actions/submit-usd-class-transfer! store address action))

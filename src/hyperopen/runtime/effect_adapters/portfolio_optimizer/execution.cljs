@@ -1,12 +1,14 @@
 (ns hyperopen.runtime.effect-adapters.portfolio-optimizer.execution
   (:require [hyperopen.account.context :as account-context]
+            [hyperopen.config :as app-config]
             [hyperopen.order.feedback-runtime :as feedback-runtime]
             [hyperopen.portfolio.optimizer.application.execution :as execution]
             [hyperopen.portfolio.optimizer.application.execution-carryover :as carryover]
             [hyperopen.portfolio.optimizer.application.execution-cloid :as cloid]
             [hyperopen.portfolio.optimizer.application.execution-workflow :as execution-workflow]
             [hyperopen.api.trading.cancel-request :as cancel-request]
-            [hyperopen.portfolio.optimizer.contracts :as contracts]))
+            [hyperopen.portfolio.optimizer.contracts :as contracts]
+            [hyperopen.service.tenant-config :as tenant-config]))
 
 (defn- execution-outcome-toast
   "Plain-language summary toast for a finished run, so success/failure is announced (the toast
@@ -434,6 +436,12 @@
                  {:plan plan
                   :market-by-key (get-in state [:asset-selector :market-by-key])
                   :orderbooks (:orderbooks state)
+                  :builder-fee-context
+                  {:config (:builder-fee (tenant-config/active-tenant-config state))
+                   :approval (get-in state [:builder-fee :approval])
+                   :owner-address owner-address
+                   :target-address account-address
+                   :network (get-in app-config/config [:hyperliquid :network])}
                   ;; Reverts unwind existing fills with reduce-only orders; tagging them
                   ;; would make a revert order recognizable as a fresh optimizer order to
                   ;; cancel later. Only tag forward rebalance/refine orders.

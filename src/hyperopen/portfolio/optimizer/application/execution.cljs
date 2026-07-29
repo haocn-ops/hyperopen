@@ -1,6 +1,7 @@
 (ns hyperopen.portfolio.optimizer.application.execution
   (:require [clojure.string :as str]
             [hyperopen.api.gateway.orders.commands :as order-commands]
+            [hyperopen.builder-fee.policy :as builder-fee-policy]
             [hyperopen.asset-selector.markets :as markets]
             [hyperopen.domain.trading :as trading-domain]
             [hyperopen.portfolio.optimizer.application.execution-order-type :as execution-order-type]
@@ -294,7 +295,7 @@
   (trading-domain/base-size-string {:market market} (coercion/parse-float-number size)))
 
 (defn- order-request-for-row
-  [{:keys [market-by-key orderbooks cloid-fn]} row]
+  [{:keys [market-by-key orderbooks cloid-fn builder-fee-context]} row]
   (let [market (row-market market-by-key row)
         coin (coin-for-row row)
         asset-idx (market-asset-idx market)]
@@ -328,9 +329,23 @@
           (let [request (order-commands/build-order-request
                          command-context
                          (cond-> (assoc form :size size-text)
-                           (non-blank-text cloid) (assoc :cloid cloid)))]
-            (if (map? request)
-              {:request request}
+                           (non-blank-text cloid) (assoc :cloid cloid)))
+                request* (when (map? request)
+                           (update request :action
+                                   (fn [action]
+                                     (let [network (:network builder-fee-context)]
+                                       (:action
+                                        (builder-fee-policy/policy-decision
+                                         (:config builder-fee-context)
+                                         (:approval builder-fee-context)
+                                         (:owner-address builder-fee-context)
+                                         (:target-address builder-fee-context)
+                                         network
+                                         (:market-type market)
+                                         action
+                                         (:side form)))))))]
+            (if (map? request*)
+              {:request request*}
               {:blocked-reason :request-unavailable})))))))
 
 (defn- attempt-row
@@ -346,10 +361,11 @@
     row))
 
 (defn build-execution-attempt
-  [{:keys [plan market-by-key orderbooks cloid-fn]}]
+  [{:keys [plan market-by-key orderbooks cloid-fn builder-fee-context]}]
   (let [rows (mapv #(attempt-row {:market-by-key (or market-by-key {})
                                   :orderbooks (or orderbooks {})
-                                  :cloid-fn cloid-fn}
+                                  :cloid-fn cloid-fn
+                                  :builder-fee-context builder-fee-context}
                                  %)
                    (:rows plan))
         ready-count (count (filter #(= :ready (:status %)) rows))

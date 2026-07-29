@@ -119,6 +119,13 @@
    opts]
   (account-endpoints/request-user-abstraction! post-info! address opts))
 
+(defn request-max-builder-fee!
+  [{:keys [post-info!]}
+   address
+   builder
+   opts]
+  (account-endpoints/request-max-builder-fee! post-info! address builder opts))
+
 (defn request-portfolio!
   [{:keys [post-info!]}
    address

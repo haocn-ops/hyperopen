@@ -11,12 +11,17 @@
   (into #{} (map :id) ui-theme/themes))
 (def ^:private known-features #{:terminal :analytics :affiliate})
 (def ^:private affiliate-statuses #{:configured :enabled :disabled :unavailable})
+(def ^:private builder-fee-statuses #{:configured :disabled})
+(def ^:private builder-fee-fields
+  #{:status :builder-address :fee-tenths-bp :disclosure :max-fee-rate})
 (def ^:private secret-key-pattern
   #"(?i)(private[-_ ]?key|seed[-_ ]?phrase|api[-_ ]?secret|access[-_ ]?token|raw[-_ ]?signature|mnemonic)")
 (def ^:private secret-value-pattern
   #"(?i)(sk_(?:live|test)_[A-Za-z0-9_-]+|0x[0-9a-f]{32,}|(?:seed|private)[-_ ]?(?:phrase|key)|access[-_ ]?token)")
 (def ^:private url-pattern #"^https://[^\s]+$")
 (def ^:private max-affiliate-endpoint-length 2048)
+
+(def ^:private builder-address-pattern #"^0x[0-9a-f]{40}$")
 
 (def default-tenant-raw
   {:tenant/id "hyperopen-default"
@@ -32,7 +37,11 @@
                :status :unavailable
                :referral-url ""
                :event-endpoint ""
-               :disclosure "官方 affiliate 服务当前不可用；交易不受影响。"}})
+               :disclosure "官方 affiliate 服务当前不可用；交易不受影响。"}
+   :builder-fee {:status :disabled
+                 :builder-address nil
+                 :fee-tenths-bp nil
+                 :disclosure "No DEXHelm builder fee is active in this release."}})
 
 (defn- key-name
   [key]
@@ -47,7 +56,13 @@
   (cond
     (map? value)
     (or (some #(re-find secret-key-pattern (key-name %)) (keys value))
-        (some contains-secret? (vals value)))
+        (some (fn [[key nested]]
+                (and (not (and (or (= :builder-address key)
+                                   (= "builder-address" (key-name key)))
+                               (string? nested)
+                               (re-matches builder-address-pattern nested)))
+                     (contains-secret? nested)))
+              value))
 
     (sequential? value)
     (boolean (some contains-secret? value))
@@ -87,6 +102,60 @@
 (defn valid-affiliate-event-endpoint?
   [value]
   (boolean (normalize-affiliate-event-endpoint value)))
+
+(defn max-fee-rate
+  [fee-tenths-bp]
+  (when (and (integer? fee-tenths-bp)
+             (<= 1 fee-tenths-bp 100))
+    (let [fraction (-> (str "000" fee-tenths-bp)
+                       (subs (- (count (str "000" fee-tenths-bp)) 3))
+                       (str/replace #"0+$" ""))]
+      (str "0." fraction "%"))))
+
+(defn- valid-builder-fee?
+  [builder-fee]
+  (let [{:keys [status builder-address fee-tenths-bp disclosure]} builder-fee
+        max-fee-rate-value (:max-fee-rate builder-fee)]
+    (and (map? builder-fee)
+         (every? builder-fee-fields (keys builder-fee))
+         (contains? builder-fee-statuses status)
+         (non-empty-string? disclosure)
+         (if (= :disabled status)
+           (and (nil? builder-address)
+                (nil? fee-tenths-bp)
+                (nil? max-fee-rate-value))
+           (and (string? builder-address)
+                (re-matches builder-address-pattern builder-address)
+                (integer? fee-tenths-bp)
+                (<= 1 fee-tenths-bp 100)
+                (= (max-fee-rate fee-tenths-bp) max-fee-rate-value))))))
+
+(defn- normalize-builder-fee
+  [raw]
+  (let [builder-fee (if (map? raw) raw {})
+        status (get builder-fee :status)
+        disclosure (get builder-fee :disclosure)
+        builder-address (get builder-fee :builder-address)
+        fee-tenths-bp (get builder-fee :fee-tenths-bp)]
+    (cond
+      (= status :disabled)
+      {:status :disabled
+       :builder-address nil
+       :fee-tenths-bp nil
+       :disclosure disclosure}
+
+      (= status :configured)
+      (when (and (string? builder-address)
+                 (re-matches builder-address-pattern builder-address)
+                 (integer? fee-tenths-bp)
+                 (<= 1 fee-tenths-bp 100))
+        {:status :configured
+         :builder-address builder-address
+         :fee-tenths-bp fee-tenths-bp
+         :disclosure disclosure
+         :max-fee-rate (max-fee-rate fee-tenths-bp)})
+
+      :else nil)))
 
 (defn normalize-tenant-theme-id
   "Normalize a tenant theme id against the UI theme catalog.
@@ -134,6 +203,7 @@
               (nil? (get-in tenant [:affiliate :id]))
               (= "" (get-in tenant [:affiliate :referral-url]))))
        (non-empty-string? (get-in tenant [:affiliate :disclosure]))
+       (valid-builder-fee? (:builder-fee tenant))
        (not (contains-secret? tenant))))
 
 (defn- normalize-features
@@ -161,9 +231,12 @@
                             :referral-url (get-in raw* [:affiliate :referral-url])
                             :event-endpoint
                             (let [endpoint (or (get-in raw* [:affiliate :event-endpoint]) "")]
-                              (or (normalize-affiliate-event-endpoint endpoint)
+                                  (or (normalize-affiliate-event-endpoint endpoint)
                                   endpoint))
-                            :disclosure (get-in raw* [:affiliate :disclosure])}}]
+                            :disclosure (get-in raw* [:affiliate :disclosure])}
+                :builder-fee (normalize-builder-fee
+                              (or (:builder-fee raw*)
+                                  (:builder-fee default-tenant-raw)))}]
     (when (and (contains? known-themes (:theme/id tenant))
                (valid-tenant-config? tenant))
       tenant)))
@@ -184,6 +257,18 @@
   [state]
   (normalize-tenant-config (or (:tenant/override (or state {}))
                                default-tenant-raw)))
+
+(defn active-builder-fee-config
+  "Select a strictly normalized builder-fee subconfig from runtime state."
+  [state]
+  (let [builder-fee (get-in state [:tenant/override :builder-fee])]
+    (if (and (map? builder-fee)
+             (every? builder-fee-fields (keys builder-fee))
+             (not (contains-secret? builder-fee)))
+      (:builder-fee
+       (normalize-tenant-config
+        (assoc default-tenant-raw :builder-fee builder-fee)))
+      (:builder-fee (active-tenant-config state)))))
 
 (defn canonical-serialize
   "Stable, insertion-order independent serialization for public config."

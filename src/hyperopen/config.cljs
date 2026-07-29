@@ -32,7 +32,11 @@
                         (string? (get-in parsed [:affiliate :status]))
                         (update-in [:affiliate :status] keyword)
                         (nil? (get-in parsed [:affiliate :status]))
-                        (assoc-in [:affiliate :status] :unavailable))]
+                        (assoc-in [:affiliate :status] :unavailable)
+                        (nil? (:builder-fee parsed))
+                        (assoc :builder-fee (:builder-fee tenant-config/default-tenant-raw))
+                        (string? (get-in parsed [:builder-fee :status]))
+                        (update-in [:builder-fee :status] keyword))]
           (when (tenant-config/valid-tenant-config? parsed*)
             (tenant-config/normalize-tenant-config parsed*)))
         (catch :default _

@@ -37,9 +37,12 @@
            apply-open-orders-error
            apply-user-fills-success
            apply-user-fills-error
+           refresh-builder-fee-approval!
            fetch-and-merge-funding-history!]}]
   (let [address* (or address
                      (account-context/effective-account-address @store))]
+    (when (fn? refresh-builder-fee-approval!)
+      (refresh-builder-fee-approval! nil store))
     (when address*
       (-> (request-frontend-open-orders! address* {:priority :high})
         (.then (promise-effects/apply-success-and-return

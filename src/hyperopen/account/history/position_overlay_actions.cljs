@@ -2,6 +2,7 @@
   (:require [hyperopen.account.history.position-margin :as position-margin]
             [hyperopen.account.history.position-reduce :as position-reduce]
             [hyperopen.account.history.position-tpsl :as position-tpsl]
+            [hyperopen.service.tenant-config :as tenant-config]
             [hyperopen.trading-settings :as trading-settings]))
 
 (defn- tpsl-modal-with-locale
@@ -119,8 +120,19 @@
     [[:effects/save [:positions-ui :reduce-popover]
       (position-reduce/set-limit-price-to-mid popover)]]))
 
-(def ^:private confirm-close-position-message
-  "Submit this close order?\n\nDisable close-position confirmation in Trading settings if you prefer one-click closes.")
+(defn- active-builder-fee-note
+  [state action]
+  (when (map? (:builder action))
+    (let [fee-rate (:max-fee-rate (tenant-config/active-builder-fee-config state))]
+      (when (string? fee-rate)
+        (str "Builder fee: " fee-rate " additional builder fee active.")))))
+
+(defn- confirm-close-position-message
+  [state action]
+  (str "Submit this close order?"
+       (when-let [fee-note (active-builder-fee-note state action)]
+         (str "\n\n" fee-note))
+       "\n\nDisable close-position confirmation in Trading settings if you prefer one-click closes."))
 
 (defn submit-position-reduce-close [state]
   (let [popover (reduce-popover-with-locale state)
@@ -131,7 +143,7 @@
       (let [next-popover (assoc popover :error nil)]
         (if (trading-settings/confirm-close-position? state)
           [[:effects/confirm-api-submit-order {:variant :close-position
-                                               :message confirm-close-position-message
+                                               :message (confirm-close-position-message state (:action result))
                                                :request (:request result)
                                                :path-values [[[:positions-ui :reduce-popover] next-popover]]}]]
           [[:effects/save [:positions-ui :reduce-popover]

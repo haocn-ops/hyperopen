@@ -55,10 +55,15 @@
 
 (defn summary-display
   [summary sz-decimals]
-  {:available-to-trade (format-usdc (:available-to-trade summary))
-   :current-position (format-position-label (:current-position summary) sz-decimals)
-   :liquidation-price (format-trade-price-or-na (:liquidation-price summary))
-   :order-value (format-currency-or-na (:order-value summary))
-   :margin-required (format-currency-or-na (:margin-required summary))
-   :slippage (format-slippage (:slippage-est summary) (:slippage-max summary))
-   :fees (format-fees (:fees summary))})
+  (let [builder-fee (:builder-fee summary)]
+    (cond-> {:available-to-trade (format-usdc (:available-to-trade summary))
+             :current-position (format-position-label (:current-position summary) sz-decimals)
+             :liquidation-price (format-trade-price-or-na (:liquidation-price summary))
+             :order-value (format-currency-or-na (:order-value summary))
+             :margin-required (format-currency-or-na (:margin-required summary))
+             :slippage (format-slippage (:slippage-est summary) (:slippage-max summary))
+             :fees (format-fees (:fees summary))}
+      (and (true? (:active? builder-fee))
+           (string? (:max-fee-rate builder-fee)))
+      (assoc :builder-fee
+             (str (:max-fee-rate builder-fee) " additional builder fee active")))))

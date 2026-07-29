@@ -37,6 +37,7 @@
     "deploy:cloudflare": "npm run build:cloudflare && wrangler deploy",
     "verify:cloudflare-worker": "node tools/cloudflare/verify_cloudflare_worker.mjs",
     "white-label:validate": "node tools/white-label/cli.mjs validate",
+    "builder-fee:preflight": "node tools/white-label/builder_fee_preflight.mjs",
     "build:white-label": "node tools/white-label/cli.mjs build",
     "verify:white-label": "node tools/white-label/cli.mjs verify",
     "test:playwright:white-label": "playwright test -c playwright.white-label.config.mjs",

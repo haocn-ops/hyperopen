@@ -139,6 +139,12 @@
              (when (seq (:error modal*))
                [:div {:class ["text-xs" "text-ho-sell-hi"]} (:error modal*)])
 
+             (when (seq (:builder-fee-note modal*))
+               [:div {:class ["flex" "items-center" "justify-between" "text-xs" "text-trading-text-secondary"]}
+                [:span "Builder fee"]
+                [:span {:class ["font-medium" "text-trading-text"]}
+                 (:builder-fee-note modal*)]])
+
              [:div {:class ["grid" "grid-cols-2" "gap-3" "pt-1"]}
               [:button {:type "button"
                         :class ["h-11"

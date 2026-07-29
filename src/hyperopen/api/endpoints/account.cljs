@@ -61,6 +61,15 @@
   [post-info! address opts]
   (portfolio/request-user-abstraction! post-info! address opts))
 
+(defn request-max-builder-fee!
+  [post-info! address builder opts]
+  (if (and address builder)
+    (post-info! {"type" "maxBuilderFee"
+                 "user" address
+                 "builder" builder}
+                opts)
+    (js/Promise.resolve nil)))
+
 (defn request-clearinghouse-state!
   [post-info! address dex opts]
   (portfolio/request-clearinghouse-state! post-info! address dex opts))

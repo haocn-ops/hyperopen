@@ -40,6 +40,7 @@
 (declare ensure-public-webdata2!)
 (declare request-spot-clearinghouse-state!)
 (declare request-user-abstraction!)
+(declare request-max-builder-fee!)
 (declare request-clearinghouse-state!)
 (declare fetch-clearinghouse-state!)
 
@@ -416,6 +417,11 @@
 (defn request-user-abstraction!
   ([address] (request-user-abstraction! address {}))
   ([address opts] (account/request-user-abstraction! {:post-info! post-info!} address opts)))
+
+(defn request-max-builder-fee!
+  ([address builder] (request-max-builder-fee! address builder {}))
+  ([address builder opts]
+   (account/request-max-builder-fee! {:post-info! post-info!} address builder opts)))
 
 (defn request-user-account-mode!
   "Requests the account abstraction for `address` and resolves to the

@@ -1,6 +1,8 @@
 (ns hyperopen.header.actions
-  (:require [hyperopen.account.spectate-mode-actions :as spectate-mode-actions]
+  (:require [hyperopen.account.context :as account-context]
+            [hyperopen.account.spectate-mode-actions :as spectate-mode-actions]
             [hyperopen.runtime.action-adapters :as action-adapters]
+            [hyperopen.service.tenant-config :as tenant-config]
             [hyperopen.trading-settings :as trading-settings]
             [hyperopen.ui.theme :as ui-theme]
             [hyperopen.wallet.agent-session :as agent-session]))
@@ -163,6 +165,37 @@
 (defn set-affiliate-consent
   [_state enabled?]
   [[:effects/set-affiliate-consent (boolean enabled?)]])
+
+(defn- configured-builder-fee
+  [state]
+  (let [builder-fee (tenant-config/active-builder-fee-config state)]
+    (when (= :configured (:status builder-fee))
+      builder-fee)))
+
+(defn request-builder-fee-review
+  [state]
+  (if-let [{:keys [builder-address fee-tenths-bp]} (configured-builder-fee state)]
+    (if-let [owner-address (account-context/owner-address state)]
+      [[:effects/save [:header-ui :builder-fee-review]
+        {:status :reviewing
+         :owner-address owner-address
+         :builder-address builder-address
+         :fee-tenths-bp fee-tenths-bp}]]
+      [])
+    []))
+
+(defn confirm-builder-fee-review
+  [state]
+  (let [review (get-in state [:header-ui :builder-fee-review])
+        current-owner (account-context/owner-address state)
+        configured (configured-builder-fee state)]
+    (if (and (= :reviewing (:status review))
+             (= current-owner (:owner-address review))
+             (= (:builder-address configured) (:builder-address review))
+             (= (:fee-tenths-bp configured) (:fee-tenths-bp review)))
+      [[:effects/save [:header-ui :builder-fee-review] {:status :submitting}]
+       [:effects/approve-builder-fee current-owner]]
+      [[:effects/save [:header-ui :builder-fee-review] nil]])))
 
 (defn reset-degen-life
   "Joke control on the degen Feeling Gauge widget. Bumps a session-local

@@ -27,6 +27,8 @@
    :set-open-order-safety-mode header-actions/set-open-order-safety-mode
    :set-ui-theme header-actions/set-ui-theme
    :set-affiliate-consent header-actions/set-affiliate-consent
+   :request-builder-fee-review header-actions/request-builder-fee-review
+   :confirm-builder-fee-review header-actions/confirm-builder-fee-review
    :reset-degen-life header-actions/reset-degen-life
    :navigate-mobile-header-menu header-actions/navigate-mobile-header-menu
    :open-spectate-mode-mobile-header-menu header-actions/open-spectate-mode-mobile-header-menu

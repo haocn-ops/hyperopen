@@ -176,7 +176,8 @@
 (defn- armed-band
   [{:keys [confirm-disabled? disabled-message summary
            ready-buys-usd ready-sells-usd
-           margin-rec-auto-topup? margin-rec-isolated-legs] :as model} rows]
+           margin-rec-auto-topup? margin-rec-isolated-legs
+           builder-fee-note] :as model} rows]
   (let [order-count (count (filter #(= :ready (:status %)) rows))
         type-summary (order-summary-line model rows)
         gross (:gross-ready-notional-usd summary)
@@ -211,6 +212,10 @@
                     margin-warn? (conj "text-trading-red"))}
        (str (when (seq type-summary) (str "Order types: " type-summary ". "))
             "Filled trades can't be undone — closing them later sends new market orders at then-current prices and costs.")]
+      (when (seq builder-fee-note)
+        [:p {:class ["mt-0.5" "font-mono" "text-[0.72rem]" "text-trading-text"]
+             :data-role "portfolio-optimizer-execution-builder-fee"}
+         (str "Builder fee: " builder-fee-note)])
       ;; Isolated-margin legs (HIP-3) get a per-position liquidation price; the
       ;; margin-rec background loop can top each fill up to its modeled
       ;; recommendation once, capped by available collateral.

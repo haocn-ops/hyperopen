@@ -21,5 +21,11 @@
     "referral-url": "",
     "event-endpoint": "",
     "disclosure": "官方 affiliate 服务当前不可用；交易不受影响。"
+  },
+  "builder-fee": {
+    "status": "configured",
+    "builder-address": "0x36a47878219fb346e031f6cf82cbfc8c77e35932",
+    "fee-tenths-bp": 10,
+    "disclosure": "DEXHelm charges an additional 0.01% builder fee on eligible fills after you approve it."
   }
 }

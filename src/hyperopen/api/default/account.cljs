@@ -78,6 +78,10 @@
   [{:keys [post-info!]} address opts]
   (account-gateway/request-user-abstraction! {:post-info! post-info!} address opts))
 
+(defn request-max-builder-fee!
+  [{:keys [post-info!]} address builder opts]
+  (account-gateway/request-max-builder-fee! {:post-info! post-info!} address builder opts))
+
 (defn normalize-user-abstraction-mode
   [abstraction]
   (account-gateway/normalize-user-abstraction-mode abstraction))

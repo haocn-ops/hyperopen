@@ -46,13 +46,25 @@
 
 (defn parse-json! [resp]
   (let [parse-response-promise
-        (if (fn? (.-text resp))
+        (cond
+          (or (map? resp)
+              (string? (.-status resp)))
+          (js/Promise.resolve (if (map? resp)
+                                resp
+                                (js->clj resp :keywordize-keys true)))
+
+          (fn? (.-text resp))
           (-> (.text resp)
               (.then (fn [raw]
                        (parse-text-body raw (.-status resp)))))
+
+          (fn? (.-json resp))
           (-> (.json resp)
               (.then (fn [payload]
-                       (js->clj payload :keywordize-keys true)))))]
+                       (js->clj payload :keywordize-keys true))))
+
+          :else
+          (js/Promise.resolve (js->clj resp :keywordize-keys true)))]
     (-> parse-response-promise
         (.then (fn [parsed]
                  (when (validation/validation-enabled?)
@@ -140,6 +152,12 @@
    (post-signed-action! action nonce signature {}))
   ([action nonce signature options]
    (let [{:keys [vault-address expires-after]} options
+         simulator-paths (if (= "scheduleCancel" (:type action))
+                           [[:signedActions "scheduleCancel"]
+                            [:signedActions :default]]
+                           [[:signedActions (keyword (str (:type action)))]
+                            [:signedActions (str (:type action))]
+                            [:signedActions :default]])
          payload (cond-> {:action action
                           :nonce nonce
                           :signature signature}
@@ -147,8 +165,7 @@
                    expires-after (assoc :expiresAfter expires-after))]
      (maybe-assert-signed-exchange-payload! payload action)
      (or (debug-exchange-simulator/simulated-fetch-response
-          [[:signedActions (:type action)]
-           [:signedActions :default]]
+          simulator-paths
           payload)
          (json-post! exchange-url payload)))))
 

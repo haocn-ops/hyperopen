@@ -8,6 +8,7 @@ const ROOT_FIELDS = new Set([
   "features",
   "venue",
   "affiliate",
+  "builder-fee",
   "hyperliquid-network",
 ]);
 const FEATURE_FIELDS = new Set(["terminal", "analytics", "affiliate"]);
@@ -22,6 +23,9 @@ const AFFILIATE_FIELDS = new Set([
 ]);
 const THEMES = new Set(["dark", "institutional", "hyperdegen"]);
 const AFFILIATE_STATUSES = new Set(["configured", "enabled", "disabled", "unavailable"]);
+const BUILDER_FEE_FIELDS = new Set(["status", "builder-address", "fee-tenths-bp", "disclosure"]);
+const BUILDER_FEE_STATUSES = new Set(["configured", "disabled"]);
+const BUILDER_ADDRESS_PATTERN = /^0x[0-9a-f]{40}$/;
 const SECRET_KEY_PATTERN =
   /(?:secret|private[-_ ]?key|seed[-_ ]?phrase|access[-_ ]?token|api[-_ ]?key|api[-_ ]?secret|password|credential|authorization|mnemonic|raw[-_ ]?signature)/i;
 const SECRET_VALUE_PATTERN =
@@ -261,6 +265,9 @@ function requiredBoolean(value, field) {
 }
 
 function assertNoSecretValues(value, field = "root") {
+  if (field === "tenant.builder-fee.builder-address" && BUILDER_ADDRESS_PATTERN.test(value || "")) {
+    return;
+  }
   if (typeof value === "string" && SECRET_VALUE_PATTERN.test(value)) {
     fieldError(field, "contains a secret-shaped value.");
   }
@@ -274,6 +281,49 @@ function assertNoSecretValues(value, field = "root") {
       assertNoSecretValues(nested, `${field}.${key}`);
     }
   }
+}
+
+function formatMaxFeeRate(feeTenthsBp) {
+  const fraction = String(feeTenthsBp).padStart(3, "0").replace(/0+$/, "");
+  return `0.${fraction}%`;
+}
+
+function normalizeBuilderFee(value) {
+  if (value === undefined) {
+    return {
+      status: "disabled",
+      "builder-address": null,
+      "fee-tenths-bp": null,
+      disclosure: "No builder fee is active in this release.",
+    };
+  }
+  const builderFee = assertExactObject(value, BUILDER_FEE_FIELDS, "builder-fee");
+  const status = requiredString(builderFee.status, "builder-fee.status").toLowerCase();
+  if (!BUILDER_FEE_STATUSES.has(status)) {
+    fieldError("builder-fee.status", "is unsupported.");
+  }
+  const disclosure = requiredString(builderFee.disclosure, "builder-fee.disclosure");
+  const address = builderFee["builder-address"];
+  const feeTenthsBp = builderFee["fee-tenths-bp"];
+  if (status === "disabled") {
+    if (address !== null || feeTenthsBp !== null) {
+      fieldError("builder-fee", "must not include a builder address or fee when disabled.");
+    }
+    return { status, "builder-address": null, "fee-tenths-bp": null, disclosure };
+  }
+  if (typeof address !== "string" || !BUILDER_ADDRESS_PATTERN.test(address)) {
+    fieldError("builder-fee.builder-address", "must be a lowercase 42-character address.");
+  }
+  if (!Number.isInteger(feeTenthsBp) || feeTenthsBp < 1 || feeTenthsBp > 100) {
+    fieldError("builder-fee.fee-tenths-bp", "must be an integer from 1 through 100.");
+  }
+  return {
+    status,
+    "builder-address": address,
+    "fee-tenths-bp": feeTenthsBp,
+    disclosure,
+    "max-fee-rate": formatMaxFeeRate(feeTenthsBp),
+  };
 }
 
 export function normalizeWhiteLabelOrigin(value) {
@@ -302,7 +352,7 @@ export function normalizeWhiteLabelOrigin(value) {
 
 export function parseAndNormalizeTenantConfig(rawText) {
   const raw = parseJsonWithDuplicateKeys(rawText);
-  assertExactObject(raw, ROOT_FIELDS, "tenant", new Set(["hyperliquid-network"]));
+  assertExactObject(raw, ROOT_FIELDS, "tenant", new Set(["hyperliquid-network", "builder-fee"]));
   assertNoSecretValues(raw, "tenant");
 
   const tenantId = requiredString(raw["tenant/id"], "tenant/id");
@@ -375,6 +425,8 @@ export function parseAndNormalizeTenantConfig(rawText) {
     fieldError("affiliate", "must not include provider, id, or referral URL when unavailable.");
   }
 
+  const builderFee = normalizeBuilderFee(raw["builder-fee"]);
+
   return {
     "tenant/id": tenantId,
     "brand/name": brandName,
@@ -383,6 +435,7 @@ export function parseAndNormalizeTenantConfig(rawText) {
     features,
     venue,
     affiliate,
+    "builder-fee": builderFee,
     ...(deploymentNetwork ? { "hyperliquid-network": deploymentNetwork } : {}),
   };
 }

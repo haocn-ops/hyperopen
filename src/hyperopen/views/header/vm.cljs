@@ -308,6 +308,34 @@
                         (not (true? (get-in state [:attribution :affiliate-consent?])))]]
                       :tooltip "Only redacted attribution fields are sent after you opt in.")]))))
 
+(defn- builder-fee-section
+  [state]
+  (let [builder-fee (tenant-config/active-builder-fee-config state)
+        fee-rate (or (:max-fee-rate builder-fee)
+                     (tenant-config/max-fee-rate (:fee-tenths-bp builder-fee)))
+        review-status (get-in state [:header-ui :builder-fee-review :status])]
+    (when (= :configured (:status builder-fee))
+      (assoc
+       (settings-section
+        :builder-fee
+        "Builder fee"
+        "Optional onchain approval"
+        [{:id :builder-fee-review
+          :kind :button
+          :data-role "builder-fee-review"
+          :title (if (= :reviewing review-status)
+                   "Confirm and enable"
+                   "Review and enable")
+          :hint (str (:disclosure builder-fee)
+                     " Fee " fee-rate
+                     ". Recipient " (:builder-address builder-fee)
+                     ". Eligible on perp and spot sell orders.")
+          :disabled? (= :submitting review-status)
+          :action [[(if (= :reviewing review-status)
+                      :actions/confirm-builder-fee-review
+                      :actions/request-builder-fee-review)]]}])
+       :data-role "builder-fee-section"))))
+
 (defn- settings-vm
   [state]
   (let [confirmation (settings-confirmation-copy
@@ -324,7 +352,8 @@
                                                     passkey-capable?
                                                     passkey-enabled?
                                                     agent-status)
-        affiliate-section (affiliate-consent-section state)]
+        affiliate-section (affiliate-consent-section state)
+        builder-fee-section (builder-fee-section state)]
     {:open? (true? (get-in state [:header-ui :settings-open?]))
      :return-focus? (true? (get-in state [:header-ui :settings-return-focus?]))
      :trigger-key (str "header-settings-button:"
@@ -440,7 +469,8 @@
                  "Appearance"
                  "Look and feel"
                  [(theme-choice-row state)])]
-                 affiliate-section (conj affiliate-section))}))
+                 affiliate-section (conj affiliate-section)
+                 builder-fee-section (conj builder-fee-section))}))
 
 (defn- brand-vm
   [state context]

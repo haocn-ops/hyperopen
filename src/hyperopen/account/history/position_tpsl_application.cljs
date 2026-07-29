@@ -1,10 +1,14 @@
 (ns hyperopen.account.history.position-tpsl-application
-  (:require [hyperopen.account.history.position-identity :as position-identity]
+  (:require [hyperopen.account.context :as account-context]
+            [hyperopen.account.history.position-identity :as position-identity]
             [hyperopen.account.history.position-tpsl-policy :as position-tpsl-policy]
             [hyperopen.account.history.position-tpsl-state :as position-tpsl-state]
             [hyperopen.api.gateway.orders.commands :as order-commands]
             [hyperopen.asset-selector.markets :as markets]
-            [hyperopen.domain.trading :as trading-domain]))
+            [hyperopen.builder-fee.policy :as builder-fee-policy]
+            [hyperopen.config :as app-config]
+            [hyperopen.domain.trading :as trading-domain]
+            [hyperopen.service.tenant-config :as tenant-config]))
 
 (defn- parse-num [value]
   (trading-domain/parse-num value))
@@ -73,6 +77,20 @@
                    sl-limit
                    "")}}))
 
+(defn- apply-builder-fee-policy
+  [state market action side]
+  (let [config (tenant-config/active-builder-fee-config state)]
+    (:action
+     (builder-fee-policy/policy-decision
+      config
+      (get-in state [:builder-fee :approval])
+      (account-context/owner-address state)
+      (account-context/active-trading-account-address state)
+      (get-in app-config/config [:hyperliquid :network])
+      (:market-type market)
+      action
+      side))))
+
 (defn prepare-submit [state modal]
   (let [validation (position-tpsl-policy/validate-modal modal)
         market-by-key (get-in state [:asset-selector :market-by-key] {})
@@ -95,9 +113,13 @@
           (if (seq orders)
             {:ok? true
              :display-message (:display-message validation)
-             :request {:action {:type "order"
-                                :orders orders
-                                :grouping "positionTpsl"}}}
+             :request {:action (apply-builder-fee-policy
+                                state
+                                market
+                                {:type "order"
+                                 :orders orders
+                                 :grouping "positionTpsl"}
+                                (:side form))}}
             {:ok? false
              :display-message "Place Order"}))))))
 

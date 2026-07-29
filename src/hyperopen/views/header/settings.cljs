@@ -75,10 +75,25 @@
                    :on-change on-change})
    (confirmation-strip confirmation)])
 
+(defn- button-row
+  [{:keys [action data-role disabled? hint title]}]
+  [:div {:class ["ts-row" (when disabled? "is-disabled")]
+         :data-role data-role}
+   [:div {:class ["ts-row-text"]}
+    [:div {:class ["ts-row-label"]} title]
+    [:div {:class ["ts-row-hint"]} hint]]
+   [:button {:type "button"
+             :class ["ts-confirmation-btn" "primary"]
+             :data-role (str data-role "-button")
+             :disabled (boolean disabled?)
+             :on {:click action}}
+    title]])
+
 (defn- setting-row
   [{:keys [kind] :as row}]
-  (if (= :choice kind)
-    (choice-row row)
+  (case kind
+    :choice (choice-row row)
+    :button (button-row row)
     (toggle-row row)))
 
 (defn- settings-section

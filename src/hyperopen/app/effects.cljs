@@ -7,6 +7,7 @@
             [hyperopen.runtime.effect-adapters.attribution :as attribution-effects]
             [hyperopen.runtime.effect-adapters.margin-rec :as margin-rec-effects]
             [hyperopen.runtime.effect-adapters.spectate-mode :as spectate-mode-effects]
+            [hyperopen.builder-fee.effects :as builder-fee-effects]
             [hyperopen.runtime.state :as runtime-state]
             [hyperopen.schema.runtime-registration.portfolio :as portfolio-registration]
             [hyperopen.schema.runtime-registration.vaults :as vault-registration]))
@@ -73,6 +74,7 @@
               :disconnect-wallet (effect-adapters/make-disconnect-wallet runtime)
               :record-attribution-event attribution-effects/effect
               :set-affiliate-consent attribution-effects/set-affiliate-consent!
+              :approve-builder-fee builder-fee-effects/approve-builder-fee!
               :enable-agent-trading action-adapters/enable-agent-trading
               :set-agent-storage-mode effect-adapters/set-agent-storage-mode
               :set-agent-local-protection-mode effect-adapters/set-agent-local-protection-mode

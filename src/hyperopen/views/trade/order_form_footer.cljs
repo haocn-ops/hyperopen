@@ -166,4 +166,8 @@
         [(primitives/metric-row "Slippage"
                                 (:slippage display)
                                 "text-primary")])
-      [(fees-row (:fees display) fee-copy)]))))
+      [(fees-row (:fees display) fee-copy)]
+      (when (seq (:builder-fee display))
+        [(primitives/metric-row "Builder fee"
+                                (:builder-fee display)
+                                "text-primary")])))))

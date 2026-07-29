@@ -55,6 +55,7 @@
             [hyperopen.api.gateway.funding-hyperunit-test]
             [hyperopen.api.gateway.market-test]
             [hyperopen.api.gateway.orders-test]
+            [hyperopen.api.gateway.orders.builder-fee-connection-id-edge-cases-test]
             [hyperopen.api.gateway.orders.commands-test]
             [hyperopen.api.gateway.vaults-test]
             [hyperopen.api.info-client-cache-test]
@@ -83,6 +84,8 @@
             [hyperopen.api.service-test]
             [hyperopen.api.trading-test]
             [hyperopen.api.trading.approve-agent-test]
+            [hyperopen.api.trading.approve-builder-fee-acceptance-test]
+            [hyperopen.api.trading.approve-builder-fee-edge-cases-test]
             [hyperopen.api.trading.cancel-request-test]
             [hyperopen.api.trading.debug-exchange-simulator-test]
             [hyperopen.api.trading.internal-seams-test]
@@ -104,6 +107,10 @@
             [hyperopen.asset-selector.markets-test]
             [hyperopen.asset-selector.outcome-actions-test]
             [hyperopen.asset-selector.settings-test]
+            [hyperopen.builder-fee.approval-refresh-acceptance-test]
+            [hyperopen.builder-fee.approval-state-edge-cases-test]
+            [hyperopen.builder-fee.order-submission-acceptance-test]
+            [hyperopen.builder-fee.policy-edge-cases-test]
             [hyperopen.chart.settings-test]
             [hyperopen.config-test]
             [hyperopen.core-bootstrap.account-history-pagination-test]
@@ -178,6 +185,7 @@
             [hyperopen.funding.predictability-test]
             [hyperopen.funding.transfer-modal-context-test]
             [hyperopen.header.actions-test]
+            [hyperopen.header.builder-fee-actions-edge-cases-test]
             [hyperopen.i18n.locale-test]
             [hyperopen.leaderboard.actions-test]
             [hyperopen.leaderboard.cache-test]
@@ -452,6 +460,7 @@
             [hyperopen.security.attribution-authority-edge-cases-test]
             [hyperopen.security.memory-only-agent-acceptance-test]
             [hyperopen.security.memory-only-agent-edge-cases-test]
+            [hyperopen.service.builder-fee-config-acceptance-test]
             [hyperopen.service.portfolio-analytics-acceptance-test]
             [hyperopen.service.product-context-view-model-test]
             [hyperopen.service.tenant-build-config-test]
@@ -591,6 +600,7 @@
             [hyperopen.views.asset-selector.rows-test]
             [hyperopen.views.asset-selector.runtime-test]
             [hyperopen.views.autocorrelation-plot-test]
+            [hyperopen.views.builder-fee-disclosure-acceptance-test]
             [hyperopen.views.chart.d3.model-test]
             [hyperopen.views.chart.d3.runtime-test]
             [hyperopen.views.chart.tooltip-core-test]
@@ -910,6 +920,7 @@
              'hyperopen.api.gateway.funding-hyperunit-test
              'hyperopen.api.gateway.market-test
              'hyperopen.api.gateway.orders-test
+             'hyperopen.api.gateway.orders.builder-fee-connection-id-edge-cases-test
              'hyperopen.api.gateway.orders.commands-test
              'hyperopen.api.gateway.vaults-test
              'hyperopen.api.info-client-cache-test
@@ -938,6 +949,8 @@
              'hyperopen.api.service-test
              'hyperopen.api.trading-test
              'hyperopen.api.trading.approve-agent-test
+             'hyperopen.api.trading.approve-builder-fee-acceptance-test
+             'hyperopen.api.trading.approve-builder-fee-edge-cases-test
              'hyperopen.api.trading.cancel-request-test
              'hyperopen.api.trading.debug-exchange-simulator-test
              'hyperopen.api.trading.internal-seams-test
@@ -959,6 +972,10 @@
              'hyperopen.asset-selector.markets-test
              'hyperopen.asset-selector.outcome-actions-test
              'hyperopen.asset-selector.settings-test
+             'hyperopen.builder-fee.approval-refresh-acceptance-test
+             'hyperopen.builder-fee.approval-state-edge-cases-test
+             'hyperopen.builder-fee.order-submission-acceptance-test
+             'hyperopen.builder-fee.policy-edge-cases-test
              'hyperopen.chart.settings-test
              'hyperopen.config-test
              'hyperopen.core-bootstrap.account-history-pagination-test
@@ -1033,6 +1050,7 @@
              'hyperopen.funding.predictability-test
              'hyperopen.funding.transfer-modal-context-test
              'hyperopen.header.actions-test
+             'hyperopen.header.builder-fee-actions-edge-cases-test
              'hyperopen.i18n.locale-test
              'hyperopen.leaderboard.actions-test
              'hyperopen.leaderboard.cache-test
@@ -1307,6 +1325,7 @@
              'hyperopen.security.attribution-authority-edge-cases-test
              'hyperopen.security.memory-only-agent-acceptance-test
              'hyperopen.security.memory-only-agent-edge-cases-test
+             'hyperopen.service.builder-fee-config-acceptance-test
              'hyperopen.service.portfolio-analytics-acceptance-test
              'hyperopen.service.product-context-view-model-test
              'hyperopen.service.tenant-build-config-test
@@ -1446,6 +1465,7 @@
              'hyperopen.views.asset-selector.rows-test
              'hyperopen.views.asset-selector.runtime-test
              'hyperopen.views.autocorrelation-plot-test
+             'hyperopen.views.builder-fee-disclosure-acceptance-test
              'hyperopen.views.chart.d3.model-test
              'hyperopen.views.chart.d3.runtime-test
              'hyperopen.views.chart.tooltip-core-test

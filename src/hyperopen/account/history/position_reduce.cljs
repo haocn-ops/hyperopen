@@ -1,10 +1,14 @@
 (ns hyperopen.account.history.position-reduce
   (:require [clojure.string :as str]
+            [hyperopen.account.context :as account-context]
             [hyperopen.account.history.position-identity :as position-identity]
             [hyperopen.account.history.position-reduce-pricing :as position-reduce-pricing]
             [hyperopen.api.gateway.orders.commands :as order-commands]
             [hyperopen.asset-selector.markets :as markets]
+            [hyperopen.builder-fee.policy :as builder-fee-policy]
+            [hyperopen.config :as app-config]
             [hyperopen.domain.trading :as trading-domain]
+            [hyperopen.service.tenant-config :as tenant-config]
             [hyperopen.utils.parse :as parse-utils]))
 
 (def ^:private anchor-keys
@@ -379,6 +383,20 @@
    :price (submit-price popover market)
    :reduce-only true})
 
+(defn- apply-builder-fee-policy
+  [action state market side]
+  (let [config (tenant-config/active-builder-fee-config state)]
+    (:action
+     (builder-fee-policy/policy-decision
+      config
+      (get-in state [:builder-fee :approval])
+      (account-context/owner-address state)
+      (account-context/active-trading-account-address state)
+      (get-in app-config/config [:hyperliquid :network])
+      (:market-type market)
+      action
+      side))))
+
 (defn prepare-submit
   [state popover]
   (let [validation (validate-popover popover)
@@ -392,11 +410,12 @@
               asset-id
               (submit-form popover market))
         request (when (number? asset-id)
-                  (order-commands/build-order-request
-                   {:active-asset (:coin popover)
-                    :asset-idx asset-id
-                    :market market}
-                   form))]
+                  (some-> (order-commands/build-order-request
+                           {:active-asset (:coin popover)
+                            :asset-idx asset-id
+                            :market market}
+                           form)
+                          (update :action apply-builder-fee-policy state market (:side form))))]
     (cond
       (not (:is-ok validation))
       {:ok? false

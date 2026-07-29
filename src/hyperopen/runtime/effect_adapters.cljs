@@ -6,6 +6,7 @@
             [hyperopen.account.context :as account-context]
             [hyperopen.account-tab-modules :as account-tab-modules]
             [hyperopen.account.history.effects :as account-history-effects]
+            [hyperopen.builder-fee.effects :as builder-fee-effects]
             [hyperopen.runtime.effect-adapters.asset-selector :as asset-adapters]
             [hyperopen.runtime.effect-adapters.common :as common]
             [hyperopen.runtime.effect-adapters.funding :as funding-adapters]
@@ -296,6 +297,7 @@
     :apply-open-orders-error api-projections/apply-open-orders-error
     :apply-user-fills-success api-projections/apply-user-fills-success
     :apply-user-fills-error api-projections/apply-user-fills-error
+    :refresh-builder-fee-approval! builder-fee-effects/refresh-builder-fee-approval!
     :fetch-and-merge-funding-history! account-history-effects/fetch-and-merge-funding-history!}))
 
 (defn api-fetch-trader-portfolio-benchmark-effect

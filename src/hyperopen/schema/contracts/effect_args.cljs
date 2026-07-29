@@ -288,6 +288,7 @@
    :effects/connect-wallet ::common/optional-string-args
    :effects/disconnect-wallet ::common/no-args
    :effects/set-affiliate-consent ::common/boolean-args
+   :effects/approve-builder-fee ::common/address-args
    :effects/enable-agent-trading ::enable-agent-trading-args
    :effects/set-agent-storage-mode ::common/set-agent-storage-mode-args
    :effects/set-agent-local-protection-mode ::common/set-agent-local-protection-mode-args

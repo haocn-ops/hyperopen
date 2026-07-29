@@ -1,11 +1,13 @@
 (ns hyperopen.views.account-info.vm
   (:require [clojure.string :as str]
             [hyperopen.account.context :as account-context]
+            [hyperopen.account.history.position-tpsl :as position-tpsl]
             [hyperopen.asset-selector.markets :as markets]
             [hyperopen.margin-rec.state :as margin-rec-state]
             [hyperopen.order.cancel-visible-confirmation :as cancel-visible-confirmation]
             [hyperopen.platform :as platform]
             [hyperopen.portfolio.routes :as portfolio-routes]
+            [hyperopen.service.tenant-config :as tenant-config]
             [hyperopen.views.account-info.derived-cache :as derived-cache]
             [hyperopen.views.account-info.projections :as projections]
             [hyperopen.views.websocket-freshness :as ws-freshness]))
@@ -90,6 +92,16 @@
   (if (contains? orders k)
     (get orders k)
     (get webdata2 k)))
+
+(defn- position-tpsl-modal-with-builder-fee-note
+  [state modal]
+  (let [result (position-tpsl/prepare-submit state modal)
+        fee-rate (:max-fee-rate (tenant-config/active-builder-fee-config state))]
+    (cond-> modal
+      (and (map? (get-in result [:request :action :builder]))
+           (string? fee-rate))
+      (assoc :builder-fee-note
+             (str fee-rate " additional builder fee active")))))
 
 (def ^:private tp-side-markers
   #{"tp" "takeprofit" "take-profit" "take profit"})
@@ -399,7 +411,9 @@
      :open-orders-sort open-orders-sort
      :positions-state positions-state
      :open-orders-state open-orders-state
-     :position-tpsl-modal (get-in state [:positions-ui :tpsl-modal])
+     :position-tpsl-modal (position-tpsl-modal-with-builder-fee-note
+                           state
+                           (get-in state [:positions-ui :tpsl-modal]))
      :position-reduce-popover (get-in state [:positions-ui :reduce-popover])
      :position-margin-modal (get-in state [:positions-ui :margin-modal])
      :hide-small? hide-small?

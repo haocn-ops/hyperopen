@@ -83,6 +83,11 @@ const SHADOW_MODULE_PREFIXES = new Set([
 ]);
 const SECRET_CONTENT_PATTERN = /(?:sk_(?:live|test)_[A-Za-z0-9_-]+|0x[0-9a-f]{32,}|(?:seed|private)[-_ ]?(?:phrase|key)|access[-_ ]?token|api[-_ ]?(?:key|secret)|password(?:\s*[:=])|credential(?:\s*[:=])|raw[-_ ]?signature)/i;
 
+function containsSecretShapedContent(content) {
+  const withoutPublicAddresses = content.replace(/\b0x[0-9a-f]{40}\b/gi, "");
+  return SECRET_CONTENT_PATTERN.test(withoutPublicAddresses);
+}
+
 async function readJson(filePath, label) {
   try {
     return JSON.parse(await fs.readFile(filePath, "utf8"));
@@ -183,7 +188,7 @@ async function assertAllowedArtifacts(outputPath, files, enabledRoutes, expected
     }
     if (isPublicTextArtifact(normalized)) {
       const content = await fs.readFile(path.join(outputPath, normalized), "utf8");
-      if (SECRET_CONTENT_PATTERN.test(content)) {
+      if (containsSecretShapedContent(content)) {
         throw new Error(`Release public artifact contains secret-shaped content: ${normalized}`);
       }
     }
@@ -241,7 +246,19 @@ export async function verifyWhiteLabelRelease(options = {}) {
   const outputPath = resolved.outputPath;
   const manifest = await readJson(path.join(outputPath, TENANT_MANIFEST_FILE_PATH), "tenant manifest");
   assertManifestShape(manifest);
-  const manifestTenant = parseAndNormalizeTenantConfig(JSON.stringify(manifest.tenant));
+  // The public manifest stores the normalized tenant, including derived fields
+  // such as builder-fee.max-fee-rate. Strip derived values before feeding it
+  // through the strict source-config parser; normalization recomputes them and
+  // the canonical comparison below rejects any tampering.
+  const manifestTenantSource = {
+    ...manifest.tenant,
+    "builder-fee": manifest.tenant?.["builder-fee"]
+      ? Object.fromEntries(
+          Object.entries(manifest.tenant["builder-fee"]).filter(([key]) => key !== "max-fee-rate")
+        )
+      : manifest.tenant?.["builder-fee"],
+  };
+  const manifestTenant = parseAndNormalizeTenantConfig(JSON.stringify(manifestTenantSource));
 
   if (manifest.canonicalOrigin !== canonicalOrigin) {
     throw new Error("Tenant manifest canonical origin does not match.");

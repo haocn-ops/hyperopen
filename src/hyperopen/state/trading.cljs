@@ -3,7 +3,10 @@
             [hyperopen.account.context :as account-context]
             [hyperopen.asset-selector.markets :as markets]
             [hyperopen.api.gateway.orders.commands :as order-commands]
+            [hyperopen.builder-fee.policy :as builder-fee-policy]
+            [hyperopen.config :as app-config]
             [hyperopen.domain.trading :as trading-domain]
+            [hyperopen.service.tenant-config :as tenant-config]
             [hyperopen.domain.trading.market :as trading-market]
             [hyperopen.state.trading.order-form-key-policy :as order-form-key-policy]
             [hyperopen.state.trading.fee-context :as trading-fee-context]
@@ -77,7 +80,9 @@
          selected-outcome-sides
          selected-question-option
          cross-margin-allowed?
-         active-clearinghouse-state-for-market resolved-active-market)
+         active-clearinghouse-state-for-market
+         resolved-active-market
+         builder-fee-market-type)
 
 (defn order-form-ui-overrides-from-form
   "Extract UI-owned order-form fields from a normalized working form."
@@ -619,14 +624,35 @@
       (= :scale final-type) (assoc-in [:tp :enabled?] false)
       (= :scale final-type) (assoc-in [:sl :enabled?] false))))
 
+(defn- builder-fee-summary
+  [state context form]
+  (let [builder-fee (tenant-config/active-builder-fee-config state)
+        action {:type (if (= :twap (:type form)) "twapOrder" "order")
+                :orders []}
+        decision (builder-fee-policy/policy-decision
+                  builder-fee
+                  (get-in state [:builder-fee :approval])
+                  (account-context/owner-address state)
+                  (account-context/active-trading-account-address state)
+                  (get-in app-config/config [:hyperliquid :network])
+                  (builder-fee-market-type context)
+                  action
+                  (:side form))]
+    (when (:active? decision)
+      {:active? true
+       :builder-address (:builder-address builder-fee)
+       :max-fee-rate (:max-fee-rate builder-fee)})))
+
 (defn order-summary [state form]
   (let [fee-context (trading-fee-context/select-fee-context state)
         requested-type (normalize-order-type (:type form))
         normalized-form (-> (normalize-order-form state form)
-                            (assoc :requested-type requested-type))]
-    (trading-domain/order-summary (trading-context state fee-context normalized-form)
-                                  normalized-form
-                                  fee-context)))
+                            (assoc :requested-type requested-type))
+        context (trading-context state fee-context normalized-form)
+        summary (trading-domain/order-summary context normalized-form fee-context)
+        builder-fee (builder-fee-summary state context normalized-form)]
+    (cond-> summary
+      builder-fee (assoc :builder-fee builder-fee))))
 
 (defn validate-order-form
   ([form]
@@ -707,15 +733,36 @@
       {:trading-context context
        :identity identity
        :spectate-mode-message (account-context/mutations-blocked-message state)
-       :request-builder (partial order-commands/build-order-request context)}
+       :request-builder (partial build-order-request state)}
       normalized-form
       {:mode mode
        :submitting? submitting?
        :agent-ready? agent-ready?
        :agent-unavailable-message agent-unavailable-message}))))
 
+(defn- builder-fee-market-type
+  [context]
+  (let [market-type (get-in context [:market :market-type])
+        normalized (cond
+                     (keyword? market-type) market-type
+                     (string? market-type) (keyword (str/lower-case market-type))
+                     :else nil)]
+    (when (contains? #{:perp :spot :outcome} normalized)
+      normalized)))
+
 (defn build-order-request [state form]
-  (order-commands/build-order-request (trading-context state
-                                                       (trading-fee-context/select-fee-context state)
-                                                       form)
-                                      form))
+  (let [context (trading-context state
+                                 (trading-fee-context/select-fee-context state)
+                                 form)
+        request (order-commands/build-order-request context form)]
+    (when request
+      (let [decision (builder-fee-policy/policy-decision
+                      (tenant-config/active-builder-fee-config state)
+                      (get-in state [:builder-fee :approval])
+                      (account-context/owner-address state)
+                      (account-context/active-trading-account-address state)
+                      (get-in app-config/config [:hyperliquid :network])
+                      (builder-fee-market-type context)
+                      (:action request)
+                      (:side form))]
+        (assoc request :action (:action decision))))))

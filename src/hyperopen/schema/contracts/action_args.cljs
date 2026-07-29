@@ -242,6 +242,8 @@
    :actions/set-agent-storage-mode ::common/set-agent-storage-mode-args
    :actions/set-agent-local-protection-mode ::common/set-agent-local-protection-mode-args
    :actions/set-affiliate-consent ::common/boolean-args
+   :actions/request-builder-fee-review ::common/no-args
+   :actions/confirm-builder-fee-review ::common/no-args
    :actions/copy-wallet-address ::common/no-args
    :actions/reconnect-websocket ::common/no-args
    :actions/toggle-ws-diagnostics ::common/no-args

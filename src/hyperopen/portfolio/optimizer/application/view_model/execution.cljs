@@ -1,5 +1,8 @@
 (ns hyperopen.portfolio.optimizer.application.view-model.execution
   (:require [clojure.string :as str]
+            [hyperopen.account.context :as account-context]
+            [hyperopen.builder-fee.policy :as builder-fee-policy]
+            [hyperopen.config :as app-config]
             [hyperopen.portfolio.optimizer.application.execution :as execution]
             [hyperopen.portfolio.optimizer.application.execution-amend :as execution-amend]
             [hyperopen.portfolio.optimizer.application.execution-carryover :as carryover]
@@ -9,6 +12,7 @@
             [hyperopen.portfolio.optimizer.application.view-model.execution-reconcile :as reconcile]
             [hyperopen.portfolio.optimizer.application.view-model.workspace :as workspace]
             [hyperopen.portfolio.optimizer.contracts :as contracts]
+            [hyperopen.service.tenant-config :as tenant-config]
             [hyperopen.trading-settings :as trading-settings]))
 
 ;; Keep in sync with hyperopen.portfolio.optimizer.actions.execution/stale-recommendation-message
@@ -23,6 +27,30 @@
 ;; honest resolution is a re-run.
 (def ^:private simulation-allowed-note
   "You can still model execution strategies and per-order types here to compare costs — arming and sending stay disabled.")
+
+(defn- active-builder-fee-note
+  [state rows]
+  (let [config (tenant-config/active-builder-fee-config state)
+        approval (get-in state [:builder-fee :approval])
+        owner-address (account-context/owner-address state)
+        target-address (account-context/active-trading-account-address state)
+        network (get-in app-config/config [:hyperliquid :network])
+        fee-rate (:max-fee-rate config)]
+    (when (and (string? fee-rate)
+               (some (fn [row]
+                       (:active?
+                        (builder-fee-policy/policy-decision
+                         config
+                         approval
+                         owner-address
+                         target-address
+                         network
+                         (get-in state [:asset-selector :market-by-key
+                                        (:instrument-id row) :market-type])
+                         {:type "order" :orders []}
+                         (:side row))))
+                     (filter #(= :ready (:status %)) rows)))
+      (str fee-rate " additional builder fee active"))))
 
 (defn- labels-by-instrument
   [state]
@@ -345,6 +373,7 @@
                              execution-disabled? disabled-message
                              scenario-stale? stale-recommendation-message
                              :else nil)
+     :builder-fee-note (active-builder-fee-note state display-rows)
      :confirm-disabled? (boolean confirm-disabled?)
      :disabled-message disabled-message
      :has-plan? (boolean (seq (:rows plan)))}))

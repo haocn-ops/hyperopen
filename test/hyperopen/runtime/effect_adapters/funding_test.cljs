@@ -10,18 +10,17 @@
             [hyperopen.platform :as platform]
             [hyperopen.runtime.effect-adapters :as effect-adapters]
             [hyperopen.runtime.effect-adapters.funding :as funding-adapters]
+            [hyperopen.runtime.effect-adapters.funding-workflow :as funding-workflow-adapters]
             [hyperopen.runtime.effect-adapters.common :as common]
-            [hyperopen.test-support.async :as async-support]))
+            [hyperopen.runtime.state :as runtime-state]
+            [hyperopen.test-support.async :as async-support]
+            [hyperopen.views.funding-modal-module :as funding-modal-module]))
 
 (deftest facade-funding-adapters-delegate-to-funding-module-test
   (is (identical? funding-adapters/sync-active-asset-funding-predictability
                   effect-adapters/sync-active-asset-funding-predictability))
   (is (identical? funding-adapters/api-fetch-predicted-fundings-effect
-                  effect-adapters/api-fetch-predicted-fundings-effect))
-  (is (identical? funding-adapters/api-fetch-hyperunit-fee-estimate-effect
-                  effect-adapters/api-fetch-hyperunit-fee-estimate-effect))
-  (is (identical? funding-adapters/api-fetch-hyperunit-withdrawal-queue-effect
-                  effect-adapters/api-fetch-hyperunit-withdrawal-queue-effect)))
+                  effect-adapters/api-fetch-predicted-fundings-effect)))
 
 (deftest funding-submit-wrappers-inject-order-toast-seam-test
   (let [runtime-store (atom {})
@@ -54,14 +53,15 @@
                                     :store store*
                                     :request request*
                                     :opts opts}))]
-      (with-redefs [funding-adapters/api-submit-funding-send-effect capture-send-call!
-                    funding-adapters/api-submit-funding-transfer-effect capture-transfer-call!
-                    funding-adapters/api-submit-funding-withdraw-effect capture-withdraw-call!
-                    funding-adapters/api-submit-funding-deposit-effect capture-deposit-call!]
-        (effect-adapters/api-submit-funding-send-effect nil runtime-store request)
-        (effect-adapters/api-submit-funding-transfer-effect nil runtime-store request)
-        (effect-adapters/api-submit-funding-withdraw-effect nil runtime-store request)
-        (effect-adapters/api-submit-funding-deposit-effect nil runtime-store request)))
+      (with-redefs [funding-workflow-adapters/api-submit-funding-send-effect capture-send-call!
+                    funding-workflow-adapters/api-submit-funding-transfer-effect capture-transfer-call!
+                    funding-workflow-adapters/api-submit-funding-withdraw-effect capture-withdraw-call!
+                    funding-workflow-adapters/api-submit-funding-deposit-effect capture-deposit-call!]
+        (let [deps (funding-modal-module/effect-deps runtime-state/runtime)]
+          ((get-in deps [:api :api-submit-funding-send]) nil runtime-store request)
+          ((get-in deps [:api :api-submit-funding-transfer]) nil runtime-store request)
+          ((get-in deps [:api :api-submit-funding-withdraw]) nil runtime-store request)
+          ((get-in deps [:api :api-submit-funding-deposit]) nil runtime-store request))))
     (doseq [{:keys [ctx store request opts]} [@send-call
                                               @transfer-call
                                               @withdraw-call
@@ -158,9 +158,9 @@
       (is (= :predicted-result
              (funding-adapters/api-fetch-predicted-fundings-effect nil store)))
       (is (= :fee-estimate-result
-             (funding-adapters/api-fetch-hyperunit-fee-estimate-effect nil store)))
+             (funding-workflow-adapters/api-fetch-hyperunit-fee-estimate-effect nil store)))
       (is (= :withdrawal-queue-result
-             (funding-adapters/api-fetch-hyperunit-withdrawal-queue-effect nil store))))
+             (funding-workflow-adapters/api-fetch-hyperunit-withdrawal-queue-effect nil store))))
     (let [captured (into {} (map (juxt first second) @calls))]
       (is (= store (get-in captured [:predicted :store])))
       (is (identical? api/request-predicted-fundings!
@@ -298,13 +298,13 @@
                     (swap! calls conj [:deposit-default deps])
                     :deposit-result)]
       (is (= :transfer-result
-             (funding-adapters/api-submit-funding-transfer-effect nil store {:id :transfer-default})))
+             (funding-workflow-adapters/api-submit-funding-transfer-effect nil store {:id :transfer-default})))
       (is (= :send-result
-             (funding-adapters/api-submit-funding-send-effect nil store {:id :send-default})))
+             (funding-workflow-adapters/api-submit-funding-send-effect nil store {:id :send-default})))
       (is (= :withdraw-result
-             (funding-adapters/api-submit-funding-withdraw-effect nil store {:id :withdraw-default})))
+             (funding-workflow-adapters/api-submit-funding-withdraw-effect nil store {:id :withdraw-default})))
       (is (= :deposit-result
-             (funding-adapters/api-submit-funding-deposit-effect nil store {:id :deposit-default}))))
+             (funding-workflow-adapters/api-submit-funding-deposit-effect nil store {:id :deposit-default}))))
     (with-redefs [funding-workflow-effects/api-submit-funding-transfer!
                   (fn [deps]
                     (swap! calls conj [:transfer-custom deps])
@@ -322,25 +322,25 @@
                     (swap! calls conj [:deposit-custom deps])
                     :deposit-result)]
       (is (= :transfer-result
-             (funding-adapters/api-submit-funding-transfer-effect
+             (funding-workflow-adapters/api-submit-funding-transfer-effect
               nil
               store
               {:id :transfer-custom}
               {:show-toast! custom-show-toast!})))
       (is (= :send-result
-             (funding-adapters/api-submit-funding-send-effect
+             (funding-workflow-adapters/api-submit-funding-send-effect
               nil
               store
               {:id :send-custom}
               {:show-toast! custom-show-toast!})))
       (is (= :withdraw-result
-             (funding-adapters/api-submit-funding-withdraw-effect
+             (funding-workflow-adapters/api-submit-funding-withdraw-effect
               nil
               store
               {:id :withdraw-custom}
               {:show-toast! custom-show-toast!})))
       (is (= :deposit-result
-             (funding-adapters/api-submit-funding-deposit-effect
+             (funding-workflow-adapters/api-submit-funding-deposit-effect
               nil
               store
               {:id :deposit-custom}

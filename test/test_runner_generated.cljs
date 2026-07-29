@@ -152,6 +152,7 @@
             [hyperopen.domain.trading.order-values-test]
             [hyperopen.funding-comparison.actions-test]
             [hyperopen.funding-comparison.effects-test]
+            [hyperopen.funding-lazy-runtime-edge-test]
             [hyperopen.funding.actions-test]
             [hyperopen.funding.application.deposit-submit-test]
             [hyperopen.funding.application.hyperunit-query-test]
@@ -1018,6 +1019,7 @@
              'hyperopen.domain.trading.order-values-test
              'hyperopen.funding-comparison.actions-test
              'hyperopen.funding-comparison.effects-test
+             'hyperopen.funding-lazy-runtime-edge-test
              'hyperopen.funding.actions-test
              'hyperopen.funding.application.deposit-submit-test
              'hyperopen.funding.application.hyperunit-query-test

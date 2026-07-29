@@ -1,6 +1,5 @@
 (ns hyperopen.runtime.collaborators
   (:require [hyperopen.account.history.effects :as account-history-effects]
-            [hyperopen.funding.effects :as funding-effects]
             [hyperopen.funding-comparison.effects :as funding-comparison-effects]
             [hyperopen.leaderboard.effects :as leaderboard-effects]
             [hyperopen.runtime.collaborators.account-history :as account-history-collaborators]
@@ -42,14 +41,7 @@
           :api-submit-staking-deposit staking-effects/api-submit-staking-deposit!
           :api-submit-staking-withdraw staking-effects/api-submit-staking-withdraw!
           :api-submit-staking-delegate staking-effects/api-submit-staking-delegate!
-          :api-submit-staking-undelegate staking-effects/api-submit-staking-undelegate!
-          :api-fetch-hyperunit-fee-estimate funding-effects/api-fetch-hyperunit-fee-estimate!
-          :api-fetch-hyperunit-withdrawal-queue funding-effects/api-fetch-hyperunit-withdrawal-queue!
-          :api-submit-funding-send funding-effects/api-submit-funding-send!
-          :api-submit-funding-transfer funding-effects/api-submit-funding-transfer!
-          :api-submit-funding-repay funding-effects/api-submit-funding-repay!
-          :api-submit-funding-withdraw funding-effects/api-submit-funding-withdraw!
-          :api-submit-funding-deposit funding-effects/api-submit-funding-deposit!}}
+          :api-submit-staking-undelegate staking-effects/api-submit-staking-undelegate!}}
    effect-overrides))
 
 (defn runtime-action-deps

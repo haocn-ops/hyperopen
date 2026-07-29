@@ -177,15 +177,18 @@
 
 (defn- render-desktop-shell
   [anchored-popover? popover-style focus-on-render panel-children]
-  (let [layer-classes (into ["fixed" "inset-0" "z-[80]"]
+  (let [layer-classes (into ["funding-modal-desktop-layer"
+                             "fixed" "inset-0" "z-[80]"]
                             (if anchored-popover?
                               ["pointer-events-none"]
                               ["flex" "items-center" "justify-center" "p-4"]))
-        backdrop-classes (into ["absolute" "inset-0"]
+        backdrop-classes (into ["funding-modal-desktop-backdrop"
+                                "absolute" "inset-0"]
                                (if anchored-popover?
                                  ["pointer-events-auto" "bg-transparent"]
                                  ["bg-black/65"]))
-        panel-classes (into ["relative"
+        panel-classes (into ["funding-modal-desktop-panel"
+                             "relative"
                              "z-[81]"
                              "space-y-3"
                              "border"

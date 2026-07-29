@@ -27,6 +27,15 @@
        (map second)
        vec))
 
+(def ^:private lazy-funding-workflow-effect-keys
+  [:api-fetch-hyperunit-fee-estimate
+   :api-fetch-hyperunit-withdrawal-queue
+   :api-submit-funding-transfer
+   :api-submit-funding-send
+   :api-submit-funding-repay
+   :api-submit-funding-withdraw
+   :api-submit-funding-deposit])
+
 (defn- runtime-effect-overrides
   [runtime]
   (let [lazy-portfolio-optimizer-effect-deps
@@ -40,7 +49,13 @@
          runtime
          :vaults
          :api
-         lazy-vault-effect-keys)]
+         lazy-vault-effect-keys)
+        lazy-funding-effect-deps
+        (route-modules/lazy-route-effect-leaf-deps
+         runtime
+         :funding-modal
+         :api
+         lazy-funding-workflow-effect-keys)]
     {:storage {:save effect-adapters/save
                :save-many effect-adapters/save-many
                :local-storage-set effect-adapters/local-storage-set
@@ -125,15 +140,9 @@
                   :api-submit-staking-deposit effect-adapters/api-submit-staking-deposit-effect
                   :api-submit-staking-withdraw effect-adapters/api-submit-staking-withdraw-effect
                   :api-submit-staking-delegate effect-adapters/api-submit-staking-delegate-effect
-                  :api-submit-staking-undelegate effect-adapters/api-submit-staking-undelegate-effect
-                  :api-fetch-hyperunit-fee-estimate effect-adapters/api-fetch-hyperunit-fee-estimate-effect
-                  :api-fetch-hyperunit-withdrawal-queue effect-adapters/api-fetch-hyperunit-withdrawal-queue-effect
-                  :api-submit-funding-transfer effect-adapters/api-submit-funding-transfer-effect
-                  :api-submit-funding-send effect-adapters/api-submit-funding-send-effect
-                  :api-submit-funding-repay effect-adapters/api-submit-funding-repay-effect
-                  :api-submit-funding-withdraw effect-adapters/api-submit-funding-withdraw-effect
-                  :api-submit-funding-deposit effect-adapters/api-submit-funding-deposit-effect}
-                 (:api lazy-vault-effect-deps))
+                  :api-submit-staking-undelegate effect-adapters/api-submit-staking-undelegate-effect}
+                 (:api lazy-vault-effect-deps)
+                 (:api lazy-funding-effect-deps))
      :portfolio-optimizer (:portfolio-optimizer lazy-portfolio-optimizer-effect-deps)}))
 
 (defn runtime-effect-deps

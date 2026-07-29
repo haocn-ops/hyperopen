@@ -19,10 +19,22 @@
 
 (deftest runtime-deps-load-route-owned-optimizer-and-vault-handlers-through-lazy-route-runtime-deps-test
   (let [runtime {:runtime-id :lazy-route-runtime}
+        funding-workflow-effect-keys
+        [:api-fetch-hyperunit-fee-estimate
+         :api-fetch-hyperunit-withdrawal-queue
+         :api-submit-funding-transfer
+         :api-submit-funding-send
+         :api-submit-funding-repay
+         :api-submit-funding-withdraw
+         :api-submit-funding-deposit]
         portfolio-action-handler (fn [& _] :portfolio-action)
         vault-action-handler (fn [& _] :vault-action)
         portfolio-effect-handler (fn [& _] :portfolio-effect)
         vault-effect-handler (fn [& _] :vault-effect)
+        funding-effect-handlers (into {}
+                                     (map (fn [handler-key]
+                                            [handler-key (fn [& _] handler-key)]))
+                                     funding-workflow-effect-keys)
         action-calls (atom [])
         effect-calls (atom [])]
     (with-redefs [route-modules/lazy-route-action-leaf-deps
@@ -51,6 +63,9 @@
                       {:api
                        {:api-fetch-vault-index vault-effect-handler}}
 
+                      [:funding-modal :api]
+                      {:api funding-effect-handlers}
+
                       {}))]
       (let [action-deps (wiring/runtime-action-deps)
             effect-deps (wiring/runtime-effect-deps runtime)]
@@ -64,6 +79,9 @@
                                 [:portfolio-optimizer :load-portfolio-optimizer-history])))
         (is (identical? vault-effect-handler
                         (get-in effect-deps [:api :api-fetch-vault-index])))
+        (doseq [[handler-key funding-handler] funding-effect-handlers]
+          (is (identical? funding-handler
+                          (get-in effect-deps [:api handler-key]))))
         (is (fn? (get-in action-deps [:portfolio-optimizer :load-portfolio-optimizer-route])))
         (is (identical?
              portfolio-optimizer-actions/restore-or-preseed-portfolio-optimizer-draft
@@ -75,7 +93,12 @@
                                    :restore-or-preseed-portfolio-optimizer-draft)
                        @action-calls)))
         (is (seq @action-calls)))
-      (is (seq @effect-calls)))))
+      (is (= #{[:portfolio :portfolio-optimizer]
+               [:vaults :api]
+               [:funding-modal :api]}
+             (set (map #(subvec % 0 2) @effect-calls))))
+      (is (some #(= [:funding-modal :api (set funding-workflow-effect-keys)] %)
+                @effect-calls)))))
 
 (deftest runtime-effect-deps-uses-extracted-effect-adapter-overrides-test
   (let [deps (wiring/runtime-effect-deps)]

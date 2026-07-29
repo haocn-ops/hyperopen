@@ -585,48 +585,47 @@
           request
           {:show-toast! show-order-feedback-toast!}]))
 
-(def api-fetch-hyperunit-fee-estimate-effect
-  funding-adapters/api-fetch-hyperunit-fee-estimate-effect)
+(defn- invoke-lazy-funding-workflow-effect
+  [handler-key ctx store & args]
+  (let [handler (get-in (route-modules/lazy-route-effect-leaf-deps
+                         runtime-state/runtime
+                         :funding-modal
+                         :api
+                         [handler-key])
+                        [:api handler-key])]
+    (apply handler ctx store args)))
 
-(def api-fetch-hyperunit-withdrawal-queue-effect
-  funding-adapters/api-fetch-hyperunit-withdrawal-queue-effect)
+(defn api-fetch-hyperunit-fee-estimate-effect
+  [ctx store]
+  (invoke-lazy-funding-workflow-effect
+   :api-fetch-hyperunit-fee-estimate ctx store))
+
+(defn api-fetch-hyperunit-withdrawal-queue-effect
+  [ctx store]
+  (invoke-lazy-funding-workflow-effect
+   :api-fetch-hyperunit-withdrawal-queue ctx store))
 
 (defn api-submit-funding-transfer-effect
-  [_ store request]
-  (apply funding-adapters/api-submit-funding-transfer-effect
-         [nil
-          store
-          request
-          {:show-toast! show-order-feedback-toast!}]))
+  [ctx store request]
+  (invoke-lazy-funding-workflow-effect
+   :api-submit-funding-transfer ctx store request))
 
 (defn api-submit-funding-send-effect
-  [_ store request]
-  (apply funding-adapters/api-submit-funding-send-effect
-         [nil
-          store
-          request
-          {:show-toast! show-order-feedback-toast!}]))
+  [ctx store request]
+  (invoke-lazy-funding-workflow-effect
+   :api-submit-funding-send ctx store request))
 
 (defn api-submit-funding-repay-effect
-  [_ store request]
-  (apply funding-adapters/api-submit-funding-repay-effect
-         [nil
-          store
-          request
-          {:show-toast! show-order-feedback-toast!}]))
+  [ctx store request]
+  (invoke-lazy-funding-workflow-effect
+   :api-submit-funding-repay ctx store request))
 
 (defn api-submit-funding-withdraw-effect
-  [_ store request]
-  (apply funding-adapters/api-submit-funding-withdraw-effect
-         [nil
-          store
-          request
-          {:show-toast! show-order-feedback-toast!}]))
+  [ctx store request]
+  (invoke-lazy-funding-workflow-effect
+   :api-submit-funding-withdraw ctx store request))
 
 (defn api-submit-funding-deposit-effect
-  [_ store request]
-  (apply funding-adapters/api-submit-funding-deposit-effect
-         [nil
-          store
-          request
-          {:show-toast! show-order-feedback-toast!}]))
+  [ctx store request]
+  (invoke-lazy-funding-workflow-effect
+   :api-submit-funding-deposit ctx store request))

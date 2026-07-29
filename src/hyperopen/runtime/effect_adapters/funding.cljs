@@ -1,15 +1,12 @@
 (ns hyperopen.runtime.effect-adapters.funding
-  (:require [nexus.registry :as nxr]
-            [hyperopen.active-asset.funding-policy :as funding-policy]
+  (:require [hyperopen.active-asset.funding-policy :as funding-policy]
             [hyperopen.asset-selector.markets :as markets]
             [hyperopen.api.default :as api]
             [hyperopen.api.projections :as api-projections]
             [hyperopen.funding.history-cache :as funding-cache]
             [hyperopen.funding.predictability :as funding-predictability]
-            [hyperopen.funding.effects :as funding-workflow-effects]
             [hyperopen.funding-comparison.effects :as funding-effects]
             [hyperopen.platform :as platform]
-            [hyperopen.runtime.effect-adapters.common :as common]
             [hyperopen.ui.dialog-focus-runtime :as dialog-focus-runtime]))
 
 (defn- funding-predictability-path
@@ -113,93 +110,6 @@
     :apply-funding-comparison-success api-projections/apply-funding-comparison-success
     :apply-funding-comparison-error api-projections/apply-funding-comparison-error}))
 
-(defn api-fetch-hyperunit-fee-estimate-effect
-  [_ store]
-  (funding-workflow-effects/api-fetch-hyperunit-fee-estimate!
-   {:store store
-    :request-hyperunit-estimate-fees! api/request-hyperunit-estimate-fees!
-    :now-ms-fn platform/now-ms
-    :runtime-error-message common/runtime-error-message}))
-
-(defn api-fetch-hyperunit-withdrawal-queue-effect
-  [_ store]
-  (funding-workflow-effects/api-fetch-hyperunit-withdrawal-queue!
-   {:store store
-    :request-hyperunit-withdrawal-queue! api/request-hyperunit-withdrawal-queue!
-    :now-ms-fn platform/now-ms
-    :runtime-error-message common/runtime-error-message}))
-
 (defn restore-dialog-focus-effect
   [_ _]
   (dialog-focus-runtime/restore-remembered-focus!))
-
-(defn api-submit-funding-transfer-effect
-  ([_ store request]
-   (api-submit-funding-transfer-effect nil store request {}))
-  ([_ store request {:keys [show-toast!]
-                     :or {show-toast! (fn [_store _kind _message] nil)}}]
-   (funding-workflow-effects/api-submit-funding-transfer!
-    {:store store
-     :request request
-     :dispatch! nxr/dispatch
-     :exchange-response-error common/exchange-response-error
-     :runtime-error-message common/runtime-error-message
-     :show-toast! show-toast!})))
-
-(defn api-submit-funding-send-effect
-  ([_ store request]
-   (api-submit-funding-send-effect nil store request {}))
-  ([_ store request {:keys [show-toast!]
-                     :or {show-toast! (fn [_store _kind _message] nil)}}]
-   (funding-workflow-effects/api-submit-funding-send!
-    {:store store
-     :request request
-     :dispatch! nxr/dispatch
-     :exchange-response-error common/exchange-response-error
-     :runtime-error-message common/runtime-error-message
-     :show-toast! show-toast!})))
-
-(defn api-submit-funding-repay-effect
-  ([_ store request]
-   (api-submit-funding-repay-effect nil store request {}))
-  ([_ store request {:keys [show-toast!]
-                     :or {show-toast! (fn [_store _kind _message] nil)}}]
-   (funding-workflow-effects/api-submit-funding-repay!
-    {:store store
-     :request request
-     :dispatch! nxr/dispatch
-     :exchange-response-error common/exchange-response-error
-     :runtime-error-message common/runtime-error-message
-     :show-toast! show-toast!})))
-
-(defn api-submit-funding-withdraw-effect
-  ([_ store request]
-   (api-submit-funding-withdraw-effect nil store request {}))
-  ([_ store request {:keys [show-toast!]
-                     :or {show-toast! (fn [_store _kind _message] nil)}}]
-   (funding-workflow-effects/api-submit-funding-withdraw!
-    {:store store
-     :request request
-     :dispatch! nxr/dispatch
-     :request-hyperunit-operations! api/request-hyperunit-operations!
-     :request-hyperunit-withdrawal-queue! api/request-hyperunit-withdrawal-queue!
-     :set-timeout-fn platform/set-timeout!
-     :now-ms-fn platform/now-ms
-     :exchange-response-error common/exchange-response-error
-     :runtime-error-message common/runtime-error-message
-     :show-toast! show-toast!})))
-
-(defn api-submit-funding-deposit-effect
-  ([_ store request]
-   (api-submit-funding-deposit-effect nil store request {}))
-  ([_ store request {:keys [show-toast!]
-                     :or {show-toast! (fn [_store _kind _message] nil)}}]
-   (funding-workflow-effects/api-submit-funding-deposit!
-    {:store store
-     :request request
-     :dispatch! nxr/dispatch
-     :request-hyperunit-operations! api/request-hyperunit-operations!
-     :set-timeout-fn platform/set-timeout!
-     :now-ms-fn platform/now-ms
-     :runtime-error-message common/runtime-error-message
-     :show-toast! show-toast!})))

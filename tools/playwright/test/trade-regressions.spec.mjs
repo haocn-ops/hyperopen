@@ -3273,7 +3273,17 @@ test("funding modal deposit flow selects USDC @regression", async ({ page }) => 
 });
 
 test("trade funding openers launch the funding modal on real click @regression", async ({ page }) => {
+  const fundingModuleRequests = [];
+  page.on("request", (request) => {
+    const pathname = new URL(request.url()).pathname;
+    if (pathname.includes("funding_modal")) {
+      fundingModuleRequests.push(pathname);
+    }
+  });
+
   await visitRoute(page, "/trade");
+  await waitForIdle(page, { quietMs: 150, timeoutMs: 3_000, pollMs: 50 });
+  expect(fundingModuleRequests).toEqual([]);
 
   for (const [dataRole, title] of [
     ["funding-action-deposit", "Deposit"],
@@ -3286,11 +3296,66 @@ test("trade funding openers launch the funding modal on real click @regression",
     await openButton.click();
     await waitForIdle(page, { quietMs: 150, timeoutMs: 3_000, pollMs: 50 });
     await expectOracle(page, "funding-modal", { open: true, title });
+    await expect.poll(() => fundingModuleRequests.length).toBe(1);
 
     await page.locator("[data-role='funding-modal-close']").click();
     await waitForIdle(page, { quietMs: 150, timeoutMs: 3_000, pollMs: 50 });
     await expectOracle(page, "funding-modal", { open: false });
   }
+
+  expect(fundingModuleRequests).toHaveLength(1);
+});
+
+test("open desktop funding modal adapts when viewport narrows @regression", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await visitRoute(page, "/trade");
+
+  await page.locator("[data-role='funding-action-deposit']").click();
+  const modal = page.locator("[data-role='funding-modal']");
+  await expect(modal).toBeVisible();
+  await expect(modal).toHaveAttribute("data-parity-id", "funding-modal-desktop");
+
+  await page.setViewportSize({ width: 375, height: 812 });
+
+  await expect.poll(async () => modal.evaluate((node) => {
+    const rect = node.getBoundingClientRect();
+    const style = getComputedStyle(node);
+    return {
+      left: rect.left,
+      right: rect.right,
+      bottom: rect.bottom,
+      width: rect.width,
+      viewportWidth: window.innerWidth,
+      viewportHeight: window.innerHeight,
+      position: style.position,
+      borderBottomLeftRadius: style.borderBottomLeftRadius,
+      overflowY: style.overflowY
+    };
+  }), { timeout: 3_000 }).toMatchObject({
+    left: 0,
+    right: 375,
+    bottom: 812,
+    width: 375,
+    viewportWidth: 375,
+    viewportHeight: 812,
+    position: "absolute",
+    borderBottomLeftRadius: "0px",
+    overflowY: "auto"
+  });
+
+  const geometry = await modal.evaluate((node) => {
+    const rect = node.getBoundingClientRect();
+    return {
+      right: rect.right,
+      bottom: rect.bottom,
+      viewportWidth: window.innerWidth,
+      viewportHeight: window.innerHeight
+    };
+  });
+  expect(geometry.right).toBeLessThanOrEqual(geometry.viewportWidth);
+  expect(geometry.bottom).toBeLessThanOrEqual(geometry.viewportHeight);
+  await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth))
+    .toBeLessThanOrEqual(375);
 });
 
 test("intermediate desktop trade funding actions stay above orderbook depth @regression", async ({ page }) => {

@@ -6,6 +6,14 @@
 
 (deftest runtime-effect-deps-builds-runtime-bound-handlers-via-factories-test
   (let [runtime {:runtime-id :test}
+        funding-workflow-effect-keys
+        [:api-fetch-hyperunit-fee-estimate
+         :api-fetch-hyperunit-withdrawal-queue
+         :api-submit-funding-transfer
+         :api-submit-funding-send
+         :api-submit-funding-repay
+         :api-submit-funding-withdraw
+         :api-submit-funding-deposit]
         queue-handler (fn [& _] nil)
         refresh-handler (fn [& _] nil)
         disconnect-handler (fn [& _] nil)
@@ -16,7 +24,12 @@
         vault-transfer-handler (fn [& _] nil)
         submit-handler (fn [& _] nil)
         cancel-handler (fn [& _] nil)
-        margin-handler (fn [& _] nil)]
+        margin-handler (fn [& _] nil)
+        funding-handlers (into {}
+                               (map (fn [handler-key]
+                                      [handler-key (fn [& _] handler-key)]))
+                               funding-workflow-effect-keys)
+        lazy-effect-calls (atom [])]
     (with-redefs [effect-adapters/make-queue-asset-icon-status
                   (fn [runtime*]
                     (is (identical? runtime runtime*))
@@ -38,8 +51,9 @@
                     (is (identical? runtime runtime*))
                     copy-link-handler)
                   route-modules/lazy-route-effect-leaf-deps
-                  (fn [runtime* module-id group-key _handler-keys]
+                  (fn [runtime* module-id group-key handler-keys]
                     (is (identical? runtime runtime*))
+                    (swap! lazy-effect-calls conj [module-id group-key handler-keys])
                     (case [module-id group-key]
                       [:portfolio :portfolio-optimizer]
                       {:portfolio-optimizer
@@ -49,6 +63,9 @@
                       [:vaults :api]
                       {:api
                        {:api-submit-vault-transfer vault-transfer-handler}}
+
+                      [:funding-modal :api]
+                      {:api funding-handlers}
 
                       {}))
                   effect-adapters/make-api-submit-order
@@ -85,6 +102,11 @@
                         (get-in deps [:portfolio-optimizer :run-portfolio-optimizer-pipeline])))
         (is (identical? effect-adapters/api-fetch-predicted-fundings-effect
                         (get-in deps [:api :api-fetch-predicted-fundings])))
+        (is (identical? effect-adapters/sync-active-asset-funding-predictability
+                        (get-in deps [:api :sync-active-asset-funding-predictability])))
+        (doseq [[handler-key funding-handler] funding-handlers]
+          (is (identical? funding-handler
+                          (get-in deps [:api handler-key]))))
         (is (identical? submit-handler
                         (get-in deps [:orders :api-submit-order])))
         (is (identical? cancel-handler
@@ -92,4 +114,6 @@
         (is (identical? margin-handler
                         (get-in deps [:orders :api-submit-position-margin])))
         (is (identical? vault-transfer-handler
-                        (get-in deps [:api :api-submit-vault-transfer])))))))
+                        (get-in deps [:api :api-submit-vault-transfer])))
+        (is (some #(= [:funding-modal :api funding-workflow-effect-keys] %)
+                  @lazy-effect-calls))))))

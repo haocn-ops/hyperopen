@@ -5,6 +5,12 @@ const DEXHELM_APEX_HOST = "dexhelm.com";
 const DEXHELM_MAINNET_HOST = "app.dexhelm.com";
 const DEXHELM_TESTNET_HOST = "testnet.dexhelm.com";
 const DEXHELM_STATUS_HOST = "status.dexhelm.com";
+const DEXHELM_PUBLIC_HOSTS = new Set([
+  DEXHELM_APEX_HOST,
+  DEXHELM_MAINNET_HOST,
+  DEXHELM_TESTNET_HOST,
+  DEXHELM_STATUS_HOST,
+]);
 const HYPERLIQUID_NETWORK_QUERY_KEY = "hyperliquidNetwork";
 const MAX_PROXY_BODY_BYTES = 1024 * 1024;
 const PROXY_TIMEOUT_MS = 15_000;
@@ -199,6 +205,16 @@ function mainnetClosedResponse() {
     cacheControl: "no-store",
     status: 503,
   });
+}
+
+function httpsRedirectResponse(requestUrl) {
+  if (requestUrl.protocol === "https:" || !DEXHELM_PUBLIC_HOSTS.has(requestUrl.hostname)) {
+    return null;
+  }
+
+  const httpsUrl = new URL(requestUrl);
+  httpsUrl.protocol = "https:";
+  return Response.redirect(httpsUrl, 308);
 }
 
 function isDocumentNavigation(request) {
@@ -538,6 +554,11 @@ export async function handleRequest(request, env, {
   timeoutMs = PROXY_TIMEOUT_MS,
 } = {}) {
   const requestUrl = new URL(request.url);
+
+  const httpsRedirect = httpsRedirectResponse(requestUrl);
+  if (httpsRedirect) {
+    return httpsRedirect;
+  }
 
   if (requestUrl.hostname === DEXHELM_MAINNET_HOST) {
     return mainnetClosedResponse();

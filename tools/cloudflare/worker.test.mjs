@@ -14,6 +14,40 @@ function workerEnv(overrides = {}) {
   };
 }
 
+test("handleRequest redirects every owned HTTP host to HTTPS and preserves the URL", async () => {
+  const { handleRequest } = await loadWorker();
+  const cases = [
+    ["dexhelm.com", "/?from=home"],
+    ["testnet.dexhelm.com", "/trade?coin=HYPE&hyperliquidNetwork=testnet"],
+    ["app.dexhelm.com", "/trade?from=mainnet"],
+    ["status.dexhelm.com", "/api/health?format=json"],
+  ];
+
+  for (const [hostname, path] of cases) {
+    const response = await handleRequest(
+      new Request(`http://${hostname}${path}`),
+      workerEnv()
+    );
+    const location = new URL(response.headers.get("location"));
+
+    assert.equal(response.status, 308, hostname);
+    assert.equal(location.protocol, "https:", hostname);
+    assert.equal(location.hostname, hostname, hostname);
+    assert.equal(location.pathname + location.search, path, hostname);
+  }
+});
+
+test("handleRequest does not redirect unowned HTTP hostnames", async () => {
+  const { handleRequest } = await loadWorker();
+  const response = await handleRequest(
+    new Request("http://hyperopen.izhenghaocn.workers.dev/trade"),
+    workerEnv()
+  );
+
+  assert.equal(response.status, 404);
+  assert.equal(response.headers.get("location"), null);
+});
+
 test("resolveHyperunitTarget maps only the canonical Testnet host and route", async () => {
   const { resolveHyperunitTarget } = await loadWorker();
   const env = workerEnv();

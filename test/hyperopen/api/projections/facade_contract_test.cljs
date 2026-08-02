@@ -79,6 +79,9 @@
    ["begin-staking-history-load" projections/begin-staking-history-load staking/begin-staking-history-load]
    ["apply-staking-history-success" projections/apply-staking-history-success staking/apply-staking-history-success]
    ["apply-staking-history-error" projections/apply-staking-history-error staking/apply-staking-history-error]
+   ["begin-staking-spot-state-load" projections/begin-staking-spot-state-load staking/begin-staking-spot-state-load]
+   ["apply-staking-spot-state-success" projections/apply-staking-spot-state-success staking/apply-staking-spot-state-success]
+   ["apply-staking-spot-state-error" projections/apply-staking-spot-state-error staking/apply-staking-spot-state-error]
 
    ["clear-api-wallets-errors" projections/clear-api-wallets-errors api-wallets/clear-api-wallets-errors]
    ["reset-api-wallets" projections/reset-api-wallets api-wallets/reset-api-wallets]

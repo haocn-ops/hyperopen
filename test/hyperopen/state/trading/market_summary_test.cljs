@@ -4,7 +4,8 @@
             [hyperopen.domain.trading.fees :as trading-fees]
             [hyperopen.state.trading.fee-context :as fee-context-selector]
             [hyperopen.state.trading :as trading]
-            [hyperopen.state.trading.test-support :as support]))
+            [hyperopen.state.trading.test-support :as support]
+            [hyperopen.views.trade.order-form-summary-display :as summary-display]))
 
 (def base-state support/base-state)
 

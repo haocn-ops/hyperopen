@@ -2,6 +2,7 @@
   (:require [clojure.string :as str]
             [hyperopen.account.context :as account-context]
             [hyperopen.domain.trading :as trading-domain]
+            [hyperopen.staking.account-scope :as account-scope]
             [hyperopen.utils.parse :as parse-utils]))
 
 (def default-staking-tab
@@ -313,7 +314,7 @@
           (when (= "HYPE"
                    (normalize-coin-token (:coin row)))
             (balance-row-available row)))
-        (get-in state [:spot :clearinghouse-state :balances])))
+        (get-in state [:staking :spot-state :balances])))
 
 (defn- undelegated-hype-available
   [state]
@@ -401,29 +402,17 @@
 
 (defn load-staking
   [state]
-  (let [address (account-context/effective-account-address state)
-        no-user-projection-effects
-        [[:effects/save-many
-          [[[:staking :delegator-summary] nil]
-           [[:staking :delegations] []]
-           [[:staking :rewards] []]
-           [[:staking :history] []]
-           [[:staking :errors :delegator-summary] nil]
-           [[:staking :errors :delegations] nil]
-           [[:staking :errors :rewards] nil]
-           [[:staking :errors :history] nil]]]]
+  (let [address (account-context/native-staking-account-address state)
         user-heavy-effects (if (seq address)
                              [[:effects/api-fetch-staking-delegator-summary address]
                               [:effects/api-fetch-staking-delegations address]
                               [:effects/api-fetch-staking-rewards address]
                               [:effects/api-fetch-staking-history address]
                               [:effects/api-fetch-staking-spot-state address]]
-                             [])
-        projection-effects (if (seq address)
-                             [[:effects/save [:staking-ui :form-error] nil]]
-                             (into [[:effects/save [:staking-ui :form-error] nil]]
-                                   no-user-projection-effects))]
-    (into projection-effects
+                             [])]
+    (into [[:effects/save [:staking-ui :form-error] nil]
+           [:effects/save [:staking :account-address] address]
+           [:effects/save-many account-scope/cleared-user-projections]]
           (into [[:effects/api-fetch-staking-validator-summaries]]
                 user-heavy-effects))))
 
@@ -587,6 +576,9 @@
            (> amount available))
       (submit-guard-error :deposit? "Amount exceeds available HYPE in spot balance.")
 
+      (not (account-scope/resource-ready? state :spot-state))
+      (submit-guard-error :deposit? "Staking account data is still loading. Please try again.")
+
       :else
       (into (start-submit-effects :deposit?)
             [[:effects/api-submit-staking-deposit
@@ -615,6 +607,9 @@
       (and (finite-number? amount)
            (> amount available))
       (submit-guard-error :withdraw? "Amount exceeds available staking balance.")
+
+      (not (account-scope/resource-ready? state :delegator-summary))
+      (submit-guard-error :withdraw? "Staking account data is still loading. Please try again.")
 
       :else
       (into (start-submit-effects :withdraw?)
@@ -648,6 +643,9 @@
       (and (finite-number? amount)
            (> amount available))
       (submit-guard-error :delegate? "Amount exceeds available staking balance.")
+
+      (not (account-scope/resource-ready? state :delegator-summary))
+      (submit-guard-error :delegate? "Staking account data is still loading. Please try again.")
 
       :else
       (into (start-submit-effects :delegate?)
@@ -683,6 +681,9 @@
       (and (finite-number? amount)
            (> amount delegated-amount))
       (submit-guard-error :undelegate? "Amount exceeds your delegated amount for this validator.")
+
+      (not (account-scope/resource-ready? state :delegations))
+      (submit-guard-error :undelegate? "Staking account data is still loading. Please try again.")
 
       :else
       (into (start-submit-effects :undelegate?)

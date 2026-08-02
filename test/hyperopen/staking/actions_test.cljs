@@ -6,6 +6,34 @@
 (def ^:private wallet-address
   "0x1234567890abcdef1234567890abcdef12345678")
 
+(def ^:private staking-not-ready-message
+  "Staking account data is still loading. Please try again.")
+
+(def ^:private validator-address
+  "0x1234567890abcdef1234567890abcdef12345678")
+
+(def ^:private cleared-staking-user-projections
+  [[[:staking :delegator-summary] nil]
+   [[:staking :delegations] []]
+   [[:staking :rewards] []]
+   [[:staking :history] []]
+   [[:staking :spot-state] nil]
+   [[:staking :loading :delegator-summary] false]
+   [[:staking :loading :delegations] false]
+   [[:staking :loading :rewards] false]
+   [[:staking :loading :history] false]
+   [[:staking :loading :spot-state] false]
+   [[:staking :errors :delegator-summary] nil]
+   [[:staking :errors :delegations] nil]
+   [[:staking :errors :rewards] nil]
+   [[:staking :errors :history] nil]
+   [[:staking :errors :spot-state] nil]
+   [[:staking :loaded-for :delegator-summary] nil]
+   [[:staking :loaded-for :delegations] nil]
+   [[:staking :loaded-for :rewards] nil]
+   [[:staking :loaded-for :history] nil]
+   [[:staking :loaded-for :spot-state] nil]])
+
 (deftest parse-staking-route-supports-route-and-non-route-paths-test
   (is (= {:kind :page
           :path "/staking"}
@@ -25,6 +53,8 @@
                            :effects/api-fetch-staking-history
                            :effects/api-fetch-staking-spot-state}]
     (is (= [[:effects/save [:staking-ui :form-error] nil]
+            [:effects/save [:staking :account-address] wallet-address]
+            [:effects/save-many cleared-staking-user-projections]
             [:effects/api-fetch-staking-validator-summaries]
             [:effects/api-fetch-staking-delegator-summary wallet-address]
             [:effects/api-fetch-staking-delegations wallet-address]
@@ -36,20 +66,94 @@
             "/staking")))
     (let [route-effects (actions/load-staking-route {} "/staking")]
       (is (= [[:effects/save [:staking-ui :form-error] nil]
-              [:effects/save-many
-               [[[:staking :delegator-summary] nil]
-                [[:staking :delegations] []]
-                [[:staking :rewards] []]
-                [[:staking :history] []]
-                [[:staking :errors :delegator-summary] nil]
-                [[:staking :errors :delegations] nil]
-                [[:staking :errors :rewards] nil]
-                [[:staking :errors :history] nil]]]
+              [:effects/save [:staking :account-address] nil]
+              [:effects/save-many cleared-staking-user-projections]
               [:effects/api-fetch-staking-validator-summaries]]
              route-effects))
       (is (effect-extractors/projection-before-heavy? route-effects heavy-effect-ids))))
   (is (= []
          (actions/load-staking-route {} "/portfolio"))))
+
+(deftest load-staking-uses-owner-for-every-user-projection-with-selected-subaccount-test
+  (let [owner "0x1111111111111111111111111111111111111111"
+        selected "0x2222222222222222222222222222222222222222"
+        state {:wallet {:address owner}
+               :account-context {:spectate-mode {:active? false :address nil}
+                                 :subaccounts {:selected-address selected
+                                               :rows [{:sub-account-user selected
+                                                       :master owner}]}}}
+        effects (actions/load-staking state)
+        addressed-effects (filterv #(contains? #{:effects/api-fetch-staking-delegator-summary
+                                                 :effects/api-fetch-staking-delegations
+                                                 :effects/api-fetch-staking-rewards
+                                                 :effects/api-fetch-staking-history
+                                                 :effects/api-fetch-staking-spot-state}
+                                               (first %))
+                                  effects)]
+    (is (= [[:effects/api-fetch-staking-delegator-summary owner]
+            [:effects/api-fetch-staking-delegations owner]
+            [:effects/api-fetch-staking-rewards owner]
+            [:effects/api-fetch-staking-history owner]
+            [:effects/api-fetch-staking-spot-state owner]]
+           addressed-effects))
+    (is (not-any? #(= selected (second %)) addressed-effects))))
+
+(deftest load-staking-switches-account-and-clears-user-projections-before-fetching-test
+  (let [owner "0x1111111111111111111111111111111111111111"
+        effects (actions/load-staking {:wallet {:address owner}})
+        account-index (first (keep-indexed (fn [idx effect]
+                                             (when (= [:effects/save [:staking :account-address] owner]
+                                                      effect)
+                                               idx))
+                                           effects))
+        clear-index (first (keep-indexed (fn [idx effect]
+                                           (when (= :effects/save-many (first effect))
+                                             idx))
+                                         effects))
+        first-fetch-index (first (keep-indexed (fn [idx effect]
+                                                  (when (contains? #{:effects/api-fetch-staking-validator-summaries
+                                                                     :effects/api-fetch-staking-delegator-summary
+                                                                     :effects/api-fetch-staking-delegations
+                                                                     :effects/api-fetch-staking-rewards
+                                                                     :effects/api-fetch-staking-history
+                                                                     :effects/api-fetch-staking-spot-state}
+                                                                   (first effect))
+                                                    idx))
+                                                effects))
+        clear-values (if (number? clear-index)
+                       (into {} (second (nth effects clear-index)))
+                       {})]
+    (is (number? account-index))
+    (is (number? clear-index))
+    (is (number? first-fetch-index))
+    (is (and (number? account-index)
+             (number? first-fetch-index)
+             (< account-index first-fetch-index)))
+    (is (and (number? clear-index)
+             (number? first-fetch-index)
+             (< clear-index first-fetch-index)))
+    (doseq [[path expected]
+            [[[:staking :delegator-summary] nil]
+             [[:staking :delegations] []]
+             [[:staking :rewards] []]
+             [[:staking :history] []]
+             [[:staking :spot-state] nil]
+             [[:staking :loading :delegator-summary] false]
+             [[:staking :loading :delegations] false]
+             [[:staking :loading :rewards] false]
+             [[:staking :loading :history] false]
+             [[:staking :loading :spot-state] false]
+             [[:staking :errors :delegator-summary] nil]
+             [[:staking :errors :delegations] nil]
+             [[:staking :errors :rewards] nil]
+             [[:staking :errors :history] nil]
+             [[:staking :errors :spot-state] nil]
+             [[:staking :loaded-for :delegator-summary] nil]
+             [[:staking :loaded-for :delegations] nil]
+             [[:staking :loaded-for :rewards] nil]
+             [[:staking :loaded-for :history] nil]
+             [[:staking :loaded-for :spot-state] nil]]]
+      (is (= expected (get clear-values path)) (str "clear " path)))))
 
 (deftest normalize-staking-validator-sort-column-supports-aliases-and-defaults-test
   (is (= :your-stake
@@ -255,9 +359,32 @@
                      :wei 125000000}}]]
          (actions/submit-staking-deposit
           {:wallet {:address wallet-address}
-           :spot {:clearinghouse-state {:balances [{:coin "HYPE"
-                                                    :available 2}]}}
+           :staking {:account-address wallet-address
+                     :loaded-for {:spot-state wallet-address}
+                     :spot-state {:balances [{:coin "HYPE"
+                                              :available 2}]}}
            :staking-ui {:deposit-amount "1.25"}}))))
+
+(deftest staking-deposit-validation-and-max-use-staking-owned-spot-state-test
+  (let [state {:wallet {:address wallet-address}
+               :spot {:clearinghouse-state {:balances [{:coin "HYPE"
+                                                        :total "1"
+                                                        :hold "0"}]}}
+               :staking {:account-address wallet-address
+                         :loaded-for {:spot-state wallet-address}
+                         :spot-state {:balances [{:coin "HYPE"
+                                                  :total "9"
+                                                  :hold "2"}]}}
+               :staking-ui {:deposit-amount "5"}}]
+    (is (= [[:effects/save [:staking-ui :deposit-amount] "7"]]
+           (actions/set-staking-deposit-amount-to-max state)))
+    (is (= [[:effects/save [:staking-ui :form-error] nil]
+            [:effects/save [:staking-ui :submitting :deposit?] true]
+            [:effects/api-submit-staking-deposit
+             {:kind :deposit
+              :action {:type "cDeposit"
+                       :wei 500000000}}]]
+           (actions/submit-staking-deposit state)))))
 
 (deftest submit-staking-withdraw-validates-blockers-wallet-amount-and-balance-test
   (is (= [[:effects/save [:staking-ui :form-error]
@@ -294,8 +421,67 @@
                      :wei 125000000}}]]
          (actions/submit-staking-withdraw
           {:wallet {:address wallet-address}
-           :staking {:delegator-summary {:undelegated 2}}
+           :staking {:account-address wallet-address
+                     :loaded-for {:delegator-summary wallet-address}
+                     :delegator-summary {:undelegated 2}}
            :staking-ui {:withdraw-amount "1.25"}}))))
+
+(deftest staking-submissions-require-current-account-provenance-test
+  (let [other-address "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd"
+        cases [{:label "deposit"
+                :submit actions/submit-staking-deposit
+                :resource :spot-state
+                :submitting-key :deposit?
+                :submit-effect :effects/api-submit-staking-deposit
+                :staking {:spot-state {:balances [{:coin "HYPE" :available 3}]}}
+                :staking-ui {:deposit-amount "1"}}
+               {:label "withdraw"
+                :submit actions/submit-staking-withdraw
+                :resource :delegator-summary
+                :submitting-key :withdraw?
+                :submit-effect :effects/api-submit-staking-withdraw
+                :staking {:delegator-summary {:undelegated 3}}
+                :staking-ui {:withdraw-amount "1"}}
+               {:label "delegate"
+                :submit actions/submit-staking-delegate
+                :resource :delegator-summary
+                :submitting-key :delegate?
+                :submit-effect :effects/api-submit-staking-delegate
+                :staking {:delegator-summary {:undelegated 3}}
+                :staking-ui {:delegate-amount "1"
+                             :selected-validator validator-address}}
+               {:label "undelegate"
+                :submit actions/submit-staking-undelegate
+                :resource :delegations
+                :submitting-key :undelegate?
+                :submit-effect :effects/api-submit-staking-undelegate
+                :staking {:delegations [{:validator validator-address :amount 3}]}
+                :staking-ui {:undelegate-amount "1"
+                             :selected-validator validator-address}}]]
+    (doseq [{:keys [label submit resource submitting-key submit-effect staking staking-ui]} cases
+            [scenario provenance]
+            [["requires saved account identity" {}]
+             ["requires resource loaded for that identity"
+              {:account-address wallet-address
+               :loaded-for {resource other-address}}]]]
+      (let [effects (submit {:wallet {:address wallet-address}
+                             :staking (merge staking provenance)
+                             :staking-ui staking-ui})]
+        (is (= [[:effects/save [:staking-ui :form-error] staking-not-ready-message]
+                [:effects/save [:staking-ui :submitting submitting-key] false]]
+               effects)
+            (str label " " scenario))
+        (is (not-any? #(= submit-effect (first %)) effects)
+            (str label " " scenario " must not submit"))))
+    (doseq [{:keys [label submit resource submit-effect staking staking-ui]}
+            (filter #(contains? #{:delegate? :undelegate?} (:submitting-key %)) cases)
+            :let [effects (submit {:wallet {:address wallet-address}
+                                   :staking (assoc staking
+                                                   :account-address wallet-address
+                                                   :loaded-for {resource wallet-address})
+                                   :staking-ui staking-ui})]]
+      (is (some #(= submit-effect (first %)) effects)
+          (str label " submits when its current resource provenance matches")))))
 
 (deftest submit-staking-delegate-requires-validator-selection-test
   (is (= [[:effects/save [:staking-ui :form-error]

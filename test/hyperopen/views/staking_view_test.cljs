@@ -214,10 +214,10 @@
                                                :amount 1.25}]
                                 :delegator-summary {:delegated 1.25
                                                     :undelegated 3
-                                                    :total-pending-withdrawal 0}}
-                      :spot {:clearinghouse-state {:balances [{:coin "hype"
-                                                              :total "5"
-                                                              :hold "3"}]}}}))]
+                                                    :total-pending-withdrawal 0}
+                                :spot-state {:balances [{:coin "hype"
+                                                        :total "5"
+                                                        :hold "3"}]}}}))]
     (is (= 1 (:validator-page view-model)))
     (is (= 2 (:validator-page-count view-model)))
     (is (= 26 (:validator-page-range-start view-model)))
@@ -227,6 +227,18 @@
     (is (= 5 (count (:validators view-model))))
     (is (= delegated-validator
            (get-in view-model [:validators 4 :validator])))))
+
+(deftest staking-vm-uses-staking-owned-spot-state-for-transfer-balance-test
+  (let [view-model (staking-vm/staking-vm
+                    (base-connected-state
+                     {:staking {:validator-summaries []
+                                :spot-state {:balances [{:coin "HYPE"
+                                                        :total "9"
+                                                        :hold "2"}]}}
+                      :spot {:clearinghouse-state {:balances [{:coin "HYPE"
+                                                              :total "1"
+                                                              :hold "0"}]}}}))]
+    (is (= 7 (get-in view-model [:balances :available-transfer])))))
 
 (deftest staking-view-renders-open-transfer-popover-actions-test
   (let [view (staking-view/staking-view
@@ -355,3 +367,14 @@
     (is (some? error-banner))
     (is (contains? strings "Request failed"))
     (is (nil? popover))))
+
+(deftest staking-route-surfaces-isolated-spot-state-errors-in-its-vm-and-view-test
+  (let [message "Unable to load the native staking spot balance."
+        state (base-connected-state
+               {:staking {:errors {:spot-state message}}})
+        view-model (staking-vm/staking-vm state)
+        view (staking-view/staking-view state)
+        error-banner (find-node-by-data-role "staking-error" view)]
+    (is (= message (:error view-model)))
+    (is (some? error-banner))
+    (is (contains? (set (collect-strings view)) message))))

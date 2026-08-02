@@ -127,6 +127,13 @@
     (is (= [] (get-in state [:staking :delegations])))
     (is (= [] (get-in state [:staking :rewards])))
     (is (= [] (get-in state [:staking :history])))
+    (is (nil? (get-in state [:staking :account-address])))
+    (is (nil? (get-in state [:staking :spot-state])))
+    (is (= false (get-in state [:staking :loading :spot-state])))
+    (is (nil? (get-in state [:staking :errors :spot-state])))
+    (doseq [resource [:delegator-summary :delegations :rewards :history :spot-state]]
+      (is (nil? (get-in state [:staking :loaded-for resource]))
+          (str "staking loaded-for " resource)))
     (is (= false (get-in state [:staking :loading :validator-summaries])))
     (is (nil? (get-in state [:staking :errors :validator-summaries])))
     (is (= false (get-in state [:account-context :spectate-mode :active?])))

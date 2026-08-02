@@ -448,6 +448,7 @@
             [hyperopen.schema.order-request-contracts-test]
             [hyperopen.schema.vault-transfer-contracts-test]
             [hyperopen.staking.actions-test]
+            [hyperopen.staking.effects-freshness-test]
             [hyperopen.staking.effects-test]
             [hyperopen.startup.account-lifecycle-test]
             [hyperopen.startup.collaborators-test]
@@ -467,6 +468,7 @@
             [hyperopen.state.trading.order-form-ownership-formal-conformance-test]
             [hyperopen.state.trading.order-form-state-test]
             [hyperopen.state.trading.order-request-test]
+            [hyperopen.state.trading.scale-pm-summary-test]
             [hyperopen.state.trading.submit-policy-formal-conformance-test]
             [hyperopen.state.trading.validation-and-scale-test]
             [hyperopen.subaccounts.actions-test]
@@ -1297,6 +1299,7 @@
              'hyperopen.schema.order-request-contracts-test
              'hyperopen.schema.vault-transfer-contracts-test
              'hyperopen.staking.actions-test
+             'hyperopen.staking.effects-freshness-test
              'hyperopen.staking.effects-test
              'hyperopen.startup.account-lifecycle-test
              'hyperopen.startup.collaborators-test
@@ -1316,6 +1319,7 @@
              'hyperopen.state.trading.order-form-ownership-formal-conformance-test
              'hyperopen.state.trading.order-form-state-test
              'hyperopen.state.trading.order-request-test
+             'hyperopen.state.trading.scale-pm-summary-test
              'hyperopen.state.trading.submit-policy-formal-conformance-test
              'hyperopen.state.trading.validation-and-scale-test
              'hyperopen.subaccounts.actions-test

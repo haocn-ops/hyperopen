@@ -69,6 +69,7 @@
                 outcome-sides
                 outcome-side-index
                 read-only?
+                account-mode-label
                 display
                 ui-leverage
                 size-percent
@@ -150,7 +151,8 @@
                                ui-leverage
                                leverage-draft
                                max-leverage
-                               leverage-handlers))
+                               leverage-handlers
+                               account-mode-label))
       (when (and (not outcome?) (not spot?))
         (degen-order-form/leverage-warning-banner state ui-leverage))
 

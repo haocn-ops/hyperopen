@@ -180,6 +180,30 @@
     (is (true? (account-context/mutations-allowed? state)))
     (is (nil? (account-context/mutations-blocked-message state)))))
 
+(deftest native-staking-account-address-is-owner-scoped-except-on-inspection-routes-test
+  (let [owner "0x1111111111111111111111111111111111111111"
+        selected "0x2222222222222222222222222222222222222222"
+        spectate "0x3333333333333333333333333333333333333333"
+        trader "0x4444444444444444444444444444444444444444"
+        normal-state (subaccount-state {})
+        spectate-state (subaccount-state
+                        {:account-context {:spectate-mode {:active? true
+                                                           :address spectate}
+                                           :subaccounts {:rows [{:sub-account-user selected
+                                                                :master owner}]
+                                                         :selected-address selected}}})
+        trader-state (subaccount-state
+                      {:router {:path (str "/portfolio/trader/" trader)}
+                       :account-context {:spectate-mode {:active? true
+                                                         :address spectate}
+                                         :subaccounts {:rows [{:sub-account-user selected
+                                                              :master owner}]
+                                                       :selected-address selected}}})]
+    (is (= owner (account-context/native-staking-account-address normal-state)))
+    (is (= spectate (account-context/native-staking-account-address spectate-state)))
+    (is (= trader (account-context/native-staking-account-address trader-state)))
+    (is (nil? (account-context/native-staking-account-address {})))))
+
 (deftest selected-subaccount-preserves-master-default-and-read-only-overrides-test
   (let [owner "0x1111111111111111111111111111111111111111"
         selected "0x2222222222222222222222222222222222222222"

@@ -3,6 +3,7 @@
             [hyperopen.account.context :as account-context]
             [hyperopen.api.promise-effects :as promise-effects]
             [hyperopen.api.trading :as trading-api]
+            [hyperopen.staking.account-scope :as account-scope]
             [hyperopen.staking.actions :as staking-actions]))
 
 (defn- staking-route-active?
@@ -21,8 +22,8 @@
 
 (defn- resolve-address
   [store address]
-  (or address
-      (account-context/effective-account-address @store)))
+  (or (account-context/normalize-address address)
+      (account-context/native-staking-account-address @store)))
 
 (defn api-fetch-staking-validator-summaries!
   [{:keys [store
@@ -43,115 +44,105 @@
                    apply-staking-validator-summaries-error))))
     (js/Promise.resolve nil)))
 
-(defn api-fetch-staking-delegator-summary!
-  [{:keys [store
-           address
-           request-staking-delegator-summary!
-           begin-staking-delegator-summary-load
-           apply-staking-delegator-summary-success
-           apply-staking-delegator-summary-error
-           opts]}]
+(defn- current-staking-request?
+  [state address resource generation]
+  (and (account-scope/current-address? state address)
+       (= generation (get-in state [:staking :request-generations resource]))))
+
+(defn- begin-current-staking-request!
+  [store address resource begin-load]
+  (let [generation (atom nil)]
+    (swap! store
+           (fn [state]
+             (if (account-scope/current-address? state address)
+               (let [next-generation (inc (get-in state [:staking :request-generations resource] 0))]
+                 (reset! generation next-generation)
+                 (-> (begin-load state)
+                     (assoc-in [:staking :request-generations resource] next-generation)))
+               state)))
+    @generation))
+
+(defn- apply-current-staking-success!
+  [store address resource generation apply-success payload]
+  (swap! store
+         (fn [state]
+           (if (current-staking-request? state address resource generation)
+             (-> (apply-success state payload)
+                 (assoc-in [:staking :loaded-for resource] address))
+             state)))
+  payload)
+
+(defn- apply-current-staking-error-and-reject
+  [store address resource generation apply-error]
+  (fn [err]
+    (swap! store
+           (fn [state]
+             (if (current-staking-request? state address resource generation)
+               (apply-error state err)
+               state)))
+    (promise-effects/reject-error err)))
+
+(defn- fetch-staking-resource!
+  [resource {:keys [store address request! begin-load apply-success apply-error opts]}]
   (let [address* (resolve-address store address)]
-    (if (and (allow-route? store opts)
-             (seq address*))
-      (let [request-opts* (request-opts opts)]
-        (swap! store begin-staking-delegator-summary-load)
-        (-> (request-staking-delegator-summary! address* request-opts*)
-            (.then (promise-effects/apply-success-and-return
-                    store
-                    apply-staking-delegator-summary-success))
-            (.catch (promise-effects/apply-error-and-reject
-                     store
-                     apply-staking-delegator-summary-error))))
+    (if (and (allow-route? store opts) (seq address*))
+      (if-let [generation (begin-current-staking-request!
+                           store address* resource begin-load)]
+        (-> (request! address* (request-opts opts))
+            (.then (fn [payload]
+                     (apply-current-staking-success!
+                      store address* resource generation apply-success payload)))
+            (.catch (apply-current-staking-error-and-reject
+                     store address* resource generation apply-error)))
+        (js/Promise.resolve nil))
       (js/Promise.resolve nil))))
+
+(defn api-fetch-staking-delegator-summary!
+  [{:keys [store address request-staking-delegator-summary!
+           begin-staking-delegator-summary-load apply-staking-delegator-summary-success
+           apply-staking-delegator-summary-error opts]}]
+  (fetch-staking-resource!
+   :delegator-summary {:store store :address address
+                       :request! request-staking-delegator-summary!
+                       :begin-load begin-staking-delegator-summary-load
+                       :apply-success apply-staking-delegator-summary-success
+                       :apply-error apply-staking-delegator-summary-error :opts opts}))
 
 (defn api-fetch-staking-delegations!
-  [{:keys [store
-           address
-           request-staking-delegations!
-           begin-staking-delegations-load
-           apply-staking-delegations-success
-           apply-staking-delegations-error
-           opts]}]
-  (let [address* (resolve-address store address)]
-    (if (and (allow-route? store opts)
-             (seq address*))
-      (let [request-opts* (request-opts opts)]
-        (swap! store begin-staking-delegations-load)
-        (-> (request-staking-delegations! address* request-opts*)
-            (.then (promise-effects/apply-success-and-return
-                    store
-                    apply-staking-delegations-success))
-            (.catch (promise-effects/apply-error-and-reject
-                     store
-                     apply-staking-delegations-error))))
-      (js/Promise.resolve nil))))
+  [{:keys [store address request-staking-delegations! begin-staking-delegations-load
+           apply-staking-delegations-success apply-staking-delegations-error opts]}]
+  (fetch-staking-resource!
+   :delegations {:store store :address address :request! request-staking-delegations!
+                 :begin-load begin-staking-delegations-load
+                 :apply-success apply-staking-delegations-success
+                 :apply-error apply-staking-delegations-error :opts opts}))
 
 (defn api-fetch-staking-rewards!
-  [{:keys [store
-           address
-           request-staking-delegator-rewards!
-           begin-staking-rewards-load
-           apply-staking-rewards-success
-           apply-staking-rewards-error
-           opts]}]
-  (let [address* (resolve-address store address)]
-    (if (and (allow-route? store opts)
-             (seq address*))
-      (let [request-opts* (request-opts opts)]
-        (swap! store begin-staking-rewards-load)
-        (-> (request-staking-delegator-rewards! address* request-opts*)
-            (.then (promise-effects/apply-success-and-return
-                    store
-                    apply-staking-rewards-success))
-            (.catch (promise-effects/apply-error-and-reject
-                     store
-                     apply-staking-rewards-error))))
-      (js/Promise.resolve nil))))
+  [{:keys [store address request-staking-delegator-rewards! begin-staking-rewards-load
+           apply-staking-rewards-success apply-staking-rewards-error opts]}]
+  (fetch-staking-resource!
+   :rewards {:store store :address address :request! request-staking-delegator-rewards!
+             :begin-load begin-staking-rewards-load
+             :apply-success apply-staking-rewards-success
+             :apply-error apply-staking-rewards-error :opts opts}))
 
 (defn api-fetch-staking-history!
-  [{:keys [store
-           address
-           request-staking-delegator-history!
-           begin-staking-history-load
-           apply-staking-history-success
-           apply-staking-history-error
-           opts]}]
-  (let [address* (resolve-address store address)]
-    (if (and (allow-route? store opts)
-             (seq address*))
-      (let [request-opts* (request-opts opts)]
-        (swap! store begin-staking-history-load)
-        (-> (request-staking-delegator-history! address* request-opts*)
-            (.then (promise-effects/apply-success-and-return
-                    store
-                    apply-staking-history-success))
-            (.catch (promise-effects/apply-error-and-reject
-                     store
-                     apply-staking-history-error))))
-      (js/Promise.resolve nil))))
+  [{:keys [store address request-staking-delegator-history! begin-staking-history-load
+           apply-staking-history-success apply-staking-history-error opts]}]
+  (fetch-staking-resource!
+   :history {:store store :address address :request! request-staking-delegator-history!
+             :begin-load begin-staking-history-load
+             :apply-success apply-staking-history-success
+             :apply-error apply-staking-history-error :opts opts}))
 
 (defn api-fetch-staking-spot-state!
-  [{:keys [store
-           address
-           request-spot-clearinghouse-state!
-           begin-spot-balances-load
-           apply-spot-balances-success
-           apply-spot-balances-error
-           opts]}]
-  (let [address* (resolve-address store address)]
-    (if (and (allow-route? store opts)
-             (seq address*))
-      (let [request-opts* (request-opts opts)]
-        (swap! store begin-spot-balances-load)
-        (-> (request-spot-clearinghouse-state! address* request-opts*)
-            (.then (promise-effects/apply-success-and-return
-                    store
-                    apply-spot-balances-success))
-            (.catch (promise-effects/apply-error-and-reject
-                     store
-                     apply-spot-balances-error))))
-      (js/Promise.resolve nil))))
+  [{:keys [store address request-spot-clearinghouse-state! begin-staking-spot-state-load
+           apply-staking-spot-state-success apply-staking-spot-state-error opts]}]
+  (fetch-staking-resource!
+   :spot-state {:store store :address address :request! request-spot-clearinghouse-state!
+                :begin-load begin-staking-spot-state-load
+                :apply-success apply-staking-spot-state-success
+                :apply-error apply-staking-spot-state-error :opts opts}))
 
 (defn- fallback-exchange-response-error
   [resp]

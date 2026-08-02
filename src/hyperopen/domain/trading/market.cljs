@@ -519,26 +519,26 @@
   ([context form fee-context]
    (let [fee-context* (or fee-context (context->fee-context context))
          spot? (spot-market? context)
+         requested-type (core/normalize-order-type (or (:requested-type form) (:type form)))
+         portfolio-margin? (core/portfolio-margin-abstraction?
+                            (get-in context [:account :abstraction-raw]))
          size (core/parse-num (:size form))
          ref-price (reference-price context form)
-         available (if spot?
-                     (spot-usdc-available context)
-                     (available-to-trade context))
-         order-value (when (and (number? size)
-                                (pos? size)
-                                (number? ref-price)
-                                (pos? ref-price))
-                       (* size ref-price))
+         available (when-not portfolio-margin?
+                     (if spot? (spot-usdc-available context) (available-to-trade context)))
+         order-value (if (= :scale requested-type)
+                       (core/scale-order-value form {:sz-decimals (get-in context [:market :szDecimals])})
+                       (when (and (number? size) (pos? size) (number? ref-price) (pos? ref-price))
+                         (* size ref-price)))
          leverage (core/normalize-ui-leverage context (:ui-leverage form))
          ;; Margin and liquidation are perp-only — spot has no leverage and no
          ;; position to liquidate, so they are omitted (nil) for spot markets.
-         margin-required (when (and (not spot?) (number? order-value) (pos? leverage))
+         margin-required (when (and (not spot?) (not portfolio-margin?) (number? order-value) (pos? leverage))
                            (/ order-value leverage))
          position (current-position-summary context)
          liquidation-price (when-not spot?
                              (or (:liquidation-price position)
                                  (projected-liquidation-price context form available ref-price order-value)))
-         requested-type (core/normalize-order-type (or (:requested-type form) (:type form)))
          market-order? (= :market requested-type)
          slippage-est (if market-order?
                         (market-slippage-estimate-pct context form)

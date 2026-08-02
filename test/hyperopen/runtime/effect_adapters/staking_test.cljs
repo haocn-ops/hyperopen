@@ -3,6 +3,7 @@
             [nexus.registry :as nxr]
             [hyperopen.api.default :as api]
             [hyperopen.api.projections :as api-projections]
+            [hyperopen.api.projections.staking :as staking-projections]
             [hyperopen.runtime.effect-adapters :as effect-adapters]
             [hyperopen.runtime.effect-adapters.common :as common]
             [hyperopen.runtime.effect-adapters.staking :as staking-adapters]
@@ -128,12 +129,12 @@
       (is (= address (get-in captured [:spot-state :address])))
       (is (identical? api/request-spot-clearinghouse-state!
                       (get-in captured [:spot-state :request-spot-clearinghouse-state!])))
-      (is (identical? api-projections/begin-spot-balances-load
-                      (get-in captured [:spot-state :begin-spot-balances-load])))
-      (is (identical? api-projections/apply-spot-balances-success
-                      (get-in captured [:spot-state :apply-spot-balances-success])))
-      (is (identical? api-projections/apply-spot-balances-error
-                      (get-in captured [:spot-state :apply-spot-balances-error])))))
+      (is (identical? staking-projections/begin-staking-spot-state-load
+                      (get-in captured [:spot-state :begin-staking-spot-state-load])))
+      (is (identical? staking-projections/apply-staking-spot-state-success
+                      (get-in captured [:spot-state :apply-staking-spot-state-success])))
+      (is (identical? staking-projections/apply-staking-spot-state-error
+                      (get-in captured [:spot-state :apply-staking-spot-state-error])))))
 
 (deftest staking-submit-adapters-inject-default-and-custom-toast-seams-test
   (let [store (atom {})

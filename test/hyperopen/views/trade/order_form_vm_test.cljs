@@ -266,7 +266,8 @@
           controls (:controls view-model)]
       (is (false? (:show-tpsl-toggle? controls)))
       (is (false? (:show-liquidation-row? controls)))
-      (is (true? (:show-scale-preview? controls)))))
+      (is (true? (:show-scale-preview? controls)))
+      (is (true? (:show-post-only? controls)))))
 
   (testing "market enables slippage row and hides limit-like controls"
     (let [view-model (vm/order-form-vm (base-state {:entry-mode :market :type :market} {}))
@@ -279,6 +280,24 @@
           controls (:controls view-model)]
       (is (true? (:show-post-only? controls)))
       (is (true? (:show-limit-like-controls? controls))))))
+
+(deftest order-form-vm-account-mode-label-is-exclusive-to-raw-portfolio-margin-test
+  (doseq [[raw-abstraction expected-label]
+          [[" portfolioMargin " "PM"]
+           ["PoRtFoLiOmArGiN" "PM"]
+           ["unifiedAccount" "Classic"]
+           ["default" "Classic"]
+           ["disabled" "Classic"]
+           ["dexAbstraction" "Classic"]
+           ["unknown" "Classic"]
+           ["" "Classic"]
+           [nil "Classic"]]]
+    (let [view-model (vm/order-form-vm
+                      (assoc (base-state {:type :limit} {})
+                             :account {:mode :unified
+                                       :abstraction-raw raw-abstraction}))]
+      (is (= expected-label (:account-mode-label view-model))
+          (str "raw abstraction " (pr-str raw-abstraction))))))
 
 (deftest order-form-vm-skips-scale-preview-boundary-calculation-when-hidden-test
   (let [calls (atom 0)

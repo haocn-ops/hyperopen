@@ -85,3 +85,25 @@
     (is (= false (get-in failed [:staking :loading :delegator-summary])))
     (is (= "Error: delegator summary fail"
            (get-in failed [:staking :errors :delegator-summary])))))
+
+(deftest staking-spot-state-projection-is-isolated-from-active-trading-spot-state-test
+  (let [active-trading-spot-state {:balances [{:coin "HYPE" :total "1" :hold "0"}]}
+        master-staking-spot-state {:balances [{:coin "HYPE" :total "9" :hold "2"}]}
+        state {:spot {:clearinghouse-state active-trading-spot-state}
+               :staking {:spot-state {:balances [{:coin "HYPE" :total "0"}]}
+                         :loading {:spot-state false}
+                         :errors {:spot-state "stale"}}}
+        loading (staking/begin-staking-spot-state-load state)
+        success (staking/apply-staking-spot-state-success loading master-staking-spot-state)
+        failed (staking/apply-staking-spot-state-error loading (js/Error. "staking spot fail"))]
+    (is (= true (get-in loading [:staking :loading :spot-state])))
+    (is (nil? (get-in loading [:staking :errors :spot-state])))
+    (is (= active-trading-spot-state (get-in loading [:spot :clearinghouse-state])))
+    (is (= master-staking-spot-state (get-in success [:staking :spot-state])))
+    (is (= false (get-in success [:staking :loading :spot-state])))
+    (is (nil? (get-in success [:staking :errors :spot-state])))
+    (is (number? (get-in success [:staking :loaded-at-ms :spot-state])))
+    (is (= active-trading-spot-state (get-in success [:spot :clearinghouse-state])))
+    (is (= false (get-in failed [:staking :loading :spot-state])))
+    (is (= "Error: staking spot fail" (get-in failed [:staking :errors :spot-state])))
+    (is (= active-trading-spot-state (get-in failed [:spot :clearinghouse-state])))))

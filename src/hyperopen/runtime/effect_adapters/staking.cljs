@@ -60,9 +60,9 @@
    {:store store
     :address address
     :request-spot-clearinghouse-state! api/request-spot-clearinghouse-state!
-    :begin-spot-balances-load api-projections/begin-spot-balances-load
-    :apply-spot-balances-success api-projections/apply-spot-balances-success
-    :apply-spot-balances-error api-projections/apply-spot-balances-error}))
+    :begin-staking-spot-state-load api-projections/begin-staking-spot-state-load
+    :apply-staking-spot-state-success api-projections/apply-staking-spot-state-success
+    :apply-staking-spot-state-error api-projections/apply-staking-spot-state-error}))
 
 (defn api-submit-staking-deposit-effect
   ([_ store request]

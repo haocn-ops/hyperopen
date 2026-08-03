@@ -277,32 +277,110 @@
     (is (= [[:error "Connect your wallet before submitting stake."]]
            @toasts))))
 
-(deftest api-submit-staking-undelegate-predicate-kind-updates-undelegate-submit-state-test
+(deftest api-submit-staking-undelegate-submits-canonical-owner-action-despite-stale-selected-subaccount-test
   (async done
-    (let [store (atom {:wallet {:address "0x1234567890abcdef1234567890abcdef12345678"}
+    (let [owner "0x1111111111111111111111111111111111111111"
+          stale-selected "0x2222222222222222222222222222222222222222"
+          validator "0x3333333333333333333333333333333333333333"
+          action {:type "tokenDelegate"
+                  :validator validator
+                  :wei 10100000000
+                  :isUndelegate true}
+          store (atom {:router {:path "/staking"}
+                       :wallet {:address owner}
+                       :account-context {:spectate-mode {:active? false
+                                                         :address nil}
+                                         :subaccounts {:selected-address stale-selected
+                                                       :rows []}}
+                       :staking {:account-address owner
+                                 :loaded-for {:delegations owner}}
                        :staking-ui {:submitting {:undelegate? true}
+                                    :undelegate-amount "101"
                                     :form-error nil}})
-          toasts (atom [])]
-      (-> (effects/api-submit-staking-undelegate!
-           {:store store
-            :request {:kind :undelegate?
-                      :action {:type "tokenDelegate"
-                               :validator "0x1234567890abcdef1234567890abcdef12345678"
-                               :wei 100000000
-                               :isUndelegate true}}
-            :submit-token-delegate! (fn [_store _address _action]
-                                      (js/Promise.resolve {:status "error"
-                                                           :message "validator busy"}))
-            :show-toast! (fn [_store kind message]
-                           (swap! toasts conj [kind message]))})
-          (.then (fn [resp]
-                   (is (= {:status "error" :message "validator busy"} resp))
-                   (is (= false (get-in @store [:staking-ui :submitting :undelegate?])))
-                   (is (= "Staking action failed: validator busy"
-                          (get-in @store [:staking-ui :form-error])))
-                   (is (= [[:error "Staking action failed: validator busy"]]
-                          @toasts))
-                   (done)))
-          (.catch (fn [err]
-                    (is false (str "Unexpected error: " err))
-                    (done)))))))
+          submit-calls (atom [])
+          toasts (atom [])
+          dispatches (atom [])
+          result (effects/api-submit-staking-undelegate!
+                  {:store store
+                   :request {:kind :undelegate
+                             :action action}
+                   :submit-token-delegate! (fn [store* address submitted-action]
+                                             (swap! submit-calls conj [store* address submitted-action])
+                                             (js/Promise.resolve {:status "ok"}))
+                   :show-toast! (fn [_store kind message]
+                                  (swap! toasts conj [kind message]))
+                   :dispatch! (fn [_store _ctx dispatched-effects]
+                                (swap! dispatches conj dispatched-effects))})]
+      (if (instance? js/Promise result)
+        (-> result
+            (.then (fn [resp]
+                     (is (= {:status "ok"} resp))
+                     (is (= [[owner action]]
+                            (mapv (fn [[_store address submitted-action]]
+                                    [address submitted-action])
+                                  @submit-calls)))
+                     (is (= false (get-in @store [:staking-ui :submitting :undelegate?])))
+                     (is (= "" (get-in @store [:staking-ui :undelegate-amount])))
+                     (is (nil? (get-in @store [:staking-ui :form-error])))
+                     (is (= [[:success "Unstake submitted."]]
+                            @toasts))
+                     (is (= [[[:actions/load-staking]]]
+                            @dispatches))
+                     (done)))
+            (.catch (fn [err]
+                      (is false (str "Unexpected error: " err))
+                      (done))))
+        (do
+          (is (instance? js/Promise result)
+              "A canonical undelegate request must enter the asynchronous submit lifecycle.")
+          (is (= [[owner action]]
+                 (mapv (fn [[_store address submitted-action]]
+                         [address submitted-action])
+                       @submit-calls)))
+          (done))))))
+
+(deftest api-submit-staking-undelegate-keeps-inspection-routes-read-only-test
+  (let [owner "0x1111111111111111111111111111111111111111"
+        trader "0x2222222222222222222222222222222222222222"
+        action {:type "tokenDelegate"
+                :validator "0x3333333333333333333333333333333333333333"
+                :wei 10100000000
+                :isUndelegate true}
+        cases [{:label "spectate"
+                :state {:wallet {:address owner}
+                        :account-context {:spectate-mode {:active? true
+                                                          :address trader}}
+                        :staking-ui {:submitting {:undelegate? true}
+                                     :undelegate-amount "101"
+                                     :form-error nil}}
+                :message "Spectate Mode is read-only. Stop Spectate Mode to place trades or move funds."}
+               {:label "trader portfolio"
+                :state {:router {:path (str "/portfolio/trader/" trader)}
+                        :wallet {:address owner}
+                        :account-context {:spectate-mode {:active? false
+                                                          :address nil}}
+                        :staking-ui {:submitting {:undelegate? true}
+                                     :undelegate-amount "101"
+                                     :form-error nil}}
+                :message "Trader portfolio routes are read-only. Open your Portfolio to place trades or move funds."}]]
+    (doseq [{:keys [label state message]} cases]
+      (let [store (atom state)
+            submit-calls (atom [])
+            toasts (atom [])]
+        (effects/api-submit-staking-undelegate!
+         {:store store
+          :request {:kind :undelegate
+                    :action action}
+          :submit-token-delegate! (fn [store* address submitted-action]
+                                    (swap! submit-calls conj [store* address submitted-action])
+                                    (js/Promise.resolve {:status "ok"}))
+          :show-toast! (fn [_store kind toast-message]
+                         (swap! toasts conj [kind toast-message]))})
+        (is (= 0 (count @submit-calls))
+            (str label " must not submit"))
+        (is (= false (get-in @store [:staking-ui :submitting :undelegate?]))
+            (str label " clears pending"))
+        (is (= message (get-in @store [:staking-ui :form-error]))
+            (str label " keeps its read-only message"))
+        (is (= [[:error message]] @toasts)
+            (str label " shows the read-only message"))))))

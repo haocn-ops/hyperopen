@@ -3,6 +3,7 @@
             [hyperopen.account.context :as account-context]
             [hyperopen.domain.trading :as trading-domain]
             [hyperopen.staking.account-scope :as account-scope]
+            [hyperopen.utils.formatting :as formatting]
             [hyperopen.utils.parse :as parse-utils]))
 
 (def default-staking-tab
@@ -323,13 +324,8 @@
 
 (defn- delegation-amount-by-validator
   [state validator]
-  (let [validator* (normalize-validator-address validator)]
-    (or (some (fn [row]
-                (when (= validator*
-                         (normalize-validator-address (:validator row)))
-                  (optional-number (:amount row))))
-              (get-in state [:staking :delegations]))
-        0)))
+  (or (some-> (account-scope/delegation-row-by-validator state validator) :amount optional-number)
+      0))
 
 (defn- parse-amount-number
   [state value]
@@ -555,7 +551,7 @@
 
 (defn submit-staking-deposit
   [state]
-  (let [blocked-message (account-context/mutations-blocked-message state)
+  (let [blocked-message (account-scope/mutations-blocked-message state)
         owner-address (account-context/owner-address state)
         amount-input (get-in state [:staking-ui :deposit-amount])
         amount (parse-amount-number state amount-input)
@@ -588,7 +584,7 @@
 
 (defn submit-staking-withdraw
   [state]
-  (let [blocked-message (account-context/mutations-blocked-message state)
+  (let [blocked-message (account-scope/mutations-blocked-message state)
         owner-address (account-context/owner-address state)
         amount-input (get-in state [:staking-ui :withdraw-amount])
         amount (parse-amount-number state amount-input)
@@ -620,7 +616,7 @@
 
 (defn submit-staking-delegate
   [state]
-  (let [blocked-message (account-context/mutations-blocked-message state)
+  (let [blocked-message (account-scope/mutations-blocked-message state)
         owner-address (account-context/owner-address state)
         validator (selected-validator state)
         amount-input (get-in state [:staking-ui :delegate-amount])
@@ -657,39 +653,48 @@
                         :isUndelegate false}}]]))))
 
 (defn submit-staking-undelegate
-  [state]
-  (let [blocked-message (account-context/mutations-blocked-message state)
-        owner-address (account-context/owner-address state)
-        validator (selected-validator state)
-        amount-input (get-in state [:staking-ui :undelegate-amount])
-        amount (parse-amount-number state amount-input)
-        wei (parse-hype-input->wei state amount-input)
-        delegated-amount (delegation-amount-by-validator state validator)]
-    (cond
-      (seq blocked-message)
-      (submit-guard-error :undelegate? blocked-message)
+  ([state]
+   (submit-staking-undelegate state (.now js/Date)))
+  ([state now-ms]
+   (let [blocked-message (account-scope/mutations-blocked-message state)
+         owner-address (account-context/owner-address state)
+         validator (selected-validator state)
+         amount-input (get-in state [:staking-ui :undelegate-amount])
+         amount (parse-amount-number state amount-input)
+         wei (parse-hype-input->wei state amount-input)
+         delegation (account-scope/delegation-row-by-validator state validator)
+         delegated-amount (or (some-> delegation :amount optional-number) 0)]
+     (cond
+       (true? (get-in state [:staking-ui :submitting :undelegate?])) []
+       (seq blocked-message)
+       (submit-guard-error :undelegate? blocked-message)
 
-      (nil? owner-address)
-      (submit-guard-error :undelegate? "Connect your wallet before undelegating.")
+       (nil? owner-address)
+       (submit-guard-error :undelegate? "Connect your wallet before undelegating.")
 
-      (nil? validator)
-      (submit-guard-error :undelegate? "Select a validator before undelegating.")
+       (nil? validator)
+       (submit-guard-error :undelegate? "Select a validator before undelegating.")
 
-      (nil? wei)
-      (submit-guard-error :undelegate? "Enter a valid amount up to 8 decimals.")
+       (nil? wei)
+       (submit-guard-error :undelegate? "Enter a valid amount up to 8 decimals.")
 
-      (and (finite-number? amount)
-           (> amount delegated-amount))
-      (submit-guard-error :undelegate? "Amount exceeds your delegated amount for this validator.")
+       (and (finite-number? amount)
+            (> amount delegated-amount))
+       (submit-guard-error :undelegate? "Amount exceeds your delegated amount for this validator.")
 
-      (not (account-scope/resource-ready? state :delegations))
-      (submit-guard-error :undelegate? "Staking account data is still loading. Please try again.")
+       (not (account-scope/resource-ready? state :delegations))
+       (submit-guard-error :undelegate? "Staking account data is still loading. Please try again.")
 
-      :else
-      (into (start-submit-effects :undelegate?)
-            [[:effects/api-submit-staking-undelegate
-              {:kind :undelegate
-               :action {:type "tokenDelegate"
-                        :validator validator
-                        :wei wei
-                        :isUndelegate true}}]]))))
+       (account-scope/delegation-locked-after? delegation now-ms)
+       (submit-guard-error :undelegate? (str "This delegation is locked until "
+                                            (formatting/format-local-date-time (:locked-until-timestamp delegation))
+                                            "."))
+
+       :else
+       (into (start-submit-effects :undelegate?)
+             [[:effects/api-submit-staking-undelegate
+               {:kind :undelegate
+                :action {:type "tokenDelegate"
+                         :validator validator
+                         :wei wei
+                         :isUndelegate true}}]])))))

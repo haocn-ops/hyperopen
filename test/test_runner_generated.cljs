@@ -450,6 +450,7 @@
             [hyperopen.staking.actions-test]
             [hyperopen.staking.effects-freshness-test]
             [hyperopen.staking.effects-test]
+            [hyperopen.staking.unstake-actions-regression-test]
             [hyperopen.startup.account-lifecycle-test]
             [hyperopen.startup.collaborators-test]
             [hyperopen.startup.deferred-bootstrap-outcome-cache-test]
@@ -1301,6 +1302,7 @@
              'hyperopen.staking.actions-test
              'hyperopen.staking.effects-freshness-test
              'hyperopen.staking.effects-test
+             'hyperopen.staking.unstake-actions-regression-test
              'hyperopen.startup.account-lifecycle-test
              'hyperopen.startup.collaborators-test
              'hyperopen.startup.deferred-bootstrap-outcome-cache-test

@@ -1,5 +1,6 @@
 (ns hyperopen.views.staking.popovers
   (:require [clojure.string :as str]
+            [hyperopen.views.ui.dialog-focus :as dialog-focus]
             [hyperopen.views.staking.shared :as shared]))
 (def ^:private popover-margin-px
   12)
@@ -15,6 +16,7 @@
   {:transfer "staking-action-transfer-button"
    :unstake "staking-action-unstake-button"
    :stake "staking-action-stake-button"})
+(def ^:private action-popover-focus-on-render (dialog-focus/dialog-focus-on-render))
 (defn- clamp
   [value min-value max-value]
   (-> value
@@ -135,7 +137,7 @@
                      "focus:outline-none"
                      "focus:ring-0"
                      "focus:ring-offset-0"]
-             :on {:click [on-max]}}
+             :on {:click [[on-max]]}}
     "MAX"]])
 (defn- popover-cta-button
   [{:keys [label submitting? on-submit]}]
@@ -152,7 +154,7 @@
                     "disabled:cursor-not-allowed"
                     "disabled:opacity-65"]
             :disabled submitting?
-            :on {:click [on-submit]}}
+            :on {:click [[on-submit]]}}
    (if submitting?
      "Submitting..."
      label)])
@@ -410,6 +412,7 @@
 (defn- unstake-popover-content
   [{:keys [form
            submitting
+           error
            selected-validator
            validators
            validator-search-query
@@ -423,6 +426,11 @@
                               :validators validators
                               :search-query validator-search-query
                               :dropdown-open? validator-dropdown-open?})
+   (when (seq error)
+     [:div {:class ["rounded-lg" "border" "border-ho-border-sell" "bg-ho-sell-soft-deep"
+                    "px-3" "py-2" "text-sm" "text-ho-sell-tint"]
+            :data-role "staking-unstake-error"}
+      error])
    (popover-cta-button {:label "Unstake"
                         :submitting? (true? (:undelegate? submitting))
                         :on-submit :actions/submit-staking-undelegate})])
@@ -431,6 +439,7 @@
            form
            submitting
            balances
+           error
            selected-validator
            validator-search-query
            validator-dropdown-open?
@@ -462,8 +471,8 @@
               :style panel-style
               :tab-index 0
               :role "dialog"
-              :aria-modal true
-              :data-role "staking-action-popover"
+              :aria-modal true :data-role "staking-action-popover"
+              :replicant/on-render action-popover-focus-on-render
               :on {:keydown [[:actions/handle-staking-action-popover-keydown [:event/key]]]}}
         (popover-close-button)
         [:h2 {:class ["text-[42px]" "font-normal" "leading-none" "text-ho-text" "text-center"]}
@@ -477,6 +486,7 @@
           :unstake
           (unstake-popover-content {:form form
                                     :submitting submitting
+                                    :error error
                                     :selected-validator selected-validator
                                     :validator-search-query validator-search-query
                                     :validator-dropdown-open? validator-dropdown-open?

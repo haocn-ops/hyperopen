@@ -230,7 +230,7 @@
          runtime-error-message fallback-runtime-error-message
          show-toast! (fn [_store _kind _message] nil)}}]
   (let [state @store
-        blocked-message (account-context/mutations-blocked-message state)
+        blocked-message (account-scope/mutations-blocked-message state)
         owner-address (account-context/owner-address state)
         kind (:kind request)
         action (:action request)

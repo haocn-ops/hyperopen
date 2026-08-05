@@ -741,17 +741,22 @@
 
               :else
               "Order types are locked once execution is armed."))]]
-     (cond
-       (not (seq rows))
-       [:p {:class ["px-4" "py-4" "text-sm" "text-trading-muted"]}
-        "No orders are staged for this run."]
+     ;; Stable slots below: the body alternates between a <table> and an empty-state <p>,
+     ;; and the auto-exit strip is nil post-run. A bare tag swap desyncs Replicant's child
+     ;; walk, the keyed skipped <details> then lands on the nil, and reconciliation throws
+     ;; mid-render — freezing the whole surface, toasts included. One tag, always present.
+     [:div {:class (cond-> [] any-visible? (conj "overflow-x-auto"))
+            :data-role "portfolio-optimizer-execution-order-list-body"}
+      (cond
+        (not (seq rows))
+        [:p {:class ["px-4" "py-4" "text-sm" "text-trading-muted"]}
+         "No orders are staged for this run."]
 
-       (not any-visible?)
-       [:p {:class ["px-4" "py-4" "text-sm" "text-trading-muted"]}
-        (str "No " (name active-filter) " orders to show.")]
+        (not any-visible?)
+        [:p {:class ["px-4" "py-4" "text-sm" "text-trading-muted"]}
+         (str "No " (name active-filter) " orders to show.")]
 
-       :else
-       [:div {:class ["overflow-x-auto"]}
+        :else
         (into
          [:table {:class ["optimizer-table" "optimizer-exec-table"]}
           [:thead
@@ -773,6 +778,7 @@
                      (order-row model index row)
                      []))
                  (range)
-                 rows))])
-     (auto-exit-setting-strip model rows)
+                 rows)))]
+     [:div {:data-role "portfolio-optimizer-execution-auto-exit-slot"}
+      (auto-exit-setting-strip model rows)]
      (skipped-section model rows)]))

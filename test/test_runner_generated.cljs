@@ -620,6 +620,7 @@
             [hyperopen.views.portfolio.optimize.equal-risk-impact-strip-test]
             [hyperopen.views.portfolio.optimize.execution-amend-view-test]
             [hyperopen.views.portfolio.optimize.execution-exit-affordance-test]
+            [hyperopen.views.portfolio.optimize.execution-order-table-reconcile-test]
             [hyperopen.views.portfolio.optimize.execution-order-table-test]
             [hyperopen.views.portfolio.optimize.execution-strategy-band-test]
             [hyperopen.views.portfolio.optimize.execution-tab-test]
@@ -1472,6 +1473,7 @@
              'hyperopen.views.portfolio.optimize.equal-risk-impact-strip-test
              'hyperopen.views.portfolio.optimize.execution-amend-view-test
              'hyperopen.views.portfolio.optimize.execution-exit-affordance-test
+             'hyperopen.views.portfolio.optimize.execution-order-table-reconcile-test
              'hyperopen.views.portfolio.optimize.execution-order-table-test
              'hyperopen.views.portfolio.optimize.execution-strategy-band-test
              'hyperopen.views.portfolio.optimize.execution-tab-test

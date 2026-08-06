@@ -39,3 +39,17 @@
     (is (= "BTC" (:max-symbol ctx)))
     (is (= "~20 mins" (:withdraw-estimated-time ctx)))
     (is (= "0.00001@bitcoin" (:withdraw-network-fee ctx)))))
+
+(deftest amount-context-uses-official-bridge2-withdrawal-facts-test
+  (let [usdc-asset (support/withdraw-asset :key :usdc
+                                           :symbol "USDC"
+                                           :flow-kind :bridge2
+                                           :min 0
+                                           :max 12.5)
+        state (support/base-state {:modal {:mode :withdraw}
+                                   :withdraw-assets [usdc-asset]
+                                   :withdraw-asset usdc-asset})
+        ctx (support/build-context (support/base-deps) state)]
+    (is (= 0 (:withdraw-min-amount ctx)))
+    (is (= "3-5 minutes" (:withdraw-estimated-time ctx)))
+    (is (= "1 USDC" (:withdraw-network-fee ctx)))))

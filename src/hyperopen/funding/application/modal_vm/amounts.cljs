@@ -49,7 +49,7 @@
     (or (when hyperunit-fee-estimate-loading? "Loading...")
         (non-blank-text (:withdrawal-eta withdraw-chain-fee))
         "Depends on destination chain")
-    "~10 seconds"))
+    "3-5 minutes"))
 
 (defn- withdraw-network-fee
   [estimate-fee-display
@@ -62,7 +62,7 @@
         (estimate-fee-display (:withdrawal-fee withdraw-chain-fee)
                               withdraw-chain)
         "Paid on destination chain")
-    "None"))
+    "1 USDC"))
 
 (defn with-amount-context
   [{:keys [state

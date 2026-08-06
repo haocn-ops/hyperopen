@@ -212,6 +212,9 @@
       (not (amounts/finite-number? amount))
       "Enter a valid amount."
 
+      (<= amount 0)
+      "Enter an amount greater than 0."
+
       (and (amounts/finite-number? min-amount)
            (> min-amount 0)
            (< amount min-amount))

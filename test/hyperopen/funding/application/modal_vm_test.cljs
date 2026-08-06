@@ -108,6 +108,25 @@
     (is (= "1.25" (get-in view-model [:withdraw :assets 1 :available-display])))
     (is (false? (get-in view-model [:feedback :visible?])))))
 
+(deftest funding-modal-view-model-omits-bridge2-withdrawal-minimum-row-test
+  (let [usdc-asset (support/withdraw-asset :key :usdc
+                                           :symbol "USDC"
+                                           :flow-kind :bridge2
+                                           :min 0
+                                           :max 12.5)
+        state (support/base-state {:modal {:mode :withdraw
+                                           :withdraw-step :amount-entry
+                                           :withdraw-selected-asset-key :usdc}
+                                   :withdraw-assets [usdc-asset]
+                                   :withdraw-asset usdc-asset})
+        view-model (modal-vm/funding-modal-view-model (support/base-deps) state)
+        labels (mapv :label (get-in view-model [:withdraw :summary :rows]))]
+    (is (= ["Estimated time" "Withdrawal fee"] labels))
+    (is (= "3-5 minutes"
+           (get-in view-model [:withdraw :summary :rows 0 :value])))
+    (is (= "1 USDC"
+           (get-in view-model [:withdraw :summary :rows 1 :value])))))
+
 (deftest funding-modal-view-model-direct-feedback-uses-preview-errors-for-withdrawals-test
   (let [state (support/base-state {:modal {:mode :withdraw
                                            :withdraw-step :amount-entry

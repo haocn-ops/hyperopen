@@ -159,7 +159,7 @@
                             selected-withdraw-symbol)))
     true
     (conj (summary-row "Estimated time" withdraw-estimated-time)
-          (summary-row "Network fee" withdraw-network-fee))))
+          (summary-row "Withdrawal fee" withdraw-network-fee))))
 
 (defn- content-kind
   [{:keys [mode

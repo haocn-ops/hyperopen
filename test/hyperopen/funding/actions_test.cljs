@@ -306,38 +306,38 @@
                        :deposit-selected-asset-key :usdc
                        :amount-input "6"}))))))
 
-(deftest submit-funding-withdraw-validates-destination-and-minimum-test
+(deftest submit-funding-withdraw-validates-destination-and-positive-amount-test
   (let [invalid-destination (assoc-in (base-state)
                                       [:funding-ui :modal]
                                       {:open? true
                                        :mode :withdraw
                                        :destination-input "abc"
                                        :amount-input "10"})
-        below-minimum (assoc-in (base-state)
-                                [:funding-ui :modal]
-                                {:open? true
-                                 :mode :withdraw
-                                 :destination-input "0x1234567890abcdef1234567890abcdef12345678"
-                                 :amount-input "1"})
-        valid (assoc-in (base-state)
-                        [:funding-ui :modal]
-                        {:open? true
-                         :mode :withdraw
-                         :destination-input "0x1234567890abcdef1234567890abcdef12345678"
-                         :amount-input "6.5"})]
+        zero-amount (assoc-in (base-state)
+                              [:funding-ui :modal]
+                              {:open? true
+                               :mode :withdraw
+                               :destination-input "0x1234567890abcdef1234567890abcdef12345678"
+                               :amount-input "0"})
+        below-deposit-minimum (assoc-in (base-state)
+                                        [:funding-ui :modal]
+                                        {:open? true
+                                         :mode :withdraw
+                                         :destination-input "0x1234567890abcdef1234567890abcdef12345678"
+                                         :amount-input "1"})]
     (is (= [[:effects/save-many [[[:funding-ui :modal :submitting?] false]
                                  [[:funding-ui :modal :error] "Enter a valid destination address."]]]]
            (funding-actions/submit-funding-withdraw invalid-destination)))
     (is (= [[:effects/save-many [[[:funding-ui :modal :submitting?] false]
-                                 [[:funding-ui :modal :error] "Minimum withdrawal is 5 USDC."]]]]
-           (funding-actions/submit-funding-withdraw below-minimum)))
+                                 [[:funding-ui :modal :error] "Enter an amount greater than 0."]]]]
+           (funding-actions/submit-funding-withdraw zero-amount)))
     (is (= [[:effects/save-many [[[:funding-ui :modal :submitting?] true]
                                  [[:funding-ui :modal :error] nil]]]
             [:effects/api-submit-funding-withdraw
              {:action {:type "withdraw3"
-                       :amount "6.5"
+                       :amount "1"
                        :destination "0x1234567890abcdef1234567890abcdef12345678"}}]]
-           (funding-actions/submit-funding-withdraw valid)))))
+           (funding-actions/submit-funding-withdraw below-deposit-minimum)))))
 
 (deftest submit-funding-withdraw-supports-btc-hyperunit-send-asset-flow-test
   (let [state (-> (base-state)

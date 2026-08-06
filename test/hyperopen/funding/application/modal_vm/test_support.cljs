@@ -103,7 +103,7 @@
            :format-usdc-input str
            :deposit-quick-amounts [5 10 25]
            :deposit-min-usdc 5
-           :withdraw-min-usdc 5}
+           :withdraw-min-usdc 0}
           overrides)))
 
 (defn deposit-asset

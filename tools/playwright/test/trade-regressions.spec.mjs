@@ -3272,6 +3272,36 @@ test("funding modal deposit flow selects USDC @regression", async ({ page }) => 
   });
 });
 
+test("funding modal Bridge2 USDC withdrawal matches official facts @regression", async ({ page }) => {
+  await visitRoute(page, "/trade");
+
+  await dispatch(page, [":actions/open-funding-withdraw-modal", null]);
+  await waitForIdle(page, { quietMs: 150, timeoutMs: 3_000, pollMs: 50 });
+  await expectOracle(page, "funding-modal", {
+    open: true,
+    title: "Withdraw",
+    contentKind: ":withdraw/select"
+  });
+
+  await dispatch(page, [":actions/select-funding-withdraw-asset", "usdc"]);
+  await waitForIdle(page, { quietMs: 150, timeoutMs: 3_000, pollMs: 50 });
+
+  const modal = page.locator("[data-role='funding-modal']");
+  const summary = modal.locator("[data-role='funding-withdraw-detail-step']");
+  await expect(summary).toContainText("Estimated time");
+  await expect(summary).toContainText("3-5 minutes");
+  await expect(summary).toContainText("Withdrawal fee");
+  await expect(summary).toContainText("1 USDC");
+  await expect(summary).not.toContainText("Minimum withdrawal");
+
+  await modal.locator("#funding-withdraw-destination-input").fill(
+    "0x1234567890abcdef1234567890abcdef12345678"
+  );
+  await modal.locator("#funding-withdraw-amount-input").fill("1");
+  await waitForIdle(page, { quietMs: 150, timeoutMs: 3_000, pollMs: 50 });
+  await expect(modal).not.toContainText("Minimum withdrawal is 5 USDC.");
+});
+
 test("trade funding openers launch the funding modal on real click @regression", async ({ page }) => {
   const fundingModuleRequests = [];
   page.on("request", (request) => {

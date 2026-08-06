@@ -24,3 +24,9 @@
       (is (= assets/deposit-chain-id-mainnet (:chain-id mainnet-asset)))
       (is (= "Arbitrum Sepolia" (:network testnet-asset)))
       (is (= assets/deposit-chain-id-testnet (:chain-id testnet-asset))))))
+
+(deftest bridge2-usdc-keeps-deposit-minimum-without-withdrawal-minimum-test
+  (is (= 5 assets/deposit-min-usdc))
+  (is (= 0 assets/withdraw-min-usdc))
+  (is (= 0 (assets/withdraw-minimum-amount {:key :usdc})))
+  (is (= 0.0003 (assets/withdraw-minimum-amount {:key :btc}))))

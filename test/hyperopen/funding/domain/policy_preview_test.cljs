@@ -36,6 +36,29 @@
                                    :destination-input "0x1234567890abcdef1234567890abcdef12345678"
                                    :amount-input "6.5"}))))
 
+(deftest withdraw-preview-accepts-positive-usdc-below-deposit-minimum-test
+  (let [destination "0x1234567890abcdef1234567890abcdef12345678"]
+    (is (= {:ok? true
+            :request {:action {:type "withdraw3"
+                               :amount "0.000001"
+                               :destination destination}}}
+           (policy/withdraw-preview (base-state)
+                                    {:withdraw-selected-asset-key :usdc
+                                     :destination-input destination
+                                     :amount-input "0.000001"})))
+    (is (= {:ok? false
+            :display-message "Enter an amount greater than 0."}
+           (policy/withdraw-preview (base-state)
+                                    {:withdraw-selected-asset-key :usdc
+                                     :destination-input destination
+                                     :amount-input "0"})))
+    (is (= {:ok? false
+            :display-message "Enter an amount greater than 0."}
+           (policy/withdraw-preview (base-state)
+                                    {:withdraw-selected-asset-key :usdc
+                                     :destination-input destination
+                                     :amount-input "-1"})))))
+
 (deftest withdraw-preview-requires-hyperunit-source-chain-and-preserves-request-shape-test
   (with-redefs [assets-domain/withdraw-assets (fn [_state]
                                                 [{:key :btc
@@ -234,7 +257,7 @@
                                      :destination-input "bc1qexamplexyz0p4y0p4y0p4y0p4y0p4y0p4y0p"
                                      :amount-input "0.0001"})))))
 
-(deftest withdraw-preview-error-helper-allows-zero-and-exact-minimum-boundaries-test
+(deftest withdraw-preview-error-helper-enforces-positive-and-exact-minimum-boundaries-test
   (let [withdraw-preview-error @#'hyperopen.funding.domain.policy/withdraw-preview-error
         base-input {:selected-asset {:symbol "BTC"}
                     :destination "bc1qexamplexyz0p4y0p4y0p4y0p4y0p4y0p4y0p"
@@ -244,9 +267,10 @@
                                              :amount 1
                                              :max-amount 1
                                              :min-amount 0))))
-    (is (nil? (withdraw-preview-error (assoc base-input
-                                             :amount -1
-                                             :min-amount 0))))
+    (is (= "Enter an amount greater than 0."
+           (withdraw-preview-error (assoc base-input
+                                          :amount -1
+                                          :min-amount 0))))
     (is (nil? (withdraw-preview-error (assoc base-input
                                              :amount 0.0003
                                              :min-amount 0.0003))))))

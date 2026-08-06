@@ -3,8 +3,11 @@
             [hyperopen.config :as app-config]
             [hyperopen.domain.trading :as trading-domain]))
 
+;; Bridge2 documents a deposit minimum but does not define a USDC withdrawal
+;; minimum. Keep zero as the no-protocol-minimum sentinel; preview validation
+;; still requires a strictly positive amount.
 (def withdraw-min-usdc
-  5)
+  0)
 
 (def deposit-min-usdc
   5)

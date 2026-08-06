@@ -26,8 +26,9 @@ four configured DEXHelm custom domains, Testnet-only HyperUnit proxy, and `worke
 - [x] Corrected repository gates passed 35/35 (6,691 tests, 36,502 assertions).
 - [x] Final Cloudflare build, artifact preflight (33/33), and Wrangler dry-run passed.
 - [x] Pushed `codex/upstream-sync-20260806` to the user fork.
-- [ ] Deploy the existing Worker, verify the returned version and public host matrix.
-- [ ] Record final evidence and move this plan to `completed/`.
+- [x] Deployed the existing Worker as version `1e10deb3-eae7-4943-aeeb-951e87b760a9`.
+- [x] Verified public headers, proxy policy, four-host status matrix, logo, and health endpoint.
+- [x] Recorded final evidence and moved this plan to `completed/`.
 
 ## Decision Log
 
@@ -53,6 +54,24 @@ four configured DEXHelm custom domains, Testnet-only HyperUnit proxy, and `worke
   available and `app.dexhelm.com` remains intentionally closed.
 - Both repository public verifiers pass without printing response bodies.
 
+## Outcomes & Retrospective
+
+The reviewed upstream synchronization is published on the GitHub fork branch
+`codex/upstream-sync-20260806` and deployed to the existing `hyperopen` Worker. Cloudflare
+reports version `1e10deb3-eae7-4943-aeeb-951e87b760a9` at 100% traffic. The deployment kept
+the same Worker name, asset directory, Testnet-only binding, and four custom domains.
+
+Public verification passed: `dexhelm.com`, `testnet.dexhelm.com`, `/trade`, and
+`status.dexhelm.com` returned 200; `app.dexhelm.com` returned its intentional 503;
+`/brand/dexhelm-mark.svg` returned 200 `image/svg+xml`; and `/api/health` returned 200 JSON.
+The Testnet fee probe returned 200 JSON while Mainnet and generic proxy probes returned 404.
+Deployment-header verification passed for the trade document, fingerprinted CSS/JS,
+metadata, service worker, and branded CSP source.
+
+No DNS, secret, wallet, Mainnet, or canonical-upstream mutation occurred. The remaining
+non-blocking warnings are the stale Browserslist database notice and locally available but
+not globally configured JDK 21. The previous Worker version remains available for rollback.
+
 ## Recovery
 
 If public verification fails, stop further mutations and request explicit rollback using the
@@ -61,3 +80,4 @@ recorded prior version ID. Do not delete the Worker or alter DNS/custom-domain c
 ## Revision Note
 
 Created 2026-08-06 after the upstream merge review and before any GitHub or Cloudflare write.
+Completed 2026-08-06 after GitHub upload, Worker deployment, and public verification passed.

@@ -1,0 +1,25 @@
+name: DEXHelm public monitor
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  # Keep the current closed state as the safe default. Set the repository
+  # variable to "200" in the same approved release change that opens Mainnet.
+  DEXHELM_EXPECT_MAINNET_STATUS: ${{ vars.DEXHELM_EXPECT_MAINNET_STATUS || '503' }}
+
+jobs:
+  public-monitor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+      - name: Probe public surfaces
+        run: node tools/cloudflare/public_monitor.mjs

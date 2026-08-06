@@ -2,7 +2,6 @@
   (:require [clojure.string :as str]
             [hyperopen.account.context :as account-context]
             [hyperopen.funding.application.modal-state :as modal-state]))
-
 (defn- mutation-guard-effects
   [state funding-modal-path]
   (when-let [message (account-context/mutations-blocked-message state)]
@@ -54,6 +53,7 @@
                                         (:destination-input base "")
                                         ""))
           (modal-state/with-open-focus-metadata base opener-data-role))]
+     [:effects/api-fetch-hyperliquid-legal-check]
      [:effects/api-fetch-hyperunit-fee-estimate]]))
 (defn open-funding-send-modal
   [{:keys [modal-state
@@ -151,6 +151,7 @@
                  :withdraw-selected-asset-key selected-asset-key
                  :destination-input (or (wallet-address state) ""))
           (modal-state/with-open-focus-metadata base opener-data-role))]
+     [:effects/api-fetch-hyperliquid-legal-check]
      [:effects/api-fetch-hyperunit-withdrawal-queue]
      [:effects/api-fetch-hyperunit-fee-estimate]]))
 (defn open-legacy-funding-modal

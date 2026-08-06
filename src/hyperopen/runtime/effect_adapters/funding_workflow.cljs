@@ -13,6 +13,13 @@
     :now-ms-fn platform/now-ms
     :runtime-error-message common/runtime-error-message}))
 
+(defn api-fetch-hyperliquid-legal-check-effect
+  [_ store]
+  (funding-effects/api-fetch-hyperliquid-legal-check!
+   {:store store
+    :request-hyperliquid-legal-check! api/request-hyperliquid-legal-check!
+    :now-ms-fn platform/now-ms}))
+
 (defn api-fetch-hyperunit-withdrawal-queue-effect
   [_ store]
   (funding-effects/api-fetch-hyperunit-withdrawal-queue!

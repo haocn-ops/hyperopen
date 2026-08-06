@@ -1,6 +1,7 @@
 (ns hyperopen.funding.application.modal-state
   (:require [clojure.string :as str]
             [hyperopen.funding.domain.assets :as assets-domain]
+            [hyperopen.funding.domain.legal-check :as legal-check]
             [hyperopen.funding.domain.policy :as policy-domain]
             [hyperopen.funding.domain.lifecycle :as lifecycle-domain]))
 
@@ -38,6 +39,7 @@
    :hyperunit-lifecycle (lifecycle-domain/default-hyperunit-lifecycle-state)
    :hyperunit-fee-estimate (lifecycle-domain/default-hyperunit-fee-estimate-state)
    :hyperunit-withdrawal-queue (lifecycle-domain/default-hyperunit-withdrawal-queue-state)
+   :legal-check (legal-check/default-legal-check-state)
    :submitting? false
    :error nil})
 
@@ -86,5 +88,6 @@
                                     (:hyperunit-fee-estimate modal))
            :hyperunit-withdrawal-queue (lifecycle-domain/normalize-hyperunit-withdrawal-queue
                                         (:hyperunit-withdrawal-queue modal))
+           :legal-check (legal-check/normalize-state (:legal-check modal))
            :hyperunit-lifecycle (lifecycle-domain/normalize-hyperunit-lifecycle
                                  (:hyperunit-lifecycle modal)))))

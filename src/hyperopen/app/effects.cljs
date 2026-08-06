@@ -28,7 +28,8 @@
        vec))
 
 (def ^:private lazy-funding-workflow-effect-keys
-  [:api-fetch-hyperunit-fee-estimate
+  [:api-fetch-hyperliquid-legal-check
+   :api-fetch-hyperunit-fee-estimate
    :api-fetch-hyperunit-withdrawal-queue
    :api-submit-funding-transfer
    :api-submit-funding-send
@@ -117,6 +118,7 @@
               :api-cancel-order (effect-adapters/make-api-cancel-order runtime)
               :api-submit-position-tpsl (effect-adapters/make-api-submit-position-tpsl runtime)
               :api-submit-position-margin (effect-adapters/make-api-submit-position-margin runtime)
+              :api-submit-close-all-positions (effect-adapters/make-api-submit-close-all-positions runtime)
               :clear-order-feedback-toast-timeout (effect-adapters/make-clear-order-feedback-toast-timeout runtime)}
      :margin-rec {:margin-rec-fetch-fills margin-rec-effects/margin-rec-fetch-fills-effect
                   :margin-rec-compute margin-rec-effects/margin-rec-compute-effect}

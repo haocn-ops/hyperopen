@@ -1,4 +1,5 @@
-(ns hyperopen.funding.application.modal-vm.context)
+(ns hyperopen.funding.application.modal-vm.context
+  (:require [hyperopen.funding.domain.legal-check :as legal-check]))
 
 (defn- string-value
   [value]
@@ -61,6 +62,7 @@
      :anchor (:anchor modal)
      :opener-data-role (:opener-data-role modal)
      :error (:error modal)
+     :legal-check (legal-check/normalize-state (:legal-check modal))
      :submitting? (true? (:submitting? modal))
      :legacy-kind (modal-legacy-kind modal)
      :hyperunit-lifecycle (normalize-hyperunit-lifecycle (:hyperunit-lifecycle modal))

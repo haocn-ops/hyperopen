@@ -11,6 +11,11 @@
     "spectate_mode_modal", "staking_route", "subaccounts_route", "trade_chart",
     "trading_crypto", "trading_indicators", "vaults_route"
   ];
+  var approvedWorkerScripts = [
+    "/js/portfolio_worker.js",
+    "/js/portfolio_optimizer_worker.js",
+    "/js/vault_detail_worker.js"
+  ];
   var trustedTypesApi = globalThis.trustedTypes;
   if (trustedTypesApi) {
     trustedTypesApi.createPolicy("default", {
@@ -28,6 +33,9 @@
           ? value.match(/^\/js\/([a-z][a-z0-9_]*)\.[0-9A-F]{32}\.js$/)
           : null;
         if (match && approvedScriptModules.indexOf(match[1]) !== -1) {
+          return value;
+        }
+        if (approvedWorkerScripts.indexOf(value) !== -1) {
           return value;
         }
         throw new TypeError("Unapproved script URL assignment blocked.");

@@ -27,6 +27,8 @@
   (is (fn? effect-adapters/api-cancel-order))
   (is (fn? effect-adapters/api-submit-position-tpsl))
   (is (fn? effect-adapters/api-submit-position-margin))
+  (is (fn? effect-adapters/api-submit-close-all-positions))
+  (is (fn? effect-adapters/make-api-submit-close-all-positions))
   (is (fn? effect-adapters/sync-active-asset-funding-predictability))
   (is (fn? effect-adapters/api-fetch-predicted-fundings-effect))
   (is (fn? effect-adapters/api-fetch-hyperunit-fee-estimate-effect))

@@ -25,6 +25,7 @@
    [:effects/api-cancel-order :api-cancel-order]
    [:effects/api-submit-position-tpsl :api-submit-position-tpsl]
    [:effects/api-submit-position-margin :api-submit-position-margin]
+   [:effects/api-submit-close-all-positions :api-submit-close-all-positions]
    [:effects/clear-order-feedback-toast-timeout :clear-order-feedback-toast-timeout]])
 
 (def effect-order-policy-required-action-ids
@@ -35,6 +36,7 @@
     :actions/select-account-info-tab
     :actions/open-position-reduce-popover
     :actions/submit-order
+    :actions/submit-close-all-positions-confirmation
     :actions/submit-position-margin-update
     :actions/confirm-order-submission
     :actions/submit-cancel-visible-open-orders-confirmation
@@ -131,6 +133,9 @@
    [:actions/set-position-tpsl-limit-price :set-position-tpsl-limit-price]
    [:actions/submit-position-tpsl :submit-position-tpsl]
    [:actions/trigger-close-all-positions :trigger-close-all-positions]
+   [:actions/dismiss-close-all-positions-confirmation :dismiss-close-all-positions-confirmation]
+   [:actions/handle-close-all-positions-confirmation-keydown :handle-close-all-positions-confirmation-keydown]
+   [:actions/submit-close-all-positions-confirmation :submit-close-all-positions-confirmation]
    [:actions/open-position-reduce-popover :open-position-reduce-popover]
    [:actions/close-position-reduce-popover :close-position-reduce-popover]
    [:actions/handle-position-reduce-popover-keydown :handle-position-reduce-popover-keydown]

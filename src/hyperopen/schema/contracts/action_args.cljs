@@ -51,6 +51,18 @@
   (s/or :position-only (s/tuple map?)
         :position-and-anchor (s/tuple map? any?)))
 (s/def ::position-margin-modal-field-args (s/tuple ::common/state-path any?))
+(def ^:private close-all-trigger-bound-keys
+  #{:left :right :top :bottom :width :height :viewport-width :viewport-height})
+(defn- close-all-trigger-bounds?
+  [bounds]
+  (and (map? bounds)
+       (seq bounds)
+       (every? close-all-trigger-bound-keys (keys bounds))
+       (every? number? (vals bounds))))
+(s/def ::close-all-trigger-args
+  (s/or :none ::common/no-args
+        :bounds (s/tuple (s/or :resolved-bounds close-all-trigger-bounds?
+                                :bounds-placeholder #{:event.currentTarget/bounds}))))
 (s/def ::funding-send-open-args
   (s/or :none ::common/no-args
         :context-only (s/tuple map?)
@@ -521,7 +533,10 @@
    :actions/set-position-tpsl-configure-amount ::common/boolean-args
    :actions/set-position-tpsl-limit-price ::common/boolean-args
    :actions/submit-position-tpsl ::common/no-args
-   :actions/trigger-close-all-positions ::common/no-args
+   :actions/trigger-close-all-positions ::close-all-trigger-args
+   :actions/dismiss-close-all-positions-confirmation ::common/no-args
+   :actions/handle-close-all-positions-confirmation-keydown ::common/key-args
+   :actions/submit-close-all-positions-confirmation ::common/no-args
    :actions/open-position-reduce-popover ::position-reduce-open-args
    :actions/close-position-reduce-popover ::common/no-args
    :actions/handle-position-reduce-popover-keydown ::common/key-args

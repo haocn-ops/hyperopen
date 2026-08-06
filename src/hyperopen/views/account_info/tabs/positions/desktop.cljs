@@ -11,7 +11,8 @@
             [hyperopen.views.account-info.shared :as shared]
             [hyperopen.views.account-info.table :as table]
             [hyperopen.views.account-info.tabs.positions.layout :as positions-layout]
-            [hyperopen.views.account-info.tabs.positions.shared :as positions-shared]))
+            [hyperopen.views.account-info.tabs.positions.shared :as positions-shared]
+            [hyperopen.views.ui.anchored-popover :as anchored-popover]))
 
 (defn- position-coin-click-actions
   [coin positions-state]
@@ -239,12 +240,105 @@
                                  :actions/sort-positions
                                  {:explanation explanation})))
 
+(def ^:private close-all-confirmation-preferred-width-px 392)
+(def ^:private close-all-confirmation-estimated-height-px 256)
+
+(defn- close-all-confirmation-anchored?
+  [confirmation]
+  (and (positions-layout/active-desktop-table-layout?)
+       (anchored-popover/complete-anchor? (:trigger-bounds confirmation))))
+
+(defn close-all-confirmation-view
+  [confirmation]
+  (when (and (true? (:open? confirmation))
+             (positions-layout/active-desktop-table-layout?))
+    (let [snapshot (vec (or (:snapshot confirmation) []))
+          position-count (count snapshot)
+          lifecycle (:lifecycle confirmation)
+          submitting? (= :submitting lifecycle)
+          anchored? (close-all-confirmation-anchored? confirmation)
+          popover-style (when anchored?
+                          (anchored-popover/anchored-popover-layout-style
+                           {:anchor (:trigger-bounds confirmation)
+                            :preferred-width-px close-all-confirmation-preferred-width-px
+                            :estimated-height-px close-all-confirmation-estimated-height-px}))
+          error (some-> (:error confirmation) str)]
+      [:div {:class (into ["fixed" "inset-0" "z-[220]"]
+                          (if anchored?
+                            ["pointer-events-none"]
+                            ["flex" "items-center" "justify-center" "p-4"]))
+             :data-role "positions-close-all-confirmation-layer"}
+       [:button {:type "button"
+                 :class ["absolute" "inset-0" "pointer-events-auto" "bg-black/45" "backdrop-blur-[1px]"]
+                 :disabled submitting?
+                 :aria-label "Dismiss close all positions confirmation"
+                 :data-role "positions-close-all-confirmation-backdrop"
+                 :on (when-not submitting?
+                       {:click [[:actions/dismiss-close-all-positions-confirmation]]})}]
+       [:div {:class ["relative" "z-[221]" "w-full" "max-w-[24rem]" "space-y-4"
+                      "rounded-lg" "border" "border-ho-border-sell" "bg-ho-bg-deep" "p-4"
+                      "shadow-[0_24px_60px_rgb(var(--ho-bg-deep)/0.72)]" "pointer-events-auto"]
+              :style popover-style
+              :role "dialog"
+              :aria-modal "true"
+              :aria-label "Close all positions confirmation"
+              :tab-index 0
+              :data-role "positions-close-all-confirmation"
+              :on {:keydown [[:actions/handle-close-all-positions-confirmation-keydown
+                              [:event/key]]]}}
+        [:div {:class ["space-y-2"]}
+         [:div {:class ["text-xs" "font-medium" "text-trading-text-secondary"]
+                :data-role "positions-close-all-confirmation-count"}
+          (str position-count " position" (when (not= 1 position-count) "s"))]
+         [:h3 {:class ["text-lg" "font-semibold" "text-trading-text"]}
+          "Close All Positions?"]]
+        (cond
+          submitting?
+          [:p {:class ["text-sm" "text-trading-text-secondary"]}
+           (str "Closing " position-count " positions...")]
+
+          (= :success lifecycle)
+          [:p {:class ["text-sm" "text-trading-green"]}
+           (str "Close requests submitted for " (:accepted-count confirmation) " positions")]
+
+          :else
+          [:p {:class ["text-sm" "leading-6" "text-trading-text-secondary"]}
+           (str "Submit reduce-only market close requests for " position-count " positions.")])
+        (when (seq error)
+          [:p {:class ["text-sm" "text-trading-red"]
+               :role "alert"}
+           error])
+        (when (= :error lifecycle)
+          [:p {:class ["text-xs" "text-trading-text-secondary"]}
+           (str (:accepted-count confirmation) " accepted, "
+                (:rejected-count confirmation) " rejected")])
+        [:div {:class ["flex" "justify-end" "gap-2" "pt-1"]}
+         [:button {:type "button"
+                   :autofocus true
+                   :disabled submitting?
+                   :class ["rounded-lg" "border" "border-ho-border-accent-muted" "px-3.5" "py-2"
+                           "text-sm" "font-medium" "text-trading-text" "transition-colors"
+                           "focus:outline-none"]
+                   :on (when-not submitting?
+                         {:click [[:actions/dismiss-close-all-positions-confirmation]]})}
+          "Cancel"]
+         [:button {:type "button"
+                   :disabled (or submitting? (zero? position-count))
+                   :class ["rounded-lg" "border" "border-ho-border-sell" "bg-ho-sell-soft/55" "px-3.5" "py-2"
+                           "text-sm" "font-medium" "text-ho-sell-tint" "transition-colors"
+                           "focus:outline-none"]
+                   :on (when-not submitting?
+                         {:click [[:actions/submit-close-all-positions-confirmation]]})}
+          "Close all positions"]]]])))
+
 (defn position-table-header
   ([sort-state]
-   (position-table-header sort-state false []))
+   (position-table-header sort-state false [] {:close-all-available? true}))
   ([sort-state extra-classes]
-   (position-table-header sort-state false extra-classes))
+   (position-table-header sort-state false extra-classes {:close-all-available? true}))
   ([sort-state read-only? extra-classes]
+   (position-table-header sort-state read-only? extra-classes {:close-all-available? true}))
+  ([sort-state read-only? extra-classes positions-state]
    (into [:div {:class (into ["grid"
                               (positions-layout/positions-grid-template-class read-only?)
                               "gap-2"
@@ -263,7 +357,9 @@
           [:div.text-left (sortable-header "Margin" sort-state margin-header-explanation)]
           [:div.text-left (sortable-header "Funding" sort-state funding-header-explanation)]]
          (concat
-          (when-not read-only?
+          (when (and (not read-only?)
+                     (true? (:close-all-available? positions-state))
+                     (positions-layout/active-desktop-table-layout?))
             [[:div.text-left
               [:button {:class (into ["w-full"
                                       "text-left"
@@ -275,6 +371,11 @@
                                      (concat table/header-base-text-classes
                                              table/sortable-header-interaction-classes))
                         :type "button"
-                        :on {:click [[:actions/trigger-close-all-positions]]}}
+                        :data-role "positions-close-all-trigger"
+                        :aria-expanded (if (true? (get-in positions-state [:close-all-confirmation :open?]))
+                                        "true"
+                                        "false")
+                        :disabled (= :submitting (get-in positions-state [:close-all-confirmation :lifecycle]))
+                        :on {:click [[:actions/trigger-close-all-positions :event.currentTarget/bounds]]}}
                "Close All"]]])
           [[:div.text-left (table/non-sortable-header "TP/SL")]]))))

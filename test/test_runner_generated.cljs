@@ -5,6 +5,7 @@
             [hyperopen.account-tab-modules-test]
             [hyperopen.account.context-test]
             [hyperopen.account.history.actions-test]
+            [hyperopen.account.history.close-all-positions-test]
             [hyperopen.account.history.effects-csv-export-test]
             [hyperopen.account.history.effects-funding-fetch-test]
             [hyperopen.account.history.effects-funding-merge-test]
@@ -121,6 +122,7 @@
             [hyperopen.core-bootstrap.chart-menu-and-storage-test]
             [hyperopen.core-bootstrap.order-effects.attribution-test]
             [hyperopen.core-bootstrap.order-effects.cancel-test]
+            [hyperopen.core-bootstrap.order-effects.close-all-positions-test]
             [hyperopen.core-bootstrap.order-effects.position-margin-test]
             [hyperopen.core-bootstrap.order-effects.position-tpsl-test]
             [hyperopen.core-bootstrap.order-effects.subaccount-routing-test]
@@ -169,6 +171,7 @@
             [hyperopen.funding.application.modal-vm.presentation-test]
             [hyperopen.funding.application.submit-effects-test]
             [hyperopen.funding.domain.assets-test]
+            [hyperopen.funding.domain.legal-check-test]
             [hyperopen.funding.domain.named-dex-transfer-preview-test]
             [hyperopen.funding.domain.policy-preview-test]
             [hyperopen.funding.domain.policy-test]
@@ -872,6 +875,7 @@
     (run-tests env 'hyperopen.account-tab-modules-test
              'hyperopen.account.context-test
              'hyperopen.account.history.actions-test
+             'hyperopen.account.history.close-all-positions-test
              'hyperopen.account.history.effects-csv-export-test
              'hyperopen.account.history.effects-funding-fetch-test
              'hyperopen.account.history.effects-funding-merge-test
@@ -988,6 +992,7 @@
              'hyperopen.core-bootstrap.chart-menu-and-storage-test
              'hyperopen.core-bootstrap.order-effects.attribution-test
              'hyperopen.core-bootstrap.order-effects.cancel-test
+             'hyperopen.core-bootstrap.order-effects.close-all-positions-test
              'hyperopen.core-bootstrap.order-effects.position-margin-test
              'hyperopen.core-bootstrap.order-effects.position-tpsl-test
              'hyperopen.core-bootstrap.order-effects.subaccount-routing-test
@@ -1036,6 +1041,7 @@
              'hyperopen.funding.application.modal-vm.presentation-test
              'hyperopen.funding.application.submit-effects-test
              'hyperopen.funding.domain.assets-test
+             'hyperopen.funding.domain.legal-check-test
              'hyperopen.funding.domain.named-dex-transfer-preview-test
              'hyperopen.funding.domain.policy-preview-test
              'hyperopen.funding.domain.policy-test

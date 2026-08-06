@@ -219,6 +219,12 @@ function assertEqualJson(expected, actual, label) {
 }
 
 async function resolveVerificationOutput(options, tenantId) {
+  if (options.allowedOutputRoot) {
+    return {
+      repositoryRoot: path.resolve(options.repositoryRoot),
+      outputPath: await assertReleasePathContained(options.outputPath, options.allowedOutputRoot),
+    };
+  }
   if (!options.allowStagingOutput) {
     const paths = await resolveWhiteLabelPaths({
       repositoryRoot: options.repositoryRoot,

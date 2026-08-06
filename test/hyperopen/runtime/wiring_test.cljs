@@ -20,7 +20,8 @@
 (deftest runtime-deps-load-route-owned-optimizer-and-vault-handlers-through-lazy-route-runtime-deps-test
   (let [runtime {:runtime-id :lazy-route-runtime}
         funding-workflow-effect-keys
-        [:api-fetch-hyperunit-fee-estimate
+        [:api-fetch-hyperliquid-legal-check
+         :api-fetch-hyperunit-fee-estimate
          :api-fetch-hyperunit-withdrawal-queue
          :api-submit-funding-transfer
          :api-submit-funding-send

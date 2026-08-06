@@ -91,8 +91,7 @@
         mid-effects (history-actions/set-position-reduce-limit-price-to-mid
                      {:positions-ui {:reduce-popover (assoc opened-popover :limit-price "")}})
         closed-effects (history-actions/close-position-reduce-popover {})
-        submit-effects (history-actions/submit-position-reduce-close {})
-        close-all-effects (history-actions/trigger-close-all-positions {})]
+        submit-effects (history-actions/submit-position-reduce-close {})]
     (is (= [:effects/save-many [:effects/fetch-asset-selector-markets]]
            [(ffirst open-effects) (second open-effects)]))
     (is (true? (:open? opened-popover)))
@@ -119,7 +118,89 @@
              (assoc (position-reduce/default-popover-state)
                     :error "Place Order")]]
            submit-effects))
-    (is (= [] close-all-effects))))
+    ))
+
+(deftest close-all-positions-trigger-opens-a-confirmation-with-a-current-snapshot-test
+  (let [state {:webdata2 {:clearinghouseState
+                          {:assetPositions [{:position {:coin "BTC"
+                                                        :szi "1.25"}}]}}
+               :perp-dex-clearinghouse {"xyz" {:assetPositions [{:position {:coin "xyz:NVDA"
+                                                                             :szi "-2.5"}}]}}}
+        bounds {:left 120 :right 196 :top 32 :bottom 56
+                :width 76 :height 24 :viewport-width 1440 :viewport-height 900}
+        effects (history-actions/trigger-close-all-positions state bounds)
+        confirmation (nth (first effects) 2)]
+    (is (= :effects/save (ffirst effects)))
+    (is (= [:positions-ui :close-all-confirmation]
+           (second (first effects))))
+    (is (true? (:open? confirmation)))
+    (is (= :confirming (:lifecycle confirmation)))
+    (is (= bounds (:trigger-bounds confirmation)))
+    (is (= [{:position-key "BTC|default" :coin "BTC" :dex nil :szi "1.25"}
+            {:position-key "xyz:NVDA|xyz" :coin "xyz:NVDA" :dex "xyz" :szi "-2.5"}]
+           (:snapshot confirmation)))
+    (is (= 1 (count effects))
+        "Opening confirmation is local only and must never submit an order.")))
+
+(deftest close-all-positions-confirmation-dismisses-on-cancel-or-escape-test
+  (let [confirmation {:open? true
+                      :lifecycle :confirming
+                      :snapshot [{:position-key "BTC|default" :coin "BTC" :dex nil :szi "1"}]
+                      :trigger-bounds {:left 12 :right 36 :top 8 :bottom 32
+                                       :width 24 :height 24 :viewport-width 1440 :viewport-height 900}
+                      :error nil
+                      :accepted-count 0
+                      :rejected-count 0}
+        state {:positions-ui {:close-all-confirmation confirmation}}
+        dismiss-effects (history-actions/dismiss-close-all-positions-confirmation state)
+        escape-effects (history-actions/handle-close-all-positions-confirmation-keydown state "Escape")]
+    (doseq [effects [dismiss-effects escape-effects]]
+      (let [next-confirmation (nth (first effects) 2)]
+        (is (= :effects/save (ffirst effects)))
+        (is (= [:positions-ui :close-all-confirmation]
+               (second (first effects))))
+        (is (false? (:open? next-confirmation)))
+        (is (nil? (:snapshot next-confirmation)))
+        (is (= 1 (count effects)))))
+    (is (= []
+           (history-actions/handle-close-all-positions-confirmation-keydown state "Enter")))))
+
+(deftest close-all-positions-submission-rejects-stale-read-only-spectate-empty-and-duplicate-states-test
+  (let [snapshot [{:position-key "BTC|default" :coin "BTC" :dex nil :szi "1"}]
+        confirming {:open? true :lifecycle :confirming :snapshot snapshot
+                    :trigger-bounds nil :error nil :accepted-count 0 :rejected-count 0}
+        current-state {:webdata2 {:clearinghouseState {:assetPositions [{:position {:coin "BTC" :szi "2"}}]}}
+                       :positions-ui {:close-all-confirmation confirming}}
+        stale-effects (history-actions/submit-close-all-positions-confirmation current-state)
+        stale-confirmation (nth (first stale-effects) 2)
+        submitting-state (assoc-in current-state [:positions-ui :close-all-confirmation :lifecycle] :submitting)
+        read-only-state (assoc current-state :account-context {:spectate-mode {:active? true
+                                                                                :address "0x1234567890abcdef1234567890abcdef12345678"}})
+        empty-state {:positions-ui {:close-all-confirmation confirming}
+                     :webdata2 {:clearinghouseState {:assetPositions [{:position {:coin "BTC" :szi "0"}}]}}}]
+    (is (= :effects/save (ffirst stale-effects)))
+    (is (= :error (:lifecycle stale-confirmation)))
+    (is (= "Positions changed. Review current positions before closing."
+           (:error stale-confirmation)))
+    (is (not-any? #(= :effects/api-submit-close-all-positions (first %)) stale-effects))
+    (is (= []
+           (history-actions/submit-close-all-positions-confirmation submitting-state)))
+    (is (= []
+           (history-actions/dismiss-close-all-positions-confirmation submitting-state)))
+    (is (= []
+           (history-actions/handle-close-all-positions-confirmation-keydown submitting-state "Escape")))
+    (doseq [state [read-only-state empty-state]]
+      (let [effects (history-actions/submit-close-all-positions-confirmation state)]
+        (is (not-any? #(= :effects/api-submit-close-all-positions (first %)) effects))))))
+
+(deftest close-all-positions-trigger-is-unavailable-for-read-only-spectate-and-empty-accounts-test
+  (let [position-state {:webdata2 {:clearinghouseState {:assetPositions [{:position {:coin "BTC" :szi "1"}}]}}}
+        spectate-state (assoc position-state :account-context {:spectate-mode {:active? true
+                                                                                 :address "0x1234567890abcdef1234567890abcdef12345678"}})
+        read-only-state (assoc position-state :account-info {:positions {:read-only? true}})
+        empty-state {:webdata2 {:clearinghouseState {:assetPositions [{:position {:coin "BTC" :szi "0"}}]}}}]
+    (doseq [state [spectate-state read-only-state empty-state]]
+      (is (= [] (history-actions/trigger-close-all-positions state))))))
 
 (deftest position-reduce-popover-parses-localized-input-values-test
   (let [row (fixtures/sample-position-row "xyz:NVDA" 10 "0.500")

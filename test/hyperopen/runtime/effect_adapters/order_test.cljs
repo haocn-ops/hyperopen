@@ -17,10 +17,34 @@
   (is (identical? order-adapters/api-cancel-order effect-adapters/api-cancel-order))
   (is (identical? order-adapters/api-submit-position-tpsl effect-adapters/api-submit-position-tpsl))
   (is (identical? order-adapters/api-submit-position-margin effect-adapters/api-submit-position-margin))
+  (is (identical? order-adapters/api-submit-close-all-positions effect-adapters/api-submit-close-all-positions))
   (is (identical? order-adapters/make-api-submit-order effect-adapters/make-api-submit-order))
   (is (identical? order-adapters/make-api-cancel-order effect-adapters/make-api-cancel-order))
   (is (identical? order-adapters/make-api-submit-position-tpsl effect-adapters/make-api-submit-position-tpsl))
-  (is (identical? order-adapters/make-api-submit-position-margin effect-adapters/make-api-submit-position-margin)))
+  (is (identical? order-adapters/make-api-submit-position-margin effect-adapters/make-api-submit-position-margin))
+  (is (identical? order-adapters/make-api-submit-close-all-positions effect-adapters/make-api-submit-close-all-positions)))
+
+(deftest close-all-order-adapter-injects-the-standard-runtime-aware-dependencies-test
+  (let [runtime (atom {:timeouts {:order-toast {}}})
+        store (make-toast-store)
+        calls (atom [])]
+    (with-redefs [order-effects/api-submit-close-all-positions
+                  (fn [deps ctx store* request]
+                    (swap! calls conj {:deps deps :ctx ctx :store store* :request request})
+                    :close-all-result)]
+      (is (= :close-all-result
+             (order-adapters/api-submit-close-all-positions :default store {:id :default})))
+      (is (= :close-all-result
+             (order-adapters/api-submit-close-all-positions runtime :explicit store {:id :explicit})))
+      (is (= :close-all-result
+             ((order-adapters/make-api-submit-close-all-positions runtime)
+              :factory store {:id :factory}))))
+    (is (= [:default :explicit :factory] (mapv :ctx @calls)))
+    (doseq [{:keys [deps]} @calls]
+      (is (identical? nxr/dispatch (:dispatch! deps)))
+      (is (identical? common/exchange-response-error (:exchange-response-error deps)))
+      (is (identical? common/runtime-error-message (:runtime-error-message deps)))
+      (is (fn? (:show-toast! deps))))))
 
 (deftest order-feedback-toast-adapters-manage-store-and-runtime-timeouts-test
   (let [store (make-toast-store)

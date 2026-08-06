@@ -1,10 +1,44 @@
 (ns hyperopen.funding.application.submit-effects
   (:require [clojure.string :as str]
-            [hyperopen.account.context :as account-context]))
+            [hyperopen.account.context :as account-context]
+            [hyperopen.funding.domain.legal-check :as legal-check]))
 
 (defn- spectate-mode-submit-error
   [store]
   (account-context/mutations-blocked-message @store))
+
+(defn- legal-check-now-ms
+  [now-ms-fn]
+  (if (fn? now-ms-fn)
+    (now-ms-fn)
+    (js/Date.now)))
+
+(defn- store-legal-check!
+  [store decision now-ms-fn]
+  (swap! store assoc-in [:funding-ui :modal :legal-check]
+         (assoc decision :checked-at-ms (legal-check-now-ms now-ms-fn)))
+  decision)
+
+(defn- legal-check-before-submit!
+  [store address request-hyperliquid-legal-check! now-ms-fn]
+  (let [request-result (try
+                         (if (fn? request-hyperliquid-legal-check!)
+                           (request-hyperliquid-legal-check! address)
+                           nil)
+                         (catch :default _
+                           nil))
+        request-promise (if (some? (some-> request-result .-then))
+                          request-result
+                          (js/Promise.resolve request-result))]
+    (-> request-promise
+        (.then (fn [response]
+                 (store-legal-check! store
+                                     (legal-check/assess response)
+                                     now-ms-fn)))
+        (.catch (fn [_]
+                  (store-legal-check! store
+                                      (legal-check/assess nil)
+                                      now-ms-fn))))))
 
 (defn api-submit-funding-send!
   [{:keys [store
@@ -106,6 +140,7 @@
            submit-hyperunit-send-asset-withdraw-request-fn
            request-hyperunit-operations!
            request-hyperunit-withdrawal-queue!
+           request-hyperliquid-legal-check!
            set-timeout-fn
            now-ms-fn
            exchange-response-error
@@ -139,8 +174,27 @@
       (set-funding-submit-error! store
                                  show-toast!
                                  "Connect your wallet before withdrawing.")
-      (-> (submit-withdraw! store address action)
-          (.then (fn [resp]
+      (let [legal-check-promise (legal-check-before-submit! store
+                                                            address
+                                                            request-hyperliquid-legal-check!
+                                                            now-ms-fn)
+            submit-promise (.then legal-check-promise
+                                  (fn [decision]
+                   (if (not= :allowed (:status decision))
+                     (set-funding-submit-error! store
+                                                show-toast!
+                                                (or (:message decision)
+                                                    legal-check/unavailable-message))
+                     (let [submit-result (try
+                                           (submit-withdraw! store address action)
+                                           (catch :default err
+                                             (js/Promise.reject err)))]
+                       (if (some? (some-> submit-result .-then))
+                         submit-result
+                         (js/Promise.resolve submit-result))))))
+            response-promise (.then submit-promise
+                                    (fn [resp]
+                   (when resp
                    (if (= "ok" (:status resp))
                      (if (true? (:keep-modal-open? resp))
                        (let [asset-key (some-> (:asset resp) str str/lower-case keyword)
@@ -185,8 +239,9 @@
                            message (str "Withdrawal failed: "
                                         (if (seq error-text) error-text "Unknown exchange error"))]
                        (set-funding-submit-error! store show-toast! message)
-                       resp))))
-          (.catch (fn [err]
+                       resp)))))]
+        (.catch response-promise
+                (fn [err]
                     (let [error-text (str/trim (str (runtime-error-message err)))
                           message (str "Withdrawal failed: "
                                        (if (seq error-text) error-text "Unknown runtime error"))]
@@ -201,6 +256,7 @@
            submit-usdh-across-deposit!
            submit-hyperunit-address-request!
            request-hyperunit-operations!
+           request-hyperliquid-legal-check!
            set-timeout-fn
            now-ms-fn
            runtime-error-message
@@ -229,15 +285,27 @@
       (set-funding-submit-error! store
                                  show-toast!
                                  "Connect your wallet before depositing.")
-      (let [submit-result (try
-                            (submit-deposit! store address action)
-                            (catch :default err
-                              (js/Promise.reject err)))
-            submit-promise (if (fn? (some-> submit-result .-then))
-                             submit-result
-                             (js/Promise.resolve submit-result))]
-        (-> submit-promise
-            (.then (fn [resp]
+      (let [legal-check-promise (legal-check-before-submit! store
+                                                            address
+                                                            request-hyperliquid-legal-check!
+                                                            now-ms-fn)
+            submit-promise (.then legal-check-promise
+                                  (fn [decision]
+                   (if (not= :allowed (:status decision))
+                     (set-funding-submit-error! store
+                                                show-toast!
+                                                (or (:message decision)
+                                                    legal-check/unavailable-message))
+                     (let [submit-result (try
+                                           (submit-deposit! store address action)
+                                           (catch :default err
+                                             (js/Promise.reject err)))]
+                       (if (some? (some-> submit-result .-then))
+                         submit-result
+                         (js/Promise.resolve submit-result))))))
+            response-promise (.then submit-promise
+                                    (fn [resp]
+                   (when resp
                      (if (= "ok" (:status resp))
                        (if (true? (:keep-modal-open? resp))
                          (let [asset-key (some-> (:asset resp) str str/lower-case keyword)
@@ -285,9 +353,10 @@
                              message (str "Deposit failed: "
                                           (if (seq error-text) error-text "Unknown runtime error"))]
                          (set-funding-submit-error! store show-toast! message)
-                         resp))))
-            (.catch (fn [err]
+                         resp)))))]
+        (.catch response-promise
+                (fn [err]
                       (let [error-text (str/trim (str (runtime-error-message err)))
                             message (str "Deposit failed: "
                                          (if (seq error-text) error-text "Unknown runtime error"))]
-                        (set-funding-submit-error! store show-toast! message))))))))))
+                        (set-funding-submit-error! store show-toast! message)))))))))

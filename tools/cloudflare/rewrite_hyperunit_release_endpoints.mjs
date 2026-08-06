@@ -5,28 +5,37 @@ import { fileURLToPath } from "node:url";
 const MAINNET_ORIGIN = "https://api.hyperunit.xyz";
 const TESTNET_ORIGIN = "https://api.hyperunit-testnet.xyz";
 const MAINNET_DISABLED_BASE = "/__hyperopen_disabled__/hyperunit-mainnet";
+const TESTNET_DISABLED_BASE = "/__hyperopen_disabled__/hyperunit-testnet";
+const MAINNET_PROXY_BASE = "/api/hyperunit/mainnet";
 const TESTNET_PROXY_BASE = "/api/hyperunit/testnet";
 const URL_BOUNDARY = String.raw`(?=$|[/?#"'\x60\s])`;
 
 function usageError(message) {
-  throw new Error(`${message}\nUsage: node tools/cloudflare/rewrite_hyperunit_release_endpoints.mjs [--release-directory <path>]`);
+  throw new Error(`${message}\nUsage: node tools/cloudflare/rewrite_hyperunit_release_endpoints.mjs [--release-directory <path>] [--network testnet|mainnet]`);
 }
 
 function parseArguments(argumentsList) {
   let releaseDirectory = path.resolve("out/release-public");
+  let network = "testnet";
   for (let index = 0; index < argumentsList.length; index += 1) {
     const argument = argumentsList[index];
-    if (argument !== "--release-directory") {
+    if (!["--release-directory", "--network"].includes(argument)) {
       usageError(`Unknown argument: ${argument}`);
     }
     const value = argumentsList[index + 1];
     if (!value || value.startsWith("--")) {
       usageError("--release-directory requires a path.");
     }
-    releaseDirectory = path.resolve(value);
+    if (argument === "--release-directory") {
+      releaseDirectory = path.resolve(value);
+    } else if (["testnet", "mainnet"].includes(value)) {
+      network = value;
+    } else {
+      usageError("--network must be testnet or mainnet.");
+    }
     index += 1;
   }
-  return releaseDirectory;
+  return { network, releaseDirectory };
 }
 
 function replacementPattern(origin) {
@@ -62,7 +71,10 @@ async function collectJavaScriptFiles(directoryPath) {
   return files.sort();
 }
 
-export async function rewriteReleaseJavaScript(releaseDirectory) {
+export async function rewriteReleaseJavaScript(releaseDirectory, { network = "testnet" } = {}) {
+  if (!["testnet", "mainnet"].includes(network)) {
+    throw new Error("HyperUnit release network must be testnet or mainnet.");
+  }
   const releaseRootStat = await fs.lstat(releaseDirectory);
   if (releaseRootStat.isSymbolicLink()) {
     throw new Error(`Release directory contains a symbolic link: ${releaseDirectory}`);
@@ -75,6 +87,8 @@ export async function rewriteReleaseJavaScript(releaseDirectory) {
   const files = await collectJavaScriptFiles(javascriptDirectory);
   const mainnetPattern = replacementPattern(MAINNET_ORIGIN);
   const testnetPattern = replacementPattern(TESTNET_ORIGIN);
+  const mainnetReplacement = network === "mainnet" ? MAINNET_PROXY_BASE : MAINNET_DISABLED_BASE;
+  const testnetReplacement = network === "testnet" ? TESTNET_PROXY_BASE : TESTNET_DISABLED_BASE;
   const rewrites = [];
   let mainnetCount = 0;
   let testnetCount = 0;
@@ -88,8 +102,8 @@ export async function rewriteReleaseJavaScript(releaseDirectory) {
     rewrites.push({
       filePath,
       contents: contents
-        .replace(mainnetPattern, MAINNET_DISABLED_BASE)
-        .replace(testnetPattern, TESTNET_PROXY_BASE),
+        .replace(mainnetPattern, mainnetReplacement)
+        .replace(testnetPattern, testnetReplacement),
       mainnetCount: fileMainnetCount,
       testnetCount: fileTestnetCount,
     });
@@ -130,7 +144,7 @@ export async function rewriteReleaseJavaScript(releaseDirectory) {
   }
 
   console.log(
-    `Rewrote HyperUnit release endpoints: mainnet=${mainnetCount}, testnet=${testnetCount}.`
+    `Rewrote HyperUnit release endpoints for ${network}: mainnet=${mainnetCount}, testnet=${testnetCount}.`
   );
   for (const rewrite of rewrites) {
     if (rewrite.mainnetCount || rewrite.testnetCount) {
@@ -142,7 +156,8 @@ export async function rewriteReleaseJavaScript(releaseDirectory) {
 }
 
 async function main() {
-  await rewriteReleaseJavaScript(parseArguments(process.argv.slice(2)));
+  const { network, releaseDirectory } = parseArguments(process.argv.slice(2));
+  await rewriteReleaseJavaScript(releaseDirectory, { network });
 }
 
 const invokedDirectly =

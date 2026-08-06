@@ -67,6 +67,12 @@
    :set-position-tpsl-limit-price account-history-actions/set-position-tpsl-limit-price
    :submit-position-tpsl account-history-actions/submit-position-tpsl
    :trigger-close-all-positions account-history-actions/trigger-close-all-positions
+   :dismiss-close-all-positions-confirmation
+   account-history-actions/dismiss-close-all-positions-confirmation
+   :handle-close-all-positions-confirmation-keydown
+   account-history-actions/handle-close-all-positions-confirmation-keydown
+   :submit-close-all-positions-confirmation
+   account-history-actions/submit-close-all-positions-confirmation
    :open-position-reduce-popover account-history-actions/open-position-reduce-popover
    :close-position-reduce-popover account-history-actions/close-position-reduce-popover
    :handle-position-reduce-popover-keydown

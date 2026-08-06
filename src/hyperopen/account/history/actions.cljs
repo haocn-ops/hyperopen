@@ -280,6 +280,15 @@
 (def trigger-close-all-positions
   position-overlay-actions/trigger-close-all-positions)
 
+(def dismiss-close-all-positions-confirmation
+  position-overlay-actions/dismiss-close-all-positions-confirmation)
+
+(def handle-close-all-positions-confirmation-keydown
+  position-overlay-actions/handle-close-all-positions-confirmation-keydown)
+
+(def submit-close-all-positions-confirmation
+  position-overlay-actions/submit-close-all-positions-confirmation)
+
 (def open-position-reduce-popover
   position-overlay-actions/open-position-reduce-popover)
 

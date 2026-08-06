@@ -173,6 +173,11 @@
   []
   {:submit-send-asset! (fn [_store _address _action]
                          (js/Promise.resolve {:status "ok"}))
+   :request-hyperliquid-legal-check! (fn [_address]
+                                      (js/Promise.resolve
+                                       {:acceptedTerms true
+                                        :userAllowed true
+                                        :restrictions "n"}))
    :exchange-response-error fallback-exchange-response-error
    :runtime-error-message fallback-runtime-error-message
    :default-funding-modal-state default-funding-modal-state

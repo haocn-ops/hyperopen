@@ -3,6 +3,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
+import vm from "node:vm";
 
 import {
   DEFAULT_CANONICAL_ORIGIN,
@@ -196,6 +197,57 @@ test("release document policy excludes Cloudflare Insights scripts and declares 
   assert.deepEqual(requireTrustedTypes, ["'script'"]);
   assert.deepEqual(trustedTypes, ["default"]);
   assert.equal(STRICT_TRANSPORT_SECURITY, "max-age=31536000; includeSubDomains");
+});
+
+test("theme preload Trusted Types policy permits only approved script modules and workers", () => {
+  let defaultPolicy;
+
+  vm.runInNewContext(THEME_PRELOAD_INLINE_SOURCE, {
+    document: { documentElement: { dataset: {} } },
+    localStorage: { getItem: () => null },
+    trustedTypes: {
+      createPolicy(name, callbacks) {
+        assert.equal(name, "default");
+        defaultPolicy = callbacks;
+        return callbacks;
+      },
+    },
+  });
+
+  assert.ok(defaultPolicy);
+
+  const approvedUrls = [
+    "/js/portfolio_route.0123456789ABCDEF0123456789ABCDEF.js",
+    "/js/portfolio_worker.js",
+    "/js/portfolio_optimizer_worker.js",
+    "/js/vault_detail_worker.js",
+  ];
+  for (const url of approvedUrls) {
+    let trustedUrl;
+    assert.doesNotThrow(
+      () => {
+        trustedUrl = defaultPolicy.createScriptURL(url);
+      },
+      `default policy must accept ${url}`
+    );
+    assert.equal(trustedUrl, url);
+  }
+
+  const rejectedUrls = [
+    "/js/other_worker.js",
+    "/js/portfolio_worker.js?cache=1",
+    "/js/portfolio_optimizer_worker.js?cache=1",
+    "/js/vault_detail_worker.js?cache=1",
+    "/workers/portfolio_worker.js",
+    "/js/portfolio_route.js",
+    "/js/other_route.0123456789ABCDEF0123456789ABCDEF.js",
+  ];
+  for (const url of rejectedUrls) {
+    assert.throws(
+      () => defaultPolicy.createScriptURL(url),
+      /Unapproved script URL assignment blocked\./
+    );
+  }
 });
 
 function buildSampleIndexHtml() {

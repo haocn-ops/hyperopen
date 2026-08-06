@@ -3,6 +3,7 @@
             [hyperopen.account.context :as account-context]
             [hyperopen.funding.application.deposit-submit :as deposit-submit]
             [hyperopen.funding.application.submit-effects :as effects]
+            [hyperopen.funding.domain.legal-check :as legal-check]
             [hyperopen.funding.test-support.effects :as effects-support]
             [hyperopen.test-support.async :as async-support]))
 
@@ -54,6 +55,38 @@
            (get-in @store [:funding-ui :modal :error])))
     (is (= [[:error "Connect your wallet before depositing."]]
            @toasts))))
+
+(deftest api-submit-funding-deposit-blocked-legal-check-never-invokes-signer-test
+  (async done
+    (let [store (atom {:wallet {:address "0xabc"}
+                       :funding-ui {:modal (effects-support/seed-modal :deposit)}})
+          signer-calls (atom 0)
+          toasts (atom [])]
+      (-> (effects/api-submit-funding-deposit!
+           (submit-deps
+            {:store store
+             :request {:action {:type "bridge2Deposit"
+                                :asset "usdc"
+                                :amount "5"
+                                :chainId "0xa4b1"}}
+             :request-hyperliquid-legal-check!
+             (fn [_address]
+               (js/Promise.resolve {:acceptedTerms true
+                                    :userAllowed true
+                                    :restrictions "a"}))
+             :submit-usdc-bridge2-deposit! (fn [& _]
+                                             (swap! signer-calls inc)
+                                             (js/Promise.resolve {:status "ok"}))
+             :show-toast! (effects-support/capture-toast! toasts)}))
+          (.then (fn [_]
+                   (is (= 0 @signer-calls))
+                   (is (= legal-check/jurisdiction-blocked-message
+                          (get-in @store [:funding-ui :modal :error])))
+                   (is (= [[:error legal-check/jurisdiction-blocked-message]] @toasts))
+                   (done)))
+          (.catch (fn [err]
+                    (is false (str "Unexpected legal-check failure: " err))
+                    (done)))))))
 
 (deftest api-submit-funding-deposit-success-closes-modal-and-refreshes-test
   (async done

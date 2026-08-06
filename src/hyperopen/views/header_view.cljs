@@ -9,7 +9,7 @@
   ["brand-mark"
    "text-primary"
    "font-black"
-   "tracking-[-0.12em]"
+   "tracking-normal"
    "italic"
    "select-none"])
 
@@ -17,7 +17,7 @@
   ["brand-wordmark"
    "text-primary"
    "font-black"
-   "tracking-[-0.06em]"
+   "tracking-normal"
    "italic"
    "select-none"])
 

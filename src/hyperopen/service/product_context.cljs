@@ -1,6 +1,7 @@
 (ns hyperopen.service.product-context
   "Read-only product and tenant context shared by shell surfaces."
-  (:require [hyperopen.portfolio.routes :as portfolio-routes]
+  (:require [hyperopen.config :as app-config]
+            [hyperopen.portfolio.routes :as portfolio-routes]
             [hyperopen.router :as router]
             [hyperopen.service.tenant-config :as tenant-config]))
 
@@ -18,6 +19,8 @@
   (let [tenant (tenant-source source)
         brand-name (or (:brand/name tenant) "Hyperopen")
         venue-label (or (get-in tenant [:venue :label]) "Hyperliquid")
+        network-label (or (get-in app-config/config [:hyperliquid :hyperliquid-chain])
+                         "Unavailable")
         affiliate-status (or (get-in tenant [:affiliate :status]) :unavailable)
         attribution-status (when (map? source)
                              (get-in source [:attribution :status]))
@@ -31,6 +34,7 @@
              :theme-id (or (:theme/id tenant) :default)}
      :venue {:id (get-in tenant [:venue :id])
              :label venue-label}
+     :network-label network-label
      :affiliate {:status affiliate-status
                  :attribution-status attribution-status
                  :enabled? affiliate-enabled?

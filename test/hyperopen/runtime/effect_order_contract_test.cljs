@@ -92,3 +92,35 @@
   (is (= (registration-catalog/effect-order-policy-required-action-ids)
          (contract/covered-action-ids))
       "Actions marked as requiring effect-order policy in the runtime registration catalog must exactly match effect-order policy coverage."))
+
+(deftest close-all-confirmation-requires-one-projection-before-its-one-dedicated-heavy-effect-test
+  (let [effect [:effects/api-submit-close-all-positions {:action {:type "order" :orders []}}]
+        effects [[:effects/save [:positions-ui :close-all-confirmation]
+                  {:open? true :lifecycle :submitting}]
+                 effect]
+        policy (contract/action-policy :actions/submit-close-all-positions-confirmation)
+        summary (contract/effect-order-summary :actions/submit-close-all-positions-confirmation effects)]
+    (is (= {:required-phase-order [:projection :persistence :heavy-io]
+            :require-projection-before-heavy? true
+            :allow-duplicate-heavy-effects? false
+            :heavy-effect-ids #{:effects/api-submit-close-all-positions}}
+           policy))
+    (is (= effects
+           (contract/assert-action-effect-order!
+            :actions/submit-close-all-positions-confirmation effects {:phase :test})))
+    (is (= [:projection :heavy-io] (:phases summary)))
+    (is (true? (:projection-before-heavy summary)))
+    (is (thrown-with-msg?
+         js/Error
+         #"rule=duplicate-heavy-effect"
+         (contract/assert-action-effect-order!
+          :actions/submit-close-all-positions-confirmation
+          (conj effects effect)
+          {:phase :test})))
+    (is (thrown-with-msg?
+         js/Error
+         #"rule=heavy-before-projection-phase"
+         (contract/assert-action-effect-order!
+          :actions/submit-close-all-positions-confirmation
+          [effect]
+          {:phase :test})))))

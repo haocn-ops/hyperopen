@@ -1,0 +1,31 @@
+{
+  "tenant/id": "dexhelm-mainnet",
+  "brand/name": "DEXHelm",
+  "brand/logo-url": "https://app.dexhelm.com/brand/dexhelm-mark.svg",
+  "theme/id": "dark",
+  "hyperliquid-network": "mainnet",
+  "features": {
+    "terminal": true,
+    "analytics": true,
+    "affiliate": false
+  },
+  "venue": {
+    "id": "hyperliquid",
+    "label": "Hyperliquid",
+    "url": "https://app.hyperliquid.xyz"
+  },
+  "affiliate": {
+    "provider": null,
+    "id": null,
+    "status": "unavailable",
+    "referral-url": "",
+    "event-endpoint": "",
+    "disclosure": "官方 affiliate 服务当前不可用；交易不受影响。"
+  },
+  "builder-fee": {
+    "status": "disabled",
+    "builder-address": null,
+    "fee-tenths-bp": null,
+    "disclosure": "No DEXHelm builder fee is active in this Mainnet release candidate."
+  }
+}

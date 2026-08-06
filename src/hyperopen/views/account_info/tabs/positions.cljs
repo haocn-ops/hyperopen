@@ -81,7 +81,7 @@
                                         sorted-row-vms))]
     (if (seq sorted-row-vms)
       [:div {:class ["flex" "h-full" "min-h-0" "flex-col"]}
-       (positions-desktop/position-table-header sort-state* read-only? ["hidden" "lg:grid"])
+       (positions-desktop/position-table-header sort-state* read-only? ["hidden" "lg:grid"] positions-state)
        (into [:div {:class ["hidden"
                             "lg:block"
                             "flex-1"
@@ -136,10 +136,21 @@
                                                         reduce-popover
                                                         margin-modal
                                                         read-only?
-                                                        margin-rec)]
-      (empty-state (if (seq positions*)
-                     "No matching positions"
-                     "No active positions")))))
+                                                        margin-rec)
+       (when-not read-only?
+         (positions-desktop/close-all-confirmation-view
+          (:close-all-confirmation positions-state)))]
+      (let [empty-view (empty-state (if (seq positions*)
+                                      "No matching positions"
+                                      "No active positions"))
+            confirmation-view (when-not read-only?
+                                (positions-desktop/close-all-confirmation-view
+                                 (:close-all-confirmation positions-state)))]
+        (if confirmation-view
+          [:div {:class ["relative" "h-full"]}
+           empty-view
+           confirmation-view]
+          empty-view)))))
 
 (defn positions-tab-content-from-webdata
   [{:keys [webdata2 perp-dex-states] :as options}]

@@ -230,6 +230,12 @@
     :allow-duplicate-heavy-effects? false
     :heavy-effect-ids #{:effects/api-submit-order}}
 
+   :actions/submit-close-all-positions-confirmation
+   {:required-phase-order [:projection :persistence :heavy-io]
+    :require-projection-before-heavy? true
+    :allow-duplicate-heavy-effects? false
+    :heavy-effect-ids #{:effects/api-submit-close-all-positions}}
+
    :actions/confirm-order-submission
    {:required-phase-order [:projection :persistence :heavy-io]
     :require-projection-before-heavy? true

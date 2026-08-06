@@ -33,6 +33,9 @@
      [:span {:class ["text-ho-text-dim"]
              :data-role (str role "-venue")}
       (str "Venue: " (:venue-label vm))]
+     [:span {:class ["font-semibold" "text-ho-text"]
+             :data-role (str role "-network")}
+      (str "Network: " (:network-label vm))]
      [:span {:class ["text-ho-text-dim"]
              :data-role (str role "-affiliate-status")}
       (affiliate-status-label (get-in vm [:affiliate :status])

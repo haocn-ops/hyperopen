@@ -215,6 +215,10 @@
 
 (def make-copy-spectate-link wallet-adapters/make-copy-spectate-link)
 
+(def api-submit-close-all-positions order-adapters/api-submit-close-all-positions)
+
+(def make-api-submit-close-all-positions order-adapters/make-api-submit-close-all-positions)
+
 (def make-reconnect-websocket ws-adapters/make-reconnect-websocket)
 
 (def reconnect-websocket ws-adapters/reconnect-websocket)

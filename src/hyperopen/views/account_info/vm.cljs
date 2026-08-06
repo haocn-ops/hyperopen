@@ -1,6 +1,7 @@
 (ns hyperopen.views.account-info.vm
   (:require [clojure.string :as str]
             [hyperopen.account.context :as account-context]
+            [hyperopen.account.history.close-all-positions :as close-all-positions]
             [hyperopen.account.history.position-tpsl :as position-tpsl]
             [hyperopen.asset-selector.markets :as markets]
             [hyperopen.margin-rec.state :as margin-rec-state]
@@ -370,6 +371,11 @@
                                         (portfolio-routes/portfolio-route? route)}
                                        (get-in state [:account-info :positions] {}))
                           true (assoc :read-only? read-only?)
+                          true (assoc :close-all-available?
+                                      (and (not read-only?)
+                                           (seq (close-all-positions/current-position-snapshot state))))
+                          true (assoc :close-all-confirmation
+                                      (get-in state [:positions-ui :close-all-confirmation]))
                           true (assoc :margin-rec (margin-rec-state/ui-slice state))
                           (seq read-only-message) (assoc :read-only-message read-only-message))
         open-orders-state (cond-> (-> (merge {:direction-filter :all

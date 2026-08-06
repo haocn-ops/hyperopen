@@ -70,6 +70,12 @@
                                        :requested-at-ms nil
                                        :updated-at-ms nil
                                        :error nil}
+              :legal-check {:status :idle
+                            :accepted-terms nil
+                            :user-allowed nil
+                            :restrictions nil
+                            :message nil
+                            :checked-at-ms nil}
               :hyperunit-withdrawal-queue {:status :idle
                                            :by-chain {}
                                            :requested-at-ms nil

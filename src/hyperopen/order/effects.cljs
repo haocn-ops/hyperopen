@@ -574,6 +574,132 @@
                                (.catch handle-submit-runtime-error!)))))
                 (.catch handle-submit-runtime-error!))))))))))
 
+(defn- close-all-order-count
+  [request]
+  (count (or (:snapshot request)
+             (get-in request [:action :orders])
+             [])))
+
+(defn- close-all-confirmation-result
+  [state lifecycle accepted-count rejected-count error-text]
+  (update-in state
+             [:positions-ui :close-all-confirmation]
+             (fn [confirmation]
+               (assoc (or confirmation {})
+                      :open? true
+                      :lifecycle lifecycle
+                      :accepted-count accepted-count
+                      :rejected-count rejected-count
+                      :error error-text))))
+
+(defn- set-close-all-confirmation-result!
+  [store lifecycle accepted-count rejected-count error-text]
+  (swap! store close-all-confirmation-result lifecycle accepted-count rejected-count error-text))
+
+(defn- close-all-status-error
+  [idx status-entry]
+  (cond
+    (and (map? status-entry)
+         (contains? status-entry :error))
+    (let [error-value (:error status-entry)
+          message (cond
+                    (string? error-value) error-value
+                    (map? error-value) (or (:message error-value)
+                                           (pr-str error-value))
+                    :else (str error-value))]
+      (str "Order " (inc idx) ": " message))
+
+    (and (string? status-entry)
+         (= "success" (str/lower-case (str/trim status-entry))))
+    nil
+
+    (map? status-entry)
+    nil
+
+    :else
+    (str "Order " (inc idx) ": Missing exchange order status.")))
+
+(defn- close-all-outcome
+  [exchange-response-error request resp]
+  (let [order-count (close-all-order-count request)]
+    (if (not= "ok" (:status resp))
+      {:ok? false
+       :accepted-count 0
+       :rejected-count order-count
+       :error-text (str (exchange-response-error resp))}
+      (let [statuses (vec (take order-count
+                                (concat (submit-status-entries resp)
+                                        (repeat {:error "Missing exchange order status."}))))
+            errors (->> statuses
+                        (map-indexed close-all-status-error)
+                        (keep identity)
+                        vec)
+            rejected-count (count errors)
+            accepted-count (- order-count rejected-count)]
+        (if (zero? rejected-count)
+          {:ok? true
+           :accepted-count accepted-count
+           :rejected-count 0}
+          {:ok? false
+           :accepted-count accepted-count
+           :rejected-count rejected-count
+           :error-text (str/join "; " errors)})))))
+
+(defn- close-all-precondition-error
+  [state address agent-status]
+  (let [read-only-message (spectate-mode-precondition-error state)]
+    (cond
+      (seq read-only-message)
+      read-only-message
+
+      (nil? address)
+      "Connect your wallet before closing positions."
+
+      (not= :ready agent-status)
+      (trading-readiness-message agent-status
+                                 "Enable trading before closing positions."
+                                 "Unlock trading before closing positions."
+                                 "Awaiting passkey before closing positions.")
+
+      :else
+      nil)))
+
+(defn- refresh-after-close-all!
+  [store dispatch! address]
+  (refresh-account-surfaces-after-order-mutation! store address)
+  (dispatch! store nil [[:actions/refresh-order-history]]))
+
+(defn api-submit-close-all-positions
+  [{:keys [dispatch! exchange-response-error runtime-error-message show-toast!]} _ store request]
+  (let [state @store
+        {:keys [owner-address account-address options]} (order-mutation-target state)
+        address owner-address
+        order-count (close-all-order-count request)
+        agent-status (get-in state [:wallet :agent :status])]
+    (if-let [error-text (close-all-precondition-error state address agent-status)]
+      (do
+        (set-close-all-confirmation-result! store :error 0 order-count error-text)
+        (show-toast! store :error error-text))
+      (-> (submit-order-for-target! store address (:action request) options)
+          (.then (fn [resp]
+                   (let [{:keys [ok? accepted-count rejected-count error-text]}
+                         (close-all-outcome exchange-response-error request resp)]
+                     (if ok?
+                       (do
+                         (set-close-all-confirmation-result! store :success accepted-count 0 nil)
+                         (show-toast! store :success
+                                      (str "Close requests submitted for " accepted-count " positions"))
+                         (refresh-after-close-all! store dispatch! account-address))
+                       (do
+                         (set-close-all-confirmation-result! store :error accepted-count rejected-count error-text)
+                         (show-toast! store :error error-text)
+                         (when (pos? accepted-count)
+                           (refresh-after-close-all! store dispatch! account-address)))))))
+          (.catch (fn [err]
+                    (let [error-text (runtime-error-message err)]
+                      (set-close-all-confirmation-result! store :error 0 order-count error-text)
+                      (show-toast! store :error error-text))))))))
+
 (defn- update-position-tpsl-modal-error
   [state error-text]
   (-> state

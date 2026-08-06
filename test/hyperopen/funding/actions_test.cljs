@@ -49,9 +49,9 @@
    :hyperunit-lifecycle (funding-actions/default-hyperunit-lifecycle-state)
    :hyperunit-fee-estimate (funding-actions/default-hyperunit-fee-estimate-state)
    :hyperunit-withdrawal-queue (funding-actions/default-hyperunit-withdrawal-queue-state)
+   :legal-check {:status :idle :accepted-terms nil :user-allowed nil :restrictions nil :message nil :checked-at-ms nil}
    :submitting? false
    :error nil})
-
 (deftest open-funding-modal-actions-set-mode-and-open-state-test
   (let [state (base-state)]
     (is (= [funding-modal-surface-load-effect
@@ -74,6 +74,7 @@
     (is (= [funding-modal-surface-load-effect
             [:effects/save [:funding-ui :modal]
              (expected-open-modal :deposit)]
+            [:effects/api-fetch-hyperliquid-legal-check]
             [:effects/api-fetch-hyperunit-fee-estimate]]
            (funding-actions/open-funding-deposit-modal state)))
     (is (= [funding-modal-surface-load-effect
@@ -86,6 +87,7 @@
     (is (= [funding-modal-surface-load-effect
             [:effects/save [:funding-ui :modal]
              (expected-open-modal :withdraw)]
+            [:effects/api-fetch-hyperliquid-legal-check]
             [:effects/api-fetch-hyperunit-withdrawal-queue]
             [:effects/api-fetch-hyperunit-fee-estimate]]
            (funding-actions/open-funding-withdraw-modal state)))))
@@ -111,6 +113,7 @@
                              :height 34
                              :viewport-width 1600
                              :viewport-height 900})]
+            [:effects/api-fetch-hyperliquid-legal-check]
             [:effects/api-fetch-hyperunit-fee-estimate]]
            (funding-actions/open-funding-deposit-modal state anchor)))))
 
@@ -159,6 +162,7 @@
             [:effects/save [:funding-ui :modal]
              (assoc (expected-open-modal :deposit)
                     :opener-data-role "funding-action-deposit")]
+            [:effects/api-fetch-hyperliquid-legal-check]
             [:effects/api-fetch-hyperunit-fee-estimate]]
            (funding-actions/open-funding-deposit-modal state nil "funding-action-deposit")))
     (is (= [funding-modal-surface-load-effect

@@ -6,6 +6,12 @@
             [hyperopen.funding.test-support.effects :as effects-support]
             [hyperopen.test-support.async :as async-support]))
 
+(defn- allowed-legal-check!
+  [_address]
+  (js/Promise.resolve {:acceptedTerms true
+                       :userAllowed true
+                       :restrictions "n"}))
+
 (deftest start-hyperunit-lifecycle-polling-noops-when-required-inputs-are-missing-test
   (let [request-calls (atom 0)
         install-calls (atom 0)]
@@ -257,6 +263,7 @@
                                                                       :asset "btc"
                                                                       :deposit-address deposit-address
                                                                       :deposit-signatures [{:r "0x1"}]}))
+            :request-hyperliquid-legal-check! allowed-legal-check!
             :request-hyperunit-operations! (fn [_opts]
                                              (js/Promise.resolve
                                               {:operations [{:operation-id "op_d1"
@@ -305,6 +312,7 @@
                                                                       :asset "btc"
                                                                       :deposit-address "bc1qexamplexyz"
                                                                       :deposit-signatures [{:r "0x1"}]}))
+            :request-hyperliquid-legal-check! allowed-legal-check!
             :request-hyperunit-operations! (fn [opts]
                                              (swap! operation-calls conj opts)
                                              (js/Promise.resolve
@@ -367,6 +375,7 @@
                                                                       :asset "btc"
                                                                       :deposit-address "bc1qexamplexyz"
                                                                       :deposit-signatures [{:r "0x1"}]}))
+            :request-hyperliquid-legal-check! allowed-legal-check!
             :request-hyperunit-operations! (fn [_opts]
                                              (js/Promise.resolve
                                               {:operations [{:operation-id "op_124"

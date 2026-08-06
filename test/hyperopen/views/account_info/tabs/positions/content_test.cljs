@@ -8,6 +8,44 @@
 
 (use-fixtures :each test-support/reset-positions-sort-cache-fixture)
 
+(deftest positions-close-all-availability-is-derived-before-filtering-and-is-never-rendered-on-mobile-test
+  (let [rows [(fixtures/sample-position-row "BTC" 100 "1.25")
+              (fixtures/sample-position-row "xyz:NVDA" 10 "-2.5")]
+        render (fn [state]
+                 (test-support/render-positions-tab-from-rows rows
+                                                               fixtures/default-sort-state
+                                                               nil nil nil state))]
+    (test-support/with-viewport
+     1280 900
+     (fn []
+       (let [filtered-content (render {:direction-filter :short
+                                       :coin-search "NVDA"
+                                       :close-all-available? true})
+             unavailable-content (render {:direction-filter :all
+                                          :close-all-available? false})
+             filtered-trigger (hiccup/find-first-node filtered-content
+                                                      #(= "positions-close-all-trigger" (get-in % [1 :data-role])))
+             unavailable-trigger (hiccup/find-first-node unavailable-content
+                                                         #(= "positions-close-all-trigger" (get-in % [1 :data-role])))]
+         (is (some? filtered-trigger)
+             "A visible filtered row cannot hide the unfiltered Close All capability.")
+         (is (nil? unavailable-trigger)))))
+    (test-support/with-viewport
+     768 900
+     (fn []
+       (let [content (render {:direction-filter :all
+                              :close-all-available? true
+                              :close-all-confirmation {:open? true
+                                                       :lifecycle :confirming
+                                                       :snapshot [{:position-key "BTC|default" :coin "BTC" :dex nil :szi "1.25"}]
+                                                       :error nil
+                                                       :accepted-count 0
+                                                       :rejected-count 0}})]
+         (is (nil? (hiccup/find-first-node content
+                                           #(= "positions-close-all-trigger" (get-in % [1 :data-role])))))
+         (is (nil? (hiccup/find-first-node content
+                                           #(= "positions-close-all-confirmation" (get-in % [1 :data-role]))))))))))
+
 (deftest positions-tab-content-recomputes-sorting-per-render-without-view-cache-test
   (let [positions [fixtures/sample-position-data]
         sort-state {:column "Coin" :direction :asc}

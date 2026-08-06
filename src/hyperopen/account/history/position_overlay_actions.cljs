@@ -1,5 +1,7 @@
 (ns hyperopen.account.history.position-overlay-actions
-  (:require [hyperopen.account.history.position-margin :as position-margin]
+  (:require [hyperopen.account.context :as account-context]
+            [hyperopen.account.history.close-all-positions :as close-all-positions]
+            [hyperopen.account.history.position-margin :as position-margin]
             [hyperopen.account.history.position-reduce :as position-reduce]
             [hyperopen.account.history.position-tpsl :as position-tpsl]
             [hyperopen.service.tenant-config :as tenant-config]
@@ -70,8 +72,86 @@
     [[:effects/save [:positions-ui :tpsl-modal]
       (position-tpsl/set-limit-price modal checked)]]))
 
-(defn trigger-close-all-positions [_state]
-  [])
+(defn- close-all-read-only?
+  [state]
+  (or (account-context/inspected-account-read-only? state)
+      (true? (get-in state [:account-info :positions :read-only?]))))
+
+(defn trigger-close-all-positions
+  ([state]
+   (trigger-close-all-positions state nil))
+  ([state trigger-bounds]
+   (let [confirmation (get-in state [:positions-ui :close-all-confirmation])
+         snapshot (close-all-positions/current-position-snapshot state)]
+     (if (or (close-all-read-only? state)
+             (= :submitting (:lifecycle confirmation))
+             (empty? snapshot))
+       []
+       [[:effects/save
+         [:positions-ui :close-all-confirmation]
+         (close-all-positions/confirmation-state snapshot trigger-bounds)]]))))
+
+(defn dismiss-close-all-positions-confirmation
+  [state]
+  (let [confirmation (or (get-in state [:positions-ui :close-all-confirmation])
+                         (close-all-positions/default-confirmation-state))]
+    (if (= :submitting (:lifecycle confirmation))
+      []
+      [[:effects/save
+        [:positions-ui :close-all-confirmation]
+        (close-all-positions/default-confirmation-state)]])))
+
+(defn handle-close-all-positions-confirmation-keydown
+  [state key]
+  (if (= key "Escape")
+    (dismiss-close-all-positions-confirmation state)
+    []))
+
+(defn- close-all-error-state
+  [confirmation error]
+  (assoc confirmation
+         :open? true
+         :lifecycle :error
+         :error error))
+
+(defn submit-close-all-positions-confirmation
+  [state]
+  (let [confirmation (or (get-in state [:positions-ui :close-all-confirmation])
+                         (close-all-positions/default-confirmation-state))
+        snapshot (:snapshot confirmation)
+        current-snapshot (close-all-positions/current-position-snapshot state)]
+    (cond
+      (close-all-read-only? state)
+      []
+
+      (or (not (:open? confirmation))
+          (not= :confirming (:lifecycle confirmation)))
+      []
+
+      (or (empty? snapshot)
+          (empty? current-snapshot))
+      []
+
+      (not= snapshot current-snapshot)
+      [[:effects/save
+        [:positions-ui :close-all-confirmation]
+        (close-all-error-state confirmation
+                               "Positions changed. Review current positions before closing.")]]
+
+      :else
+      (let [result (close-all-positions/prepare-submit state snapshot)]
+        (if-not (:ok? result)
+          [[:effects/save
+            [:positions-ui :close-all-confirmation]
+            (close-all-error-state confirmation (:display-message result))]]
+          [[:effects/save
+            [:positions-ui :close-all-confirmation]
+            (assoc confirmation
+                   :lifecycle :submitting
+                   :error nil
+                   :accepted-count 0
+                   :rejected-count 0)]
+           [:effects/api-submit-close-all-positions (:request result)]])))))
 
 (defn open-position-reduce-popover
   ([state position-data]

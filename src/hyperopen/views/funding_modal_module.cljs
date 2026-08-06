@@ -15,7 +15,9 @@
                       (order-adapters/show-order-feedback-toast!
                        runtime store kind message))]
     {:api
-     {:api-fetch-hyperunit-fee-estimate
+     {:api-fetch-hyperliquid-legal-check
+      funding-workflow/api-fetch-hyperliquid-legal-check-effect
+      :api-fetch-hyperunit-fee-estimate
       funding-workflow/api-fetch-hyperunit-fee-estimate-effect
       :api-fetch-hyperunit-withdrawal-queue
       funding-workflow/api-fetch-hyperunit-withdrawal-queue-effect

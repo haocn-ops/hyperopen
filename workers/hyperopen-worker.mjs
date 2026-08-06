@@ -1,5 +1,7 @@
+const HYPERUNIT_MAINNET_PREFIX = "/api/hyperunit/mainnet";
 const HYPERUNIT_TESTNET_PREFIX = "/api/hyperunit/testnet";
 const HYPERUNIT_ROOT_PREFIX = "/api/hyperunit";
+const MAINNET_ASSET_PREFIX = "/__hyperopen_mainnet";
 const PORTFOLIO_SHELL_PATH = "/portfolio";
 const DEXHELM_APEX_HOST = "dexhelm.com";
 const DEXHELM_MAINNET_HOST = "app.dexhelm.com";
@@ -19,6 +21,13 @@ const HYPERUNIT_METHOD_ALLOWLIST = new Set(["GET", "HEAD", "POST"]);
 const HYPERUNIT_TESTNET_ROUTE = {
   prefix: HYPERUNIT_TESTNET_PREFIX,
   environmentKey: "HYPERUNIT_TESTNET_URL",
+  expectedOrigin: "https://api.hyperunit-testnet.xyz",
+};
+
+const HYPERUNIT_MAINNET_ROUTE = {
+  prefix: HYPERUNIT_MAINNET_PREFIX,
+  environmentKey: "HYPERUNIT_MAINNET_URL",
+  expectedOrigin: "https://api.hyperunit.xyz",
 };
 
 const REQUEST_HEADER_ALLOWLIST = new Set([
@@ -288,9 +297,27 @@ function isPortfolioOptimizerRoute(pathname) {
 }
 
 async function fetchStaticAsset(request, env) {
-  const response = await env.ASSETS.fetch(request);
+  const requestUrl = new URL(request.url);
+  const mainnetRequest = requestUrl.hostname === DEXHELM_MAINNET_HOST && mainnetEnabled(env);
+  const assetUrl = new URL(requestUrl);
+  if (mainnetRequest) {
+    assetUrl.pathname = `${MAINNET_ASSET_PREFIX}${assetUrl.pathname}`;
+  }
+  const assetRequest = mainnetRequest ? new Request(assetUrl, request) : request;
+  let response = await env.ASSETS.fetch(assetRequest);
+  if (mainnetRequest && response.headers.get("content-type")?.toLowerCase().includes("text/html")) {
+    const headers = new Headers(response.headers);
+    const contentSecurityPolicy = headers.get("content-security-policy");
+    if (contentSecurityPolicy) {
+      headers.set(
+        "content-security-policy",
+        contentSecurityPolicy.replaceAll("https://testnet.dexhelm.com", "https://app.dexhelm.com")
+      );
+    }
+    response = new Response(response.body, { status: response.status, headers });
+  }
   const method = request.method.toUpperCase();
-  const pathname = new URL(request.url).pathname;
+  const pathname = requestUrl.pathname;
 
   if (
     response.status !== 404 ||
@@ -300,24 +327,39 @@ async function fetchStaticAsset(request, env) {
     return response;
   }
 
-  const shellUrl = new URL(request.url);
-  shellUrl.pathname = PORTFOLIO_SHELL_PATH;
+  const shellUrl = new URL(assetRequest.url);
+  shellUrl.pathname = mainnetRequest
+    ? `${MAINNET_ASSET_PREFIX}${PORTFOLIO_SHELL_PATH}`
+    : PORTFOLIO_SHELL_PATH;
   shellUrl.search = "";
   shellUrl.hash = "";
   return env.ASSETS.fetch(new Request(shellUrl, request));
 }
 
 function matchingHyperunitRoute(pathname) {
-  return matchesPathPrefix(pathname, HYPERUNIT_TESTNET_PREFIX)
-    ? HYPERUNIT_TESTNET_ROUTE
-    : null;
+  if (matchesPathPrefix(pathname, HYPERUNIT_TESTNET_PREFIX)) {
+    return HYPERUNIT_TESTNET_ROUTE;
+  }
+  if (matchesPathPrefix(pathname, HYPERUNIT_MAINNET_PREFIX)) {
+    return HYPERUNIT_MAINNET_ROUTE;
+  }
+  return null;
 }
 
-function validatedUpstreamOrigin(value) {
+function mainnetEnabled(env) {
+  return env?.HYPEROPEN_MAINNET_ENABLED === "true" &&
+    validatedUpstreamOrigin(
+      env?.HYPERUNIT_MAINNET_URL,
+      HYPERUNIT_MAINNET_ROUTE.expectedOrigin
+    ) !== null;
+}
+
+function validatedUpstreamOrigin(value, expectedOrigin) {
   try {
     const upstream = new URL(value);
     if (
       upstream.protocol !== "https:" ||
+      upstream.origin !== expectedOrigin ||
       upstream.username ||
       upstream.password ||
       upstream.pathname !== "/" ||
@@ -376,12 +418,21 @@ function proxyBodyTooLargeResponse() {
   });
 }
 
-function hostMayProxyHyperunit(hostname) {
-  return hostname === DEXHELM_TESTNET_HOST;
+function hostMayProxyHyperunit(hostname, env) {
+  return hostname === DEXHELM_TESTNET_HOST ||
+    (hostname === DEXHELM_MAINNET_HOST && mainnetEnabled(env));
 }
 
-function hostMayServeAssets(hostname) {
-  return hostname === DEXHELM_TESTNET_HOST;
+function hostMayServeAssets(hostname, env) {
+  return hostname === DEXHELM_TESTNET_HOST ||
+    (hostname === DEXHELM_MAINNET_HOST && mainnetEnabled(env));
+}
+
+function routeMatchesHost(route, hostname) {
+  return (
+    (hostname === DEXHELM_TESTNET_HOST && route.prefix === HYPERUNIT_TESTNET_PREFIX) ||
+    (hostname === DEXHELM_MAINNET_HOST && route.prefix === HYPERUNIT_MAINNET_PREFIX)
+  );
 }
 
 function notFoundResponse() {
@@ -509,21 +560,31 @@ function responseBodyWithDeadline(body, signal, finish) {
 
 export function resolveHyperunitTarget(requestUrl, env) {
   const incoming = requestUrl instanceof URL ? requestUrl : new URL(requestUrl);
-  if (incoming.hostname !== DEXHELM_TESTNET_HOST) {
-    return null;
-  }
   const route = matchingHyperunitRoute(incoming.pathname);
-  if (!route) {
+  if (
+    !route ||
+    !hostMayProxyHyperunit(incoming.hostname, env) ||
+    !routeMatchesHost(route, incoming.hostname)
+  ) {
     return null;
   }
 
-  const upstream = validatedUpstreamOrigin(env?.[route.environmentKey]);
+  const upstream = validatedUpstreamOrigin(
+    env?.[route.environmentKey],
+    route.expectedOrigin
+  );
   if (!upstream) {
     return null;
   }
 
   const suffix = incoming.pathname.slice(route.prefix.length) || "/";
-  return new URL(`${suffix}${incoming.search}`, upstream);
+  if (!suffix.startsWith("/") || suffix.startsWith("//")) {
+    return null;
+  }
+  const target = new URL(upstream);
+  target.pathname = suffix;
+  target.search = incoming.search;
+  return target;
 }
 
 export function buildHyperunitRequest(request, targetUrl, body = undefined, signal = undefined) {
@@ -560,12 +621,19 @@ export async function handleRequest(request, env, {
     return httpsRedirect;
   }
 
-  if (requestUrl.hostname === DEXHELM_MAINNET_HOST) {
+  if (requestUrl.hostname === DEXHELM_MAINNET_HOST && !mainnetEnabled(env)) {
     return mainnetClosedResponse();
   }
 
+  if (matchesPathPrefix(requestUrl.pathname, MAINNET_ASSET_PREFIX)) {
+    return notFoundResponse();
+  }
+
   if (requestUrl.pathname === "/api/health") {
-    if (![DEXHELM_STATUS_HOST, DEXHELM_TESTNET_HOST].includes(requestUrl.hostname)) {
+    if (
+      ![DEXHELM_STATUS_HOST, DEXHELM_TESTNET_HOST].includes(requestUrl.hostname) &&
+      !(requestUrl.hostname === DEXHELM_MAINNET_HOST && mainnetEnabled(env))
+    ) {
       return notFoundResponse();
     }
     return new Response(JSON.stringify({ status: "ok" }), {
@@ -616,15 +684,15 @@ export async function handleRequest(request, env, {
     if (matchesPathPrefix(requestUrl.pathname, HYPERUNIT_ROOT_PREFIX)) {
       return notFoundResponse();
     }
-    if (!hostMayServeAssets(requestUrl.hostname)) {
+    if (!hostMayServeAssets(requestUrl.hostname, env)) {
       return notFoundResponse();
     }
     return fetchStaticAsset(request, env);
   }
 
   if (
-    !hostMayProxyHyperunit(requestUrl.hostname) ||
-    route.prefix !== HYPERUNIT_TESTNET_PREFIX
+    !hostMayProxyHyperunit(requestUrl.hostname, env) ||
+    !routeMatchesHost(route, requestUrl.hostname)
   ) {
     return notFoundResponse();
   }
@@ -636,7 +704,7 @@ export async function handleRequest(request, env, {
 
   const targetUrl = resolveHyperunitTarget(requestUrl, env);
   if (!targetUrl) {
-    return genericProxyFailureResponse();
+    return notFoundResponse();
   }
 
   const controller = new AbortControllerImpl();

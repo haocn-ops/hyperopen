@@ -4,6 +4,7 @@
   [[:effects/restore-dialog-focus :restore-dialog-focus]
    [:effects/api-fetch-user-funding-history :api-fetch-user-funding-history]
    [:effects/export-funding-history-csv :export-funding-history-csv]
+   [:effects/api-fetch-hyperliquid-legal-check :api-fetch-hyperliquid-legal-check]
    [:effects/api-fetch-hyperunit-fee-estimate :api-fetch-hyperunit-fee-estimate]
    [:effects/api-fetch-hyperunit-withdrawal-queue :api-fetch-hyperunit-withdrawal-queue]
    [:effects/api-submit-funding-send :api-submit-funding-send]

@@ -258,6 +258,22 @@ function isFingerprintedReleaseJavaScriptFile(fileName) {
   return path.posix.basename(fileName).split(".").length >= 3;
 }
 
+export function immutableAssetPathsForReleaseFiles(filePaths = []) {
+  const immutablePaths = [];
+  for (const filePath of filePaths) {
+    const normalized = String(filePath || "").replaceAll("\\", "/").replace(/^\/+/, "");
+    if (
+      (normalized.startsWith("css/") && normalized.endsWith(".css") &&
+        path.posix.basename(normalized).split(".").length >= 3) ||
+      (normalized.startsWith("js/") &&
+        isFingerprintedReleaseJavaScriptFile(normalized.slice("js/".length)))
+    ) {
+      immutablePaths.push(`/${normalized}`);
+    }
+  }
+  return [...new Set(immutablePaths)].sort();
+}
+
 const JS_IDENTIFIER_SOURCE = String.raw`[$A-Za-z_][$A-Za-z0-9_]*`;
 const JS_PROPERTY_ACCESS_SOURCE = String.raw`${JS_IDENTIFIER_SOURCE}(?:\.${JS_IDENTIFIER_SOURCE})*`;
 const SHADOW_LOADER_RUNTIME_ASSIGNMENT_PATTERN = new RegExp(
@@ -602,12 +618,10 @@ export async function generateReleaseArtifacts({
     await fs.copyFile(sourcePath, destinationPath);
   }
 
-  const immutableAssetPaths = [
-    `/css/${cssFileName}`,
-    ...releaseJavaScriptFiles
-      .filter((fileName) => isFingerprintedReleaseJavaScriptFile(fileName))
-      .map((fileName) => `/${path.posix.join(JS_DIR, fileName)}`),
-  ].sort();
+  const immutableAssetPaths = immutableAssetPathsForReleaseFiles([
+    path.posix.join("css", cssFileName),
+    ...releaseJavaScriptFiles.map((fileName) => path.posix.join(JS_DIR, fileName)),
+  ]);
 
   await fs.writeFile(
     path.join(outputRoot, SECURITY_HEADERS_FILE_PATH),

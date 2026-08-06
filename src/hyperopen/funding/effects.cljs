@@ -1,11 +1,13 @@
 (ns hyperopen.funding.effects
   (:require [clojure.string :as str]
             [hyperopen.account.context :as account-context]
+            [hyperopen.api.default :as default-api]
             [hyperopen.api.trading :as trading-api]
             [hyperopen.funding.actions :as funding-actions]
             [hyperopen.funding.application.hyperunit-query :as hyperunit-query]
             [hyperopen.funding.application.modal-state :as modal-state]
             [hyperopen.funding.application.submit-effects :as submit-effects]
+            [hyperopen.funding.domain.legal-check :as legal-check]
             [hyperopen.funding.domain.lifecycle :as funding-lifecycle]
             [hyperopen.funding.effects.common :as common]
             [hyperopen.funding.effects.hyperunit-runtime :as hyperunit-runtime]
@@ -72,6 +74,51 @@
     :now-ms-fn now-ms-fn
     :runtime-error-message runtime-error-message
     :transition-loading? true}))
+
+(defn api-fetch-hyperliquid-legal-check!
+  [{:keys [store
+           request-hyperliquid-legal-check!
+           now-ms-fn]
+    :or {request-hyperliquid-legal-check! default-api/request-hyperliquid-legal-check!
+         now-ms-fn (fn [] (js/Date.now))}}]
+  (let [address (get-in @store [:wallet :address])
+        loading-state (assoc (legal-check/default-legal-check-state)
+                             :status :loading)]
+    (swap! store assoc-in [:funding-ui :modal :legal-check] loading-state)
+    (if-not (and (string? address) (seq address))
+      (let [decision (assoc (legal-check/assess nil)
+                            :checked-at-ms (now-ms-fn))]
+        (swap! store (fn [state]
+                       (-> state
+                           (assoc-in [:funding-ui :modal :legal-check] decision)
+                           (assoc-in [:funding-ui :modal :error] (:message decision)))))
+        (js/Promise.resolve decision))
+      (let [request-result (try
+                             (request-hyperliquid-legal-check! address)
+                             (catch :default _
+                               nil))
+            request-promise (if (some? (some-> request-result .-then))
+                              request-result
+                              (js/Promise.resolve request-result))]
+        (-> request-promise
+            (.then (fn [response]
+                     (let [decision (assoc (legal-check/assess response)
+                                           :checked-at-ms (now-ms-fn))]
+                       (swap! store (fn [state]
+                                      (-> state
+                                          (assoc-in [:funding-ui :modal :legal-check] decision)
+                                          (assoc-in [:funding-ui :modal :error]
+                                                    (when (not= :allowed (:status decision))
+                                                      (:message decision))))))
+                       decision)))
+            (.catch (fn [_]
+                      (let [decision (assoc (legal-check/assess nil)
+                                            :checked-at-ms (now-ms-fn))]
+                        (swap! store (fn [state]
+                                       (-> state
+                                           (assoc-in [:funding-ui :modal :legal-check] decision)
+                                           (assoc-in [:funding-ui :modal :error] (:message decision)))))
+                        decision))))))))
 
 (defn api-submit-funding-transfer!
   [{:keys [store
@@ -187,6 +234,7 @@
            submit-hyperunit-send-asset-withdraw-request-fn
            request-hyperunit-operations!
            request-hyperunit-withdrawal-queue!
+           request-hyperliquid-legal-check!
            set-timeout-fn
            now-ms-fn
            exchange-response-error
@@ -198,6 +246,7 @@
          submit-hyperunit-send-asset-withdraw-request-fn transport-runtime/submit-hyperunit-send-asset-withdraw-request!
          request-hyperunit-operations! nil
          request-hyperunit-withdrawal-queue! nil
+         request-hyperliquid-legal-check! default-api/request-hyperliquid-legal-check!
          set-timeout-fn nil
          now-ms-fn nil
          exchange-response-error common/fallback-exchange-response-error
@@ -213,6 +262,7 @@
     :submit-hyperunit-send-asset-withdraw-request-fn submit-hyperunit-send-asset-withdraw-request-fn
     :request-hyperunit-operations! request-hyperunit-operations!
     :request-hyperunit-withdrawal-queue! request-hyperunit-withdrawal-queue!
+    :request-hyperliquid-legal-check! request-hyperliquid-legal-check!
     :set-timeout-fn set-timeout-fn
     :now-ms-fn now-ms-fn
     :exchange-response-error exchange-response-error
@@ -235,6 +285,7 @@
            submit-usdh-across-deposit!
            submit-hyperunit-address-request!
            request-hyperunit-operations!
+           request-hyperliquid-legal-check!
            set-timeout-fn
            now-ms-fn
            runtime-error-message
@@ -245,6 +296,7 @@
          submit-usdh-across-deposit! transport-runtime/submit-usdh-across-deposit-tx!
          submit-hyperunit-address-request! transport-runtime/submit-hyperunit-address-deposit-request!
          request-hyperunit-operations! nil
+         request-hyperliquid-legal-check! default-api/request-hyperliquid-legal-check!
          set-timeout-fn nil
          now-ms-fn nil
          runtime-error-message common/fallback-runtime-error-message
@@ -259,6 +311,7 @@
     :submit-usdh-across-deposit! submit-usdh-across-deposit!
     :submit-hyperunit-address-request! submit-hyperunit-address-request!
     :request-hyperunit-operations! request-hyperunit-operations!
+    :request-hyperliquid-legal-check! request-hyperliquid-legal-check!
     :set-timeout-fn set-timeout-fn
     :now-ms-fn now-ms-fn
     :runtime-error-message runtime-error-message

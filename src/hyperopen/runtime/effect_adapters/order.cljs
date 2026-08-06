@@ -87,6 +87,12 @@
   ([runtime ctx store request]
    (order-effects/api-submit-position-margin (order-api-effect-deps runtime) ctx store request)))
 
+(defn api-submit-close-all-positions
+  ([ctx store request]
+   (api-submit-close-all-positions runtime-state/runtime ctx store request))
+  ([runtime ctx store request]
+   (order-effects/api-submit-close-all-positions (order-api-effect-deps runtime) ctx store request)))
+
 (defn confirm-api-submit-order
   ([ctx store payload]
    (confirm-api-submit-order runtime-state/runtime ctx store payload))
@@ -114,3 +120,8 @@
   [runtime]
   (fn [ctx store request]
     (api-submit-position-margin runtime ctx store request)))
+
+(defn make-api-submit-close-all-positions
+  [runtime]
+  (fn [ctx store request]
+    (api-submit-close-all-positions runtime ctx store request)))

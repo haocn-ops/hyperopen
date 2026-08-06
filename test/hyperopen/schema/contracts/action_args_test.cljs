@@ -2,6 +2,29 @@
   (:require [cljs.test :refer-macros [deftest is]]
             [hyperopen.schema.contracts :as contracts]))
 
+(deftest assert-action-args-validates-close-all-confirmation-actions-with-bounded-trigger-only-test
+  (let [bounds {:left 120 :right 196 :top 32 :bottom 56
+                :width 76 :height 24 :viewport-width 1440 :viewport-height 900}]
+    (is (= []
+           (contracts/assert-action-args! :actions/trigger-close-all-positions [] {:phase :test})))
+    (is (= [bounds]
+           (contracts/assert-action-args! :actions/trigger-close-all-positions [bounds] {:phase :test})))
+    (is (= []
+           (contracts/assert-action-args! :actions/dismiss-close-all-positions-confirmation [] {:phase :test})))
+    (is (= ["Escape"]
+           (contracts/assert-action-args! :actions/handle-close-all-positions-confirmation-keydown ["Escape"] {:phase :test})))
+    (is (= []
+           (contracts/assert-action-args! :actions/submit-close-all-positions-confirmation [] {:phase :test})))
+    (doseq [[action-id args] [[:actions/trigger-close-all-positions [{:left "bad"}]]
+                              [:actions/trigger-close-all-positions [bounds :extra]]
+                              [:actions/dismiss-close-all-positions-confirmation [bounds]]
+                              [:actions/handle-close-all-positions-confirmation-keydown []]
+                              [:actions/submit-close-all-positions-confirmation [bounds]]]]
+      (is (thrown-with-msg?
+           js/Error
+           #"action payload"
+           (contracts/assert-action-args! action-id args {:phase :test}))))))
+
 (deftest assert-action-args-validates-hyperunit-lifecycle-actions-test
   (is (= [{:direction :deposit
            :asset-key :btc

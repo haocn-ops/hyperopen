@@ -5,7 +5,8 @@
             [hyperopen.route-modules :as route-modules]))
 
 (def ^:private funding-workflow-effect-keys
-  [:api-fetch-hyperunit-fee-estimate
+  [:api-fetch-hyperliquid-legal-check
+   :api-fetch-hyperunit-fee-estimate
    :api-fetch-hyperunit-withdrawal-queue
    :api-submit-funding-transfer
    :api-submit-funding-send

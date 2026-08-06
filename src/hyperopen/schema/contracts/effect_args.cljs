@@ -24,6 +24,7 @@
 (s/def ::api-cancel-order-args (s/tuple ::api-submit-request))
 (s/def ::api-submit-position-tpsl-args (s/tuple ::api-submit-request))
 (s/def ::api-submit-position-margin-args (s/tuple ::api-submit-request))
+(s/def ::api-submit-close-all-positions-args (s/tuple ::api-submit-request))
 (s/def ::margin-rec-fetch-fills-args (s/tuple ::common/non-empty-string))
 
 (defn- margin-rec-compute-args?
@@ -326,6 +327,7 @@
    :effects/api-cancel-order ::api-cancel-order-args
    :effects/api-submit-position-tpsl ::api-submit-position-tpsl-args
    :effects/api-submit-position-margin ::api-submit-position-margin-args
+   :effects/api-submit-close-all-positions ::api-submit-close-all-positions-args
    :effects/margin-rec-fetch-fills ::margin-rec-fetch-fills-args
    :effects/margin-rec-compute ::margin-rec-compute-args
    :effects/clear-order-feedback-toast-timeout ::common/optional-string-args
@@ -357,6 +359,7 @@
    :effects/api-submit-staking-withdraw ::api-submit-order-args
    :effects/api-submit-staking-delegate ::api-submit-order-args
    :effects/api-submit-staking-undelegate ::api-submit-order-args
+   :effects/api-fetch-hyperliquid-legal-check ::common/no-args
    :effects/api-fetch-hyperunit-fee-estimate ::common/no-args
    :effects/api-fetch-hyperunit-withdrawal-queue ::common/no-args
    :effects/api-submit-funding-send ::api-submit-funding-send-args

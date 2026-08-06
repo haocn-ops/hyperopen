@@ -17,12 +17,16 @@
 
 (defn- status-message
   [{:keys [error
+           legal-check
            preview-ok?
            preview-message
            mode
            deposit-step-amount-entry?
            withdraw-step-amount-entry?]}]
   (or error
+      (when (and (contains? #{:blocked :error} (:status legal-check))
+                 (seq (:message legal-check)))
+        (:message legal-check))
       (when (and (not preview-ok?)
                  (seq preview-message)
                  (or (not= mode :deposit)
@@ -32,13 +36,14 @@
         preview-message)))
 
 (defn- show-status-message?
-  [{:keys [legacy? deposit? withdraw? withdraw-step-amount-entry?]} status-message]
+  [{:keys [legacy? deposit? withdraw? withdraw-step-amount-entry? legal-check]} status-message]
   (boolean
    (and (seq status-message)
         (not legacy?)
-        (not deposit?)
-        (or (not withdraw?)
-            withdraw-step-amount-entry?))))
+        (or (contains? #{:blocked :error} (:status legal-check))
+            (and (not deposit?)
+                 (or (not withdraw?)
+                     withdraw-step-amount-entry?))))))
 
 (defn- submit-disabled?
   [{:keys [submitting?
@@ -46,12 +51,15 @@
            withdraw?
            deposit-step-amount-entry?
            withdraw-step-amount-entry?
-           preview-ok?]}]
+           preview-ok?
+           legal-check]}]
   (or submitting?
       (and deposit?
            (not deposit-step-amount-entry?))
       (and withdraw?
            (not withdraw-step-amount-entry?))
+      (and (or deposit? withdraw?)
+           (contains? #{:blocked :error} (:status legal-check)))
       (not preview-ok?)))
 
 (defn- title

@@ -238,6 +238,11 @@
   ([] (request-hyperunit-withdrawal-queue! {}))
   ([opts] (funding-hyperunit/request-hyperunit-withdrawal-queue! opts)))
 
+(defn request-hyperliquid-legal-check!
+  [address]
+  (post-info! {:type "legalCheck"
+               :user address}))
+
 (defn request-vault-index!
   ([] (request-vault-index! {}))
   ([opts] (vaults/request-vault-index! opts)))

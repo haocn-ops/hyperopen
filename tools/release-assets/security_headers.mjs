@@ -76,6 +76,17 @@ function normalizeImmutableAssetPath(assetPath) {
   return normalized;
 }
 
+function normalizeAssetPathPrefix(prefix) {
+  const normalized = String(prefix || "").trim();
+  if (!normalized) {
+    return "";
+  }
+  if (!normalized.startsWith("/") || normalized.endsWith("/") || normalized.includes("..")) {
+    throw new Error(`Expected an absolute asset path prefix without a trailing slash: ${prefix}`);
+  }
+  return normalized;
+}
+
 function normalizeHttpsOrigins(sources) {
   return [...new Set(sources)]
     .flatMap((source) => {
@@ -105,6 +116,20 @@ function formatHeaderBlock(pattern, entries) {
   }
 
   return lines.join("\n");
+}
+
+export function buildImmutableAssetHeaderBlocks({
+  immutableAssetPaths = [],
+  prefix = "",
+} = {}) {
+  const normalizedPrefix = normalizeAssetPathPrefix(prefix);
+  return [...new Set(immutableAssetPaths.map(normalizeImmutableAssetPath))]
+    .sort()
+    .map((assetPath) => formatHeaderBlock(`${normalizedPrefix}${assetPath}`, [
+      { detach: true, name: "Cache-Control" },
+      { name: "Cache-Control", value: IMMUTABLE_CACHE_CONTROL },
+    ]))
+    .join("\n\n");
 }
 
 export function buildContentSecurityPolicy({ imageSources = [], connectSources = [] } = {}) {
@@ -198,14 +223,11 @@ export function buildReleaseHeadersFile({
     ]),
   );
 
-  for (const assetPath of normalizedImmutableAssetPaths) {
-    lines.push(
-      "",
-      formatHeaderBlock(assetPath, [
-        { detach: true, name: "Cache-Control" },
-        { name: "Cache-Control", value: IMMUTABLE_CACHE_CONTROL },
-      ]),
-    );
+  const immutableAssetHeaderBlocks = buildImmutableAssetHeaderBlocks({
+    immutableAssetPaths: normalizedImmutableAssetPaths,
+  });
+  if (immutableAssetHeaderBlocks) {
+    lines.push("", immutableAssetHeaderBlocks);
   }
 
   return `${lines.join("\n")}\n`;

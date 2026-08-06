@@ -10,15 +10,76 @@
 
 (use-fixtures :each test-support/reset-positions-sort-cache-fixture)
 
-(deftest position-table-header-close-all-dispatches-placeholder-action-test
-  (let [header-node (positions-tab/position-table-header fixtures/default-sort-state)
-        close-all-button (hiccup/find-first-node
-                          header-node
-                          #(and (= :button (first %))
-                                (contains? (hiccup/direct-texts %) "Close All")))]
-    (is (some? close-all-button))
-    (is (= [[:actions/trigger-close-all-positions]]
-           (get-in close-all-button [1 :on :click])))))
+(deftest position-table-header-close-all-is-a-desktop-only-bounded-confirmation-trigger-test
+  (test-support/with-viewport
+   1280 900
+   (fn []
+     (let [rows [(fixtures/sample-position-row "BTC" 100 "1.25")
+                 (fixtures/sample-position-row "xyz:NVDA" 10 "-2.5")]
+           content (test-support/render-positions-tab-from-rows
+                    rows
+                    fixtures/default-sort-state
+                    nil nil nil
+                    {:direction-filter :short
+                     :coin-search "NVDA"
+                     :close-all-available? true})
+           header-node (hiccup/tab-header-node content)
+           close-all-button (hiccup/find-first-node
+                             header-node
+                             #(= "positions-close-all-trigger" (get-in % [1 :data-role])))]
+       (is (some? close-all-button))
+       (is (= "Close All" (first (hiccup/direct-texts close-all-button))))
+       (is (= [[:actions/trigger-close-all-positions :event.currentTarget/bounds]]
+              (get-in close-all-button [1 :on :click])))
+       (is (= "false" (get-in close-all-button [1 :aria-expanded])))))))
+
+(deftest close-all-confirmation-renders-count-cancel-destructive-submit-and-lifecycle-labels-test
+  (test-support/with-viewport
+   1440 900
+   (fn []
+     (let [confirmation {:open? true
+                         :lifecycle :confirming
+                         :snapshot [{:position-key "BTC|default" :coin "BTC" :dex nil :szi "1.25"}
+                                    {:position-key "xyz:NVDA|xyz" :coin "xyz:NVDA" :dex "xyz" :szi "-2.5"}]
+                         :trigger-bounds {:left 120 :right 196 :top 32 :bottom 56
+                                          :width 76 :height 24 :viewport-width 1440 :viewport-height 900}
+                         :error nil
+                         :accepted-count 0
+                         :rejected-count 0}
+           render (fn [model]
+                    (test-support/render-positions-tab-from-rows
+                     [(fixtures/sample-position-row "BTC" 100 "1.25")]
+                     fixtures/default-sort-state
+                     nil nil nil
+                     {:close-all-available? true
+                      :close-all-confirmation model}))
+           confirming-content (render confirmation)
+           dialog (hiccup/find-first-node confirming-content
+                                        #(= "positions-close-all-confirmation" (get-in % [1 :data-role])))
+           cancel-button (hiccup/find-first-node dialog #(and (= :button (first %))
+                                                               (contains? (hiccup/direct-texts %) "Cancel")))
+           submit-button (hiccup/find-first-node dialog #(and (= :button (first %))
+                                                               (contains? (hiccup/direct-texts %) "Close all positions")))
+           submitting-content (render (assoc confirmation :lifecycle :submitting))
+           submitting-dialog (hiccup/find-first-node submitting-content
+                                                    #(= "positions-close-all-confirmation" (get-in % [1 :data-role])))
+           success-content (render (assoc confirmation :lifecycle :success :accepted-count 2))]
+       (is (some? dialog))
+       (is (= "dialog" (get-in dialog [1 :role])))
+       (is (= "true" (get-in dialog [1 :aria-modal])))
+       (is (some #(re-find #"2 positions" %) (hiccup/collect-strings dialog)))
+       (is (= [[:actions/dismiss-close-all-positions-confirmation]]
+              (get-in cancel-button [1 :on :click])))
+       (is (= [[:actions/submit-close-all-positions-confirmation]]
+              (get-in submit-button [1 :on :click])))
+       (is (false? (boolean (get-in submit-button [1 :disabled]))))
+       (is (some #(= "Closing 2 positions..." %) (hiccup/collect-strings submitting-dialog)))
+       (is (true? (boolean (get-in (hiccup/find-first-node submitting-dialog
+                                                           #(and (= :button (first %))
+                                                                 (contains? (hiccup/direct-texts %) "Close all positions")))
+                                            [1 :disabled]))))
+       (is (some #(= "Close requests submitted for 2 positions" %)
+                 (hiccup/collect-strings success-content)))))))
 
 (deftest position-row-coin-cell-dispatches-select-asset-action-test
   (let [row-node (positions-tab/position-row (fixtures/sample-position-row "xyz:NVDA" 10 "0.500"))

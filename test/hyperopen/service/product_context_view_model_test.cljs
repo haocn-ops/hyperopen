@@ -1,5 +1,6 @@
 (ns hyperopen.service.product-context-view-model-test
   (:require [cljs.test :refer-macros [deftest is testing]]
+            [hyperopen.config :as app-config]
             [hyperopen.service.fixtures :as fixtures]
             [hyperopen.service.product-context :as product-context]
             [hyperopen.service.tenant-config :as tenant-config]))
@@ -17,6 +18,8 @@
     (is (string? (get-in vm [:brand :logo-url])))
     (is (= "dark" (get-in vm [:brand :theme-id])))
     (is (= "Hyperliquid" (get-in vm [:venue :label])))
+    (is (= (get-in app-config/config [:hyperliquid :hyperliquid-chain])
+           (:network-label vm)))
     (is (= :unavailable (get-in vm [:affiliate :status])))
     (is (false? (get-in vm [:affiliate :enabled?])))
     (is (= "官方 affiliate 服务当前不可用；交易不受影响。"

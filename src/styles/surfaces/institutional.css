@@ -161,7 +161,7 @@
   :root[data-theme="institutional"] .brand-wordmark,
   :root[data-theme="institutional"] .brand-mark {
     font-style: normal;
-    letter-spacing: -0.02em;
+    letter-spacing: 0;
   }
 
   :root[data-theme="institutional"] .brand-wordmark {

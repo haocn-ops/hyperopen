@@ -24,8 +24,8 @@ four configured DEXHelm custom domains, Testnet-only HyperUnit proxy, and `worke
 - [x] Worker tests passed 50/50 and release-asset tests passed 52/52.
 - [x] DEXHelm white-label validation passed; Playwright passed at 375, 768, 1280, and 1440 px.
 - [x] Corrected repository gates passed 35/35 (6,691 tests, 36,502 assertions).
-- [ ] Final Cloudflare build, artifact preflight, and Wrangler dry-run.
-- [ ] Push the branch to the user fork and capture the GitHub ref.
+- [x] Final Cloudflare build, artifact preflight (33/33), and Wrangler dry-run passed.
+- [x] Pushed `codex/upstream-sync-20260806` to the user fork.
 - [ ] Deploy the existing Worker, verify the returned version and public host matrix.
 - [ ] Record final evidence and move this plan to `completed/`.
 
@@ -35,6 +35,13 @@ four configured DEXHelm custom domains, Testnet-only HyperUnit proxy, and `worke
   `4bdd9636-2e89-4f4f-8e49-7a4a198959eb` as rollback baseline.
 - Push only to `fork` (`https://github.com/haocn-ops/hyperopen.git`), never to canonical `origin`.
 - Preserve Testnet-only routing and the intentional `app.dexhelm.com` Mainnet-closed policy.
+
+## Release Evidence Before Deploy
+
+- Cloudflare dry-run read 57 assets from `out/white-label/dexhelm` and exited 0.
+- `git push fork codex/upstream-sync-20260806` created the matching GitHub branch.
+- Cloudflare account: Izhenghaocn@gmail.com's Account (`a95e39ff9f1a66e7630e6639a0edb86c`).
+- Rollback baseline: Worker version `4bdd9636-2e89-4f4f-8e49-7a4a198959eb`.
 
 ## Validation and Acceptance
 

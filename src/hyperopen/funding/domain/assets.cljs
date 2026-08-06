@@ -144,10 +144,6 @@
     (when (seq text)
       text)))
 
-(defn- parse-num
-  [value]
-  (trading-domain/parse-num value))
-
 (defn- normalize-chain-id
   [value]
   (let [raw (some-> value str str/trim)]

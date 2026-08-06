@@ -1,6 +1,5 @@
 (ns hyperopen.views.account-info.projections.orders
-  (:require [clojure.string :as str]
-            [hyperopen.views.account-info.projections.coins :as coins]
+  (:require [hyperopen.views.account-info.projections.coins :as coins]
             [hyperopen.views.account-info.projections.parse :as parse]))
 
 (defn resolve-open-order-oid

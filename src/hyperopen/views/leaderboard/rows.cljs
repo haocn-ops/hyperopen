@@ -94,37 +94,6 @@
     (neg? value) ["text-ho-sell-hi"]
     :else ["text-trading-text"]))
 
-(defn- sort-direction-icon
-  [direction]
-  [:svg {:class (into ["h-3" "w-3" "shrink-0" "opacity-70" "transition-transform"]
-                      (if (= :asc direction)
-                        ["rotate-180"]
-                        ["rotate-0"]))
-         :viewBox "0 0 12 12"
-         :aria-hidden true}
-   [:path {:d "M3 4.5L6 7.5L9 4.5"
-           :fill "none"
-           :stroke "currentColor"
-           :stroke-width "1.5"
-           :stroke-linecap "round"
-           :stroke-linejoin "round"}]])
-
-(defn- sortable-header
-  [label column sort-state]
-  (let [active? (= column (:column sort-state))]
-    [:button {:type "button"
-              :class (into ["inline-flex"
-                            "items-center"
-                            "gap-1"
-                            "font-normal"
-                            "text-trading-text-secondary"
-                            "hover:text-trading-text"]
-                           focus-visible-ring-classes)
-              :on {:click [[:actions/set-leaderboard-sort column]]}}
-     [:span label]
-     (when active?
-       (sort-direction-icon (:direction sort-state)))]))
-
 (defn- trader-chip
   [row]
   [:div {:class ["flex" "min-w-0" "items-center" "gap-2"]}

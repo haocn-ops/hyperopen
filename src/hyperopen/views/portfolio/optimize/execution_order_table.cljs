@@ -189,11 +189,16 @@
         splittable? (and crossing? (some? spread-usd))
         price-cost-usd (if crossing? (or estimated-slippage-usd 0) 0)
         price-cost-bps (if crossing? (or slippage-bps 0) 0)
-        fee-usd (if crossing? (or (:estimated-fee-usd cost) 0) (or (:maker-fee-usd cost) 0))
-        fee-bps (if crossing? (or (:fee-bps cost) 0) (or (:maker-fee-bps cost) 0))]
+        ;; An absent fee is UNKNOWN, not zero. A resting row pays no spread or impact, so
+        ;; coercing its missing maker fee to 0 would render "$0.00 all-in" for a real
+        ;; order; nil flows through to "—" and suppresses the all-in total instead.
+        fee-usd (if crossing? (:estimated-fee-usd cost) (:maker-fee-usd cost))
+        fee-bps (if crossing? (:fee-bps cost) (:maker-fee-bps cost))
+        fee-known? (shared/finite fee-usd)]
     {:crossing? crossing?
      :splittable? splittable?
      :floor? (boolean (and crossing? estimate-floor?))
+     :fee-known? fee-known?
      :twap-adjusted? (boolean twap-adjusted?)
      :suborders suborders
      :slice-exceeds-visible-depth? (boolean slice-exceeds-visible-depth?)
@@ -203,7 +208,8 @@
      :impact-usd (when splittable? impact-usd)
      :price-cost-bps price-cost-bps :price-cost-usd price-cost-usd
      :fee-bps fee-bps :fee-usd fee-usd
-     :all-in-bps (+ price-cost-bps fee-bps) :all-in-usd (+ price-cost-usd fee-usd)}))
+     :all-in-bps (when fee-known? (+ price-cost-bps (or fee-bps 0)))
+     :all-in-usd (when fee-known? (+ price-cost-usd fee-usd))}))
 
 (defn- cost-breakdown-strip
   "The right-hand column of the expanded editor: the execution-cost equation laid out across
@@ -213,18 +219,28 @@
   sliced estimate and the strip says how it is worked; a depth-overrun (floor) estimate is
   labeled as a lower bound."
   [model row]
-  (let [{:keys [crossing? splittable? floor? twap-adjusted? suborders
+  (let [{:keys [crossing? splittable? floor? fee-known? twap-adjusted? suborders
                 slice-exceeds-visible-depth? spread-bps spread-usd impact-bps impact-usd
                 price-cost-bps price-cost-usd fee-bps fee-usd all-in-bps all-in-usd]}
         (cost-breakdown model row)
-        twap-note (when twap-adjusted?
+        twap-row? (= :twap (shared/effective-type model row))
+        twap-note (cond
+                    twap-adjusted?
                     (str "worked as " suborders " clips over "
                          (:twap-min (shared/row-params model row))
                          "m — book refills between clips"
                          (when slice-exceeds-visible-depth?
-                           " · each clip still exceeds the visible book")))
+                           " · each clip still exceeds the visible book"))
+
+                    ;; Slicing a flat assumption would fabricate precision, so twap-cost
+                    ;; passes it through — which makes this tile read identically to
+                    ;; Market. Say why instead of leaving two equal numbers unexplained.
+                    twap-row?
+                    "no live book to slice — this is the same flat estimate a Market order pays")
         floor-note (when floor?
-                     "order exceeds visible book depth — price cost is a floor (≥), not a point estimate")]
+                     "order exceeds visible book depth — price cost is a floor (≥), not a point estimate")
+        fee-note (when-not fee-known?
+                   "fee unknown for this order type — not included in the all-in total")]
     [:div {:class ["optimizer-exec-cost-panel"]
            :data-role "portfolio-optimizer-execution-cost-breakdown"}
      [:p {:class ["optimizer-exec-cost-head"]}
@@ -265,10 +281,10 @@
       (cost-stat "Fees" fee-bps fee-usd :input)
       (cost-op "=")
       (cost-stat "All-in" all-in-bps all-in-usd :allin)]
-     (when (or twap-note floor-note)
+     (when (or twap-note floor-note fee-note)
        [:p {:class ["mt-1" "font-mono" "text-[0.62rem]" "text-trading-muted/80"]
             :data-role "portfolio-optimizer-execution-cost-note"}
-        (str/join " · " (remove nil? [twap-note floor-note]))])]))
+        (str/join " · " (remove nil? [twap-note floor-note fee-note]))])]))
 
 (defn- order-editor-row
   [model row colspan]
@@ -725,17 +741,22 @@
 
               :else
               "Order types are locked once execution is armed."))]]
-     (cond
-       (not (seq rows))
-       [:p {:class ["px-4" "py-4" "text-sm" "text-trading-muted"]}
-        "No orders are staged for this run."]
+     ;; Stable slots below: the body alternates between a <table> and an empty-state <p>,
+     ;; and the auto-exit strip is nil post-run. A bare tag swap desyncs Replicant's child
+     ;; walk, the keyed skipped <details> then lands on the nil, and reconciliation throws
+     ;; mid-render — freezing the whole surface, toasts included. One tag, always present.
+     [:div {:class (cond-> [] any-visible? (conj "overflow-x-auto"))
+            :data-role "portfolio-optimizer-execution-order-list-body"}
+      (cond
+        (not (seq rows))
+        [:p {:class ["px-4" "py-4" "text-sm" "text-trading-muted"]}
+         "No orders are staged for this run."]
 
-       (not any-visible?)
-       [:p {:class ["px-4" "py-4" "text-sm" "text-trading-muted"]}
-        (str "No " (name active-filter) " orders to show.")]
+        (not any-visible?)
+        [:p {:class ["px-4" "py-4" "text-sm" "text-trading-muted"]}
+         (str "No " (name active-filter) " orders to show.")]
 
-       :else
-       [:div {:class ["overflow-x-auto"]}
+        :else
         (into
          [:table {:class ["optimizer-table" "optimizer-exec-table"]}
           [:thead
@@ -757,6 +778,7 @@
                      (order-row model index row)
                      []))
                  (range)
-                 rows))])
-     (auto-exit-setting-strip model rows)
+                 rows)))]
+     [:div {:data-role "portfolio-optimizer-execution-auto-exit-slot"}
+      (auto-exit-setting-strip model rows)]
      (skipped-section model rows)]))

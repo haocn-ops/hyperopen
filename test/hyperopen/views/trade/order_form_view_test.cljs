@@ -20,6 +20,29 @@
     (is (contains? strings "Buy / Long"))
     (is (contains? strings "Sell / Short"))))
 
+(deftest order-form-renders-raw-portfolio-margin-mode-and-scale-post-only-test
+  (doseq [[raw-abstraction expected-label]
+          [[" portfolioMargin " "PM"]
+           ["unifiedAccount" "Classic"]
+           ["default" "Classic"]
+           ["disabled" "Classic"]
+           ["dexAbstraction" "Classic"]
+           ["unknown" "Classic"]
+           [nil "Classic"]]]
+    (let [view-node (view/order-form-view
+                     (assoc (base-state {:type :limit})
+                            :account {:mode :unified
+                                      :abstraction-raw raw-abstraction}))]
+      (is (contains? (set (collect-strings view-node)) expected-label)
+          (str "raw abstraction " (pr-str raw-abstraction)))))
+  (let [view-node (view/order-form-view
+                   (base-state {:type :scale :post-only true}))
+        post-only-input (find-first-node view-node
+                                         #(= "trade-toggle-post-only"
+                                             (get-in % [1 :id])))]
+    (is (some? post-only-input))
+    (is (true? (get-in post-only-input [1 :checked])))))
+
 (deftest order-form-renders-outcome-side-selector-test
   (let [state (assoc (base-state {:type :limit})
                      :active-asset "outcome:0"

@@ -264,8 +264,6 @@
                             :served-observations-by-instrument instrument-id])
          (native-history-observations state instrument)))))
 
-(def ^:private native-observation-count native-history-observations)
-
 (defn assumption-required-ids
   "Ids whose native history is below the assumption-required threshold (their
   covariance cannot be defensibly estimated AND their short calendar would

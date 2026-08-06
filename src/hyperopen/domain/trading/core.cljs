@@ -320,6 +320,34 @@
                (range order-count)
                weights))))))
 
+(defn portfolio-margin-abstraction?
+  [raw-abstraction]
+  (= "portfoliomargin" (some-> raw-abstraction str str/trim str/lower-case)))
+
+(defn scale-order-value
+  "Return the generated ladder's finite, positive leg-notional sum, or nil."
+  [form opts]
+  (let [scale (or (:scale form) {})
+        legs (scale-order-legs (:size form)
+                               (:count scale)
+                               (:skew scale)
+                               (:start scale)
+                               (:end scale)
+                               opts)
+        notionals (when (seq legs)
+                    (mapv (fn [{:keys [price size]}]
+                            (when (and (number? price)
+                                       (js/isFinite price)
+                                       (pos? price)
+                                       (number? size)
+                                       (js/isFinite size)
+                                       (pos? size))
+                              (* price size)))
+                          legs))]
+    (when (and (seq notionals)
+               (every? #(and (number? %) (js/isFinite %) (pos? %)) notionals))
+      (reduce + notionals))))
+
 (defn scale-preview-boundaries
   "Return first/last scale ladder legs as:
    {:start {:price number :size number}

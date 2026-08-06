@@ -190,7 +190,7 @@
                     (and (finite-number? total) (finite-number? hold)) (max 0 (- total hold))
                     (finite-number? total) (max 0 total)
                     :else nil)))))
-        (get-in state [:spot :clearinghouse-state :balances])))
+        (get-in state [:staking :spot-state :balances])))
 
 (defn- requested-validator-page
   [state]
@@ -277,7 +277,8 @@
         (:delegator-summary errors)
         (:delegations errors)
         (:rewards errors)
-        (:history errors))))
+        (:history errors)
+        (:spot-state errors))))
 
 (defn- action-popover-vm
   [{:keys [popover-state popover-kind popover-open? transfer-direction]}]
@@ -317,7 +318,7 @@
                 staking-balance
                 pending-withdrawals]}
         (delegator-summary-values delegator-summary validator-summaries)
-        effective-address (account-context/effective-account-address state)
+        effective-address (account-context/native-staking-account-address state)
         loading? (staking-loading? state)
         route-error (staking-route-error state)]
     {:connected? (true? (get-in state [:wallet :connected?]))

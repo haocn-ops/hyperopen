@@ -123,7 +123,3 @@ export function assertScenarioRouting(value) {
     }
   }
 }
-
-export function isScenarioContractError(error) {
-  return error?.name === "ScenarioContractError";
-}

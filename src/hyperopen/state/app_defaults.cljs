@@ -344,26 +344,36 @@
 
 (defn default-staking-state
   []
-  {:validator-summaries []
+  {:account-address nil
+   :validator-summaries []
    :delegator-summary nil
    :delegations []
    :rewards []
    :history []
+   :spot-state nil
    :loading {:validator-summaries false
              :delegator-summary false
              :delegations false
              :rewards false
-             :history false}
+             :history false
+             :spot-state false}
    :errors {:validator-summaries nil
             :delegator-summary nil
             :delegations nil
             :rewards nil
-            :history nil}
+            :history nil
+            :spot-state nil}
    :loaded-at-ms {:validator-summaries nil
                   :delegator-summary nil
                   :delegations nil
                   :rewards nil
-                  :history nil}})
+                  :history nil
+                  :spot-state nil}
+   :loaded-for {:delegator-summary nil
+                :delegations nil
+                :rewards nil
+                :history nil
+                :spot-state nil}})
 
 (defn default-api-wallets-ui-state
   []

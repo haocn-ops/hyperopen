@@ -284,7 +284,6 @@
     (.toFixed n decimals)))
 
 (defn safe-to-fixed [value decimals]
-  "Safely convert a value to fixed decimal places, defaulting to 0 if not a number"
   (let [num-value (if (and value (number? value)) value 0)]
     (.toFixed num-value decimals)))
 
@@ -349,16 +348,13 @@
          (.padStart (str total-seconds) 2 "0"))))
 
 (defn safe-number [value]
-  "Convert value to number, handling NaN and nil cases"
   (let [num (if (number? value) value (js/parseFloat value))]
     (if (js/isNaN num) 0 num)))
 
 (defn calculate-open-interest-usd [open-interest mark-price]
-  "Calculate open interest in USD by multiplying open interest by mark price"
   (when (and open-interest mark-price)
     (* open-interest mark-price)))
 
 (defn format-open-interest-usd [open-interest mark-price]
-  "Calculate and format open interest in USD"
   (when-let [usd-value (calculate-open-interest-usd open-interest mark-price)]
     (format-large-currency usd-value))) 

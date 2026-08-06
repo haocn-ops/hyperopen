@@ -237,6 +237,8 @@
     actions/set-portfolio-optimizer-execution-overlap-cancel
     :set-portfolio-optimizer-execution-exit
     actions/set-portfolio-optimizer-execution-exit
+    :restage-portfolio-optimizer-execution-plan
+    actions/restage-portfolio-optimizer-execution-plan
     :set-portfolio-optimizer-execution-auto-exit
     actions/set-portfolio-optimizer-execution-auto-exit
     :refresh-portfolio-optimizer-tracking

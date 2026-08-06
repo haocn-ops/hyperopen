@@ -11,10 +11,6 @@
   [view]
   (editor-model/view-comparator-id view))
 
-(defn- view-direction
-  [view]
-  (editor-model/view-direction view))
-
 (defn view-instrument-ids
   [view]
   (case (:kind view)

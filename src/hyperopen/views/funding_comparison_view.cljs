@@ -1,6 +1,5 @@
 (ns hyperopen.views.funding-comparison-view
-  (:require [clojure.string :as str]
-            [hyperopen.account.spectate-mode-links :as spectate-mode-links]
+  (:require [hyperopen.account.spectate-mode-links :as spectate-mode-links]
             [hyperopen.utils.formatting :as fmt]
             [hyperopen.views.funding-comparison.vm :as funding-vm]))
 

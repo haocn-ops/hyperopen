@@ -39,14 +39,6 @@
   [view]
   (model/view->draft view))
 
-(defn- editing-view-id
-  [state]
-  (model/editing-view-id (get-in state common/editor-path)))
-
-(defn- pending-draft?
-  [draft editing?]
-  (model/pending-draft? draft editing?))
-
 (defn editor-view-result
   [state]
   (model/editor-view-result

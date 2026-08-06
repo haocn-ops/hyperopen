@@ -9,9 +9,6 @@
 
 (def info-url state/info-url)
 
-(def ^:private default-info-client-config state/default-info-client-config)
-
-(defn- make-default-api-service [] (state/make-default-api-service))
 (defn- now-ms [] (state/now-ms))
 (defn- active-api-service [] (state/active-api-service))
 (defn- api-log-fn [] (state/api-log-fn))

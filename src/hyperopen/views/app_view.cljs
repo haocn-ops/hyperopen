@@ -1,6 +1,5 @@
 (ns hyperopen.views.app-view
-  (:require [clojure.string :as str]
-            [hyperopen.account.context :as account-context]
+  (:require [hyperopen.account.context :as account-context]
             [hyperopen.route-modules :as route-modules]
             [hyperopen.router :as router]
             [hyperopen.service.product-context :as product-context]

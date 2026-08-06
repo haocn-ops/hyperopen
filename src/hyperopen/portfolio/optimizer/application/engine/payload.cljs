@@ -5,6 +5,7 @@
              :as equal-risk-payload]
             [hyperopen.portfolio.optimizer.application.engine.target-selection :as target-selection]
             [hyperopen.portfolio.optimizer.application.instrument-labels :as instrument-labels]
+            [hyperopen.portfolio.optimizer.contracts.constants :as contracts-constants]
             [hyperopen.portfolio.optimizer.domain.diagnostics :as diagnostics]
             [hyperopen.portfolio.optimizer.domain.frontier-overlays :as frontier-overlays]
             [hyperopen.portfolio.optimizer.domain.math :as math]
@@ -269,7 +270,11 @@
       :cost-contexts-by-id (:cost-contexts-by-id execution-assumptions)
       :leverage-by-id (get-in request [:constraints :perp-leverage])
       :fee-bps-by-id (:fee-bps-by-id execution-assumptions)
-      :default-fee-bps (:default-fee-bps execution-assumptions)})))
+      :default-fee-bps (:default-fee-bps execution-assumptions)
+      ;; Same maker fee the frontend refresh charges (application.rebalance-preview):
+      ;; both build sites must agree, or which one happened to produce the preview on
+      ;; screen decides whether a resting row's all-in reads $0.
+      :maker-fee-bps contracts-constants/maker-fee-bps})))
 
 (defn- solved-payload
   [request

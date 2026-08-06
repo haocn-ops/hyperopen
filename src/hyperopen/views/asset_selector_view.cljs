@@ -19,16 +19,6 @@
 (def asset-list-scroll-active? runtime/asset-list-scroll-active?)
 (def asset-list-freeze-active? runtime/asset-list-freeze-active?)
 
-(def ^:private mobile-favorite-button icons/mobile-favorite-button)
-(def ^:private asset-list-body runtime/asset-list-body)
-(def ^:private asset-list-window-state runtime/asset-list-window-state)
-(def ^:private asset-list-viewport-covered? runtime/asset-list-viewport-covered?)
-(def ^:private asset-list-window-covered? runtime/asset-list-window-covered?)
-(def ^:private schedule-asset-list-render-limit-sync! runtime/schedule-asset-list-render-limit-sync!)
-(def ^:private asset-list-now-ms runtime/asset-list-now-ms)
-(def ^:private asset-list-set-timeout! runtime/asset-list-set-timeout!)
-(def ^:private asset-list-clear-timeout! runtime/asset-list-clear-timeout!)
-
 (defn asset-selector-dropdown
   [props]
   (layout/asset-selector-dropdown props))

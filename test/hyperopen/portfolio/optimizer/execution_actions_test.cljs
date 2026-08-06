@@ -91,9 +91,14 @@
     ;; Staging refreshes the open-order snapshots (base + per-dex frontendOpenOrders)
     ;; so confirm can recognize cloid-tagged resting orders from previous sessions.
     (is (= [:effects/refresh-portfolio-optimizer-open-orders] (nth effects 2)))
-    (is (= [:effects/save [:portfolio-ui :optimizer :results-tab] :execution]
+    ;; ...and re-prices the plan against live books. Entry is the trigger because a tab
+    ;; entry that does not follow a fresh solve (deep link, reload, restored autosave,
+    ;; loaded scenario) would otherwise quote flat fallback costs with no book at all.
+    (is (= [:effects/refresh-portfolio-optimizer-rebalance-slippage-snapshots]
            (nth effects 3)))
-    (is (= [:effects/replace-shareable-route-query] (nth effects 4)))))
+    (is (= [:effects/save [:portfolio-ui :optimizer :results-tab] :execution]
+           (nth effects 4)))
+    (is (= [:effects/replace-shareable-route-query] (nth effects 5)))))
 
 (deftest open-execution-derives-preview-when-solved-run-lacks-preview-test
   (let [state {:asset-selector
@@ -182,7 +187,7 @@
                                            {:result {:status :infeasible}})}}})]
     (is (nil? (get-in effects [0 2 :plan])))
     (is (= [:effects/save [:portfolio-ui :optimizer :results-tab] :execution]
-           (nth effects 3)))))
+           (nth effects 4)))))
 
 (deftest open-execution-stages-disabled-plan-when-recommendation-stale-test
   ;; The entry gates on currency, not just solved?: a stale recommendation (dirty draft) stages a
@@ -299,6 +304,38 @@
     ;; Nothing trades: ENS holds again, BTC stays within tolerance.
     (is (zero? (get-in plan [:summary :ready-count])))
     (is (= 2 (get-in plan [:summary :skipped-count])))))
+
+;; ── restage on fresher book data ──────────────────────────────────────────
+
+(deftest restage-plan-rebuilds-the-staged-plan-and-keeps-the-exit-set-test
+  ;; The snapshot-refresh effect dispatches this once live books land: the modal holds a
+  ;; plan SNAPSHOT, so re-costing the run alone would leave the surface quoting the
+  ;; estimate it staged before the books arrived. Staging choices must survive.
+  (let [effects (actions/restage-portfolio-optimizer-execution-plan
+                 (exit-toggle-state {:exit-instrument-ids #{"perp:ENS"}}))
+        plan (get-in effects [0 2])]
+    (is (emitted-effects-valid? :actions/restage-portfolio-optimizer-execution-plan effects))
+    (is (= 1 (count effects)) "only the plan is rewritten — no phase or error churn")
+    (is (= [:portfolio :optimizer :execution-modal :plan] (get-in effects [0 1])))
+    ;; The exit set is honored by the rebuild, so a staged sell-to-zero is not lost.
+    (is (= :ready (:status (plan-row plan "perp:ENS"))))
+    (is (= -200 (:delta-notional-usd (plan-row plan "perp:ENS"))))))
+
+(deftest restage-plan-never-touches-a-committed-or-in-flight-surface-test
+  ;; A restage must never move the ground under a trader who has already reviewed and
+  ;; armed, is mid-submit, or is watching a run that left :idle.
+  (is (= [] (actions/restage-portfolio-optimizer-execution-plan
+             (exit-toggle-state {:phase :armed}))))
+  (is (= [] (actions/restage-portfolio-optimizer-execution-plan
+             (exit-toggle-state {:submitting? true}))))
+  (is (= [] (actions/restage-portfolio-optimizer-execution-plan
+             (exit-toggle-state {:open? false}))))
+  (is (= [] (actions/restage-portfolio-optimizer-execution-plan
+             (exit-toggle-state {:plan nil}))))
+  (is (= [] (actions/restage-portfolio-optimizer-execution-plan
+             (assoc-in (exit-toggle-state nil)
+                       [:portfolio :optimizer :execution :status]
+                       :submitted)))))
 
 (def ^:private auto-exit-request
   ;; Stored run request for the auto-exit tests: BTC targeted; ENS a held perp the

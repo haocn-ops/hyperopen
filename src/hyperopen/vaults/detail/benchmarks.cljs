@@ -313,10 +313,6 @@
      :options-signature {:markets (:markets-signature market-result)
                          :vault-rows (:rows-signature vault-result)}}))
 
-(defn- benchmark-selector-options
-  [state]
-  (:options (benchmark-selector-options-result state)))
-
 (defn- normalize-benchmark-search-query
   [value]
   (-> (or value "")

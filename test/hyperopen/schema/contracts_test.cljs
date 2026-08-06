@@ -10,6 +10,7 @@
                   :side :buy
                   :type :limit
                   :entry-mode :limit
+                  :account-mode-label "Classic"
                   :pro-dropdown-open? false
                   :tpsl-panel-open? false
                   :pro-dropdown-options [:scale]

@@ -29,12 +29,6 @@
     (str (fmt/safe-to-fixed ratio 2) "x")
     "--"))
 
-(def ^:private unified-account-ratio-tooltip
-  "Represents the risk of portfolio liquidation. When the value is greater than 95%, your portfolio may be liquidated.")
-
-(def ^:private unified-account-leverage-tooltip
-  "Unified Account Leverage = Total Cross Positions Value / Total Collateral Balance. Perp positions only; spot holdings are not counted as exposure here.")
-
 (def ^:private tooltip-panel-position-classes
   {"top" ["bottom-full" "left-0" "mb-2"]
    "bottom" ["top-full" "left-0" "mt-2"]

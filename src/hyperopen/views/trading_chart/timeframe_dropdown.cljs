@@ -1,5 +1,4 @@
-(ns hyperopen.views.trading-chart.timeframe-dropdown
-  (:require [replicant.core :as r]))
+(ns hyperopen.views.trading-chart.timeframe-dropdown)
 
 (defn timeframe-dropdown [{:keys [selected-timeframe timeframes-dropdown-visible]}]
   [:div.relative

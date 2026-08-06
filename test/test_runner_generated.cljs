@@ -471,7 +471,9 @@
             [hyperopen.service.tenant-config-acceptance-test]
             [hyperopen.service.trade-attribution-acceptance-test]
             [hyperopen.staking.actions-test]
+            [hyperopen.staking.effects-freshness-test]
             [hyperopen.staking.effects-test]
+            [hyperopen.staking.unstake-actions-regression-test]
             [hyperopen.startup.account-lifecycle-test]
             [hyperopen.startup.builder-fee-recovery-test]
             [hyperopen.startup.collaborators-test]
@@ -491,6 +493,7 @@
             [hyperopen.state.trading.order-form-ownership-formal-conformance-test]
             [hyperopen.state.trading.order-form-state-test]
             [hyperopen.state.trading.order-request-test]
+            [hyperopen.state.trading.scale-pm-summary-test]
             [hyperopen.state.trading.submit-policy-formal-conformance-test]
             [hyperopen.state.trading.validation-and-scale-test]
             [hyperopen.subaccounts.actions-test]
@@ -642,6 +645,7 @@
             [hyperopen.views.portfolio.optimize.black-litterman-preview-chart-test]
             [hyperopen.views.portfolio.optimize.execution-amend-view-test]
             [hyperopen.views.portfolio.optimize.execution-exit-affordance-test]
+            [hyperopen.views.portfolio.optimize.execution-order-table-reconcile-test]
             [hyperopen.views.portfolio.optimize.execution-order-table-test]
             [hyperopen.views.portfolio.optimize.execution-strategy-band-test]
             [hyperopen.views.portfolio.optimize.execution-tab-test]
@@ -1341,7 +1345,9 @@
              'hyperopen.service.tenant-config-acceptance-test
              'hyperopen.service.trade-attribution-acceptance-test
              'hyperopen.staking.actions-test
+             'hyperopen.staking.effects-freshness-test
              'hyperopen.staking.effects-test
+             'hyperopen.staking.unstake-actions-regression-test
              'hyperopen.startup.account-lifecycle-test
              'hyperopen.startup.builder-fee-recovery-test
              'hyperopen.startup.collaborators-test
@@ -1361,6 +1367,7 @@
              'hyperopen.state.trading.order-form-ownership-formal-conformance-test
              'hyperopen.state.trading.order-form-state-test
              'hyperopen.state.trading.order-request-test
+             'hyperopen.state.trading.scale-pm-summary-test
              'hyperopen.state.trading.submit-policy-formal-conformance-test
              'hyperopen.state.trading.validation-and-scale-test
              'hyperopen.subaccounts.actions-test
@@ -1512,6 +1519,7 @@
              'hyperopen.views.portfolio.optimize.black-litterman-preview-chart-test
              'hyperopen.views.portfolio.optimize.execution-amend-view-test
              'hyperopen.views.portfolio.optimize.execution-exit-affordance-test
+             'hyperopen.views.portfolio.optimize.execution-order-table-reconcile-test
              'hyperopen.views.portfolio.optimize.execution-order-table-test
              'hyperopen.views.portfolio.optimize.execution-strategy-band-test
              'hyperopen.views.portfolio.optimize.execution-tab-test

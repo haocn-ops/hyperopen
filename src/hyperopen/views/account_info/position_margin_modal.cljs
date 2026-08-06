@@ -86,13 +86,6 @@
    [:span {:class ["text-sm" "text-gray-400"]} label]
    [:span {:class ["text-sm" "font-semibold" "text-gray-100" "num"]} value]])
 
-(defn- coin-label
-  [coin]
-  (let [parsed (shared/parse-coin-namespace coin)]
-    (or (:base parsed)
-        (shared/non-blank-text coin)
-        "-")))
-
 (defn- format-usdc
   [value]
   (str (shared/format-currency value) " USDC"))

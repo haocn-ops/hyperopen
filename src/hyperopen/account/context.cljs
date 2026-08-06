@@ -264,6 +264,13 @@
       (spectate-address state)
       (active-trading-account-address state))))
 
+(defn native-staking-account-address
+  [state]
+  (if (or (spectate-mode-active? state)
+          (trader-portfolio-route-active? state))
+    (effective-account-address state)
+    (owner-address state)))
+
 (defn live-user-stream-address
   [state]
   (when (user-stream-subscriptions-enabled? state)

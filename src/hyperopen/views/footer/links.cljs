@@ -13,14 +13,6 @@
 (def ^:private social-link-group-classes
   ["flex" "items-center" "gap-2"])
 
-(def ^:private social-link-shell-classes
-  ["inline-flex"
-   "h-6"
-   "w-6"
-   "items-center"
-   "justify-center"
-   "text-trading-text"])
-
 (def ^:private social-link-anchor-classes
   ["inline-flex"
    "h-6"

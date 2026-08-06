@@ -158,10 +158,6 @@
       (assoc-in [:account-info :order-history :loaded-for-address] nil)
       (assoc-in [:orders :order-history] [])))
 
-(defn- invalidate-order-history-request!
-  [store]
-  (swap! store invalidate-order-history-request))
-
 (defn- prefetch-order-history!
   [{:keys [store fetch-historical-orders!]}]
   (when (fn? fetch-historical-orders!)

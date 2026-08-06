@@ -20,8 +20,7 @@
   presolve feasibility in domain.equal-risk-presolve, the solver plan and QP
   subproblem shapes in domain.equal-risk-plan, and the iterative
   orchestration in application.engine.equal-risk-solve."
-  (:require [hyperopen.portfolio.optimizer.coercion :as coercion]
-            [hyperopen.portfolio.optimizer.domain.risk-contributions :as risk-contributions]))
+  (:require [hyperopen.portfolio.optimizer.domain.risk-contributions :as risk-contributions]))
 
 (def tolerances
   "Every numeric tolerance the Equal Risk path uses, in one place.
@@ -58,8 +57,6 @@
    :max-iterations 80
    :max-initializations 4
    :bisection-steps 100})
-
-(def ^:private finite-number? coercion/finite-number?)
 
 (defn exactness-tolerance
   "Absolute RRC-error threshold for the :exact label at universe size n."

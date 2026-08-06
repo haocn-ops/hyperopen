@@ -1,14 +1,15 @@
 (ns hyperopen.portfolio.optimizer.application.rebalance-preview
   (:require [clojure.string :as str]
-            [hyperopen.domain.trading.core :as trading-core]
             [hyperopen.portfolio.optimizer.coercion :as coercion]
+            [hyperopen.portfolio.optimizer.contracts.constants :as contracts-constants]
             [hyperopen.portfolio.optimizer.domain.rebalance :as rebalance]
             [hyperopen.portfolio.optimizer.ids :as ids]))
 
 (def ^:private maker-fee-bps
-  ;; Canonical Hyperliquid maker fee (percent -> bps), used to show the lower fee a resting
-  ;; (limit/passive) execution order would pay. The taker fee comes from the draft :fee-mode.
-  (* 100 (:maker trading-core/default-fees)))
+  ;; The lower fee a resting (limit/passive) execution order would pay. Shared with the
+  ;; worker payload build site (application.engine.payload) so the two previews can never
+  ;; charge different maker fees. The taker fee comes from the draft :fee-mode.
+  contracts-constants/maker-fee-bps)
 
 (def ^:private finite-number? coercion/finite-number?)
 (def ^:private non-blank-text coercion/non-blank-text)

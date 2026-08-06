@@ -36,6 +36,7 @@
            :sections [:scale]
            :limit-like? false
            :supports-tpsl? false
+           :supports-post-only? true
            :show-scale-preview? true
            :show-liquidation-row? false}
    :twap {:label "TWAP"

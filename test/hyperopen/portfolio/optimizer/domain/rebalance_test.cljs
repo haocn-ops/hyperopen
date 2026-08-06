@@ -606,6 +606,24 @@
     (is (= 1.5 (:maker-fee-bps cost)))
     (is (near? 0.15 (:maker-fee-usd cost)))))
 
+(deftest build-rebalance-preview-omits-maker-fee-when-the-assumption-is-missing-test
+  ;; A build site that forgets the maker-fee assumption must leave the keys OFF the cost
+  ;; map, never stamp 0: a resting row pays no spread or impact, so a zero fee reads as a
+  ;; confident "$0.00 all-in" for a real order. Absent => the surfaces render "—".
+  (let [preview (rebalance/build-rebalance-preview
+                 {:capital-usd 10000
+                  :rebalance-tolerance 0.0
+                  :instrument-ids ["perp:BTC"]
+                  :current-weights [0.0]
+                  :target-weights [0.1]
+                  :instruments-by-id {"perp:BTC" {:instrument-type :perp :coin "BTC"}}
+                  :prices-by-id {"perp:BTC" 100}
+                  :fee-bps-by-id {"perp:BTC" 4.5}})
+        cost (get-in preview [:rows 0 :cost])]
+    (is (near? 0.45 (:estimated-fee-usd cost)))
+    (is (not (contains? cost :maker-fee-bps)))
+    (is (not (contains? cost :maker-fee-usd)))))
+
 ;; ── price-cost decomposition (spread + impact) ─────────────────────────────
 
 (deftest build-rebalance-preview-decomposes-price-cost-into-spread-and-impact-test

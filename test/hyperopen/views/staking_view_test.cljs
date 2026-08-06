@@ -214,10 +214,10 @@
                                                :amount 1.25}]
                                 :delegator-summary {:delegated 1.25
                                                     :undelegated 3
-                                                    :total-pending-withdrawal 0}}
-                      :spot {:clearinghouse-state {:balances [{:coin "hype"
-                                                              :total "5"
-                                                              :hold "3"}]}}}))]
+                                                    :total-pending-withdrawal 0}
+                                :spot-state {:balances [{:coin "hype"
+                                                        :total "5"
+                                                        :hold "3"}]}}}))]
     (is (= 1 (:validator-page view-model)))
     (is (= 2 (:validator-page-count view-model)))
     (is (= 26 (:validator-page-range-start view-model)))
@@ -227,6 +227,18 @@
     (is (= 5 (count (:validators view-model))))
     (is (= delegated-validator
            (get-in view-model [:validators 4 :validator])))))
+
+(deftest staking-vm-uses-staking-owned-spot-state-for-transfer-balance-test
+  (let [view-model (staking-vm/staking-vm
+                    (base-connected-state
+                     {:staking {:validator-summaries []
+                                :spot-state {:balances [{:coin "HYPE"
+                                                        :total "9"
+                                                        :hold "2"}]}}
+                      :spot {:clearinghouse-state {:balances [{:coin "HYPE"
+                                                              :total "1"
+                                                              :hold "0"}]}}}))]
+    (is (= 7 (get-in view-model [:balances :available-transfer])))))
 
 (deftest staking-view-renders-open-transfer-popover-actions-test
   (let [view (staking-view/staking-view
@@ -249,7 +261,7 @@
     (is (= [[:actions/set-staking-transfer-direction :staking->spot]]
            (get-in direction-toggle [1 :on :click])))
     (is (= "12.5" (get-in amount-input [1 :value])))
-    (is (= [:actions/set-staking-deposit-amount-to-max]
+    (is (= [[:actions/set-staking-deposit-amount-to-max]]
            (get-in max-button [1 :on :click])))
     (is (contains? strings "Transfer HYPE"))
     (is (contains? strings "Submitting..."))
@@ -293,10 +305,67 @@
                                                        :name "Alpha Validator")]}}))
         max-button (find-button-by-text "MAX" view)
         strings (set (collect-strings view))]
-    (is (= [:actions/set-staking-undelegate-amount-to-max]
+    (is (= [[:actions/set-staking-undelegate-amount-to-max]]
            (get-in max-button [1 :on :click])))
     (is (contains? strings "Unstake"))
     (is (contains? strings "No validators found"))))
+
+(deftest staking-view-keeps-unstake-error-and-retryable-form-inside-open-popover-test
+  (let [validator (validator-address 8)
+        message "This delegation is locked until 1/2/2026 - 03:04:05."
+        state (base-connected-state
+               {:staking-ui {:action-popover {:open? true
+                                              :kind :unstake}
+                             :undelegate-amount "101"
+                             :selected-validator validator
+                             :form-error message
+                             :submitting {:undelegate? false}}
+                :staking {:validator-summaries [(assoc (validator-row 8)
+                                                       :validator validator
+                                                       :name "Nansen x HypurrCollective")]
+                          :delegations [{:validator validator
+                                         :amount 101}]}})
+        view (staking-view/staking-view state)
+        popover (find-node-by-data-role "staking-action-popover" view)
+        inline-error (find-node-by-data-role "staking-unstake-error" popover)
+        amount-input (find-input-by-id "staking-undelegate-amount" popover)
+        validator-input (find-input-by-placeholder "Nansen x HypurrCollective" popover)
+        cta (find-button-by-text "Unstake" popover)]
+    (is (some? popover))
+    (is (some? inline-error))
+    (is (contains? (set (collect-strings inline-error)) message))
+    (is (= "101" (get-in amount-input [1 :value])))
+    (is (some? validator-input))
+    (is (= false (get-in cta [1 :disabled])))))
+
+(deftest staking-view-disables-unstake-only-while-submitting-and-reenables-after-error-test
+  (let [validator (validator-address 9)
+        message "Unstake failed: validator busy"
+        state (base-connected-state
+               {:staking-ui {:action-popover {:open? true
+                                              :kind :unstake}
+                             :undelegate-amount "101"
+                             :selected-validator validator
+                             :form-error message}
+                :staking {:validator-summaries [(assoc (validator-row 9)
+                                                       :validator validator
+                                                       :name "Nansen x HypurrCollective")]
+                          :delegations [{:validator validator
+                                         :amount 101}]}})
+        submitting-view (staking-view/staking-view
+                         (assoc-in state [:staking-ui :submitting :undelegate?] true))
+        submitting-popover (find-node-by-data-role "staking-action-popover" submitting-view)
+        submitting-cta (find-button-by-text "Submitting..." submitting-popover)
+        recovered-view (staking-view/staking-view
+                        (assoc-in state [:staking-ui :submitting :undelegate?] false))
+        recovered-popover (find-node-by-data-role "staking-action-popover" recovered-view)
+        recovered-cta (find-button-by-text "Unstake" recovered-popover)
+        inline-error (find-node-by-data-role "staking-unstake-error" recovered-popover)]
+    (is (= true (get-in submitting-cta [1 :disabled])))
+    (is (= false (get-in recovered-cta [1 :disabled])))
+    (is (= [[:actions/submit-staking-undelegate]]
+           (get-in recovered-cta [1 :on :click])))
+    (is (contains? (set (collect-strings inline-error)) message))))
 
 (deftest staking-view-renders-reward-history-states-test
   (let [loaded-view (staking-view/staking-view
@@ -355,3 +424,14 @@
     (is (some? error-banner))
     (is (contains? strings "Request failed"))
     (is (nil? popover))))
+
+(deftest staking-route-surfaces-isolated-spot-state-errors-in-its-vm-and-view-test
+  (let [message "Unable to load the native staking spot balance."
+        state (base-connected-state
+               {:staking {:errors {:spot-state message}}})
+        view-model (staking-vm/staking-vm state)
+        view (staking-view/staking-view state)
+        error-banner (find-node-by-data-role "staking-error" view)]
+    (is (= message (:error view-model)))
+    (is (some? error-banner))
+    (is (contains? (set (collect-strings view)) message))))

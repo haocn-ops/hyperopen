@@ -249,7 +249,3 @@ export function assertBrowserQaEvalCorpus(value) {
     assertObject(entry.report, `browserQaEvalCorpus.cases[${index}].report`);
   }
 }
-
-export function isDesignReviewContractError(error) {
-  return error?.name === "DesignReviewContractError";
-}

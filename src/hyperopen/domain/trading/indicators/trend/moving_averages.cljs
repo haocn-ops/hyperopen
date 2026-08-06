@@ -5,7 +5,6 @@
 
 (def ^:private finite-number? imath/finite-number?)
 (def ^:private parse-period imath/parse-period)
-(def ^:private parse-number imath/parse-number)
 (def ^:private field-values imath/field-values)
 (def ^:private normalize-values imath/normalize-values)
 

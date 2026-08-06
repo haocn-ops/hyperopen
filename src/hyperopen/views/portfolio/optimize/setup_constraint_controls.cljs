@@ -2,7 +2,6 @@
   (:require ["lucide/dist/esm/icons/chevron-down.js" :default lucide-chevron-down]
             ["lucide/dist/esm/icons/refresh-cw.js" :default lucide-refresh-cw]
             ["lucide/dist/esm/icons/shield.js" :default lucide-shield]
-            [hyperopen.portfolio.optimizer.application.view-model :as optimizer-view-model]
             [hyperopen.portfolio.optimizer.application.view-model.exposure :as exposure-vm]
             [hyperopen.portfolio.optimizer.application.view-model.setup-summary :as setup-summary]
             [hyperopen.portfolio.optimizer.domain.exposure-policy :as exposure-policy]

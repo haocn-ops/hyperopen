@@ -19,6 +19,7 @@
     :outcome-options
     :outcome-option-id
     :read-only?
+    :account-mode-label
     :display
     :ui-leverage
     :next-leverage
@@ -99,6 +100,7 @@
 (s/def :order-form-vm/outcome-options vector?)
 (s/def :order-form-vm/outcome-option-id int?)
 (s/def :order-form-vm/read-only? boolean?)
+(s/def :order-form-vm/account-mode-label string?)
 (s/def :order-form-vm/ui-leverage number?)
 (s/def :order-form-vm/next-leverage number?)
 (s/def :order-form-vm/size-percent number?)
@@ -224,6 +226,7 @@
                     :order-form-vm/outcome-options
                     :order-form-vm/outcome-option-id
                     :order-form-vm/read-only?
+                    :order-form-vm/account-mode-label
                     :order-form-vm/display
                     :order-form-vm/ui-leverage
                     :order-form-vm/next-leverage

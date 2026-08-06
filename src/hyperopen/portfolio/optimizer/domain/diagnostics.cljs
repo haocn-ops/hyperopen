@@ -6,10 +6,6 @@
   [value]
   (js/Math.abs value))
 
-(defn- gross-exposure
-  [weights]
-  (reduce + 0 (map abs-num weights)))
-
 (defn exposure-summary
   [weights]
   (reduce (fn [acc weight]

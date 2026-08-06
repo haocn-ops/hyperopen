@@ -4,9 +4,6 @@
             [hyperopen.views.portfolio.vm.summary :as vm-summary]
             [hyperopen.vaults.detail.metrics-bridge :as metrics-bridge]))
 
-(def ^:private performance-periods-per-year
-  365)
-
 (def ^:private empty-source-version-counter
   0)
 
@@ -290,21 +287,6 @@
     (nil? worker-ref) nil
     (satisfies? IDeref worker-ref) @worker-ref
     :else worker-ref))
-
-(defn- benchmark-performance-column
-  [benchmark-cumulative-rows label-by-coin coin]
-  (let [benchmark-daily-rows (portfolio-metrics/daily-compounded-returns benchmark-cumulative-rows)
-        values (if (seq benchmark-daily-rows)
-                 (portfolio-metrics/compute-performance-metrics {:strategy-daily-rows benchmark-daily-rows
-                                                                 :rf 0
-                                                                 :periods-per-year performance-periods-per-year
-                                                                 :compounded true})
-                 {})]
-    {:coin coin
-     :label (or (get label-by-coin coin)
-                coin)
-     :daily-rows benchmark-daily-rows
-     :values values}))
 
 (defn- with-performance-metric-columns
   [groups portfolio-values benchmark-columns]

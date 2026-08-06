@@ -1,5 +1,6 @@
 (ns hyperopen.views.trade.order-form-vm
-  (:require [hyperopen.state.trading :as trading]
+  (:require [hyperopen.domain.trading.core :as core]
+            [hyperopen.state.trading :as trading]
             [hyperopen.trading.order-form-application :as application]
             [hyperopen.trading.order-type-registry :as order-types]
             [hyperopen.views.trade.order-form-vm-selectors :as selectors]
@@ -21,6 +22,9 @@
   (if (= entry-mode :pro)
     (order-type-label order-type)
     "Pro"))
+
+(defn account-mode-label [raw-abstraction]
+  (if (core/portfolio-margin-abstraction? raw-abstraction) "PM" "Classic"))
 
 (defn- parse-outcome-side-index [value]
   (let [parsed (cond
@@ -117,6 +121,7 @@
         required-submit-fields (:required-fields submit-policy)
         submit-tooltip (submit/submit-tooltip-from-policy submit-policy)
         submit-disabled? (:disabled? submit-policy)
+        mode-label (account-mode-label (get-in state [:account :abstraction-raw]))
         outcome-side-index (parse-outcome-side-index
                             (or (:outcome-side normalized-form)
                                 (:outcome-side-index normalized-form)))
@@ -160,6 +165,7 @@
      :outcome-options (vec (or outcome-options []))
      :outcome-option-id (or selected-outcome-option-id 0)
      :read-only? read-only?
+     :account-mode-label mode-label
      :display summary-display
      :ui-leverage ui-leverage
      :next-leverage (selectors/next-leverage ui-leverage max-leverage)

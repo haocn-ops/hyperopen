@@ -440,7 +440,7 @@
        "Confirm"]]]))
 
 (defn leverage-row
-  [state margin-mode cross-margin-allowed? margin-mode-dropdown-open? leverage-popover-open? ui-leverage leverage-draft max-leverage leverage-handlers]
+  [state margin-mode cross-margin-allowed? margin-mode-dropdown-open? leverage-popover-open? ui-leverage leverage-draft max-leverage leverage-handlers & [account-mode-label]]
   (let [mode (trading/effective-margin-mode state margin-mode)
         dropdown-open? (and cross-margin-allowed?
                             margin-mode-dropdown-open?)]
@@ -452,7 +452,7 @@
                        max-leverage
                        leverage-popover-open?
                        leverage-handlers)
-     (primitives/chip-button "Classic" true :disabled? true)]))
+     (primitives/chip-button (or account-mode-label "Classic") true :disabled? true)]))
 
 (defn side-row
   ([side side-handlers]

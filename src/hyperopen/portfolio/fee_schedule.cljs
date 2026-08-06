@@ -352,15 +352,6 @@
       "0%"
       (str (trim-rate-decimals (.toFixed rate* 4)) "%"))))
 
-(defn- format-discount-pct
-  [ratio]
-  (let [pct (* 100 (or (optional-number ratio) 0))
-        fixed (.toFixed pct 2)
-        trimmed (-> fixed
-                    (str/replace #"0+$" "")
-                    (str/replace #"\.$" ""))]
-    (str trimmed "%")))
-
 (defn- positive-fee-discount
   [rate discount]
   (if (pos? rate)

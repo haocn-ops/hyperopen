@@ -235,6 +235,7 @@
                                                 :form form
                                                 :submitting submitting
                                                 :balances balances
+                                                :error error
                                                 :selected-validator selected-validator
                                                 :validator-search-query validator-search-query
                                                 :validator-dropdown-open? validator-dropdown-open?

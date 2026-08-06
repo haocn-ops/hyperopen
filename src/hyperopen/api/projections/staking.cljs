@@ -27,6 +27,27 @@
         (assoc-in [:staking :loading :validator-summaries] false)
         (assoc-in [:staking :errors :validator-summaries] message))))
 
+(defn begin-staking-spot-state-load
+  [state]
+  (-> state
+      (assoc-in [:staking :loading :spot-state] true)
+      (assoc-in [:staking :errors :spot-state] nil)))
+
+(defn apply-staking-spot-state-success
+  [state spot-state]
+  (-> state
+      (assoc-in [:staking :spot-state] (when (map? spot-state) spot-state))
+      (assoc-in [:staking :loading :spot-state] false)
+      (assoc-in [:staking :errors :spot-state] nil)
+      (assoc-in [:staking :loaded-at-ms :spot-state] (.now js/Date))))
+
+(defn apply-staking-spot-state-error
+  [state err]
+  (let [{:keys [message]} (normalized-error err)]
+    (-> state
+        (assoc-in [:staking :loading :spot-state] false)
+        (assoc-in [:staking :errors :spot-state] message))))
+
 (defn begin-staking-delegator-summary-load
   [state]
   (-> state

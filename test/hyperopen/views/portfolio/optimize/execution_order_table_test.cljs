@@ -164,3 +164,39 @@
     (is (str/includes? (h/node-text editor) "book covers 0.2% of order"))
     (is (some? note))
     (is (str/includes? (h/node-text note) "floor"))))
+
+(deftest resting-row-with-no-maker-fee-reads-unknown-not-zero-test
+  ;; The $0-all-in regression: a preview built without the maker-fee assumption carries no
+  ;; :maker-fee-usd. A passive row pays no spread or impact, so reading the missing fee as
+  ;; 0 printed a confident "$0.00" all-in for a real order. Unknown must render "—".
+  (let [feeless-cost {:source :snapshot :slippage-bps 45.4 :estimated-slippage-usd 0.4
+                      :notional-usd 87 :fee-bps 4.5 :estimated-fee-usd 0.04}
+        plan* (assoc-in plan [:rows 0 :cost] feeless-cost)
+        node (view {:plan plan* :overrides {"perp:EWZ" :passive} :open-row "perp:EWZ"})
+        breakdown (h/find-by-data-role node "portfolio-optimizer-execution-cost-breakdown")
+        note (h/find-by-data-role node "portfolio-optimizer-execution-cost-note")
+        text (h/node-text breakdown)]
+    (is (some? breakdown))
+    (is (str/includes? text "Resting order"))
+    (is (str/includes? text "—") "the unknown fee and all-in render as em dashes")
+    (is (not (str/includes? text "$0.00")))
+    (is (some? note))
+    (is (str/includes? (h/node-text note) "fee unknown"))))
+
+(deftest twap-row-without-a-book-says-it-is-the-same-flat-estimate-test
+  ;; With no spread/impact split (flat fallback / prebaked bps) twap-cost passes the
+  ;; one-shot estimate through unchanged — correct, but it makes TWAP read identically to
+  ;; Market. The row must say why instead of showing two equal numbers with no note.
+  (let [flat-cost {:source :fallback-bps :slippage-bps 25 :estimated-slippage-usd 25
+                   :notional-usd 10000 :fee-bps 4.5 :estimated-fee-usd 4.5
+                   :maker-fee-bps 1.5 :maker-fee-usd 1.5}
+        plan* (-> plan
+                  (assoc-in [:rows 0 :delta-notional-usd] 10000)
+                  (assoc-in [:rows 0 :cost] flat-cost))
+        node (view {:plan plan* :overrides {"perp:EWZ" :twap} :open-row "perp:EWZ"})
+        breakdown (h/find-by-data-role node "portfolio-optimizer-execution-cost-breakdown")
+        note (h/find-by-data-role node "portfolio-optimizer-execution-cost-note")]
+    (is (str/includes? (h/node-text breakdown) "Not separable"))
+    (is (some? note))
+    (is (str/includes? (h/node-text note) "no live book to slice"))
+    (is (str/includes? (h/node-text note) "same flat estimate a Market order pays"))))

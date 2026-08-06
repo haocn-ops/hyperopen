@@ -31,7 +31,7 @@ Local scratch refs (non-authoritative):
 - [x] (2026-08-06) Audited the upstream delta: 119 files, 4,266 insertions, and 1,409 deletions, including staking account scope/undelegation safety, optimizer execution stability and pricing, dead-code cleanup, QA tooling/tests, and badge/lockfile churn.
 - [x] (2026-08-06) Created `codex/upstream-sync-20260806` from local `main`, merged `origin/main`, and resolved 9 textual conflicts while preserving both parent histories.
 - [x] (2026-08-06) Ran delimiter preflight, `npm test`, `npm run check`, `npm run test:websocket`, targeted staking Playwright (6/6), and the full Playwright CI suite (216 passed, 22 failed, 7 flaky, 4 skipped).
-- [ ] Verify local Cloudflare/DEXHelm files and `test-results/` are preserved, review the final diff, and hand off the branch and remaining risks without pushing or deploying.
+- [x] (2026-08-06) Verified both parent ancestry, preserved local Cloudflare/DEXHelm paths byte-for-byte, confirmed `test-results/.last-run.json` hash stability, reviewed the merge graph, and handed off residual browser risks without pushing or deploying.
 
 ## Surprises & Discoveries
 
@@ -69,7 +69,14 @@ Local scratch refs (non-authoritative):
 
 ## Outcomes & Retrospective
 
-The upstream main history is integrated on `codex/upstream-sync-20260806`. Conflicts were limited to badges, dependency manifests, namespace-size exceptions, funding network selection, and app-view imports; local Bridge2/product-context behavior and upstream staking/optimizer changes were composed. The required code gates are green. Targeted staking browser coverage is green, while the broad Playwright suite and design-review launcher remain environment/legacy-flow risks documented above. No Cloudflare or remote mutation was performed.
+The upstream main history is integrated on `codex/upstream-sync-20260806` in merge commit `ec6f749a`. Conflicts were limited to badges, dependency manifests, namespace-size exceptions, funding network selection, and app-view imports; local Bridge2/product-context behavior and upstream staking/optimizer changes were composed. The required code gates are green (`npm test`, `npm run check`, `npm run test:websocket`). Targeted staking browser coverage is green (6/6). The broad Playwright suite recorded 216 passed, 22 failed, 7 flaky, and 4 skipped; failures are spread across pre-existing builder-fee, mobile, close-all, referrals, optimizer prefetch, and trade flows. The design-review launcher was blocked by stale local Shadow/app startup state after explicit cleanup attempts, so its six passes are `BLOCKED` rather than inferred. No Cloudflare, wallet, DNS, push, or other remote mutation was performed.
+
+Final evidence:
+
+- `git merge-base --is-ancestor 7652651b443d8fa7a9b1d85f49a0f966eb1d3b9b HEAD` passed.
+- `git merge-base --is-ancestor d708a545dd45aa9923b0936edb350efca9172e05 HEAD` passed.
+- Local Cloudflare/DEXHelm path diff against the pre-merge local commit was empty.
+- The pre-existing `test-results/.last-run.json` hash compared equal before and after.
 
 ## Context and Orientation
 

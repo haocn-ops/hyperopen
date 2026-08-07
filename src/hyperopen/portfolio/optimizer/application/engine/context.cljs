@@ -199,13 +199,22 @@
   [request]
   (dissoc (:history request) :freshness))
 
+(def ^:private return-inputs-memo-capacity
+  ;; A single-slot cache is evicted whenever two visible optimizer helpers
+  ;; alternate between equivalent request variants. Keep a small bounded set
+  ;; so those legitimate renders do not repeat the covariance estimate.
+  8)
+
 (defn- return-inputs-memo-lookup
   [memo key compute]
-  (let [cached @memo]
-    (if (and cached (= (:key cached) key))
-      (:value cached)
-      (let [value (compute)]
-        (vreset! memo {:key key :value value})
+  (let [cached (or @memo {})]
+    (if (contains? cached key)
+      (get cached key)
+      (let [value (compute)
+            cached* (if (>= (count cached) return-inputs-memo-capacity)
+                      (dissoc cached (first (keys cached)))
+                      cached)]
+        (vreset! memo (assoc cached* key value))
         value))))
 
 (defonce ^:private ui-risk-result-memo (volatile! nil))
@@ -313,10 +322,7 @@
    (let [{conservative-inputs :conservative
           proxy-inputs :proxy} (history-assumptions/history-assumption-engine-inputs
                                 request)
-         raw-risk-result (-> (risk/estimate-risk-model
-                              {:risk-model (:risk-model request)
-                               :periods-per-year (:periods-per-year request)
-                               :history (:history request)})
+         raw-risk-result (-> (ui-risk-result request)
                              (risk/augment-risk-result-with-assumptions conservative-inputs)
                              (history-assumption-proxy/augment-risk-result-with-proxy-assumptions
                               proxy-inputs

@@ -19,10 +19,12 @@
                           out)})
 
 (defn- with-webauthn-env
-  [{:keys [crypto credentials is-secure-context public-key-credential]} f]
+  [{:keys [crypto credentials hostname is-secure-context public-key-credential]
+    :or {hostname "app.hyperopen.test"}} f]
   (let [original-crypto (.-crypto js/globalThis)
         original-public-key-credential (.-PublicKeyCredential js/globalThis)
         original-is-secure-context (.-isSecureContext js/globalThis)
+        original-location (.-location js/globalThis)
         original-navigator (.-navigator js/globalThis)
         navigator* (or original-navigator #js {})
         original-credentials (.-credentials navigator*)]
@@ -30,11 +32,13 @@
     (set! (.-crypto js/globalThis) crypto)
     (set! (.-PublicKeyCredential js/globalThis) public-key-credential)
     (set! (.-isSecureContext js/globalThis) is-secure-context)
+    (set! (.-location js/globalThis) #js {:hostname hostname})
     (set! (.-credentials navigator*) credentials)
     (let [restore! (fn []
                      (set! (.-crypto js/globalThis) original-crypto)
                      (set! (.-PublicKeyCredential js/globalThis) original-public-key-credential)
                      (set! (.-isSecureContext js/globalThis) original-is-secure-context)
+                     (set! (.-location js/globalThis) original-location)
                      (set! (.-navigator js/globalThis) original-navigator)
                      (when navigator*
                        (set! (.-credentials navigator*) original-credentials)))]
@@ -55,6 +59,25 @@
           {:type "public-key"
            :alg -257}]
          default-pub-key-cred-params)))
+
+(deftest passkey-lock-support-requires-dns-relying-party-host-test
+  (let [supported-env {:crypto (fake-crypto)
+                       :credentials #js {:create (fn [_] nil)
+                                         :get (fn [_] nil)}
+                       :is-secure-context true
+                       :public-key-credential #js {}}]
+    (with-webauthn-env
+      (assoc supported-env :hostname "127.0.0.1")
+      (fn []
+        (is (false? (webauthn/passkey-lock-supported?)))))
+    (with-webauthn-env
+      (assoc supported-env :hostname "::1")
+      (fn []
+        (is (false? (webauthn/passkey-lock-supported?)))))
+    (with-webauthn-env
+      (assoc supported-env :hostname "app.hyperopen.test")
+      (fn []
+        (is (true? (webauthn/passkey-lock-supported?)))))))
 
 (deftest passkey-capability-hint-reflects-available-browser-probes-test
   (with-webauthn-env

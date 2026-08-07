@@ -1219,8 +1219,15 @@ test("portfolio optimizer draft objective menu edits max sharpe return views imm
   // separate "use my views" objective, and the views editor renders under the
   // pending max-sharpe selection (pending defaults to the current key).
   await expect(useMyViews).toHaveCount(0);
-  await expect(menu.locator("[data-role^='portfolio-optimizer-objective-menu-option-']"))
-    .toHaveCount(4);
+  const objectiveOptions = menu.locator("[data-role^='portfolio-optimizer-objective-menu-option-']");
+  await expect(objectiveOptions).toHaveCount(5);
+  await expect(objectiveOptions).toHaveText([
+    /Minimum risk/,
+    /Maximum Sharpe/,
+    /Equal Risk/,
+    /Target volatility/,
+    /Maximum return/
+  ]);
   await expect(maximumSharpe).toHaveAttribute("data-selected", "true");
   await expect(editor).toBeVisible();
   await expect(editor).toContainText("Return views");
@@ -1379,6 +1386,7 @@ test("portfolio optimizer draft objective menu edits max sharpe return views imm
   const editorEthReturn = editor.locator("[data-role='portfolio-optimizer-objective-menu-view-hl:perp:ETH-return']");
   const editorBtcHigh = editor.locator("[data-role='portfolio-optimizer-objective-menu-view-hl:perp:BTC-confidence-high']");
   const editorEthLow = editor.locator("[data-role='portfolio-optimizer-objective-menu-view-hl:perp:ETH-confidence-low']");
+  await editorBtcRow.scrollIntoViewIfNeeded();
   await expect(editorBtcRow).toBeInViewport({ ratio: 1 });
   await expect(editorBtcReturn).toHaveValue("18");
   await expect(editorEthReturn).toHaveValue("16.5");
@@ -1442,7 +1450,10 @@ test("portfolio optimizer draft objective menu edits max sharpe return views imm
     returnModel: "black-litterman",
     viewInstruments: ["hl:perp:BTC", "hl:perp:ETH"]
   });
-  await expect(railEditor).toBeVisible();
+  // Minimum risk is covariance-only. Keep the authored Black-Litterman views
+  // in the draft for reversible switching, but do not expose an editor whose
+  // changes cannot affect the selected objective.
+  await expect(railEditor).toHaveCount(0);
 });
 
 test("portfolio optimizer max sharpe return views popover stays usable across review widths @smoke @regression", async ({ page }) => {

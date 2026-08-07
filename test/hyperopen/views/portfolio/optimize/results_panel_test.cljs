@@ -382,7 +382,7 @@
                             "portfolio-optimizer-draft-add-asset-popover")))
     (is (some? popover))
     (is (contains? (set (node-attr popover :class)) "fixed"))
-    (is (contains? (set (node-attr popover :class)) "md:absolute"))
+    (is (contains? (set (node-attr popover :class)) "md:fixed"))
     (is (contains? (set (node-attr popover :class)) "overflow-hidden"))
     (is (not (contains? (set (node-attr popover :class)) "overflow-auto")))
     (is (contains? (set (node-attr popover :class)) "optimizer-draft-add-asset-popover--dark"))

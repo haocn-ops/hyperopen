@@ -7,7 +7,7 @@
   520)
 
 (def ^:private estimated-height-px
-  520)
+  360)
 
 (def ^:private trigger-selector
   "[data-role='portfolio-volume-history-trigger']")

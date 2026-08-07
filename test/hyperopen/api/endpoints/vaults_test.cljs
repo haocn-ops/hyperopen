@@ -385,6 +385,46 @@
                    (done)))
           (.catch (async-support/unexpected-error done))))))
 
+(deftest request-vault-webdata2-starts-own-slices-before-child-discovery-test
+  (async done
+    (let [calls (atom [])
+          resolve-children! (atom nil)
+          post-info! (fn [body _opts]
+                       (swap! calls conj body)
+                       (case (get body "type")
+                         "vaultDetails"
+                         (js/Promise. (fn [resolve _reject]
+                                        (reset! resolve-children! resolve)))
+
+                         "clearinghouseState"
+                         (js/Promise.resolve {:assetPositions []})
+
+                         "frontendOpenOrders"
+                         (js/Promise.resolve [])
+
+                         "spotClearinghouseState"
+                         (js/Promise.resolve {:balances []})
+
+                         "twapHistory"
+                         (js/Promise.resolve [])))
+          result-promise (vaults/request-vault-webdata2! post-info! "0xVaUlT" {})]
+      (is (= #{"spotClearinghouseState"
+               "clearinghouseState"
+               "frontendOpenOrders"
+               "twapHistory"}
+             (->> @calls
+                  (filter #(= "0xvault" (get % "user")))
+                  (map #(get % "type"))
+                  set))
+          "the current vault slices must start while child discovery is unresolved")
+      (@resolve-children! {:relationship {:type "normal"}})
+      (-> result-promise
+          (.then (fn [merged]
+                   (is (= {:assetPositions []} (:clearinghouseState merged)))
+                   (is (= {:balances []} (:spotState merged)))
+                   (done)))
+          (.catch (async-support/unexpected-error done))))))
+
 (deftest request-vault-webdata2-aggregates-parent-vault-children-test
   (async done
     (let [positions-by-user {"0xparent" []

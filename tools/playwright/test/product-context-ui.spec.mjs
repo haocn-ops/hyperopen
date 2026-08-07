@@ -62,14 +62,14 @@ async function assertBrandLogoAnchors(page, mobile) {
     await expect.poll(() => activeImage.evaluate((node) => node.naturalWidth))
       .toBeGreaterThan(0);
   } else {
-    await expect(page.locator(`[data-role='${activePrefix}-fallback']`)).toBeVisible();
+    await expect(page.locator(`[data-role='${activePrefix}-fallback']:visible`)).toBeVisible();
   }
 }
 
 async function assertProductContext(page, route) {
   const desktopBrand = page.locator("[data-role='header-brand-name']");
   const mobileBrand = page.locator("[data-role='mobile-brand']");
-  const mobile = (page.viewportSize()?.width || 0) < 768;
+  const mobile = (page.viewportSize()?.width || 0) < 1024;
   if (mobile) {
     await expect(mobileBrand).toBeVisible();
   } else {

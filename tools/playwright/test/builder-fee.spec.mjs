@@ -42,6 +42,22 @@ async function openConfiguredBuilderFeeSettings(page) {
   await expect(page.locator('[data-role="trading-settings-panel"]')).toBeVisible();
 }
 
+async function freezeAccountSurfaceSync(page) {
+  await page.evaluate((address) => {
+    const addressWatcher = globalThis.hyperopen?.wallet?.address_watcher;
+    const webdata2 = globalThis.hyperopen?.websocket?.webdata2;
+    const userSubscriptions = globalThis.hyperopen?.websocket?.user_runtime?.subscriptions;
+    const store = globalThis.hyperopen?.system?.store;
+    if (!addressWatcher || !webdata2 || !userSubscriptions || !store) return;
+    addressWatcher.stop_watching_BANG_(store);
+    addressWatcher.remove_handler_BANG_("webdata2-subscription-handler");
+    addressWatcher.remove_handler_BANG_("user-ws-subscription-handler");
+    addressWatcher.remove_handler_BANG_("startup-account-bootstrap-handler");
+    webdata2.unsubscribe_webdata2_BANG_(address);
+    userSubscriptions.unsubscribe_user_BANG_(address);
+  }, OWNER_ADDRESS);
+}
+
 async function seedReadyTradingSession(page) {
   await page.evaluate(
     ({ ownerAddress, agentAddress, privateKey }) => {
@@ -274,6 +290,7 @@ for (const viewport of [
       page
     }) => {
       await visitRoute(page, "/trade");
+      await freezeAccountSurfaceSync(page);
       const maxBuilderFeeRequests = [];
       await page.route("**/info", async (route) => {
         const request = route.request();
@@ -302,12 +319,15 @@ for (const viewport of [
           order: { responses: [{ status: "ok" }, { status: "ok" }] }
         }
       });
-      await openConfiguredBuilderFeeSettings(page);
       await seedReadyTradingSession(page);
+      await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
+      await openConfiguredBuilderFeeSettings(page);
       await dispatch(page, [":actions/set-confirm-open-orders-enabled", false]);
 
       const section = page.locator("[data-role='builder-fee-section']");
-      await section.getByRole("button", { name: "Review and enable" }).click();
+      const reviewButton = section.getByRole("button", { name: "Review and enable" });
+      await reviewButton.click({ trial: true });
+      await reviewButton.click();
       await expect(section.getByRole("button", { name: "Confirm and enable" })).toBeVisible();
       await section.getByRole("button", { name: "Confirm and enable" }).click();
 

@@ -73,7 +73,7 @@
                              "space-y-2.5"
                              "px-2.5"
                              "pt-2"
-                             "pb-[calc(6rem+env(safe-area-inset-bottom))]"]
+                             "pb-[calc(8.5rem+env(safe-area-inset-bottom))]"]
                     :data-role "balances-mobile-cards-viewport"}]
               (map-indexed (fn [idx row]
                              (let [tooltip-position (if (zero? idx) :bottom :top)]

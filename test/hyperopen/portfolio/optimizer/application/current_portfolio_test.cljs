@@ -254,10 +254,10 @@
     ;; recommendation preserves leverage instead of delevering.
     (is (= 1.6 (:gross-min constraints)))
     (is (= 1.6 (:gross-max constraints)))
-    ;; Net target = the book's current net; the tolerance is :net-band-pct, a
-    ;; fraction of realized gross preserving the old ±0.05x width (0.05 / 1.6).
-    (is (= 1.0 (:net-min constraints)))
-    (is (= 1.0 (:net-max constraints)))
+    ;; The editor exposes the book's current net with the same +/-0.05x band
+    ;; represented proportionally by :net-band-pct for the solver.
+    (is (= 0.95 (:net-min constraints)))
+    (is (= 1.05 (:net-max constraints)))
     (is (= 0.03125 (:net-band-pct constraints)))
     (is (= 1.3 (:max-asset-weight constraints)))
     (is (nil? (:max-turnover constraints)))
@@ -288,8 +288,8 @@
                       :max-turnover 1.0})]
     (is (= 0.32 (:gross-min constraints)))
     (is (= 0.33 (:gross-max constraints)))
-    (is (= 0.2 (:net-min constraints)))
-    (is (= 0.2 (:net-max constraints)))
+    (is (= 0.15 (:net-min constraints)))
+    (is (= 0.26 (:net-max constraints)))
     (is (< (js/Math.abs (- (:net-band-pct constraints)
                            (/ 0.05 (/ 32005 100005))))
            1e-6)

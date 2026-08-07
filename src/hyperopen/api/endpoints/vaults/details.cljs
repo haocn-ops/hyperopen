@@ -230,27 +230,36 @@
   data); the other slices degrade."
   [post-info! vault-address opts]
   (if-let [vault-address* (common/normalize-address vault-address)]
-    (-> (vault-child-addresses post-info! vault-address* opts)
-        (.then (fn [child-addresses]
-                 (let [addresses (into [vault-address*]
-                                       (remove #(= % vault-address*) child-addresses))
-                       spot-request (vault-slice-request post-info!
-                                                         {"type" "spotClearinghouseState"
-                                                          "user" vault-address*}
-                                                         :spot-clearinghouse-state
-                                                         [:vault-spot-clearinghouse-state vault-address*]
-                                                         opts
-                                                         {})
-                       account-requests (mapcat (fn [address]
-                                                  (account-slice-requests
-                                                   post-info!
-                                                   address
-                                                   opts
-                                                   (= address vault-address*)))
-                                                addresses)]
-                   (-> (js/Promise.all (into-array (cons spot-request account-requests)))
-                       (.then (fn [results]
-                                (let [results* (vec (array-seq results))]
-                                  (merge-vault-account-slices (first results*)
-                                                              (rest results*))))))))))
+    (let [spot-request (vault-slice-request post-info!
+                                             {"type" "spotClearinghouseState"
+                                              "user" vault-address*}
+                                             :spot-clearinghouse-state
+                                             [:vault-spot-clearinghouse-state vault-address*]
+                                             opts
+                                             {})
+          own-requests (account-slice-requests post-info!
+                                               vault-address*
+                                               opts
+                                               true)
+          own-results (js/Promise.all (into-array (cons spot-request own-requests)))
+          child-results (-> (vault-child-addresses post-info! vault-address* opts)
+                            (.then
+                             (fn [child-addresses]
+                               (let [child-requests
+                                     (mapcat (fn [address]
+                                               (account-slice-requests
+                                                post-info!
+                                                address
+                                                opts
+                                                false))
+                                             (remove #(= % vault-address*) child-addresses))]
+                                 (js/Promise.all (into-array child-requests))))))]
+      (-> (js/Promise.all #js [own-results child-results])
+          (.then
+           (fn [result-groups]
+             (let [own-results* (vec (array-seq (aget result-groups 0)))
+                   child-results* (vec (array-seq (aget result-groups 1)))]
+               (merge-vault-account-slices (first own-results*)
+                                           (concat (rest own-results*)
+                                                   child-results*)))))))
     (js/Promise.resolve nil)))

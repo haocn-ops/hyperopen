@@ -36,8 +36,8 @@ async function seedCloseAllAccount(page) {
       { position: { coin: "ETH", szi: "-2", markPx: "50", entryPx: "51", marginUsed: "10" } }
     ];
     let markets = clj({
-      "perp:BTC": { key: "perp:BTC", coin: "BTC", dex: null, "market-type": "perp", "asset-id": 1, mark: 100, szDecimals: 2 },
-      "perp:ETH": { key: "perp:ETH", coin: "ETH", dex: null, "market-type": "perp", "asset-id": 2, mark: 50, szDecimals: 2 }
+      "perp:BTC": { key: "perp:BTC", coin: "BTC", dex: null, "market-type": "perp", "asset-id": 0, mark: 100, szDecimals: 2 },
+      "perp:ETH": { key: "perp:ETH", coin: "ETH", dex: null, "market-type": "perp", "asset-id": 1, mark: 50, szDecimals: 2 }
     });
     markets = c.assoc_in(markets, path("perp:BTC", "market-type"), keyword("perp"));
     markets = c.assoc_in(markets, path("perp:ETH", "market-type"), keyword("perp"));
@@ -227,8 +227,8 @@ test.describe("Positions Close All", () => {
       expect(orders).toHaveLength(2);
       expect(orders.map((order) => ({ a: order.a, b: order.b, s: order.s, r: order.r, tif: order.t?.limit?.tif })))
         .toEqual([
-          { a: 1, b: false, s: "1.25", r: true, tif: "Ioc" },
-          { a: 2, b: true, s: "2", r: true, tif: "Ioc" }
+          { a: 0, b: false, s: "1.25", r: true, tif: "Ioc" },
+          { a: 1, b: true, s: "2", r: true, tif: "Ioc" }
         ]);
       const geometry = await confirmation.evaluate((node) => {
         const rect = node.getBoundingClientRect();

@@ -103,6 +103,22 @@ async function interceptReferralApi(page, raw) {
   });
 }
 
+async function freezeAccountSurfaceSync(page) {
+  await page.evaluate((address) => {
+    const addressWatcher = globalThis.hyperopen?.wallet?.address_watcher;
+    const webdata2 = globalThis.hyperopen?.websocket?.webdata2;
+    const userSubscriptions = globalThis.hyperopen?.websocket?.user_runtime?.subscriptions;
+    const store = globalThis.hyperopen?.system?.store;
+    if (!addressWatcher || !webdata2 || !userSubscriptions || !store) return;
+    addressWatcher.stop_watching_BANG_(store);
+    addressWatcher.remove_handler_BANG_("webdata2-subscription-handler");
+    addressWatcher.remove_handler_BANG_("user-ws-subscription-handler");
+    addressWatcher.remove_handler_BANG_("startup-account-bootstrap-handler");
+    webdata2.unsubscribe_webdata2_BANG_(address);
+    userSubscriptions.unsubscribe_user_BANG_(address);
+  }, ownerAddress);
+}
+
 async function seedReferralsState(page, options = {}) {
   await page.evaluate(({ owner, referralState, spectate }) => {
     const c = globalThis.cljs?.core;
@@ -181,6 +197,7 @@ test("referrals route opens modals, validates code, and switches tabs @regressio
     }
   });
   await visitRoute(page, "/referrals");
+  await freezeAccountSurfaceSync(page);
   await seedReferralsState(page);
 
   await expect(page.locator("[data-parity-id='referrals-root']")).toBeVisible();
@@ -213,6 +230,7 @@ test("referrals route opens modals, validates code, and switches tabs @regressio
 test("referrals ready state exposes share and claim modal flows @regression", async ({ page }) => {
   await interceptReferralApi(page, liveReadyPayload);
   await visitRoute(page, "/referrals");
+  await freezeAccountSurfaceSync(page);
   await seedReferralsState(page, {
     raw: liveReadyPayload,
     stage: "ready",
@@ -239,7 +257,12 @@ test("referrals ready state exposes share and claim modal flows @regression", as
   await expect(page.locator("[data-role='referrals-rewards-panel']")).toHaveCount(0);
   const rowCells = page.locator("[data-role='referrals-row']").first().locator("> span");
   await expect(rowCells.nth(0)).toHaveText(/0xb480.*0098/);
-  await expect(rowCells.nth(1)).toHaveText("10/20/2025 - 22:06:52");
+  const expectedJoinedDate = await page.evaluate(() => {
+    const date = new Date(1761012412763);
+    const pad2 = (value) => String(value).padStart(2, "0");
+    return `${date.getMonth() + 1}/${date.getDate()}/${date.getFullYear()} - ${pad2(date.getHours())}:${pad2(date.getMinutes())}:${pad2(date.getSeconds())}`;
+  });
+  await expect(rowCells.nth(1)).toHaveText(expectedJoinedDate);
   await expect(rowCells.nth(2)).toHaveText("$6,226,785.18");
   await expect(rowCells.nth(3)).toHaveText("$4,428.91");
   await expect(rowCells.nth(4)).toHaveText("$187.36");
@@ -329,6 +352,7 @@ test("referrals layout contains core modal controls at review widths @regression
   for (const width of [375, 768, 1280, 1440]) {
     await page.setViewportSize({ width, height: 760 });
     await visitRoute(page, "/referrals");
+    await freezeAccountSurfaceSync(page);
     await seedReferralsState(page);
 
     await expect(page.locator("[data-parity-id='referrals-root']")).toBeVisible();

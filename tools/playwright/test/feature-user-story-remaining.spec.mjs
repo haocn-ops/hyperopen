@@ -19,7 +19,7 @@ function kw(value) {
   return { __hyperopenKeyword: value };
 }
 
-async function setAppState(page, updates) {
+async function setAppState(page, updates, { wait = true } = {}) {
   await page.evaluate((nextUpdates) => {
     const c = globalThis.cljs?.core;
     const store = globalThis.hyperopen?.system?.store;
@@ -68,7 +68,9 @@ async function setAppState(page, updates) {
     }
   }, updates);
 
-  await waitForIdle(page, { quietMs: 150, timeoutMs: 5_000, pollMs: 50 });
+  if (wait) {
+    await waitForIdle(page, { quietMs: 150, timeoutMs: 5_000, pollMs: 50 });
+  }
 }
 
 async function seedConnectedOwner(page) {
@@ -143,6 +145,25 @@ async function seedFundingComparisonRows(page) {
     [["funding-comparison-ui", "sort"], { column: kw("coin"), direction: kw("asc") }]
   ]);
 }
+
+const fundingComparisonPayload = [
+  [
+    "BTC",
+    [
+      ["HlPerp", { fundingRate: "0.0001" }],
+      ["BinPerp", { fundingRate: "0.0004", fundingIntervalHours: "8" }],
+      ["BybitPerp", { fundingRate: "0.0002", fundingIntervalHours: "8" }]
+    ]
+  ],
+  [
+    "ETH",
+    [
+      ["HlPerp", { fundingRate: "-0.00005" }],
+      ["BinPerp", { fundingRate: "0.0001", fundingIntervalHours: "8" }],
+      ["BybitPerp", { fundingRate: "0.0003", fundingIntervalHours: "8" }]
+    ]
+  ]
+];
 
 async function seedNotificationToast(page) {
   await setAppState(page, [
@@ -346,8 +367,51 @@ async function stubVaultDetailFixture(page) {
 }
 
 test("api wallet route supports generate, authorize, and remove confirmation @regression", async ({ page }) => {
+  await page.route("https://api.hyperliquid.xyz/info", async (route) => {
+    const payload = route.request().postDataJSON?.() || {};
+    if (payload?.type === "extraAgents") {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([])
+      });
+      return;
+    }
+    if (payload?.type === "webData2") {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ serverTime: String(Date.UTC(2026, 5, 22, 12, 0, 0)) })
+      });
+      return;
+    }
+    await route.fallback();
+  });
   await visitRoute(page, "/api");
   await seedApiWalletRoute(page);
+
+  await expect.poll(
+    () => page.evaluate(() => {
+      const c = globalThis.cljs?.core;
+      const store = globalThis.hyperopen?.system?.store;
+      if (!c || !store) return null;
+      const state = c.deref(store);
+      const kw = (name) => c.keyword(name);
+      const get = (path) => c.get_in(state, c.PersistentVector.fromArray(path.map(kw), true));
+      return {
+        loadingExtra: get(["api-wallets", "loading", "extra-agents?"]),
+        loadingDefault: get(["api-wallets", "loading", "default-agent?"]),
+        loadedExtra: get(["api-wallets", "loaded-at-ms", "extra-agents"]),
+        loadedDefault: get(["api-wallets", "loaded-at-ms", "default-agent"])
+      };
+    }),
+    { timeout: 10_000 }
+  ).toEqual({
+    loadingExtra: false,
+    loadingDefault: false,
+    loadedExtra: expect.anything(),
+    loadedDefault: expect.anything()
+  });
 
   await expect(page.locator("[data-parity-id='api-wallets-root']")).toBeVisible();
   await expect(page.locator("[data-role='api-wallets-authorize-button']")).toBeDisabled();
@@ -384,19 +448,16 @@ test("api wallet route supports generate, authorize, and remove confirmation @re
 test("funding comparison route filters rows, switches timeframe, and exposes errors @regression", async ({
   page
 }) => {
-  // Stub the live predicted-fundings fetch so the seeded rows below stay
-  // authoritative. With real network access the live fetch resolves after the
-  // seed and overwrites it with the full ~212-coin universe, which made the
-  // row-count assertion environment-dependent. Returning an empty success
-  // (error stays nil, so the "N coins shown" summary still renders) lets the
-  // seed be the single source of funding rows regardless of network.
+  // Return the same deterministic rows used by the seed. The route load can
+  // resolve after the seed, so returning an empty payload would erase the
+  // fixture state when its success projection lands.
   await page.route("https://api.hyperliquid.xyz/info", async (route) => {
     const payload = route.request().postDataJSON();
     if (payload?.type === "predictedFundings") {
       await route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: "[]"
+        body: JSON.stringify(fundingComparisonPayload)
       });
       return;
     }
@@ -418,7 +479,11 @@ test("funding comparison route filters rows, switches timeframe, and exposes err
   await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
   await expect(page.locator("[data-role='funding-comparison-row']")).toHaveCount(1);
 
-  await setAppState(page, [[["funding-comparison", "error"], "Provider unavailable"]]);
+  await setAppState(
+    page,
+    [[["funding-comparison", "error"], "Provider unavailable"]],
+    { wait: false }
+  );
   await expect(page.locator("[data-role='funding-comparison-error']")).toContainText(
     "Provider unavailable"
   );

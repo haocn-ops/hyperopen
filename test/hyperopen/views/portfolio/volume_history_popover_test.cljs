@@ -147,7 +147,7 @@
     (is (= "dialog" (get-in popover [1 :role])))
     (is (nil? (get-in popover [1 :aria-modal])))
     (is (= {:left "170px"
-            :top "168px"
+            :top "220px"
             :width "520px"
             :max-height "calc(100vh - 72px)"
             :overflow-y "auto"}

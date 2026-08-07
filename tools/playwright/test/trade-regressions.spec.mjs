@@ -362,6 +362,10 @@ function buildCachedAssetSelectorMarkets(count = 240) {
       symbol: "BTC",
       base: "BTC",
       "market-type": "perp",
+      idx: 0,
+      "asset-id": 0,
+      szDecimals: 5,
+      maxLeverage: 40,
       category: "crypto",
       volume24h: 2_900_000_000,
       openInterest: 1_900_000_000,
@@ -503,6 +507,7 @@ async function stubAssetSelectorMarketInfo(page) {
   const emptyInfoResponses = new Map([
     ["perpDexs", []],
     ["spotMeta", { tokens: [], universe: [] }],
+    ["spotMetaAndAssetCtxs", [{ tokens: [], universe: [] }, []]],
     ["webData2", { spotAssetCtxs: [] }],
     ["outcomeMeta", { outcomes: [], questions: [] }],
     ["metaAndAssetCtxs", [{ universe: [], marginTables: [] }, []]]
@@ -525,9 +530,12 @@ async function stubAssetSelectorMarketInfo(page) {
   });
 }
 
-async function seedGroupedOutcomeAssetSelectorState(page, { activeTab = null } = {}) {
+async function seedGroupedOutcomeAssetSelectorState(
+  page,
+  { activeTab = null, activeMarketKey = null, activeOutcomeOptionId = null } = {}
+) {
   await waitForHyperopenStoreReady(page);
-  await page.evaluate((nextActiveTab) => {
+  await page.evaluate(({ nextActiveTab, nextActiveMarketKey, nextActiveOutcomeOptionId }) => {
     const c = globalThis.cljs?.core;
     const store = globalThis.hyperopen?.system?.store;
 
@@ -882,10 +890,16 @@ async function seedGroupedOutcomeAssetSelectorState(page, { activeTab = null } =
     const markets = vector([rangeMarket, worldCupMarket, sportsMarket, cpiMarket]);
     let nextState = c.deref(store);
     nextState = c.assoc_in(nextState, path("asset-selector", "markets"), markets);
+    const marketByKey = stringMap([
+      ["question:30", rangeMarket],
+      ["question:32", worldCupMarket],
+      ["outcome:142", sportsMarket],
+      ["question:19", cpiMarket]
+    ]);
     nextState = c.assoc_in(
       nextState,
       path("asset-selector", "market-by-key"),
-      stringMap([["question:30", rangeMarket], ["question:32", worldCupMarket], ["outcome:142", sportsMarket], ["question:19", cpiMarket]])
+      marketByKey
     );
     nextState = c.assoc_in(
       nextState,
@@ -900,58 +914,51 @@ async function seedGroupedOutcomeAssetSelectorState(page, { activeTab = null } =
     nextState = c.assoc_in(nextState, path("asset-selector", "sort-by"), kw("volume"));
     nextState = c.assoc_in(nextState, path("asset-selector", "sort-direction"), kw("desc"));
     nextState = c.assoc_in(nextState, path("asset-selector", "live-market-subscriptions-paused?"), true);
+    if (nextActiveMarketKey) {
+      const activeMarket = c.get(marketByKey, nextActiveMarketKey);
+      if (!activeMarket) {
+        throw new Error(`Seeded grouped outcome market missing: ${nextActiveMarketKey}`);
+      }
+
+      const activeAsset = c.get(activeMarket, kw("coin"));
+      nextState = c.assoc_in(nextState, path("active-asset"), activeAsset);
+      nextState = c.assoc_in(nextState, path("selected-asset"), activeAsset);
+      nextState = c.assoc_in(nextState, path("active-market"), activeMarket);
+      nextState = c.assoc_in(
+        nextState,
+        path("order-form", "outcome-option-id"),
+        nextActiveOutcomeOptionId
+      );
+      nextState = c.assoc_in(nextState, path("order-form", "outcome-side"), 0);
+      nextState = c.assoc_in(
+        nextState,
+        path("order-form-ui", "outcome-option-dropdown-open?"),
+        false
+      );
+      nextState = c.assoc_in(
+        nextState,
+        path("order-form-ui", "outcome-option-query"),
+        ""
+      );
+    }
     c.reset_BANG_(store, nextState);
 
     const renderApp = globalThis.hyperopen?.app?.bootstrap?.render_app_BANG_;
     if (typeof renderApp === "function") {
       renderApp(c.deref(store));
     }
-  }, activeTab);
+  }, {
+    nextActiveTab: activeTab,
+    nextActiveMarketKey: activeMarketKey,
+    nextActiveOutcomeOptionId: activeOutcomeOptionId
+  });
 }
 
 async function seedWorldCupOutcomeOrderForm(page) {
-  await seedGroupedOutcomeAssetSelectorState(page, { activeTab: "sports" });
-  await page.evaluate(() => {
-    const c = globalThis.cljs?.core;
-    const store = globalThis.hyperopen?.system?.store;
-
-    if (!c || !store) {
-      throw new Error("Hyperopen store or cljs core unavailable");
-    }
-
-    const kw = (name) => c.keyword(name);
-    const path = (...segments) => c.PersistentVector.fromArray(segments, true);
-    const worldCupMarket = c.get_in(
-      c.deref(store),
-      path(kw("asset-selector"), kw("market-by-key"), "question:32")
-    );
-
-    if (!worldCupMarket) {
-      throw new Error("World Cup grouped outcome market missing from seeded state");
-    }
-
-    let nextState = c.deref(store);
-    nextState = c.assoc_in(nextState, path(kw("active-asset")), "#1890");
-    nextState = c.assoc_in(nextState, path(kw("selected-asset")), "#1890");
-    nextState = c.assoc_in(nextState, path(kw("active-market")), worldCupMarket);
-    nextState = c.assoc_in(nextState, path(kw("order-form"), kw("outcome-option-id")), 189);
-    nextState = c.assoc_in(nextState, path(kw("order-form"), kw("outcome-side")), 0);
-    nextState = c.assoc_in(
-      nextState,
-      path(kw("order-form-ui"), kw("outcome-option-dropdown-open?")),
-      false
-    );
-    nextState = c.assoc_in(
-      nextState,
-      path(kw("order-form-ui"), kw("outcome-option-query")),
-      ""
-    );
-    c.reset_BANG_(store, nextState);
-
-    const renderApp = globalThis.hyperopen?.app?.bootstrap?.render_app_BANG_;
-    if (typeof renderApp === "function") {
-      renderApp(c.deref(store));
-    }
+  await seedGroupedOutcomeAssetSelectorState(page, {
+    activeTab: "sports",
+    activeMarketKey: "question:32",
+    activeOutcomeOptionId: 189
   });
 }
 
@@ -1127,6 +1134,11 @@ async function seedOutcomeActiveAsset(page, overrides = {}) {
     nextState = c.assoc_in(nextState, kwPath("selected-asset"), "#0");
     nextState = c.assoc_in(nextState, kwPath("active-market"), market);
     nextState = c.assoc_in(nextState, kwPath("active-assets", "contexts", "#0"), context);
+    nextState = c.assoc_in(
+      nextState,
+      kwPath("asset-selector", "live-market-subscriptions-paused?"),
+      true
+    );
     nextState = c.assoc_in(nextState, kwPath("now-ms"), Date.UTC(2026, 4, 2, 15, 0, 0));
 
     c.reset_BANG_(store, nextState);
@@ -1342,12 +1354,55 @@ async function seedRememberedTradingSession(page, options = {}) {
 }
 
 async function seedReadyTradingSession(page, options = {}) {
-  await seedRememberedTradingSession(page, {
-    status: "ready",
-    localProtectionMode: "plain",
-    passkeySupported: false,
-    ...options
-  });
+  const {
+    walletAddress = "0x1111111111111111111111111111111111111111",
+    agentAddress = "0x9999999999999999999999999999999999999999",
+    privateKey = "0xpriv"
+  } = options;
+
+  await page.evaluate(
+    ({ walletAddress: ownerAddress, agentAddress: nextAgentAddress, privateKey: nextPrivateKey }) => {
+      const c = globalThis.cljs?.core;
+      const store = globalThis.hyperopen?.system?.store;
+      const lockbox = globalThis.hyperopen?.wallet?.agent_lockbox;
+      if (!c || !store || !lockbox) {
+        throw new Error("ready trading session test seam unavailable");
+      }
+
+      const keyword = c.keyword;
+      const path = (...segments) =>
+        c.PersistentVector.fromArray(segments.map((segment) => keyword(segment)), true);
+      const approvedAt = 1_700_000_000_000;
+      const session = c.js__GT_clj(
+        {
+          "agent-address": nextAgentAddress,
+          "private-key": nextPrivateKey,
+          "last-approved-at": approvedAt,
+          "nonce-cursor": approvedAt
+        },
+        c.PersistentArrayMap.fromArray([keyword("keywordize-keys"), true], true)
+      );
+
+      localStorage.setItem("hyperopen:agent-storage-mode:v1", "session");
+      localStorage.setItem("hyperopen:agent-local-protection-mode:v1", "plain");
+      lockbox.cache_unlocked_session_BANG_(ownerAddress, session);
+
+      let nextState = c.deref(store);
+      nextState = c.assoc_in(nextState, path("wallet", "connected?"), true);
+      nextState = c.assoc_in(nextState, path("wallet", "address"), ownerAddress);
+      nextState = c.assoc_in(nextState, path("wallet", "chain-id"), "0xa4b1");
+      nextState = c.assoc_in(nextState, path("wallet", "agent", "status"), keyword("ready"));
+      nextState = c.assoc_in(nextState, path("wallet", "agent", "storage-mode"), keyword("session"));
+      nextState = c.assoc_in(nextState, path("wallet", "agent", "local-protection-mode"), keyword("plain"));
+      nextState = c.assoc_in(nextState, path("wallet", "agent", "passkey-supported?"), false);
+      nextState = c.assoc_in(nextState, path("wallet", "agent", "agent-address"), nextAgentAddress);
+      nextState = c.assoc_in(nextState, path("wallet", "agent", "last-approved-at"), approvedAt);
+      nextState = c.assoc_in(nextState, path("wallet", "agent", "nonce-cursor"), approvedAt);
+      nextState = c.assoc_in(nextState, path("wallet", "agent", "error"), null);
+      c.reset_BANG_(store, nextState);
+    },
+    { walletAddress, agentAddress, privateKey }
+  );
 }
 
 async function seedOwnedSubaccounts(page, { ownerAddress, subaccountAddress, selectedAddress = null }) {
@@ -1710,8 +1765,8 @@ test("asset selector opens and selects ETH @regression", async ({ page }) => {
 });
 
 test("asset selector outcome rows use full-width question copy without duplicate chip @regression", async ({ page }) => {
-  await visitRoute(page, "/trade");
   await stubAssetSelectorMarketInfo(page);
+  await visitRoute(page, "/trade");
 
   await dispatch(page, [":actions/toggle-asset-dropdown", ":asset-selector"]);
   await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
@@ -1739,8 +1794,8 @@ test("asset selector outcome rows use full-width question copy without duplicate
 });
 
 test("asset selector outcome subtabs render grouped question markets @smoke @regression", async ({ page }) => {
-  await visitRoute(page, "/trade");
   await stubAssetSelectorMarketInfo(page);
+  await visitRoute(page, "/trade");
   await dispatch(page, [":actions/toggle-asset-dropdown", ":asset-selector"]);
   await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
   await waitForAssetSelectorLoadSettled(page);
@@ -1786,7 +1841,9 @@ test("asset selector outcome subtabs render grouped question markets @smoke @reg
 });
 
 test("market strip uses searchable dropdown for multi-option outcome markets @smoke @regression", async ({ page }) => {
+  await stubAssetSelectorMarketInfo(page);
   await visitRoute(page, "/trade");
+  await waitForAssetSelectorLoadSettled(page);
   await seedWorldCupOutcomeOrderForm(page);
   await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
 
@@ -1893,7 +1950,9 @@ test("market strip uses searchable dropdown for multi-option outcome markets @sm
 });
 
 test("two-sided outcome side selector switches chart and order book market @regression", async ({ page }) => {
+  await stubAssetSelectorMarketInfo(page);
   await visitRoute(page, "/trade");
+  await waitForAssetSelectorLoadSettled(page);
   await seedSportsOutcomeOrderFormUntilReady(page);
 
   const orderForm = page.locator('[data-parity-id="order-form"]');
@@ -1934,7 +1993,9 @@ test("two-sided outcome side selector switches chart and order book market @regr
 });
 
 test("outcome market tooltip uses adaptive readable width and glows on hover @regression", async ({ page }) => {
+  await stubAssetSelectorMarketInfo(page);
   await visitRoute(page, "/trade");
+  await waitForAssetSelectorLoadSettled(page);
   await seedOutcomeActiveAsset(page);
   await waitForIdle(page, { quietMs: 200, timeoutMs: 4_000, pollMs: 50 });
 
@@ -2017,7 +2078,9 @@ test("outcome market tooltip scrolls long outcome details without becoming narro
   ].join(" ");
   const longDetails = Array.from({ length: 3 }, () => longDetailsSection).join(" ");
 
+  await stubAssetSelectorMarketInfo(page);
   await visitRoute(page, "/trade");
+  await waitForAssetSelectorLoadSettled(page);
   await seedOutcomeActiveAsset(page, {
     coin: "#1890",
     symbol: "2026 World Cup Champion",
@@ -2687,7 +2750,7 @@ test("vault detail 429 retries stop after returning to trade @regression", async
     }
 
     if (
-      requestType === "webData2" &&
+      ["spotClearinghouseState", "clearinghouseState", "frontendOpenOrders", "twapHistory"].includes(requestType) &&
       requestVaultAddress === vaultAddress
     ) {
       vaultWebDataRequests += 1;
@@ -2826,7 +2889,7 @@ test("vault detail hero TVL bootstraps from list metadata when vaultDetails omit
     }
 
     if (
-      requestType === "webData2" &&
+      ["spotClearinghouseState", "clearinghouseState", "frontendOpenOrders", "twapHistory"].includes(requestType) &&
       requestVaultAddress === vaultAddress
     ) {
       await route.fulfill({
@@ -2943,7 +3006,7 @@ test("vault startup preview row click reuses inflight list bootstrap @regression
     }
 
     if (
-      requestType === "webData2" &&
+      ["spotClearinghouseState", "clearinghouseState", "frontendOpenOrders", "twapHistory"].includes(requestType) &&
       requestVaultAddress === vaultAddress
     ) {
       vaultWebDataRequests += 1;
@@ -3077,32 +3140,37 @@ test("vault position coin jumps to the trade route market @regression", async ({
     }
 
     if (
-      requestType === "webData2" &&
+      ["spotClearinghouseState", "clearinghouseState", "frontendOpenOrders", "twapHistory"].includes(requestType) &&
       requestVaultAddress === vaultAddress
     ) {
       vaultWebDataRequests += 1;
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({
-          clearinghouseState: {
+      const responseBody = requestType === "clearinghouseState"
+        ? {
             assetPositions: [
               {
-                coin: "BTC",
-                szi: "1.25",
-                positionValue: "2500",
-                entryPx: "50000",
-                markPx: "50125",
-                unrealizedPnl: "125",
-                returnOnEquity: "0.05",
-                liquidationPx: "42000",
-                marginUsed: "500",
-                leverage: { value: 3 },
-                cumFunding: { sinceOpen: "-4.2" }
+                position: {
+                  coin: "BTC",
+                  szi: "1.25",
+                  positionValue: "2500",
+                  entryPx: "50000",
+                  markPx: "50125",
+                  unrealizedPnl: "125",
+                  returnOnEquity: "0.05",
+                  liquidationPx: "42000",
+                  marginUsed: "500",
+                  leverage: { value: 3 },
+                  cumFunding: { sinceOpen: "-4.2" }
+                }
               }
             ]
           }
-        })
+        : requestType === "spotClearinghouseState"
+          ? { balances: [] }
+          : [];
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(responseBody)
       });
       return;
     }
@@ -3597,6 +3665,7 @@ test("wallet connect and enable trading stays deterministic @regression", async 
     address: "0x1111111111111111111111111111111111111111",
     agentStatus: "not-ready"
   });
+  await freezeAccountSurfaceSync(page, "0x1111111111111111111111111111111111111111");
 
   await dispatch(page, [":actions/enable-agent-trading"]);
   await waitForIdle(page, { quietMs: 250, timeoutMs: 5_000, pollMs: 50 });
@@ -3632,7 +3701,10 @@ test("wallet connect and enable trading stays deterministic @regression", async 
 });
 
 test("order submit and cancel gating uses simulator-backed assertions @regression", async ({ page }) => {
+  await seedAssetSelectorMarketsCache(page);
+  await stubAssetSelectorMarketInfo(page);
   await visitRoute(page, "/trade");
+  await waitForAssetSelectorLoadSettled(page);
 
   await debugCall(page, "installWalletSimulator", {
     accounts: ["0x1111111111111111111111111111111111111111"],
@@ -3661,6 +3733,10 @@ test("order submit and cancel gating uses simulator-backed assertions @regressio
     sizeDisplay: "1",
     submitDisabled: false,
     submitReason: null
+  });
+  await expectOracle(page, "wallet-status", {
+    agentStatus: "not-ready",
+    agentError: null
   });
 
   await dispatch(page, [":actions/submit-order"]);
@@ -3916,7 +3992,12 @@ test("header account selector routes subaccount order payloads through vaultAddr
 test("order submit confirmation renders in-app instead of opening a browser dialog @regression", async ({
   page
 }) => {
+  await seedAssetSelectorMarketsCache(page);
+  await stubAssetSelectorMarketInfo(page);
   await visitRoute(page, "/trade");
+  await waitForAssetSelectorLoadSettled(page);
+  await freezeAccountSurfaceSync(page, "0x1111111111111111111111111111111111111111");
+  await waitForIdle(page, { quietMs: 500, timeoutMs: 10_000, pollMs: 50 });
 
   let browserDialogSeen = false;
   page.on("dialog", async (dialog) => {
@@ -3936,6 +4017,14 @@ test("order submit confirmation renders in-app instead of opening a browser dial
   await waitForIdle(page, { quietMs: 100, timeoutMs: 2_000, pollMs: 50 });
   await dispatch(page, [":actions/set-order-size-display", "1"]);
   await waitForIdle(page, { quietMs: 250, timeoutMs: 4_000, pollMs: 50 });
+  await expectOracle(page, "order-form", {
+    submitDisabled: false,
+    submitReason: null
+  });
+  await expectOracle(page, "wallet-status", {
+    agentStatus: "ready",
+    agentError: null
+  });
 
   await dispatch(page, [":actions/submit-order"]);
   await waitForIdle(page, { quietMs: 250, timeoutMs: 4_000, pollMs: 50 });
@@ -4153,7 +4242,11 @@ test("ready remembered session keeps submit usable after enabling passkey lock @
   page
 }) => {
   await seedAssetSelectorMarketsCache(page);
+  await stubAssetSelectorMarketInfo(page);
   await visitRoute(page, "/trade");
+  await waitForAssetSelectorLoadSettled(page);
+  await freezeAccountSurfaceSync(page, "0x1111111111111111111111111111111111111111");
+  await waitForIdle(page, { quietMs: 500, timeoutMs: 10_000, pollMs: 50 });
   await installPasskeyLockboxMock(page);
   await seedRememberedTradingSession(page, {
     status: "ready",
@@ -4216,6 +4309,14 @@ test("ready remembered session keeps submit usable after enabling passkey lock @
   await waitForIdle(page, { quietMs: 100, timeoutMs: 2_000, pollMs: 50 });
   await dispatch(page, [":actions/set-order-size-display", "1"]);
   await waitForIdle(page, { quietMs: 250, timeoutMs: 4_000, pollMs: 50 });
+  await expectOracle(page, "order-form", {
+    submitDisabled: false,
+    submitReason: null
+  });
+  await expectOracle(page, "wallet-status", {
+    agentStatus: "ready",
+    agentError: null
+  });
 
   await dispatch(page, [":actions/submit-order"]);
   await waitForIdle(page, { quietMs: 250, timeoutMs: 4_000, pollMs: 50 });

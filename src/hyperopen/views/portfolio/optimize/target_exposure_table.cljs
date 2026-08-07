@@ -386,7 +386,7 @@
                    "fixed" "inset-x-2" "top-16" "z-30" "max-h-[calc(100vh-5rem)]"
                    "overflow-hidden" "border" "border-base-300" "p-3"
                    "shadow-[0_12px_32px_rgba(0,0,0,0.45)]"
-                   "md:absolute" "md:inset-auto" "md:right-0" "md:top-[calc(100%+4px)]"
+                   "md:fixed" "md:inset-auto" "md:right-2" "md:top-16"
                    ;; Cap the dropdown shorter than the row it anchors to so it stays
                    ;; within the viewport even when content above (e.g. the
                    ;; recommendation verdict) pushes the anchor row lower on the page.

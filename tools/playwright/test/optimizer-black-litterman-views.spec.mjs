@@ -106,6 +106,7 @@ async function seedBlackLittermanEditorState(page) {
       instrument("perp:SOL", "perp", "SOL", "SOL-USDC"),
       instrument("perp:HYPE", "perp", "HYPE", "HYPE-USDC")
     ]),
+    seedPatch(optimizerPath("draft", "objective"), { kind: keyword("max-sharpe") }),
     seedPatch(optimizerPath("draft", "return-model"), {
       kind: keyword("black-litterman"),
       views: [absoluteView, relativeView]

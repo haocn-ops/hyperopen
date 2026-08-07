@@ -19,11 +19,21 @@
   []
   (true? (some-> js/globalThis .-isSecureContext)))
 
+(defn- valid-relying-party-host?
+  []
+  (let [hostname (some-> js/globalThis .-location .-hostname str str/lower-case)]
+    ;; Chromium rejects WebAuthn credentials whose implicit RP ID is an IP
+    ;; literal, even when the page is otherwise a secure context.
+    (and (seq hostname)
+         (not (re-matches #"^(?:\d{1,3}\.){3}\d{1,3}$" hostname))
+         (not (str/includes? hostname ":")))))
+
 (defn passkey-lock-supported?
   []
   (let [credentials-container (some-> js/globalThis .-navigator .-credentials)
         subtle (some-> js/globalThis .-crypto .-subtle)]
     (and (secure-context?)
+         (valid-relying-party-host?)
          (some? (.-PublicKeyCredential js/globalThis))
          (some? credentials-container)
          (fn? (.-create credentials-container))

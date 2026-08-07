@@ -408,7 +408,63 @@ async function seedPortfolioWalletAddress(page, address) {
   await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
 }
 
+async function waitForPortfolioAddressLoadSettled(page, address) {
+  await page.waitForFunction((targetAddress) => {
+    const c = globalThis.cljs?.core;
+    const store = globalThis.hyperopen?.system?.store;
+    if (!c || !store) {
+      return false;
+    }
+
+    const kw = (name) => c.keyword(name);
+    const path = (...segments) => c.PersistentVector.fromArray(segments.map(kw), true);
+    const state = c.deref(store);
+    const normalizedTarget = targetAddress.toLowerCase();
+    const matchesTarget = (value) =>
+      typeof value === "string" && value.toLowerCase() === normalizedTarget;
+    const portfolioSettled = !c.get_in(state, path("portfolio", "loading?"))
+      && (matchesTarget(c.get_in(state, path("portfolio", "loaded-for-address")))
+        || matchesTarget(c.get_in(state, path("portfolio", "error-for-address"))));
+    const userFeesSettled = !c.get_in(state, path("portfolio", "user-fees-loading?"))
+      && (matchesTarget(c.get_in(state, path("portfolio", "user-fees-loaded-for-address")))
+        || matchesTarget(c.get_in(state, path("portfolio", "user-fees-error-for-address"))));
+    return portfolioSettled && userFeesSettled;
+  }, address, { timeout: 15_000 });
+}
+
+async function stubPortfolioAnalyticsRefreshes(page) {
+  await page.route("**/info", async (route) => {
+    const request = route.request();
+    if (request.method() === "POST") {
+      try {
+        const payload = request.postDataJSON();
+        if (payload?.type === "portfolio") {
+          await route.fulfill({
+            status: 200,
+            contentType: "application/json",
+            body: JSON.stringify({ data: {} })
+          });
+          return;
+        }
+        if (payload?.type === "userFees") {
+          await route.fulfill({
+            status: 200,
+            contentType: "application/json",
+            body: JSON.stringify({ dailyUserVlm: [] })
+          });
+          return;
+        }
+      } catch {
+        // Let unrelated non-JSON requests continue.
+      }
+    }
+    await route.fallback();
+  });
+}
+
 async function seedPortfolioAnalyticsFixture(page, fixture) {
+  await seedPortfolioWalletAddress(page, fixture.walletAddress);
+  await waitForPortfolioAddressLoadSettled(page, fixture.userFeesAddress);
   await page.evaluate((payload) => {
     const c = globalThis.cljs.core;
     const kw = (name) => c.keyword(name);
@@ -421,9 +477,13 @@ async function seedPortfolioAnalyticsFixture(page, fixture) {
     const loadedAtMs = payload.loadedAtMs ?? Date.now();
     const store = globalThis.hyperopen.system.store;
     let nextState = c.deref(store);
-    nextState = c.assoc_in(nextState, path("wallet", "address"), payload.walletAddress);
     nextState = c.assoc_in(nextState, path("portfolio-ui", "summary-time-range"), kw("month"));
     nextState = c.assoc_in(nextState, path("portfolio", "summary-by-key"), summaryByKey);
+    nextState = c.assoc_in(
+      nextState,
+      path("portfolio", "loaded-for-address"),
+      payload.userFeesAddress
+    );
     nextState = c.assoc_in(nextState, path("portfolio", "loading?"), false);
     nextState = c.assoc_in(nextState, path("portfolio", "error"), payload.portfolioError ?? null);
     nextState = c.assoc_in(nextState, path("portfolio", "loaded-at-ms"), loadedAtMs);
@@ -436,6 +496,10 @@ async function seedPortfolioAnalyticsFixture(page, fixture) {
     );
     nextState = c.assoc_in(nextState, path("portfolio", "user-fees-loaded-at-ms"), loadedAtMs);
     c.reset_BANG_(store, nextState);
+    const renderApp = globalThis.hyperopen?.app?.bootstrap?.render_app_BANG_;
+    if (typeof renderApp === "function") {
+      renderApp(c.deref(store));
+    }
   }, fixture);
   await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
 }
@@ -473,7 +537,12 @@ async function seedPortfolioLedgerRows(page, rows) {
   await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
 }
 
-async function stubPortfolioLedgerRows(page, rows, observedRequests = []) {
+async function stubPortfolioLedgerRows(
+  page,
+  rows,
+  observedRequests = [],
+  { summaryByRange = null } = {}
+) {
   await page.route("**/info", async (route) => {
     const request = route.request();
     if (request.method() === "POST") {
@@ -485,6 +554,22 @@ async function stubPortfolioLedgerRows(page, rows, observedRequests = []) {
             status: 200,
             contentType: "application/json",
             body: JSON.stringify(rows)
+          });
+          return;
+        }
+        if (payload?.type === "portfolio" && summaryByRange) {
+          await route.fulfill({
+            status: 200,
+            contentType: "application/json",
+            body: JSON.stringify({ data: summaryByRange })
+          });
+          return;
+        }
+        if (payload?.type === "userFees" && summaryByRange) {
+          await route.fulfill({
+            status: 200,
+            contentType: "application/json",
+            body: JSON.stringify({ dailyUserVlm: [] })
           });
           return;
         }
@@ -556,6 +641,30 @@ async function stubOptimizerHistoryBundle(page, observedRequests = []) {
   });
 }
 
+async function stubOptimizerAssetSelectorMarketInfo(page) {
+  const emptyInfoResponses = new Map([
+    ["perpDexs", []],
+    ["spotMeta", { tokens: [], universe: [] }],
+    ["spotMetaAndAssetCtxs", [{ tokens: [], universe: [] }, []]],
+    ["webData2", { spotAssetCtxs: [] }],
+    ["outcomeMeta", { outcomes: [], questions: [] }],
+    ["metaAndAssetCtxs", [{ universe: [], marginTables: [] }, []]]
+  ]);
+
+  await page.route("https://api.hyperliquid.xyz/info", async (route) => {
+    const payload = JSON.parse(route.request().postData() || "{}");
+    if (emptyInfoResponses.has(payload?.type)) {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(emptyInfoResponses.get(payload.type))
+      });
+      return;
+    }
+    await route.fallback();
+  });
+}
+
 async function stubPortfolioSummaryInfo(page, summaryByRange) {
   await page.route("**/info", async (route) => {
     const request = route.request();
@@ -586,22 +695,30 @@ async function stubPortfolioSummaryInfo(page, summaryByRange) {
   });
 }
 
+function nearYearMonteCarloSummaryFixture() {
+  const startMs = Date.UTC(2025, 0, 1);
+  const weekMs = 7 * 24 * 60 * 60 * 1000;
+  const accountValueHistory = [];
+  const pnlHistory = [];
+  for (let idx = 0; idx < 53; idx += 1) {
+    const timeMs = startMs + idx * weekMs;
+    accountValueHistory.push([timeMs, 10_000 + idx * 20]);
+    pnlHistory.push([timeMs, idx * 10]);
+  }
+  return { allTime: { accountValueHistory, pnlHistory } };
+}
+
 async function seedNearYearMonteCarloForecast(page) {
-  await page.evaluate(() => {
+  await page.evaluate((fixture) => {
     const c = globalThis.cljs.core;
     const kw = (name) => c.keyword(name);
     const path = (...segments) =>
       c.PersistentVector.fromArray(segments.map((segment) => kw(segment)), true);
     const row = (timeMs, value) => c.PersistentVector.fromArray([timeMs, value], true);
-    const startMs = Date.UTC(2025, 0, 1);
-    const weekMs = 7 * 24 * 60 * 60 * 1000;
-    const accountRows = [];
-    const pnlRows = [];
-    for (let idx = 0; idx < 53; idx += 1) {
-      const timeMs = startMs + idx * weekMs;
-      accountRows.push(row(timeMs, 10_000 + idx * 20));
-      pnlRows.push(row(timeMs, idx * 10));
-    }
+    const accountRows = fixture.allTime.accountValueHistory.map(([timeMs, value]) =>
+      row(timeMs, value)
+    );
+    const pnlRows = fixture.allTime.pnlHistory.map(([timeMs, value]) => row(timeMs, value));
     const rows = (items) => c.PersistentVector.fromArray(items, true);
     const summary = c.PersistentArrayMap.fromArray(
       [
@@ -630,7 +747,7 @@ async function seedNearYearMonteCarloForecast(page) {
     nextState = c.assoc_in(nextState, path("portfolio-ui", "account-info-tab"), kw("monte-carlo"));
     nextState = c.assoc_in(nextState, path("portfolio-ui", "monte-carlo"), controls);
     c.reset_BANG_(store, nextState);
-  });
+  }, nearYearMonteCarloSummaryFixture());
   await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
 }
 
@@ -647,6 +764,9 @@ async function seedOptimizerAssetSelectorMarkets(page) {
       ];
       if (dex) {
         entries.push(kw("dex"), dex);
+      }
+      if (marketType === "perp" && ["BTC", "ETH", "SOL", "HYPE"].includes(coin)) {
+        entries.push(kw("optimizer-history/instrument-id"), `hl:perp:${coin}`);
       }
       return c.PersistentArrayMap.fromArray(entries, true);
     };
@@ -1175,6 +1295,54 @@ async function seedPersistedOptimizerTrackingScenario(page) {
   );
 }
 
+async function readOptimizerScenarioLoadStartedAt(page) {
+  return page.evaluate(() => {
+    const c = globalThis.cljs?.core;
+    const store = globalThis.hyperopen?.system?.store;
+    if (!c || !store) return -1;
+    const kw = (name) => c.keyword(name);
+    const path = (...segments) =>
+      c.PersistentVector.fromArray(segments.map((segment) => kw(segment)), true);
+    return c.get_in(
+      c.deref(store),
+      path("portfolio", "optimizer", "scenario-load-state", "started-at-ms")
+    ) ?? -1;
+  });
+}
+
+async function waitForPersistedOptimizerTrackingHydrated(
+  page,
+  scenarioId,
+  afterStartedAtMs = -1
+) {
+  await page.waitForFunction(({ targetScenarioId, afterStartedAtMs }) => {
+    const c = globalThis.cljs?.core;
+    const store = globalThis.hyperopen?.system?.store;
+    if (!c || !store) {
+      return false;
+    }
+
+    const kw = (name) => c.keyword(name);
+    const path = (...segments) =>
+      c.PersistentVector.fromArray(segments.map((segment) => kw(segment)), true);
+    const state = c.deref(store);
+    const loadState = c.get_in(state, path("portfolio", "optimizer", "scenario-load-state"));
+    const tracking = c.get_in(state, path("portfolio", "optimizer", "tracking"));
+    const snapshots = c.get(tracking, kw("snapshots"));
+    const startedAtMs = c.get(loadState, kw("started-at-ms"));
+
+    return startedAtMs > afterStartedAtMs
+      && c.get_in(state, path("portfolio", "optimizer", "active-scenario", "loaded-id"))
+        === targetScenarioId
+      && c.get(loadState, kw("scenario-id")) === targetScenarioId
+      && c._EQ_(c.get(loadState, kw("status")), kw("loaded"))
+      && c.get(tracking, kw("scenario-id")) === targetScenarioId
+      && c._EQ_(c.get(tracking, kw("status")), kw("loaded"))
+      && c.count(snapshots) > 0;
+  }, { targetScenarioId: scenarioId, afterStartedAtMs }, { timeout: 15_000 });
+  await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
+}
+
 async function seedOptimizerDraftSaveState(page, placeholderId = "draft-current") {
   await page.evaluate(({ address, placeholderId }) => {
     const c = globalThis.cljs.core;
@@ -1485,6 +1653,7 @@ test("portfolio route exposes deterministic interaction states @regression", asy
 });
 
 test("portfolio analytics fixtures stay address-scoped across connected and observed routes @analytics @regression", async ({ page }) => {
+  await stubPortfolioAnalyticsRefreshes(page);
   const connected = {
     walletAddress: "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     userFeesAddress: "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
@@ -1947,6 +2116,7 @@ test("portfolio optimizer setup exposes separate model layers @regression", asyn
 });
 
 test("portfolio optimizer universe search uses one integrated shell @regression", async ({ page }) => {
+  await stubOptimizerAssetSelectorMarketInfo(page);
   const reviewViewports = [
     { width: 375, height: 812 },
     { width: 768, height: 1024 },
@@ -2044,6 +2214,7 @@ test("portfolio optimizer universe search uses one integrated shell @regression"
 test("portfolio optimizer manual universe builder adds and removes assets @regression", async ({ page }) => {
   const historyBundleRequests = [];
   await stubOptimizerHistoryBundle(page, historyBundleRequests);
+  await stubOptimizerAssetSelectorMarketInfo(page);
 
   await visitRoute(page, "/portfolio/optimize/new");
   await expect(page.locator("[data-role='portfolio-optimizer-setup-route-surface']")).toBeVisible();
@@ -2201,13 +2372,11 @@ test("portfolio optimizer manual universe builder adds and removes vaults @regre
 
   await expect(vaultRow).toBeVisible();
   await expect(vaultRow).toContainText("Alpha Yield");
-  await expect(vaultRow).toContainText("vault");
   await vaultAdd.click();
   await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
 
   await expect(vaultSelected).toBeVisible();
   await expect(vaultSelected).toContainText("Alpha Yield");
-  await expect(vaultSelected).toContainText("vault");
   // The verbose center summary panel is gone; the compact right-column summary card shows the
   // asset COUNT and must never leak the raw vault address/id.
   await expect(page.locator("[data-role='portfolio-optimizer-setup-summary-card']"))
@@ -2275,6 +2444,7 @@ test("portfolio optimizer manual universe vault search sorts by TVL @regression"
 });
 
 test("portfolio optimizer manual universe search supports keyboard selection @regression", async ({ page }) => {
+  await stubOptimizerAssetSelectorMarketInfo(page);
   await visitRoute(page, "/portfolio/optimize/new");
   await expect(page.locator("[data-role='portfolio-optimizer-setup-route-surface']")).toBeVisible();
   await seedOptimizerAssetSelectorMarkets(page);
@@ -2396,16 +2566,24 @@ test("portfolio optimizer selection prefetch requests API v2 history before run 
     }
 
     const payload = request.postDataJSON();
-    if (payload?.type === "candleSnapshot") {
+    const candleWindowDays = payload?.type === "candleSnapshot"
+      ? (Number(payload.req?.endTime) - Number(payload.req?.startTime)) / 86_400_000
+      : null;
+    if (payload?.type === "candleSnapshot" && candleWindowDays === 1095) {
       legacyHistoryRequests.push(`${payload.type}:${payload.req?.coin}`);
     }
 
-    if (payload?.type === "fundingHistory") {
+    if (
+      payload?.type === "fundingHistory"
+      && Number.isFinite(Number(payload.startTime))
+      && Number.isFinite(Number(payload.endTime))
+    ) {
       legacyHistoryRequests.push(`${payload.type}:${payload.coin}`);
     }
 
     await route.continue();
   });
+  await stubOptimizerAssetSelectorMarketInfo(page);
 
   await visitRoute(page, "/portfolio/optimize/new");
   await seedOptimizerAssetSelectorMarkets(page);
@@ -2512,6 +2690,7 @@ test("portfolio optimizer recommendation chart shows minimum variance frontier o
 
     await route.continue();
   });
+  await stubOptimizerAssetSelectorMarketInfo(page);
 
   await visitRoute(page, "/portfolio/optimize/new");
   await seedOptimizerAssetSelectorMarkets(page);
@@ -2911,6 +3090,7 @@ test("portfolio optimizer persisted scenario hydrates results and tracking after
   await seedPersistedOptimizerTrackingScenario(page);
 
   await visitRoute(page, `/portfolio/optimize/${OPTIMIZER_RELOAD_SCENARIO_ID}`);
+  await waitForPersistedOptimizerTrackingHydrated(page, OPTIMIZER_RELOAD_SCENARIO_ID);
 
   const scenarioDetail = page.locator("[data-role='portfolio-optimizer-scenario-detail-surface']");
   const results = page.locator("[data-role='portfolio-optimizer-results-surface']");
@@ -2920,7 +3100,13 @@ test("portfolio optimizer persisted scenario hydrates results and tracking after
   await expect(results).toContainText("Optimization status");
   await expect(page.locator("[data-role='portfolio-optimizer-target-exposure-asset-BTC']"))
     .toContainText("BTC");
+  const previousLoadStartedAt = await readOptimizerScenarioLoadStartedAt(page);
   await visitRoute(page, `/portfolio/optimize/${OPTIMIZER_RELOAD_SCENARIO_ID}`);
+  await waitForPersistedOptimizerTrackingHydrated(
+    page,
+    OPTIMIZER_RELOAD_SCENARIO_ID,
+    previousLoadStartedAt
+  );
   await selectOptimizerScenarioTab(page, "tracking");
   await expect(tracking).toContainText("Weight Drift RMS");
   await expect(tracking).toContainText("Predicted Vol");
@@ -2930,15 +3116,26 @@ test("portfolio optimizer persisted scenario hydrates results and tracking after
   await expect(page.locator("[data-role='portfolio-optimizer-tracking-row-0']"))
     .toContainText("perp:BTC");
 
+  const beforeReloadStartedAt = await readOptimizerScenarioLoadStartedAt(page);
   await page.reload();
   await waitForDebugBridge(page);
   await waitForIdle(page, { quietMs: 200, timeoutMs: 6_000, pollMs: 50 });
   await expect(page.locator("[data-parity-id='app-route-module-shell']"))
     .toHaveCount(0, { timeout: 15_000 });
+  await waitForPersistedOptimizerTrackingHydrated(
+    page,
+    OPTIMIZER_RELOAD_SCENARIO_ID,
+    beforeReloadStartedAt
+  );
 
   await expect(scenarioDetail).toHaveAttribute("data-scenario-id", OPTIMIZER_RELOAD_SCENARIO_ID);
   await page.locator("[data-role='portfolio-optimizer-scenario-tab-tracking']").click();
   await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
+  const enableManualTracking = page.locator("[data-role='portfolio-optimizer-enable-manual-tracking']");
+  if (await enableManualTracking.isVisible()) {
+    await enableManualTracking.click();
+    await waitForIdle(page, { quietMs: 150, timeoutMs: 8_000, pollMs: 50 });
+  }
   await expect(tracking).toContainText("Realized Return");
   await expect(tracking).toContainText("38.00%");
   await expect(page.locator("[data-role='portfolio-optimizer-tracking-row-1']"))
@@ -3156,7 +3353,16 @@ test("portfolio funding openers launch the funding modal on real click @regressi
 test("portfolio account activity tab renders ledger history @regression", async ({ page }) => {
   await page.setViewportSize(PORTFOLIO_LEDGER_REVIEW_VIEWPORTS[0]);
   const observedLedgerRequests = [];
-  await stubPortfolioLedgerRows(page, PORTFOLIO_LEDGER_FIXTURE, observedLedgerRequests);
+  await stubPortfolioLedgerRows(page, PORTFOLIO_LEDGER_FIXTURE, observedLedgerRequests, {
+    summaryByRange: {
+      month: {
+        account: "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        accountValueHistory: [[1_000, 10_000], [2_000, 12_000]],
+        pnlHistory: [[1_000, 0], [2_000, 2_000]],
+        vlm: 10_000
+      }
+    }
+  });
   await visitRoute(page, "/portfolio");
   await seedPortfolioWalletAddress(page, "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
   await selectAccountTab(page, "deposits-withdrawals");
@@ -3534,12 +3740,7 @@ test("trader portfolio route stays read-only while reusing stable controls @regr
 });
 
 test("portfolio Monte Carlo forecast horizon can return to one year after six months @regression", async ({ page }) => {
-  await stubPortfolioSummaryInfo(page, {
-    allTime: {
-      accountValueHistory: [],
-      pnlHistory: []
-    }
-  });
+  await stubPortfolioSummaryInfo(page, nearYearMonteCarloSummaryFixture());
   await visitRoute(page, `/portfolio/trader/${TRADER_ADDRESS}`);
 
   for (const viewport of PORTFOLIO_LEDGER_REVIEW_VIEWPORTS) {

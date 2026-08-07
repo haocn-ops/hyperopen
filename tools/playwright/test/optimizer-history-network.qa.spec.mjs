@@ -13,6 +13,9 @@ async function seedMarkets(page) {
         kw("symbol"), symbol
       ];
       if (dex) entries.push(kw("dex"), dex);
+      if (marketType === "perp") {
+        entries.push(kw("optimizer-history/instrument-id"), `hl:perp:${coin}`);
+      }
       return c.PersistentArrayMap.fromArray(entries, true);
     };
     const btc = market("perp:BTC", "perp", "BTC", "BTC-USDC", "hl");
@@ -109,6 +112,22 @@ test("portfolio optimizer adding an asset prefetches API v2 history before run @
         }
         if (payload?.type === "fundingHistory") {
           seenLegacyHistory.push({ type: payload.type, coin: payload.coin });
+        }
+        const bootstrapResponses = {
+          perpDexs: [],
+          spotMeta: { tokens: [], universe: [] },
+          spotMetaAndAssetCtxs: [{ tokens: [], universe: [] }, []],
+          webData2: { spotAssetCtxs: [] },
+          outcomeMeta: { outcomes: [], questions: [] },
+          metaAndAssetCtxs: [{ universe: [], marginTables: [] }, []]
+        };
+        if (Object.hasOwn(bootstrapResponses, payload?.type)) {
+          await route.fulfill({
+            status: 200,
+            contentType: "application/json",
+            body: JSON.stringify(bootstrapResponses[payload.type])
+          });
+          return;
         }
       } catch {
         // Let non-JSON requests continue.

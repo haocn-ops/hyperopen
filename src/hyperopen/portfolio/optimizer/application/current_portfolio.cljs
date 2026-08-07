@@ -531,12 +531,12 @@
                exposures)
       (let [gross-ratio (/ gross-usdc nav-usdc)
             net-ratio (/ net-usdc nav-usdc)
-            ;; Net target = the book's current net; the tolerance is a fraction
-            ;; of REALIZED gross (:net-band-pct). Preserve the old ±0.05x
-            ;; absolute width at the current gross (0.05 / gross), clamped to
-            ;; the valid [0, 1] range.
-            net-min (floor-to-constraint-precision net-ratio)
-            net-max net-min
+            ;; Seed the visible net envelope around the current book. The
+            ;; solver also keeps the proportional band, but the editor fields
+            ;; must expose the same +/- 0.05 absolute tolerance users see in
+            ;; the holdings preview.
+            net-min (floor-to-constraint-precision (- net-ratio exposure-band-width))
+            net-max (ceil-to-constraint-precision (+ net-ratio exposure-band-width))
             net-band-pct (if (> gross-ratio 1e-9)
                            (min 1.0 (/ (js/Math.round
                                         (* 1000000 (/ exposure-band-width gross-ratio)))

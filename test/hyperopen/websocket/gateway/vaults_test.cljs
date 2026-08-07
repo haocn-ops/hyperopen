@@ -159,11 +159,11 @@
                      (is (= ["vaultSummaries"
                              "userVaultEquities"
                              "vaultDetails"
-                             "vaultDetails"
                              "spotClearinghouseState"
                              "clearinghouseState"
                              "frontendOpenOrders"
-                             "twapHistory"]
+                             "twapHistory"
+                             "vaultDetails"]
                             (mapv (comp #(get % "type") first) @calls))))
                    (done)))
           (.catch (async-support/unexpected-error done))))))

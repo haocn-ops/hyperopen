@@ -106,6 +106,22 @@ test("optimizer history API v2 loads rows without legacy history fanout @regress
     if (request.method() === "POST") {
       try {
         const payload = request.postDataJSON();
+        const bootstrapResponses = {
+          perpDexs: [],
+          spotMeta: { tokens: [], universe: [] },
+          spotMetaAndAssetCtxs: [{ tokens: [], universe: [] }, []],
+          webData2: { spotAssetCtxs: [] },
+          outcomeMeta: { outcomes: [], questions: [] },
+          metaAndAssetCtxs: [{ universe: [], marginTables: [] }, []]
+        };
+        if (Object.hasOwn(bootstrapResponses, payload?.type)) {
+          await route.fulfill({
+            status: 200,
+            contentType: "application/json",
+            body: JSON.stringify(bootstrapResponses[payload.type])
+          });
+          return;
+        }
         if (payload?.type === "candleSnapshot" || payload?.type === "fundingHistory") {
           legacyHistoryRequests.push(payload);
         }
@@ -168,6 +184,7 @@ test("optimizer history API v2 uses aligned returns when point rows are sparse @
 
   const legacyHistoryRequests = [];
   const v2Requests = [];
+  let observeLegacyHistory = false;
 
   await page.route("https://price-history.hyperopen.xyz/v1/optimizer/instruments", async (route) => {
     v2Requests.push({ type: "instruments" });
@@ -276,7 +293,24 @@ test("optimizer history API v2 uses aligned returns when point rows are sparse @
     if (request.method() === "POST") {
       try {
         const payload = request.postDataJSON();
-        if (payload?.type === "candleSnapshot" || payload?.type === "fundingHistory") {
+        const bootstrapResponses = {
+          perpDexs: [],
+          spotMeta: { tokens: [], universe: [] },
+          spotMetaAndAssetCtxs: [{ tokens: [], universe: [] }, []],
+          webData2: { spotAssetCtxs: [] },
+          outcomeMeta: { outcomes: [], questions: [] },
+          metaAndAssetCtxs: [{ universe: [], marginTables: [] }, []]
+        };
+        if (Object.hasOwn(bootstrapResponses, payload?.type)) {
+          await route.fulfill({
+            status: 200,
+            contentType: "application/json",
+            body: JSON.stringify(bootstrapResponses[payload.type])
+          });
+          return;
+        }
+        if (observeLegacyHistory
+            && (payload?.type === "candleSnapshot" || payload?.type === "fundingHistory")) {
           legacyHistoryRequests.push(payload);
         }
       } catch {
@@ -296,18 +330,21 @@ test("optimizer history API v2 uses aligned returns when point rows are sparse @
       "market-type": "perp",
       coin: "ETH",
       symbol: "ETH-USDC",
-      name: "Ether"
+      name: "Ether",
+      "optimizer-history/instrument-id": "hl:perp:ETH"
     },
     {
       key: "perp:BTC",
       "market-type": "perp",
       coin: "BTC",
       symbol: "BTC-USDC",
-      name: "Bitcoin"
+      name: "Bitcoin",
+      "optimizer-history/instrument-id": "hl:perp:BTC"
     }
   ]);
   legacyHistoryRequests.length = 0;
 
+  observeLegacyHistory = true;
   await page.locator("[data-role='portfolio-optimizer-universe-search-input']").fill("btc");
   await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
   await page.locator("[data-role='portfolio-optimizer-universe-add-perp:BTC']").click();

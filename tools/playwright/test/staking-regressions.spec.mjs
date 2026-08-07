@@ -259,6 +259,32 @@ async function setupMasterUnstakeScenario(page, options = {}) {
   await visitRoute(page, "/staking");
   await installUnstakeSimulators(page, options.exchangeResponse);
   await seedMasterUnstakeState(page, options);
+  await expect.poll(
+    () => page.evaluate((ownerAddress) => {
+      const c = globalThis.cljs?.core;
+      const store = globalThis.hyperopen?.system?.store;
+      if (!c || !store) return false;
+      const kw = (name) => c.keyword(name);
+      const path = (...segments) =>
+        c.PersistentVector.fromArray(segments.map((segment) => kw(segment)), true);
+      const state = c.deref(store);
+      const loading = c.clj__GT_js(c.get_in(state, path("staking", "loading"))) || {};
+      const loadedForDelegations = c.get_in(
+        state,
+        path("staking", "loaded-for", "delegations")
+      );
+      const loadedForSummary = c.get_in(
+        state,
+        path("staking", "loaded-for", "delegator-summary")
+      );
+      const delegations = c.clj__GT_js(c.get_in(state, path("staking", "delegations"))) || [];
+      return Object.values(loading).every((value) => value !== true)
+        && loadedForDelegations === ownerAddress
+        && loadedForSummary === ownerAddress
+        && typeof delegations[0]?.amount === "number";
+    }, OWNER_ADDRESS),
+    { timeout: 10_000 }
+  ).toBe(true);
 }
 
 async function unstakeStateSnapshot(page) {

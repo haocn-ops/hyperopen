@@ -58,6 +58,17 @@ async function freezeAccountSurfaceSync(page) {
   }, OWNER_ADDRESS);
 }
 
+async function ensureTradingCryptoReady(page) {
+  await page.evaluate(async () => {
+    const loadTradingCrypto =
+      globalThis.hyperopen?.trading_crypto_modules?.load_trading_crypto_module_BANG_;
+    if (typeof loadTradingCrypto !== "function") {
+      throw new Error("trading crypto module loader unavailable");
+    }
+    await loadTradingCrypto();
+  });
+}
+
 async function seedReadyTradingSession(page) {
   await page.evaluate(
     ({ ownerAddress, agentAddress, privateKey }) => {
@@ -321,6 +332,7 @@ for (const viewport of [
       });
       await seedReadyTradingSession(page);
       await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
+      await ensureTradingCryptoReady(page);
       await openConfiguredBuilderFeeSettings(page);
       await dispatch(page, [":actions/set-confirm-open-orders-enabled", false]);
 

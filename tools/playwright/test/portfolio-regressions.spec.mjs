@@ -519,6 +519,69 @@ async function seedPortfolioWebdata2(page, webdata2) {
   }, webdata2);
 }
 
+async function freezePortfolioAccountSurfaceSync(page, address) {
+  await page.evaluate((targetAddress) => {
+    const store = globalThis.hyperopen?.system?.store;
+    const addressWatcher = globalThis.hyperopen?.wallet?.address_watcher;
+    const webdata2 = globalThis.hyperopen?.websocket?.webdata2;
+    const userSubscriptions = globalThis.hyperopen?.websocket?.user_runtime?.subscriptions;
+
+    if (!store || !addressWatcher || !webdata2 || !userSubscriptions) {
+      throw new Error("Hyperopen account sync runtime unavailable");
+    }
+
+    addressWatcher.stop_watching_BANG_(store);
+    addressWatcher.remove_handler_BANG_("webdata2-subscription-handler");
+    addressWatcher.remove_handler_BANG_("user-ws-subscription-handler");
+    addressWatcher.remove_handler_BANG_("startup-account-bootstrap-handler");
+    webdata2.unsubscribe_webdata2_BANG_(targetAddress);
+    userSubscriptions.unsubscribe_user_BANG_(targetAddress);
+  }, address);
+}
+
+async function seedPortfolioBalanceFixture(page) {
+  await page.evaluate(() => {
+    const c = globalThis.cljs?.core;
+    const store = globalThis.hyperopen?.system?.store;
+
+    if (!c || !store) {
+      throw new Error("Hyperopen store or cljs core unavailable");
+    }
+
+    const keyword = c.keyword;
+    const kwPath = (...segments) =>
+      c.PersistentVector.fromArray(segments.map((segment) => keyword(segment)), true);
+    const opts = c.PersistentArrayMap.fromArray([keyword("keywordize-keys"), true], true);
+    const webdata2 = c.js__GT_clj({
+      clearinghouseState: {
+        marginSummary: { accountValue: "1000", totalMarginUsed: "100" },
+        assetPositions: []
+      }
+    }, opts);
+    const spotBalances = c.js__GT_clj(
+      [{ coin: "USDC", total: "250", hold: "0" }],
+      opts
+    );
+
+    let nextState = c.deref(store);
+    nextState = c.assoc_in(nextState, kwPath("webdata2"), webdata2);
+    nextState = c.assoc_in(
+      nextState,
+      kwPath("spot", "clearinghouse-state", "balances"),
+      spotBalances
+    );
+    nextState = c.assoc_in(nextState, kwPath("spot", "loading-balances?"), false);
+    nextState = c.assoc_in(nextState, kwPath("spot", "error"), null);
+    c.reset_BANG_(store, nextState);
+
+    const renderApp = globalThis.hyperopen?.app?.bootstrap?.render_app_BANG_;
+    if (typeof renderApp === "function") {
+      renderApp(c.deref(store));
+    }
+  });
+  await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
+}
+
 async function seedPortfolioLedgerRows(page, rows) {
   await page.evaluate((payload) => {
     const c = globalThis.cljs.core;
@@ -3703,6 +3766,8 @@ test("portfolio fee schedule opens, switches market type, and restores focus @re
 
 test("trader portfolio route stays read-only while reusing stable controls @regression", async ({ page }) => {
   await visitRoute(page, `/portfolio/trader/${TRADER_ADDRESS}`);
+  await freezePortfolioAccountSurfaceSync(page, TRADER_ADDRESS);
+  await seedPortfolioBalanceFixture(page);
   const accountTable = page.locator("[data-role='portfolio-account-table']");
 
   await expect(page.locator("[data-role='portfolio-inspection-header']")).toBeVisible();

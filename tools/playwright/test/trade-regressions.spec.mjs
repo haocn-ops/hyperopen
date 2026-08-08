@@ -2446,6 +2446,7 @@ test("asset selector focuses search input and keyboard-navigates rows @regressio
 
   await dispatch(page, [":actions/toggle-asset-dropdown", ":asset-selector"]);
   await waitForIdle(page, { quietMs: 150, timeoutMs: 4_000, pollMs: 50 });
+  await waitForAssetSelectorLoadSettled(page);
   await expectOracle(page, "asset-selector", {
     visibleDropdown: "asset-selector",
     desktopPresent: true

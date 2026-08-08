@@ -25,6 +25,8 @@ Local scratch refs (non-authoritative): none.
 - [x] (2026-08-08) Implemented scoped funding feedback, Mainnet-safe routing, receipt-revert classification, malformed-balance fallback, duplicate-submit guard, inline visibility, and structured toast rendering.
 - [x] (2026-08-08) Completed the corrected 35/35 repository gates with Homebrew JDK 21, including `npm test` (5948 tests, 33148 assertions) and `npm run test:websocket` (562 tests, 3198 assertions).
 - [x] (2026-08-08) Source-backed focused Playwright funding regression passed 6/6 at the managed local app. The first governed design-review attempt could not start its managed app; the source fix was also simulated across 375, 768, 1280, and 1440 px with no toast/modal overlap, no footer occlusion, and a visible dismiss focus ring. Native-control, styling-consistency, interaction, layout-regression, and jank/perf evidence were recorded in the browser QA artifacts; dynamic design-review automation remains an environment limitation.
+- [x] (2026-08-08) Built and dry-ran the DEXHelm Cloudflare artifact, committed as `bf58c138`, pushed branch `codex/upstream-sync-20260806` to `haocn-ops/hyperopen`, and deployed the existing `hyperopen` Worker.
+- [x] (2026-08-08) Verified the public Testnet origin and all configured custom-domain policy paths after deployment.
 
 ## Surprises & Discoveries
 
@@ -82,6 +84,8 @@ Local scratch refs (non-authoritative): none.
 Implementation is complete for the scoped funding path. Nested wallet errors now become bounded, actionable feedback; Testnet USDC2 balance evidence prevents a known underfunded send while malformed reads fall back to the existing transaction path; Mainnet keeps its legacy path. The modal stays open and recoverable, and the notification layer avoids the modal while exposing keyboard focus.
 
 Validation completed: `npm run setup:worktree`, the corrected 35/35 gates, `node --check` for the focused Playwright spec, `git diff --check`, `npm run build:cloudflare`, artifact preflight (33 passed, 2 environment warnings), and `npm run cloudflare:check` dry-run. The source-backed focused funding Playwright suite passed 6/6; browser sessions and local dev processes were cleaned up. The release still carries the existing soft bundle-budget warning and the governed design-review runner could not manage its app in this environment, so the four-size evidence is recorded as simulated/source-backed QA rather than a fresh automated design-review report.
+
+Deployment record: Worker `hyperopen`, version `76c0b3a6-b636-4bbc-b473-8cc3d8fb2601`, public Testnet origin `https://testnet.dexhelm.com`. `verify:deployment-headers` passed for `/trade`, fingerprinted CSS/JS, route metadata, site metadata, and service worker. `verify:cloudflare-worker` returned Testnet fee probe `200`, Mainnet probe `404`, and generic proxy probe `404`. Public matrix: `https://dexhelm.com` 200, `https://testnet.dexhelm.com/trade` 200, `https://app.dexhelm.com` intentional 503, `https://status.dexhelm.com` 200, `/api/health` `{"status":"ok"}`, and the DEXHelm logo `200 image/svg+xml`. Workers Static Assets accepted the generated `_headers`; no Worker fallback was required. No DNS, secrets, wallet action, or Mainnet opening was performed.
 
 ## Context and Orientation
 

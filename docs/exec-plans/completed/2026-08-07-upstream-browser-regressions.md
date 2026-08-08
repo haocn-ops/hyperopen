@@ -36,6 +36,9 @@ This is correctness and interaction repair, not performance work. The “reuse i
 - [x] (2026-08-07 20:00+08:00) Passed focused repeats, smoke coverage, release SEO (7/7), and the final full interactive suite (245 passed, 4 configured skips, 0 failed).
 - [x] (2026-08-07 20:00+08:00) Ran the 35-gate matrix. The only sandbox failure was three loopback-bind release-asset fixtures; the identical elevated release-assets command passed 52/52, so the corrected aggregate is 35/35.
 - [x] (2026-08-07 22:30+08:00) Passed Cloudflare artifact checks and white-label browser coverage, cleaned browser sessions, deployed the existing `hyperopen` Worker as version `ab717702-379e-4a09-abc6-9b065ef34e44`, and passed the public verification matrix. GitHub push follows the completed-record commit.
+- [x] (2026-08-08 12:00+08:00) Stabilized the three remaining full-suite fixture races, reran the interactive suite (245 passed, 4 configured skips), release SEO (7/7), Builder Fee repeats, 6,693 ClojureScript/websocket tests with 36,508 assertions, Worker tests (50/50), release-asset tests (52/52), and DEXHelm white-label coverage (4/4).
+- [x] (2026-08-08 12:00+08:00) Committed the fixture repairs as `83d0ff6b`, pushed `codex/upstream-sync-20260806` to the user fork, and deployed the existing `hyperopen` Worker as version `0ee0e137-8495-488c-acb3-19aa119b1148` from rollback baseline `ab717702-379e-4a09-abc6-9b065ef34e44`.
+- [x] (2026-08-08 12:00+08:00) Reverified public headers, Testnet-only proxy policy, all four custom domains, the DEXHelm logo, and the health endpoint after the follow-up deployment. Mainnet remains closed.
 
 ## Surprises & Discoveries
 
@@ -65,6 +68,9 @@ This is correctness and interaction repair, not performance work. The “reuse i
 
 - Observation: `qa:pr-ui` starts a managed local app for its scenario bundle and then attempts a second managed app for design review before the first process group has released ports 8080/9630.
   Evidence: two wrapper runs failed with `shadow-cljs already running`; the separated critical scenario run passed loopback preflight but ended `automation-gap` after its managed app was not reachable. Final deterministic Playwright coverage still passed at 375, 768, 1280, and 1440 where those surfaces are asserted.
+
+- Observation: the documented DEXHelm white-label command inherits the sample tenant's default dark-theme and disabled-route expectations unless both overrides are supplied.
+  Evidence: the first follow-up invocation simultaneously treated `/trade` as enabled and disabled; the corrected invocation with `HYPEROPEN_EXPECT_THEME=dark` and an empty `HYPEROPEN_EXPECT_DISABLED_ROUTE` passed 4/4 at 375, 768, 1280, and 1440 px without code changes.
 
 ## Decision Log
 
@@ -120,6 +126,10 @@ This is correctness and interaction repair, not performance work. The “reuse i
   Rationale: the user authorized deployment of the existing Worker, not a new Worker, DNS changes, or Mainnet opening. Wrangler confirmed the same Worker name and replaced prior version `1e10deb3-eae7-4943-aeeb-951e87b760a9` with `ab717702-379e-4a09-abc6-9b065ef34e44`.
   Date/Author: 2026-08-07 / Codex.
 
+- Decision: publish the 2026-08-08 fixture-stability follow-up to the same fork branch and existing Worker without changing routes, DNS, secrets, or Mainnet policy.
+  Rationale: the user explicitly authorized the GitHub push and Worker update after the full regression rerun. Wrangler confirmed `ab717702-379e-4a09-abc6-9b065ef34e44` as the immediate rollback baseline and created `0ee0e137-8495-488c-acb3-19aa119b1148` on the same `hyperopen` Worker.
+  Date/Author: 2026-08-08 / Codex.
+
 ## Outcomes & Retrospective
 
 The regression repair is implemented and the final self-managed Playwright run is green: 245 passed and four configured white-label skips. The release SEO suite is 7/7 and the DEXHelm white-label suite is 4/4 at 375, 768, 1280, and 1440 px. ClojureScript and websocket suites pass with zero failures, and the corrected 35-gate matrix is green after rerunning loopback fixtures outside the sandbox. Production changes remain bounded to vault loading, WebAuthn RP safety, optimizer exposure/risk calculation, and the affected responsive/popover styles; test changes isolate startup ownership races without weakening user-facing behavior. The findings-first static review found no remaining correctness, security, race, or public-contract issue.
@@ -129,6 +139,10 @@ Cloudflare preflight passed 25 checks with two documented environment warnings; 
 Public verification passed: `https://dexhelm.com` returned 200, `https://testnet.dexhelm.com` and `/trade` returned 200, `https://app.dexhelm.com` returned the intentional 503, `https://status.dexhelm.com` returned 200, and the public logo returned 200 `image/svg+xml`. The deployment-header verifier passed for the document, fingerprinted CSS/JavaScript, route metadata, site metadata, and service worker. The Worker verifier returned 200 JSON for the non-mutating Testnet fee probe and 404 for both Mainnet and generic proxy paths. Mainnet remains closed. Rollback remains available to prior version `1e10deb3-eae7-4943-aeeb-951e87b760a9` but was not exercised because all public checks passed.
 
 Governed `qa:pr-ui` remains a tooling automation gap because its wrapper double-starts the managed app; it produced no application assertion failure. Deterministic browser coverage and the public release checks account for the changed surfaces, and browser cleanup reported no active sessions. Upstream service availability and the uncorrected wrapper lifecycle are the remaining operational risks.
+
+The 2026-08-08 follow-up release committed three deterministic Playwright fixture repairs as `83d0ff6b` and pushed them to `haocn-ops/hyperopen:codex/upstream-sync-20260806`. The final interactive suite passed 245 tests with four configured skips, SEO passed 7/7, DEXHelm white-label coverage passed 4/4, Worker tests passed 50/50, release-asset tests passed 52/52, and the governed ClojureScript/websocket suites passed 6,693 tests with 36,508 assertions. Artifact preflight passed 33 checks; Wrangler dry-run read 57 assets and exited successfully.
+
+Wrangler updated the same `hyperopen` Worker from `ab717702-379e-4a09-abc6-9b065ef34e44` to `0ee0e137-8495-488c-acb3-19aa119b1148`. Post-deploy verification returned 200 for `dexhelm.com`, `testnet.dexhelm.com`, `/trade`, `status.dexhelm.com`, the SVG logo, the health endpoint, and the non-mutating Testnet fee probe. `app.dexhelm.com` remained intentionally closed with 503, while Mainnet and generic HyperUnit proxy probes returned 404. Static headers and fingerprinted asset caching verified successfully.
 
 ## Context and Orientation
 
@@ -250,13 +264,13 @@ Acceptance is behavioral and all conditions below are required.
 
 The test, setup, QA, and cleanup commands are repeatable. Preserve generated failure artifacts until the corresponding case has a green rerun; new Playwright artifacts stay under `tmp/playwright/**`, and Browser MCP artifacts stay under `tmp/browser-inspection/**`. A focused failure should be retried only after correcting the responsible code or test contract, not with a larger timeout or suppression. If an intended product contract changes after this plan is created, update `Decision Log`, the frozen contract, and acceptance criteria together before changing a test.
 
-External state changed only through the explicitly authorized Git commit and update of the existing Cloudflare Worker. To recover the public release, request explicit rollback authorization and deploy prior version `1e10deb3-eae7-4943-aeeb-951e87b760a9`; do not delete the Worker. To abandon local implementation, use normal version-control review/revert procedures for the specific changed files; do not run destructive repository commands. Do not move or delete baseline reports merely to obtain a clean browser-report directory.
+External state changed only through the explicitly authorized Git commits and updates of the existing Cloudflare Worker. For the 2026-08-08 follow-up, request explicit rollback authorization and deploy immediate prior version `ab717702-379e-4a09-abc6-9b065ef34e44`; do not delete the Worker. Historical version `1e10deb3-eae7-4943-aeeb-951e87b760a9` remains an earlier release baseline. To abandon local implementation, use normal version-control review/revert procedures for the specific changed files; do not run destructive repository commands. Do not move or delete baseline reports merely to obtain a clean browser-report directory.
 
 ## Artifacts and Notes
 
 Baseline interactive result: 223 passed, 21 failed, 1 flaky, 4 skipped. Baseline smoke result: 43 passed, 5 failed. Baseline release SEO result: 7 passed. The retained interactive HTML report is self-contained and embeds the detailed Playwright report data; failure evidence remains in `tmp/playwright/test-results/interactive/**`.
 
-The release was committed locally as `8a19cb87` before this final record update. The completed-record commit is the artifact intended for the authorized `fork` push. The untracked `test-results/` directory remains outside version control. The local review report is `tmp/multi-agent/upstream-browser-regressions/review-report.json`; it records a pass with no findings and the same QA-wrapper residual risk.
+The original repair release was committed locally as `8a19cb87` before its final record update. The 2026-08-08 fixture-stability follow-up was committed as `83d0ff6b`; this updated completed record is the final evidence intended for the authorized `fork` push. The untracked `test-results/` directory remains outside version control. The local review report is `tmp/multi-agent/upstream-browser-regressions/review-report.json`; it records a pass with no findings and the same QA-wrapper residual risk.
 
 ## Interfaces and Dependencies
 
@@ -264,4 +278,4 @@ Use existing dependencies only: Playwright and the repository’s `HYPEROPEN_DEB
 
 The stable interfaces to preserve are the current route/query shapes, the signed exchange action payload shape (including `vaultAddress` for selected subaccounts), established `data-role`/`data-parity-id` test anchors, optimizer objective values including `:equal-risk`, and the existing tenant/product-context configuration. All side effects remain in the existing effect/interpreter boundaries; action and view-model decisions remain pure and deterministic.
 
-Revision note: created on 2026-08-07 from the direct upstream-merge regression request and the recorded 21-failure interactive Playwright baseline. It freezes the exact failing test contract, records the one asset-selector flake as a stability requirement, and permits only the current five-option Equal Risk objective expectation to replace a stale assertion without further product clarification.
+Revision note: created on 2026-08-07 from the direct upstream-merge regression request and the recorded 21-failure interactive Playwright baseline. It freezes the exact failing test contract, records the one asset-selector flake as a stability requirement, and permits only the current five-option Equal Risk objective expectation to replace a stale assertion without further product clarification. Updated on 2026-08-08 with the fixture-stability follow-up commit, Worker deployment, rollback baseline, and public verification evidence.

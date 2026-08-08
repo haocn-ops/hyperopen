@@ -148,10 +148,7 @@
                           "w-8"
                           "items-center"
                           "justify-center"
-                          "rounded-full"
-                          "focus:outline-none"
-                          "focus:ring-0"
-                          "focus:ring-offset-0"]
+                          "rounded-full"]
                   :aria-label "Dismiss notification"
                   :on {:click [[:actions/dismiss-order-feedback-toast toast-id]]}
                   :data-role "global-toast-dismiss"}
@@ -226,17 +223,21 @@
   [state]
   (let [toasts (->> (toast-entries state)
                     (keep #(toast-card state %))
-                    vec)]
+                    vec)
+        funding-modal-open? (true? (get-in state [:funding-ui :modal :open?]))]
     (when (seq toasts)
-      (into [:div {:class ["pointer-events-none"
-                           "fixed"
-                           "right-3"
-                           "bottom-16"
-                           "z-[280]"
-                           "flex"
-                           "w-[min(24rem,calc(100vw-1.5rem))]"
-                           "flex-col"
-                           "gap-2.5"]
+      (into [:div {:class (cond-> ["pointer-events-none"
+                                   "fixed"
+                                   "right-3"
+                                   "z-[280]"
+                                   "flex"
+                                   "w-[min(24rem,calc(100vw-1.5rem))]"
+                                   "flex-col"
+                                   "gap-2.5"]
+                            funding-modal-open?
+                            (conj "top-20")
+                            (not funding-modal-open?)
+                            (conj "bottom-16"))
                    :role "status"
                    :aria-live "polite"
                    :data-role "global-toast-region"}]

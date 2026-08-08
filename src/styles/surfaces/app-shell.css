@@ -345,6 +345,11 @@
     transform: translateY(-1px);
   }
 
+  .global-toast-dismiss:focus-visible {
+    outline: 2px solid rgb(var(--ho-accent-bright) / 0.96);
+    outline-offset: 2px;
+  }
+
   .global-toast-surface[data-toast-kind="success"] {
     border-color: rgb(55 88 94 / 0.92);
     background:

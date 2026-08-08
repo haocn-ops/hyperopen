@@ -25,3 +25,11 @@
     (is (= "Route-based bridge/swap flow will be implemented in the next milestone."
            (:deposit-unsupported-detail ctx)))
     (is (= "Deposit unavailable" (:deposit-submit-label ctx)))))
+
+(deftest presentation-context-shows-submit-errors-during-deposit-amount-entry-test
+  (let [message "Deposit failed: Check current Testnet USDC2 and test ETH."
+        state (support/base-state {:modal {:deposit-step :amount-entry
+                                           :error message}})
+        ctx (support/build-presented-context (support/base-deps) state)]
+    (is (= message (:status-message ctx)))
+    (is (true? (:show-status-message? ctx)))))

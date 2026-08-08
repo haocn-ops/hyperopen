@@ -36,11 +36,21 @@
         preview-message)))
 
 (defn- show-status-message?
-  [{:keys [legacy? deposit? withdraw? withdraw-step-amount-entry? legal-check]} status-message]
+  [{:keys [legacy?
+           deposit?
+           withdraw?
+           deposit-step-amount-entry?
+           withdraw-step-amount-entry?
+           error
+           legal-check]}
+   status-message]
   (boolean
    (and (seq status-message)
         (not legacy?)
         (or (contains? #{:blocked :error} (:status legal-check))
+            (and deposit?
+                 deposit-step-amount-entry?
+                 (seq error))
             (and (not deposit?)
                  (or (not withdraw?)
                      withdraw-step-amount-entry?))))))

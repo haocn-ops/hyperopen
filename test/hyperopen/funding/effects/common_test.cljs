@@ -80,6 +80,45 @@
   (is (= "Unknown wallet error"
          (common/wallet-error-message (js/Error. "   ")))))
 
+(deftest deposit-wallet-error-feedback-classifies-nested-provider-errors-test
+  (let [insufficient-error #js {:message "RPC 0x66eee Custom error"
+                                :data #js {:originalError
+                                           #js {:message "execution reverted: ERC20: transfer amount exceeds balance"}}}
+        insufficient-feedback (common/deposit-wallet-error-feedback insufficient-error)
+        rejected-feedback (common/deposit-wallet-error-feedback
+                           #js {:code 4001
+                                :message "User rejected the request"})
+        wrong-network-feedback (common/deposit-wallet-error-feedback
+                                #js {:code 4902
+                                     :message "Unrecognized chain"})
+        gas-feedback (common/deposit-wallet-error-feedback
+                      #js {:message "Internal JSON-RPC error"
+                           :cause #js {:message "insufficient funds for gas * price + value"}})
+        provider-rejection-feedback (common/deposit-wallet-error-feedback
+                                     #js {:message "RPC 0x66eee Custom error: bridge deposit rejected by provider"
+                                          :data #js {:request #js {:method "eth_sendTransaction"
+                                                                  :params #js ["private payload"]}}})]
+    (is (= :insufficient-usdc2 (:kind insufficient-feedback)))
+    (is (= "Deposit could not be submitted"
+           (get-in insufficient-feedback [:toast :headline])))
+    (is (re-find #"USDC2" (:message insufficient-feedback)))
+    (is (not (re-find #"RPC|0x66eee|Custom error"
+                      (str (:message insufficient-feedback)
+                           " "
+                           (get-in insufficient-feedback [:toast :detail])))))
+    (is (= :wallet-rejected (:kind rejected-feedback)))
+    (is (= "Deposit canceled" (get-in rejected-feedback [:toast :headline])))
+    (is (= :wrong-network (:kind wrong-network-feedback)))
+    (is (re-find #"Arbitrum Sepolia" (:message wrong-network-feedback)))
+    (is (= :wallet-rpc (:kind gas-feedback)))
+    (is (re-find #"test ETH" (:message gas-feedback)))
+    (is (= :transaction-reverted (:kind provider-rejection-feedback)))
+    (is (= false (get-in provider-rejection-feedback [:toast :auto-timeout?])))
+    (is (not (re-find #"RPC|0x66eee|private payload"
+                      (str (:message provider-rejection-feedback)
+                           " "
+                           (get-in provider-rejection-feedback [:toast :detail])))))))
+
 (deftest funding-effect-common-config-resolution-prefers-action-wallet-and-default-branches-test
   (let [testnet-config (common/resolve-deposit-chain-config
                         (atom {:wallet {:chain-id "0xa4b1"}})

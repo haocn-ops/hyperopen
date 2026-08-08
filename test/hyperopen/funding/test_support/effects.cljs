@@ -67,13 +67,17 @@
       (str err)))
 
 (defn set-funding-submit-error!
-  [store show-toast! error-text]
-  (swap! store
-         (fn [state]
-           (-> state
-               (assoc-in [:funding-ui :modal :submitting?] false)
-               (assoc-in [:funding-ui :modal :error] error-text))))
-  (show-toast! store :error error-text))
+  [store show-toast! error]
+  (let [error-text (if (map? error) (:message error) error)
+        toast-content (if (map? error)
+                        (or (:toast error) error-text)
+                        error-text)]
+    (swap! store
+           (fn [state]
+             (-> state
+                 (assoc-in [:funding-ui :modal :submitting?] false)
+                 (assoc-in [:funding-ui :modal :error] error-text))))
+    (show-toast! store :error toast-content)))
 
 (defn close-funding-modal!
   [store default-funding-modal-state]

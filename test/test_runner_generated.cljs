@@ -156,11 +156,13 @@
             [hyperopen.funding-comparison.effects-test]
             [hyperopen.funding-lazy-runtime-edge-test]
             [hyperopen.funding.actions-test]
+            [hyperopen.funding.application.deposit-submit-error-feedback-test]
             [hyperopen.funding.application.deposit-submit-test]
             [hyperopen.funding.application.hyperunit-query-test]
             [hyperopen.funding.application.hyperunit-submit-test]
             [hyperopen.funding.application.lifecycle-polling-test]
             [hyperopen.funding.application.lifecycle-polling.internal-test]
+            [hyperopen.funding.application.modal-commands-submit-guard-test]
             [hyperopen.funding.application.modal-state-test]
             [hyperopen.funding.application.modal-vm-test]
             [hyperopen.funding.application.modal-vm.amounts-test]
@@ -620,6 +622,7 @@
             [hyperopen.views.funding-comparison-view-test]
             [hyperopen.views.funding-comparison.vm-test]
             [hyperopen.views.funding-modal-accessibility-test]
+            [hyperopen.views.funding-modal-feedback-test]
             [hyperopen.views.funding-modal-test]
             [hyperopen.views.header-account-selector-test]
             [hyperopen.views.header-brand-view-test]
@@ -1030,11 +1033,13 @@
              'hyperopen.funding-comparison.effects-test
              'hyperopen.funding-lazy-runtime-edge-test
              'hyperopen.funding.actions-test
+             'hyperopen.funding.application.deposit-submit-error-feedback-test
              'hyperopen.funding.application.deposit-submit-test
              'hyperopen.funding.application.hyperunit-query-test
              'hyperopen.funding.application.hyperunit-submit-test
              'hyperopen.funding.application.lifecycle-polling-test
              'hyperopen.funding.application.lifecycle-polling.internal-test
+             'hyperopen.funding.application.modal-commands-submit-guard-test
              'hyperopen.funding.application.modal-state-test
              'hyperopen.funding.application.modal-vm-test
              'hyperopen.funding.application.modal-vm.amounts-test
@@ -1494,6 +1499,7 @@
              'hyperopen.views.funding-comparison-view-test
              'hyperopen.views.funding-comparison.vm-test
              'hyperopen.views.funding-modal-accessibility-test
+             'hyperopen.views.funding-modal-feedback-test
              'hyperopen.views.funding-modal-test
              'hyperopen.views.header-account-selector-test
              'hyperopen.views.header-brand-view-test

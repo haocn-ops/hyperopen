@@ -90,6 +90,20 @@
     (is (contains? (hiccup/node-class-set detail-node) "whitespace-normal"))
     (is (contains? (hiccup/node-class-set detail-node) "break-words"))))
 
+(deftest notifications-view-raises-funding-toast-above-open-modal-test
+  (let [view-node (notifications-view/notifications-view
+                   {:funding-ui {:modal {:open? true}}
+                    :ui {:toasts [{:id "funding-error"
+                                   :kind :error
+                                   :headline "Deposit could not be submitted"
+                                   :subline "Check your wallet and retry."
+                                   :detail "Use Arbitrum Sepolia with enough USDC2 and test ETH."}]}})
+        region (hiccup/find-by-data-role view-node "global-toast-region")
+        dismiss-node (hiccup/find-by-data-role view-node "global-toast-dismiss")]
+    (is (contains? (hiccup/node-class-set region) "top-20"))
+    (is (not (contains? (hiccup/node-class-set region) "bottom-16")))
+    (is (some? dismiss-node))))
+
 (deftest notifications-view-renders-trade-confirmation-toast-variants-test
   (let [fills [(fill-prop "fill-1" :buy "HYPE" 0.25 44.20 1800000000000)
                (fill-prop "fill-2" :buy "HYPE" 0.30 44.30 1800000003300)

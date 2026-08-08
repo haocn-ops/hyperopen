@@ -54,14 +54,21 @@
       (js/BigInt text)
       (js/BigInt "0"))))
 
+(defn- balance-bigint-from-hex
+  [value]
+  (let [text (some-> value str str/trim str/lower-case)]
+    (if (re-matches #"^0x[0-9a-f]+$" text)
+      (js/BigInt text)
+      (js/Promise.reject (js/Error. "Invalid ERC-20 balance response.")))))
+
 (defn read-erc20-balance-units!
   [provider-request! provider token-address owner-address]
   (-> (provider-request! provider
                          "eth_call"
                          [{:to token-address
-                           :data (encode-erc20-balance-of-call-data owner-address)}
+                          :data (encode-erc20-balance-of-call-data owner-address)}
                           "latest"])
-      (.then bigint-from-hex)))
+      (.then balance-bigint-from-hex)))
 
 (defn read-erc20-allowance-units!
   [provider-request! provider token-address owner-address spender-address]

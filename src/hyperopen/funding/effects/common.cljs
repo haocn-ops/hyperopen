@@ -144,6 +144,160 @@
       (seq message) message
       :else "Unknown wallet error")))
 
+(def ^:private deposit-error-message-paths
+  [["message"]
+   ["shortMessage"]
+   ["reason"]
+   ["error" "message"]
+   ["error" "reason"]
+   ["error" "data" "message"]
+   ["data" "message"]
+   ["data" "reason"]
+   ["data" "originalError" "message"]
+   ["data" "originalError" "reason"]
+   ["data" "originalError" "data" "message"]
+   ["cause" "message"]
+   ["cause" "reason"]
+   ["revert" "name"]
+   ["revert" "signature"]])
+
+(def ^:private deposit-error-code-paths
+  [["code"]
+   ["error" "code"]
+   ["data" "code"]
+   ["data" "originalError" "code"]
+   ["cause" "code"]])
+
+(def ^:private deposit-error-data-paths
+  [["data"]
+   ["error" "data"]
+   ["data" "originalError" "data"]
+   ["cause" "data"]
+   ["revert" "data"]])
+
+(defn- error-field
+  [value field]
+  (when (some? value)
+    (if (map? value)
+      (or (get value (keyword field))
+          (get value field))
+      (try
+        (aget value field)
+        (catch :default _
+          nil)))))
+
+(defn- error-path-value
+  [value path]
+  (reduce (fn [current field]
+            (when (some? current)
+              (error-field current field)))
+          value
+          path))
+
+(defn- normalized-error-values
+  [err paths]
+  (->> paths
+       (keep (fn [path]
+               (let [value (error-path-value err path)]
+                 (when (or (string? value)
+                           (number? value))
+                   (some-> value str str/trim)))))
+       (remove str/blank?)
+       distinct
+       vec))
+
+(defn- deposit-feedback
+  [kind message headline subline detail]
+  {:kind kind
+   :message message
+   :toast (cond-> {:headline headline
+                   :subline subline
+                   :auto-timeout? false}
+            (seq detail) (assoc :detail detail))})
+
+(defn deposit-wallet-error-feedback
+  ([err]
+   (deposit-wallet-error-feedback err nil))
+  ([err {:keys [submitted?]}]
+   (let [messages (normalized-error-values err deposit-error-message-paths)
+         codes (set (normalized-error-values err deposit-error-code-paths))
+         data-values (normalized-error-values err deposit-error-data-paths)
+         signal (-> (str/join " " (concat messages data-values))
+                    str/lower-case)
+         rejected? (or (contains? codes "4001")
+                       (str/includes? signal "user rejected")
+                       (str/includes? signal "user denied")
+                       (str/includes? signal "request rejected"))
+         wrong-network? (or (contains? codes "4902")
+                            (str/includes? signal "wrong network")
+                            (str/includes? signal "unsupported chain")
+                            (str/includes? signal "unrecognized chain")
+                            (str/includes? signal "chain not found"))
+         insufficient-usdc2? (or (str/includes? signal "transfer amount exceeds balance")
+                                 (str/includes? signal "erc20insufficientbalance")
+                                 (str/includes? signal "0xe450d38c"))
+         insufficient-gas? (or (str/includes? signal "insufficient funds for gas")
+                               (str/includes? signal "insufficient funds for intrinsic transaction cost"))
+         reverted? (or (str/includes? signal "execution reverted")
+                       (str/includes? signal "transaction reverted")
+                       (str/includes? signal "reverted on-chain")
+                       (str/includes? signal "custom error"))]
+     (cond
+      rejected?
+      (deposit-feedback :wallet-rejected
+                        "Deposit canceled in your wallet."
+                        "Deposit canceled"
+                        "No transaction was submitted."
+                        nil)
+
+      wrong-network?
+      (deposit-feedback :wrong-network
+                        "Switch your wallet to Arbitrum Sepolia and try the deposit again."
+                        "Wrong wallet network"
+                        "Switch to Arbitrum Sepolia."
+                        "After switching networks, confirm the connected account and retry the deposit.")
+
+      submitted?
+      (if reverted?
+        (deposit-feedback :transaction-reverted
+                          "The USDC2 deposit transaction was submitted but reverted on-chain."
+                          "Deposit transaction reverted"
+                          "The submitted transaction did not complete."
+                          "Review the wallet activity before retrying to avoid a duplicate deposit.")
+        (deposit-feedback :wallet-rpc
+                          "The USDC2 deposit transaction was submitted, but confirmation could not be verified."
+                          "Deposit confirmation pending"
+                          "Check the wallet activity before retrying."
+                          "The transaction may still confirm. Verify its status before submitting another deposit."))
+
+      insufficient-usdc2?
+      (deposit-feedback :insufficient-usdc2
+                        "This wallet does not have enough current Testnet USDC2 for this deposit."
+                        "Deposit could not be submitted"
+                        "Check the current Testnet USDC2 balance."
+                        "A different token named USDC cannot fund this deposit. Confirm the USDC2 balance, then try again.")
+
+      insufficient-gas?
+      (deposit-feedback :wallet-rpc
+                        "This wallet does not have enough Arbitrum Sepolia test ETH to pay the network fee."
+                        "Deposit could not be submitted"
+                        "Add Arbitrum Sepolia test ETH."
+                        "Test ETH is required for the network fee. Add a small amount, then retry the deposit.")
+
+      reverted?
+      (deposit-feedback :transaction-reverted
+                        "The network rejected this USDC2 deposit before submission."
+                        "Deposit could not be submitted"
+                        "Check the Testnet wallet balances."
+                        "Confirm current USDC2 and Arbitrum Sepolia test ETH, then try again.")
+
+      :else
+      (deposit-feedback :wallet-rpc
+                        "The wallet could not submit this Testnet deposit."
+                        "Deposit could not be submitted"
+                        "Check the wallet and try again."
+                        "Confirm Arbitrum Sepolia, current USDC2, and enough test ETH for the network fee.")))))
+
 (defn resolve-deposit-chain-config
   [store action]
   (let [action-chain-id (normalize-chain-id (:chainId action))

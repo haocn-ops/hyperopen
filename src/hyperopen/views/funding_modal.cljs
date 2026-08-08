@@ -133,7 +133,7 @@
 
 (defn- render-mobile-shell
   [sheet-style focus-on-render panel-children]
-  [:div {:class ["fixed" "inset-0" "z-[80]"]
+  [:div {:class ["fixed" "inset-0" "z-[180]"]
          :data-role "funding-mobile-sheet-layer"}
    [:button {:type "button"
              :class ["absolute" "inset-0" "bg-black/55" "backdrop-blur-[1px]"]
@@ -272,6 +272,9 @@
                               "py-2"
                               "text-sm"
                               "text-ho-sell-tint"]
+                        :role "alert"
+                        :aria-live "assertive"
+                        :aria-atomic "true"
                         :data-role "funding-status"}
                 (:message feedback)])]]
         (if mobile-sheet?

@@ -3341,6 +3341,118 @@ test("funding modal deposit flow selects USDC @regression", async ({ page }) => 
   });
 });
 
+test("funding modal keeps actionable feedback open when the wallet provider rejects USDC2 submission @regression", async ({ page }) => {
+  await page.route("https://api.hyperliquid.xyz/info", async (route) => {
+    const payload = JSON.parse(route.request().postData() || "{}");
+    if (payload?.type === "legalCheck") {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          acceptedTerms: true,
+          userAllowed: true,
+          restrictions: "n"
+        })
+      });
+      return;
+    }
+    await route.continue();
+  });
+
+  await visitRoute(page, "/trade");
+  await debugCall(page, "installWalletSimulator", {
+    accounts: ["0x1111111111111111111111111111111111111111"],
+    requestAccounts: ["0x1111111111111111111111111111111111111111"],
+    chainId: "0x66eee"
+  });
+  await debugCall(page, "setWalletConnectedHandlerMode", "suppress");
+  await dispatch(page, [":actions/connect-wallet"]);
+  await waitForIdle(page, { quietMs: 250, timeoutMs: 4_000, pollMs: 50 });
+
+  await page.evaluate(() => {
+    const provider = globalThis.ethereum;
+    if (!provider || typeof provider.request !== "function") {
+      throw new Error("Wallet simulator provider unavailable");
+    }
+
+    const originalRequest = provider.request.bind(provider);
+    globalThis.__fundingDepositRpcCalls = [];
+    provider.request = (request) => {
+      const method = request?.method;
+      globalThis.__fundingDepositRpcCalls.push(method);
+      if (method === "eth_call") {
+        return Promise.resolve("0x989680");
+      }
+      if (method === "eth_sendTransaction") {
+        return Promise.reject({
+          message: "RPC 0x66eee Custom error: bridge deposit rejected by provider",
+          data: {
+            request: {
+              method: "eth_sendTransaction",
+              params: ["private payload"]
+            }
+          }
+        });
+      }
+      return originalRequest(request);
+    };
+  });
+
+  await dispatch(page, [":actions/open-funding-deposit-modal", null]);
+  await dispatch(page, [":actions/select-funding-deposit-asset", "usdc"]);
+  const modal = page.locator("[data-role='funding-modal']");
+  const amountInput = modal.locator("#funding-deposit-amount-input");
+  await amountInput.fill("5");
+  await modal.getByRole("button", { name: "Deposit", exact: true }).click();
+  await waitForIdle(page, { quietMs: 250, timeoutMs: 5_000, pollMs: 50 });
+
+  await expect.poll(() => page.evaluate(() => {
+    const c = globalThis.cljs.core;
+    const store = globalThis.hyperopen.system.store;
+    const state = c.deref(store);
+    const path = (...segments) => c.PersistentVector.fromArray(
+      segments.map((segment) => c.keyword(segment)),
+      true
+    );
+    return {
+      error: c.get_in(state, path("funding-ui", "modal", "error")),
+      submitting: c.get_in(state, path("funding-ui", "modal", "submitting?")),
+      depositStep: String(c.get_in(state, path("funding-ui", "modal", "deposit-step")))
+    };
+  })).toEqual({
+    error: "Deposit failed: The network rejected this USDC2 deposit before submission.",
+    submitting: false,
+    depositStep: ":amount-entry"
+  });
+
+  const status = modal.locator("[data-role='funding-status']");
+  await expect(modal).toBeVisible();
+  await expect(status).toHaveText(
+    "Deposit failed: The network rejected this USDC2 deposit before submission."
+  );
+  await expect(status).not.toContainText(/RPC|0x66eee|private payload/);
+  await expect(amountInput).toBeEnabled();
+  await expect(modal.getByRole("button", { name: "Deposit", exact: true })).toBeEnabled();
+
+  const toast = page.locator("[data-role='global-toast']");
+  const detail = toast.locator("[data-role='global-toast-detail']");
+  await expect(toast.locator("[data-role='global-toast-headline']"))
+    .toHaveText("Deposit could not be submitted");
+  await expect(toast.locator("[data-role='global-toast-subline']"))
+    .toHaveText("Check the Testnet wallet balances.");
+  await expect(detail)
+    .toHaveText("Confirm current USDC2 and Arbitrum Sepolia test ETH, then try again.");
+  await expect(detail).toHaveClass(/whitespace-normal/);
+  await expect(detail).toHaveClass(/break-words/);
+  await expect(toast).not.toContainText(/RPC|0x66eee|private payload/);
+
+  await expect.poll(() => page.evaluate(() => globalThis.__fundingDepositRpcCalls))
+    .toEqual(["eth_chainId", "eth_call", "eth_sendTransaction"]);
+  await toast.locator("[data-role='global-toast-dismiss']").click();
+  await expect(toast).toBeHidden();
+  await expect(modal).toBeVisible();
+});
+
 test("funding modal Bridge2 USDC withdrawal matches official facts @regression", async ({ page }) => {
   await visitRoute(page, "/trade");
 

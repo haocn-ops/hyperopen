@@ -182,6 +182,8 @@
                       (get-in @seen [:usdc-deposit :deps :wallet-provider-fn])))
       (is (fn? (get-in @seen [:usdc-deposit :deps :resolve-deposit-chain-config])))
       (is (fn? (get-in @seen [:usdc-deposit :deps :wallet-error-message])))
+      (is (fn? (get-in @seen [:usdc-deposit :deps :read-erc20-balance-units!])))
+      (is (fn? (get-in @seen [:usdc-deposit :deps :deposit-wallet-error-feedback])))
 
       (is (= :usdh-deposit-result
              (transport-runtime/submit-usdh-across-deposit-tx! store "0xowner" {:type "acrossUsdcToUsdhDeposit"})))

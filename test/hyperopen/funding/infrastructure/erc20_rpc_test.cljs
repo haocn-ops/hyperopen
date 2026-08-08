@@ -95,3 +95,18 @@
                           @calls))
                    (done)))
           (.catch (async-support/unexpected-error done))))))
+
+(deftest read-erc20-balance-units-rejects-an-unusable-provider-response-test
+  (async done
+    (-> (erc20-rpc/read-erc20-balance-units!
+         (fn [& _]
+           (js/Promise.resolve "not-hex"))
+         :provider
+         token-address
+         owner-address)
+        (.then (fn [_]
+                 (is false "Expected an unusable balance response to reject.")
+                 (done)))
+        (.catch (fn [err]
+                  (is (= "Invalid ERC-20 balance response." (.-message err)))
+                  (done))))))

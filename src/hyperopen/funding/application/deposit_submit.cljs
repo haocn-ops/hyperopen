@@ -22,43 +22,91 @@
   (js/Promise.resolve {:status "err"
                        :error message}))
 
+(defn- error-feedback-response
+  [feedback]
+  {:status "err"
+   :error (:message feedback)
+   :error-feedback feedback})
+
+(defn- insufficient-balance?
+  [balance-units amount-units]
+  (try
+    (and (some? balance-units)
+         (< balance-units amount-units))
+    (catch :default _
+      false)))
+
+(defn- testnet-bridge-config?
+  [chain-config]
+  (= "0x66eee" (:chain-id chain-config)))
+
 (defn submit-usdc-bridge2-deposit-tx!
   [{:keys [wallet-provider-fn
            normalize-address
            resolve-deposit-chain-config
            parse-usdc-units
            ensure-wallet-chain!
+           read-erc20-balance-units!
            provider-request!
            wait-for-transaction-receipt!
            encode-erc20-transfer-call-data
-           wallet-error-message]}
+           wallet-error-message
+           deposit-wallet-error-feedback]}
    store
    owner-address
    action]
   (let [provider (wallet-provider-fn)
         from-address (normalize-address owner-address)
         chain-config (resolve-deposit-chain-config store action)
+        testnet-bridge? (testnet-bridge-config? chain-config)
         amount-units (parse-usdc-units (:amount action))
         usdc-address (:usdc-address chain-config)
         bridge-address (:bridge-address chain-config)]
     (if-let [message (deposit-submit-error provider from-address amount-units)]
       (error-response message)
-      (-> (ensure-wallet-chain! provider chain-config)
-          (.then (fn [_]
-                   (provider-request! provider
-                                      "eth_sendTransaction"
-                                      [{:from from-address
-                                        :to usdc-address
-                                        :data (encode-erc20-transfer-call-data bridge-address amount-units)}])))
-          (.then (fn [tx-hash]
-                   (-> (wait-for-transaction-receipt! provider tx-hash)
-                       (.then (fn [_]
-                                {:status "ok"
-                                 :txHash tx-hash
-                                 :network (:network-label chain-config)})))))
-          (.catch (fn [err]
-                    {:status "err"
-                     :error (wallet-error-message err)}))))))
+      (letfn [(classify-error [err]
+                (if (and testnet-bridge?
+                         (fn? deposit-wallet-error-feedback))
+                  (error-feedback-response (deposit-wallet-error-feedback err))
+                  {:status "err"
+                   :error (wallet-error-message err)}))
+              (send-transaction! []
+                (provider-request! provider
+                                   "eth_sendTransaction"
+                                   [{:from from-address
+                                     :to usdc-address
+                                     :data (encode-erc20-transfer-call-data bridge-address amount-units)}]))
+              (preflight-and-send! []
+                (if (and testnet-bridge?
+                         (fn? read-erc20-balance-units!))
+                  (-> (read-erc20-balance-units! provider usdc-address from-address)
+                      ;; A read outage must not become a false insufficient-balance result.
+                      (.catch (fn [_] nil))
+                      (.then (fn [balance-units]
+                               (if (insufficient-balance? balance-units amount-units)
+                                 (error-feedback-response
+                                  (deposit-wallet-error-feedback
+                                   {:message "ERC20: transfer amount exceeds balance"}))
+                                 (send-transaction!)))))
+                  (send-transaction!)))
+              (confirm-transaction! [tx-hash]
+                (if (map? tx-hash)
+                  tx-hash
+                  (-> (wait-for-transaction-receipt! provider tx-hash)
+                      (.then (fn [_]
+                               {:status "ok"
+                                :txHash tx-hash
+                                :network (:network-label chain-config)}))
+                      (.catch (fn [err]
+                                (if (and testnet-bridge?
+                                         (fn? deposit-wallet-error-feedback))
+                                  (error-feedback-response
+                                   (deposit-wallet-error-feedback err {:submitted? true}))
+                                  (js/Promise.reject err)))))))]
+        (-> (ensure-wallet-chain! provider chain-config)
+            (.then (fn [_] (preflight-and-send!)))
+            (.then (fn [tx-hash] (confirm-transaction! tx-hash)))
+            (.catch (fn [err] (classify-error err))))))))
 
 (defn- approve-lifi-swap-token-if-needed!
   [{:keys [read-erc20-allowance-units!

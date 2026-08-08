@@ -525,19 +525,19 @@
    state]
   (if-let [guard-effects (mutation-guard-effects state funding-modal-path)]
     guard-effects
-    (let [modal (modal-state state)
-          mode (normalize-mode (:mode modal))
-          result (if (= :deposit mode)
-                   (deposit-preview state modal)
-                   {:ok? false
-                    :display-message "Deposit modal unavailable."})]
-      (if-not (:ok? result)
-        [[:effects/save-many [[(conj funding-modal-path :submitting?) false]
-                              [(conj funding-modal-path :error) (:display-message result)]]]]
-        [[:effects/save-many [[(conj funding-modal-path :submitting?) true]
-                              [(conj funding-modal-path :error) nil]]]
-         [:effects/api-submit-funding-deposit (:request result)]]))))
-
+    (let [modal (modal-state state)]
+      (if (true? (:submitting? modal))
+        []
+        (let [result (if (= :deposit (normalize-mode (:mode modal)))
+                       (deposit-preview state modal)
+                       {:ok? false
+                        :display-message "Deposit modal unavailable."})]
+          (if-not (:ok? result)
+            [[:effects/save-many [[(conj funding-modal-path :submitting?) false]
+                                  [(conj funding-modal-path :error) (:display-message result)]]]]
+            [[:effects/save-many [[(conj funding-modal-path :submitting?) true]
+                                  [(conj funding-modal-path :error) nil]]]
+         [:effects/api-submit-funding-deposit (:request result)]]))))))
 (defn set-funding-modal-compat
   [{:keys [close-funding-modal-fn
            open-funding-send-modal-fn

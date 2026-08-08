@@ -138,10 +138,12 @@
     :resolve-deposit-chain-config common/resolve-deposit-chain-config
     :parse-usdc-units common/parse-usdc-units
     :ensure-wallet-chain! ensure-wallet-chain!
+    :read-erc20-balance-units! read-erc20-balance-units!
     :provider-request! provider-request!
     :wait-for-transaction-receipt! wait-for-transaction-receipt!
     :encode-erc20-transfer-call-data encode-erc20-transfer-call-data
-    :wallet-error-message common/wallet-error-message}
+    :wallet-error-message common/wallet-error-message
+    :deposit-wallet-error-feedback common/deposit-wallet-error-feedback}
    store
    owner-address
    action))

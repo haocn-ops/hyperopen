@@ -351,8 +351,15 @@
                        (let [error-text (str/trim (str (or (:error resp)
                                                           (runtime-error-message resp))))
                              message (str "Deposit failed: "
-                                          (if (seq error-text) error-text "Unknown runtime error"))]
-                         (set-funding-submit-error! store show-toast! message)
+                                          (if (seq error-text) error-text "Unknown runtime error"))
+                             structured-feedback (:error-feedback resp)]
+                         (set-funding-submit-error!
+                          store
+                          show-toast!
+                          (if (map? structured-feedback)
+                            {:message message
+                             :toast (:toast structured-feedback)}
+                            message))
                          resp)))))]
         (.catch response-promise
                 (fn [err]
